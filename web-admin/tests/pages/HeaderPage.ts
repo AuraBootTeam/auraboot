@@ -230,7 +230,7 @@ export class HeaderPage {
 
   /** The user menu button (contains the avatar) */
   get userMenuButton(): Locator {
-    return this.userMenu.locator('button');
+    return this.page.locator('[data-testid="user-menu"] > button').first();
   }
 
   /** The user avatar image */
@@ -263,20 +263,19 @@ export class HeaderPage {
    * doesn't make auth/logout flows flaky.
    */
   async openUserMenu(): Promise<void> {
-    await expect
-      .poll(
-        async () => {
-          await this.userMenuButton.click().catch(async () => {
-            await this.userAvatar.click();
-          });
-          return this.userDropdown.isVisible({ timeout: 500 }).catch(() => false);
-        },
-        {
-          timeout: 5000,
-          intervals: [100, 250, 500, 1000],
-        },
-      )
-      .toBe(true);
+    await expect(this.userMenuButton).toBeVisible({ timeout: 8000 });
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (await this.userDropdown.isVisible({ timeout: 250 }).catch(() => false)) {
+        break;
+      }
+      await this.userMenuButton.click().catch(async () => {
+        await this.userAvatar.click();
+      });
+      await this.userDropdown.waitFor({ state: 'visible', timeout: 1000 }).catch(() => null);
+    }
+
+    await expect(this.userDropdown).toBeVisible({ timeout: 3000 });
 
     await expect(this.logoutLink).toBeVisible({ timeout: 5000 });
   }
@@ -302,29 +301,21 @@ export class HeaderPage {
 
     const logoutVisible = await this.logoutLink.isVisible({ timeout: 3000 }).catch(() => false);
     if (logoutVisible) {
-      await Promise.all([
-        this.page.waitForURL(/\/logout/, { timeout: 8000 }).catch(() => {}),
-        this.logoutLink.click(),
-      ]);
+      await this.logoutLink.click();
     } else {
       // Fallback: try button with logout text
       const logoutBtn = this.page.locator('button:has-text("退出")');
-      await Promise.all([
-        this.page.waitForURL(/\/logout/, { timeout: 8000 }).catch(() => {}),
-        logoutBtn.click(),
-      ]);
+      await logoutBtn.click();
     }
 
-    // Wait for navigation to logout/login page
-    await this.page.waitForURL(/\/(logout|login)/, { timeout: 8000 }).catch(() => {});
-
-    // Handle logout confirmation page if present (button text is "确认退出" in Chinese UI)
-    const logoutButton = this.page.locator('button:has-text("确认退出"), button:has-text("Log Out"), button[type="submit"]').first();
-    const hasLogoutButton = await logoutButton.isVisible({ timeout: 5000 }).catch(() => false);
-    if (hasLogoutButton) {
+    if (!/\/login([?#].*)?$/.test(this.page.url())) {
+      const logoutButton = this.page
+        .locator('button:has-text("确认退出"), button:has-text("Log Out"), button[type="submit"]')
+        .first();
+      await expect(logoutButton).toBeVisible({ timeout: 10000 });
       await logoutButton.scrollIntoViewIfNeeded();
       await Promise.all([
-        this.page.waitForURL(/\/login/, { timeout: 10000 }).catch(() => null),
+        this.page.waitForURL(/\/login/, { timeout: 10000 }),
         logoutButton.click().catch(async () => {
           await this.page.locator('form').first().evaluate((form) => {
             if (form instanceof HTMLFormElement) {
@@ -332,16 +323,14 @@ export class HeaderPage {
             }
           });
         }),
-      ]);
-
-      if (/\/logout([?#].*)?$/.test(this.page.url())) {
+      ]).catch(async () => {
         await this.page.locator('form').first().evaluate((form) => {
           if (form instanceof HTMLFormElement) {
             form.requestSubmit();
           }
         });
-      }
-      await this.page.waitForURL(/\/login/, { timeout: 10000 });
+        await this.page.waitForURL(/\/login/, { timeout: 10000 });
+      });
     }
   }
 }

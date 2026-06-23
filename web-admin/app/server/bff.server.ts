@@ -150,16 +150,12 @@ function isMobileDevice(userAgent: string): boolean {
 }
 
 function resolvePostLoginRedirect(loginData: any, req: express.Request, redirectTo: string): string {
-  const mustChangePassword = loginData?.mustChangePassword;
   if (!loginData?.tenantId) {
-    return mustChangePassword ? '/personal/profile?forceChangePassword=true' : '/tenant-selection';
+    return '/tenant-selection';
   }
 
-  let finalRedirectTo =
+  const finalRedirectTo =
     isMobileDevice(req.headers['user-agent'] || '') && redirectTo === '/' ? '/h5-scan' : redirectTo;
-  if (mustChangePassword) {
-    finalRedirectTo = '/personal/profile?forceChangePassword=true';
-  }
   return finalRedirectTo;
 }
 

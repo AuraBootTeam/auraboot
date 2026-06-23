@@ -128,7 +128,7 @@ async function loginAndSave(baseURL: string, user: TestUser): Promise<boolean> {
       await page.goto(`${baseURL}/`, { waitUntil: 'domcontentloaded' });
       await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
-      const emailInput = page.locator('input#email');
+      const emailInput = page.locator('input#identifier, input#email').first();
       const hasLoginForm = await emailInput.isVisible({ timeout: 10000 }).catch(() => false);
 
       if (hasLoginForm) {

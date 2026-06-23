@@ -36,7 +36,7 @@ const SHOT = '/tmp/m2-e2e';
 async function uiLogin(page: Page): Promise<void> {
   for (let attempt = 1; attempt <= 3; attempt++) {
     await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
-    const emailInput = page.locator('input#email');
+    const emailInput = page.locator('input#identifier, input#email');
     const hasLogin = await emailInput.isVisible({ timeout: 8000 }).catch(() => false);
     if (!hasLogin) break;
     await emailInput.fill(EMAIL);
@@ -54,7 +54,7 @@ async function uiLogin(page: Page): Promise<void> {
     if (!stillOnLogin) break;
     if (attempt === 3) throw new Error('UI login failed after 3 attempts');
   }
-  await expect(page.locator('input#email')).toHaveCount(0, { timeout: 5000 });
+  await expect(page.locator('input#identifier, input#email')).toHaveCount(0, { timeout: 5000 });
 }
 
 /** Navigate to a page by its SPA path route (React Router 7, path-based) and wait for content. */

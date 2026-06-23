@@ -13,7 +13,11 @@ import java.util.List;
 public interface UserService {
 
 
-    public User signUp(String email, String rawPassword, String displayName) throws UserException;
+    public User signUp(String email, String rawPassword, String displayName, String userName) throws UserException;
+
+    default User signUp(String email, String rawPassword, String displayName) throws UserException {
+        return signUp(email, rawPassword, displayName, null);
+    }
 
     default User signUp(String email, String rawPassword) throws UserException {
         return signUp(email, rawPassword, null);

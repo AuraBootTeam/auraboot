@@ -103,10 +103,19 @@ public class UserServiceImpl implements UserService {
     }
     
     @Override
-    public User signUp(String email, String rawPassword, String displayName) throws UserException {
-        User userByEmail = queryUserByEmail(email);
+    public User signUp(String email, String rawPassword, String displayName, String userName) throws UserException {
+        String normalizedEmail = normalizeBlankToNull(email);
+        String normalizedUserName = normalizeBlankToNull(userName);
+        if (normalizedEmail == null && normalizedUserName == null) {
+            throw new BusinessException("Email or user name is required");
+        }
 
+        User userByEmail = normalizedEmail != null ? queryUserByEmail(normalizedEmail) : null;
         if (null == userByEmail ) {
+            if (normalizedUserName != null && queryUserByName(normalizedUserName) != null) {
+                throw new BusinessException("User name already exists: " + normalizedUserName);
+            }
+
             // Validate password against policy before encoding
             List<String> policyErrors = passwordPolicyService.validate(rawPassword.trim());
             if (!policyErrors.isEmpty()) {
@@ -117,9 +126,12 @@ public class UserServiceImpl implements UserService {
 
             User signUpUser = new User();
             signUpUser.setPid(UniqueIdGenerator.generate());
-            signUpUser.setEmail(email);
+            signUpUser.setEmail(normalizedEmail);
+            signUpUser.setUserName(normalizedUserName);
             String resolvedName = (displayName != null && !displayName.isBlank()) ? displayName
-                    : (email.contains("@") ? email.substring(0, email.indexOf('@')) : email);
+                    : (normalizedUserName != null ? normalizedUserName
+                    : (normalizedEmail.contains("@") ? normalizedEmail.substring(0, normalizedEmail.indexOf('@'))
+                    : normalizedEmail));
             signUpUser.setNickName(resolvedName);
             signUpUser.setPassword(encodedPassword);
             signUpUser.setEnabled(true);
@@ -136,6 +148,13 @@ public class UserServiceImpl implements UserService {
         } else {
             throw new UserException(ResponseCode.IdentifierAlreadyBeenTaken);
         }
+    }
+
+    private String normalizeBlankToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private User queryUserByName(String name) {
@@ -156,7 +175,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public User signIn(String email, String rawPassword) throws UserException {
-        User user = this.queryUserByEmail(email);
+        User user = this.queryUserByLoginIdentifier(email);
 
         if (null == user) {
             throw new UserException(ResponseCode.InvalidUserNameOrPassword);
@@ -214,6 +233,15 @@ public class UserServiceImpl implements UserService {
     @Override
     public User findByEmail(String email) {
         return this.queryUserByEmail(email);
+    }
+
+    private User queryUserByLoginIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            return null;
+        }
+        String normalized = identifier.trim();
+        User byEmail = this.queryUserByEmail(normalized);
+        return byEmail != null ? byEmail : this.queryUserByName(normalized);
     }
 
 

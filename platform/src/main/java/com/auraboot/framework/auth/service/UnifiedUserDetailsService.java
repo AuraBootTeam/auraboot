@@ -50,18 +50,27 @@ public class UnifiedUserDetailsService implements UserDetailsService {
     }
 
     private User findUserByIdentifier(String identifier) {
-        // 尝试多种方式查找用户
-        if (identifier.contains("@")) {
-            return userService.findByEmail(identifier);
-        } else if (identifier.matches("\\d{11}")) {
+        if (identifier == null || identifier.isBlank()) {
+            return null;
+        }
+        String normalized = identifier.trim();
+
+        User byEmail = userService.findByEmail(normalized);
+        if (byEmail != null) {
+            return byEmail;
+        }
+
+        if (normalized.matches("\\d{11}")) {
             throw new UnSupportedException(ResponseCode.SystemError);
 //            return userService.findByPhone(identifier);
-        } else {
-//            throw new UnSupportedException(ExceptionResponse.SystemError);
-
-            // 可能是userPid或其他标识符 todo 后续还是通过 request 里面的变量来确定,而不是猜测
-            return userService.findByPid(identifier);
         }
+
+        User byUserName = userService.findByUserName(normalized);
+        if (byUserName != null) {
+            return byUserName;
+        }
+
+        return userService.findByPid(normalized);
     }
 
     public UserDetails loadUserById(Long userId) throws UsernameNotFoundException {

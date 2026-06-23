@@ -15,10 +15,12 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
+import static com.auraboot.framework.common.constant.ResponseCode.FORBIDDEN;
 
 /**
  * 用户个人资料控制器
@@ -33,6 +35,9 @@ public class UserProfileController {
     private final UserProfileService userProfileService;
     private final FileService fileService;
     private final PasswordManagementService passwordManagementService;
+
+    @Value("${security.password.self-service-enabled:false}")
+    private boolean passwordSelfServiceEnabled;
     
     /**
      * 获取当前用户个人资料
@@ -64,6 +69,11 @@ public class UserProfileController {
     public ApiResponse<Void> changePassword(
             @CurrentUserId Long userId,
             @RequestBody @Valid ChangePasswordRequest request) {
+        if (!passwordSelfServiceEnabled) {
+            throw new RootUnCheckedException(
+                    FORBIDDEN,
+                    "Self-service password change is disabled. Contact an administrator.");
+        }
         if (!request.getNewPassword().equals(request.getConfirmPassword())) {
             throw new RootUnCheckedException(BadParam, "New password and confirm password do not match");
         }

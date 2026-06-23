@@ -62,13 +62,14 @@ security:
   password:
     min-length: 8
     max-length: 128
-    require-uppercase: true
+    require-uppercase: false
     require-lowercase: true
     require-digit: true
     require-special: false
     history-count: 5
     expiry-days: 90
     reset-token-expiry-minutes: 30
+    self-service-enabled: ${PASSWORD_SELF_SERVICE_ENABLED:false}
   lockout:
     max-attempts: 5
     duration-minutes: 30

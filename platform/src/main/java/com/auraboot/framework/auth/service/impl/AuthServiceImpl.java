@@ -62,6 +62,7 @@ public class AuthServiceImpl implements AuthService {
     public AuthenticationResponse authenticate(AuthenticationRequest request) throws UserException {
         // Delegate to EMAIL_PASSWORD strategy for backward compatibility
         AuthStrategyRequest strategyRequest = new AuthStrategyRequest();
+        strategyRequest.setIdentifier(request.resolveIdentifier());
         strategyRequest.setEmail(request.getEmail());
         strategyRequest.setPassword(request.getPassword());
         strategyRequest.setChannelCode("email_password");

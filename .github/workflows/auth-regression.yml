@@ -1,0 +1,152 @@
+name: Auth Regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'platform/src/main/java/com/auraboot/framework/auth/**'
+      - 'platform/src/main/java/com/auraboot/framework/tenant/**'
+      - 'platform/src/main/java/com/auraboot/framework/user/**'
+      - 'platform/src/main/java/com/auraboot/framework/permission/**'
+      - 'platform/src/main/resources/db/migration/core/**'
+      - 'platform/src/main/resources/tenant-templates/default-bootstrap.json'
+      - 'web-admin/app/auth/**'
+      - 'web-admin/app/routes/logout.tsx'
+      - 'web-admin/app/server/**'
+      - 'web-admin/tests/auth.setup.ts'
+      - 'web-admin/tests/e2e/auth/**'
+      - 'web-admin/tests/pages/HeaderPage.ts'
+      - 'web-admin/tests/pages/LoginPage.ts'
+      - 'web-admin/scripts/run-auth-regression.mjs'
+      - 'web-admin/package.json'
+      - 'pnpm-lock.yaml'
+      - 'docker-compose.yml'
+      - 'docker-compose.isolated.yml'
+      - '.github/workflows/auth-regression.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'platform/src/main/java/com/auraboot/framework/auth/**'
+      - 'platform/src/main/java/com/auraboot/framework/tenant/**'
+      - 'platform/src/main/java/com/auraboot/framework/user/**'
+      - 'platform/src/main/java/com/auraboot/framework/permission/**'
+      - 'platform/src/main/resources/db/migration/core/**'
+      - 'platform/src/main/resources/tenant-templates/default-bootstrap.json'
+      - 'web-admin/app/auth/**'
+      - 'web-admin/app/routes/logout.tsx'
+      - 'web-admin/app/server/**'
+      - 'web-admin/tests/auth.setup.ts'
+      - 'web-admin/tests/e2e/auth/**'
+      - 'web-admin/tests/pages/HeaderPage.ts'
+      - 'web-admin/tests/pages/LoginPage.ts'
+      - 'web-admin/scripts/run-auth-regression.mjs'
+      - 'web-admin/package.json'
+      - 'pnpm-lock.yaml'
+      - 'docker-compose.yml'
+      - 'docker-compose.isolated.yml'
+      - '.github/workflows/auth-regression.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: auth-regression-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  COMPOSE_PROJECT_NAME: auraboot-auth-${{ github.run_id }}-${{ github.run_attempt }}
+  PW_E2E_RUN_ID: ci-auth-${{ github.run_id }}-${{ github.run_attempt }}
+  PW_STORAGE_DIR: tests/storage/ci-auth-${{ github.run_id }}-${{ github.run_attempt }}
+  PW_ARTIFACT_DIR: test-results/runs/ci-auth-${{ github.run_id }}-${{ github.run_attempt }}/artifacts
+  PW_REPORT_DIR: test-results/runs/ci-auth-${{ github.run_id }}-${{ github.run_attempt }}/html-report
+  PW_RESULTS_JSON: test-results/runs/ci-auth-${{ github.run_id }}-${{ github.run_attempt }}/results.json
+
+jobs:
+  auth-regression:
+    name: Auth login/register regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Prepare optional plugin mount dirs
+        run: |
+          set -euo pipefail
+          mkdir -p .aura-stack/empty-enterprise-plugins .aura-stack/empty-enterprise-plugin-jars
+
+      - name: Build and start isolated auth stack
+        run: |
+          set -euo pipefail
+          docker compose \
+            -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.yml \
+            -f docker-compose.isolated.yml \
+            --profile isolated \
+            --profile cache \
+            up --build -d backend isolated-frontend
+
+      - name: Run auth regression suite
+        run: |
+          set -euo pipefail
+          docker compose \
+            -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.yml \
+            -f docker-compose.isolated.yml \
+            --profile isolated \
+            --profile cache \
+            --profile playwright-runner \
+            run --rm \
+            -e PLAYWRIGHT_RUNNER_COMMAND="pnpm test:auth-regression" \
+            -e PW_E2E_RUN_ID="$PW_E2E_RUN_ID" \
+            -e PW_PROFILE=fast \
+            -e PW_ROLE_PROJECTS=1 \
+            -e PW_WORKERS=1 \
+            -e PW_STORAGE_DIR="$PW_STORAGE_DIR" \
+            -e PW_ADMIN_STORAGE_STATE="$PW_STORAGE_DIR/admin.json" \
+            -e PW_OPERATOR_STORAGE_STATE="$PW_STORAGE_DIR/operator.json" \
+            -e PW_VIEWER_STORAGE_STATE="$PW_STORAGE_DIR/viewer.json" \
+            -e PW_ARTIFACT_DIR="$PW_ARTIFACT_DIR" \
+            -e PW_REPORT_DIR="$PW_REPORT_DIR" \
+            -e PW_RESULTS_JSON="$PW_RESULTS_JSON" \
+            -e PW_SKIP_WEBSERVER=1 \
+            playwright-runner
+
+      - name: Upload auth regression artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: auth-regression-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            web-admin/test-results/runs/ci-auth-${{ github.run_id }}-${{ github.run_attempt }}
+            web-admin/tests/storage/ci-auth-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Dump compose logs on failure
+        if: failure()
+        run: |
+          docker compose \
+            -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.yml \
+            -f docker-compose.isolated.yml \
+            --profile isolated \
+            --profile cache \
+            logs --tail 250
+
+      - name: Tear down isolated auth stack
+        if: always()
+        run: |
+          docker compose \
+            -p "$COMPOSE_PROJECT_NAME" \
+            -f docker-compose.yml \
+            -f docker-compose.isolated.yml \
+            --profile isolated \
+            --profile cache \
+            --profile playwright-runner \
+            down -v --remove-orphans

@@ -17,6 +17,9 @@ import lombok.Data;
 @Data
 public class AuthStrategyRequest {
 
+    /** Username or email address (used by EMAIL_PASSWORD channel). */
+    private String identifier;
+
     /** Email address (used by EMAIL_PASSWORD and EMAIL_CODE channels) */
     private String email;
 
@@ -37,4 +40,11 @@ public class AuthStrategyRequest {
 
     /** Client User-Agent header (populated by controller) */
     private String userAgent;
+
+    public String resolveIdentifier() {
+        if (identifier != null && !identifier.isBlank()) {
+            return identifier.trim();
+        }
+        return email != null ? email.trim() : null;
+    }
 }

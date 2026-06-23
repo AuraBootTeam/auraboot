@@ -20,6 +20,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,12 +48,15 @@ public class AuthController {
     @Autowired(required = false)
     private TenantMemberService tenantMemberService;
 
+    @Value("${security.password.self-service-enabled:false}")
+    private boolean passwordSelfServiceEnabled;
+
     @PostMapping("/login")
     @ResponseBody
     @Operation(summary = "Password login", description = "Authenticate with email/username and password. Returns JWT token.")
     public ApiResponse<AuthenticationResponse> login(@RequestBody AuthenticationRequest request,
                                                       HttpServletRequest httpRequest) {
-            if (!loginRateLimiter.isAllowed(extractIp(httpRequest), request.getEmail())) {
+            if (!loginRateLimiter.isAllowed(extractIp(httpRequest), request.resolveIdentifier())) {
                 return ApiResponse.error(ResponseCode.BadParam, "Too many login attempts. Please try again later.", null);
             }
 
@@ -167,6 +171,12 @@ public class AuthController {
     @ResponseBody
     public ApiResponse<Void> forgotPassword(@jakarta.validation.Valid @RequestBody ForgotPasswordRequest request,
                                              HttpServletRequest httpRequest) {
+        if (!passwordSelfServiceEnabled) {
+            return ApiResponse.error(
+                    ResponseCode.FORBIDDEN,
+                    "Self-service password reset is disabled. Contact an administrator.",
+                    null);
+        }
         // Rate limit: max 3 forgot-password requests per IP per minute (prevents email bombing)
         String ip = extractIp(httpRequest);
         if (!apiRateLimiter.isAllowed("forgot-pwd:ip:" + ip, 3)) {
@@ -181,6 +191,12 @@ public class AuthController {
     @ResponseBody
     public ApiResponse<Void> resetPassword(@jakarta.validation.Valid @RequestBody ResetPasswordRequest request,
                                             HttpServletRequest httpRequest) {
+        if (!passwordSelfServiceEnabled) {
+            return ApiResponse.error(
+                    ResponseCode.FORBIDDEN,
+                    "Self-service password reset is disabled. Contact an administrator.",
+                    null);
+        }
         // Rate limit: max 5 reset-password attempts per IP per minute (prevents token brute force)
         String ip = extractIp(httpRequest);
         if (!apiRateLimiter.isAllowed("reset-pwd:ip:" + ip, 5)) {

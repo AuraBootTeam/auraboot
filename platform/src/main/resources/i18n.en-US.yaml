@@ -462,6 +462,8 @@ auth:
   tagline: Enterprise low-code platform for rapid business app development
   email: Email
   emailPlaceholder: Enter your email
+  identifier: Username or email
+  identifierPlaceholder: Enter username or email
   password: Password
   passwordPlaceholder: Enter your password
   rememberMe: Remember me
@@ -481,14 +483,15 @@ auth:
     dataModel: Flexible data models
     workflow: Automated workflows
   channel:
-    emailPassword: Email & Password
+    emailPassword: Username/Email & Password
     sms: SMS Login
     emailCode: Email Code
   social:
     wechat: WeChat Login
     oidc: SSO Login
   error:
-    invalidCredentials: Invalid email or password
+    invalidCredentials: Invalid username/email or password
+    identifierRequired: Enter username or email
     invalidMobile: Please enter a valid mobile number
     codeRequired: Please enter the verification code
     codeInvalid: Invalid or expired verification code

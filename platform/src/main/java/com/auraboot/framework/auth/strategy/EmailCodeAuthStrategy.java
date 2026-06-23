@@ -5,6 +5,7 @@ import com.auraboot.framework.auth.dto.AuthenticationResponse;
 import com.auraboot.framework.auth.service.VerificationCodeService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -32,6 +33,7 @@ public class EmailCodeAuthStrategy implements AuthStrategy {
     private final VerificationCodeService verificationCodeService;
     private final LoginCompletionHelper loginCompletionHelper;
     private final UserMapper userMapper;
+    private final SystemModeService systemModeService;
 
     @Override
     public String getChannelCode() {
@@ -59,6 +61,9 @@ public class EmailCodeAuthStrategy implements AuthStrategy {
         // Find user by email, auto-register if not found
         User user = findUserByEmail(email);
         if (user == null) {
+            if (!systemModeService.isRegistrationAllowed()) {
+                throw new BusinessException(ResponseCode.CommonValidationFailed, "Self-registration is disabled");
+            }
             log.info("Auto-registering new user via email OTP");
             user = autoRegisterByEmail(email);
         }

@@ -108,17 +108,46 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return data({ errors: { general: 'Unsupported login method' } }, { status: 400 });
 };
 
+function extractCodeLoginError(result: unknown, fallback: string): string {
+  const response = result as {
+    context?: unknown;
+    desc?: unknown;
+    message?: unknown;
+  };
+  const context = response.context;
+  if (typeof context === 'string' && context.trim().length > 0) {
+    return context.trim();
+  }
+  if (context && typeof context === 'object') {
+    const record = context as Record<string, unknown>;
+    for (const key of ['error', 'message', 'detail', 'reason']) {
+      const value = record[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+  }
+  if (typeof response.desc === 'string' && response.desc.trim().length > 0) {
+    return response.desc.trim();
+  }
+  if (typeof response.message === 'string' && response.message.trim().length > 0) {
+    return response.message.trim();
+  }
+  return fallback;
+}
+
 async function handleEmailPasswordLogin(
   formData: FormData,
   request: Request,
   redirectTo: string,
   remember: boolean,
 ) {
-  const email = formData.get('email');
+  const identifierValue = formData.get('identifier') ?? formData.get('email');
   const password = formData.get('password');
+  const identifier = typeof identifierValue === 'string' ? identifierValue.trim() : '';
 
-  if (!validateEmail(email)) {
-    return data({ errors: { email: 'Email is invalid', password: null } }, { status: 400 });
+  if (!identifier) {
+    return data({ errors: { email: 'auth.error.identifierRequired', password: null } }, { status: 400 });
   }
 
   if (typeof password !== 'string' || password.length === 0) {
@@ -131,7 +160,7 @@ async function handleEmailPasswordLogin(
 
   const result = await post<User>(
     '/api/auth/login',
-    { email: email as string, password: password as string },
+    { identifier, email: identifier, password: password as string },
     {},
     request,
   );
@@ -153,10 +182,10 @@ async function handleSmsLogin(
   const code = formData.get('code') as string;
 
   if (!mobile || mobile.trim().length < 10) {
-    return data({ errors: { mobile: 'auth.error.invalidMobile', code: null } }, { status: 400 });
+    return data({ channelCode: 'sms', errors: { mobile: 'auth.error.invalidMobile', code: null } }, { status: 400 });
   }
   if (!code || code.trim().length < 4) {
-    return data({ errors: { mobile: null, code: 'auth.error.codeRequired' } }, { status: 400 });
+    return data({ channelCode: 'sms', errors: { mobile: null, code: 'auth.error.codeRequired' } }, { status: 400 });
   }
 
   const result = await post<User>(
@@ -168,7 +197,7 @@ async function handleSmsLogin(
 
   if (!ResultHelper.isSuccess(result)) {
     return data(
-      { errors: { mobile: null, code: result.desc || result.message || 'auth.error.codeInvalid' } },
+      { channelCode: 'sms', errors: { mobile: null, code: extractCodeLoginError(result, 'auth.error.codeInvalid') } },
       { status: 400 },
     );
   }
@@ -186,10 +215,10 @@ async function handleEmailCodeLogin(
   const code = formData.get('code') as string;
 
   if (!validateEmail(email)) {
-    return data({ errors: { email: 'Email is invalid', code: null } }, { status: 400 });
+    return data({ channelCode: 'email_code', errors: { email: 'Email is invalid', code: null } }, { status: 400 });
   }
   if (!code || code.trim().length < 4) {
-    return data({ errors: { email: null, code: 'auth.error.codeRequired' } }, { status: 400 });
+    return data({ channelCode: 'email_code', errors: { email: null, code: 'auth.error.codeRequired' } }, { status: 400 });
   }
 
   const result = await post<User>(
@@ -201,7 +230,7 @@ async function handleEmailCodeLogin(
 
   if (!ResultHelper.isSuccess(result)) {
     return data(
-      { errors: { email: null, code: result.desc || result.message || 'auth.error.codeInvalid' } },
+      { channelCode: 'email_code', errors: { email: null, code: extractCodeLoginError(result, 'auth.error.codeInvalid') } },
       { status: 400 },
     );
   }
@@ -215,23 +244,17 @@ function completeLogin(user: User, request: Request, redirectTo: string, remembe
     return data({ errors: { general: 'Login failed, please retry later' } }, { status: 500 });
   }
   const tenantId = user.tenantId;
-  const mustChangePassword = (user as any).mustChangePassword;
   if (!tenantId) {
     return createUserSession({
       request,
       token,
       remember,
-      redirectTo: mustChangePassword
-        ? '/personal/profile?forceChangePassword=true'
-        : '/tenant-selection',
+      redirectTo: '/tenant-selection',
     });
   }
   const userAgent = request.headers.get('User-Agent') || '';
   const isMobile = isMobileDevice(userAgent);
-  let finalRedirectTo = isMobile && redirectTo === '/' ? '/h5-scan' : redirectTo;
-  if (mustChangePassword) {
-    finalRedirectTo = '/personal/profile?forceChangePassword=true';
-  }
+  const finalRedirectTo = isMobile && redirectTo === '/' ? '/h5-scan' : redirectTo;
   return createUserSession({
     request,
     token,
@@ -262,6 +285,9 @@ export default function LoginPage() {
   const channels: string[] = Array.from(
     new Set(rawChannels.map((channel) => String(channel || '').toLowerCase()).filter(Boolean)),
   );
+  const actionChannel = typeof (actionData as any)?.channelCode === 'string'
+    ? String((actionData as any).channelCode).toLowerCase()
+    : null;
 
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -274,7 +300,16 @@ export default function LoginPage() {
   // Determine which tab channels and social channels are available
   const tabChannels = channels.filter((c: string) => !SOCIAL_CHANNELS.includes(c as any));
   const socialChannels = channels.filter((c: string) => SOCIAL_CHANNELS.includes(c as any));
-  const [activeTab, setActiveTab] = useState<string>(tabChannels[0] || 'email_password');
+  const preferredTab = actionChannel && tabChannels.includes(actionChannel)
+    ? actionChannel
+    : tabChannels[0] || 'email_password';
+  const [activeTab, setActiveTab] = useState<string>(preferredTab);
+
+  useEffect(() => {
+    if (actionChannel && tabChannels.includes(actionChannel)) {
+      setActiveTab(actionChannel);
+    }
+  }, [actionChannel, tabChannels]);
 
   useEffect(() => {
     if (tabChannels.length === 0) return;
@@ -647,7 +682,7 @@ function ErrorBanner({ message, t }: { message: string; t: (key: string) => stri
       </svg>
       <p className="font-medium">
         {message === 'auth.error.invalidCredentials'
-          ? t('auth.error.invalidCredentials') || 'Invalid email or password, please try again'
+          ? t('auth.error.invalidCredentials') || 'Invalid username/email or password, please try again'
           : t(message) || message}
       </p>
     </div>
@@ -688,7 +723,7 @@ function EmailPasswordForm({
       onSubmit={(e) => {
         if (typeof window === 'undefined') return;
         const formData = new FormData(e.currentTarget);
-        const trimmedEmail = (formData.get('email') as string)?.trim() || '';
+        const trimmedEmail = (formData.get('identifier') as string)?.trim() || '';
         const pwd = (formData.get('password') as string) || '';
         const isRemember = (e.currentTarget.elements.namedItem('remember') as HTMLInputElement)
           ?.checked;
@@ -710,26 +745,26 @@ function EmailPasswordForm({
       {actionData?.errors?.general && <ErrorBanner message={actionData.errors.general} t={t} />}
 
       <div>
-        <label htmlFor="email" className={LABEL_CLS}>
-          {t('auth.email') || 'Email'}
+        <label htmlFor="identifier" className={LABEL_CLS}>
+          {t('auth.identifier', undefined, '用户名或邮箱')}
         </label>
         <input
           ref={emailRef}
-          id="email"
+          id="identifier"
           required
           autoFocus
-          name="email"
-          type="email"
-          autoComplete="email"
+          name="identifier"
+          type="text"
+          autoComplete="username"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder={t('auth.emailPlaceholder') || 'you@company.com'}
+          placeholder={t('auth.identifierPlaceholder', undefined, '输入用户名或邮箱')}
           aria-invalid={actionData?.errors?.email ? true : undefined}
           className={INPUT_CLS}
         />
         {actionData?.errors?.email && (
           <div className="mt-1.5 text-xs text-red-600 dark:text-red-400">
-            {actionData.errors.email}
+            {t(actionData.errors.email) || actionData.errors.email}
           </div>
         )}
       </div>
@@ -790,12 +825,6 @@ function EmailPasswordForm({
           />
           {t('auth.rememberMe') || 'Remember me'}
         </label>
-        <Link
-          to="/forgot-password"
-          className="text-[14px] font-medium text-[#4B3FE4] hover:underline dark:text-[#a99dff]"
-        >
-          {t('auth.forgotPassword') || 'Forgot?'}
-        </Link>
       </div>
 
       <button type="submit" className={SUBMIT_CLS}>
@@ -893,7 +922,7 @@ function SmsLoginForm({
           />
           <button
             type="button"
-            data-testid="email-code-send"
+            data-testid="sms-code-send"
             onClick={sendCode}
             disabled={countdown > 0 || sending || mobile.trim().length < 10}
             className={`${SECONDARY_BTN_CLS} h-[52px] ${
@@ -1028,6 +1057,7 @@ function EmailCodeLoginForm({
           />
           <button
             type="button"
+            data-testid="email-code-send"
             onClick={sendCode}
             disabled={countdown > 0 || sending || !validateEmail(email)}
             className={`${SECONDARY_BTN_CLS} h-[52px] ${

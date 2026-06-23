@@ -30,9 +30,9 @@ export class LoginPage extends BasePage {
 
   // --- Form Fields ---
 
-  /** Email input field */
+  /** Identifier input field (username or email) */
   get emailInput(): Locator {
-    return this.page.locator('input#email');
+    return this.page.locator('input#identifier, input#email').first();
   }
 
   /** Password input field */

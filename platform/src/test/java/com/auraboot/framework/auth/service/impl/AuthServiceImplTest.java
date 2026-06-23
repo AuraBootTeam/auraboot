@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -64,11 +65,15 @@ class AuthServiceImplTest {
         when(emailPasswordStrategy.authenticate(any(AuthStrategyRequest.class))).thenReturn(expected);
 
         AuthenticationRequest req = new AuthenticationRequest();
-        req.setEmail("a@b.com");
+        req.setIdentifier("吴书生");
         req.setPassword("pw");
 
         AuthenticationResponse actual = service.authenticate(req);
         assertEquals(expected, actual);
+        verify(emailPasswordStrategy).authenticate(argThat(strategyRequest ->
+                "吴书生".equals(strategyRequest.getIdentifier()) &&
+                "pw".equals(strategyRequest.getPassword()) &&
+                "email_password".equals(strategyRequest.getChannelCode())));
     }
 
     @Test

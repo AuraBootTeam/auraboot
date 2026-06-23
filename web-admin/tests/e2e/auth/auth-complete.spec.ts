@@ -1,8 +1,8 @@
 /**
  * Comprehensive Auth E2E Tests
  *
- * Covers: Registration (with displayName), Login (email/password + email OTP),
- * Profile editing, Password change, Forgot/Reset password, Session management.
+ * Covers: Registration (with displayName), Login (username/email password + email OTP),
+ * Profile editing, admin-managed password policy, Session management.
  *
  * ## Fixed Issues (2026-03-07)
  * - Registration JWT session: AuthServiceImpl.register() now calls
@@ -19,13 +19,10 @@
  *    If dev profile is not active, EMAIL_CODE tests will be skipped.
  * 2. OIDC SSO tests require a configured OIDC provider in ab_cloud_config.
  *    Cannot be tested without an external IdP — skipped with TODO marker.
- * 3. Password change invalidates the current JWT (security_version bump),
- *    so the test user created for password-change tests cannot reuse the
- *    admin storageState afterward. Uses a dedicated test user.
- * 4. Social login (WeChat/Google/Apple/OIDC) requires external OAuth providers.
+ * 3. Social login (WeChat/Google/Apple/OIDC) requires external OAuth providers.
  *    Not covered here — see social-login.spec.ts when providers are configured.
- * 5. Forgot/Reset Password pages exist but actual email delivery is not tested
- *    (no mail server in dev). Tests verify form validation and API calls only.
+ * 4. Forgot/Reset Password pages are intentionally disabled in the current
+ *    admin-managed password policy.
  *
  * @since 7.2.0
  */
@@ -52,8 +49,6 @@ const TEST_PREFIX = uniqueId('auth');
 const SIGNUP_EMAIL = `${TEST_PREFIX.toLowerCase()}@e2e-test.local`;
 const SIGNUP_DISPLAY_NAME = `E2E User ${TEST_PREFIX}`;
 const SIGNUP_PASSWORD = 'TestPass2026!';
-const PWD_TEST_EMAIL = `pwd-${TEST_PREFIX.toLowerCase()}@e2e-test.local`;
-const PWD_TEST_PASSWORD = 'PwdTest2026!';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -64,7 +59,7 @@ async function loginViaUI(page: Page, email: string, password: string) {
   await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
     timeout: 5000,
   });
-  const emailInput = page.locator('input#email');
+  const emailInput = page.locator('input#identifier, input#email').first();
   await emailInput.waitFor({ state: 'visible', timeout: 5000 });
   const pwd = page.locator('input#password');
   await pwd.waitFor({ state: 'visible', timeout: 5000 });
@@ -164,102 +159,70 @@ async function isDevVerifyCodeAvailable(request: APIRequestContext): Promise<boo
   }
 }
 
-/** Register a new user and create a tenant for them via API. Returns the email and password. */
-async function registerUserWithTenant(
+function isSelfRegistrationDisabled(body: unknown): boolean {
+  return /self-registration.*disabled|single-tenant/i.test(JSON.stringify(body ?? {}));
+}
+
+async function postRegistrationAttempt(
   request: APIRequestContext,
   email: string,
-  password: string,
-  displayName: string,
-): Promise<string> {
-  // Step 1: Register
-  const regResp = await request.post('/api/auth/register', {
-    data: { email, password, displayName },
-    headers: { 'Content-Type': 'application/json' },
+  displayName = 'Registration Probe',
+) {
+  const response = await request.post('/api/auth/register', {
+    data: { email, password: 'ProbePass2026!', displayName },
   });
-  if (!regResp.ok()) {
-    const text = await regResp.text();
-    // Tolerate "already exists" errors
-    if (!/already|exists|duplicate|已存在/i.test(text)) {
-      throw new Error(`Registration failed: ${regResp.status()} ${text}`);
-    }
-  }
-
-  // Step 2: Login to get JWT (without tenant)
-  const loginResp = await request.post('/api/auth/login', {
-    data: { email, password },
-    headers: { 'Content-Type': 'application/json' },
-  });
-  expect(loginResp.ok(), 'Login after register should succeed').toBe(true);
-  const loginData = await loginResp.json();
-  const jwt = loginData?.data?.jwt;
-  expect(jwt, 'JWT should be present after login').toBeTruthy();
-
-  // Step 3: Check if already has tenant
-  if (loginData?.data?.tenantId) {
-    return jwt;
-  }
-
-  // Step 4: Create tenant
-  const tenantName = `PWD-Test-${Date.now().toString().slice(-6)}`;
-  const createResp = await request.post('/api/tenant-selection/process', {
-    data: {
-      action: 'create',
-      tenantName,
-      displayName: tenantName,
-      industry: 'technology',
-    },
-    headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' },
-  });
-  expect(createResp.ok(), 'Tenant creation should succeed').toBe(true);
-  const createData = await createResp.json();
-  const newJwt = createData?.data?.jwt;
-  expect(newJwt, 'Tenant creation should return new JWT').toBeTruthy();
-
-  return newJwt;
+  const body = await response.json().catch(() => ({}));
+  return { response, body };
 }
 
-/** Navigate to profile page and scroll to password change form, ensuring it's hydrated */
-async function gotoPasswordForm(page: Page) {
-  await page.goto('/personal/profile', { waitUntil: 'load' });
-  if (page.url().includes('/login')) {
-    await loginViaUI(page, ADMIN.email, ADMIN.password);
-    await expectLoggedIn(page);
-    await page.goto('/personal/profile', { waitUntil: 'load' });
+async function detectSelfRegistrationStatus(
+  request: APIRequestContext,
+): Promise<'enabled' | 'disabled'> {
+  const email = `probe-${uniqueId('reg').toLowerCase()}@e2e-test.local`;
+  const { response, body } = await postRegistrationAttempt(request, email);
+  if (isSelfRegistrationDisabled(body)) {
+    return 'disabled';
   }
-  await expect(page.locator('h1:has-text("个人资料")')).toBeVisible({ timeout: 10000 });
-
-  // Scroll to password form
-  await page.evaluate(() => {
-    document
-      .querySelector('[data-testid="change-password-btn"]')
-      ?.scrollIntoView({ behavior: 'instant' });
-  });
-
-  // Wait for form to be visible and interactive (React hydration)
-  const curPwd = page.locator('[data-testid="current-password-input"]');
-  await curPwd.waitFor({ state: 'visible', timeout: 10000 });
-
-  // Ensure React hydration is complete by typing and verifying the value sticks.
-  // Under full-suite load, hydration can take longer — retry up to 3 times.
-  for (let attempt = 0; attempt < 3; attempt++) {
-    await curPwd.click();
-    await curPwd.fill('hydration-check');
-    try {
-      await expect(curPwd).toHaveValue('hydration-check', { timeout: 3000 });
-      break; // Hydration confirmed
-    } catch {
-      if (attempt === 2) throw new Error('Password form failed hydration after 3 attempts');
-    }
-  }
-  await curPwd.fill(''); // Clear for the actual test
+  expect(response.ok(), `Unexpected self-registration probe response: ${JSON.stringify(body)}`).toBe(
+    true,
+  );
+  return 'enabled';
 }
 
-async function typePasswordField(page: Page, testId: string, value: string) {
-  const input = page.locator(`[data-testid="${testId}"]`);
-  await input.click();
-  await input.fill('');
-  await input.pressSequentially(value);
-  await expect(input).toHaveValue(value, { timeout: 3000 });
+async function getLoginChannels(request: APIRequestContext): Promise<string[]> {
+  const res = await request.get('/api/auth/login/channels');
+  return res.ok() ? ((await res.json())?.data ?? []) : [];
+}
+
+async function openEmailCodeLogin(page: Page): Promise<void> {
+  await page.goto('/login');
+  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
+    timeout: 5000,
+  });
+  const tab = page.locator('[data-testid="login-tab-email_code"]');
+  if (await tab.isVisible().catch(() => false)) {
+    await selectTab(tab);
+  }
+}
+
+async function sendEmailLoginCode(page: Page, email: string): Promise<void> {
+  const emailInput = page.locator('#ec-email');
+  await expect(emailInput).toBeVisible({ timeout: 8000 });
+  await emailInput.fill(email);
+  await expect(emailInput).toHaveValue(email, { timeout: 3000 });
+
+  const sendBtn = page.getByTestId('email-code-send');
+  await expect(sendBtn).toBeEnabled({ timeout: 8000 });
+  const sendResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes('/api/auth/verify-code/send') &&
+      response.request().method() === 'POST',
+    { timeout: 15000 },
+  );
+  await sendBtn.click();
+  const response = await sendResponse;
+  expect(response.ok(), 'Email verification-code send request should succeed').toBe(true);
+  await expect(sendBtn).toContainText(/\d+s|发送中|Sending/i, { timeout: 15000 });
 }
 
 // ===========================================================================
@@ -316,18 +279,30 @@ test.describe('Registration Flow', () => {
     expect(hasError || onSignup).toBe(true);
   });
 
+  test('REG-007: should have link to login page', async ({ page }) => {
+    await page.goto('/signup');
+    const loginLink = page.locator('a:has-text("立即登录")');
+    await expect(loginLink).toBeVisible();
+    await loginLink.click();
+    await expect(page).toHaveURL(/login/);
+  });
+});
+
+test.describe('Registration Flow — Self-registration enabled', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  let selfRegistrationEnabled = false;
+
+  test.beforeAll(async ({ request }) => {
+    selfRegistrationEnabled = (await detectSelfRegistrationStatus(request)) === 'enabled';
+  });
+
+  test.beforeEach(() => {
+    test.skip(!selfRegistrationEnabled, 'Self-registration enabled scenario is not active');
+  });
+
   test('REG-005: should register successfully and redirect @smoke', async ({ page }) => {
     test.setTimeout(30000);
-
-    // Check if self-registration is enabled (disabled in single-tenant mode)
-    const regProbe = await page.request.post('/api/auth/register', {
-      data: { email: 'probe-check@test.local', password: 'ProbePass2026!', displayName: 'Probe' },
-    });
-    const probeBody = await regProbe.json().catch(() => ({}));
-    if (probeBody?.message?.includes('disabled') || probeBody?.message?.includes('single-tenant')) {
-      test.skip(true, 'Self-registration is disabled in single-tenant mode');
-      return;
-    }
 
     await page.goto('/signup');
 
@@ -338,7 +313,7 @@ test.describe('Registration Flow', () => {
     await page.locator('button:has-text("创建账号")').click();
 
     // Should redirect to tenant-selection (new user without tenant)
-    // or /home (if user was previously registered and already has a tenant)
+    // or /home (if user was previously registered and already has a tenant).
     await page.waitForURL(
       (url) => {
         const path = url.toString();
@@ -351,25 +326,19 @@ test.describe('Registration Flow', () => {
   });
 
   test('REG-006: should reject duplicate email registration', async ({ page }) => {
-    // Check if self-registration is enabled
-    const regProbe = await page.request.post('/api/auth/register', {
-      data: { email: 'probe-check@test.local', password: 'ProbePass2026!', displayName: 'Probe' },
-    });
-    const probeBody = await regProbe.json().catch(() => ({}));
-    if (probeBody?.message?.includes('disabled') || probeBody?.message?.includes('single-tenant')) {
-      test.skip(true, 'Self-registration is disabled in single-tenant mode');
-      return;
-    }
+    const duplicateEmail = `${uniqueId('dup').toLowerCase()}@e2e-test.local`;
+    const first = await postRegistrationAttempt(page.request, duplicateEmail, 'Duplicate Seed');
+    expect(first.response.ok(), `Duplicate seed registration failed: ${JSON.stringify(first.body)}`).toBe(
+      true,
+    );
 
-    // Try registering with the same email again
     await page.goto('/signup');
-    await page.locator('input#email').fill(SIGNUP_EMAIL);
+    await page.locator('input#email').fill(duplicateEmail);
     await page.locator('input#displayName').fill('Duplicate');
     await page.locator('input#password').fill(SIGNUP_PASSWORD);
     await page.locator('button:has-text("创建账号")').click();
 
     await page.waitForLoadState('load');
-    // Should show error or stay on signup
     const hasError = await page
       .locator('#email-error, .text-red-600')
       .first()
@@ -378,13 +347,19 @@ test.describe('Registration Flow', () => {
     const onSignup = page.url().includes('/signup');
     expect(hasError || onSignup).toBe(true);
   });
+});
 
-  test('REG-007: should have link to login page', async ({ page }) => {
-    await page.goto('/signup');
-    const loginLink = page.locator('a:has-text("立即登录")');
-    await expect(loginLink).toBeVisible();
-    await loginLink.click();
-    await expect(page).toHaveURL(/login/);
+test.describe('Registration Policy — Self-registration disabled', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('REG-DISABLED-001: single-tenant mode rejects self-registration explicitly', async ({
+    request,
+  }) => {
+    const email = `${uniqueId('disabled-reg').toLowerCase()}@e2e-test.local`;
+    const { body } = await postRegistrationAttempt(request, email, 'Disabled Registration Probe');
+
+    test.skip(!isSelfRegistrationDisabled(body), 'Self-registration is enabled in this environment');
+    expect(JSON.stringify(body)).toMatch(/Self-registration is disabled|single-tenant/i);
   });
 });
 
@@ -397,7 +372,7 @@ test.describe('Login — Email/Password', () => {
 
   test('LN-001: should display login form @smoke', async ({ page }) => {
     await page.goto('/login');
-    await expect(page.locator('input#email')).toBeVisible();
+    await expect(page.locator('input#identifier')).toBeVisible();
     await expect(page.locator('input#password')).toBeVisible();
     await expect(page.locator('form button[type="submit"]')).toBeVisible();
   });
@@ -415,7 +390,7 @@ test.describe('Login — Email/Password', () => {
     const errorBanner = page.getByTestId('login-error');
     await expect(errorBanner).toBeVisible({ timeout: 15_000 });
     await expect(errorBanner).toContainText(
-      /邮箱或密码错误|请重试|Invalid email or password|invalid credentials/i,
+      /账号或密码错误|用户名\/邮箱|请重试|Invalid username\/email or password|invalid credentials/i,
     );
     const onLogin = page.url().includes('/login');
     expect(onLogin).toBe(true);
@@ -442,12 +417,10 @@ test.describe('Login — Email/Password', () => {
     await expect(page).toHaveURL(/signup/);
   });
 
-  test('LN-007: should have forgot password link', async ({ page }) => {
+  test('LN-007: should hide forgot password link when passwords are admin-managed', async ({ page }) => {
     await page.goto('/login');
     const forgotLink = page.locator('a[href*="forgot-password"]').first();
-    await expect(forgotLink).toBeVisible();
-    await forgotLink.click();
-    await expect(page).toHaveURL(/forgot-password/);
+    await expect(forgotLink).toHaveCount(0);
   });
 });
 
@@ -468,7 +441,10 @@ test.describe('Login — Email OTP', () => {
     try {
       devCodeAvailable = await isDevVerifyCodeAvailable(adminRequest);
       const enableResp = await adminRequest.put('/api/admin/login-channels', {
-        data: [{ channel: 'email_code', enabled: true, sortOrder: 2 }],
+        data: [
+          { channel: 'email_password', enabled: true, sortOrder: 0 },
+          { channel: 'email_code', enabled: true, sortOrder: 2 },
+        ],
       });
       expect(enableResp.ok(), 'EMAIL_CODE channel should be enabled in test setup').toBe(true);
     } finally {
@@ -476,10 +452,26 @@ test.describe('Login — Email OTP', () => {
     }
   });
 
+  test.afterAll(async () => {
+    const adminRequest = await playwrightRequest.newContext({
+      baseURL: BASE_URL,
+      storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+    });
+    try {
+      await adminRequest.put('/api/admin/login-channels', {
+        data: [
+          { channel: 'email_password', enabled: true, sortOrder: 0 },
+          { channel: 'sms', enabled: false, sortOrder: 1 },
+          { channel: 'email_code', enabled: false, sortOrder: 2 },
+        ],
+      });
+    } finally {
+      await adminRequest.dispose();
+    }
+  });
+
   test('OTP-001: should show email code tab when channel is enabled', async ({ page, request }) => {
-    // Check if EMAIL_CODE channel is available
-    const res = await request.get('/api/auth/login/channels');
-    const channels: string[] = res.ok() ? (await res.json())?.data || [] : [];
+    const channels = await getLoginChannels(request);
 
     test.skip(!channels.includes('email_code'), 'EMAIL_CODE channel not enabled');
 
@@ -491,93 +483,50 @@ test.describe('Login — Email OTP', () => {
   });
 
   test('OTP-002: should display email code form fields', async ({ page, request }) => {
-    test.fixme(true, 'OTP code field only appears after sending code — requires email integration');
-    const res = await request.get('/api/auth/login/channels');
-    const channels: string[] = res.ok() ? (await res.json())?.data || [] : [];
+    const channels = await getLoginChannels(request);
     test.skip(!channels.includes('email_code'), 'EMAIL_CODE channel not enabled');
 
-    await page.goto('/login');
-    // Switch to EMAIL_CODE tab
-    const tab = page.locator('[data-testid="login-tab-email_code"]');
-    if (await tab.isVisible()) {
-      await tab.click();
-    }
-    await expect(page.locator('#ec-email, input[name="email"]').first()).toBeVisible();
-    await expect(page.locator('#ec-code, input[name="code"]').first()).toBeVisible();
+    await openEmailCodeLogin(page);
+    await expect(page.locator('#ec-email')).toBeVisible();
+    await expect(page.locator('#ec-code')).toBeVisible();
+    await expect(page.getByTestId('email-code-send')).toBeVisible();
   });
 
   test('OTP-003: should send verification code and login @smoke', async ({ page, request }) => {
-    test.fixme(true, 'OTP send button click timeout — requires email service');
-    const res = await request.get('/api/auth/login/channels');
-    const channels: string[] = res.ok() ? (await res.json())?.data || [] : [];
+    const channels = await getLoginChannels(request);
     test.skip(!channels.includes('email_code'), 'EMAIL_CODE channel not enabled');
     test.skip(!devCodeAvailable, 'Dev verify-code endpoint not available — cannot retrieve OTP');
     test.setTimeout(45000);
 
-    // Use unique email per run to avoid 60s rate-limit conflicts in batch/repeat
-    const otpEmail = `otp-login-${TEST_PREFIX.toLowerCase()}@e2e-test.local`;
+    const otpEmail = ADMIN.email;
 
-    await page.goto('/login');
-    await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
-      timeout: 5000,
-    });
-    const tab = page.locator('[data-testid="login-tab-email_code"]');
-    if (await tab.isVisible()) {
-      await tab.click();
-    }
-
-    // Fill email
-    await page.locator('#ec-email, input[name="email"]').first().fill(otpEmail);
-
-    // Click send code button — try multiple strategies
-    const sendBtn = page
-      .getByRole('button', { name: /发送|send|验证码|获取/i })
-      .first()
-      .or(page.locator('#ec-code').locator('xpath=following-sibling::button[1]'));
-    await sendBtn.click({ timeout: 10_000 });
-
-    // Wait for countdown (send API may be slow under batch load)
-    await expect(sendBtn).toContainText(/\d+s|发送中/, { timeout: 15000 });
+    await openEmailCodeLogin(page);
+    await sendEmailLoginCode(page, otpEmail);
 
     const code = await waitForDevVerifyCode(request, otpEmail, 10000);
     expect(code, 'Verification code should be retrievable from dev API').toBeTruthy();
 
-    // Fill code and submit
-    await page.locator('#ec-code, input[name="code"]').first().fill(code!);
+    await page.locator('#ec-code').fill(code!);
     await page.locator('form[action="/login"] button[type="submit"]').click();
 
-    // Unique email → auto-register → tenant-selection page (or /home if tenant exists)
+    // Existing user → normal tenant-aware login, no self-registration involved.
     await page.waitForURL(/tenant-selection|dashboard|\/home/, { timeout: 20000 });
   });
 
-  // BLOCKER: Email OTP auto-registration test requires sending to a new email.
-  // In dev environment without real mail service, this depends on dev verify-code API.
   test('OTP-004: should auto-register new user via email OTP', async ({ page, request }) => {
-    const res = await request.get('/api/auth/login/channels');
-    const channels: string[] = res.ok() ? (await res.json())?.data || [] : [];
+    const channels = await getLoginChannels(request);
     test.skip(!channels.includes('email_code'), 'EMAIL_CODE channel not enabled');
     test.skip(!devCodeAvailable, 'Dev verify-code endpoint not available');
+    test.skip(
+      (await detectSelfRegistrationStatus(request)) !== 'enabled',
+      'Email OTP auto-registration requires self-registration enabled',
+    );
     test.setTimeout(30000);
 
     const newEmail = `otp-${TEST_PREFIX.toLowerCase()}@e2e-test.local`;
 
-    await page.goto('/login');
-    const tab = page.locator('[data-testid="login-tab-email_code"]');
-    if (await tab.isVisible()) {
-      await selectTab(tab);
-    }
-
-    const emailCodeInput = page.locator('#ec-email');
-    await expect(emailCodeInput).toBeVisible({ timeout: 8000 });
-    await emailCodeInput.fill(newEmail);
-    await expect(emailCodeInput).toHaveValue(newEmail, { timeout: 3000 });
-    const sendBtn = page
-      .locator('#ec-code')
-      .locator('xpath=following-sibling::button[1]')
-      .or(page.getByRole('button', { name: /发送|send|验证码/i }).first());
-    await sendBtn.waitFor({ state: 'visible', timeout: 8000 });
-    await sendBtn.click();
-    await expect(sendBtn).toContainText(/\d+s/, { timeout: 10000 });
+    await openEmailCodeLogin(page);
+    await sendEmailLoginCode(page, newEmail);
 
     const code = await waitForDevVerifyCode(request, newEmail);
     expect(code, 'Verification code should be retrievable for new email').toBeTruthy();
@@ -589,6 +538,39 @@ test.describe('Login — Email OTP', () => {
 
     // New user → should go to tenant-selection (no tenant yet), or /home if auto-assigned
     await page.waitForURL(/tenant-selection|\/home/, { timeout: 20000 });
+  });
+
+  test('OTP-005: should reject new-user email OTP when self-registration is disabled', async ({
+    page,
+    request,
+  }) => {
+    const channels = await getLoginChannels(request);
+    test.skip(!channels.includes('email_code'), 'EMAIL_CODE channel not enabled');
+    test.skip(!devCodeAvailable, 'Dev verify-code endpoint not available');
+    test.skip(
+      (await detectSelfRegistrationStatus(request)) !== 'disabled',
+      'Self-registration disabled scenario is not active',
+    );
+    test.setTimeout(30000);
+
+    const newEmail = `otp-disabled-${TEST_PREFIX.toLowerCase()}@e2e-test.local`;
+
+    await openEmailCodeLogin(page);
+    await sendEmailLoginCode(page, newEmail);
+
+    const code = await waitForDevVerifyCode(request, newEmail);
+    expect(code, 'Verification code should be retrievable for disabled-registration probe').toBeTruthy();
+
+    await page.locator('#ec-code').fill(code!);
+    await page.locator('form[action="/login"] button[type="submit"]').click();
+
+    await expect(page).toHaveURL(/\/login/, { timeout: 15000 });
+    await expect(
+      page
+        .locator('.text-red-600, .text-red-400')
+        .filter({ hasText: /Self-registration is disabled|self-registration.*disabled/i })
+        .first(),
+    ).toBeVisible({ timeout: 10000 });
   });
 });
 
@@ -698,26 +680,12 @@ test.describe('User Profile', () => {
     await expect(page.getByText(newNickname)).toBeVisible();
   });
 
-  test('PRF-006: should show Security Settings section', async ({ page }) => {
+  test('PRF-006: should hide self-service password settings', async ({ page }) => {
     await page.goto('/personal/profile', { waitUntil: 'load' });
     await expect(page.locator('h1:has-text("个人资料")')).toBeVisible({ timeout: 10000 });
 
-    // Security Settings is below the fold — use evaluate to scroll to it
-    // (scrollIntoViewIfNeeded can fail if React re-renders the component)
-    await page.evaluate(() => {
-      const el = document.querySelector('h2');
-      const secEl = Array.from(document.querySelectorAll('h2')).find((h) =>
-        h.textContent?.includes('Security Settings'),
-      );
-      secEl?.scrollIntoView({ behavior: 'instant' });
-    });
-
-    await expect(page.getByRole('heading', { name: 'Security Settings' })).toBeVisible({
-      timeout: 10000,
-    });
-    await expect(page.getByRole('heading', { name: 'Change Password' })).toBeVisible({
-      timeout: 5000,
-    });
+    await expect(page.getByRole('heading', { name: 'Security Settings' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Change Password' })).toHaveCount(0);
   });
 
   test('PRF-007: should show Social Account Binding section', async ({ page }) => {
@@ -742,155 +710,16 @@ test.describe('User Profile', () => {
 // ===========================================================================
 
 test.describe('Password Change', () => {
-  // These tests use the newly registered test user to avoid affecting admin
+  test('PWD-001: should not expose self-service password change form', async ({ page }) => {
+    await page.goto('/personal/security', { waitUntil: 'load' });
 
-  test('PWD-001: should display password change form on profile page', async ({ page }) => {
-    await gotoPasswordForm(page);
-
-    await expect(page.locator('[data-testid="current-password-input"]')).toBeVisible();
-    await expect(page.locator('[data-testid="new-password-input"]')).toBeVisible();
-    await expect(page.locator('[data-testid="confirm-password-input"]')).toBeVisible();
-    await expect(page.locator('[data-testid="change-password-btn"]')).toBeVisible();
-  });
-
-  test('PWD-002: should validate current password required', async ({ page }) => {
-    await gotoPasswordForm(page);
-
-    // Leave current password empty, fill new password
-    await page.locator('[data-testid="new-password-input"]').click();
-    await page.locator('[data-testid="new-password-input"]').fill('NewPass2026!');
-    await page.locator('[data-testid="confirm-password-input"]').click();
-    await page.locator('[data-testid="confirm-password-input"]').fill('NewPass2026!');
-    await page.locator('[data-testid="change-password-btn"]').click();
-
-    // Should show validation error
-    await expect(page.getByText('Please enter current password')).toBeVisible();
-  });
-
-  test('PWD-003: should validate new password minimum length', async ({ page }) => {
-    await gotoPasswordForm(page);
-
-    await page.locator('[data-testid="current-password-input"]').fill('OldPass123!');
-    await page.locator('[data-testid="new-password-input"]').click();
-    await page.locator('[data-testid="new-password-input"]').fill('short');
-    await page.locator('[data-testid="confirm-password-input"]').click();
-    await page.locator('[data-testid="confirm-password-input"]').fill('short');
-    await page.locator('[data-testid="change-password-btn"]').click();
-
-    await expect(page.getByText(/at least 8|至少8|密码长度|minimum.*8|password.*short/i).first())
-      .toBeVisible({ timeout: 5000 })
-      .catch(async () => {
-        // Validation may show as toast or inline
-        await expect(
-          page.locator('[class*="error"], [class*="destructive"], [role="alert"]').first(),
-        ).toBeVisible({ timeout: 5000 });
-      });
-  });
-
-  test('PWD-004: should validate password confirmation match', async ({ page }) => {
-    await gotoPasswordForm(page);
-
-    await typePasswordField(page, 'current-password-input', 'OldPass123!');
-    await typePasswordField(page, 'new-password-input', 'NewPassword2026!');
-    await typePasswordField(page, 'confirm-password-input', 'DifferentPassword!');
-    await page.locator('[data-testid="change-password-btn"]').click();
-
-    await expect(page.getByText('Passwords do not match')).toBeVisible({ timeout: 10000 });
-  });
-
-  test('PWD-005: should validate new password differs from current', async ({ page }) => {
-    await gotoPasswordForm(page);
-
-    await typePasswordField(page, 'current-password-input', 'SamePass2026!');
-    await typePasswordField(page, 'new-password-input', 'SamePass2026!');
-    await typePasswordField(page, 'confirm-password-input', 'SamePass2026!');
-    await page.locator('[data-testid="change-password-btn"]').click();
-
-    await expect(
-      page.getByText('New password must be different from current password'),
-    ).toBeVisible({ timeout: 10000 });
-  });
-
-  // Uses a dedicated test user (not admin) to avoid invalidating admin JWT.
-  // Flow: register user → create tenant via API → login via UI → change password → re-login
-  test('PWD-006: should change password successfully for test user', async ({ browser }) => {
-    test.setTimeout(60000);
-    const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-    const page = await context.newPage();
-
-    try {
-      const regProbe = await page.request.post('/api/auth/register', {
-        data: {
-          email: 'probe-check@test.local',
-          password: 'ProbePass2026!',
-          displayName: 'Probe',
-        },
-      });
-      const probeBody = await regProbe.json().catch(() => ({}));
-      if (
-        probeBody?.message?.includes('disabled') ||
-        probeBody?.message?.includes('single-tenant')
-      ) {
-        test.skip(true, 'Self-registration is disabled in single-tenant mode');
-        return;
-      }
-
-      // Step 1: Prepare user with tenant via API
-      await registerUserWithTenant(
-        page.request,
-        PWD_TEST_EMAIL,
-        PWD_TEST_PASSWORD,
-        `PWD Tester ${TEST_PREFIX}`,
-      );
-
-      // Step 2: Login as test user via UI in a clean session
-      await loginViaUI(page, PWD_TEST_EMAIL, PWD_TEST_PASSWORD);
-      await expectLoggedIn(page);
-
-      // Step 3: Navigate to profile and change password
-      await gotoPasswordForm(page);
-
-      const newPassword = 'Changed2026!';
-
-      // Use click + pressSequentially to ensure React onChange handlers fire reliably
-      const curPwdInput = page.locator('[data-testid="current-password-input"]');
-      const newPwdInput = page.locator('[data-testid="new-password-input"]');
-      const confirmPwdInput = page.locator('[data-testid="confirm-password-input"]');
-
-      await curPwdInput.click();
-      await curPwdInput.pressSequentially(PWD_TEST_PASSWORD);
-      await expect(curPwdInput).toHaveValue(PWD_TEST_PASSWORD, { timeout: 3000 });
-
-      await newPwdInput.click();
-      await newPwdInput.pressSequentially(newPassword);
-      await expect(newPwdInput).toHaveValue(newPassword, { timeout: 3000 });
-
-      await confirmPwdInput.click();
-      await confirmPwdInput.pressSequentially(newPassword);
-      await expect(confirmPwdInput).toHaveValue(newPassword, { timeout: 3000 });
-
-      const responsePromise = page.waitForResponse(
-        (res) =>
-          res.url().includes('/api/user/password') &&
-          res.request().method().toLowerCase() === 'put',
-        { timeout: 30000 },
-      );
-      await page.locator('[data-testid="change-password-btn"]').click();
-      const response = await responsePromise;
-
-      // Should succeed
-      expect(response.ok()).toBe(true);
-
-      // After password change, should redirect to /login (JWT invalidated via security_version bump)
-      await expect(page).toHaveURL(/login/, { timeout: 15000 });
-
-      // Step 4: Login with new password
-      await loginViaUI(page, PWD_TEST_EMAIL, newPassword);
-      await expectLoggedIn(page);
-    } finally {
-      await page.close();
-      await context.close();
-    }
+    await expect(page.getByRole('heading', { name: 'Security Settings' })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.locator('[data-testid="current-password-input"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="new-password-input"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="confirm-password-input"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="change-password-btn"]')).toHaveCount(0);
   });
 });
 
@@ -901,79 +730,13 @@ test.describe('Password Change', () => {
 test.describe('Forgot & Reset Password', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('FP-001: should display forgot password form', async ({ page }) => {
+  test('FP-001: should display admin-managed password notice', async ({ page }) => {
     await page.goto('/forgot-password');
-    await expect(page.locator('[data-testid="forgot-email-input"]')).toBeVisible();
-    await expect(page.locator('[data-testid="forgot-submit-btn"]')).toBeVisible();
-    await expect(page.getByText('Send Reset Link')).toBeVisible();
+    await expect(page.locator('[data-testid="forgot-password-disabled"]')).toBeVisible();
+    await expect(page.getByText(/tenant administrator/i)).toBeVisible();
   });
 
-  test('FP-002: should submit forgot password and show confirmation', async ({ page }) => {
-    await page.goto('/forgot-password', { waitUntil: 'load' });
-    await expect(page.locator('[data-testid="forgot-email-input"]')).toBeVisible({ timeout: 5000 });
-
-    await page.locator('[data-testid="forgot-email-input"]').click();
-    await page.locator('[data-testid="forgot-email-input"]').fill(ADMIN.email);
-    await expect(page.locator('[data-testid="forgot-email-input"]')).toHaveValue(ADMIN.email);
-    await page.locator('[data-testid="forgot-submit-btn"]').click();
-
-    // Under full-suite load the forgot-password API can be slow; accept any stable
-    // confirmation-state signal instead of only a single heading check.
-    await expect
-      .poll(
-        async () => {
-          const headingVisible = await page
-            .getByRole('heading', { name: /check your email/i })
-            .isVisible()
-            .catch(() => false);
-          const bodyVisible = await page
-            .getByText(/we've sent a password reset link/i)
-            .isVisible()
-            .catch(() => false);
-          const loginLinkVisible = await page
-            .getByRole('link', { name: /back to login/i })
-            .isVisible()
-            .catch(() => false);
-          return headingVisible || bodyVisible || loginLinkVisible;
-        },
-        { timeout: 20000 },
-      )
-      .toBe(true);
-  });
-
-  test('FP-003: should show confirmation even for unknown email', async ({ page }) => {
-    await page.goto('/forgot-password', { waitUntil: 'load' });
-    await expect(page.locator('[data-testid="forgot-email-input"]')).toBeVisible({ timeout: 5000 });
-
-    await page.locator('[data-testid="forgot-email-input"]').click();
-    await page.locator('[data-testid="forgot-email-input"]').fill('unknown-user-xyz@nowhere.com');
-    await page.locator('[data-testid="forgot-submit-btn"]').click();
-
-    // Should still show success (prevents email enumeration); use the same
-    // stable confirmation-state signals as FP-002 to avoid load-related flakes.
-    await expect
-      .poll(
-        async () => {
-          const headingVisible = await page
-            .getByRole('heading', { name: /check your email/i })
-            .isVisible()
-            .catch(() => false);
-          const bodyVisible = await page
-            .getByText(/we've sent a password reset link/i)
-            .isVisible()
-            .catch(() => false);
-          const loginLinkVisible = await page
-            .getByRole('link', { name: /back to login/i })
-            .isVisible()
-            .catch(() => false);
-          return headingVisible || bodyVisible || loginLinkVisible;
-        },
-        { timeout: 20000 },
-      )
-      .toBe(true);
-  });
-
-  test('FP-004: should have back to login link', async ({ page }) => {
+  test('FP-002: should have back to login link', async ({ page }) => {
     await page.goto('/forgot-password', { waitUntil: 'load' });
     const backLink = page.getByRole('link', { name: 'Back to Login' });
     await expect(backLink).toBeVisible();
@@ -981,76 +744,10 @@ test.describe('Forgot & Reset Password', () => {
     await expect(page).toHaveURL(/login/);
   });
 
-  test('RP-001: should display reset password form', async ({ page }) => {
+  test('RP-001: should display admin-managed password notice', async ({ page }) => {
     await page.goto('/reset-password?token=test-token', { waitUntil: 'load' });
-    await expect(page.locator('[data-testid="reset-new-password"]')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('[data-testid="reset-confirm-password"]')).toBeVisible();
-    await expect(page.locator('[data-testid="reset-submit-btn"]')).toBeVisible();
-  });
-
-  test('RP-002: should show error for missing token', async ({ page }) => {
-    await page.goto('/reset-password', { waitUntil: 'load' });
-    await expect(page.locator('[data-testid="reset-new-password"]')).toBeVisible({ timeout: 5000 });
-
-    // Submit with empty token — should show error
-    await page.locator('[data-testid="reset-new-password"]').click();
-    await page.locator('[data-testid="reset-new-password"]').fill('ValidPass2026!');
-    await page.locator('[data-testid="reset-confirm-password"]').click();
-    await page.locator('[data-testid="reset-confirm-password"]').fill('ValidPass2026!');
-    await page.locator('[data-testid="reset-submit-btn"]').click();
-
-    // Error is rendered in a <p> tag; use locator for more reliable matching
-    await expect(
-      page
-        .locator('p.text-red-600')
-        .filter({ hasText: /invalid reset link/i })
-        .first(),
-    ).toContainText(/invalid reset link/i, {
-      timeout: 5000,
-    });
-  });
-
-  test('RP-003: should validate password strength', async ({ page }) => {
-    await page.goto('/reset-password?token=fake-token', { waitUntil: 'load' });
-    await expect(page.locator('[data-testid="reset-new-password"]')).toBeVisible({ timeout: 5000 });
-
-    await page.locator('[data-testid="reset-new-password"]').click();
-    await page.locator('[data-testid="reset-new-password"]').fill('short');
-    await expect(page.locator('[data-testid="reset-new-password"]')).toHaveValue('short');
-    await page.locator('[data-testid="reset-confirm-password"]').click();
-    await page.locator('[data-testid="reset-confirm-password"]').fill('short');
-    await expect(page.locator('[data-testid="reset-confirm-password"]')).toHaveValue('short');
-    await page.locator('[data-testid="reset-submit-btn"]').click();
-
-    await expect(page.getByText(/at least 8|至少8|密码长度|minimum.*8|password.*short/i).first())
-      .toBeVisible({ timeout: 5000 })
-      .catch(async () => {
-        await expect(
-          page.locator('[class*="error"], [class*="destructive"], [role="alert"]').first(),
-        ).toBeVisible({ timeout: 5000 });
-      });
-  });
-
-  test('RP-004: should validate password confirmation match', async ({ page }) => {
-    await page.goto('/reset-password?token=fake-token', { waitUntil: 'load' });
-    await expect(page.locator('[data-testid="reset-new-password"]')).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('[data-testid="reset-password-page-root"]')).toHaveAttribute(
-      'data-hydrated',
-      'true',
-      { timeout: 5000 },
-    );
-
-    await page.locator('[data-testid="reset-new-password"]').click();
-    await page.locator('[data-testid="reset-new-password"]').fill('ValidPass2026!');
-    await expect(page.locator('[data-testid="reset-new-password"]')).toHaveValue('ValidPass2026!');
-    await page.locator('[data-testid="reset-confirm-password"]').click();
-    await page.locator('[data-testid="reset-confirm-password"]').fill('DifferentPass!');
-    await expect(page.locator('[data-testid="reset-confirm-password"]')).toHaveValue(
-      'DifferentPass!',
-    );
-    await page.locator('[data-testid="reset-submit-btn"]').click();
-
-    await expect(page.getByText(/do not match/i)).toBeVisible();
+    await expect(page.locator('[data-testid="reset-password-disabled"]')).toBeVisible();
+    await expect(page.getByText(/tenant administrator/i)).toBeVisible();
   });
 });
 
@@ -1059,16 +756,14 @@ test.describe('Forgot & Reset Password', () => {
 // ===========================================================================
 
 test.describe('Security Settings — Sessions', () => {
-  test('SEC-001: should display security page with tabs @smoke', async ({ page }) => {
+  test('SEC-001: should display security page with active sessions @smoke', async ({ page }) => {
     await page.goto('/personal/security', { waitUntil: 'load' });
     // Wait for the heading to appear as load indicator
     await expect(page.getByRole('heading', { name: 'Security Settings' })).toBeVisible({
       timeout: 15000,
     });
-    // Should show Change Password and Active Sessions tab buttons (use nav context to avoid duplicates)
-    const tabNav = page.locator('nav');
-    await expect(tabNav.getByText('Change Password')).toBeVisible();
-    await expect(tabNav.getByText('Active Sessions')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Active Sessions' })).toBeVisible();
+    await expect(page.getByText('Change Password')).toHaveCount(0);
   });
 
   test('SEC-002: should show active sessions list', async ({ page }) => {
@@ -1076,10 +771,6 @@ test.describe('Security Settings — Sessions', () => {
     await expect(page.getByRole('heading', { name: 'Security Settings' })).toBeVisible({
       timeout: 15000,
     });
-
-    // Click Active Sessions tab
-    const tabNav = page.locator('nav');
-    await tabNav.getByText('Active Sessions').click();
 
     // Should show at least one session (current)
     const sessionResponse = page.waitForResponse(
@@ -1094,18 +785,15 @@ test.describe('Security Settings — Sessions', () => {
     }
   });
 
-  test('SEC-003: should show password change form in security page', async ({ page }) => {
+  test('SEC-003: should not show password change form in security page', async ({ page }) => {
     await page.goto('/personal/security', { waitUntil: 'load' });
     await expect(page.getByRole('heading', { name: 'Security Settings' })).toBeVisible({
       timeout: 15000,
     });
 
-    // Change Password tab is default active — form fields should be visible
-    await expect(page.locator('[data-testid="current-password-input"]')).toBeVisible({
-      timeout: 5000,
-    });
-    await expect(page.locator('[data-testid="new-password-input"]')).toBeVisible();
-    await expect(page.locator('[data-testid="confirm-password-input"]')).toBeVisible();
+    await expect(page.locator('[data-testid="current-password-input"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="new-password-input"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="confirm-password-input"]')).toHaveCount(0);
   });
 });
 
@@ -1180,24 +868,23 @@ test.describe('Tenant Selection', () => {
   const TENANT_PASSWORD = 'TenantPass2026!';
   const TENANT_ORG_NAME = `E2E Org ${TENANT_PREFIX}`;
 
-  /** Check if registration is available (disabled in single-tenant mode) */
-  async function skipIfRegistrationDisabled(page: import('@playwright/test').Page) {
-    const regProbe = await page.request.post('/api/auth/register', {
-      data: { email: 'probe-check@test.local', password: 'ProbePass2026!', displayName: 'Probe' },
-    });
-    const probeBody = await regProbe.json().catch(() => ({}));
-    if (probeBody?.message?.includes('disabled') || probeBody?.message?.includes('single-tenant')) {
-      test.skip(true, 'Self-registration is disabled in single-tenant mode');
-      return true;
-    }
-    return false;
-  }
+  let selfRegistrationEnabled = false;
+
+  test.beforeAll(async ({ request }) => {
+    selfRegistrationEnabled = (await detectSelfRegistrationStatus(request)) === 'enabled';
+  });
+
+  test.beforeEach(() => {
+    test.skip(
+      !selfRegistrationEnabled,
+      'Tenant-selection registration scenario requires self-registration enabled',
+    );
+  });
 
   test('TS-001: should display tenant selection page after registration @smoke', async ({
     page,
   }) => {
     test.setTimeout(30000);
-    if (await skipIfRegistrationDisabled(page)) return;
 
     await page.goto('/signup');
     await page.locator('input#email').fill(TENANT_EMAIL);
@@ -1217,7 +904,6 @@ test.describe('Tenant Selection', () => {
 
   test('TS-002: should create tenant successfully after registration @smoke', async ({ page }) => {
     test.setTimeout(45000);
-    if (await skipIfRegistrationDisabled(page)) return;
 
     // Register
     await page.goto('/signup');
@@ -1249,7 +935,6 @@ test.describe('Tenant Selection', () => {
 
   test('TS-003: should show error state only for current action', async ({ page }) => {
     test.setTimeout(30000);
-    if (await skipIfRegistrationDisabled(page)) return;
 
     // Register and go to tenant selection
     await page.goto('/signup');
@@ -1286,25 +971,29 @@ test.describe('Tenant Selection', () => {
 // ===========================================================================
 
 test.describe('Invitation Flow', () => {
-  test('INV-001: should generate invite code via API @smoke', async ({ request }) => {
-    // Use admin auth (from default storageState)
+  async function generateInviteCode(
+    request: APIRequestContext,
+    expiryDays = '3',
+  ): Promise<string> {
     const res = await request.post('/api/tenant/invite-code/generate', {
-      params: { expiryDays: '3' },
+      params: { expiryDays },
     });
+
     expect(res.ok()).toBe(true);
     const json = await res.json();
-    expect(json.data).toBeTruthy();
-    expect(typeof json.data).toBe('string');
-    expect(json.data.length).toBeGreaterThanOrEqual(6);
+    const code = json?.data;
+    expect(code).toBeTruthy();
+    expect(typeof code).toBe('string');
+    return code;
+  }
+
+  test('INV-001: should generate invite code via API @smoke', async ({ request }) => {
+    const code = await generateInviteCode(request);
+    expect(code.length).toBeGreaterThanOrEqual(6);
   });
 
   test('INV-002: should validate existing invite code', async ({ request }) => {
-    // Generate an invite code first
-    const genRes = await request.post('/api/tenant/invite-code/generate', {
-      params: { expiryDays: '3' },
-    });
-    const code = (await genRes.json())?.data;
-    expect(code).toBeTruthy();
+    const code = await generateInviteCode(request);
 
     // Validate it
     const valRes = await request.get('/api/tenant/invite-code/validate', {
@@ -1325,11 +1014,7 @@ test.describe('Invitation Flow', () => {
   });
 
   test('INV-004: should revoke invite code', async ({ request }) => {
-    // Generate
-    const genRes = await request.post('/api/tenant/invite-code/generate', {
-      params: { expiryDays: '3' },
-    });
-    const code = (await genRes.json())?.data;
+    const code = await generateInviteCode(request);
 
     // Revoke
     const revokeRes = await request.post('/api/tenant/invite-code/revoke', {
@@ -1347,9 +1032,7 @@ test.describe('Invitation Flow', () => {
 
   test('INV-005: should get current valid invite code', async ({ request }) => {
     // Generate fresh code
-    await request.post('/api/tenant/invite-code/generate', {
-      params: { expiryDays: '3' },
-    });
+    await generateInviteCode(request);
 
     const res = await request.get('/api/tenant/invite-code/current');
     expect(res.ok()).toBe(true);

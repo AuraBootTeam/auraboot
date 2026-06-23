@@ -25,7 +25,7 @@ export async function login(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
 
   // Check if already logged in (no login form visible)
-  const loginForm = page.locator('input#email, input#password');
+  const loginForm = page.locator('input#identifier, input#email, input#password');
   const hasLoginForm = await loginForm
     .first()
     .isVisible()
@@ -38,7 +38,7 @@ export async function login(page: Page): Promise<void> {
   }
 
   // Fill email
-  const emailInput = page.locator('input#email');
+  const emailInput = page.locator('input#identifier, input#email').first();
   await emailInput.fill(TEST_CONFIG.credentials.email);
 
   // Fill password
@@ -52,7 +52,10 @@ export async function login(page: Page): Promise<void> {
   // Wait for login to complete - either URL changes or login form disappears
   await Promise.race([
     page.waitForURL((url) => !url.pathname.includes('login'), { timeout: TEST_CONFIG.timeout }),
-    page.waitForSelector('input#email', { state: 'hidden', timeout: TEST_CONFIG.timeout }),
+    page.waitForSelector('input#identifier, input#email', {
+      state: 'hidden',
+      timeout: TEST_CONFIG.timeout,
+    }),
   ]).catch(() => {
     // Timeout is ok if we're already past login
   });
@@ -62,7 +65,7 @@ export async function login(page: Page): Promise<void> {
 
   // Final check - verify not on login page
   const stillOnLoginPage = await page
-    .locator('input#email')
+    .locator('input#identifier, input#email')
     .isVisible()
     .catch(() => false);
   if (stillOnLoginPage) {

@@ -639,7 +639,7 @@ export async function loginViaUI(page: Page, email: string, password: string): P
   }
 
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
-  const emailInput = page.locator('input#email').first();
+  const emailInput = page.locator('input#identifier, input#email').first();
   await emailInput.waitFor({ state: 'visible', timeout: 10_000 });
   // Click to focus before fill — prevents React hydration from discarding the value.
   await emailInput.click();

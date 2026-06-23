@@ -50,6 +50,7 @@ import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 const COMPANY_NAME = process.env.AURA_BOOTSTRAP_COMPANY ?? 'AuraBoot Dev';
 const AUTO_BOOTSTRAP_WAIT_MS = Number(process.env.AURA_AUTO_BOOTSTRAP_WAIT_MS ?? '0');
 const BOOTSTRAP_POLL_MS = 2000;
+const TENANT_INVITE_MANAGE_PERMISSION = 'org.tenant.invite.manage';
 
 /**
  * Run a SQL query against the configured stack and return scalar / row.
@@ -103,6 +104,138 @@ function psqlInt(query: string): number {
     throw new Error(`psql query did not return an integer: ${query} → ${out}`);
   }
   return n;
+}
+
+/**
+ * Tenant invite-code APIs are guarded by org.tenant.invite.manage. Older dev and
+ * CI databases can predate that template permission, so setup owns the E2E
+ * precondition explicitly instead of letting INV-* specs skip on 403.
+ */
+function ensureTenantInviteManageGrant(): void {
+  psql(`
+UPDATE ab_permission p
+SET name = 'Manage tenant invite codes',
+    description = 'Tenant membership — generate / revoke invite codes',
+    resource_type = 'function',
+    resource_code = 'org:tenant-invite',
+    action = 'manage',
+    source = 'system',
+    source_ref = 'auth-e2e-setup',
+    status = 'active',
+    deleted_flag = FALSE,
+    updated_at = NOW()
+WHERE p.code = '${TENANT_INVITE_MANAGE_PERMISSION}'
+  AND p.tenant_id IN (
+      SELECT DISTINCT r.tenant_id
+      FROM ab_role r
+      WHERE r.tenant_id IS NOT NULL
+        AND r.code IN ('tenant_admin', 'operator')
+        AND r.status = 'active'
+        AND r.deleted_flag = FALSE
+  );
+
+INSERT INTO ab_permission (
+    pid,
+    tenant_id,
+    code,
+    name,
+    description,
+    resource_type,
+    resource_code,
+    action,
+    source,
+    source_ref,
+    status,
+    deleted_flag,
+    created_at,
+    updated_at
+)
+SELECT
+    'tinp' || substr(md5(t.tenant_id::text), 1, 28),
+    t.tenant_id,
+    '${TENANT_INVITE_MANAGE_PERMISSION}',
+    'Manage tenant invite codes',
+    'Tenant membership — generate / revoke invite codes',
+    'function',
+    'org:tenant-invite',
+    'manage',
+    'system',
+    'auth-e2e-setup',
+    'active',
+    FALSE,
+    NOW(),
+    NOW()
+FROM (
+    SELECT DISTINCT r.tenant_id
+    FROM ab_role r
+    WHERE r.tenant_id IS NOT NULL
+      AND r.code IN ('tenant_admin', 'operator')
+      AND r.status = 'active'
+      AND r.deleted_flag = FALSE
+) t
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM ab_permission p
+    WHERE p.tenant_id = t.tenant_id
+      AND p.code = '${TENANT_INVITE_MANAGE_PERMISSION}'
+);
+
+UPDATE ab_role_permission rp
+SET grant_type = 'grant',
+    status = 'active',
+    deleted_flag = FALSE,
+    updated_at = NOW()
+FROM ab_role r
+JOIN ab_permission p
+  ON p.tenant_id = r.tenant_id
+ AND p.code = '${TENANT_INVITE_MANAGE_PERMISSION}'
+WHERE rp.tenant_id = r.tenant_id
+  AND rp.role_id = r.id
+  AND rp.permission_id = p.id
+  AND r.code IN ('tenant_admin', 'operator')
+  AND r.status = 'active'
+  AND r.deleted_flag = FALSE;
+
+INSERT INTO ab_role_permission (
+    pid,
+    tenant_id,
+    role_id,
+    permission_id,
+    grant_type,
+    source_ref,
+    status,
+    deleted_flag,
+    created_at,
+    updated_at
+)
+SELECT
+    'tinrp' || substr(md5(r.id::text || ':' || p.id::text), 1, 27),
+    r.tenant_id,
+    r.id,
+    p.id,
+    'grant',
+    'auth-e2e-setup',
+    'active',
+    FALSE,
+    NOW(),
+    NOW()
+FROM ab_role r
+JOIN ab_permission p
+  ON p.tenant_id = r.tenant_id
+ AND p.code = '${TENANT_INVITE_MANAGE_PERMISSION}'
+ AND p.status = 'active'
+ AND p.deleted_flag = FALSE
+WHERE r.code IN ('tenant_admin', 'operator')
+  AND r.status = 'active'
+  AND r.deleted_flag = FALSE
+  AND NOT EXISTS (
+      SELECT 1
+      FROM ab_role_permission ex
+      WHERE ex.tenant_id = r.tenant_id
+        AND ex.role_id = r.id
+        AND ex.permission_id = p.id
+  );
+`);
 }
 
 async function readBootstrapStatus(request: APIRequestContext): Promise<{
@@ -167,6 +300,8 @@ test('00-bootstrap: ensure system is initialized via /api/bootstrap/setup', asyn
     const recheckBody = await recheck.json();
     expect(recheckBody?.data?.initialized).toBe(true);
   }
+
+  ensureTenantInviteManageGrant();
 });
 
 test('00-bootstrap: invariant 1 — system_config row + system.initialized=true', async () => {
@@ -259,6 +394,38 @@ test('00-bootstrap: invariant 8 — Business Tenant template roles exist', async
     .filter(Boolean);
 
   expect(roles).toEqual(['operator', 'tenant_admin', 'viewer']);
+});
+
+test('00-bootstrap: invariant 8b — tenant_admin/operator can manage invite codes', async () => {
+  ensureTenantInviteManageGrant();
+
+  const missingGrantRows = psqlInt(
+    `SELECT COUNT(*)
+     FROM ab_role r
+     JOIN ab_tenant t ON r.tenant_id = t.id
+     LEFT JOIN ab_permission p
+       ON p.tenant_id = r.tenant_id
+      AND p.code = '${TENANT_INVITE_MANAGE_PERMISSION}'
+      AND p.status = 'active'
+      AND p.deleted_flag = false
+     LEFT JOIN ab_role_permission rp
+       ON rp.tenant_id = r.tenant_id
+      AND rp.role_id = r.id
+      AND rp.permission_id = p.id
+      AND rp.grant_type = 'grant'
+      AND rp.status = 'active'
+      AND rp.deleted_flag = false
+     WHERE t.name = '${COMPANY_NAME}'
+       AND r.code IN ('tenant_admin', 'operator')
+       AND r.status = 'active'
+       AND r.deleted_flag = false
+       AND rp.id IS NULL`,
+  );
+
+  expect(
+    missingGrantRows,
+    `${TENANT_INVITE_MANAGE_PERMISSION} grant missing for ${COMPANY_NAME} tenant_admin/operator`,
+  ).toBe(0);
 });
 
 test('00-bootstrap: invariant 9 — JWT signing key usable (login round-trip)', async ({ request }) => {

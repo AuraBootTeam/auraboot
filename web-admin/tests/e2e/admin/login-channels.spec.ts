@@ -255,7 +255,9 @@ test.describe('Login Channel Management', () => {
         .first();
       await expect(emailTab).toBeVisible({ timeout: 8000 });
       await emailTab.click();
-      await expect(freshPage.locator('#email')).toBeVisible({ timeout: 8000 });
+      await expect(freshPage.locator('#identifier, #email').first()).toBeVisible({
+        timeout: 8000,
+      });
       await expect(freshPage.locator('#password')).toBeVisible({ timeout: 8000 });
     } finally {
       await freshPage.close();
