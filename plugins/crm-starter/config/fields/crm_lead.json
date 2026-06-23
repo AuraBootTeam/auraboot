@@ -87,17 +87,18 @@
     "displayName:en": "Assign To",
     "dataType": "enum",
     "dictCode": "owner_type",
-    "defaultValue": "user"
+    "defaultValue": "user",
+    "description": "Whether the lead is assigned to a user or a team.",
+    "feature": { "searchable": true }
   },
   {
     "code": "owner_id",
     "displayName:zh-CN": "分配给",
     "displayName:en": "Assignee",
-    "dataType": "reference",
-    "refTarget": {
-      "targetModel": "ab_user",
-      "targetField": "user_name"
-    },
+    "dataType": "string",
+    "constraints": { "maxLength": 64 },
+    "description": "PID of the assigned user or team.",
+    "feature": { "searchable": true },
     "extension": {
       "renderComponent": "ownerselect",
       "placeholder:zh-CN": "请选择负责人",

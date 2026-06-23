@@ -262,7 +262,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       expect.objectContaining({
         method: 'post',
         params: expect.objectContaining({
-          targetRecordId: 'QUOTE-123',
+          targetRecordPid: 'QUOTE-123',
           operationType: 'UPDATE',
         }),
       }),
@@ -308,7 +308,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       expect.objectContaining({
         method: 'post',
         params: expect.objectContaining({
-          targetRecordId: 'QUOTE-123',
+          targetRecordPid: 'QUOTE-123',
           operationType: 'UPDATE',
         }),
       }),
@@ -392,7 +392,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       expect.objectContaining({
         method: 'post',
         params: expect.objectContaining({
-          targetRecordId: 'QUOTE-123',
+          targetRecordPid: 'QUOTE-123',
           operationType: 'UPDATE',
           payload: expect.objectContaining({
             corrected_bom_file_id: 'FILE-123',
@@ -660,7 +660,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       expect.objectContaining({
         method: 'post',
         params: expect.objectContaining({
-          targetRecordId: 'RFQ-123',
+          targetRecordPid: 'RFQ-123',
           operationType: 'UPDATE',
           payload: expect.objectContaining({
             attachment_type: 'raw_bom',
@@ -708,7 +708,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       expect.objectContaining({
         method: 'post',
         params: expect.objectContaining({
-          targetRecordId: 'ATTACHMENT-ROW-1',
+          targetRecordPid: 'ATTACHMENT-ROW-1',
           operationType: 'DELETE',
         }),
       }),

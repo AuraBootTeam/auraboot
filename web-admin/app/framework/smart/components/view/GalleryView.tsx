@@ -12,6 +12,7 @@ import type { FilterConfig } from '~/framework/smart/types/chart';
 import { dynamicService } from '~/shared/services/dynamicService';
 import { cn } from '~/utils/cn';
 import { DataLimitBanner, ViewEmptyState } from './shared';
+import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 
 /**
  * Props for GalleryView component
@@ -109,14 +110,17 @@ export const GalleryView: React.FC<GalleryViewProps> = ({
 
       const galleryItems: GalleryItem[] = result.records
         .filter((record) => record[imageField])
-        .map((record) => ({
-          id: String(record.id ?? record.pid ?? ''),
-          recordPid: String(record.pid ?? record.id ?? ''),
-          imageUrl: String(record[imageField]),
-          title: String(record[titleField] ?? record['name'] ?? 'Untitled'),
-          description: descriptionField ? String(record[descriptionField] ?? '') : undefined,
-          record,
-        }));
+        .map((record) => {
+          const recordPid = getLegacyCompatibleRecordPid(record) || '';
+          return {
+            id: recordPid,
+            recordPid,
+            imageUrl: String(record[imageField]),
+            title: String(record[titleField] ?? record['name'] ?? 'Untitled'),
+            description: descriptionField ? String(record[descriptionField] ?? '') : undefined,
+            record,
+          };
+        });
 
       setItems(galleryItems);
     } catch (err) {

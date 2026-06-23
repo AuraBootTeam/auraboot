@@ -18,6 +18,7 @@ import { ResultHelper } from '~/utils/type';
 import type { ViewConfig } from '~/framework/smart/types/savedView';
 import type { FilterConfig } from '~/framework/smart/types/chart';
 import { DataLimitBanner, ViewDiagnostics, ViewEmptyState } from './shared';
+import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 
 interface TimelineViewProps {
   viewConfig?: ViewConfig;
@@ -101,7 +102,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     for (const record of data) {
       const startVal = record[startField || ''];
       const endVal = endField ? record[endField] : startVal;
-      const recordId = String(record.pid || record.id || '');
+      const recordId = getLegacyCompatibleRecordPid(record) || '';
       const titleVal = String(record[titleField] || recordId);
       const hasStart = startVal != null && startVal !== '';
       const hasEnd = endVal != null && endVal !== '';

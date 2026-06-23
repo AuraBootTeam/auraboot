@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -62,6 +63,9 @@ class TeamScopeControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private org.springframework.cache.CacheManager cacheManager;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -77,6 +81,7 @@ class TeamScopeControllerIntegrationTest extends BaseIntegrationTest {
         // "system.view_saved_view.update" code is no longer registered.
         grantPermission("dashboard.saved_view.update", "dashboard", "saved_view", "update", "Saved View Update");
         userPermissionService.evictUserPermissions(getTestUser().getId());
+        ensurePageSchema("controller-team-test", "device");
 
         ensureUserInSingleTeam(getTestUser().getId(), TEAM_ALPHA);
 
@@ -183,5 +188,20 @@ class TeamScopeControllerIntegrationTest extends BaseIntegrationTest {
         member.setUpdatedAt(Instant.now());
         member.setUpdatedBy(getTestUser().getId());
         tenantMemberService.updateMember(member);
+    }
+
+    private void ensurePageSchema(String pageKey, String modelCode) {
+        jdbcTemplate.update("""
+                INSERT INTO ab_page_schema
+                    (pid, tenant_id, env_id, page_key, model_code, name, kind, schema_version,
+                     title, layout, blocks, status, is_current, version, row_version,
+                     deleted_flag, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, 'list', 4,
+                        '{}'::jsonb, '{"type":"stack"}'::jsonb, '[]'::jsonb,
+                        'published', TRUE, 1, 1, FALSE, NOW(), NOW())
+                ON CONFLICT DO NOTHING
+                """,
+                UniqueIdGenerator.generate(), getTestTenant().getId(), MetaContext.getCurrentEnvironmentId(),
+                pageKey, modelCode, "Controller Team Test");
     }
 }

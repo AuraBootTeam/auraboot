@@ -87,11 +87,11 @@ class CsComplaintEmailExtractionLiveIT extends BaseIntegrationTest {
 
     private static final Map<String, Object> COMPLAINT_SCHEMA = objectSchema(
             new LinkedHashMap<>(Map.of(
-                    "account", prop("string", "Customer company name or account code the complaint is from"),
-                    "contact", prop("string", "Name of the contact person who sent the complaint, if stated"),
+                    "account", prop("string", "Customer company name or account code the complaint is from. Omit if the email does not state it."),
+                    "contact", prop("string", "Name of the contact person who sent the complaint. Omit if the email does not state it."),
                     "description", prop("string", "A concise description of the problem being complained about"),
-                    "severity", propEnum("Severity of the complaint", List.of("low", "medium", "high", "critical")))),
-            List.of("account", "description", "severity"));
+                    "severity", propEnum("Severity of the complaint. Only set when the email states urgency, production impact, or explicit priority; omit for vague problem reports.", List.of("low", "medium", "high", "critical")))),
+            List.of("description"));
 
     private List<Email> emails() {
         List<Email> e = new ArrayList<>();
@@ -197,7 +197,9 @@ class CsComplaintEmailExtractionLiveIT extends BaseIntegrationTest {
                     .systemPrompt("You are a customer-service triage assistant. Read the inbound complaint "
                             + "email and call the tool to register it. Extract only what the email actually "
                             + "states — never invent a company name, contact, or severity that is not supported "
-                            + "by the email. Map the customer's urgency to the severity enum.")
+                            + "by the email. Only map severity when the email contains an explicit urgency, "
+                            + "priority, quality-incident, or production-impact signal. Vague wording such as "
+                            + "'有点问题' is not enough for severity; omit account/contact/severity when unknown.")
                     .messages(List.of(LlmChatRequest.Message.text("user", em.body())))
                     .tools(List.of(tool))
                     .toolChoice("auto")
@@ -294,6 +296,7 @@ class CsComplaintEmailExtractionLiveIT extends BaseIntegrationTest {
         schema.put("type", "object");
         schema.put("properties", properties);
         schema.put("required", required);
+        schema.put("additionalProperties", false);
         return schema;
     }
 

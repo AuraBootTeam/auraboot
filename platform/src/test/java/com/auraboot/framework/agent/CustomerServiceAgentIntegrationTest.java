@@ -7,11 +7,14 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.crm.event.InboundEmailEvent;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.notification.service.EmailSender;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,6 +65,12 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @MockitoBean
+    private EmailSender emailSender;
+
     // Shared state across ordered tests
     private final String testPrefix = "cstest-" + System.currentTimeMillis();
     private String accountRecordId;
@@ -69,6 +78,153 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
     private Long accountRowId;
     private Long contactRowId;
     private String taskPid;
+
+    @BeforeAll
+    void ensureCrmTables() {
+        ensureAccountTable("mt_crm_account_common");
+        ensureAccountTable("mt_crm_account");
+        ensureContactTable("mt_crm_contact_common");
+        ensureContactTable("mt_crm_contact");
+        ensureActivityTable();
+        ensureComplaintTable();
+    }
+
+    private void ensureAccountTable(String tableName) {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS %s (
+                    id BIGSERIAL PRIMARY KEY,
+                    pid VARCHAR(64) UNIQUE NOT NULL,
+                    tenant_id BIGINT NOT NULL,
+                    crm_acc_code VARCHAR(128),
+                    crm_acc_name VARCHAR(255),
+                    crm_acc_industry VARCHAR(255),
+                    crm_acc_website VARCHAR(255),
+                    crm_acc_phone VARCHAR(64),
+                    crm_acc_address TEXT,
+                    crm_acc_rating VARCHAR(64),
+                    crm_acc_owner VARCHAR(128),
+                    crm_acc_status VARCHAR(64),
+                    crm_acc_remark TEXT,
+                    created_by BIGINT,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    updated_by BIGINT,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+                )
+                """.formatted(tableName));
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_acc_code VARCHAR(128)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_acc_name VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_acc_industry VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_acc_website VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_acc_phone VARCHAR(64)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_acc_address TEXT");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_acc_rating VARCHAR(64)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_acc_owner VARCHAR(128)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_acc_status VARCHAR(64)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_acc_remark TEXT");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS created_by BIGINT");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS updated_by BIGINT");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS deleted_flag BOOLEAN NOT NULL DEFAULT FALSE");
+    }
+
+    private void ensureContactTable(String tableName) {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS %s (
+                    id BIGSERIAL PRIMARY KEY,
+                    pid VARCHAR(64) UNIQUE NOT NULL,
+                    tenant_id BIGINT NOT NULL,
+                    crm_ct_account_id VARCHAR(128),
+                    crm_ct_name VARCHAR(255),
+                    crm_ct_title VARCHAR(255),
+                    crm_ct_email VARCHAR(255),
+                    crm_ct_phone VARCHAR(64),
+                    crm_ct_mobile VARCHAR(64),
+                    crm_ct_is_primary BOOLEAN DEFAULT FALSE,
+                    crm_ct_remark TEXT,
+                    created_by BIGINT,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    updated_by BIGINT,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+                )
+                """.formatted(tableName));
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_ct_account_id VARCHAR(128)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_ct_name VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_ct_title VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_ct_email VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_ct_phone VARCHAR(64)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_ct_mobile VARCHAR(64)");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_ct_is_primary BOOLEAN DEFAULT FALSE");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS crm_ct_remark TEXT");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS created_by BIGINT");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS updated_by BIGINT");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE " + tableName + " ADD COLUMN IF NOT EXISTS deleted_flag BOOLEAN NOT NULL DEFAULT FALSE");
+    }
+
+    private void ensureActivityTable() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS mt_crm_activity (
+                    id BIGSERIAL PRIMARY KEY,
+                    pid VARCHAR(64) UNIQUE NOT NULL,
+                    tenant_id BIGINT NOT NULL,
+                    crm_act_type VARCHAR(64),
+                    crm_act_subject VARCHAR(255),
+                    crm_act_content TEXT,
+                    crm_act_date TIMESTAMPTZ,
+                    crm_act_owner VARCHAR(128),
+                    created_by BIGINT,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    updated_by BIGINT,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+                )
+                """);
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS crm_act_type VARCHAR(64)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS crm_act_subject VARCHAR(255)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS crm_act_content TEXT");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS crm_act_date TIMESTAMPTZ");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS crm_act_owner VARCHAR(128)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS created_by BIGINT");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS updated_by BIGINT");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_activity ADD COLUMN IF NOT EXISTS deleted_flag BOOLEAN NOT NULL DEFAULT FALSE");
+    }
+
+    private void ensureComplaintTable() {
+        jdbcTemplate.execute("""
+                CREATE TABLE IF NOT EXISTS mt_crm_complaint (
+                    id BIGSERIAL PRIMARY KEY,
+                    pid VARCHAR(64) UNIQUE NOT NULL,
+                    tenant_id BIGINT NOT NULL,
+                    crm_cp_title VARCHAR(500),
+                    crm_cp_description TEXT,
+                    crm_cp_status VARCHAR(50) DEFAULT 'open',
+                    crm_cp_priority VARCHAR(50),
+                    crm_cp_customer_email VARCHAR(255),
+                    crm_complaint_subject VARCHAR(500),
+                    crm_complaint_description TEXT,
+                    crm_complaint_status VARCHAR(50),
+                    crm_complaint_priority VARCHAR(50),
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    created_by BIGINT,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    updated_by BIGINT,
+                    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE
+                )
+                """);
+        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS crm_complaint_subject VARCHAR(500)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS crm_complaint_description TEXT");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS crm_complaint_status VARCHAR(50)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS crm_complaint_priority VARCHAR(50)");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP");
+        jdbcTemplate.execute("ALTER TABLE mt_crm_complaint ADD COLUMN IF NOT EXISTS deleted_flag BOOLEAN NOT NULL DEFAULT FALSE");
+    }
 
     // ========== Test 1: Seed CRM Account + Contact ==========
 
