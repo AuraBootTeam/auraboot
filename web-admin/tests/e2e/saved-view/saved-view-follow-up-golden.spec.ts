@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { test, expect, type Page } from '@playwright/test';
+import { BACKEND_URL } from '../../helpers/environments';
 import { openSavedViewManagePanel, uniqueId, waitForDynamicPageLoad } from '../helpers';
 import { navigateToOrderViaSidebar } from './helpers';
 
@@ -34,10 +35,7 @@ async function apiText(page: Page, method: 'get' | 'post', url: string, data?: u
 }
 
 function backendBaseUrl(): string {
-  if (process.env.PLAYWRIGHT_BACKEND_URL) return process.env.PLAYWRIGHT_BACKEND_URL;
-  if (process.env.BACKEND_URL) return process.env.BACKEND_URL;
-  const port = process.env.BE_PORT || '6443';
-  return `http://127.0.0.1:${port}`;
+  return BACKEND_URL;
 }
 
 function adminStorageStatePath(): string {

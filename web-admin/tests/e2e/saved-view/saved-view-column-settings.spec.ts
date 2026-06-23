@@ -23,12 +23,12 @@ import {
   type Page,
   type Response as PlaywrightResponse,
 } from '@playwright/test';
+import { BASE_URL } from '../../helpers/environments';
 import { uniqueId } from '../helpers';
 
 const MODEL_CODE = 'e2et_order';
 const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
 const ADMIN_STORAGE_STATE = process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json';
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 
 // ---------------------------------------------------------------------------
 // Navigation helper — sidebar menu, NOT page.goto for the list page  [D1]
