@@ -150,7 +150,7 @@
     "dayjs": "^1.11.20",
     "dompurify": "^3.4.11",
     "dotenv": "^17.2.1",
-    "echarts": "^6.0.0",
+    "echarts": "^6.1.0",
     "echarts-for-react": "^3.0.6",
     "echarts-wordcloud": "^2.1.0",
     "express": "^4.22.2",
