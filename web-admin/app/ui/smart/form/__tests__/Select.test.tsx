@@ -1,10 +1,11 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Select } from '../Select';
 
 let mockOptions: Array<{ label: string; value: string }> = [];
 let mockLoading = false;
+let mockRefetch = vi.fn();
 
 vi.mock('react-router', async () => {
   const actual = await vi.importActual<typeof import('react-router')>('react-router');
@@ -19,7 +20,7 @@ vi.mock('~/framework/meta/hooks/useFieldDataSource', () => ({
     options: mockOptions,
     loading: mockLoading,
     error: null,
-    refetch: vi.fn(),
+    refetch: mockRefetch,
   }),
 }));
 
@@ -27,6 +28,7 @@ describe('Smart Select', () => {
   beforeEach(() => {
     mockOptions = [];
     mockLoading = false;
+    mockRefetch = vi.fn();
   });
 
   it('shows the selected option label after async options load without requiring reselection', () => {
@@ -79,5 +81,23 @@ describe('Smart Select', () => {
       .mock.calls.map((call) => call.map(String).join(' '))
       .join('\n');
     expect(consoleErrors).not.toContain('changing from uncontrolled to controlled');
+  });
+
+  it('refetches async options when opening a single select', () => {
+    render(
+      <Select
+        name="bom_project_id"
+        dataSource={{
+          type: 'api',
+          endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
+          method: 'get',
+          autoFetch: false,
+        } as any}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('select-trigger-bom_project_id'));
+
+    expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
 });

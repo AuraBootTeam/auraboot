@@ -701,12 +701,41 @@ async function seedQuoteScaffold(
   const created: CreatedRows = { quoteId: '', quoteCode, rows: [] };
 
   try {
+    const accountResult = await executeCommand(
+      page,
+      'crm:create_account',
+      {
+        crm_acc_name: `E2E ${marker} Customer ${suffix}`,
+        crm_acc_industry: 'electronics',
+        crm_acc_rating: 'A',
+      },
+      undefined,
+      'create',
+    );
+    const accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
+    expect(accountId, 'crm:create_account should return account id').toBeTruthy();
+    created.rows.push({ model: 'crm_account_common', pid: accountId });
+
+    const projectId = await dynamicCreate(
+      page,
+      'req_requirement_set_pcba_bom',
+      {
+        bom_project_name: `E2E ${marker} Project ${suffix}`,
+        bom_project_customer_id: accountId,
+        bom_project_quality_level: 'industrial',
+        bom_pcba_code: `PCBA-${marker}-${suffix}`,
+        bom_project_remark: `Seeded by QuoteOps ${marker} E2E`,
+      },
+      created.rows,
+    );
+
     const customerRequestId = await dynamicCreate(
       page,
       'crm_customer_request_common',
       {
         crm_cr_code: `CR-E2E-${marker}-${suffix}`,
         crm_cr_title: `E2E ${marker} request ${suffix}`,
+        crm_cr_account_id: accountId,
         crm_cr_type: 'pcba_quote',
         crm_cr_status: 'draft',
         crm_cr_priority: 'normal',
@@ -731,33 +760,24 @@ async function seedQuoteScaffold(
       },
       created.rows,
     );
-    const quoteResult = await executeCommand(
+    const quoteId = await dynamicCreate(
       page,
-      'qo_quote_common:create',
+      'qo_quote_common',
       {
         qo_quote_customer: `E2E ${marker} Customer ${suffix}`,
         qo_quote_code: quoteCode,
+        qo_quote_status: 'draft',
+        qo_quote_version_no: 1,
+        qo_quote_crm_account_id: accountId,
+        qo_quote_project_id: projectId,
         qo_quote_customer_request_id: customerRequestId,
         qo_quote_tax_rate: 0.13,
         qo_quote_factory_class: factoryClass,
+        qo_quote_industry: 'pcba',
       },
-      undefined,
-      'create',
+      created.rows,
     );
-    const quoteId = String(
-      quoteResult.recordId ??
-        quoteResult.quoteId ??
-        quoteResult.pid ??
-        ((quoteResult.quote as Record<string, unknown> | undefined)?.pid ?? ''),
-    );
-    expect(quoteId, 'qo_quote_common:create should return quote id').toBeTruthy();
-    created.rows.push({ model: 'qo_quote_common', pid: quoteId });
     created.quoteId = quoteId;
-    const returnedPcbaRfqId = String(quoteResult.pcbaRfqId ?? '');
-    if (returnedPcbaRfqId && returnedPcbaRfqId !== pcbaRfqId) {
-      pcbaRfqId = returnedPcbaRfqId;
-      created.rows.push({ model: 'crm_customer_request_pcba_rfq', pid: pcbaRfqId });
-    }
 
     await dynamicCreate(
       page,
@@ -863,14 +883,29 @@ export async function seedBomWorkbench(page: Page): Promise<BomWorkbenchSeed> {
   } as BomWorkbenchSeed;
 
   try {
+    const accountResult = await executeCommand(
+      page,
+      'crm:create_account',
+      {
+        crm_acc_name: `${marker} customer`,
+        crm_acc_industry: 'electronics',
+        crm_acc_rating: 'A',
+      },
+      undefined,
+      'create',
+    );
+    const accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
+    expect(accountId, 'crm:create_account should return account id').toBeTruthy();
+    created.rows.push({ model: 'crm_account_common', pid: accountId });
+
     created.projectId = await dynamicCreate(
       page,
       'req_requirement_set_pcba_bom',
       {
-        bom_pcba_code: `PCBA-${suffix}`,
         bom_project_name: `${marker} project`,
-        bom_product_name: `${marker} product`,
-        bom_project_library_source: 'excel_current_library',
+        bom_project_customer_id: accountId,
+        bom_project_quality_level: 'industrial',
+        bom_pcba_code: `PCBA-${suffix}`,
         bom_project_remark: 'Seeded by QuoteOps BOM workbench golden E2E',
       },
       created.rows,
@@ -881,6 +916,7 @@ export async function seedBomWorkbench(page: Page): Promise<BomWorkbenchSeed> {
       'bom_conversion_task_pcba',
       {
         bom_task_no: `TASK-${suffix}`,
+        bom_task_customer_id: accountId,
         bom_task_project_id: created.projectId,
         bom_task_source_package: 'quoteops-e2e',
         bom_task_source_model: 'req_requirement_set_pcba_bom',
