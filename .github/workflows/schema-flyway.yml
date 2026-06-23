@@ -44,7 +44,7 @@ jobs:
       PG_PASSWORD: auraboot
       FLYWAY_VERSION: "11.2.0"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Flyway CLI
         run: |
