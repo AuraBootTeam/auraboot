@@ -153,11 +153,6 @@ const REQUIRED_COMMON_KEYS = [
   'saved_view_save_preset_to_personal',
   'saved_view_preset_saved_to_personal',
   'saved_view_preset_save_failed',
-  'saved_view_preset_saved_badge',
-  'saved_view_preset_edited_badge',
-  'saved_view_preset_reset',
-  'saved_view_preset_reset_done',
-  'saved_view_preset_reset_failed',
   // System audit field column headers (#2)
   'created_at',
   'updated_at',
