@@ -46,7 +46,7 @@ dependencies {
     testImplementation 'org.springframework:spring-beans:6.2.18'
     testImplementation 'org.springframework.boot:spring-boot:3.5.14'
     testImplementation 'org.slf4j:slf4j-api:2.0.18'
-    testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.21'
+    testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.22'
     testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.16'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.14.4'

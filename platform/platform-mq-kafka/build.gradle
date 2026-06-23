@@ -37,7 +37,7 @@ dependencies {
 
     // Root platform classes reference Jackson annotations; keep the compileOnly API visible
     // when this provider compiles against project(':') without the full root runtime graph.
-    compileOnly 'com.fasterxml.jackson.core:jackson-annotations:2.21'
+    compileOnly 'com.fasterxml.jackson.core:jackson-annotations:2.22'
 
     // SLF4J for @Slf4j
     compileOnly 'org.slf4j:slf4j-api:2.0.18'
