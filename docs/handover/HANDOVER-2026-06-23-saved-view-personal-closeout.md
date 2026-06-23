@@ -64,6 +64,6 @@ distilled_to:
 
 ## Next Steps
 
-1. Commit OSS code/docs and enterprise system-reference docs as separate PRs.
-2. Run targeted code review before merge; findings must cite file/line and distinguish code risk from roadmap scope.
-3. Admin merge both PRs to `main`, push, then pull/update local main worktrees.
+1. OSS PR `#1062` and enterprise PR `#660` are the closeout PRs for this Personal-only baseline.
+2. Targeted self-review found the main remaining risk was stale backlog wording that still sounded like shared/team/global was current scope; this handover and backlog now mark those rows as historical evidence only.
+3. Before merge, re-check PR CI / mergeability in real time. After admin merge, fetch/pull local `main` worktrees and do not reopen shared/team/global or pid-only migration in this branch.
