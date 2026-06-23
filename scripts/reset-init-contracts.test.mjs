@@ -221,6 +221,32 @@ test('Gradle plugin markers resolve from Maven Central before Gradle Plugin Port
   );
 });
 
+test('CI and Docker builds no longer install SmartEngine into Maven local', () => {
+  assert.equal(
+    existsSync('scripts/install-smartengine-maven-local.sh'),
+    false,
+    'root SmartEngine Maven local wrapper should be removed after publishing 4.0.2',
+  );
+  assert.equal(
+    existsSync('platform/scripts/install-smartengine-maven-local.sh'),
+    false,
+    'platform SmartEngine Maven local installer should be removed after publishing 4.0.2',
+  );
+
+  for (const path of ['.github/workflows/backend.yml', '.github/workflows/codeql.yml', 'platform/Dockerfile']) {
+    const content = read(path);
+    assert.doesNotMatch(content, /Install SmartEngine fork into Maven local/);
+    assert.doesNotMatch(content, /install-smartengine-maven-local/);
+  }
+});
+
+test('markdownlint MD025 ignores frontmatter title without disabling single-h1 checks', () => {
+  const config = read('.markdownlint-cli2.jsonc');
+
+  assert.match(config, /"MD025"\s*:\s*\{\s*"front_matter_title"\s*:\s*""\s*\}/);
+  assert.doesNotMatch(config, /"MD025"\s*:\s*false/);
+});
+
 test('seeded CS agent declares only OSS CRM starter tools that can be imported', () => {
   const seed = read('scripts/seed-cs-agent.sql');
   for (const staleReference of [
