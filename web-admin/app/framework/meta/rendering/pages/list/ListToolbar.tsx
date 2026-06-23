@@ -11,10 +11,7 @@ import { FilterChipBar } from '~/framework/smart/components/view/FilterChipBar';
 import type { SortConfig, ViewFilterConfig, RowHeight } from '~/framework/smart/types/savedView';
 import { SortPopover, type SortableColumn } from './SortPopover';
 import { useI18n } from '~/contexts/I18nContext';
-import {
-  type QuickFilterPresetKey,
-  getQuickFilterPresetDefinitions,
-} from './quickFilterPresets';
+import { type QuickFilterPresetKey, getQuickFilterPresetDefinitions } from './quickFilterPresets';
 
 type QuickFilterKey = QuickFilterPresetKey;
 
@@ -133,7 +130,7 @@ export function ListToolbar({
     <>
       {/* Main toolbar row */}
       <div
-        className="print-hide flex flex-wrap items-center gap-2 border-b border-gray-100 px-4 py-2 sm:px-6"
+        className="print-hide border-border flex flex-wrap items-center gap-2 border-b px-4 py-2 sm:px-6"
         data-print="hide"
         data-testid="list-toolbar"
       >
@@ -164,7 +161,7 @@ export function ListToolbar({
         </div>
 
         {/* Separator */}
-        {showInlineControls && <div className="mx-1 hidden h-6 w-px bg-gray-200 sm:block" />}
+        {showInlineControls && <div className="bg-border mx-1 hidden h-6 w-px sm:block" />}
 
         {/* Sort popover trigger */}
         {!hideSort && (
@@ -177,7 +174,7 @@ export function ListToolbar({
               type="button"
               className={`rounded-card flex items-center gap-1 border px-3 py-1.5 text-xs font-medium transition-colors ${
                 activeSorts.length > 0
-                  ? 'bg-accent-weak text-accent border-blue-200 hover:bg-blue-100'
+                  ? 'bg-accent-weak text-accent border-accent/30 hover:bg-accent-weak'
                   : 'border-border text-text-2 hover:bg-hover hover:text-text-2'
               }`}
               data-testid="sort-popover-trigger"
@@ -233,7 +230,7 @@ export function ListToolbar({
             onClick={onFilterFormToggle}
             className={`rounded-card flex items-center gap-1 border px-3 py-1.5 text-xs font-medium transition-colors ${
               filterFormVisible
-                ? 'bg-accent-weak text-accent border-blue-200 hover:bg-blue-100'
+                ? 'bg-accent-weak text-accent border-accent/30 hover:bg-accent-weak'
                 : 'border-border text-text-2 hover:bg-hover hover:text-text-2'
             }`}
             data-testid="filters-toggle"
@@ -284,7 +281,7 @@ export function ListToolbar({
                   aria-pressed={active}
                   className={`rounded-pill inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium transition-colors ${
                     active
-                      ? 'bg-accent-weak text-accent ring-1 ring-blue-300'
+                      ? 'bg-accent-weak text-accent ring-accent/30 ring-1'
                       : 'bg-subtle text-text-2 hover:bg-hover'
                   }`}
                 >

@@ -264,32 +264,31 @@
 }
 
 /* 深色模式 */
-@media (prefers-color-scheme: dark) {
-  .drag-preview-ghost {
-    background: rgba(31, 41, 55, 0.9) !important;
-    border-color: rgba(96, 165, 250, 0.4);
-  }
 
-  .drag-preview-solid {
-    background: #374151 !important;
-    border-color: #4b5563;
-  }
+:where(.dark) .drag-preview-ghost {
+  background: rgba(31, 41, 55, 0.9) !important;
+  border-color: rgba(96, 165, 250, 0.4);
+}
 
-  .drag-preview-info {
-    background: #111827;
-    color: #f9fafb;
-  }
+:where(.dark) .drag-preview-solid {
+  background: #374151 !important;
+  border-color: #4b5563;
+}
 
-  .drag-preview-info::after {
-    border-top-color: #111827;
-  }
+:where(.dark) .drag-preview-info {
+  background: #111827;
+  color: #f9fafb;
+}
 
-  .drag-placeholder-dashed,
-  .drag-placeholder-dotted,
-  .drag-placeholder-solid {
-    border-color: #60a5fa;
-    background: rgba(96, 165, 250, 0.1);
-  }
+:where(.dark) .drag-preview-info::after {
+  border-top-color: #111827;
+}
+
+:where(.dark) .drag-placeholder-dashed,
+:where(.dark) .drag-placeholder-dotted,
+:where(.dark) .drag-placeholder-solid {
+  border-color: #60a5fa;
+  background: rgba(96, 165, 250, 0.1);
 }
 
 /* 性能优化 */

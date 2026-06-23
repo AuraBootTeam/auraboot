@@ -27,13 +27,13 @@ function getDueDateDisplay(
     const overHours = Math.abs(Math.floor(diffHours));
     const text =
       overHours >= 24 ? `逾期 ${Math.floor(overHours / 24)} 天` : `逾期 ${overHours} 小时`;
-    return { text, className: 'text-red-600 font-medium', isOverdue: true };
+    return { text, className: 'text-status-red font-medium', isOverdue: true };
   }
 
   if (diffHours <= 4) {
     return {
       text: `${Math.ceil(diffHours)} 小时后`,
-      className: 'text-orange-500',
+      className: 'text-status-amber',
       isOverdue: false,
     };
   }
@@ -41,33 +41,33 @@ function getDueDateDisplay(
   if (diffHours <= 24) {
     return {
       text: `${Math.ceil(diffHours)} 小时后`,
-      className: 'text-yellow-600',
+      className: 'text-status-amber',
       isOverdue: false,
     };
   }
 
   const diffDays = Math.ceil(diffHours / 24);
-  return { text: `${diffDays} 天后`, className: 'text-gray-500', isOverdue: false };
+  return { text: `${diffDays} 天后`, className: 'text-text-2', isOverdue: false };
 }
 
 function PriorityBadge({ priority }: { priority?: number }) {
   if (priority === undefined || priority === null) return null;
   if (priority >= 80) {
     return (
-      <span className="inline-flex items-center rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
+      <span className="bg-status-red-bg text-status-red inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium">
         高
       </span>
     );
   }
   if (priority >= 50) {
     return (
-      <span className="inline-flex items-center rounded bg-yellow-100 px-1.5 py-0.5 text-xs font-medium text-yellow-700">
+      <span className="bg-status-amber-bg text-status-amber inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium">
         中
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center rounded bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+    <span className="bg-status-green-bg text-status-green inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium">
       低
     </span>
   );
@@ -116,7 +116,7 @@ export function TaskTable({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8 text-gray-500">
+      <div className="text-text-2 flex items-center justify-center py-8">
         <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
         加载中...
       </div>
@@ -125,7 +125,7 @@ export function TaskTable({
 
   if (tasks.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+      <div className="text-text-3 flex flex-col items-center justify-center py-12">
         <CheckCircle2 className="mb-4 h-12 w-12 opacity-20" />
         <p>暂无任务</p>
       </div>
@@ -134,8 +134,8 @@ export function TaskTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b bg-gray-50 text-xs uppercase">
+      <table className="text-text-2 w-full text-left text-sm">
+        <thead className="border-border bg-subtle text-text-3 border-b text-xs uppercase">
           <tr>
             {showCheckbox && (
               <th className="w-12 px-4 py-3">
@@ -154,7 +154,7 @@ export function TaskTable({
             {showActions && <th className="w-24 px-4 py-3">操作</th>}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-border divide-y">
           {tasks.map((task) => (
             <TaskRow
               key={task.taskId || task.instanceId}
@@ -222,7 +222,7 @@ function TaskRow({
   );
 
   return (
-    <tr className="border-b hover:bg-gray-50">
+    <tr className="transition-colors hover:bg-hover">
       {showCheckbox && (
         <td className="px-4 py-3">
           <Checkbox checked={isSelected} onCheckedChange={handleCheckChange} />
@@ -230,10 +230,12 @@ function TaskRow({
       )}
       <td className="px-4 py-3">
         <div className="flex items-center gap-1.5">
-          {hasSlaWarning && <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 text-orange-500" />}
+          {hasSlaWarning && (
+            <AlertCircle className="text-status-amber h-3.5 w-3.5 flex-shrink-0" />
+          )}
           <div className="flex min-w-0 flex-col">
             <button
-              className="truncate text-left font-medium text-blue-600 hover:text-blue-800 hover:underline"
+              className="text-accent hover:text-accent-hover truncate text-left font-medium hover:underline"
               onClick={() => onOpenDetail(task)}
               data-testid="task-name-button"
             >
@@ -246,34 +248,34 @@ function TaskRow({
               into its own column so it can be sorted/scanned.
             */}
             {task.processDefinitionKey && (
-              <span className="truncate text-xs text-gray-500" data-testid="task-process-key">
+              <span className="text-text-3 truncate text-xs" data-testid="task-process-key">
                 {task.processDefinitionKey}
               </span>
             )}
           </div>
         </div>
       </td>
-      <td className="px-4 py-3 font-mono text-xs text-gray-700" data-testid="task-business-key">
-        {task.businessKey || <span className="text-gray-400">-</span>}
+      <td className="text-text-2 px-4 py-3 font-mono text-xs" data-testid="task-business-key">
+        {task.businessKey || <span className="text-text-3">-</span>}
       </td>
       <td className="px-4 py-3">
         <PriorityBadge priority={task.priority} />
       </td>
-      <td className="px-4 py-3 text-xs text-gray-500">
+      <td className="text-text-3 px-4 py-3 text-xs">
         <DateTime value={task.createTime} />
       </td>
       <td className="px-4 py-3">
         {dueInfo ? (
           <div className="flex items-center gap-1">
-            {dueInfo.isOverdue && <Clock className="h-3 w-3 text-red-500" />}
+            {dueInfo.isOverdue && <Clock className="text-status-red h-3 w-3" />}
             <span className={`text-xs ${dueInfo.className}`}>{dueInfo.text}</span>
           </div>
         ) : (
-          <span className="text-xs text-gray-400">-</span>
+          <span className="text-text-3 text-xs">-</span>
         )}
       </td>
       <td className="px-4 py-3">
-        <div className="flex items-center text-gray-600">
+        <div className="text-text-2 flex items-center">
           <User className="mr-1 h-3 w-3" />
           <span className="text-xs">{task.claimUserId || task.assignee || '-'}</span>
         </div>
@@ -322,84 +324,84 @@ function TaskActionMenu({
   };
 
   return (
-    <div className="ring-opacity-5 absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black">
+    <div className="border-border bg-panel shadow-pop absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md border py-1">
       <button
         data-testid="task-action-detail"
-        className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+        className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
         onClick={() => menuAction(() => onOpenDetail(task))}
       >
         查看详情
       </button>
-      <div className="my-1 border-t" />
+      <div className="border-border my-1 border-t" />
       <button
         data-testid="task-action-approve"
-        className="block w-full px-4 py-2 text-left text-sm text-green-700 hover:bg-gray-100"
+        className="text-status-green hover:bg-hover block w-full px-4 py-2 text-left text-sm"
         onClick={() => menuAction(() => onOpenDialog('approve', task))}
       >
         通过
       </button>
       <button
         data-testid="task-action-reject"
-        className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
+        className="text-status-red hover:bg-hover block w-full px-4 py-2 text-left text-sm"
         onClick={() => menuAction(() => onOpenDialog('reject', task))}
       >
         驳回
       </button>
       {!task.claimUserId && (
         <button
-          className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+          className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
           onClick={() => menuAction(() => onClaim(task))}
         >
           认领任务
         </button>
       )}
       <button
-        className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+        className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
         onClick={() => menuAction(() => onOpenDialog('complete', task))}
       >
         完成任务
       </button>
-      <div className="my-1 border-t" />
+      <div className="border-border my-1 border-t" />
       <button
-        className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+        className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
         onClick={() => menuAction(() => onOpenDialog('delegate', task))}
       >
         委托
       </button>
       <button
-        className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+        className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
         onClick={() => menuAction(() => onOpenDialog('transfer', task))}
       >
         转办
       </button>
       <button
-        className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+        className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
         onClick={() => menuAction(() => onOpenDialog('addSign', task))}
       >
         加签
       </button>
       <button
-        className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+        className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
         onClick={() => menuAction(() => onOpenDialog('removeSign', task))}
       >
         减签
       </button>
       <button
-        className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+        className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
         onClick={() => menuAction(() => onOpenDialog('rollback', task))}
       >
         回退
       </button>
-      <div className="my-1 border-t" />
+      <div className="border-border my-1 border-t" />
       <button
-        className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+        className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
         onClick={() => menuAction(() => onOpenDialog('carbonCopy', task))}
       >
         抄送
       </button>
       {onUrge && (
         <button
-          className="block w-full px-4 py-2 text-left text-sm text-orange-600 hover:bg-gray-100"
+          className="text-status-amber hover:bg-hover block w-full px-4 py-2 text-left text-sm"
           onClick={() => menuAction(() => onUrge(task))}
         >
           催办

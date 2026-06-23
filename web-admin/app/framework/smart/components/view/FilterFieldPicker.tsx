@@ -112,32 +112,32 @@ export function FilterFieldPicker({
     <button
       key={f.fieldCode}
       type="button"
-      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-gray-100"
+      className="hover:bg-hover flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm"
       onClick={() => {
         onSelect(f.fieldCode);
         onClose();
       }}
     >
       <span className="flex-shrink-0 text-base leading-none">{fieldIcon(f.fieldType)}</span>
-      <span className="flex-1 truncate text-gray-800">{f.label}</span>
-      <span className="flex-shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+      <span className="text-text flex-1 truncate">{f.label}</span>
+      <span className="bg-subtle text-text-2 flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium">
         {typeBadge(f.fieldType)}
       </span>
-      {activeSet.has(f.fieldCode) && <span className="flex-shrink-0 text-blue-500">&#10003;</span>}
+      {activeSet.has(f.fieldCode) && <span className="text-accent flex-shrink-0">&#10003;</span>}
     </button>
   );
 
   const content = (
     <div
       ref={containerRef}
-      className="fixed z-[9999] flex max-h-[360px] min-w-[240px] flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg"
+      className="border-border bg-panel shadow-pop fixed z-[9999] flex max-h-[360px] min-w-[240px] flex-col overflow-hidden rounded-lg border"
       style={{ left: anchorEl.x, top: anchorEl.y }}
     >
       {/* Search input */}
-      <div className="border-b border-gray-100 p-2">
+      <div className="border-border border-b p-2">
         <input
           type="text"
-          className="w-full rounded border border-gray-200 px-2 py-1 text-sm outline-none placeholder:text-gray-400 focus:border-blue-400"
+          className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent w-full rounded border px-2 py-1 text-sm outline-none"
           placeholder={t('common.search_fields', undefined, 'Search fields...')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -148,14 +148,14 @@ export function FilterFieldPicker({
       {/* Scrollable field list */}
       <div className="flex-1 overflow-y-auto p-1">
         {filtered.length === 0 && (
-          <p className="px-2 py-3 text-center text-sm text-gray-400">
+          <p className="text-text-3 px-2 py-3 text-center text-sm">
             {t('common.no_fields_found', undefined, 'No fields found')}
           </p>
         )}
 
         {commonFields.length > 0 && (
           <>
-            <p className="px-2 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
+            <p className="text-text-3 px-2 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider uppercase">
               {t('common.common_fields', undefined, 'Common Fields')}
             </p>
             {commonFields.map(renderItem)}
@@ -164,7 +164,7 @@ export function FilterFieldPicker({
 
         {otherFields.length > 0 && (
           <>
-            <p className="mt-1 px-2 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider text-gray-400 uppercase">
+            <p className="text-text-3 mt-1 px-2 pt-1 pb-0.5 text-[10px] font-semibold tracking-wider uppercase">
               {t('common.other_fields', undefined, 'Other Fields')}
             </p>
             {otherFields.map(renderItem)}

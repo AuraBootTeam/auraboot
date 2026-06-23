@@ -19,7 +19,9 @@ export interface RowHeightSelectorProps {
 const ROW_HEIGHT_OPTIONS: RowHeight[] = ['short', 'medium', 'tall', 'extra-tall'];
 
 const normalizeRowHeight = (value: unknown): RowHeight =>
-  typeof value === 'string' && value in ROW_HEIGHT_CONFIG ? (value as RowHeight) : DEFAULT_ROW_HEIGHT;
+  typeof value === 'string' && value in ROW_HEIGHT_CONFIG
+    ? (value as RowHeight)
+    : DEFAULT_ROW_HEIGHT;
 
 /** Visual indicator: horizontal lines with varying gaps */
 function HeightIcon({ height }: { height: RowHeight }) {
@@ -70,14 +72,14 @@ export const RowHeightSelector: React.FC<RowHeightSelectorProps> = ({ value, onC
         type="button"
         onClick={() => setOpen((p) => !p)}
         title="Row height"
-        className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+        className="text-text-3 hover:bg-hover hover:text-text-2 rounded-md p-1.5 transition-colors"
         data-testid="row-height-btn"
       >
         <HeightIcon height={current} />
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 z-50 mt-1 w-40 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+        <div className="border-border bg-panel shadow-pop absolute top-full right-0 z-50 mt-1 w-40 rounded-lg border py-1">
           {ROW_HEIGHT_OPTIONS.map((h) => (
             <button
               key={h}
@@ -86,13 +88,13 @@ export const RowHeightSelector: React.FC<RowHeightSelectorProps> = ({ value, onC
               data-testid={`row-height-option-${h}`}
               className={`flex w-full items-center gap-2.5 px-3 py-1.5 text-sm transition-colors ${
                 h === current
-                  ? 'bg-blue-50 font-medium text-blue-700'
-                  : 'text-gray-700 hover:bg-gray-50'
+                  ? 'bg-accent-weak text-accent font-medium'
+                  : 'text-text-2 hover:bg-hover'
               }`}
             >
               <HeightIcon height={h} />
               <span>{ROW_HEIGHT_CONFIG[h].label}</span>
-              <span className="ml-auto text-xs text-gray-400">{ROW_HEIGHT_CONFIG[h].px}px</span>
+              <span className="text-text-3 ml-auto text-xs">{ROW_HEIGHT_CONFIG[h].px}px</span>
             </button>
           ))}
         </div>

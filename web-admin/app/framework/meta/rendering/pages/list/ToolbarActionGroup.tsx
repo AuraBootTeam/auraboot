@@ -290,7 +290,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                 </button>
               ))}
 
-              {overflowButtons.length > 0 && <div className="mx-2 my-1 h-px bg-gray-100" />}
+              {overflowButtons.length > 0 && <div className="bg-border mx-2 my-1 h-px" />}
 
               {/* Built-in actions — conditionally rendered based on config visibility */}
               {!hideBuiltInImport && builtinVisibility._import && (
@@ -400,7 +400,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
 
               {(loadingReports || reportTemplates.length > 0) && (
                 <>
-                  <div className="mx-2 my-1 h-px bg-gray-100" />
+                  <div className="bg-border mx-2 my-1 h-px" />
                   {loadingReports ? (
                     <div className="text-text-3 px-3.5 py-2 text-center text-xs">
                       Loading reports...
@@ -433,7 +433,7 @@ export const ToolbarActionGroup: React.FC<ToolbarActionGroupProps> = ({
                 </>
               )}
 
-              <div className="mx-2 my-1 h-px bg-gray-100" />
+              <div className="bg-border mx-2 my-1 h-px" />
 
               {/* Configure buttons link */}
               <button

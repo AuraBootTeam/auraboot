@@ -10,16 +10,16 @@ import type { ProcessInstance } from '../services/bpmWorkbenchService';
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; className: string }> = {
-    running: { label: '进行中', className: 'bg-blue-100 text-blue-800' },
-    completed: { label: '已完成', className: 'bg-gray-100 text-gray-800' },
-    suspended: { label: '已暂停', className: 'bg-yellow-100 text-yellow-800' },
-    terminated: { label: '已终止', className: 'bg-red-100 text-red-800' },
-    aborted: { label: '已终止', className: 'bg-red-100 text-red-800' },
+    running: { label: '进行中', className: 'bg-status-blue-bg text-status-blue' },
+    completed: { label: '已完成', className: 'bg-status-gray-bg text-status-gray' },
+    suspended: { label: '已暂停', className: 'bg-status-amber-bg text-status-amber' },
+    terminated: { label: '已终止', className: 'bg-status-red-bg text-status-red' },
+    aborted: { label: '已终止', className: 'bg-status-red-bg text-status-red' },
   };
   const normalizedStatus = status?.toLowerCase() || 'unknown';
   const { label, className } = config[normalizedStatus] || {
     label: status,
-    className: 'bg-gray-100 text-gray-800',
+    className: 'bg-status-gray-bg text-status-gray',
   };
   return (
     <span
@@ -55,7 +55,7 @@ export function ProcessTable({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-8 text-gray-500">
+      <div className="text-text-2 flex items-center justify-center py-8">
         <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
         加载中...
       </div>
@@ -64,7 +64,7 @@ export function ProcessTable({
 
   if (processes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+      <div className="text-text-3 flex flex-col items-center justify-center py-12">
         <PlayCircle className="mb-4 h-12 w-12 opacity-20" />
         <p>暂无流程</p>
       </div>
@@ -73,8 +73,8 @@ export function ProcessTable({
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="border-b bg-gray-50 text-xs uppercase">
+      <table className="text-text-2 w-full text-left text-sm">
+        <thead className="border-border bg-subtle text-text-3 border-b text-xs uppercase">
           <tr>
             <th className="px-4 py-3">流程名称</th>
             <th className="px-4 py-3">业务标识</th>
@@ -83,7 +83,7 @@ export function ProcessTable({
             <th className="w-24 px-4 py-3">操作</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-border divide-y">
           {processes.map((process) => (
             <ProcessRow
               key={process.instanceId}
@@ -132,15 +132,15 @@ function ProcessRow({
   };
 
   return (
-    <tr className="border-b hover:bg-gray-50">
+    <tr className="transition-colors hover:bg-hover">
       <td className="px-4 py-3">
         <div className="flex flex-col">
           <span className="font-medium">{process.title || process.processDefinitionKey}</span>
-          <span className="text-xs text-gray-500">{process.instanceId}</span>
+          <span className="text-text-3 text-xs">{process.instanceId}</span>
         </div>
       </td>
       <td className="px-4 py-3">{process.businessKey || '-'}</td>
-      <td className="px-4 py-3 text-xs text-gray-500">
+      <td className="text-text-3 px-4 py-3 text-xs">
         <DateTime value={process.startTime} />
       </td>
       <td className="px-4 py-3">
@@ -151,16 +151,16 @@ function ProcessRow({
           <MoreHorizontal className="h-4 w-4" />
         </Button>
         {isMenuOpen && (
-          <div className="ring-opacity-5 absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black">
+          <div className="border-border bg-panel shadow-pop absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md border py-1">
             <button
-              className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+              className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
               onClick={() => menuAction(() => onViewDetail(process))}
             >
               查看详情
             </button>
             {process.status === 'running' && (
               <button
-                className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
                 onClick={() => menuAction(() => onSuspend(process))}
               >
                 暂停流程
@@ -168,7 +168,7 @@ function ProcessRow({
             )}
             {process.status === 'suspended' && (
               <button
-                className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100"
+                className="text-text-2 hover:bg-hover block w-full px-4 py-2 text-left text-sm"
                 onClick={() => menuAction(() => onResume(process))}
               >
                 恢复流程
@@ -176,7 +176,7 @@ function ProcessRow({
             )}
             {process.status !== 'completed' && process.status !== 'terminated' && process.status !== 'aborted' && (
               <button
-                className="block w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-gray-100"
+                className="text-status-red hover:bg-hover block w-full px-4 py-2 text-left text-sm"
                 onClick={() => menuAction(() => onTerminate(process))}
               >
                 终止流程
