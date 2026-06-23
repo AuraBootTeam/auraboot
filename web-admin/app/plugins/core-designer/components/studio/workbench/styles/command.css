@@ -339,139 +339,138 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .undo-redo-toolbar {
-    @apply border-gray-700 bg-gray-800;
-  }
 
-  .undo-redo-toolbar__button {
-    @apply border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-600 hover:bg-gray-700;
-  }
+:where(.dark) .undo-redo-toolbar {
+  @apply border-gray-700 bg-gray-800;
+}
 
-  .undo-redo-toolbar__button.active {
-    @apply border-blue-700 bg-blue-900 text-blue-300;
-  }
+:where(.dark) .undo-redo-toolbar__button {
+  @apply border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-600 hover:bg-gray-700;
+}
 
-  .undo-redo-toolbar__divider {
-    @apply bg-gray-700;
-  }
+:where(.dark) .undo-redo-toolbar__button.active {
+  @apply border-blue-700 bg-blue-900 text-blue-300;
+}
 
-  .undo-redo-toolbar__status {
-    @apply text-gray-400;
-  }
+:where(.dark) .undo-redo-toolbar__divider {
+  @apply bg-gray-700;
+}
 
-  .undo-redo-panel {
-    @apply border-gray-700 bg-gray-800;
-  }
+:where(.dark) .undo-redo-toolbar__status {
+  @apply text-gray-400;
+}
 
-  .undo-redo-panel__header {
-    @apply border-gray-700;
-  }
+:where(.dark) .undo-redo-panel {
+  @apply border-gray-700 bg-gray-800;
+}
 
-  .undo-redo-panel__header h3 {
-    @apply text-gray-100;
-  }
+:where(.dark) .undo-redo-panel__header {
+  @apply border-gray-700;
+}
 
-  .undo-redo-panel__action,
-  .undo-redo-panel__close {
-    @apply text-gray-400 hover:bg-gray-700 hover:text-gray-200;
-  }
+:where(.dark) .undo-redo-panel__header h3 {
+  @apply text-gray-100;
+}
 
-  .undo-redo-panel__empty {
-    @apply text-gray-500;
-  }
+:where(.dark) .undo-redo-panel__action,
+:where(.dark) .undo-redo-panel__close {
+  @apply text-gray-400 hover:bg-gray-700 hover:text-gray-200;
+}
 
-  .history-item {
-    @apply hover:bg-gray-700;
-  }
+:where(.dark) .undo-redo-panel__empty {
+  @apply text-gray-500;
+}
 
-  .history-item.current {
-    @apply border-blue-700 bg-blue-900;
-  }
+:where(.dark) .history-item {
+  @apply hover:bg-gray-700;
+}
 
-  .history-item.executed {
-    @apply text-gray-100;
-  }
+:where(.dark) .history-item.current {
+  @apply border-blue-700 bg-blue-900;
+}
 
-  .history-item.pending {
-    @apply text-gray-500;
-  }
+:where(.dark) .history-item.executed {
+  @apply text-gray-100;
+}
 
-  .history-item__icon {
-    @apply text-gray-500;
-  }
+:where(.dark) .history-item.pending {
+  @apply text-gray-500;
+}
 
-  .history-item.current .history-item__icon {
-    @apply text-blue-400;
-  }
+:where(.dark) .history-item__icon {
+  @apply text-gray-500;
+}
 
-  .history-item__time {
-    @apply text-gray-500;
-  }
+:where(.dark) .history-item.current .history-item__icon {
+  @apply text-blue-400;
+}
 
-  .snapshot-item {
-    @apply bg-gray-700;
-  }
+:where(.dark) .history-item__time {
+  @apply text-gray-500;
+}
 
-  .snapshot-item__name {
-    @apply text-gray-100;
-  }
+:where(.dark) .snapshot-item {
+  @apply bg-gray-700;
+}
 
-  .snapshot-item__time {
-    @apply text-gray-400;
-  }
+:where(.dark) .snapshot-item__name {
+  @apply text-gray-100;
+}
 
-  .snapshot-item__action {
-    @apply text-blue-400 hover:bg-blue-900 hover:text-blue-300;
-  }
+:where(.dark) .snapshot-item__time {
+  @apply text-gray-400;
+}
 
-  .snapshot-item__action--danger {
-    @apply text-red-400 hover:bg-red-900 hover:text-red-300;
-  }
+:where(.dark) .snapshot-item__action {
+  @apply text-blue-400 hover:bg-blue-900 hover:text-blue-300;
+}
 
-  .performance-stat {
-    @apply border-gray-700;
-  }
+:where(.dark) .snapshot-item__action--danger {
+  @apply text-red-400 hover:bg-red-900 hover:text-red-300;
+}
 
-  .performance-stat label {
-    @apply text-gray-400;
-  }
+:where(.dark) .performance-stat {
+  @apply border-gray-700;
+}
 
-  .performance-stat value {
-    @apply text-gray-100;
-  }
+:where(.dark) .performance-stat label {
+  @apply text-gray-400;
+}
 
-  .settings-field label {
-    @apply text-gray-300;
-  }
+:where(.dark) .performance-stat value {
+  @apply text-gray-100;
+}
 
-  .settings-field input[type='number'] {
-    @apply border-gray-600 bg-gray-700 text-gray-100 focus:border-blue-400 focus:ring-blue-400;
-  }
+:where(.dark) .settings-field label {
+  @apply text-gray-300;
+}
 
-  .settings-field input[type='checkbox'] {
-    @apply border-gray-600 bg-gray-700 text-blue-400 focus:ring-blue-400;
-  }
+:where(.dark) .settings-field input[type='number'] {
+  @apply border-gray-600 bg-gray-700 text-gray-100 focus:border-blue-400 focus:ring-blue-400;
+}
 
-  .settings-actions {
-    @apply border-gray-700;
-  }
+:where(.dark) .settings-field input[type='checkbox'] {
+  @apply border-gray-600 bg-gray-700 text-blue-400 focus:ring-blue-400;
+}
 
-  .settings-actions button:first-child {
-    @apply bg-blue-600 hover:bg-blue-700 focus:ring-blue-400;
-  }
+:where(.dark) .settings-actions {
+  @apply border-gray-700;
+}
 
-  .settings-actions button:last-child {
-    @apply border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600 focus:ring-gray-400;
-  }
+:where(.dark) .settings-actions button:first-child {
+  @apply bg-blue-600 hover:bg-blue-700 focus:ring-blue-400;
+}
 
-  .simple-undo-redo__button {
-    @apply text-gray-400 hover:bg-gray-700 hover:text-gray-100;
-  }
+:where(.dark) .settings-actions button:last-child {
+  @apply border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600 focus:ring-gray-400;
+}
 
-  .spinner {
-    @apply border-gray-600 border-t-blue-400;
-  }
+:where(.dark) .simple-undo-redo__button {
+  @apply text-gray-400 hover:bg-gray-700 hover:text-gray-100;
+}
+
+:where(.dark) .spinner {
+  @apply border-gray-600 border-t-blue-400;
 }
 
 /* 快捷键帮助面板 */
@@ -638,78 +637,77 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .shortcut-help-panel {
-    @apply bg-gray-800;
-  }
 
-  .shortcut-help-panel__header {
-    @apply border-gray-700;
-  }
+:where(.dark) .shortcut-help-panel {
+  @apply bg-gray-800;
+}
 
-  .shortcut-help-panel__title h2 {
-    @apply text-gray-100;
-  }
+:where(.dark) .shortcut-help-panel__header {
+  @apply border-gray-700;
+}
 
-  .shortcut-help-panel__close {
-    @apply text-gray-400 hover:bg-gray-700 hover:text-gray-200;
-  }
+:where(.dark) .shortcut-help-panel__title h2 {
+  @apply text-gray-100;
+}
 
-  .shortcut-help-panel__toolbar {
-    @apply border-gray-700;
-  }
+:where(.dark) .shortcut-help-panel__close {
+  @apply text-gray-400 hover:bg-gray-700 hover:text-gray-200;
+}
 
-  .shortcut-help-panel__search input {
-    @apply border-gray-600 bg-gray-700 text-gray-100 focus:border-blue-400 focus:ring-blue-400;
-  }
+:where(.dark) .shortcut-help-panel__toolbar {
+  @apply border-gray-700;
+}
 
-  .shortcut-help-panel__filter select {
-    @apply border-gray-600 bg-gray-700 text-gray-100 focus:border-blue-400 focus:ring-blue-400;
-  }
+:where(.dark) .shortcut-help-panel__search input {
+  @apply border-gray-600 bg-gray-700 text-gray-100 focus:border-blue-400 focus:ring-blue-400;
+}
 
-  .shortcut-help-panel__empty {
-    @apply text-gray-500;
-  }
+:where(.dark) .shortcut-help-panel__filter select {
+  @apply border-gray-600 bg-gray-700 text-gray-100 focus:border-blue-400 focus:ring-blue-400;
+}
 
-  .shortcut-help-panel__footer {
-    @apply border-gray-700;
-  }
+:where(.dark) .shortcut-help-panel__empty {
+  @apply text-gray-500;
+}
 
-  .shortcut-help-panel__tip {
-    @apply text-gray-400;
-  }
+:where(.dark) .shortcut-help-panel__footer {
+  @apply border-gray-700;
+}
 
-  .shortcut-help-panel__tip kbd {
-    @apply border-gray-600 bg-gray-700 text-gray-300;
-  }
+:where(.dark) .shortcut-help-panel__tip {
+  @apply text-gray-400;
+}
 
-  .shortcut-group__title {
-    @apply text-gray-100;
-  }
+:where(.dark) .shortcut-help-panel__tip kbd {
+  @apply border-gray-600 bg-gray-700 text-gray-300;
+}
 
-  .shortcut-group__count {
-    @apply bg-gray-700 text-gray-400;
-  }
+:where(.dark) .shortcut-group__title {
+  @apply text-gray-100;
+}
 
-  .shortcut-item {
-    @apply bg-gray-700 hover:bg-gray-600;
-  }
+:where(.dark) .shortcut-group__count {
+  @apply bg-gray-700 text-gray-400;
+}
 
-  .shortcut-item__description {
-    @apply text-gray-300;
-  }
+:where(.dark) .shortcut-item {
+  @apply bg-gray-700 hover:bg-gray-600;
+}
 
-  .shortcut-key {
-    @apply border-gray-600 bg-gray-800 text-gray-300;
-  }
+:where(.dark) .shortcut-item__description {
+  @apply text-gray-300;
+}
 
-  .shortcut-help-button {
-    @apply border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-600 hover:bg-gray-700;
-  }
+:where(.dark) .shortcut-key {
+  @apply border-gray-600 bg-gray-800 text-gray-300;
+}
 
-  .shortcut-help-button--minimal {
-    @apply bg-transparent hover:bg-gray-700;
-  }
+:where(.dark) .shortcut-help-button {
+  @apply border-gray-700 bg-gray-800 text-gray-300 hover:border-gray-600 hover:bg-gray-700;
+}
+
+:where(.dark) .shortcut-help-button--minimal {
+  @apply bg-transparent hover:bg-gray-700;
 }
 
 /* 打印样式 */

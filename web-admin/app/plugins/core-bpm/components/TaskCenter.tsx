@@ -156,12 +156,12 @@ export function TaskCenter() {
   );
 
   return (
-    <div className="mx-auto w-full space-y-6 px-6 py-6">
+    <div className="text-text mx-auto w-full space-y-6 px-6 py-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">任务中心</h1>
-          <p className="text-gray-500">管理您的审批任务和流程</p>
+          <p className="text-text-2">管理您的审批任务和流程</p>
         </div>
         <Button onClick={tc.fetchData} variant="outline">
           <RefreshCw className="mr-2 h-4 w-4" />
@@ -173,14 +173,14 @@ export function TaskCenter() {
       <TaskStatsCards data={tc.workbenchData} slaWarningCount={tc.slaWarningCount} />
 
       {/* Task Tabs */}
-      <div className="rounded-lg border bg-white">
-        <div className="border-b p-4">
+      <div className="rounded-card border-border bg-panel shadow-card border">
+        <div className="border-border border-b p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold">任务列表</h2>
             <div className="flex items-center space-x-2">
               {tc.activeTab !== 'cc' && tc.activeTab !== 'urge' && (
                 <div className="relative">
-                  <Search className="absolute top-2.5 left-2.5 h-4 w-4 text-gray-400" />
+                  <Search className="text-text-3 absolute top-2.5 left-2.5 h-4 w-4" />
                   <Input
                     placeholder="搜索任务..."
                     className="w-64 pl-8"
@@ -205,7 +205,7 @@ export function TaskCenter() {
           </div>
         </div>
 
-        <div className="border-b">
+        <div className="border-border border-b">
           <div className="flex space-x-4 px-4">
             {tabs.map((tab) => (
               <button
@@ -213,13 +213,13 @@ export function TaskCenter() {
                 onClick={() => tc.setActiveTab(tab.id)}
                 className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
                   tc.activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'border-accent text-accent'
+                    : 'text-text-2 hover:text-text border-transparent'
                 }`}
               >
                 {tab.label}
                 {tab.count !== undefined && tab.count > 0 && (
-                  <span className="ml-2 rounded-full bg-gray-100 px-2 py-0.5 text-xs">
+                  <span className="bg-subtle text-text-2 ml-2 rounded-full px-2 py-0.5 text-xs">
                     {tab.count}
                   </span>
                 )}

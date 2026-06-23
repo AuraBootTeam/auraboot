@@ -6,15 +6,7 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import {
-  AlertTriangle,
-  Check,
-  ChevronDown,
-  Lock,
-  Plus,
-  Settings,
-  User,
-} from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, Lock, Plus, Settings, User } from 'lucide-react';
 import { type SavedView, type ViewScope, type ViewType } from '~/framework/smart/types/savedView';
 import type { ViewRecommendation } from '~/framework/smart/hooks/useViewRecommendations';
 import {
@@ -236,17 +228,9 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
   const newViewLabel = t('common.saved_view_new_personal', undefined, '新建个人视图');
   const manageLabel = t('common.saved_view_manage', undefined, '管理视图');
   const emptyLabel = t('common.saved_view_empty', undefined, '暂无保存视图');
-  const searchPlaceholder = t(
-    'common.saved_view_search_placeholder',
-    undefined,
-    '搜索我的视图...',
-  );
+  const searchPlaceholder = t('common.saved_view_search_placeholder', undefined, '搜索我的视图...');
   const lockedPresetLabel = t('common.saved_view_locked_preset', undefined, '预置');
-  const capabilityBlockedLabel = t(
-    'common.saved_view_capability_blocked',
-    undefined,
-    '需配置',
-  );
+  const capabilityBlockedLabel = t('common.saved_view_capability_blocked', undefined, '需配置');
   const displayCurrentView =
     currentView?.scope === 'personal' && !isImplicitSavedView(currentView) ? currentView : null;
   const isDefaultBaselineActive = !displayCurrentView;
@@ -367,8 +351,8 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
         disabled={loading}
         aria-label={selectViewLabel}
         className={cn(
-          'flex items-center gap-2 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm',
-          'hover:bg-gray-50 focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none',
+          'border-border bg-panel text-text flex items-center gap-2 rounded-md border px-3 py-2 text-sm',
+          'hover:bg-hover focus:border-accent focus:shadow-focus focus:outline-none',
           'disabled:cursor-not-allowed disabled:opacity-50',
           'transition-colors duration-150',
           'max-w-[240px] min-w-[140px]',
@@ -382,54 +366,48 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
         {loading ? (
           <>
             <span
-              className="h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500"
+              className="border-border-strong border-t-accent h-4 w-4 animate-spin rounded-full border-2"
               aria-hidden="true"
             />
-            <span className="text-gray-400">{t('common.loading', undefined, 'Loading...')}</span>
+            <span className="text-text-3">{t('common.loading', undefined, 'Loading...')}</span>
           </>
         ) : displayCurrentView ? (
           <>
-            <CurrentScopeIcon className="h-4 w-4 flex-shrink-0 text-gray-500" aria-hidden="true" />
+            <CurrentScopeIcon className="text-text-3 h-4 w-4 flex-shrink-0" aria-hidden="true" />
             <span
-              className="flex-shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-[11px] font-medium text-gray-600"
+              className="bg-subtle text-text-2 flex-shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium"
               data-testid="view-selector-scope-label"
             >
               {currentScopeLabel}
             </span>
-            <span className="flex-1 truncate text-left text-gray-900">{displayCurrentView.name}</span>
+            <span className="text-text flex-1 truncate text-left">{displayCurrentView.name}</span>
             {displayCurrentView.isDefault && (
-              <span
-                className="flex-shrink-0 text-xs font-medium text-blue-600"
-                title={defaultLabel}
-              >
+              <span className="text-accent flex-shrink-0 text-xs font-medium" title={defaultLabel}>
                 *
               </span>
             )}
             {isCurrentViewLockedPreset && (
               <Lock
-                className="h-3.5 w-3.5 flex-shrink-0 text-amber-600"
+                className="text-status-amber h-3.5 w-3.5 flex-shrink-0"
                 aria-label={lockedPresetLabel}
               />
             )}
             {isCurrentViewCapabilityBlocked && (
               <AlertTriangle
-                className="h-3.5 w-3.5 flex-shrink-0 text-red-500"
+                className="text-status-red h-3.5 w-3.5 flex-shrink-0"
                 aria-label={capabilityBlockedLabel}
               />
             )}
           </>
         ) : (
           <>
-            <ViewTypeIcon
-              type="table-cells"
-              className="h-3.5 w-3.5 flex-shrink-0 text-gray-400"
-            />
-            <span className="flex-1 truncate text-left text-gray-900">{defaultViewLabel}</span>
+            <ViewTypeIcon type="table-cells" className="text-text-3 h-3.5 w-3.5 flex-shrink-0" />
+            <span className="text-text flex-1 truncate text-left">{defaultViewLabel}</span>
           </>
         )}
         <ChevronDown
           className={cn(
-            'h-4 w-4 flex-shrink-0 text-gray-400 transition-transform duration-200',
+            'text-text-3 h-4 w-4 flex-shrink-0 transition-transform duration-200',
             isOpen && 'rotate-180',
           )}
           aria-hidden="true"
@@ -440,7 +418,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
       {isOpen && (
         <div
           className={cn(
-            'absolute top-full left-0 z-50 mt-1 w-72 rounded-md border border-gray-200 bg-white shadow-lg',
+            'border-border bg-panel shadow-pop absolute top-full left-0 z-50 mt-1 w-72 rounded-md border',
             'animate-in fade-in-0 zoom-in-95 duration-100',
           )}
           role="listbox"
@@ -453,59 +431,54 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
               onClick={handleSelectDefaultView}
               data-testid="view-option-default"
               className={cn(
-                'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
-                'hover:bg-gray-100 focus:bg-gray-100 focus:outline-none',
+                'text-text-2 flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
+                'hover:bg-hover focus:bg-hover focus:outline-none',
                 'transition-colors duration-100',
-                isDefaultBaselineActive && 'bg-blue-50 text-blue-700',
+                isDefaultBaselineActive && 'bg-accent-weak text-accent',
               )}
               role="option"
               aria-selected={isDefaultBaselineActive}
             >
-              <ViewTypeIcon
-                type="table-cells"
-                className="h-3.5 w-3.5 flex-shrink-0 text-gray-400"
-              />
+              <ViewTypeIcon type="table-cells" className="text-text-3 h-3.5 w-3.5 flex-shrink-0" />
               <span className="flex-1 truncate">{defaultViewLabel}</span>
               {isDefaultBaselineActive && (
-                <Check className="h-4 w-4 flex-shrink-0 text-blue-600" aria-hidden="true" />
+                <Check className="text-accent h-4 w-4 flex-shrink-0" aria-hidden="true" />
               )}
             </button>
             {groupedViews.length === 0 ? (
               <div>
-                <div className="border-b border-gray-100 p-2">
+                <div className="border-border border-b p-2">
                   <input
                     type="search"
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.currentTarget.value)}
                     placeholder={searchPlaceholder}
                     aria-label={searchPlaceholder}
-                    className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent focus:shadow-focus w-full rounded-md border px-2 py-1.5 text-sm outline-none"
                     data-testid="view-selector-search"
                   />
                 </div>
-                <div className="px-3 py-4 text-center text-sm text-gray-500">
-                  {emptyLabel}
-                </div>
+                <div className="text-text-3 px-3 py-4 text-center text-sm">{emptyLabel}</div>
               </div>
             ) : (
               <>
-                <div className="border-b border-gray-100 p-2">
+                <div className="border-border border-b p-2">
                   <input
                     type="search"
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.currentTarget.value)}
                     placeholder={searchPlaceholder}
                     aria-label={searchPlaceholder}
-                    className="w-full rounded-md border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                    className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent focus:shadow-focus w-full rounded-md border px-2 py-1.5 text-sm outline-none"
                     data-testid="view-selector-search"
                   />
                 </div>
                 {groupedViews.map((group, groupIndex) => (
                   <div key={group.scope}>
                     {/* Group Separator */}
-                    {groupIndex > 0 && <div className="mx-2 my-1 h-px bg-gray-200" />}
+                    {groupIndex > 0 && <div className="bg-border mx-2 my-1 h-px" />}
 
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium tracking-wide text-gray-500 uppercase">
+                    <div className="text-text-3 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium tracking-wide uppercase">
                       <group.Icon className="h-3.5 w-3.5" aria-hidden="true" />
                       {group.label}
                     </div>
@@ -520,22 +493,22 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                         data-view-name={view.name}
                         data-view-type={view.viewType}
                         className={cn(
-                          'flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
-                          'hover:bg-gray-100 focus:bg-gray-100 focus:outline-none',
+                          'text-text-2 flex w-full items-center gap-2 px-3 py-2 text-left text-sm',
+                          'hover:bg-hover focus:bg-hover focus:outline-none',
                           'transition-colors duration-100',
-                          displayCurrentView?.pid === view.pid && 'bg-blue-50 text-blue-700',
+                          displayCurrentView?.pid === view.pid && 'bg-accent-weak text-accent',
                         )}
                         role="option"
                         aria-selected={displayCurrentView?.pid === view.pid}
                       >
                         <ViewTypeIcon
                           type={getViewTypeIcon(view.viewType)}
-                          className="h-3.5 w-3.5 flex-shrink-0 text-gray-400"
+                          className="text-text-3 h-3.5 w-3.5 flex-shrink-0"
                         />
                         <span className="flex-1 truncate">{view.name}</span>
                         {view.isDefault && (
                           <span
-                            className="flex-shrink-0 rounded bg-blue-100 px-1.5 py-0.5 text-xs text-blue-700"
+                            className="bg-accent-weak text-accent flex-shrink-0 rounded px-1.5 py-0.5 text-xs"
                             title={defaultLabel}
                           >
                             {defaultLabel}
@@ -543,7 +516,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                         )}
                         {isSavedViewLockedPreset(view) && (
                           <span
-                            className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700"
+                            className="bg-status-amber-bg text-status-amber inline-flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs"
                             title={lockedPresetLabel}
                           >
                             <Lock className="h-3 w-3" aria-hidden="true" />
@@ -552,7 +525,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                         )}
                         {isSavedViewCapabilityBlocked(view) && (
                           <span
-                            className="inline-flex flex-shrink-0 items-center gap-1 rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-700"
+                            className="bg-status-red-bg text-status-red inline-flex flex-shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs"
                             title={capabilityBlockedLabel}
                           >
                             <AlertTriangle className="h-3 w-3" aria-hidden="true" />
@@ -560,7 +533,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                           </span>
                         )}
                         {displayCurrentView?.pid === view.pid && (
-                          <Check className="h-4 w-4 flex-shrink-0 text-blue-600" aria-hidden="true" />
+                          <Check className="text-accent h-4 w-4 flex-shrink-0" aria-hidden="true" />
                         )}
                       </button>
                     ))}
@@ -573,7 +546,7 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
           {/* Action Buttons */}
           {hasActions && (
             <>
-              <div className="mx-2 h-px bg-gray-200" />
+              <div className="bg-border mx-2 h-px" />
               <div className="flex gap-2 p-2">
                 {onCreateView && (
                   <button
@@ -582,8 +555,8 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                     data-testid="view-selector-create"
                     className={cn(
                       'flex flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium',
-                      'rounded-md text-blue-600 hover:bg-blue-50',
-                      'focus:ring-2 focus:ring-blue-500 focus:outline-none focus:ring-inset',
+                      'text-accent hover:bg-accent-weak rounded-md',
+                      'focus:shadow-focus focus:outline-none',
                       'transition-colors duration-100',
                     )}
                   >
@@ -598,8 +571,8 @@ export const ViewSelector: React.FC<ViewSelectorProps> = ({
                     data-testid="view-selector-manage"
                     className={cn(
                       'flex flex-1 items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium',
-                      'rounded-md text-gray-700 hover:bg-gray-100',
-                      'focus:ring-2 focus:ring-gray-500 focus:outline-none focus:ring-inset',
+                      'text-text-2 hover:bg-hover rounded-md',
+                      'focus:shadow-focus focus:outline-none',
                       'transition-colors duration-100',
                     )}
                   >

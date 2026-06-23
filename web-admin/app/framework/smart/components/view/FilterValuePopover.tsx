@@ -193,7 +193,7 @@ export function FilterValuePopover({
     if (ft === 'BOOLEAN') {
       return (
         <select
-          className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+          className="border-border bg-panel text-text focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
           value={String(value ?? '')}
           onChange={(e) => setValue(e.target.value === 'true')}
         >
@@ -209,7 +209,7 @@ export function FilterValuePopover({
       return (
         <input
           type="number"
-          className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+          className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
           placeholder="Enter value..."
           value={value != null ? String(value) : ''}
           onChange={(e) => {
@@ -227,14 +227,14 @@ export function FilterValuePopover({
         <div className="flex items-center gap-2">
           <input
             type="date"
-            className="flex-1 rounded border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+            className="border-border bg-panel text-text focus:border-accent flex-1 rounded border px-2 py-1.5 text-sm outline-none"
             value={range[0] || ''}
             onChange={(e) => setValue([e.target.value || '', range[1] || ''])}
           />
-          <span className="text-xs text-gray-400">to</span>
+          <span className="text-text-3 text-xs">to</span>
           <input
             type="date"
-            className="flex-1 rounded border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+            className="border-border bg-panel text-text focus:border-accent flex-1 rounded border px-2 py-1.5 text-sm outline-none"
             value={range[1] || ''}
             onChange={(e) => setValue([range[0] || '', e.target.value || ''])}
           />
@@ -247,7 +247,7 @@ export function FilterValuePopover({
       return (
         <input
           type="date"
-          className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+          className="border-border bg-panel text-text focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
           value={value != null ? String(value) : ''}
           onChange={(e) => setValue(e.target.value || null)}
         />
@@ -262,12 +262,12 @@ export function FilterValuePopover({
           {dictOptions.map((opt) => (
             <label
               key={opt.value}
-              className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-sm hover:bg-gray-50"
+              className="hover:bg-hover flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-sm"
             >
               <input
                 type="checkbox"
                 checked={selected.includes(opt.value)}
-                className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600"
+                className="border-border-strong text-accent h-3.5 w-3.5 rounded"
                 onChange={(e) => {
                   const next = e.target.checked
                     ? [...selected, opt.value]
@@ -286,7 +286,7 @@ export function FilterValuePopover({
     if ((ft === 'ENUM' || ft === 'DICT') && dictOptions.length > 0 && operator !== 'in') {
       return (
         <select
-          className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+          className="border-border bg-panel text-text focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
           value={value != null ? String(value) : ''}
           onChange={(e) => setValue(e.target.value || null)}
         >
@@ -306,7 +306,7 @@ export function FilterValuePopover({
         <input
           type="text"
           placeholder="Search by name or ID..."
-          className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+          className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
           value={value != null ? String(value) : ''}
           onChange={(e) => setValue(e.target.value || null)}
         />
@@ -317,7 +317,7 @@ export function FilterValuePopover({
     return (
       <input
         type="text"
-        className="w-full rounded border border-gray-200 px-2 py-1.5 text-sm outline-none focus:border-blue-400"
+        className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
         placeholder="Enter value..."
         value={value != null ? String(value) : ''}
         onChange={(e) => setValue(e.target.value || null)}
@@ -328,14 +328,14 @@ export function FilterValuePopover({
   const content = (
     <div
       ref={containerRef}
-      className="fixed z-[9999] min-w-[260px] rounded-lg border border-gray-200 bg-white p-3 shadow-lg"
+      className="border-border bg-panel shadow-pop fixed z-[9999] min-w-[260px] rounded-lg border p-3"
       style={{ left: anchorEl.x, top: anchorEl.y }}
     >
       {/* Row 1: field label + operator */}
       <div className="mb-2 flex items-center gap-2">
-        <span className="flex-shrink-0 text-sm font-medium text-gray-700">{fieldLabel}</span>
+        <span className="text-text flex-shrink-0 text-sm font-medium">{fieldLabel}</span>
         <select
-          className="flex-1 rounded border border-gray-200 px-2 py-1 text-sm outline-none focus:border-blue-400"
+          className="border-border bg-panel text-text focus:border-accent flex-1 rounded border px-2 py-1 text-sm outline-none"
           value={operator}
           onChange={(e) => {
             setOperator(e.target.value);
@@ -358,14 +358,14 @@ export function FilterValuePopover({
       <div className="flex items-center justify-end gap-2">
         <button
           type="button"
-          className="rounded px-3 py-1 text-sm text-gray-500 hover:bg-gray-100"
+          className="text-text-2 hover:bg-hover rounded px-3 py-1 text-sm"
           onClick={onCancel}
         >
           Cancel
         </button>
         <button
           type="button"
-          className="rounded bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700"
+          className="bg-accent hover:bg-accent-hover rounded px-3 py-1 text-sm text-white"
           onClick={() => onApply(operator, isNullishOp(operator) ? null : value)}
         >
           Apply

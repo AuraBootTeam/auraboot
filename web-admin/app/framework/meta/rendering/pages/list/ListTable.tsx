@@ -34,6 +34,7 @@ import { buildRowTree, flattenVisible, collectAllNodeIds } from './rowTree';
 import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
 import { getPublicRecordKey } from '~/framework/meta/utils/publicRecordId';
+import { cn } from '~/utils/cn';
 
 interface DictItem {
   value: string;
@@ -49,7 +50,9 @@ const ACTION_COLUMN_WIDTH = 112;
 const TREE_INDENT_PX = 20;
 
 const normalizeRowHeight = (value: unknown): RowHeight =>
-  typeof value === 'string' && value in ROW_HEIGHT_CONFIG ? (value as RowHeight) : DEFAULT_ROW_HEIGHT;
+  typeof value === 'string' && value in ROW_HEIGHT_CONFIG
+    ? (value as RowHeight)
+    : DEFAULT_ROW_HEIGHT;
 
 function isAutoFillColumn(column: ColumnConfig): boolean {
   if (column.isActionColumn) return false;
@@ -392,6 +395,12 @@ export const ListTable = React.memo(function ListTable({
     const resolved = t(key);
     return resolved && resolved !== key ? resolved : 'Collapse row';
   })();
+  const getRowClassName = (rowId: string) =>
+    cn(
+      'group cursor-pointer text-text-2 transition-colors hover:bg-hover',
+      selectedIds.has(rowId) && 'bg-accent-weak',
+      previewRecordId === rowId && 'bg-accent-weak/50',
+    );
 
   // First-column tree affordance (T10): a depth-proportional left indent plus a
   // chevron toggle for nodes that have children (aligned spacer otherwise so
@@ -524,13 +533,13 @@ export const ListTable = React.memo(function ListTable({
               </tr>
             </thead>
 
-            <tbody className="bg-panel divide-y divide-gray-100">
+            <tbody className="divide-border bg-panel divide-y">
               {/* Loading state */}
               {loading ? (
                 <tr>
                   <td
                     colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
-                    className="px-6 py-4 text-center"
+                    className="text-text-2 px-6 py-6 text-center"
                   >
                     <div className="flex items-center justify-center">
                       <span className="loading loading-spinner loading-md mr-2"></span>
@@ -543,10 +552,30 @@ export const ListTable = React.memo(function ListTable({
                 <tr>
                   <td
                     colSpan={(columns.length || 1) + (enableSelection ? 1 : 0)}
-                    className="text-text-2 px-6 py-4 text-center"
+                    className="text-text-2 px-6 py-10 text-center"
                     data-testid="empty-state"
                   >
-                    {t('table.noData') || 'No data'}
+                    <div className="flex flex-col items-center gap-2">
+                      <span
+                        className="border-border bg-subtle text-text-3 rounded-pill flex h-9 w-9 items-center justify-center border"
+                        aria-hidden="true"
+                      >
+                        <svg
+                          className="h-4 w-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.8}
+                            d="M4 7h16M4 12h16M4 17h10"
+                          />
+                        </svg>
+                      </span>
+                      <span>{t('table.noData') || 'No data'}</span>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -596,7 +625,7 @@ export const ListTable = React.memo(function ListTable({
                         key={rowId || index}
                         data-testid={`table-row-${index}`}
                         data-tree-depth={node.depth}
-                        className={`group cursor-pointer hover:bg-hover${selectedIds.has(rowId) ? 'bg-accent-weak' : ''}${previewRecordId === rowId ? 'bg-accent-weak/50' : ''}`}
+                        className={getRowClassName(rowId)}
                         style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
                         onClick={() => onRowClick(record)}
                       >
@@ -724,7 +753,7 @@ export const ListTable = React.memo(function ListTable({
                         key={rowId || index}
                         data-testid={`table-row-${index}`}
                         data-index={virtualRow.index}
-                        className={`group cursor-pointer hover:bg-hover${selectedIds.has(rowId) ? 'bg-accent-weak' : ''}${previewRecordId === rowId ? 'bg-accent-weak/50' : ''}`}
+                        className={getRowClassName(rowId)}
                         style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
                         onClick={() => onRowClick(record)}
                       >
@@ -837,7 +866,7 @@ export const ListTable = React.memo(function ListTable({
                     <tr
                       key={rowId || index}
                       data-testid={`table-row-${index}`}
-                      className={`group cursor-pointer hover:bg-hover${selectedIds.has(rowId) ? 'bg-accent-weak' : ''}${previewRecordId === rowId ? 'bg-accent-weak/50' : ''}`}
+                      className={getRowClassName(rowId)}
                       style={{ height: `${rowHeightCfg.px}px`, ...cfInline }}
                       onClick={() => onRowClick(record)}
                     >

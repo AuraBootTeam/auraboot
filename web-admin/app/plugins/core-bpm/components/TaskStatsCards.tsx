@@ -16,23 +16,23 @@ export function TaskStatsCards({ data, slaWarningCount }: TaskStatsCardsProps) {
       <StatCard
         label="待办任务"
         value={data?.todoCount || 0}
-        icon={<Clock className="h-4 w-4 text-gray-400" />}
+        icon={<Clock className="text-text-3 h-4 w-4" />}
       />
       <StatCard
         label="已办任务"
         value={data?.completedCount || 0}
-        icon={<CheckCircle2 className="h-4 w-4 text-gray-400" />}
+        icon={<CheckCircle2 className="text-text-3 h-4 w-4" />}
       />
       <StatCard
         label="我发起的"
         value={data?.startedCount || 0}
-        icon={<PlayCircle className="h-4 w-4 text-gray-400" />}
+        icon={<PlayCircle className="text-text-3 h-4 w-4" />}
       />
       {slaWarningCount !== undefined && (
         <StatCard
           label="SLA 预警"
           value={slaWarningCount}
-          icon={<AlertTriangle className="h-4 w-4 text-orange-400" />}
+          icon={<AlertTriangle className="text-status-amber h-4 w-4" />}
           highlight={slaWarningCount > 0}
         />
       )}
@@ -53,13 +53,17 @@ function StatCard({
 }) {
   return (
     <div
-      className={`rounded-lg border bg-white p-6 ${highlight ? 'border-orange-300 bg-orange-50' : ''}`}
+      className={`rounded-card border-border bg-panel shadow-card border p-5 ${
+        highlight ? 'border-status-amber bg-status-amber-bg' : ''
+      }`}
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-gray-500">{label}</h3>
+        <h3 className="text-text-2 text-sm font-medium">{label}</h3>
         {icon}
       </div>
-      <p className={`mt-2 text-2xl font-bold ${highlight ? 'text-orange-600' : ''}`}>{value}</p>
+      <p className={`text-text mt-2 text-2xl font-bold ${highlight ? 'text-status-amber' : ''}`}>
+        {value}
+      </p>
     </div>
   );
 }

@@ -54,8 +54,8 @@ export function ManagedBadge({ pluginName, userModified, className = '' }: Manag
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
         userModified
-          ? 'border border-amber-200 bg-amber-50 text-amber-700'
-          : 'border border-blue-200 bg-blue-50 text-blue-700'
+          ? 'border-status-amber/35 bg-status-amber-bg text-status-amber border'
+          : 'border-accent/30 bg-accent-weak text-accent border'
       } ${className}`}
       title={
         userModified
@@ -68,7 +68,7 @@ export function ManagedBadge({ pluginName, userModified, className = '' }: Manag
       </svg>
       {pluginName}
       {userModified && (
-        <span className="text-amber-500" title={t('plugin.managed.badge.modified')}>
+        <span className="text-status-amber" title={t('plugin.managed.badge.modified')}>
           *
         </span>
       )}

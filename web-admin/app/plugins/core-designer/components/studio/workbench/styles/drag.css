@@ -619,146 +619,145 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .smart-drop-zone--slot {
-    @apply border-gray-600 bg-gray-800;
-  }
 
-  .smart-drop-zone--grid-cell {
-    @apply border-gray-700 bg-gray-900;
-  }
+:where(.dark) .smart-drop-zone--slot {
+  @apply border-gray-600 bg-gray-800;
+}
 
-  .smart-drop-zone--dragging.smart-drop-zone--container {
-    @apply border-blue-400 bg-blue-900/30;
-  }
+:where(.dark) .smart-drop-zone--grid-cell {
+  @apply border-gray-700 bg-gray-900;
+}
 
-  .smart-drop-zone--dragging.smart-drop-zone--slot {
-    @apply border-blue-400 bg-blue-800;
-  }
+:where(.dark) .smart-drop-zone--dragging.smart-drop-zone--container {
+  @apply border-blue-400 bg-blue-900/30;
+}
 
-  .smart-drop-zone--dragging.smart-drop-zone--grid-cell {
-    @apply border-blue-400 bg-blue-900;
-  }
+:where(.dark) .smart-drop-zone--dragging.smart-drop-zone--slot {
+  @apply border-blue-400 bg-blue-800;
+}
 
-  .smart-drop-zone--active.smart-drop-zone--container {
-    @apply border-green-400 bg-green-900;
-  }
+:where(.dark) .smart-drop-zone--dragging.smart-drop-zone--grid-cell {
+  @apply border-blue-400 bg-blue-900;
+}
 
-  .smart-drop-zone--active.smart-drop-zone--slot {
-    @apply border-green-400 bg-green-800;
-  }
+:where(.dark) .smart-drop-zone--active.smart-drop-zone--container {
+  @apply border-green-400 bg-green-900;
+}
 
-  .smart-drop-zone--active.smart-drop-zone--grid-cell {
-    @apply border-green-400 bg-green-800;
-  }
+:where(.dark) .smart-drop-zone--active.smart-drop-zone--slot {
+  @apply border-green-400 bg-green-800;
+}
 
-  .smart-drop-zone--acceptable.smart-drop-zone--container {
-    @apply bg-cyan-900;
-  }
+:where(.dark) .smart-drop-zone--active.smart-drop-zone--grid-cell {
+  @apply border-green-400 bg-green-800;
+}
 
-  .smart-drop-zone--acceptable.smart-drop-zone--slot {
-    @apply bg-cyan-800;
-  }
+:where(.dark) .smart-drop-zone--acceptable.smart-drop-zone--container {
+  @apply bg-cyan-900;
+}
 
-  .smart-drop-zone--acceptable.smart-drop-zone--grid-cell {
-    @apply bg-cyan-900;
-  }
+:where(.dark) .smart-drop-zone--acceptable.smart-drop-zone--slot {
+  @apply bg-cyan-800;
+}
 
-  .smart-drop-zone--rejected.smart-drop-zone--container {
-    @apply bg-red-900;
-  }
+:where(.dark) .smart-drop-zone--acceptable.smart-drop-zone--grid-cell {
+  @apply bg-cyan-900;
+}
 
-  .smart-drop-zone--rejected.smart-drop-zone--slot {
-    @apply bg-red-800;
-  }
+:where(.dark) .smart-drop-zone--rejected.smart-drop-zone--container {
+  @apply bg-red-900;
+}
 
-  .smart-drop-zone--rejected.smart-drop-zone--grid-cell {
-    @apply bg-red-900;
-  }
+:where(.dark) .smart-drop-zone--rejected.smart-drop-zone--slot {
+  @apply bg-red-800;
+}
 
-  .smart-drop-zone--occupied {
-    @apply border-gray-600 bg-gray-800;
-  }
+:where(.dark) .smart-drop-zone--rejected.smart-drop-zone--grid-cell {
+  @apply bg-red-900;
+}
 
-  .smart-drop-zone__placeholder {
-    @apply text-gray-500;
-  }
+:where(.dark) .smart-drop-zone--occupied {
+  @apply border-gray-600 bg-gray-800;
+}
 
-  .grid-drop-zone-container .smart-drop-zone--grid-cell:hover {
-    @apply bg-gray-800;
-  }
+:where(.dark) .smart-drop-zone__placeholder {
+  @apply text-gray-500;
+}
 
-  .drag-preview__content {
-    background: #1f2937;
-    border-color: #374151;
-    color: #f9fafb;
-  }
+:where(.dark) .grid-drop-zone-container .smart-drop-zone--grid-cell:hover {
+  @apply bg-gray-800;
+}
 
-  .drag-preview__type {
-    color: #818cf8;
-  }
+:where(.dark) .drag-preview__content {
+  background: #1f2937;
+  border-color: #374151;
+  color: #f9fafb;
+}
 
-  .drag-preview__name {
-    color: #e5e7eb;
-  }
+:where(.dark) .drag-preview__type {
+  color: #818cf8;
+}
 
-  .ghost-effect-overlay {
-    background: rgba(129, 140, 248, 0.1);
-    border-color: #818cf8;
-  }
+:where(.dark) .drag-preview__name {
+  color: #e5e7eb;
+}
 
-  .ghost-effect-item {
-    color: #818cf8;
-  }
+:where(.dark) .ghost-effect-overlay {
+  background: rgba(129, 140, 248, 0.1);
+  border-color: #818cf8;
+}
 
-  .custom-preview-content {
-    background: #1f2937;
-    border-color: #374151;
-  }
+:where(.dark) .ghost-effect-item {
+  color: #818cf8;
+}
 
-  .custom-preview-content__type {
-    color: #818cf8;
-  }
+:where(.dark) .custom-preview-content {
+  background: #1f2937;
+  border-color: #374151;
+}
 
-  .custom-preview-content__name {
-    color: #e5e7eb;
-  }
+:where(.dark) .custom-preview-content__type {
+  color: #818cf8;
+}
 
-  .preview-config-panel {
-    background: #1f2937;
-    border-color: #374151;
-  }
+:where(.dark) .custom-preview-content__name {
+  color: #e5e7eb;
+}
 
-  .preview-config-panel__title {
-    color: #f9fafb;
-  }
+:where(.dark) .preview-config-panel {
+  background: #1f2937;
+  border-color: #374151;
+}
 
-  .preview-config-panel__field span:first-child {
-    color: #e5e7eb;
-  }
+:where(.dark) .preview-config-panel__title {
+  color: #f9fafb;
+}
 
-  .preview-config-panel__preset-button {
-    background: #374151;
-    border-color: #4b5563;
-    color: #e5e7eb;
-  }
+:where(.dark) .preview-config-panel__field span:first-child {
+  color: #e5e7eb;
+}
 
-  .preview-config-panel__preset-button:hover {
-    border-color: #818cf8;
-    color: #818cf8;
-  }
+:where(.dark) .preview-config-panel__preset-button {
+  background: #374151;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
 
-  .preview-config-panel__field input[type='number'] {
-    background: #374151;
-    border-color: #4b5563;
-    color: #e5e7eb;
-  }
+:where(.dark) .preview-config-panel__preset-button:hover {
+  border-color: #818cf8;
+  color: #818cf8;
+}
 
-  .slot-highlighter-grid-overlay {
-    background-image:
-      linear-gradient(to right, #4b5563 1px, transparent 1px),
-      linear-gradient(to bottom, #4b5563 1px, transparent 1px);
-  }
+:where(.dark) .preview-config-panel__field input[type='number'] {
+  background: #374151;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+
+:where(.dark) .slot-highlighter-grid-overlay {
+  background-image:
+    linear-gradient(to right, #4b5563 1px, transparent 1px),
+    linear-gradient(to bottom, #4b5563 1px, transparent 1px);
 }
 
 /* 打印样式 */
@@ -1242,19 +1241,18 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .snap-align-panel {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
 
-  .snap-point {
-    border-color: var(--bg-primary);
-  }
+:where(.dark) .snap-align-panel {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
 
-  .alignment-distance {
-    background: var(--success-primary);
-    color: var(--bg-primary);
-  }
+:where(.dark) .snap-point {
+  border-color: var(--bg-primary);
+}
+
+:where(.dark) .alignment-distance {
+  background: var(--success-primary);
+  color: var(--bg-primary);
 }
 
 /* Print styles */
@@ -1745,128 +1743,127 @@
 }
 
 /* 暗色主题支持 */
-@media (prefers-color-scheme: dark) {
-  .undo-redo-panel {
-    background: #1f2937;
-    border-color: #374151;
-    color: #f9fafb;
-  }
 
-  .undo-redo-panel .panel-header {
-    background: #111827;
-    border-bottom-color: #374151;
-  }
+:where(.dark) .undo-redo-panel {
+  background: #1f2937;
+  border-color: #374151;
+  color: #f9fafb;
+}
 
-  .undo-redo-panel .panel-title {
-    color: #f9fafb;
-  }
+:where(.dark) .undo-redo-panel .panel-header {
+  background: #111827;
+  border-bottom-color: #374151;
+}
 
-  .undo-redo-panel .expand-button {
-    color: #9ca3af;
-  }
+:where(.dark) .undo-redo-panel .panel-title {
+  color: #f9fafb;
+}
 
-  .undo-redo-panel .expand-button:hover {
-    background: #374151;
-    color: #f9fafb;
-  }
+:where(.dark) .undo-redo-panel .expand-button {
+  color: #9ca3af;
+}
 
-  .undo-redo-panel .control-button {
-    background: #374151;
-    border-color: #4b5563;
-    color: #f9fafb;
-  }
+:where(.dark) .undo-redo-panel .expand-button:hover {
+  background: #374151;
+  color: #f9fafb;
+}
 
-  .undo-redo-panel .control-button:hover:not(.disabled) {
-    background: #4b5563;
-    border-color: #6b7280;
-  }
+:where(.dark) .undo-redo-panel .control-button {
+  background: #374151;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
 
-  .undo-redo-panel .status-label {
-    color: #9ca3af;
-  }
+:where(.dark) .undo-redo-panel .control-button:hover:not(.disabled) {
+  background: #4b5563;
+  border-color: #6b7280;
+}
 
-  .undo-redo-panel .status-value {
-    color: #f9fafb;
-  }
+:where(.dark) .undo-redo-panel .status-label {
+  color: #9ca3af;
+}
 
-  .undo-redo-panel .panel-tabs {
-    background: #111827;
-    border-bottom-color: #374151;
-  }
+:where(.dark) .undo-redo-panel .status-value {
+  color: #f9fafb;
+}
 
-  .undo-redo-panel .tab-button {
-    color: #9ca3af;
-  }
+:where(.dark) .undo-redo-panel .panel-tabs {
+  background: #111827;
+  border-bottom-color: #374151;
+}
 
-  .undo-redo-panel .tab-button:hover {
-    color: #f9fafb;
-    background: #374151;
-  }
+:where(.dark) .undo-redo-panel .tab-button {
+  color: #9ca3af;
+}
 
-  .undo-redo-panel .tab-button.active {
-    background: #1f2937;
-  }
+:where(.dark) .undo-redo-panel .tab-button:hover {
+  color: #f9fafb;
+  background: #374151;
+}
 
-  .undo-redo-panel .history-item:hover {
-    background: #374151;
-  }
+:where(.dark) .undo-redo-panel .tab-button.active {
+  background: #1f2937;
+}
 
-  .undo-redo-panel .history-item.current {
-    background: #1e3a8a;
-    border-color: #3b82f6;
-  }
+:where(.dark) .undo-redo-panel .history-item:hover {
+  background: #374151;
+}
 
-  .undo-redo-panel .history-item-description {
-    color: #f9fafb;
-  }
+:where(.dark) .undo-redo-panel .history-item.current {
+  background: #1e3a8a;
+  border-color: #3b82f6;
+}
 
-  .undo-redo-panel .history-item-meta {
-    color: #9ca3af;
-  }
+:where(.dark) .undo-redo-panel .history-item-description {
+  color: #f9fafb;
+}
 
-  .undo-redo-panel .history-item-type {
-    background: #374151;
-  }
+:where(.dark) .undo-redo-panel .history-item-meta {
+  color: #9ca3af;
+}
 
-  .undo-redo-panel .stat-item {
-    background: #111827;
-    border-color: #374151;
-  }
+:where(.dark) .undo-redo-panel .history-item-type {
+  background: #374151;
+}
 
-  .undo-redo-panel .stat-label {
-    color: #9ca3af;
-  }
+:where(.dark) .undo-redo-panel .stat-item {
+  background: #111827;
+  border-color: #374151;
+}
 
-  .undo-redo-panel .stat-value {
-    color: #f9fafb;
-  }
+:where(.dark) .undo-redo-panel .stat-label {
+  color: #9ca3af;
+}
 
-  .undo-redo-panel .setting-group label {
-    color: #f9fafb;
-  }
+:where(.dark) .undo-redo-panel .stat-value {
+  color: #f9fafb;
+}
 
-  .undo-redo-panel .setting-group select {
-    background: #374151;
-    border-color: #4b5563;
-    color: #f9fafb;
-  }
+:where(.dark) .undo-redo-panel .setting-group label {
+  color: #f9fafb;
+}
 
-  .undo-redo-panel .batch-buttons button,
-  .undo-redo-panel .clear-button,
-  .undo-redo-panel .save-button,
-  .undo-redo-panel .export-button,
-  .undo-redo-panel .import-button {
-    background: #374151;
-    border-color: #4b5563;
-    color: #f9fafb;
-  }
+:where(.dark) .undo-redo-panel .setting-group select {
+  background: #374151;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
 
-  .undo-redo-panel .batch-buttons button:hover,
-  .undo-redo-panel .export-button:hover,
-  .undo-redo-panel .import-button:hover {
-    background: #4b5563;
-    border-color: #6b7280;
-  }
+:where(.dark) .undo-redo-panel .batch-buttons button,
+:where(.dark) .undo-redo-panel .clear-button,
+:where(.dark) .undo-redo-panel .save-button,
+:where(.dark) .undo-redo-panel .export-button,
+:where(.dark) .undo-redo-panel .import-button {
+  background: #374151;
+  border-color: #4b5563;
+  color: #f9fafb;
+}
+
+:where(.dark) .undo-redo-panel .batch-buttons button:hover,
+:where(.dark) .undo-redo-panel .export-button:hover,
+:where(.dark) .undo-redo-panel .import-button:hover {
+  background: #4b5563;
+  border-color: #6b7280;
 }
 
 /* 密排模式样式 */
@@ -2137,79 +2134,78 @@
 }
 
 /* 暗色主题支持 */
-@media (prefers-color-scheme: dark) {
-  .cross-column-drag-panel {
-    @apply border-gray-700 bg-gray-800;
-  }
 
-  .cross-column-drag-panel .panel-header {
-    @apply border-gray-700;
-  }
+:where(.dark) .cross-column-drag-panel {
+  @apply border-gray-700 bg-gray-800;
+}
 
-  .cross-column-drag-panel .panel-header h3 {
-    @apply text-gray-100;
-  }
+:where(.dark) .cross-column-drag-panel .panel-header {
+  @apply border-gray-700;
+}
 
-  .cross-column-drag-panel .panel-tabs {
-    @apply border-gray-700;
-  }
+:where(.dark) .cross-column-drag-panel .panel-header h3 {
+  @apply text-gray-100;
+}
 
-  .cross-column-drag-panel .tab-button {
-    @apply text-gray-400 hover:border-gray-600 hover:text-gray-200;
-  }
+:where(.dark) .cross-column-drag-panel .panel-tabs {
+  @apply border-gray-700;
+}
 
-  .cross-column-drag-panel .tab-button.active {
-    @apply border-blue-400 text-blue-400;
-  }
+:where(.dark) .cross-column-drag-panel .tab-button {
+  @apply text-gray-400 hover:border-gray-600 hover:text-gray-200;
+}
 
-  .basic-config-panel .config-section h4,
-  .handle-config-panel .config-section h4,
-  .behavior-config-panel .config-section h4,
-  .targets-config-panel .config-section h4 {
-    @apply border-gray-700 text-gray-300;
-  }
+:where(.dark) .cross-column-drag-panel .tab-button.active {
+  @apply border-blue-400 text-blue-400;
+}
 
-  .basic-config-panel .config-row label,
-  .handle-config-panel .config-row label,
-  .behavior-config-panel .config-row label,
-  .targets-config-panel .config-row label {
-    @apply text-gray-400;
-  }
+:where(.dark) .basic-config-panel .config-section h4,
+:where(.dark) .handle-config-panel .config-section h4,
+:where(.dark) .behavior-config-panel .config-section h4,
+:where(.dark) .targets-config-panel .config-section h4 {
+  @apply border-gray-700 text-gray-300;
+}
 
-  .basic-config-panel .config-row input,
-  .basic-config-panel .config-row select,
-  .handle-config-panel .config-row input,
-  .targets-config-panel .config-row input {
-    @apply border-gray-600 bg-gray-700 text-gray-200 focus:ring-blue-400;
-  }
+:where(.dark) .basic-config-panel .config-row label,
+:where(.dark) .handle-config-panel .config-row label,
+:where(.dark) .behavior-config-panel .config-row label,
+:where(.dark) .targets-config-panel .config-row label {
+  @apply text-gray-400;
+}
 
-  .targets-config-panel .target-item {
-    @apply bg-gray-700 hover:bg-gray-600;
-  }
+:where(.dark) .basic-config-panel .config-row input,
+:where(.dark) .basic-config-panel .config-row select,
+:where(.dark) .handle-config-panel .config-row input,
+:where(.dark) .targets-config-panel .config-row input {
+  @apply border-gray-600 bg-gray-700 text-gray-200 focus:ring-blue-400;
+}
 
-  .targets-config-panel .target-item.selected {
-    @apply border-blue-700 bg-blue-900;
-  }
+:where(.dark) .targets-config-panel .target-item {
+  @apply bg-gray-700 hover:bg-gray-600;
+}
 
-  .targets-config-panel .target-id {
-    @apply text-gray-200;
-  }
+:where(.dark) .targets-config-panel .target-item.selected {
+  @apply border-blue-700 bg-blue-900;
+}
 
-  .targets-config-panel .target-area {
-    @apply text-gray-400;
-  }
+:where(.dark) .targets-config-panel .target-id {
+  @apply text-gray-200;
+}
 
-  .targets-config-panel .remove-target-btn {
-    @apply text-gray-500 hover:bg-red-900 hover:text-red-400;
-  }
+:where(.dark) .targets-config-panel .target-area {
+  @apply text-gray-400;
+}
 
-  .targets-config-panel .empty-targets {
-    @apply text-gray-500;
-  }
+:where(.dark) .targets-config-panel .remove-target-btn {
+  @apply text-gray-500 hover:bg-red-900 hover:text-red-400;
+}
 
-  .cross-column-drag-toolbar button {
-    @apply bg-gray-700 text-gray-300 hover:bg-gray-600;
-  }
+:where(.dark) .targets-config-panel .empty-targets {
+  @apply text-gray-500;
+}
+
+:where(.dark) .cross-column-drag-toolbar button {
+  @apply bg-gray-700 text-gray-300 hover:bg-gray-600;
 }
 
 /* ===== Grid Layout Panel Styles ===== */
@@ -2620,77 +2616,76 @@
 }
 
 /* Dark mode */
-@media (prefers-color-scheme: dark) {
-  .grid-layout-panel {
-    background: #1f2937;
-    border-color: #374151;
-  }
 
-  .grid-layout-panel-tabs {
-    background: #111827;
-    border-bottom-color: #374151;
-  }
+:where(.dark) .grid-layout-panel {
+  background: #1f2937;
+  border-color: #374151;
+}
 
-  .grid-layout-panel-tabs .tab {
-    color: #9ca3af;
-  }
+:where(.dark) .grid-layout-panel-tabs {
+  background: #111827;
+  border-bottom-color: #374151;
+}
 
-  .grid-layout-panel-tabs .tab:hover {
-    background: #1f2937;
-    color: #d1d5db;
-  }
+:where(.dark) .grid-layout-panel-tabs .tab {
+  color: #9ca3af;
+}
 
-  .grid-layout-panel-tabs .tab.active {
-    background: #1f2937;
-    color: #60a5fa;
-    border-bottom-color: #60a5fa;
-  }
+:where(.dark) .grid-layout-panel-tabs .tab:hover {
+  background: #1f2937;
+  color: #d1d5db;
+}
 
-  .basic-config-panel .config-section h3,
-  .tracks-config-panel .config-section h3,
-  .items-list h3,
-  .item-editor h3,
-  .item-editor .config-section h4,
-  .advanced-config-panel .config-section h3 {
-    color: #f3f4f6;
-    border-bottom-color: #374151;
-  }
+:where(.dark) .grid-layout-panel-tabs .tab.active {
+  background: #1f2937;
+  color: #60a5fa;
+  border-bottom-color: #60a5fa;
+}
 
-  .basic-config-panel .config-row label,
-  .track-item label,
-  .item-id,
-  .position-grid .config-row label,
-  .advanced-config-panel .config-row label {
-    color: #d1d5db;
-  }
+:where(.dark) .basic-config-panel .config-section h3,
+:where(.dark) .tracks-config-panel .config-section h3,
+:where(.dark) .items-list h3,
+:where(.dark) .item-editor h3,
+:where(.dark) .item-editor .config-section h4,
+:where(.dark) .advanced-config-panel .config-section h3 {
+  color: #f3f4f6;
+  border-bottom-color: #374151;
+}
 
-  .basic-config-panel .config-row input,
-  .basic-config-panel .config-row select,
-  .track-item input,
-  .position-grid .config-row input,
-  .advanced-config-panel .config-row input[type='number'] {
-    background: #374151;
-    border-color: #4b5563;
-    color: #f3f4f6;
-  }
+:where(.dark) .basic-config-panel .config-row label,
+:where(.dark) .track-item label,
+:where(.dark) .item-id,
+:where(.dark) .position-grid .config-row label,
+:where(.dark) .advanced-config-panel .config-row label {
+  color: #d1d5db;
+}
 
-  .item-card {
-    background: #374151;
-    border-color: #4b5563;
-  }
+:where(.dark) .basic-config-panel .config-row input,
+:where(.dark) .basic-config-panel .config-row select,
+:where(.dark) .track-item input,
+:where(.dark) .position-grid .config-row input,
+:where(.dark) .advanced-config-panel .config-row input[type='number'] {
+  background: #374151;
+  border-color: #4b5563;
+  color: #f3f4f6;
+}
 
-  .item-card:hover {
-    border-color: #60a5fa;
-    background: #1f2937;
-  }
+:where(.dark) .item-card {
+  background: #374151;
+  border-color: #4b5563;
+}
 
-  .item-card.selected {
-    border-color: #60a5fa;
-    background: #1e3a8a;
-  }
+:where(.dark) .item-card:hover {
+  border-color: #60a5fa;
+  background: #1f2937;
+}
 
-  .grid-layout-toolbar {
-    background: #111827;
-    border-color: #374151;
-  }
+:where(.dark) .item-card.selected {
+  border-color: #60a5fa;
+  background: #1e3a8a;
+}
+
+:where(.dark) .grid-layout-toolbar {
+  background: #111827;
+  border-color: #374151;
 }
