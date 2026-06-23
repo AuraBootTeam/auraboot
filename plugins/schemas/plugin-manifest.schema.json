@@ -10,6 +10,11 @@
       "not": {
         "required": ["entryPoint"]
       }
+    },
+    {
+      "not": {
+        "required": ["clientConfig"]
+      }
     }
   ],
   "properties": {
@@ -323,104 +328,6 @@
         "entryClass": {
           "type": "string",
           "description": "Canonical fully qualified class name of the plugin entry class"
-        }
-      },
-      "additionalProperties": false
-    },
-    "clientConfig": {
-      "type": "object",
-      "description": "Frontend plugin configuration (legacy)",
-      "properties": {
-        "remoteEntry": {
-          "type": "string",
-          "description": "Path to the Module Federation remote entry file"
-        },
-        "exposedModules": {
-          "type": "array",
-          "description": "List of exposed frontend modules",
-          "items": {
-            "type": "object",
-            "required": ["name", "path"],
-            "properties": {
-              "name": {
-                "type": "string",
-                "description": "Module name for loading"
-              },
-              "path": {
-                "type": "string",
-                "description": "Module path in the federation config"
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "slots": {
-          "type": "array",
-          "description": "Slot contribution configurations",
-          "items": {
-            "type": "object",
-            "required": ["slotId", "componentName"],
-            "properties": {
-              "slotId": {
-                "type": "string",
-                "description": "Target slot identifier"
-              },
-              "componentName": {
-                "type": "string",
-                "description": "Component name from exposed modules"
-              },
-              "priority": {
-                "type": "integer",
-                "description": "Rendering priority (lower = higher priority)",
-                "default": 100
-              },
-              "props": {
-                "type": "object",
-                "description": "Additional props to pass to the component"
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "routes": {
-          "type": "array",
-          "description": "Route contribution configurations",
-          "items": {
-            "type": "object",
-            "required": ["path", "componentName"],
-            "properties": {
-              "path": {
-                "type": "string",
-                "description": "Route path"
-              },
-              "componentName": {
-                "type": "string",
-                "description": "Component name from exposed modules"
-              },
-              "exact": {
-                "type": "boolean",
-                "default": true
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "menuItems": {
-          "type": "array",
-          "description": "Frontend menu contributions",
-          "items": {
-            "type": "object",
-            "required": ["key", "label", "path"],
-            "properties": {
-              "key": { "type": "string" },
-              "label": { "type": "string" },
-              "icon": { "type": "string" },
-              "path": { "type": "string" },
-              "order": { "type": "integer" },
-              "parent": { "type": "string" }
-            },
-            "additionalProperties": false
-          }
         }
       },
       "additionalProperties": false

@@ -64,6 +64,29 @@ describe('validateStructural plugin manifest schema', () => {
     expect(result.errorCount).toBeGreaterThan(0);
   });
 
+  it('rejects the removed top-level clientConfig field', () => {
+    const result = validateStructural(
+      pluginWithManifest({
+        pluginId: 'legacy-frontend-plugin',
+        namespace: 'legacy_frontend',
+        version: '1.0.0',
+        clientConfig: {
+          remoteEntry: 'frontend/remoteEntry.js',
+        },
+      }),
+    );
+
+    expect(result.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'L1-MANIFEST',
+          path: 'plugin.json',
+        }),
+      ]),
+    );
+    expect(result.errorCount).toBeGreaterThan(0);
+  });
+
   it('rejects removed backend jarFile and entryPoint aliases', () => {
     const result = validateStructural(
       pluginWithManifest({
