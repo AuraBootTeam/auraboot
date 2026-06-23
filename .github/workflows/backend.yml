@@ -47,7 +47,7 @@ jobs:
           fi
 
           if git diff --name-only "$base" "$head" \
-            | grep -E '^(platform/|scripts/install-smartengine-maven-local\.sh|\.github/workflows/backend\.yml)' >/dev/null; then
+            | grep -E '^(platform/|\.github/workflows/backend\.yml)' >/dev/null; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -60,10 +60,6 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
-
-      - name: Install SmartEngine fork into Maven local
-        if: steps.changes.outputs.run == 'true'
-        run: scripts/install-smartengine-maven-local.sh
 
       - name: Set up Gradle
         if: steps.changes.outputs.run == 'true'
