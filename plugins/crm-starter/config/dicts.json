@@ -1,5 +1,29 @@
 [
   {
+    "code": "owner_type",
+    "name": "Owner Type",
+    "name:zh-CN": "分配类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "user",
+        "label": "User",
+        "label:zh-CN": "用户",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "icon": "User" }
+      },
+      {
+        "value": "team",
+        "label": "Team",
+        "label:zh-CN": "团队",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": { "icon": "Users" }
+      }
+    ]
+  },
+  {
     "code": "crm_account_status",
     "name": "Account Status",
     "name:zh-CN": "客户状态",

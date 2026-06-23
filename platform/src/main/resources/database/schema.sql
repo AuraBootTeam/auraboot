@@ -5464,12 +5464,16 @@ CREATE TABLE IF NOT EXISTS ab_ai_trace (
     tags                TEXT[],
     start_time          TIMESTAMPTZ(3) NOT NULL,
     end_time            TIMESTAMPTZ(3),
+    otel_trace_id       VARCHAR(32),
     created_at          TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_trace_tenant ON ab_ai_trace(tenant_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_ai_trace_session ON ab_ai_trace(session_id);
 CREATE INDEX IF NOT EXISTS idx_ai_trace_status ON ab_ai_trace(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_ab_ai_trace_otel_trace_id
+    ON ab_ai_trace (otel_trace_id) WHERE otel_trace_id IS NOT NULL;
+COMMENT ON COLUMN ab_ai_trace.otel_trace_id IS 'OTel W3C traceId (32-hex) captured at turn start; bridges self-built UUID trace_id to the OTel trace';
 
 CREATE TABLE IF NOT EXISTS ab_ai_trace_span (
     id                      BIGSERIAL PRIMARY KEY,
@@ -5506,6 +5510,31 @@ CREATE INDEX IF NOT EXISTS idx_ai_span_trace ON ab_ai_trace_span(trace_id, seque
 CREATE INDEX IF NOT EXISTS idx_ai_span_parent ON ab_ai_trace_span(parent_span_id);
 CREATE INDEX IF NOT EXISTS idx_ai_span_type ON ab_ai_trace_span(trace_id, type);
 CREATE INDEX IF NOT EXISTS idx_ai_span_tenant ON ab_ai_trace_span(tenant_id, trace_id);
+
+-- Durable LLM usage/cost ledger — billing source of truth, not sampled trace spans.
+CREATE TABLE IF NOT EXISTS ab_gen_ai_usage (
+    id                   BIGSERIAL PRIMARY KEY,
+    tenant_id            BIGINT NOT NULL,
+    run_id               VARCHAR(64),
+    trace_id             VARCHAR(36),
+    span_id              VARCHAR(36),
+    provider             VARCHAR(40),
+    request_model        VARCHAR(120),
+    response_model       VARCHAR(120),
+    input_tokens         INT DEFAULT 0,
+    output_tokens        INT DEFAULT 0,
+    cache_read_tokens    INT DEFAULT 0,
+    cache_write_tokens   INT DEFAULT 0,
+    reasoning_tokens     INT DEFAULT 0,
+    amount               DECIMAL(14,6) DEFAULT 0,
+    currency             VARCHAR(8) DEFAULT 'USD',
+    pricing_version      VARCHAR(32),
+    created_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+COMMENT ON TABLE ab_gen_ai_usage IS 'Durable LLM usage/cost ledger (A-G6) — billing source of truth, not derived from sampled OTel spans';
+CREATE INDEX IF NOT EXISTS idx_ab_gen_ai_usage_tenant_created ON ab_gen_ai_usage (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_ab_gen_ai_usage_trace ON ab_gen_ai_usage (trace_id) WHERE trace_id IS NOT NULL;
 
 -- ============================================================
 -- Plugin Marketplace
