@@ -10,6 +10,7 @@ relates_to:
   - docs/superpowers/reports/feature-coverage-rbac-data-scope-2026-06-23.md
   - https://github.com/AuraBootTeam/auraboot/pull/1061
   - https://github.com/AuraBootTeam/auraboot/pull/1063
+  - https://github.com/AuraBootTeam/auraboot/pull/1065
 ---
 
 # RBAC Data Scope Follow-up Tasks
@@ -69,15 +70,18 @@ npx playwright test -c playwright.config.ts --project=rbac-chromium --reporter=l
 
 结果：`17 passed`。该 profile 的 `--list` 只包含 `00-bootstrap`、`01-multi-role-users`、`03-import-test-fixtures`、`rbac-auth` 和目标权限 spec，不包含 `02-test-pages`。
 
-## 保留后续任务
+## Backlog 明细
 
-| 后续项 | 触发条件 | 不在本轮做的原因 |
-|---|---|---|
-| relation 浏览器证据 | 有稳定 relation UI fixture 后补 `source visible/invisible -> child rows` 浏览器断言。 | 本轮后端已证明 source record 先授权；不为了 UI fixture 扩大范围。 |
-| 跨租户浏览器数据集 | 可稳定创建租户 A/B、用户和数据后补 UI 搜索断言。 | 运行时已有 tenant-aware mapper/scoped SQL 回归；浏览器跨租户 seed 成本高于本轮目标。 |
-| `batchUpdate` scoped bulk | 出现大批量更新性能压力时再做。 | 当前更新路径优先授权等价，不为一期引入更宽 SQL 生成面。 |
-| team/group/project scope | 小组长范围来源明确后启动。 | 用户已明确“后期再说”，现在实现会绑定错误业务模型。 |
-| NamedQuery import validator | 受保护页面大量使用 NamedQuery 后补 warning/error gate。 | 当前已支持显式声明并接入 runtime；缺声明的 NamedQuery 不标记为受 DataScope 保护。 |
+以下条目作为本轮后的正式 backlog 追踪。状态均为 `backlog`，不影响一期已合并结论。
+
+| ID | 优先级 | 任务 | 状态 | 触发条件 | 验收口径 |
+|---|---|---|---|---|---|
+| RDS-BL-001 | P0 | relation 浏览器证据 | backlog | 有稳定 relation UI fixture。 | 浏览器验证 source 记录不可见时不能通过 relation 泄漏子表；source 可见时 target 仍按 DataScope 过滤。 |
+| RDS-BL-002 | P0 | 跨租户浏览器 seed | backlog | 可稳定创建租户 A/B、用户、授权和测试数据。 | 租户 A 管理员持有 `all` 后，只能在 list/detail/chart 中看到租户 A 数据，看不到租户 B 数据。 |
+| RDS-BL-003 | P1 | NamedQuery validator/import warning | backlog | 受保护页面或插件开始规模化使用 NamedQuery dataSource/dashboard。 | 缺 `resourceCode/actionCode` 的受保护 NamedQuery 给 import warning、validator error 或明确的页面级阻断策略。 |
+| RDS-BL-004 | P1 | `batchUpdate` scoped bulk 预研 | backlog | 出现真实大批量更新性能压力。 | 在不降低授权等价的前提下，明确是否引入 tenant + DataScope + domain filter 的 scoped bulk update。 |
+| RDS-BL-005 | P2 | team/group/project scope 设计 | backlog | 小组长范围来源明确。 | 先定组织架构、项目组或业务对象字段来源，再扩 `DataScopeEvaluator`、record verdict 和 E2E matrix。 |
+| RDS-BL-006 | P2 | full Playwright setup 归类治理 | backlog | full setup 继续被非权限 demo/page-schema 资源打断。 | RBAC targeted profile 继续独立；full setup 失败能明确归因到对应模块，不阻塞权限 E2E。 |
 
 ## 不重复踩的坑
 
