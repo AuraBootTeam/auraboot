@@ -226,7 +226,7 @@
     "@vitest/ui": "^4.1.8",
     "adm-zip": "^0.5.16",
     "concurrently": "^9.2.1",
-    "daisyui": "^5.0.2",
+    "daisyui": "^5.5.23",
     "eruda": "^3.4.3",
     "eslint": "^8.47.0",
     "eslint-plugin-react-hooks": "^4.6.2",
