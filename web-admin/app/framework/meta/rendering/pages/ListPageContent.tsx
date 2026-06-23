@@ -3653,14 +3653,6 @@ function ListPageContentInner(props: PageContentProps) {
             evaluateVisible={evaluateButtonVisible}
             onImport={() => setImportOpen(true)}
             onExport={handleExport}
-            activePreset={activeQuickFilter}
-            onSelectPreset={handleQuickFilter}
-            onSaveActivePreset={handleSaveActivePreset}
-            savedPresetKeys={savedQuickFilterPresetKeys}
-            activeSavedPresetKey={activeSavedQuickFilterPresetKey}
-            activeSavedPresetEdited={activeSavedQuickFilterPresetEdited}
-            onResetActiveSavedPreset={handleResetActiveSavedPreset}
-            hidePresetViews={hideQuickFilters}
             exportFilters={exportFilterConditions}
             isTenantMemberPage={isTenantMemberPage}
             onInvite={() => setInviteDialogOpen(true)}
@@ -4204,6 +4196,11 @@ function ListPageContentInner(props: PageContentProps) {
                 }
                 activeQuickFilter={activeQuickFilter}
                 onQuickFilter={handleQuickFilter}
+                onSaveActivePreset={handleSaveActivePreset}
+                savedPresetKeys={savedQuickFilterPresetKeys}
+                activeSavedPresetKey={activeSavedQuickFilterPresetKey}
+                activeSavedPresetEdited={activeSavedQuickFilterPresetEdited}
+                onResetActiveSavedPreset={handleResetActiveSavedPreset}
                 activeSorts={activeSorts}
                 onSortsChange={setActiveSorts}
                 sortableColumns={tableColumns

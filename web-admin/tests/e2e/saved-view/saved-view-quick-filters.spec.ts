@@ -101,13 +101,14 @@ test.describe('Quick Filters (GAP-130)', () => {
 
   test('QF-007: active quick-filter preset can be saved as a personal SavedView', async ({ page }) => {
     await navigateToDynamicPage(page, 'e2et_order');
-    await expect(page.getByTestId('preset-view-bar')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByTestId('preset-view-bar')).toHaveCount(0);
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/api/dynamic/e2et_order') && resp.url().includes('list'),
       { timeout: 10000 },
     );
-    await page.getByTestId('preset-view-modified_this_week').click();
+    await page.getByTestId('quick-filter-modified_this_week').click();
     await responsePromise;
 
     const createViewPromise = page.waitForResponse(
