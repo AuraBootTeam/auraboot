@@ -4,7 +4,7 @@ status: active
 created: 2026-06-23
 owner_lane: saved-view
 relates_to:
-  - /Users/ghj/work/auraboot/.worktrees/enterprise-saved-view-vnext/docs/assets/mockups/saved-view-vnext-mockup.html
+  - docs/assets/mockups/saved-view-vnext-mockup.html
   - docs/plans/2026-06/2026-06-22-saved-view-feishu-parity-requirements.md
   - docs/backlog/2026-06-22-saved-view-feishu-parity-gaps.md
   - docs/backlog/2026-06-23-saved-view-post-pr-follow-up-gaps.md
