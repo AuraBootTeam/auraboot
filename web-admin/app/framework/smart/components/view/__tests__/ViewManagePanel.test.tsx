@@ -27,8 +27,8 @@ const ZH = {
     saved_view_new_personal: '新建个人视图',
     saved_view_personal_group: '个人视图',
     saved_view_scope_personal: '我的',
-    saved_view_personal_quota: '个人视图: {count}/{limit}',
-    saved_view_personal_quota_reached: '已达到个人视图上限，请删除不需要的视图后再新建。',
+    saved_view_personal_quota: '个人视图：{count}/{limit}',
+    saved_view_personal_quota_reached: '已达到 10 个个人视图上限，请删除或复用已有视图',
     saved_view_choose_type: '选择视图类型',
     saved_view_cancel: '取消',
     saved_view_create_cancel: '取消',
@@ -172,7 +172,7 @@ describe('ViewManagePanel personal-only release', () => {
     const props = renderPanel();
 
     fireEvent.click(screen.getByRole('button', { name: '新建个人视图' }));
-    expect(screen.getByTestId('saved-view-quota-status')).toHaveTextContent('个人视图: 0/10');
+    expect(screen.getByTestId('saved-view-quota-status')).toHaveTextContent('个人视图：0/10');
     fireEvent.click(screen.getByRole('button', { name: /^表格/ }));
 
     await waitFor(() => expect(props.onCreateView).toHaveBeenCalledOnce());
@@ -207,7 +207,7 @@ describe('ViewManagePanel personal-only release', () => {
 
     expect(screen.queryByText('我的默认视图')).not.toBeInTheDocument();
     expect(screen.getByText('本周修改')).toBeInTheDocument();
-    expect(screen.getByTestId('saved-view-quota-summary')).toHaveTextContent('个人视图: 2/10');
+    expect(screen.getByTestId('saved-view-quota-summary')).toHaveTextContent('个人视图：2/10');
     expect(screen.queryByText('团队看板')).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId('saved-view-manage-search'), {
@@ -231,9 +231,9 @@ describe('ViewManagePanel personal-only release', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '新建个人视图' }));
 
-    expect(screen.getByTestId('saved-view-quota-status')).toHaveTextContent('个人视图: 10/10');
+    expect(screen.getByTestId('saved-view-quota-status')).toHaveTextContent('个人视图：10/10');
     expect(screen.getByTestId('saved-view-quota-limit-reached')).toHaveTextContent(
-      '已达到个人视图上限',
+      '已达到 10 个个人视图上限',
     );
     const tableButton = screen.getByRole('button', { name: /^表格/ });
     expect(tableButton).toBeDisabled();
