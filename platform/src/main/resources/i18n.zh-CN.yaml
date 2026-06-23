@@ -53,6 +53,7 @@ common:
   saved_view_scope_team: 团队
   saved_view_scope_global: 全员
   saved_view_default: 默认
+  saved_view_default_view: 默认视图
   saved_view_new: 新建视图
   saved_view_new_personal: 新建个人视图
   saved_view_manage: 管理视图

@@ -24,6 +24,12 @@ describe('savedViewPersistence', () => {
   it('only persists directly to personal views', () => {
     expect(getSavedViewPersistenceMode(null)).toBe('implicit-autosave');
     expect(getSavedViewPersistenceMode(makeView('personal'))).toBe('personal-persist');
+    expect(
+      getSavedViewPersistenceMode({
+        ...makeView('personal'),
+        isImplicit: true,
+      }),
+    ).toBe('implicit-autosave');
     expect(getSavedViewPersistenceMode(makeView('team'))).toBe('shared-draft');
     expect(getSavedViewPersistenceMode(makeView('global'))).toBe('shared-draft');
   });
