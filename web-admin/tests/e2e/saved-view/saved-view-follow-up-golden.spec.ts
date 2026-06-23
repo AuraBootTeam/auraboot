@@ -312,9 +312,10 @@ test.describe('SavedView follow-up golden coverage', () => {
   test('SV-FU-003: quick preset saved copy shows saved, edited, and reset states', async ({ page }) => {
     await ensureModifiedThisWeekPresetCopy(page);
     await navigateToOrderViaSidebar(page);
-    await expect(page.getByTestId('preset-view-bar')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
+    await expect(page.getByTestId('preset-view-bar')).toHaveCount(0);
 
-    const presetChip = page.getByTestId('preset-view-modified_this_week');
+    const presetChip = page.getByTestId('quick-filter-modified_this_week');
     await expect(presetChip).toHaveAttribute('data-preset-saved', 'true', { timeout: 10000 });
     await presetChip.click();
     await page.getByTestId('preset-view-save-as-personal').click();

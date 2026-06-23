@@ -11,8 +11,6 @@ import type { ToolbarActionConfig, SavedView, ViewType } from '~/framework/smart
 import { ViewSelector } from '~/framework/smart/components/view/ViewSelector';
 import { ToolbarActionGroup } from './ToolbarActionGroup';
 import { deriveTestId } from '~/framework/meta/rendering/utils/deriveTestId';
-import { PresetViewBar } from './PresetViewBar';
-import type { QuickFilterPresetKey } from './quickFilterPresets';
 
 export interface ListPageHeaderProps {
   /** Page title (already localized) */
@@ -39,22 +37,6 @@ export interface ListPageHeaderProps {
   evaluateVisible: (button: ButtonConfig) => boolean;
   onImport: () => void;
   onExport: (format: 'xlsx' | 'csv') => void;
-  /** Active preset view (T8); null when none selected */
-  activePreset?: QuickFilterPresetKey | null;
-  /** Toggle a preset view on/off */
-  onSelectPreset?: (key: QuickFilterPresetKey) => void;
-  /** Save the active preset view as a personal SavedView */
-  onSaveActivePreset?: () => void;
-  /** Presets that already have a personal SavedView copy */
-  savedPresetKeys?: QuickFilterPresetKey[];
-  /** Origin preset key of the active personal SavedView copy */
-  activeSavedPresetKey?: QuickFilterPresetKey | null;
-  /** Whether the active personal copy differs from the current preset definition */
-  activeSavedPresetEdited?: boolean;
-  /** Reset the active personal copy to the current preset definition */
-  onResetActiveSavedPreset?: () => void;
-  /** Hide the preset-view bar (e.g. config-only pages) */
-  hidePresetViews?: boolean;
   /** Current filter conditions for export */
   exportFilters?: Array<{ field: string; operator: string; value: unknown }>;
   /** Whether this is a tenant member page (shows Invite button) */
@@ -86,14 +68,6 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   evaluateVisible,
   onImport,
   onExport,
-  activePreset,
-  onSelectPreset,
-  onSaveActivePreset,
-  savedPresetKeys,
-  activeSavedPresetKey,
-  activeSavedPresetEdited,
-  onResetActiveSavedPreset,
-  hidePresetViews,
   exportFilters,
   isTenantMemberPage,
   onInvite,
@@ -121,20 +95,6 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               activeViewType={activeViewType}
               onViewTypeChange={onViewTypeChange}
             />
-          )}
-          {!hidePresetViews && onSelectPreset && (
-            <>
-              <div className="bg-border hidden h-5 w-px sm:block" aria-hidden />
-              <PresetViewBar
-                activePreset={activePreset ?? null}
-                onSelectPreset={onSelectPreset}
-                onSaveActivePreset={onSaveActivePreset}
-                savedPresetKeys={savedPresetKeys}
-                activeSavedPresetKey={activeSavedPresetKey}
-                activeSavedPresetEdited={activeSavedPresetEdited}
-                onResetActiveSavedPreset={onResetActiveSavedPreset}
-              />
-            </>
           )}
         </div>
         <div
