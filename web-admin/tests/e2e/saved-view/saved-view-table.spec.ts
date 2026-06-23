@@ -8,13 +8,13 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { BASE_URL } from '../../helpers/environments';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { DynamicListPage } from '../../pages/DynamicListPage';
 import { selectSavedViewByName, uniqueId, todayStr } from '../helpers';
 
 const ADMIN_STORAGE_STATE = process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json';
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
 
 async function expectApiJson(response: import('@playwright/test').APIResponse, label: string) {

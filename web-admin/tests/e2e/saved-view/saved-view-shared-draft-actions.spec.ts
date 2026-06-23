@@ -12,13 +12,13 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import { mkdir, readFile } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
+import { BASE_URL } from '../../helpers/environments';
 import { acceptConfirmDialog, uniqueId } from '../helpers';
 
 const MODEL_CODE = 'e2et_order';
 const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
 const ADMIN_STORAGE_STATE = process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json';
 const VIEWER_STORAGE_STATE = process.env.PW_VIEWER_STORAGE_STATE || 'tests/storage/viewer.json';
-const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://127.0.0.1:5173';
 const SCREENSHOT_DIR = 'test-results/saved-view-vnext';
 
 interface JsonResponseLike {
