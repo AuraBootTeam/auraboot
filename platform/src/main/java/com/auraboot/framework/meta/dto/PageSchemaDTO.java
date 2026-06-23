@@ -85,9 +85,9 @@ public class PageSchemaDTO extends AbstractResponse {
 
     /**
      * Optional override for the edit-mode record-prefill fetch (e.g.
-     * {@code {"endpoint": "/api/qr/{recordId}"}}). When set, a form page loads
+     * {@code {"endpoint": "/api/qr/{recordPid}"}}). When set, a form page loads
      * the existing record from this endpoint instead of the default
-     * {@code /api/dynamic/<modelCode>/<recordId>} — required for skipTableCreation
+     * {@code /api/dynamic/<modelCode>/<recordPid>} — required for skipTableCreation
      * models whose reads are served by a custom REST endpoint. Declaring it here
      * keeps it a recognized top-level field so import validation does not reject it
      * as {@code S-PAGE-UNKNOWN-FIELDS}.

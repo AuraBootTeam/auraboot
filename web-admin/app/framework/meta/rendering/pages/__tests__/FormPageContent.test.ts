@@ -312,14 +312,26 @@ describe('resolveEditRecordEndpoint', () => {
     expect(resolveEditRecordEndpoint(undefined, 'crm_lead', 'r1')).toBe('/api/dynamic/crm_lead/r1');
     expect(resolveEditRecordEndpoint({}, 'crm_lead', 'r1')).toBe('/api/dynamic/crm_lead/r1');
   });
-  it('uses the custom endpoint and interpolates {recordId} / ${recordId}', () => {
+  it('uses the custom endpoint and interpolates public pid placeholders', () => {
+    expect(
+      resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordPid}' } }, 'qr_code', 'abc'),
+    )
+      .toBe('/api/qr/abc');
+    expect(
+      resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/${recordPid}' } }, 'qr_code', 'abc'),
+    )
+      .toBe('/api/qr/abc');
+    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{pid}' } }, 'qr_code', 'abc'))
+      .toBe('/api/qr/abc');
+  });
+  it('keeps legacy recordId placeholder compatibility', () => {
     expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordId}' } }, 'qr_code', 'abc'))
       .toBe('/api/qr/abc');
     expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/${recordId}' } }, 'qr_code', 'abc'))
       .toBe('/api/qr/abc');
   });
-  it('url-encodes the recordId', () => {
-    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordId}' } }, 'qr_code', 'a/b'))
+  it('url-encodes the public record pid', () => {
+    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordPid}' } }, 'qr_code', 'a/b'))
       .toBe('/api/qr/a%2Fb');
   });
 });

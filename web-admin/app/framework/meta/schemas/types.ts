@@ -669,9 +669,10 @@ export interface UnifiedSchema {
   /**
    * Optional override for the edit-mode record-prefill fetch. When set, the form
    * loads the existing record from this endpoint instead of the default
-   * `/api/dynamic/<modelCode>/<recordId>`. Required for skipTableCreation models
-   * whose reads are served by a custom REST endpoint (e.g. `/api/qr/{recordId}`).
-   * `{recordId}` (and `${recordId}`) in `endpoint` are interpolated with the URL recordId.
+   * `/api/dynamic/<modelCode>/<recordPid>`. Required for skipTableCreation models
+   * whose reads are served by a custom REST endpoint (e.g. `/api/qr/{recordPid}`).
+   * `{recordPid}` / `${recordPid}` / `{pid}` / `${pid}` in `endpoint` are
+   * interpolated with the URL record pid.
    */
   recordSource?: { endpoint: string; method?: string };
 }
