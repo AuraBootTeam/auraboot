@@ -6,14 +6,50 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { navigateToDynamicPage } from '../helpers';
+import { openViewSelectorDropdown } from '../helpers';
+import { cleanupGeneratedSavedViews, navigateToOrderViaSidebar } from './helpers';
+
+const MODEL_CODE = 'e2et_order';
+const PAGE_KEY = 'e2et_order_list';
 
 test.describe('Quick Filters (GAP-130)', () => {
   const quickFilter = (page: import('@playwright/test').Page, key: string) =>
     page.locator(`[data-testid="quick-filter-${key}"]`);
 
+  test.beforeEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, { modelCode: MODEL_CODE, pageKey: PAGE_KEY });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, { modelCode: MODEL_CODE, pageKey: PAGE_KEY });
+  });
+
+  async function navigateToOrderTable(page: import('@playwright/test').Page) {
+    await navigateToOrderViaSidebar(page);
+    const dropdown = await openViewSelectorDropdown(page);
+    await dropdown.getByTestId('view-option-default').click();
+    await dropdown.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
+  }
+
+  async function clickStableTestId(page: import('@playwright/test').Page, testId: string) {
+    await expect
+      .poll(
+        async () => {
+          try {
+            await page.getByTestId(testId).click({ timeout: 750 });
+            return true;
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 5000 },
+      )
+      .toBe(true);
+  }
+
   test('QF-001: quick filter chips visible in table toolbar', async ({ page }) => {
-    await navigateToDynamicPage(page, 'e2et_order');
+    await navigateToOrderTable(page);
     const quickFilters = page.getByTestId('quick-filters');
     await expect(quickFilters).toBeVisible({ timeout: 30000 });
 
@@ -24,7 +60,7 @@ test.describe('Quick Filters (GAP-130)', () => {
   });
 
   test('QF-002: quick filter chip labels are correct', async ({ page }) => {
-    await navigateToDynamicPage(page, 'e2et_order');
+    await navigateToOrderTable(page);
     await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
 
     // Runtime locale is zh-CN with translations loaded for these keys; assert
@@ -38,27 +74,34 @@ test.describe('Quick Filters (GAP-130)', () => {
   });
 
   test('QF-003: clicking a quick filter toggles active state', async ({ page }) => {
-    await navigateToDynamicPage(page, 'e2et_order');
+    await navigateToOrderTable(page);
     const myRecords = quickFilter(page, 'my_records');
     await expect(myRecords).toBeVisible({ timeout: 30000 });
 
     // Initially not active
-    const initialClass = await myRecords.getAttribute('class') ?? '';
+    const initialClass = (await myRecords.getAttribute('class')) ?? '';
 
     // Click to activate
-    await myRecords.click();
+    await clickStableTestId(page, 'quick-filter-my_records');
     // Active state should change the class (blue or primary color)
-    const activeClass = await myRecords.getAttribute('class') ?? '';
+    const activeClass = (await myRecords.getAttribute('class')) ?? '';
     expect(activeClass).not.toBe(initialClass);
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('preset'), { timeout: 5000 })
+      .toBe('my_records');
 
     // Click again to deactivate (toggle off)
-    await myRecords.click();
-    const deactivatedClass = await myRecords.getAttribute('class') ?? '';
-    expect(deactivatedClass).toBe(initialClass);
+    await clickStableTestId(page, 'quick-filter-my_records');
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('preset'), { timeout: 5000 })
+      .toBeNull();
+    await expect
+      .poll(async () => (await myRecords.getAttribute('class')) ?? '', { timeout: 5000 })
+      .toBe(initialClass);
   });
 
   test('QF-004: only one quick filter active at a time', async ({ page }) => {
-    await navigateToDynamicPage(page, 'e2et_order');
+    await navigateToOrderTable(page);
     await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
 
     const myRecords = quickFilter(page, 'my_records');
@@ -66,18 +109,18 @@ test.describe('Quick Filters (GAP-130)', () => {
 
     // Activate "My Records"
     await myRecords.click();
-    const myRecordsActive = await myRecords.getAttribute('class') ?? '';
+    const myRecordsActive = (await myRecords.getAttribute('class')) ?? '';
 
     // Activate "Created Today" — "My Records" should deactivate
     await createdToday.click();
-    const createdTodayActive = await createdToday.getAttribute('class') ?? '';
-    const myRecordsAfter = await myRecords.getAttribute('class') ?? '';
+    const createdTodayActive = (await createdToday.getAttribute('class')) ?? '';
+    const myRecordsAfter = (await myRecords.getAttribute('class')) ?? '';
     // The two should have different active states
     expect(myRecordsAfter).not.toBe(myRecordsActive);
   });
 
   test('QF-005: quick filter triggers data reload', async ({ page }) => {
-    await navigateToDynamicPage(page, 'e2et_order');
+    await navigateToOrderTable(page);
     await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
 
     // Click "Created Today" and wait for API response
@@ -92,15 +135,17 @@ test.describe('Quick Filters (GAP-130)', () => {
   });
 
   test('QF-006: quick filter coexists with view settings', async ({ page }) => {
-    await navigateToDynamicPage(page, 'e2et_order');
+    await navigateToOrderTable(page);
     // Both quick filters and row height button should be visible
     await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
     await expect(page.getByTestId('row-height-btn')).toBeVisible();
     await expect(page.getByTestId('column-settings-btn')).toBeVisible();
   });
 
-  test('QF-007: active quick-filter preset can be saved as a personal SavedView', async ({ page }) => {
-    await navigateToDynamicPage(page, 'e2et_order');
+  test('QF-007: active quick-filter preset can be saved as a personal SavedView', async ({
+    page,
+  }) => {
+    await navigateToOrderTable(page);
     await expect(page.getByTestId('quick-filters')).toBeVisible({ timeout: 30000 });
     await expect(page.getByTestId('preset-view-bar')).toHaveCount(0);
 
@@ -111,16 +156,21 @@ test.describe('Quick Filters (GAP-130)', () => {
     await page.getByTestId('quick-filter-modified_this_week').click();
     await responsePromise;
 
-    const createViewPromise = page.waitForResponse(
-      (resp) => resp.request().method() === 'POST' && new URL(resp.url()).pathname === '/api/views',
-      { timeout: 5000 },
-    ).catch(() => null);
-    await page.getByTestId('preset-view-save-as-personal').click();
+    const createViewPromise = page
+      .waitForResponse(
+        (resp) =>
+          resp.request().method() === 'POST' && new URL(resp.url()).pathname === '/api/views',
+        { timeout: 5000 },
+      )
+      .catch(() => null);
+    await clickStableTestId(page, 'preset-view-save-as-personal');
     const createViewResponse = await createViewPromise;
     if (createViewResponse) {
       expect(createViewResponse.ok()).toBeTruthy();
     }
     await expect(page).toHaveURL(/view=[^&]+/, { timeout: 10000 });
-    expect(new URL(page.url()).searchParams.get('preset')).toBeNull();
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('preset'), { timeout: 5000 })
+      .toBeNull();
   });
 });

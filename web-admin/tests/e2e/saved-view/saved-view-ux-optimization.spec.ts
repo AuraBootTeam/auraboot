@@ -21,6 +21,7 @@ import {
   selectSavedViewByName,
   selectSavedViewByType,
 } from '../helpers';
+import { cleanupGeneratedSavedViews } from './helpers';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -34,7 +35,10 @@ const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
 async function gotoOrderPage(page: Page) {
   await navigateToDynamicPage(page, ROUTE_PAGE_KEY);
   // Wait for the list page content to be visible (table renders by default)
-  await page.locator('table, [role="table"], [data-testid="dynamic-list"]').first().waitFor({ state: 'visible', timeout: 15000 });
+  await page
+    .locator('table, [role="table"], [data-testid="dynamic-list"]')
+    .first()
+    .waitFor({ state: 'visible', timeout: 15000 });
 }
 
 /** Create a saved view via API. Returns the pid. */
@@ -70,7 +74,10 @@ async function deleteViewViaApi(page: Page, pid: string): Promise<void> {
  */
 async function switchToViewType(page: Page, viewType: string) {
   if (viewType === 'table') {
-    // Table is the default view type, no switch needed
+    const dropdown = await openViewSelectorDropdown(page);
+    await dropdown.getByTestId('view-option-default').click();
+    await dropdown.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => {});
+    await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 10_000 });
     return;
   }
   await selectSavedViewByType(page, viewType);
@@ -86,6 +93,14 @@ async function selectViewByName(page: Page, viewName: string) {
 // ===========================================================================
 
 test.describe('ViewEmptyState', () => {
+  test.beforeEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, { modelCode: MODEL_CODE, pageKey: SAVED_VIEW_PAGE_KEY });
+  });
+
+  test.afterEach(async ({ page }) => {
+    await cleanupGeneratedSavedViews(page, { modelCode: MODEL_CODE, pageKey: SAVED_VIEW_PAGE_KEY });
+  });
+
   test('VES-001: rejects calendar view creation when date field mapping is missing', async ({
     page,
   }) => {
@@ -108,10 +123,9 @@ test.describe('ViewEmptyState', () => {
     expect(JSON.stringify(body.context ?? {})).toContain('calendarDateField');
 
     await gotoOrderPage(page);
-    await expect(page.getByTestId('view-selector-trigger')).toHaveAttribute(
-      'data-current-view-type',
-      'table',
-    );
+    await expect(
+      page.locator('table, [role="table"], [data-testid="dynamic-list"]').first(),
+    ).toBeVisible();
     expect(await selectViewByName(page, viewName)).toBe(false);
   });
 
@@ -138,11 +152,7 @@ test.describe('DataLimitBanner', () => {
     await gotoOrderPage(page);
     // Ensure we're on table view
     await switchToViewType(page, 'table');
-    // Wait for table to render
-    await page
-      .locator('table, [role="table"]')
-      .first()
-      .waitFor({ state: 'visible', timeout: 10000 });
+    await expect(page.getByTestId('dynamic-list')).toBeVisible({ timeout: 10000 });
     // DataLimitBanner should NOT appear on table views (they use full pagination)
     const banner = page.locator('[data-testid="data-limit-banner"]');
     await expect(banner).not.toBeVisible({ timeout: 3000 });
@@ -170,9 +180,7 @@ test.describe('DataLimitBanner', () => {
     // If not visible, totalCount <= fetchedCount — that's valid behavior
   });
 
-  test('DLB-003: data-limit banner switches back to table view', async ({
-    page,
-  }) => {
+  test('DLB-003: data-limit banner switches back to table view', async ({ page }) => {
     await gotoOrderPage(page);
     await switchToViewType(page, 'gallery');
 

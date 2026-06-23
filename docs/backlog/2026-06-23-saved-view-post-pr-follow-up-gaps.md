@@ -38,6 +38,16 @@ Related PR: `https://github.com/AuraBootTeam/auraboot/pull/1028`
 
 Dynamic business record pid-only migration has been removed from this SavedView tracker because it is owned by another workspace and is not a blocker for the SavedView feature completion decision.
 
+## 2026-06-23 Closeout Decision
+
+当前 backlog 不再作为本轮 SavedView Personal-only release 的阻塞清单。本轮最终收口结论：
+
+- `shared/team/global`、协作者、共享保存 diff、共享 audit、team/global quota 20：后续路线，当前不做。
+- `platform-wide dynamic record pid-only migration`：已移出 SavedView tracker，由其他会话处理，当前不做。
+- 当前分支只对 Personal-only 做 release-candidate 判断。
+- 最新 scoped 回归证据：SavedView E2E `101 passed / 4 skipped`，frontend focused Vitest `83 passed`，`git diff --check` PASS。
+- 后续若重新打开 shared/team/global，必须新开 scope 文档、mockup 和 E2E matrix，不能复用本 backlog 的历史 DONE 行。
+
 ## 2026-06-23 Personal-only Release Convergence
 
 本轮在 `codex/saved-view-endgame-baseline` 上重新收口后，当前 SavedView 发布判断改为 Personal-only：
