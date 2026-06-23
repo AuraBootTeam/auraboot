@@ -107,6 +107,46 @@ function snippet(text, max = 180) {
   return text.replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+function extractSelectProjection(sql) {
+  const selectMatch = /\bselect\b/i.exec(sql);
+  if (!selectMatch) return null;
+
+  let depth = 0;
+  let quote = null;
+  for (let i = selectMatch.index + selectMatch[0].length; i < sql.length; i += 1) {
+    const char = sql[i];
+    if (quote) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '\'' || char === '"' || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '(') {
+      depth += 1;
+      continue;
+    }
+    if (char === ')') {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    if (
+      depth === 0 &&
+      /\s/.test(char) &&
+      /^from\b/i.test(sql.slice(i + 1))
+    ) {
+      return sql.slice(selectMatch.index + selectMatch[0].length, i);
+    }
+  }
+  return null;
+}
+
+function selectsInternalField(sql) {
+  const projection = extractSelectProjection(sql);
+  return projection !== null && SQL_INTERNAL_FIELD_RE.test(projection);
+}
+
 function makeKey(finding) {
   return [
     finding.code,
@@ -138,7 +178,7 @@ function recordJsonStringFindings(findings, repoRoot, file, jsonPath, value) {
       message: 'Public DSL/config string still uses recordId/$record.id instead of recordPid/$record.pid.',
     });
   }
-  if (SQL_SELECT_RE.test(value) && SQL_INTERNAL_FIELD_RE.test(value)) {
+  if (SQL_SELECT_RE.test(value) && selectsInternalField(value)) {
     pushFinding(findings, {
       code: 'S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK',
       category: 'named-query-export',

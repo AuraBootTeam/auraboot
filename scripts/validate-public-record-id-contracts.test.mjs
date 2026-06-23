@@ -92,6 +92,7 @@ test('inventories named query internal-field bypass risk without blanket matchin
   const root = makeRepo();
   writeJson(root, 'plugins/demo/config/named-queries/orders.json', {
     safeQuery: 'select external_order_id, material_id from mt_order',
+    safeTenantFilteredQuery: 'select pid, order_name from mt_order where tenant_id = #{params.tenantId} order by created_at desc',
     riskyQuery: 'select id, tenant_id, created_by, name from mt_order',
   });
 

@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -28,10 +29,14 @@ public class RecordCommentService {
         // explicitly here to keep comments isolated per tenant.
         Long tenantId = MetaContext.getCurrentTenantId();
         return jdbcTemplate.queryForList(
-                "SELECT id, model_code, record_pid, content, mentions, created_by, created_at, updated_at, is_edited "
-                + "FROM " + TABLE
-                + " WHERE tenant_id = ? AND model_code = ? AND record_pid = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)"
-                + " ORDER BY created_at DESC",
+                "SELECT c.pid AS \"commentPid\", c.model_code, c.record_pid, c.content, c.mentions, "
+                + "COALESCE(NULLIF(u.nick_name, ''), NULLIF(u.user_name, ''), u.email, 'User') AS \"actorName\", "
+                + "c.created_at, c.updated_at, c.is_edited "
+                + "FROM " + TABLE + " c "
+                + "LEFT JOIN ab_user u ON u.id::text = c.created_by "
+                + "WHERE c.tenant_id = ? AND c.model_code = ? AND c.record_pid = ? "
+                + "AND (c.deleted_flag = FALSE OR c.deleted_flag IS NULL)"
+                + " ORDER BY c.created_at DESC",
                 tenantId, modelCode, recordPid);
     }
 
@@ -42,71 +47,100 @@ public class RecordCommentService {
 
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
+        String commentPid = UniqueIdGenerator.generate();
+        String actorName = resolveActorName(userId);
 
         List<Map<String, Object>> result = jdbcTemplate.queryForList(
                 "INSERT INTO " + TABLE
-                + " (tenant_id, model_code, record_pid, content, mentions, created_by, created_at, updated_at, is_edited, deleted_flag) "
-                + "VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW(), false, false) "
-                + "RETURNING id, model_code, record_pid, content, mentions, created_by, created_at",
-                tenantId, modelCode, recordPid, content, mentions, userId);
+                + " (pid, tenant_id, model_code, record_pid, content, mentions, created_by, created_at, updated_at, is_edited, deleted_flag) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), false, false) "
+                + "RETURNING pid AS \"commentPid\", model_code, record_pid, content, mentions, created_at",
+                commentPid, tenantId, modelCode, recordPid, content, mentions, userId);
 
         if (result.isEmpty()) throw new RuntimeException("Failed to insert comment");
         log.info("Comment added to {}/{} by user {}", modelCode, recordPid, userId);
-        return result.get(0);
+        Map<String, Object> row = new LinkedHashMap<>(result.get(0));
+        row.put("actorName", actorName);
+        return row;
     }
 
-    public Map<String, Object> editComment(Long commentId, String content) {
+    public Map<String, Object> editComment(String commentPid, String content) {
         if (content == null || content.isBlank()) {
             throw new IllegalArgumentException("Comment content cannot be empty");
+        }
+        if (commentPid == null || commentPid.isBlank()) {
+            throw new IllegalArgumentException("Invalid comment pid");
         }
 
         // Only the author may edit, scoped to their own tenant. JdbcTemplate bypasses the MyBatis
         // tenant interceptor, so without explicit tenant_id + created_by any authenticated user
-        // could edit any comment by id (IDOR). created_by is a varchar column (it stores the user
-        // id as text), so the parameter must be bound as a String, not a bigint.
+        // could edit any comment by reference (IDOR). created_by is a varchar column, so bind
+        // the user id as a String.
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
 
         List<Map<String, Object>> result = jdbcTemplate.queryForList(
                 "UPDATE " + TABLE
                 + " SET content = ?, updated_at = NOW(), is_edited = true"
-                + " WHERE id = ? AND tenant_id = ? AND created_by = ?"
+                + " WHERE pid = ? AND tenant_id = ? AND created_by = ?"
                 + " AND (deleted_flag = FALSE OR deleted_flag IS NULL)"
-                + " RETURNING id, content, updated_at, is_edited",
-                content, commentId, tenantId, String.valueOf(userId));
+                + " RETURNING pid AS \"commentPid\", content, updated_at, is_edited",
+                content, commentPid, tenantId, String.valueOf(userId));
 
         if (result.isEmpty()) {
-            throw new RuntimeException("Comment not found or not owned by current user: " + commentId);
+            throw new RuntimeException("Comment not found or not owned by current user: " + commentPid);
         }
         return result.get(0);
     }
 
-    public void deleteComment(Long commentId) {
+    public void deleteComment(String commentPid) {
+        if (commentPid == null || commentPid.isBlank()) {
+            throw new IllegalArgumentException("Invalid comment pid");
+        }
         // Author + tenant scoped (JdbcTemplate bypasses the tenant interceptor — see editComment).
         // created_by is a varchar column, so bind the user id as a String.
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
         int affected = jdbcTemplate.update(
                 "UPDATE " + TABLE + " SET deleted_flag = true"
-                + " WHERE id = ? AND tenant_id = ? AND created_by = ?",
-                commentId, tenantId, String.valueOf(userId));
+                + " WHERE pid = ? AND tenant_id = ? AND created_by = ?",
+                commentPid, tenantId, String.valueOf(userId));
         if (affected == 0) {
-            throw new RuntimeException("Comment not found or not owned by current user: " + commentId);
+            throw new RuntimeException("Comment not found or not owned by current user: " + commentPid);
         }
-        log.info("Comment {} deleted by user {}", commentId, userId);
+        log.info("Comment {} deleted by user {}", commentPid, userId);
     }
 
     public List<Map<String, Object>> listActivity(String modelCode, String recordPid) {
         try {
+            Long tenantId = MetaContext.getCurrentTenantId();
             return jdbcTemplate.queryForList(
-                    "SELECT id, object_model, object_record, activity_type, subject, actor_name, occurred_at "
+                    "SELECT pid AS \"activityPid\", object_model, object_record, activity_type, subject, actor_name AS \"actorName\", occurred_at "
                     + "FROM ab_activity"
-                    + " WHERE object_model = ? AND object_record = ?"
+                    + " WHERE tenant_id = ? AND object_model = ? AND object_record = ?"
                     + " ORDER BY occurred_at DESC LIMIT 50",
-                    modelCode, recordPid);
+                    tenantId, modelCode, recordPid);
         } catch (Exception e) {
             log.debug("Activity query failed: {}", e.getMessage());
             return Collections.emptyList();
+        }
+    }
+
+    private String resolveActorName(Long userId) {
+        if (userId == null) {
+            return "User";
+        }
+        try {
+            String actorName = jdbcTemplate.queryForObject(
+                    "SELECT COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email, 'User') "
+                    + "FROM ab_user WHERE id = ?",
+                    String.class,
+                    userId);
+            return Optional.ofNullable(actorName).filter(name -> !name.isBlank()).orElse("User");
+        } catch (Exception e) {
+            return Optional.ofNullable(MetaContext.getCurrentUsername())
+                    .filter(name -> !name.isBlank())
+                    .orElse("User");
         }
     }
 }

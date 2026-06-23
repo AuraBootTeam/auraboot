@@ -63,7 +63,7 @@ public class CommandSideEffectExecutor {
             return;
         }
 
-        // Build context for variable resolution (merge fieldMapResults so ${recordId} works for CREATE)
+        // Build context for variable resolution (merge fieldMapResults so ${recordPid} works for CREATE)
         Map<String, Object> currentRecord = buildCurrentRecordContext(payload, tenantId, command, request, fieldMapResults);
 
         for (Map<String, Object> effect : sideEffects) {
@@ -208,7 +208,7 @@ public class CommandSideEffectExecutor {
      *   "documentFlow": {
      *     "targetModelCode": "inv_outbound_order",
      *     "fieldMapping": {
-     *       "ioo_source_order": "${recordId}",
+     *       "ioo_source_order": "${recordPid}",
      *       "ioo_status": "'pending'"
      *     },
      *     "lineMapping": {
@@ -316,6 +316,7 @@ public class CommandSideEffectExecutor {
     /**
      * Resolve field mapping values. Supports:
      * - "$current.fieldName" -> resolve from current record
+     * - "${recordPid}" -> current public record pid
      * - "${fieldName}" -> template format resolution
      * - Plain values -> use as-is
      */
@@ -330,10 +331,12 @@ public class CommandSideEffectExecutor {
                     String fieldName = strValue.substring("$current.".length());
                     value = currentRecord != null ? currentRecord.get(fieldName) : null;
                 } else if (strValue.startsWith("${") && strValue.endsWith("}")) {
-                    // Template format: ${fieldName}, ${recordId}, or ${SpEL expression}
+                    // Template format: ${fieldName}, ${recordPid}, legacy ${recordId}, or ${SpEL expression}
                     String inner = strValue.substring(2, strValue.length() - 1).trim();
-                    if ("recordId".equals(inner)) {
-                        // Special: recordId resolves to the current record's id
+                    if ("recordPid".equals(inner) || "pid".equals(inner)) {
+                        value = resolveCurrentRecordPid(currentRecord);
+                    } else if ("recordId".equals(inner)) {
+                        // Legacy alias: recordId resolves to the current record's id field.
                         value = currentRecord != null ? currentRecord.get("id") : null;
                     } else if (inner.matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
                         // Simple field reference
@@ -478,7 +481,7 @@ public class CommandSideEffectExecutor {
      * Create multiple records from an array field in the payload.
      * Iterates over the array in sourceField, creating one record per item.
      * fieldMapping supports ${item.xxx} to reference fields from each array item,
-     * plus ${recordId} and ${fieldName} for current record context.
+     * plus ${recordPid}, legacy ${recordId}, and ${fieldName} for current record context.
      */
     @SuppressWarnings("unchecked")
     void executeBatchCreate(String targetModel, String sourceField,
@@ -607,7 +610,8 @@ public class CommandSideEffectExecutor {
      * Resolve field mapping with support for ${item.xxx} references.
      * Supports:
      * - "${item.fieldName}" -> resolve from the current array item
-     * - "${recordId}" -> current record's id
+     * - "${recordPid}" -> current record's public pid
+     * - "${recordId}" -> current record's id (legacy alias)
      * - "${fieldName}" / "$current.fieldName" -> resolve from current record
      * - Plain values -> use as-is
      */
@@ -627,9 +631,11 @@ public class CommandSideEffectExecutor {
                     String fieldName = strValue.substring("$current.".length());
                     value = currentRecord != null ? currentRecord.get(fieldName) : null;
                 } else if (strValue.startsWith("${") && strValue.endsWith("}")) {
-                    // Template format: ${fieldName} or ${recordId}
+                    // Template format: ${fieldName}, ${recordPid}, or legacy ${recordId}
                     String fieldName = strValue.substring(2, strValue.length() - 1);
-                    if ("recordId".equals(fieldName)) {
+                    if ("recordPid".equals(fieldName) || "pid".equals(fieldName)) {
+                        value = resolveCurrentRecordPid(currentRecord);
+                    } else if ("recordId".equals(fieldName)) {
                         value = currentRecord != null ? currentRecord.get("id") : null;
                     } else {
                         value = currentRecord != null ? currentRecord.get(fieldName) : null;
@@ -644,7 +650,7 @@ public class CommandSideEffectExecutor {
     /**
      * Build a context map representing the current record.
      * Combines payload with existing record data from DB.
-     * For CREATE commands, merges fieldMapResults so ${recordId} resolves to the newly created record's pid.
+     * For CREATE commands, merges fieldMapResults so ${recordPid} resolves to the newly created record's pid.
      */
     public Map<String, Object> buildCurrentRecordContext(Map<String, Object> payload,
                                                     Long tenantId, CommandDefinition command,
@@ -665,6 +671,12 @@ public class CommandSideEffectExecutor {
             if (fmRecordId != null && !context.containsKey("id")) {
                 context.put("id", coerceRecordId(fmRecordId));
             }
+            if (fmRecordId != null && !context.containsKey("pid")) {
+                context.put("pid", fmRecordId);
+            }
+            if (fmRecordId != null && !context.containsKey("recordPid")) {
+                context.put("recordPid", fmRecordId);
+            }
         }
 
         // Merge with existing record data
@@ -679,9 +691,25 @@ public class CommandSideEffectExecutor {
             }
             // Always set id from target record
             context.put("id", coerceRecordId(request.getTargetRecordId()));
+            Object pid = context.get("pid");
+            if (pid == null) {
+                pid = request.getTargetRecordId();
+                context.put("pid", pid);
+            }
+            context.putIfAbsent("recordPid", pid);
         }
 
         return context;
+    }
+
+    private Object resolveCurrentRecordPid(Map<String, Object> currentRecord) {
+        if (currentRecord == null) return null;
+        Object recordPid = currentRecord.get("recordPid");
+        if (recordPid != null) return recordPid;
+        Object pid = currentRecord.get("pid");
+        if (pid != null) return pid;
+        Object id = currentRecord.get("id");
+        return id;
     }
 
     private Object coerceRecordId(Object recordId) {

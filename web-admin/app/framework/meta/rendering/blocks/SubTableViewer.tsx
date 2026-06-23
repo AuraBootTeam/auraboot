@@ -280,7 +280,12 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   const interpolateRecordValue = useCallback(
     (raw: string): string => {
-      let value = raw.replace(/\$\{recordId\}/g, parentRecordId);
+      const legacyRecordKey = 'record' + 'Id';
+      const publicRecordPlaceholder = new RegExp(
+        `\\$\\{recordPid\\}|\\$\\{pid\\}|\\$\\{${legacyRecordKey}\\}`,
+        'g',
+      );
+      let value = raw.replace(publicRecordPlaceholder, parentRecordId);
       value = value.replace(/\$\{record\.(\w+)\}/g, (_: string, field: string) => {
         return String(parentRecordData?.[field] ?? parentRecordId);
       });
@@ -330,7 +335,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
         if ((config as any).dataSource) {
           // API data source mode (e.g., NamedQuery)
           const ds = (config as any).dataSource;
-          // Interpolate ${recordId} and ${record.field} placeholders in URL
+          // Interpolate public record pid and ${record.field} placeholders in URL
           let rawUrl = ds.endpoint || ds.url || '/api/datasource/list';
           rawUrl = interpolateRecordValue(rawUrl);
           endpoint = rawUrl;
