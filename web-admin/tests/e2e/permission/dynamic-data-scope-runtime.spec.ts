@@ -38,6 +38,13 @@ type DynamicRecord = {
   title: string;
 };
 
+type TenantSpace = {
+  id?: string | number;
+  tenantId?: string | number;
+  type?: string;
+  spaceType?: string;
+};
+
 test.describe('Permission data scope runtime', () => {
   test.setTimeout(60_000);
 
@@ -274,7 +281,7 @@ async function loginAndResolveJwt(page: Page, baseURL: string, user: TestUser): 
   });
   if (!spacesResp.ok()) return loginJwt;
   const spacesBody = await spacesResp.json().catch(() => ({}));
-  const spaces = Array.isArray(spacesBody?.data) ? spacesBody.data : [];
+  const spaces: TenantSpace[] = Array.isArray(spacesBody?.data) ? spacesBody.data : [];
   const selectedSpace =
     spaces.find((space) => String(space?.spaceType ?? space?.type ?? '').toLowerCase() === 'business') ??
     spaces.find((space) => space?.tenantId ?? space?.id);
