@@ -334,6 +334,37 @@ public interface SavedViewMapper extends BaseMapper<SavedView> {
             @Param("excludePid") String excludePid);
 
     /**
+     * Count active user-managed views for per-page saved view limits.
+     */
+    @Select("""
+        <script>
+        SELECT COUNT(*) FROM ab_saved_view
+        WHERE model_code = #{modelCode}
+          AND scope = #{scope}
+          AND deleted_flag = false
+          AND COALESCE(is_implicit, false) = false
+        <if test="ownerId != null">
+          AND owner_id = #{ownerId}
+        </if>
+        <if test="teamId != null">
+          AND team_id = #{teamId}
+        </if>
+        <if test="pageKey != null">
+          AND page_key = #{pageKey}
+        </if>
+        <if test="pageKey == null">
+          AND page_key IS NULL
+        </if>
+        </script>
+        """)
+    int countActiveNonImplicitViewsForScope(
+            @Param("modelCode") String modelCode,
+            @Param("pageKey") String pageKey,
+            @Param("scope") String scope,
+            @Param("ownerId") String ownerId,
+            @Param("teamId") String teamId);
+
+    /**
      * Insert with JSONB handling
      */
     @Insert("""

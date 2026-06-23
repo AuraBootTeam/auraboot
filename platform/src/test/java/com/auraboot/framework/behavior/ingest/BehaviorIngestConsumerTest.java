@@ -2,6 +2,7 @@ package com.auraboot.framework.behavior.ingest;
 
 import com.auraboot.framework.behavior.dto.BehaviorEventInput;
 import com.auraboot.framework.infrastructure.mq.memory.InMemoryMqProvider;
+import com.auraboot.framework.observability.W3cTraceparent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -42,5 +43,25 @@ class BehaviorIngestConsumerTest {
         assertThat(cap.getValue().userId()).isEqualTo(7L);
         assertThat(cap.getValue().events()).hasSize(1);
         assertThat(cap.getValue().events().get(0).getEventId()).isEqualTo("01ABC");
+    }
+
+    @Test
+    void onMessage_backfillsEventTraceFieldsFromTraceparentHeader() throws Exception {
+        BehaviorEventPersister persister = mock(BehaviorEventPersister.class);
+        BehaviorIngestConsumer consumer = new BehaviorIngestConsumer(new InMemoryMqProvider(), persister, objectMapper);
+        BehaviorEventInput e = new BehaviorEventInput();
+        e.setEventId("01TRACE");
+        e.setEventName("agent.task.completed");
+        String body = objectMapper.writeValueAsString(new BehaviorIngestEnvelope(42L, 7L, List.of(e)));
+
+        consumer.onMessage(BehaviorIngestPublisher.TOPIC_EVENTS, body,
+                Map.of(W3cTraceparent.HEADER,
+                        "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01"));
+
+        ArgumentCaptor<BehaviorIngestEnvelope> cap = ArgumentCaptor.forClass(BehaviorIngestEnvelope.class);
+        verify(persister).persistBatch(cap.capture());
+        BehaviorEventInput traced = cap.getValue().events().get(0);
+        assertThat(traced.getTraceId()).isEqualTo("0af7651916cd43dd8448eb211c80319c");
+        assertThat(traced.getSourceSpanId()).isEqualTo("b7ad6b7169203331");
     }
 }

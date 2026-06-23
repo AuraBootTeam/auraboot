@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { savedViewService } from '~/shared/services/savedViewService';
 import type {
   SavedView,
+  SavedViewCopyToPersonalRequest,
   SavedViewCreateRequest,
   SavedViewUpdateRequest,
   ViewConfig,
@@ -65,6 +66,8 @@ export interface UseSavedViewsResult {
   setDefaultView: (pid: string) => Promise<void>;
   /** Duplicate a view with a new name */
   duplicateView: (pid: string, newName: string) => Promise<SavedView>;
+  /** Copy an accessible shared/global view into personal scope */
+  copyToPersonal: (pid: string, request?: SavedViewCopyToPersonalRequest) => Promise<SavedView>;
   /** Reload all views */
   reload: () => Promise<void>;
   /** Views grouped by scope */
@@ -99,6 +102,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const mountedRef = useRef(true);
+  const selectedViewPidRef = useRef<string | null>(null);
 
   /**
    * Load all accessible views and default view
@@ -120,14 +124,12 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
 
       setViews(accessibleViews);
 
-      // Auto-select default view or first view
-      if (defaultView) {
-        setCurrentView(defaultView);
-      } else if (accessibleViews.length > 0) {
-        setCurrentView(accessibleViews[0]);
-      } else {
-        setCurrentView(null);
-      }
+      const preservedView = selectedViewPidRef.current
+        ? accessibleViews.find((view) => view.pid === selectedViewPidRef.current)
+        : undefined;
+      const nextView = preservedView ?? defaultView ?? accessibleViews[0] ?? null;
+      selectedViewPidRef.current = nextView?.pid ?? null;
+      setCurrentView(nextView);
     } catch (err) {
       if (mountedRef.current) {
         setError(err instanceof Error ? err : new Error('Failed to load views'));
@@ -146,6 +148,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
     (pid: string) => {
       const view = views.find((v) => v.pid === pid);
       if (view) {
+        selectedViewPidRef.current = view.pid;
         setCurrentView(view);
       }
     },
@@ -160,6 +163,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
 
     if (mountedRef.current) {
       setViews((prev) => [...prev, newView]);
+      selectedViewPidRef.current = newView.pid;
       setCurrentView(newView);
     }
 
@@ -179,6 +183,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
 
       if (mountedRef.current) {
         setViews((prev) => prev.map((v) => (v.pid === updatedView.pid ? updatedView : v)));
+        selectedViewPidRef.current = updatedView.pid;
         setCurrentView(updatedView);
       }
 
@@ -220,7 +225,9 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
 
           // If deleted view was current, select first remaining view
           if (currentView?.pid === pid) {
-            setCurrentView(remaining.length > 0 ? remaining[0] : null);
+            const nextView = remaining.length > 0 ? remaining[0] : null;
+            selectedViewPidRef.current = nextView?.pid ?? null;
+            setCurrentView(nextView);
           }
 
           return remaining;
@@ -267,6 +274,27 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
 
     return duplicatedView;
   }, []);
+
+  /**
+   * Copy an accessible view into current user's personal scope and select it.
+   */
+  const copyToPersonal = useCallback(
+    async (pid: string, request: SavedViewCopyToPersonalRequest = {}): Promise<SavedView> => {
+      const copiedView = await savedViewService.copyToPersonal(pid, request);
+
+      if (mountedRef.current) {
+        setViews((prev) => {
+          const withoutExisting = prev.filter((view) => view.pid !== copiedView.pid);
+          return [...withoutExisting, copiedView];
+        });
+        selectedViewPidRef.current = copiedView.pid;
+        setCurrentView(copiedView);
+      }
+
+      return copiedView;
+    },
+    [],
+  );
 
   /**
    * Group views by scope using useMemo
@@ -323,6 +351,7 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
     deleteView,
     setDefaultView,
     duplicateView,
+    copyToPersonal,
     reload: loadViews,
     groupedViews,
   };

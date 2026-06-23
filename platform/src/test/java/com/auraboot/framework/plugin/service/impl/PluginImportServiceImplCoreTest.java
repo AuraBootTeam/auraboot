@@ -14,6 +14,8 @@ import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.SchemaManagementService;
+import com.auraboot.framework.meta.entity.PageSchema;
+import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.template.generator.DocumentCommandGenerator;
 import com.auraboot.framework.permission.service.AutoPermissionAssignmentService;
 import com.auraboot.framework.permission.service.PermissionService;
@@ -22,10 +24,12 @@ import com.auraboot.framework.plugin.config.PlatformProperties;
 import com.auraboot.framework.plugin.dto.PluginManifest;
 import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
+import com.auraboot.framework.plugin.dto.imports.ImportExecuteResult;
 import com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ModelDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
+import com.auraboot.framework.plugin.dto.imports.SavedViewDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
 import com.auraboot.framework.plugin.entity.PluginImportHistory;
@@ -43,6 +47,8 @@ import com.auraboot.framework.plugin.validation.PluginValidationPipeline;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
+import com.auraboot.framework.view.entity.SavedView;
+import com.auraboot.framework.view.entity.ViewConfig;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -113,6 +119,7 @@ class PluginImportServiceImplCoreTest {
     @Mock private PluginQualityScorer qualityScorer;
     @Mock private com.auraboot.framework.plugin.validation.PageSchemaImportGate pageSchemaImportGate;
     @Mock private SavedViewMapper savedViewMapper;
+    @Mock private PageSchemaMapper pageSchemaMapper;
     @Mock private AutoPermissionAssignmentService autoPermissionAssignmentService;
     @Mock private ApplicationEventPublisher applicationEventPublisher;
     @Mock private DocumentCommandGenerator documentCommandGenerator;
@@ -991,12 +998,74 @@ class PluginImportServiceImplCoreTest {
         });
     }
 
+    @Test
+    @DisplayName("plugin saved views are locked presets and update by stable viewKey")
+    void importSavedViewsTagsPluginPresetAndUpdatesByViewKey() {
+        PluginManifestExtended manifest = baseManifest();
+        SavedViewDefinitionDTO dto = SavedViewDefinitionDTO.builder()
+                .name("Pipeline Board")
+                .description("Plugin baseline board")
+                .modelCode("crm.opportunity")
+                .pageKey("crm_opportunity_list")
+                .viewType("table")
+                .viewKey("crm.opportunity.pipeline")
+                .viewConfig(Map.of("rowHeight", "medium"))
+                .build();
+        manifest.setSavedViews(List.of(dto));
+
+        when(pageSchemaMapper.selectAnyByPageKey("crm_opportunity_list")).thenReturn(new PageSchema());
+        ViewConfig existingConfig = new ViewConfig();
+        existingConfig.setMeta(ViewConfig.Meta.builder()
+                .viewKey("crm.opportunity.pipeline")
+                .managedBy("plugin")
+                .locked(true)
+                .allowUserCopy(true)
+                .build());
+        SavedView existing = new SavedView();
+        existing.setPid("existing-view");
+        existing.setName("Old Plugin Board");
+        existing.setViewType("table");
+        existing.setViewConfig(existingConfig);
+        when(savedViewMapper.findGlobalViews("crm.opportunity", "crm_opportunity_list"))
+                .thenReturn(List.of(existing));
+
+        invokeImportSavedViews(manifest, new ImportExecuteResult(), 1L);
+
+        ArgumentCaptor<SavedView> captor = ArgumentCaptor.forClass(SavedView.class);
+        verify(savedViewMapper).updateSavedView(captor.capture());
+        SavedView updated = captor.getValue();
+        assertThat(updated.getName()).isEqualTo("Pipeline Board");
+        assertThat(updated.getViewConfig().getRowHeight()).isEqualTo("medium");
+        assertThat(updated.getViewConfig().getMeta().getViewKey())
+                .isEqualTo("crm.opportunity.pipeline");
+        assertThat(updated.getViewConfig().getMeta().getManagedBy()).isEqualTo("plugin");
+        assertThat(updated.getViewConfig().getMeta().getLocked()).isTrue();
+        assertThat(updated.getViewConfig().getMeta().getAllowUserCopy()).isTrue();
+    }
+
     private void invokeGeneratePermissionI18nRecords(List<PermissionDefinitionDTO> permissions, Long tenantId) {
         try {
             Method method = PluginImportServiceImpl.class.getDeclaredMethod(
                     "generatePermissionI18nRecords", List.class, Long.class);
             method.setAccessible(true);
             method.invoke(service, permissions, tenantId);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void invokeImportSavedViews(PluginManifestExtended manifest, ImportExecuteResult result, Long tenantId) {
+        try {
+            Method method = PluginImportServiceImpl.class.getDeclaredMethod(
+                    "importSavedViews", PluginManifestExtended.class, ImportExecuteResult.class, Long.class);
+            method.setAccessible(true);
+            method.invoke(service, manifest, result, tenantId);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof RuntimeException runtimeException) {

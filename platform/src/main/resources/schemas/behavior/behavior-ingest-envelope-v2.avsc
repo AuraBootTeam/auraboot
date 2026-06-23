@@ -1,0 +1,58 @@
+{
+  "type": "record",
+  "name": "BehaviorIngestEnvelope",
+  "namespace": "com.auraboot.behavior",
+  "doc": "Canonical Avro envelope for aura.behavior.events.v1. Compatibility policy: BACKWARD_TRANSITIVE.",
+  "fields": [
+    { "name": "tenantId", "type": "long" },
+    { "name": "userId", "type": ["null", "long"], "default": null },
+    {
+      "name": "events",
+      "type": {
+        "type": "array",
+        "items": {
+          "type": "record",
+          "name": "BehaviorEvent",
+          "fields": [
+            { "name": "eventId", "type": "string" },
+            { "name": "schemaVersion", "type": ["null", "string"], "default": null },
+            { "name": "eventName", "type": "string" },
+            { "name": "eventCategory", "type": ["null", "string"], "default": null },
+            { "name": "source", "type": ["null", "string"], "default": null },
+            { "name": "identityQuality", "type": ["null", "string"], "default": null },
+            {
+              "name": "occurredAt",
+              "type": ["null", { "type": "long", "logicalType": "timestamp-millis" }],
+              "default": null
+            },
+            { "name": "anonId", "type": ["null", "string"], "default": null },
+            { "name": "clientSessionId", "type": ["null", "string"], "default": null },
+            { "name": "interactionId", "type": ["null", "string"], "default": null },
+            { "name": "causedByEventId", "type": ["null", "string"], "default": null },
+            { "name": "traceId", "type": ["null", "string"], "default": null },
+            { "name": "sourceSpanId", "type": ["null", "string"], "default": null },
+            { "name": "runId", "type": ["null", "string"], "default": null },
+            { "name": "uiElementId", "type": ["null", "string"], "default": null },
+            { "name": "appId", "type": ["null", "string"], "default": null },
+            { "name": "pageId", "type": ["null", "string"], "default": null },
+            { "name": "blockId", "type": ["null", "string"], "default": null },
+            { "name": "elementCode", "type": ["null", "string"], "default": null },
+            {
+              "name": "props",
+              "type": ["null", { "type": "map", "values": "string" }],
+              "default": null
+            },
+            { "name": "consentState", "type": ["null", "string"], "default": null },
+            { "name": "consentVersion", "type": ["null", "string"], "default": null },
+            { "name": "samplingUnit", "type": ["null", "string"], "default": null },
+            { "name": "samplingProbability", "type": ["null", "string"], "default": null },
+            { "name": "producerName", "type": ["null", "string"], "default": null },
+            { "name": "producerVersion", "type": ["null", "string"], "default": null },
+            { "name": "traceparent", "type": ["null", "string"], "default": null },
+            { "name": "partitionKeyKind", "type": ["null", "string"], "default": null }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -8,10 +8,23 @@
  */
 
 import { test, expect } from '@playwright/test';
+import { BASE_URL } from '../../helpers/environments';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { DynamicListPage } from '../../pages/DynamicListPage';
-import { uniqueId, todayStr } from '../helpers';
+import { selectSavedViewByName, uniqueId, todayStr } from '../helpers';
+
+const ADMIN_STORAGE_STATE = process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json';
+const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
+
+async function expectApiJson(response: import('@playwright/test').APIResponse, label: string) {
+  const bodyText = await response.text();
+  expect(
+    response.ok(),
+    `${label} failed: ${response.status()} ${response.statusText()} ${bodyText}`,
+  ).toBe(true);
+  return bodyText ? JSON.parse(bodyText) : {};
+}
 
 test.describe('SavedView — TABLE View', () => {
   let order: ModelTestHelper;
@@ -26,37 +39,30 @@ test.describe('SavedView — TABLE View', () => {
       return listPage;
     }
 
-    const viewSelector = page.locator('button[aria-haspopup="listbox"]').first();
-    await viewSelector.click();
-    const panel = page.locator('[role="dialog"]');
-    await panel.waitFor({ state: 'visible', timeout: 5000 });
-    await panel.getByText(tableViewName, { exact: false }).first().click();
-
-    const closeBtn = panel.locator('button[aria-label="Close panel"]');
-    if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await closeBtn.click();
-    }
-    await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await selectSavedViewByName(page, tableViewName);
     await expect(table).toBeVisible({ timeout: 10000 });
     return listPage;
   }
 
   test.beforeAll(async ({ browser }) => {
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      baseURL: BASE_URL,
+      storageState: ADMIN_STORAGE_STATE,
+    });
+    const page = await context.newPage();
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     tableViewName = `E2E Table View ${uniqueId('SVT')}`;
     const viewResp = await page.request.post('/api/views', {
       data: {
         name: tableViewName,
         modelCode: E2ET_ORDER_CONFIG.modelCode,
-        pageKey: E2ET_ORDER_CONFIG.pageKey,
+        pageKey: SAVED_VIEW_PAGE_KEY,
         viewType: 'table',
         scope: 'global',
         viewConfig: {},
       },
     });
-    expect(viewResp.ok()).toBe(true);
-    const viewBody = await viewResp.json();
+    const viewBody = await expectApiJson(viewResp, 'create table saved view');
     tableViewPid = viewBody.data?.pid ?? viewBody.pid ?? '';
     expect(tableViewPid).toBeTruthy();
 
@@ -68,11 +74,15 @@ test.describe('SavedView — TABLE View', () => {
       });
       pids.push(pid);
     }
-    await page.close();
+    await context.close();
   });
 
   test.afterAll(async ({ browser }) => {
-    const page = await browser.newPage();
+    const context = await browser.newContext({
+      baseURL: BASE_URL,
+      storageState: ADMIN_STORAGE_STATE,
+    });
+    const page = await context.newPage();
     order = new ModelTestHelper(page, E2ET_ORDER_CONFIG);
     for (const pid of pids) {
       await order.deleteViaApi(pid).catch(() => {});
@@ -80,7 +90,7 @@ test.describe('SavedView — TABLE View', () => {
     if (tableViewPid) {
       await page.request.delete(`/api/views/${tableViewPid}`).catch(() => {});
     }
-    await page.close();
+    await context.close();
   });
 
   test('SV-001: TABLE view — default table renders correctly @smoke', async ({ page }) => {

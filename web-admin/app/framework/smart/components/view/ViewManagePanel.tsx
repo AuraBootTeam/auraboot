@@ -8,15 +8,32 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   type SavedView,
+  type SavedViewAuditEvent,
   type SavedViewCreateRequest,
+  type SavedViewTeamOption,
+  type SavedViewUserOption,
+  type ViewConfig,
+  type ViewCollaboratorAcl,
   type ViewScope,
   type ViewType,
 } from '~/framework/smart/types/savedView';
 import type { FieldOption } from './KanbanConfigPanel';
 import { cn } from '~/utils/cn';
 import { confirmDialog } from '~/utils/confirmDialog';
-import { savedViewService } from '~/shared/services/savedViewService';
 import { modelService } from '~/shared/services/modelService';
+import {
+  checkSavedViewCapability,
+  type SavedViewCapabilityResult,
+} from '~/framework/smart/utils/savedViewCapability';
+import {
+  canCopySavedView,
+  canDeleteSavedView,
+  canManageSavedView,
+  canSetDefaultSavedView,
+  canShareSavedView,
+  isSavedViewLockedPreset,
+} from '~/framework/smart/utils/savedViewPersistence';
+import { savedViewService } from '~/shared/services/savedViewService';
 
 /**
  * View types that require field configuration after creation.
@@ -41,7 +58,7 @@ const VIEW_TYPE_REQUIRED_FIELDS: Record<string, Array<{
     { key: 'ganttTitleField', label: 'Title Field', required: false },
   ],
   gallery: [
-    { key: 'galleryImageField', label: 'Image Field', required: false },
+    { key: 'galleryImageField', label: 'Image Field', required: true },
     { key: 'galleryTitleField', label: 'Title Field', required: false },
   ],
   tree: [
@@ -50,7 +67,8 @@ const VIEW_TYPE_REQUIRED_FIELDS: Record<string, Array<{
   ],
   timeline: [
     { key: 'timelineStartField', label: 'Start Date', required: true },
-    { key: 'timelineEndField', label: 'End Date', required: true },
+    { key: 'timelineResourceField', label: 'Resource Field', required: true },
+    { key: 'timelineEndField', label: 'End Date', required: false },
     { key: 'timelineTitleField', label: 'Title Field', required: false },
   ],
 };
@@ -117,6 +135,50 @@ const SCOPE_CONFIGS: ScopeConfig[] = [
   { scope: 'personal', label: 'Personal Views', icon: '👤' },
 ];
 
+const MANUAL_VIEW_LIMITS: Record<ViewScope, number> = {
+  personal: 10,
+  team: 20,
+  global: 20,
+};
+
+function countManualViewsForScope(
+  views: SavedView[],
+  scope: ViewScope,
+  teamId?: string,
+): number {
+  return views.filter((view) => {
+    if (view.isImplicit || view.scope !== scope) {
+      return false;
+    }
+    if (scope === 'team' && teamId) {
+      return view.teamId === teamId;
+    }
+    return true;
+  }).length;
+}
+
+function formatAuditTimestamp(timestamp?: string): string {
+  if (!timestamp) {
+    return '';
+  }
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return timestamp;
+  }
+  return date.toLocaleString();
+}
+
+function getAuditSummary(event: SavedViewAuditEvent): string {
+  const metadataSummary = event.metadata?.summary;
+  if (typeof metadataSummary === 'string' && metadataSummary.trim()) {
+    return metadataSummary;
+  }
+  if (event.changedFields && event.changedFields.length > 0) {
+    return `Changed ${event.changedFields.join(', ')}`;
+  }
+  return event.commandCode || event.eventType || 'Saved view changed';
+}
+
 function nextAutoViewName(label: string, views: SavedView[]): string {
   const baseName = `${label} View`;
   const usedNames = new Set(
@@ -164,6 +226,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   modelCode,
   pageKey,
   onCreateViewSuccess,
+  startInCreateMode,
   modelPid,
   fields,
   onViewConfigSaved,
@@ -177,6 +240,23 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
     type: 'create' | 'delete' | 'duplicate' | 'setDefault' | 'rename' | null;
     pid?: string;
   }>({ type: null });
+  const [teamOptions, setTeamOptions] = useState<SavedViewTeamOption[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [createScope, setCreateScope] = useState<ViewScope>('personal');
+  const [createTeamId, setCreateTeamId] = useState('');
+  const [auditView, setAuditView] = useState<SavedView | null>(null);
+  const [auditEvents, setAuditEvents] = useState<SavedViewAuditEvent[]>([]);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
+  const [shareView, setShareView] = useState<SavedView | null>(null);
+  const [collaboratorSearch, setCollaboratorSearch] = useState('');
+  const [collaboratorResults, setCollaboratorResults] = useState<SavedViewUserOption[]>([]);
+  const [collaboratorPid, setCollaboratorPid] = useState('');
+  const [collaboratorPermission, setCollaboratorPermission] =
+    useState<ViewCollaboratorAcl['permission']>('save');
+  const [collaboratorLoading, setCollaboratorLoading] = useState(false);
+  const [collaboratorSaving, setCollaboratorSaving] = useState(false);
+  const [collaboratorError, setCollaboratorError] = useState<string | null>(null);
 
   /**
    * Reset state when panel closes
@@ -185,7 +265,60 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
     if (!open) {
       setLoadingState({ type: null });
       setConfigStep(null);
+      setBlockedCapability(null);
+      setCreateScope('personal');
+      setCreateTeamId('');
+      setAuditView(null);
+      setAuditEvents([]);
+      setAuditError(null);
+      setShareView(null);
+      setCollaboratorSearch('');
+      setCollaboratorResults([]);
+      setCollaboratorPid('');
+      setCollaboratorPermission('save');
+      setCollaboratorError(null);
     }
+  }, [open]);
+
+  useEffect(() => {
+    if (open && startInCreateMode) {
+      setShowTypePicker(true);
+      setBlockedCapability(null);
+    }
+  }, [open, startInCreateMode]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    let cancelled = false;
+    setTeamLoading(true);
+    savedViewService
+      .getMyTeams()
+      .then((teams) => {
+        if (cancelled) {
+          return;
+        }
+        setTeamOptions(teams);
+        setCreateTeamId((current) => current || teams[0]?.pid || '');
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        setTeamOptions([]);
+        setCreateTeamId('');
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setTeamLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
   /**
@@ -210,9 +343,12 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   // Config step state for view types that need field configuration
   const [configStep, setConfigStep] = useState<{
     viewType: ViewType;
-    viewPid: string;
     fields: Record<string, string>;
+    capability: SavedViewCapabilityResult;
   } | null>(null);
+  const [blockedCapability, setBlockedCapability] = useState<SavedViewCapabilityResult | null>(
+    null,
+  );
 
   // Model fields for config step dropdowns
   const [modelFields, setModelFields] = useState<FieldOption[]>([]);
@@ -247,17 +383,55 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
     }
   }, [configStep, fields, modelPid]);
 
+  const createViewLimit = MANUAL_VIEW_LIMITS[createScope] ?? MANUAL_VIEW_LIMITS.personal;
+  const createViewCount = countManualViewsForScope(views, createScope, createTeamId);
+  const createViewLimitReached = createViewCount >= createViewLimit;
+  const createTargetDisabled =
+    (createScope === 'team' && !createTeamId) || createViewLimitReached;
+
+  const getCreateTargetPayload = useCallback((): Pick<SavedViewCreateRequest, 'scope' | 'teamId'> => {
+    if (createScope === 'team') {
+      return { scope: 'team', teamId: createTeamId };
+    }
+    return { scope: createScope };
+  }, [createScope, createTeamId]);
+
   /**
    * One-click instant view creation (Feishu style).
    * Click type → immediately create and switch.
    */
   const handleQuickCreate = useCallback(async (viewType: ViewType = 'table') => {
+    if (createTargetDisabled) return;
+
     const typeLabels: Record<string, string> = {
       table: 'Table', kanban: 'Kanban', calendar: 'Calendar', gallery: 'Gallery',
       gantt: 'Gantt', tree: 'Tree', timeline: 'Timeline', form: 'Form',
     };
     const label = typeLabels[viewType] || 'Table';
     const autoName = nextAutoViewName(label, views);
+    const requiredFields = VIEW_TYPE_REQUIRED_FIELDS[viewType];
+
+    setBlockedCapability(null);
+
+    if (requiredFields) {
+      const capability = checkSavedViewCapability(viewType, fields ?? []);
+      if (capability.status === 'blocked') {
+        setBlockedCapability(capability);
+        return;
+      }
+
+      setConfigStep({
+        viewType,
+        fields: Object.fromEntries(
+          Object.entries(capability.suggestedConfig)
+            .filter(([, value]) => typeof value === 'string' && value)
+            .map(([key, value]) => [key, String(value)]),
+        ),
+        capability,
+      });
+      setShowTypePicker(false);
+      return;
+    }
 
     setLoadingState({ type: 'create' });
     try {
@@ -265,7 +439,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
         name: autoName,
         modelCode,
         pageKey,
-        scope: 'personal',
+        ...getCreateTargetPayload(),
         viewType,
         isDefault: false,
       });
@@ -274,32 +448,93 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
       }
       onCreateViewSuccess?.(createdView);
       setShowTypePicker(false);
-
-      // Check if this view type needs field configuration
-      const requiredFields = VIEW_TYPE_REQUIRED_FIELDS[viewType];
-      if (requiredFields && createdView?.pid) {
-        // Show config step instead of closing
-        setConfigStep({
-          viewType,
-          viewPid: createdView.pid,
-          fields: {},
-        });
-      } else {
-        // Table/Form: close immediately
-        onClose();
-      }
+      onClose();
     } catch (err) {
       console.error('Failed to create view:', err);
     } finally {
       setLoadingState({ type: null });
     }
-  }, [views, onCreateView, modelCode, pageKey, onSelectView, onCreateViewSuccess, onClose]);
+  }, [
+    createTargetDisabled,
+    fields,
+    getCreateTargetPayload,
+    modelCode,
+    onClose,
+    onCreateView,
+    onCreateViewSuccess,
+    onSelectView,
+    pageKey,
+    views,
+  ]);
+
+  const handleFinishConfigStep = useCallback(async () => {
+    if (!configStep || createTargetDisabled) return;
+    const requiredFields = VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] || [];
+    const missingRequired = requiredFields
+      .filter((field) => field.required)
+      .some((field) => !configStep.fields[field.key]);
+    if (missingRequired) return;
+
+    const typeLabels: Record<string, string> = {
+      table: 'Table', kanban: 'Kanban', calendar: 'Calendar', gallery: 'Gallery',
+      gantt: 'Gantt', tree: 'Tree', timeline: 'Timeline', form: 'Form',
+    };
+    const label = typeLabels[configStep.viewType] || 'Table';
+    const autoName = nextAutoViewName(label, views);
+    const viewConfig = Object.entries(configStep.fields).reduce((acc, [key, value]) => {
+      if (value) {
+        (acc as Record<string, string>)[key] = value;
+      }
+      return acc;
+    }, {} as Partial<ViewConfig>);
+
+    setConfigSaving(true);
+    setLoadingState({ type: 'create' });
+    try {
+      const createdView = await onCreateView({
+        name: autoName,
+        modelCode,
+        pageKey,
+        ...getCreateTargetPayload(),
+        viewType: configStep.viewType,
+        viewConfig,
+        isDefault: false,
+      });
+      if (createdView?.pid) {
+        onSelectView(createdView.pid);
+      }
+      onCreateViewSuccess?.(createdView);
+      onViewConfigSaved?.();
+      setConfigStep(null);
+      setShowTypePicker(false);
+      onClose();
+    } catch (err) {
+      console.error('Failed to create configured view:', err);
+    } finally {
+      setConfigSaving(false);
+      setLoadingState({ type: null });
+    }
+  }, [
+    configStep,
+    createTargetDisabled,
+    getCreateTargetPayload,
+    modelCode,
+    onClose,
+    onCreateView,
+    onCreateViewSuccess,
+    onSelectView,
+    onViewConfigSaved,
+    pageKey,
+    views,
+  ]);
 
   /**
    * Handle delete view
    */
   const handleDelete = useCallback(
     async (view: SavedView) => {
+      if (!canDeleteSavedView(view)) return;
+
       const confirmed = await confirmDialog({
         content: `Are you sure you want to delete the view "${view.name}"? This action cannot be undone.`,
         variant: 'danger',
@@ -320,6 +555,8 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
    * Handle edit view — open inline edit form
    */
   const handleEdit = useCallback((view: SavedView) => {
+    if (!canManageSavedView(view)) return;
+
     setEditingView(view);
     setEditForm({
       name: view.name,
@@ -354,6 +591,8 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
    */
   const handleDuplicate = useCallback(
     async (view: SavedView) => {
+      if (!canCopySavedView(view)) return;
+
       const newName = window.prompt('Enter a name for the duplicated view:', `${view.name} (Copy)`);
       if (!newName?.trim()) return;
 
@@ -372,7 +611,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
    */
   const handleSetDefault = useCallback(
     async (view: SavedView) => {
-      if (view.isDefault) return;
+      if (!canSetDefaultSavedView(view)) return;
 
       setLoadingState({ type: 'setDefault', pid: view.pid });
       try {
@@ -382,6 +621,108 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
       }
     },
     [onSetDefaultView],
+  );
+
+  const handleOpenAudit = useCallback(async (view: SavedView) => {
+    setAuditView(view);
+    setAuditLoading(true);
+    setAuditError(null);
+    setAuditEvents([]);
+    try {
+      const events = await savedViewService.getAuditEvents(view.pid);
+      setAuditEvents(events);
+    } catch (err) {
+      setAuditError(
+        err instanceof Error ? err.message : 'Failed to fetch saved view audit events',
+      );
+    } finally {
+      setAuditLoading(false);
+    }
+  }, []);
+
+  const handleOpenCollaborators = useCallback((view: SavedView) => {
+    if (!canShareSavedView(view)) return;
+    setShareView(view);
+    setCollaboratorSearch('');
+    setCollaboratorResults([]);
+    setCollaboratorPid('');
+    setCollaboratorPermission('save');
+    setCollaboratorError(null);
+  }, []);
+
+  const handleSearchCollaborators = useCallback(async () => {
+    const keyword = collaboratorSearch.trim();
+    setCollaboratorLoading(true);
+    setCollaboratorError(null);
+    try {
+      const users = await savedViewService.searchUsers(keyword, 10);
+      setCollaboratorResults(users);
+    } catch (err) {
+      setCollaboratorResults([]);
+      setCollaboratorError(err instanceof Error ? err.message : 'Failed to search users');
+    } finally {
+      setCollaboratorLoading(false);
+    }
+  }, [collaboratorSearch]);
+
+  const updateCollaborators = useCallback(
+    async (view: SavedView, collaborators: ViewCollaboratorAcl[]) => {
+      const nextConfig: ViewConfig = {
+        ...(view.viewConfig ?? {}),
+        meta: {
+          ...(view.viewConfig?.meta ?? {}),
+          collaborators,
+        },
+      };
+      setCollaboratorSaving(true);
+      setCollaboratorError(null);
+      try {
+        const updated = await savedViewService.updateView(view.pid, { viewConfig: nextConfig });
+        setShareView(updated);
+        onViewConfigSaved?.();
+      } catch (err) {
+        setCollaboratorError(
+          err instanceof Error ? err.message : 'Failed to update collaborators',
+        );
+      } finally {
+        setCollaboratorSaving(false);
+      }
+    },
+    [onViewConfigSaved],
+  );
+
+  const handleAddCollaborator = useCallback(async () => {
+    if (!shareView) return;
+    const principalPid = collaboratorPid.trim();
+    if (!principalPid) {
+      setCollaboratorError('User PID is required');
+      return;
+    }
+    const current = shareView.viewConfig?.meta?.collaborators ?? [];
+    const next = [
+      ...current.filter((item) => item.principalPid !== principalPid),
+      {
+        principalType: 'user',
+        principalPid,
+        permission: collaboratorPermission,
+      },
+    ];
+    await updateCollaborators(shareView, next);
+    setCollaboratorPid('');
+    setCollaboratorSearch('');
+    setCollaboratorResults([]);
+  }, [collaboratorPermission, collaboratorPid, shareView, updateCollaborators]);
+
+  const handleRemoveCollaborator = useCallback(
+    async (principalPid: string) => {
+      if (!shareView) return;
+      const current = shareView.viewConfig?.meta?.collaborators ?? [];
+      await updateCollaborators(
+        shareView,
+        current.filter((item) => item.principalPid !== principalPid),
+      );
+    },
+    [shareView, updateCollaborators],
   );
 
   /**
@@ -476,35 +817,47 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
               <p className="mb-4 text-xs text-gray-500">
                 Select the fields to use for this view. Required fields must be set before you can finish.
               </p>
+              {configStep.capability.status === 'degraded' && (
+                <div
+                  className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800"
+                  role="status"
+                  data-testid={`view-capability-degraded-${configStep.viewType}`}
+                >
+                  {configStep.capability.reasons.join(' ')}
+                </div>
+              )}
               <div className="space-y-3">
-                {(VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] || []).map((fieldDef) => (
-                  <div key={fieldDef.key}>
-                    <label className="mb-1 block text-xs font-medium text-gray-600">
-                      {fieldDef.label} {fieldDef.required && <span className="text-red-500">*</span>}
-                    </label>
-                    <select
-                      value={configStep.fields[fieldDef.key] || ''}
-                      onChange={(e) =>
-                        setConfigStep((prev) =>
-                          prev
-                            ? {
-                                ...prev,
-                                fields: { ...prev.fields, [fieldDef.key]: e.target.value },
-                              }
-                            : null,
-                        )
-                      }
-                      className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
-                    >
-                      <option value="">Select field...</option>
-                      {modelFields.map((f) => (
-                        <option key={f.code} value={f.code}>
-                          {f.name} ({f.dataType})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+                {(VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] || []).map((fieldDef) => {
+                  const options = configStep.capability.fieldOptions[fieldDef.key] ?? modelFields;
+                  return (
+                    <div key={fieldDef.key}>
+                      <label className="mb-1 block text-xs font-medium text-gray-600">
+                        {fieldDef.label} {fieldDef.required && <span className="text-red-500">*</span>}
+                      </label>
+                      <select
+                        value={configStep.fields[fieldDef.key] || ''}
+                        onChange={(e) =>
+                          setConfigStep((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  fields: { ...prev.fields, [fieldDef.key]: e.target.value },
+                                }
+                              : null,
+                          )
+                        }
+                        className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                      >
+                        <option value="">Select field...</option>
+                        {options.map((f) => (
+                          <option key={f.code} value={f.code}>
+                            {f.name} ({f.dataType})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
               </div>
               <div className="mt-4 flex justify-end gap-2">
                 <button
@@ -519,28 +872,10 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={async () => {
-                    if (!configStep.viewPid) return;
-                    const viewConfig: Record<string, string> = {};
-                    for (const [key, value] of Object.entries(configStep.fields)) {
-                      if (value) viewConfig[key] = value;
-                    }
-                    setConfigSaving(true);
-                    try {
-                      await savedViewService.updateView(configStep.viewPid, { viewConfig });
-                      // Reload page to ensure the new viewConfig is applied
-                      // selectView uses local cache which is stale until re-render
-                      window.location.href = `${window.location.pathname}?view=${configStep.viewPid}`;
-                      return;
-                    } catch (err) {
-                      console.error('Failed to save view config:', err);
-                      setConfigSaving(false);
-                    }
-                    setConfigStep(null);
-                    onClose();
-                  }}
+                  onClick={handleFinishConfigStep}
                   disabled={
                     configSaving ||
+                    createTargetDisabled ||
                     (VIEW_TYPE_REQUIRED_FIELDS[configStep.viewType] || [])
                       .filter((f) => f.required)
                       .some((f) => !configStep.fields[f.key])
@@ -567,8 +902,86 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                     Creating...
                   </div>
                 ) : (
-                  <div className="grid grid-cols-4 gap-2">
-                    {([
+                  <>
+                    <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-gray-600">Scope</span>
+                        <select
+                          aria-label="Scope"
+                          value={createScope}
+                          onChange={(e) => {
+                            const nextScope = e.target.value as ViewScope;
+                            setCreateScope(nextScope);
+                            if (nextScope === 'team' && !createTeamId) {
+                              setCreateTeamId(teamOptions[0]?.pid || '');
+                            }
+                          }}
+                          className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        >
+                          <option value="personal">Personal</option>
+                          <option value="team" disabled={teamLoading || teamOptions.length === 0}>
+                            Team
+                          </option>
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-gray-600">Team</span>
+                        <select
+                          aria-label="Team"
+                          value={createTeamId}
+                          onChange={(e) => setCreateTeamId(e.target.value)}
+                          disabled={createScope !== 'team' || teamLoading || teamOptions.length === 0}
+                          className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm disabled:bg-gray-50 disabled:text-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                        >
+                          {teamLoading && <option value="">Loading teams...</option>}
+                          {!teamLoading && teamOptions.length === 0 && (
+                            <option value="">No available teams</option>
+                          )}
+                          {!teamLoading &&
+                            teamOptions.map((team) => (
+                              <option key={team.pid} value={team.pid}>
+                                {team.name}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    </div>
+                    <div
+                      className={cn(
+                        'mb-3 rounded-md border px-3 py-2 text-xs',
+                        createViewLimitReached
+                          ? 'border-red-200 bg-red-50 text-red-700'
+                          : 'border-gray-200 bg-gray-50 text-gray-600',
+                      )}
+                      data-testid="saved-view-quota-status"
+                    >
+                      {createScope === 'team' ? 'Team' : createScope === 'global' ? 'Global' : 'Personal'} views:{' '}
+                      {createViewCount}/{createViewLimit}
+                      {createViewLimitReached && (
+                        <span data-testid="saved-view-quota-limit-reached">
+                          {' '}
+                          Limit reached. Delete or reuse an existing view before creating another one.
+                        </span>
+                      )}
+                    </div>
+                    {createScope === 'team' && createTargetDisabled && (
+                      <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        {createViewLimitReached
+                          ? 'Team view limit reached for this page.'
+                          : 'Select a team before creating a shared view.'}
+                      </div>
+                    )}
+                    {blockedCapability && (
+                      <div
+                        className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700"
+                        role="alert"
+                        data-testid={`view-capability-blocked-${blockedCapability.viewType}`}
+                      >
+                        {blockedCapability.reasons.join(' ')}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-4 gap-2">
+                      {([
                       { type: 'table' as ViewType, icon: '≡', label: 'Table' },
                       { type: 'kanban' as ViewType, icon: '⊞', label: 'Kanban' },
                       { type: 'calendar' as ViewType, icon: '📅', label: 'Calendar' },
@@ -582,13 +995,19 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                         key={vt.type}
                         type="button"
                         onClick={() => handleQuickCreate(vt.type)}
-                        className="flex flex-col items-center gap-1 rounded-lg border border-gray-200 px-2 py-2.5 text-gray-600 transition-all hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600"
+                        disabled={createTargetDisabled}
+                        className={cn(
+                          'flex flex-col items-center gap-1 rounded-lg border border-gray-200 px-2 py-2.5 text-gray-600 transition-all',
+                          'hover:border-blue-400 hover:bg-blue-50 hover:text-blue-600',
+                          'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-gray-200 disabled:hover:bg-white disabled:hover:text-gray-600',
+                        )}
                       >
                         <span className="text-lg">{vt.icon}</span>
                         <span className="text-[10px] font-medium">{vt.label}</span>
                       </button>
                     ))}
-                  </div>
+                    </div>
+                  </>
                 )}
               </div>
             ) : (
@@ -721,6 +1140,14 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                                 Default
                               </span>
                             )}
+                            {isSavedViewLockedPreset(view) && (
+                              <span
+                                className="flex-shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600"
+                                data-testid={`view-locked-preset-${view.pid}`}
+                              >
+                                Preset
+                              </span>
+                            )}
                           </div>
                           {view.description && (
                             <p className="mt-0.5 truncate text-xs text-gray-500">
@@ -741,16 +1168,26 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                           <button
                             type="button"
                             onClick={() => handleSetDefault(view)}
-                            disabled={view.isDefault || isViewLoading(view.pid)}
+                            disabled={
+                              isViewLoading(view.pid) ||
+                              !canSetDefaultSavedView(view)
+                            }
                             className={cn(
                               'rounded-md p-1.5',
                               'focus:ring-2 focus:ring-blue-500 focus:outline-none',
                               'transition-colors duration-150',
+                              'disabled:cursor-not-allowed disabled:opacity-50',
                               view.isDefault
                                 ? 'cursor-default text-yellow-500'
                                 : 'text-gray-400 hover:bg-gray-100 hover:text-yellow-500',
                             )}
-                            title={view.isDefault ? 'Default view' : 'Set as default'}
+                            title={
+                              isSavedViewLockedPreset(view)
+                                ? 'Plugin preset is locked'
+                                : view.isDefault
+                                  ? 'Default view'
+                                  : 'Set as default'
+                            }
                           >
                             {loadingState.type === 'setDefault' && loadingState.pid === view.pid ? (
                               <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-yellow-500" />
@@ -777,7 +1214,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                             <button
                               type="button"
                               onClick={() => handleEdit(view)}
-                              disabled={isViewLoading(view.pid)}
+                              disabled={isViewLoading(view.pid) || !canManageSavedView(view)}
                               className={cn(
                                 'rounded-md p-1.5 text-gray-400',
                                 'hover:bg-gray-100 hover:text-green-500',
@@ -785,7 +1222,11 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                                 'disabled:cursor-not-allowed disabled:opacity-50',
                                 'transition-colors duration-150',
                               )}
-                              title="Edit view"
+                              title={
+                                isSavedViewLockedPreset(view)
+                                  ? 'Plugin preset is locked'
+                                  : 'Edit view'
+                              }
                             >
                               {loadingState.type === 'rename' && loadingState.pid === view.pid ? (
                                 <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-green-500" />
@@ -812,7 +1253,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                           <button
                             type="button"
                             onClick={() => handleDuplicate(view)}
-                            disabled={isViewLoading(view.pid)}
+                            disabled={isViewLoading(view.pid) || !canCopySavedView(view)}
                             className={cn(
                               'rounded-md p-1.5 text-gray-400',
                               'hover:bg-gray-100 hover:text-blue-500',
@@ -820,7 +1261,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                               'disabled:cursor-not-allowed disabled:opacity-50',
                               'transition-colors duration-150',
                             )}
-                            title="Duplicate view"
+                            title={canCopySavedView(view) ? 'Duplicate view' : 'Copy is disabled'}
                           >
                             {loadingState.type === 'duplicate' && loadingState.pid === view.pid ? (
                               <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-blue-500" />
@@ -842,54 +1283,58 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                             )}
                           </button>
 
+                          {(view.scope === 'team' ||
+                            view.scope === 'global' ||
+                            isSavedViewLockedPreset(view)) && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenAudit(view)}
+                              disabled={auditLoading && auditView?.pid === view.pid}
+                              className={cn(
+                                'rounded-md p-1.5 text-gray-400',
+                                'hover:bg-gray-100 hover:text-indigo-500',
+                                'focus:ring-2 focus:ring-indigo-500 focus:outline-none',
+                                'disabled:cursor-not-allowed disabled:opacity-50',
+                                'transition-colors duration-150',
+                              )}
+                              title="View audit"
+                              data-testid={`view-audit-${view.pid}`}
+                            >
+                              {auditLoading && auditView?.pid === view.pid ? (
+                                <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-indigo-500" />
+                              ) : (
+                                <svg
+                                  className="h-4 w-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                  aria-hidden="true"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0119 9.414V19a2 2 0 01-2 2z"
+                                  />
+                                </svg>
+                              )}
+                            </button>
+                          )}
+
                           {/* Share Button */}
                           <button
                             type="button"
-                            onClick={async () => {
-                              try {
-                                const resp = await fetch(`/api/views/${view.pid}/share/status`);
-                                const data = await resp.json();
-                                const isShared = data?.data?.shared;
-                                if (isShared) {
-                                  const shareUrl = data?.data?.shareUrl || '';
-                                  const action = window.confirm(
-                                    `This view is shared.\n\nURL: ${shareUrl}\n\nClick OK to copy link, Cancel to revoke sharing.`,
-                                  );
-                                  if (action) {
-                                    navigator.clipboard.writeText(shareUrl);
-                                  } else {
-                                    await fetch(`/api/views/${view.pid}/share`, {
-                                      method: 'delete',
-                                    });
-                                  }
-                                } else {
-                                  const password = window.prompt(
-                                    'Set a password (leave empty for no password):',
-                                  );
-                                  const body: any = {};
-                                  if (password) body.password = password;
-                                  const resp2 = await fetch(`/api/views/${view.pid}/share`, {
-                                    method: 'post',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(body),
-                                  });
-                                  const result = await resp2.json();
-                                  if (result?.data?.shareUrl) {
-                                    navigator.clipboard.writeText(result.data.shareUrl);
-                                    window.alert(`Share link copied!\n\n${result.data.shareUrl}`);
-                                  }
-                                }
-                              } catch (e) {
-                                console.error('Share error:', e);
-                              }
-                            }}
+                            onClick={() => handleOpenCollaborators(view)}
+                            disabled={!canShareSavedView(view)}
                             className={cn(
                               'rounded-md p-1.5 text-gray-400',
                               'hover:bg-gray-100 hover:text-green-500',
                               'focus:ring-2 focus:ring-green-500 focus:outline-none',
+                              'disabled:cursor-not-allowed disabled:opacity-50',
                               'transition-colors duration-150',
                             )}
                             title="Share view"
+                            data-testid={`view-share-${view.pid}`}
                           >
                             <svg
                               className="h-4 w-4"
@@ -907,11 +1352,12 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                           </button>
 
                           {/* Delete Button (for PERSONAL and TEAM views the user owns) */}
-                          {(view.scope === 'personal' || view.scope === 'team') && (
+                          {(view.scope === 'personal' || view.scope === 'team') &&
+                            !isSavedViewLockedPreset(view) && (
                             <button
                               type="button"
                               onClick={() => handleDelete(view)}
-                              disabled={isViewLoading(view.pid)}
+                              disabled={isViewLoading(view.pid) || !canDeleteSavedView(view)}
                               className={cn(
                                 'rounded-md p-1.5 text-gray-400',
                                 'hover:bg-gray-100 hover:text-red-500',
@@ -951,6 +1397,246 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
               ))
             )}
           </div>}
+
+          {!configStep && auditView && (
+            <div
+              className="m-4 rounded-lg border border-gray-200 bg-gray-50 p-4"
+              data-testid="saved-view-audit-panel"
+            >
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Audit: {auditView.name}
+                  </h3>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    Recent changes for shared or managed views.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuditView(null);
+                    setAuditEvents([]);
+                    setAuditError(null);
+                  }}
+                  className="rounded-md p-1 text-gray-400 hover:bg-white hover:text-gray-600"
+                  aria-label="Close audit panel"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              {auditLoading ? (
+                <div className="flex items-center gap-2 text-xs text-indigo-600">
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-200 border-t-indigo-600" />
+                  Loading audit events...
+                </div>
+              ) : auditError ? (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {auditError}
+                </div>
+              ) : auditEvents.length === 0 ? (
+                <div className="text-xs text-gray-500">No audit events yet.</div>
+              ) : (
+                <div className="space-y-2">
+                  {auditEvents.map((event, index) => (
+                    <div
+                      key={`${event.sequenceNo ?? event.entityPid ?? event.timestamp ?? index}`}
+                      className="rounded-md border border-gray-200 bg-white px-3 py-2"
+                      data-testid="saved-view-audit-event"
+                    >
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <span className="font-medium text-gray-900">
+                          {event.operationType || event.commandCode || 'UPDATE'}
+                        </span>
+                        {event.timestamp && (
+                          <span className="text-gray-400">
+                            {formatAuditTimestamp(event.timestamp)}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-600">{getAuditSummary(event)}</div>
+                      {event.actorName && (
+                        <div className="mt-1 text-xs text-gray-400">By {event.actorName}</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!configStep && shareView && (
+            <div
+              className="m-4 rounded-lg border border-blue-200 bg-blue-50 p-4"
+              data-testid="saved-view-collaborator-panel"
+            >
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Share: {shareView.name}
+                  </h3>
+                  <p className="mt-0.5 text-xs text-gray-500">
+                    {shareView.effectivePermission
+                      ? `Your permission: ${shareView.effectivePermission}`
+                      : 'Manage collaborators for this shared view.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShareView(null);
+                    setCollaboratorError(null);
+                  }}
+                  className="rounded-md p-1 text-gray-400 hover:bg-white hover:text-gray-600"
+                  aria-label="Close collaborator panel"
+                >
+                  <svg
+                    className="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mb-3 space-y-2">
+                {(shareView.viewConfig?.meta?.collaborators ?? []).length === 0 ? (
+                  <div className="rounded-md border border-blue-100 bg-white px-3 py-2 text-xs text-gray-500">
+                    No collaborators yet.
+                  </div>
+                ) : (
+                  (shareView.viewConfig?.meta?.collaborators ?? []).map((collaborator) => (
+                    <div
+                      key={`${collaborator.principalType ?? 'user'}:${collaborator.principalPid}`}
+                      className="flex items-center justify-between gap-3 rounded-md border border-blue-100 bg-white px-3 py-2"
+                      data-testid="saved-view-collaborator-row"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-medium text-gray-900">
+                          {collaborator.principalPid}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {collaborator.principalType || 'user'} · {collaborator.permission}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveCollaborator(collaborator.principalPid)}
+                        disabled={collaboratorSaving}
+                        className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-gray-600">User</span>
+                  <input
+                    type="text"
+                    value={collaboratorSearch}
+                    onChange={(event) => {
+                      setCollaboratorSearch(event.target.value);
+                      setCollaboratorPid(event.target.value);
+                    }}
+                    placeholder="Search name, email, or paste user pid"
+                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  />
+                </label>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleSearchCollaborators}
+                    disabled={collaboratorLoading}
+                    className="h-8 rounded-md border border-blue-200 bg-white px-3 text-xs font-medium text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                  >
+                    {collaboratorLoading ? 'Searching...' : 'Search'}
+                  </button>
+                </div>
+              </div>
+
+              {collaboratorResults.length > 0 && (
+                <div className="mt-2 max-h-32 overflow-auto rounded-md border border-blue-100 bg-white">
+                  {collaboratorResults.map((user) => (
+                    <button
+                      key={user.pid}
+                      type="button"
+                      onClick={() => {
+                        setCollaboratorPid(user.pid);
+                        setCollaboratorSearch(user.displayName || user.email || user.pid);
+                      }}
+                      className="block w-full px-3 py-2 text-left text-xs hover:bg-blue-50"
+                      data-testid="saved-view-collaborator-user-option"
+                    >
+                      <span className="font-medium text-gray-900">
+                        {user.displayName || user.email || user.pid}
+                      </span>
+                      <span className="ml-2 text-gray-400">{user.pid}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[1fr_auto]">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-gray-600">Permission</span>
+                  <select
+                    aria-label="Collaborator permission"
+                    value={collaboratorPermission}
+                    onChange={(event) =>
+                      setCollaboratorPermission(event.target.value as ViewCollaboratorAcl['permission'])
+                    }
+                    className="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 focus:outline-none"
+                  >
+                    <option value="view">View</option>
+                    <option value="save">Save</option>
+                    <option value="manage">Manage</option>
+                  </select>
+                </label>
+                <div className="flex items-end">
+                  <button
+                    type="button"
+                    onClick={handleAddCollaborator}
+                    disabled={collaboratorSaving || !collaboratorPid.trim()}
+                    className="h-8 rounded-md bg-blue-600 px-3 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {collaboratorSaving ? 'Saving...' : 'Add collaborator'}
+                  </button>
+                </div>
+              </div>
+
+              {collaboratorError && (
+                <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {collaboratorError}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </>

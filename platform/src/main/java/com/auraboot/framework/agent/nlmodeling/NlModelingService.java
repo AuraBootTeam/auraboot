@@ -1290,9 +1290,41 @@ public class NlModelingService {
     }
 
     private static String sanitizeI18nSegment(String value) {
-        String sanitized = value.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_\\-.]+", "_");
-        sanitized = sanitized.replaceAll("_+", "_").replaceAll("^[_.-]+|[_.-]+$", "");
-        return sanitized.isBlank() ? "text" : sanitized;
+        String lower = value.toLowerCase(Locale.ROOT);
+        StringBuilder sanitized = new StringBuilder(lower.length());
+        boolean previousUnderscore = false;
+        for (int i = 0; i < lower.length(); i++) {
+            char ch = lower.charAt(i);
+            if (isI18nSegmentChar(ch)) {
+                if (ch == '_' && previousUnderscore) {
+                    continue;
+                }
+                sanitized.append(ch);
+                previousUnderscore = ch == '_';
+            } else if (!previousUnderscore) {
+                sanitized.append('_');
+                previousUnderscore = true;
+            }
+        }
+
+        int start = 0;
+        int end = sanitized.length();
+        while (start < end && isI18nSegmentBoundaryChar(sanitized.charAt(start))) {
+            start++;
+        }
+        while (end > start && isI18nSegmentBoundaryChar(sanitized.charAt(end - 1))) {
+            end--;
+        }
+        return start >= end ? "text" : sanitized.substring(start, end);
+    }
+
+    private static boolean isI18nSegmentChar(char ch) {
+        return (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')
+                || ch == '_' || ch == '-' || ch == '.';
+    }
+
+    private static boolean isI18nSegmentBoundaryChar(char ch) {
+        return ch == '_' || ch == '.' || ch == '-';
     }
 
     private record I18nTextKey(String key, String enFallback, String refType) {}

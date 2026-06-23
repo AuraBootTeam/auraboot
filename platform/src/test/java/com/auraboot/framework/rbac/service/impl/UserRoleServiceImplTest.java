@@ -3,8 +3,13 @@ package com.auraboot.framework.rbac.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.rbac.dto.UserRoleResponse;
+import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -37,6 +42,8 @@ import static org.mockito.Mockito.when;
 class UserRoleServiceImplTest {
 
     @Mock private UserRoleMapper userRoleMapper;
+    @Mock private RoleMapper roleMapper;
+    @Mock private TenantMemberMapper tenantMemberMapper;
 
     private UserRoleServiceImpl service;
     private UserRoleServiceImpl spyService;
@@ -46,6 +53,8 @@ class UserRoleServiceImplTest {
         service = new UserRoleServiceImpl();
         injectField(service, "baseMapper", userRoleMapper);
         injectField(service, "userRoleMapper", userRoleMapper);
+        injectField(service, "roleMapper", roleMapper);
+        injectField(service, "tenantMemberMapper", tenantMemberMapper);
         spyService = spy(service);
     }
 
@@ -72,11 +81,29 @@ class UserRoleServiceImplTest {
     private UserRole ur(Long id, Long memberId, Long roleId, Long tenantId) {
         UserRole r = new UserRole();
         r.setId(id);
+        r.setPid("ur-pid-" + id);
         r.setMemberId(memberId);
         r.setRoleId(roleId);
         r.setTenantId(tenantId);
         r.setStatus(StatusConstants.ACTIVE);
         return r;
+    }
+
+    private TenantMember member(Long id, String pid, Long tenantId) {
+        TenantMember member = new TenantMember();
+        member.setId(id);
+        member.setPid(pid);
+        member.setTenantId(tenantId);
+        return member;
+    }
+
+    private Role role(Long id, String pid, String code, Long tenantId) {
+        Role role = new Role();
+        role.setId(id);
+        role.setPid(pid);
+        role.setCode(code);
+        role.setTenantId(tenantId);
+        return role;
     }
 
     @Test
@@ -94,6 +121,54 @@ class UserRoleServiceImplTest {
 
         assertTrue(spyService.assignRolesToMember(1L, List.of(100L, 200L), 10L, 99L));
         verify(spyService).saveBatch(anyList());
+    }
+
+    @Test
+    @DisplayName("assignRolesToMemberByRoleCodes resolves public ids within tenant")
+    void assignByRoleCodesResolvesPublicIds() {
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "member-pid"))
+                .thenReturn(member(1L, "member-pid", 10L));
+        when(roleMapper.findByTenantIdAndCode(10L, "e2et_viewer"))
+                .thenReturn(role(100L, "role-pid", "e2et_viewer", 10L));
+        doReturn(true).when(spyService).assignRolesToMember(1L, List.of(100L), 10L, 99L);
+
+        assertTrue(spyService.assignRolesToMemberByRoleCodes("member-pid", List.of("e2et_viewer"), 10L, 99L));
+
+        verify(spyService).assignRolesToMember(1L, List.of(100L), 10L, 99L);
+    }
+
+    @Test
+    @DisplayName("assignRolesToMemberByRolePids resolves public ids within tenant")
+    void assignByRolePidsResolvesPublicIds() {
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "member-pid"))
+                .thenReturn(member(1L, "member-pid", 10L));
+        when(roleMapper.findByTenantIdAndPid(10L, "role-pid"))
+                .thenReturn(role(100L, "role-pid", "e2et_viewer", 10L));
+        doReturn(true).when(spyService).assignRolesToMember(1L, List.of(100L), 10L, 99L);
+
+        assertTrue(spyService.assignRolesToMemberByRolePids("member-pid", List.of("role-pid"), 10L, 99L));
+
+        verify(spyService).assignRolesToMember(1L, List.of(100L), 10L, 99L);
+    }
+
+    @Test
+    @DisplayName("assignRolesToMemberByRoleCodes rejects unknown member pid")
+    void assignByRoleCodesRejectsUnknownMemberPid() {
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "missing-member")).thenReturn(null);
+
+        assertThrows(BusinessException.class,
+                () -> service.assignRolesToMemberByRoleCodes("missing-member", List.of("e2et_viewer"), 10L, 99L));
+    }
+
+    @Test
+    @DisplayName("assignRolesToMemberByRoleCodes rejects unknown role code")
+    void assignByRoleCodesRejectsUnknownRoleCode() {
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "member-pid"))
+                .thenReturn(member(1L, "member-pid", 10L));
+        when(roleMapper.findByTenantIdAndCode(10L, "missing_role")).thenReturn(null);
+
+        assertThrows(BusinessException.class,
+                () -> service.assignRolesToMemberByRoleCodes("member-pid", List.of("missing_role"), 10L, 99L));
     }
 
     @Test
@@ -115,6 +190,20 @@ class UserRoleServiceImplTest {
     void removeHappy() {
         doReturn(true).when(spyService).remove(any(QueryWrapper.class));
         assertTrue(spyService.removeRolesFromMember(1L, List.of(100L), 10L));
+    }
+
+    @Test
+    @DisplayName("removeRolesFromMemberByRolePids resolves public ids within tenant")
+    void removeByRolePidsResolvesPublicIds() {
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "member-pid"))
+                .thenReturn(member(1L, "member-pid", 10L));
+        when(roleMapper.findByTenantIdAndPid(10L, "role-pid"))
+                .thenReturn(role(100L, "role-pid", "e2et_viewer", 10L));
+        doReturn(true).when(spyService).removeRolesFromMember(1L, List.of(100L), 10L);
+
+        assertTrue(spyService.removeRolesFromMemberByRolePids("member-pid", List.of("role-pid"), 10L));
+
+        verify(spyService).removeRolesFromMember(1L, List.of(100L), 10L);
     }
 
     @Test
@@ -153,6 +242,37 @@ class UserRoleServiceImplTest {
         Page<UserRole> p = new Page<>(1, 10);
         doReturn(p).when(spyService).page(any(Page.class), any(QueryWrapper.class));
         assertNotNull(spyService.findUserRoles(1, 10, 1L, 100L, 10L, 5L));
+    }
+
+    @Test
+    @DisplayName("findUserRoleResponses returns only public PIDs")
+    void findUserRoleResponsesReturnsPublicPids() {
+        Page<UserRole> page = new Page<>(1, 10, 1);
+        page.setRecords(List.of(ur(1L, 10L, 20L, 30L)));
+        doReturn(page).when(spyService).page(any(Page.class), any(QueryWrapper.class));
+        when(tenantMemberMapper.findByTenantIdAndId(30L, 10L)).thenReturn(member(10L, "member-pid", 30L));
+        when(roleMapper.findByTenantIdAndId(30L, 20L)).thenReturn(role(20L, "role-pid", "e2et_viewer", 30L));
+
+        Page<UserRoleResponse> result = spyService.findUserRoleResponses(
+                1, 10, null, null, null, null, 30L, null);
+
+        assertEquals(1, result.getRecords().size());
+        assertEquals("ur-pid-1", result.getRecords().get(0).getPid());
+        assertEquals("member-pid", result.getRecords().get(0).getMemberPid());
+        assertEquals("role-pid", result.getRecords().get(0).getRolePid());
+    }
+
+    @Test
+    @DisplayName("getRolePidsByMemberPidAndTenantId resolves member pid and returns role pids")
+    void getRolePidsByMemberPidAndTenantId() {
+        when(tenantMemberMapper.findByTenantIdAndPid(30L, "member-pid"))
+                .thenReturn(member(10L, "member-pid", 30L));
+        when(userRoleMapper.findByMemberIdAndTenantId(10L, 30L))
+                .thenReturn(List.of(ur(1L, 10L, 20L, 30L)));
+        when(roleMapper.findByTenantIdAndId(30L, 20L))
+                .thenReturn(role(20L, "role-pid", "e2et_viewer", 30L));
+
+        assertEquals(List.of("role-pid"), service.getRolePidsByMemberPidAndTenantId("member-pid", 30L));
     }
 
     @Test
@@ -209,6 +329,18 @@ class UserRoleServiceImplTest {
     }
 
     @Test
+    @DisplayName("batchRemoveRolesByPids removes same-tenant public assignment pids")
+    void batchRemoveByPids() {
+        UserRole r = ur(1L, 1L, 100L, 10L);
+        doReturn(List.of(r)).when(spyService).list(any(QueryWrapper.class));
+        doReturn(true).when(spyService).removeByIds(List.of(1L));
+
+        assertEquals(1, spyService.batchRemoveRolesByPids(List.of("ur-pid-1"), 10L));
+
+        verify(spyService).removeByIds(List.of(1L));
+    }
+
+    @Test
     @DisplayName("copyMemberRoles returns true when source has no roles")
     void copyMemberRolesEmpty() {
         when(userRoleMapper.findByMemberIdAndTenantId(1L, 10L)).thenReturn(List.of());
@@ -233,6 +365,20 @@ class UserRoleServiceImplTest {
         doReturn(true).when(spyService).remove(any(QueryWrapper.class));
 
         assertTrue(spyService.syncMemberRoles(1L, List.of(200L), 10L, 99L));
+    }
+
+    @Test
+    @DisplayName("syncMemberRolesByRolePids resolves public ids within tenant")
+    void syncByRolePidsResolvesPublicIds() {
+        when(tenantMemberMapper.findByTenantIdAndPid(10L, "member-pid"))
+                .thenReturn(member(1L, "member-pid", 10L));
+        when(roleMapper.findByTenantIdAndPid(10L, "role-pid"))
+                .thenReturn(role(100L, "role-pid", "e2et_viewer", 10L));
+        doReturn(true).when(spyService).syncMemberRoles(1L, List.of(100L), 10L, 99L);
+
+        assertTrue(spyService.syncMemberRolesByRolePids("member-pid", List.of("role-pid"), 10L, 99L));
+
+        verify(spyService).syncMemberRoles(1L, List.of(100L), 10L, 99L);
     }
 
     @Test

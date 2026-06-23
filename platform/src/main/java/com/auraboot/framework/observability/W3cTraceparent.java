@@ -1,5 +1,8 @@
 package com.auraboot.framework.observability;
 
+import java.util.Locale;
+import java.util.regex.Pattern;
+
 /**
  * W3C Trace Context {@code traceparent} formatting for cross-process trace
  * propagation over the MQ event bus (A-G4, P1).
@@ -16,6 +19,8 @@ public final class W3cTraceparent {
 
     /** MQ header key carrying the W3C traceparent. */
     public static final String HEADER = "traceparent";
+    private static final Pattern TRACE_ID = Pattern.compile("[0-9a-f]{32}");
+    private static final Pattern SPAN_ID = Pattern.compile("[0-9a-f]{16}");
 
     private W3cTraceparent() {
     }
@@ -31,9 +36,37 @@ public final class W3cTraceparent {
      * @return the traceparent header value, or {@code null} if traceId/spanId are invalid
      */
     public static String format(String traceId, String spanId, boolean sampled) {
-        if (traceId == null || traceId.length() != 32 || spanId == null || spanId.length() != 16) {
+        if (!validTraceId(traceId) || !validSpanId(spanId)) {
             return null;
         }
-        return "00-" + traceId + "-" + spanId + "-" + (sampled ? "01" : "00");
+        return "00-" + traceId.toLowerCase(Locale.ROOT) + "-"
+                + spanId.toLowerCase(Locale.ROOT) + "-" + (sampled ? "01" : "00");
     }
+
+    public static TraceIds parse(String traceparent) {
+        if (traceparent == null || traceparent.isBlank()) {
+            return null;
+        }
+        String value = traceparent.toLowerCase(Locale.ROOT);
+        String[] parts = value.split("-");
+        if (parts.length < 4) {
+            return null;
+        }
+        String traceId = parts[1];
+        String spanId = parts[2];
+        if (!validTraceId(traceId) || !validSpanId(spanId)) {
+            return null;
+        }
+        return new TraceIds(traceId, spanId);
+    }
+
+    private static boolean validTraceId(String value) {
+        return value != null && TRACE_ID.matcher(value.toLowerCase(Locale.ROOT)).matches();
+    }
+
+    private static boolean validSpanId(String value) {
+        return value != null && SPAN_ID.matcher(value.toLowerCase(Locale.ROOT)).matches();
+    }
+
+    public record TraceIds(String traceId, String spanId) {}
 }

@@ -1729,7 +1729,10 @@
       "roleCode": "operator",
       "permissionCodes": [
         "dashboards",
+        "dashboard.read",
         "dashboard.manage",
+        "dashboard.saved_view.read",
+        "dashboard.saved_view.update",
         "dashboard_mgmt",
         "query_builder",
         "bpm_management",
@@ -1758,6 +1761,8 @@
       "roleCode": "viewer",
       "permissionCodes": [
         "dashboards",
+        "dashboard.read",
+        "dashboard.saved_view.read",
         "bpm_management",
         "bpm_task_center",
         "bpm.task.read",

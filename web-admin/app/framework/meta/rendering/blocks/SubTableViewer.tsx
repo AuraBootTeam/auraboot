@@ -477,7 +477,6 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           const values = Array.from(
             new Set(
               rows
-                .filter((row) => !row[refConfig.displayKey])
                 .map((row) => row[refConfig.field])
                 .filter((value) => value !== null && value !== undefined && value !== '')
                 .map((value) => String(value)),
@@ -554,10 +553,11 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       if (!refConfig) return undefined;
       const rawValue = row[col.field];
       if (rawValue === null || rawValue === undefined || rawValue === '') return undefined;
+      const resolvedDisplay =
+        referenceDisplayCache[buildSubTableReferenceDisplayCacheKey(refConfig)]?.[String(rawValue)];
+      if (resolvedDisplay) return resolvedDisplay;
       if (row[refConfig.displayKey]) return String(row[refConfig.displayKey]);
-      return referenceDisplayCache[buildSubTableReferenceDisplayCacheKey(refConfig)]?.[
-        String(rawValue)
-      ];
+      return undefined;
     },
     [referenceDisplayByField, referenceDisplayCache],
   );
@@ -1104,7 +1104,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     ? getLocalizedText(config.emptyState.actionLabel, locale, t)
     : t('common.addLine') !== 'common.addLine'
       ? t('common.addLine')
-      : 'Add Line';
+      : '添加明细';
 
   // Tree data management
   const { visibleRows: treeRows, toggleExpand } = useTreeData(rows, config.treeConfig);

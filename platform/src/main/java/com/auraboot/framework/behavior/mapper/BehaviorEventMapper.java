@@ -49,4 +49,13 @@ public interface BehaviorEventMapper extends BaseMapper<BehaviorEvent> {
             ORDER BY 1
             """)
     List<BehaviorDailyPoint> dailyTrend(@Param("tenantId") Long tenantId);
+
+    @Select("""
+            SELECT id
+            FROM ab_behavior_event
+            WHERE tenant_id = #{tenantId}
+              AND event_id = #{eventId}
+            LIMIT 1
+            """)
+    Long findIdByTenantAndEventId(@Param("tenantId") Long tenantId, @Param("eventId") String eventId);
 }

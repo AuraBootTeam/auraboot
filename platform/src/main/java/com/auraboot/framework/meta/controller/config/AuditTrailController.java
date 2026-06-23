@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.AuditChainVerificationResult;
 import com.auraboot.framework.meta.dto.AuditComplianceReport;
+import com.auraboot.framework.meta.dto.AuditTrailPublicDTO;
 import com.auraboot.framework.meta.entity.AuditTrail;
 import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -37,7 +38,7 @@ public class AuditTrailController {
      */
     @GetMapping("/trail")
     @RequirePermission(MetaPermission.META_AUDIT_TRAIL_READ)
-    public ApiResponse<List<AuditTrail>> getAuditTrail(
+    public ApiResponse<List<AuditTrailPublicDTO>> getAuditTrail(
             @RequestParam String entityType,
             @RequestParam(required = false) Long entityId,
             @RequestParam(required = false) String entityPid) {
@@ -45,7 +46,7 @@ public class AuditTrailController {
         List<AuditTrail> trail = StringUtils.hasText(entityPid)
                 ? auditTrailService.getAuditTrailByPid(tenantId, entityType, entityPid)
                 : auditTrailService.getAuditTrail(tenantId, entityType, entityId);
-        return ApiResponse.success(trail);
+        return ApiResponse.success(toPublicTrail(trail));
     }
 
     /**
@@ -54,7 +55,7 @@ public class AuditTrailController {
      */
     @GetMapping("/by-actor")
     @RequirePermission(MetaPermission.META_AUDIT_TRAIL_READ)
-    public ApiResponse<List<AuditTrail>> getByActor(
+    public ApiResponse<List<AuditTrailPublicDTO>> getByActor(
             @RequestParam Long actorId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
@@ -62,7 +63,7 @@ public class AuditTrailController {
         Instant startInstant = start.toInstant(ZoneOffset.UTC);
         Instant endInstant = end.toInstant(ZoneOffset.UTC);
         List<AuditTrail> trail = auditTrailService.getAuditByActor(tenantId, actorId, startInstant, endInstant);
-        return ApiResponse.success(trail);
+        return ApiResponse.success(toPublicTrail(trail));
     }
 
     /**
@@ -71,10 +72,10 @@ public class AuditTrailController {
      */
     @GetMapping("/by-command")
     @RequirePermission(MetaPermission.META_AUDIT_TRAIL_READ)
-    public ApiResponse<List<AuditTrail>> getByCommand(@RequestParam String commandCode) {
+    public ApiResponse<List<AuditTrailPublicDTO>> getByCommand(@RequestParam String commandCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
         List<AuditTrail> trail = auditTrailService.getAuditByCommand(tenantId, commandCode);
-        return ApiResponse.success(trail);
+        return ApiResponse.success(toPublicTrail(trail));
     }
 
     /**
@@ -116,5 +117,11 @@ public class AuditTrailController {
         Instant endInstant = end.toInstant(ZoneOffset.UTC);
         AuditComplianceReport report = auditTrailService.generateComplianceReport(tenantId, startInstant, endInstant);
         return ApiResponse.success(report);
+    }
+
+    private List<AuditTrailPublicDTO> toPublicTrail(List<AuditTrail> trail) {
+        return trail.stream()
+                .map(AuditTrailPublicDTO::from)
+                .toList();
     }
 }
