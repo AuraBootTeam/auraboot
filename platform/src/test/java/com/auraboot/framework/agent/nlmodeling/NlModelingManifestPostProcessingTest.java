@@ -404,6 +404,29 @@ class NlModelingManifestPostProcessingTest {
     }
 
     @Test
+    void buildManifest_sanitizesPageI18nSegmentsLinearly() throws Exception {
+        String noisyCode = "-".repeat(5000) + "approve!!__step" + "-".repeat(5000);
+        NlModelingResponse.Resources res = NlModelingResponse.Resources.builder()
+                .models(List.of(mutable("code", "device_inspection", "modelType", "entity")))
+                .pages(List.of(mutable(
+                        "pageKey", "device_inspection_detail",
+                        "kind", "detail",
+                        "schemaVersion", 4,
+                        "modelCode", "device_inspection",
+                        "blocks", List.of(mutable(
+                                "id", "basic",
+                                "blockType", "description",
+                                "actions", List.of(mutable("code", noisyCode, "label", "确认审批")))))))
+                .i18n(new ArrayList<>())
+                .build();
+
+        JsonNode manifest = mapper.readTree(service.buildPluginManifestJson("inspection", res));
+        JsonNode action = manifest.get("pages").get(0).get("blocks").get(0).get("actions").get(0);
+
+        assertEquals("$i18n:page.device_inspection_detail.approve_step.label", action.get("label").asText());
+    }
+
+    @Test
     void humanize_splitsSnakeAndKebab() {
         assertEquals("Unit Price", NlModelingService.humanize("unit_price"));
         assertEquals("Order Line Item", NlModelingService.humanize("order-line-item"));
