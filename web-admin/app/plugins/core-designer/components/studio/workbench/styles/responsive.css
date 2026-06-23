@@ -413,63 +413,62 @@
 }
 
 /* 暗色模式 */
-@media (prefers-color-scheme: dark) {
-  .breakpoint-toolbar {
-    @apply border-gray-700 bg-gray-800;
-  }
 
-  .breakpoint-button:not(.active) {
-    @apply text-gray-300 hover:bg-gray-700;
-  }
+:where(.dark) .breakpoint-toolbar {
+  @apply border-gray-700 bg-gray-800;
+}
 
-  .preview-toggle:not(.active) {
-    @apply text-gray-300 hover:bg-gray-700;
-  }
+:where(.dark) .breakpoint-button:not(.active) {
+  @apply text-gray-300 hover:bg-gray-700;
+}
 
-  .device-selector {
-    @apply border-gray-700 bg-gray-800 text-gray-300;
-  }
+:where(.dark) .preview-toggle:not(.active) {
+  @apply text-gray-300 hover:bg-gray-700;
+}
 
-  .zoom-button,
-  .tool-button:not(.active) {
-    @apply text-gray-300 hover:bg-gray-700;
-  }
+:where(.dark) .device-selector {
+  @apply border-gray-700 bg-gray-800 text-gray-300;
+}
 
-  .zoom-display {
-    @apply text-gray-300 hover:bg-gray-700;
-  }
+:where(.dark) .zoom-button,
+:where(.dark) .tool-button:not(.active) {
+  @apply text-gray-300 hover:bg-gray-700;
+}
 
-  .settings-panel {
-    @apply border-gray-700 bg-gray-800;
-  }
+:where(.dark) .zoom-display {
+  @apply text-gray-300 hover:bg-gray-700;
+}
 
-  .settings-title {
-    @apply text-gray-300;
-  }
+:where(.dark) .settings-panel {
+  @apply border-gray-700 bg-gray-800;
+}
 
-  .settings-action {
-    @apply text-gray-300 hover:bg-gray-700;
-  }
+:where(.dark) .settings-title {
+  @apply text-gray-300;
+}
 
-  .ruler {
-    @apply border-gray-600 bg-gray-800 text-gray-300;
-  }
+:where(.dark) .settings-action {
+  @apply text-gray-300 hover:bg-gray-700;
+}
 
-  .ruler-mark {
-    @apply bg-gray-500;
-  }
+:where(.dark) .ruler {
+  @apply border-gray-600 bg-gray-800 text-gray-300;
+}
 
-  .ruler-label {
-    @apply text-gray-300;
-  }
+:where(.dark) .ruler-mark {
+  @apply bg-gray-500;
+}
 
-  .preview-frame-container.light {
-    @apply bg-gray-800;
-  }
+:where(.dark) .ruler-label {
+  @apply text-gray-300;
+}
 
-  .safe-area-label {
-    @apply bg-gray-800 text-red-400;
-  }
+:where(.dark) .preview-frame-container.light {
+  @apply bg-gray-800;
+}
+
+:where(.dark) .safe-area-label {
+  @apply bg-gray-800 text-red-400;
 }
 
 /* 打印样式 */

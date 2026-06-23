@@ -20,8 +20,8 @@ export default function ProcessStatusPage() {
 
   if (!processInstanceId && !businessKey) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="text-center text-gray-500">
+      <div className="bg-bg flex h-screen items-center justify-center">
+        <div className="text-text-2 text-center">
           <p className="mb-2 text-lg font-medium">Missing parameters</p>
           <p className="text-sm">
             Provide <code>processInstanceId</code> or <code>businessKey</code> (+ optional{' '}
@@ -33,7 +33,7 @@ export default function ProcessStatusPage() {
   }
 
   return (
-    <div className="h-screen bg-gray-50">
+    <div className="bg-bg h-screen">
       <ReactFlowProvider>
         <ProcessStatusViewer
           processInstanceId={processInstanceId}

@@ -26,6 +26,8 @@ If you are new to AuraBoot, follow this path:
 | [Pages & Layouts](core-concepts/pages-and-layouts.md) | Page kinds (list/form/detail), block types, layout system |
 | [Permissions](core-concepts/permissions.md) | RBAC, multi-tenant isolation, data-level security |
 | [State Machines](core-concepts/state-machines.md) | Status flows, guards, transitions, and side effects |
+| **System Reference** | |
+| [Frontend Theme and Static Asset Cache Policy](system-reference/frontend-theme-and-cache-policy.md) | Theme class strategy, Tailwind v4 dark variant, visual QA, and static asset cache policy |
 | **Guides** | |
 | [Page Designer](guides/page-designer.md) | Visual drag-and-drop page builder |
 | [BPM Workflows](guides/bpm-workflows.md) | BPMN 2.0 process design, human tasks, SLA |

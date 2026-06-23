@@ -11,10 +11,16 @@ import { modelService } from '~/shared/services/modelService';
 type HealthStatus = 'ok' | 'field_drift' | 'detection_failed' | 'unknown';
 
 const HEALTH_STYLES: Record<HealthStatus, { label: string; className: string }> = {
-  ok: { label: '正常', className: 'bg-green-50 text-green-700 ring-green-200' },
-  field_drift: { label: '字段漂移', className: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  detection_failed: { label: '检测失败', className: 'bg-red-50 text-red-700 ring-red-200' },
-  unknown: { label: '未检测', className: 'bg-gray-50 text-gray-600 ring-gray-200' },
+  ok: { label: '正常', className: 'bg-status-green-bg text-status-green ring-status-green/30' },
+  field_drift: {
+    label: '字段漂移',
+    className: 'bg-status-amber-bg text-status-amber ring-status-amber/30',
+  },
+  detection_failed: {
+    label: '检测失败',
+    className: 'bg-status-red-bg text-status-red ring-status-red/30',
+  },
+  unknown: { label: '未检测', className: 'bg-status-gray-bg text-status-gray ring-status-gray/30' },
 };
 
 function ModelCodeCell({ value, record }: { value: unknown; record: Record<string, any> }) {
@@ -25,7 +31,7 @@ function ModelCodeCell({ value, record }: { value: unknown; record: Record<strin
     <div className="flex flex-col gap-1">
       <Link
         to={`/meta/models/${record.pid}`}
-        className="font-medium text-blue-600 hover:text-blue-700 hover:underline"
+        className="text-accent hover:text-accent-hover font-medium hover:underline"
       >
         {String(value ?? '')}
       </Link>
@@ -87,7 +93,7 @@ function ModelActionsCell({ record }: { record: Record<string, any> }) {
           event.stopPropagation();
           navigate(`/meta/models/${record.pid}`);
         }}
-        className="text-sm text-gray-600 hover:text-gray-900"
+        className="text-text-2 hover:text-text text-sm"
       >
         查看
       </button>
@@ -98,7 +104,7 @@ function ModelActionsCell({ record }: { record: Record<string, any> }) {
           event.stopPropagation();
           navigate(`/meta/models/${record.pid}/edit`);
         }}
-        className="text-sm text-blue-600 hover:text-blue-700"
+        className="text-accent hover:text-accent-hover text-sm"
       >
         编辑
       </button>
@@ -109,7 +115,7 @@ function ModelActionsCell({ record }: { record: Record<string, any> }) {
           event.stopPropagation();
           void handleDelete();
         }}
-        className="text-sm text-red-600 hover:text-red-700"
+        className="text-status-red text-sm hover:opacity-80"
       >
         删除
       </button>

@@ -143,7 +143,7 @@ export function SortPopover({
           align="start"
         >
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2">
+          <div className="border-border flex items-center justify-between border-b px-3 py-2">
             <span className="text-text-2 text-sm font-medium">Sort</span>
             {activeSorts.length > 0 && (
               <button
@@ -233,7 +233,7 @@ export function SortPopover({
 
           {/* Footer: add rule */}
           {canAddMore && (
-            <div className="border-t border-gray-100 px-3 py-2">
+            <div className="border-border border-t px-3 py-2">
               <button
                 type="button"
                 onClick={handleAddRule}
@@ -252,7 +252,7 @@ export function SortPopover({
             </div>
           )}
 
-          <Popover.Arrow className="fill-white" />
+          <Popover.Arrow className="fill-panel" />
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

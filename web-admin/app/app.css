@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));
 /* UX Design System tokens — generated from dsTokens (pnpm gen:tokens). */
 @import './styles/tokens.theme.css';
 @source './plugins/**/*.tsx';
@@ -438,14 +439,14 @@
 
 .decisionops-section-head p {
   margin: 2px 0 0;
-  color: #64748b;
+  color: var(--color-text-2);
   font-size: 12px;
 }
 
 .decisionops-shell .doc-panel {
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--color-panel);
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
   min-width: 0;
   overflow: hidden;
@@ -464,9 +465,9 @@
   gap: 8px;
   min-width: 0;
   flex-wrap: wrap;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: #fbfdff;
+  background: var(--color-panel);
   padding: 10px;
 }
 
@@ -475,10 +476,10 @@
 .decisionops-list-page textarea {
   min-height: 32px;
   min-width: 0;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--color-bg);
+  color: var(--color-text);
   font-size: 13px;
   padding: 4px 8px;
 }
@@ -486,18 +487,18 @@
 .decisionops-list-page input:focus,
 .decisionops-list-page select:focus,
 .decisionops-list-page textarea:focus {
-  border-color: #2563eb;
-  outline: 2px solid rgb(37 99 235 / 0.16);
+  border-color: var(--color-accent);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 20%, transparent);
   outline-offset: 0;
 }
 
 .decisionops-list-page button {
   min-height: 32px;
   min-width: max-content;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--color-panel);
+  color: var(--color-text);
   cursor: pointer;
   font-size: 13px;
   padding: 4px 10px;
@@ -505,15 +506,15 @@
 }
 
 .decisionops-list-page button:hover {
-  background: #f3f4f6;
+  background: var(--color-hover);
 }
 
 .decisionops-inline-link {
   align-items: center;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--color-border-strong);
   border-radius: 6px;
-  background: #ffffff;
-  color: #111827;
+  background: var(--color-panel);
+  color: var(--color-text);
   display: inline-flex;
   font-size: 13px;
   font-weight: 600;
@@ -525,7 +526,7 @@
 }
 
 .decisionops-inline-link:hover {
-  background: #f3f4f6;
+  background: var(--color-hover);
 }
 
 .decisionops-search-input {
@@ -538,18 +539,18 @@
   justify-content: center;
   min-width: 34px;
   min-height: 32px;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: #ffffff;
-  color: #475569;
+  background: var(--color-panel);
+  color: var(--color-text-2);
   font-size: 12px;
   font-weight: 800;
 }
 
 .decisionops-primary-button {
-  border-color: #2563eb !important;
-  background: #2563eb !important;
-  color: #ffffff !important;
+  border-color: var(--color-accent) !important;
+  background: var(--color-accent) !important;
+  color: var(--color-inverse-text) !important;
   font-weight: 800;
   padding-inline: 12px !important;
 }
@@ -559,9 +560,9 @@
   gap: 10px;
   grid-template-columns: repeat(5, minmax(130px, 1fr)) auto auto;
   align-items: center;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: #f8fafc;
+  background: var(--color-subtle);
   padding: 12px;
 }
 
@@ -569,9 +570,9 @@
   width: 100%;
   min-width: 0;
   overflow-x: auto;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--color-border);
   border-radius: 8px;
-  background: #ffffff;
+  background: var(--color-panel);
 }
 
 .decisionops-table {
@@ -584,15 +585,15 @@
 
 .decisionops-table th,
 .decisionops-table td {
-  border-bottom: 1px solid #edf2f7;
+  border-bottom: 1px solid var(--color-border);
   padding: 12px;
   text-align: left;
   vertical-align: middle;
 }
 
 .decisionops-table th {
-  background: #f8fafc;
-  color: #64748b;
+  background: var(--color-subtle);
+  color: var(--color-text-2);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0;
@@ -600,7 +601,7 @@
 }
 
 .decisionops-table td {
-  color: #0f172a;
+  color: var(--color-text);
   font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -672,14 +673,14 @@
   display: block;
   max-width: 240px;
   overflow: hidden;
-  color: #475569;
+  color: var(--color-text-2);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .decisionops-muted-cell {
-  color: #64748b !important;
+  color: var(--color-text-2) !important;
 }
 
 .decisionops-badge {
@@ -687,10 +688,10 @@
   align-items: center;
   justify-content: center;
   min-height: 24px;
-  border: 1px solid #dbe3ef;
+  border: 1px solid var(--color-border);
   border-radius: 999px;
-  background: #f8fafc;
-  color: #475569;
+  background: var(--color-subtle);
+  color: var(--color-text-2);
   font-size: 12px;
   font-weight: 800;
   padding: 3px 8px;
@@ -698,35 +699,35 @@
 }
 
 .decisionops-badge.is-success {
-  border-color: #bbf7d0;
-  background: #f0fdf4;
-  color: #15803d;
+  border-color: var(--color-status-green);
+  background: var(--color-status-green-bg);
+  color: var(--color-status-green);
 }
 
 .decisionops-badge.is-warning {
-  border-color: #fde68a;
-  background: #fffbeb;
-  color: #92400e;
+  border-color: var(--color-status-amber);
+  background: var(--color-status-amber-bg);
+  color: var(--color-status-amber);
 }
 
 .decisionops-badge.is-danger {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
+  border-color: var(--color-status-red);
+  background: var(--color-status-red-bg);
+  color: var(--color-status-red);
 }
 
 .decisionops-badge.is-neutral {
-  border-color: #dbe3ef;
-  background: #f8fafc;
-  color: #475569;
+  border-color: var(--color-border);
+  background: var(--color-subtle);
+  color: var(--color-text-2);
 }
 
 .decisionops-switch-button {
   position: relative;
   min-width: 54px;
-  border-color: #cbd5e1 !important;
-  background: #f1f5f9 !important;
-  color: #475569 !important;
+  border-color: var(--color-border-strong) !important;
+  background: var(--color-subtle) !important;
+  color: var(--color-text-2) !important;
   font-weight: 800;
   padding-left: 18px !important;
 }
@@ -739,18 +740,18 @@
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: #94a3b8;
+  background: var(--color-text-3);
   transform: translateY(-50%);
 }
 
 .decisionops-switch-button.is-on {
-  border-color: #bbf7d0 !important;
-  background: #f0fdf4 !important;
-  color: #15803d !important;
+  border-color: var(--color-status-green) !important;
+  background: var(--color-status-green-bg) !important;
+  color: var(--color-status-green) !important;
 }
 
 .decisionops-switch-button.is-on::before {
-  background: #16a34a;
+  background: var(--color-status-green);
 }
 
 .decisionops-row-actions {
@@ -763,10 +764,10 @@
 
 .decisionops-empty,
 .decisionops-state {
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--color-border-strong);
   border-radius: 8px;
-  background: #fbfdff;
-  color: #64748b;
+  background: var(--color-panel);
+  color: var(--color-text-2);
   font-size: 13px;
   font-weight: 700;
   padding: 24px;
@@ -774,9 +775,9 @@
 }
 
 .decisionops-state.is-error {
-  border-color: #fecaca;
-  background: #fef2f2;
-  color: #b91c1c;
+  border-color: var(--color-status-red);
+  background: var(--color-status-red-bg);
+  color: var(--color-status-red);
 }
 
 .ddl-section-head {

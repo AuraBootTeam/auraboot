@@ -10,10 +10,10 @@ const LABELS: Record<SourceType, string> = {
 };
 
 const COLORS: Record<SourceType, string> = {
-  physical: 'bg-blue-100 text-blue-700 border-blue-200',
-  namedQuery: 'bg-purple-100 text-purple-700 border-purple-200',
-  endpoint: 'bg-amber-100 text-amber-700 border-amber-200',
-  sqlView: 'bg-green-100 text-green-700 border-green-200',
+  physical: 'border-status-blue/35 bg-status-blue-bg text-status-blue',
+  namedQuery: 'border-status-gray/35 bg-status-gray-bg text-status-gray',
+  endpoint: 'border-status-amber/35 bg-status-amber-bg text-status-amber',
+  sqlView: 'border-status-green/35 bg-status-green-bg text-status-green',
 };
 
 export interface SourceTypeBadgeProps {
@@ -24,7 +24,7 @@ export interface SourceTypeBadgeProps {
 export function SourceTypeBadge({ sourceType, className }: SourceTypeBadgeProps) {
   const type = (sourceType ?? 'physical') as SourceType;
   const label = LABELS[type] ?? sourceType ?? 'physical';
-  const color = COLORS[type] ?? 'bg-gray-100 text-gray-700 border-gray-200';
+  const color = COLORS[type] ?? 'border-status-gray/35 bg-status-gray-bg text-status-gray';
 
   return (
     <span

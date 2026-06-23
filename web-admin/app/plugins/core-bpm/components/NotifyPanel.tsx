@@ -81,7 +81,7 @@ export function NotifyPanel({ userId, type }: NotifyPanelProps) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-gray-500">
+      <div className="text-text-2 flex items-center justify-center py-12">
         <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
         加载中...
       </div>
@@ -90,9 +90,9 @@ export function NotifyPanel({ userId, type }: NotifyPanelProps) {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-        <AlertCircle className="mb-3 h-10 w-10 text-amber-400 opacity-40" />
-        <p className="mb-3 text-sm text-gray-500">加载失败</p>
+      <div className="text-text-3 flex flex-col items-center justify-center py-12">
+        <AlertCircle className="text-status-amber mb-3 h-10 w-10 opacity-50" />
+        <p className="text-text-2 mb-3 text-sm">加载失败</p>
         <Button variant="outline" size="sm" onClick={loadRecords}>
           重试
         </Button>
@@ -102,7 +102,7 @@ export function NotifyPanel({ userId, type }: NotifyPanelProps) {
 
   if (records.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+      <div className="text-text-3 flex flex-col items-center justify-center py-12">
         <Icon className="mb-3 h-10 w-10 opacity-30" />
         <p className="text-sm">暂无消息</p>
       </div>
@@ -115,13 +115,15 @@ export function NotifyPanel({ userId, type }: NotifyPanelProps) {
         <div
           key={record.pid}
           className={`rounded-lg border p-3 ${
-            record.isRead ? 'border-gray-200 bg-white' : 'border-blue-200 bg-blue-50'
+            record.isRead
+              ? 'border-border bg-panel'
+              : 'border-accent/30 bg-accent-weak'
           }`}
         >
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <p className="text-sm text-gray-800">{record.content || '无内容'}</p>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="text-text text-sm">{record.content || '无内容'}</p>
+              <p className="text-text-2 mt-1 text-xs">
                 任务: {record.taskId} | {formatDate(record.createdAt)}
               </p>
             </div>
@@ -130,7 +132,7 @@ export function NotifyPanel({ userId, type }: NotifyPanelProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => handleMarkRead(record.pid)}
-                className="ml-2 text-xs text-blue-600 hover:text-blue-800"
+                className="text-accent hover:text-accent-hover ml-2 text-xs"
               >
                 标记已读
               </Button>
