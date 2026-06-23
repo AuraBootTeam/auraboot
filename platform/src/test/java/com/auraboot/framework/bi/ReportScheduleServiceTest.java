@@ -4,8 +4,11 @@ import com.auraboot.framework.bi.dao.entity.ReportSchedule;
 import com.auraboot.framework.bi.dao.mapper.ReportScheduleMapper;
 import com.auraboot.framework.bi.dto.ReportScheduleRequest;
 import com.auraboot.framework.bi.dto.ReportScheduleResponse;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.service.ReportDeliveryService;
 import com.auraboot.framework.bi.service.impl.ReportScheduleServiceImpl;
+import com.auraboot.framework.meta.service.impl.AuditTrailService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +39,9 @@ class ReportScheduleServiceTest {
     @Mock
     private ReportDeliveryService reportDeliveryService;
 
+    @Mock
+    private AuditTrailService auditTrailService;
+
     @InjectMocks
     private ReportScheduleServiceImpl reportScheduleService;
 
@@ -54,6 +60,16 @@ class ReportScheduleServiceTest {
         validRequest.setFormat("pdf");
         validRequest.setSubjectTemplate("Sales Report: ${reportName} - ${date}");
         validRequest.setEnabled(true);
+
+        // update/delete/testSend resolve the actor from MetaContext (set on every real
+        // authenticated request, like the controller), and create/update/delete emit
+        // audit events via AuditTrailService — mirror both, matching ReportScheduleAuditTest.
+        MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
+    }
+
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
     }
 
     @Test

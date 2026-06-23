@@ -3,6 +3,7 @@ package com.auraboot.framework.integration.security;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -85,14 +86,17 @@ class MemoryTierAdminGuardIntegrationTest extends BaseIntegrationTest {
     @DisplayName("admin POST .../promote-now on L1 row -> 200 + category=user")
     void adminPromotesL1() throws Exception {
         tenantId = TestIdGenerator.uniqueTenantId();
-        AdminGuardTestSupport.grantTenantAdmin(jdbc, tenantId, testUser.getId());
+        long roleId = AdminGuardTestSupport.grantTenantAdmin(jdbc, tenantId, testUser.getId());
+        Long memberId = AdminGuardTestSupport.findActiveMemberId(jdbc, tenantId, testUser.getId());
+        AdminGuardTestSupport.grantPermissionToRole(jdbc, tenantId, roleId,
+                MetaPermission.ACP_MEMORY_ADMIN, "ACP Memory Admin", "acp", "memory", "admin");
 
         String pid = insertL1(tenantId, String.valueOf(testUser.getId()),
                 "admin promote success " + UniqueIdGenerator.generate(), 2);
 
         MockMvc mockMvc = AdminGuardTestSupport.buildMockMvc(
                 webApplicationContext, tenantId, testUser.getId(),
-                testUser.getPid(), testUser.getUserName());
+                testUser.getPid(), testUser.getUserName(), memberId);
 
         mockMvc.perform(post("/api/admin/memory/" + pid + "/promote-now")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -111,14 +115,17 @@ class MemoryTierAdminGuardIntegrationTest extends BaseIntegrationTest {
     @DisplayName("admin POST .../promote-now on already-L2 row -> 409 memory_not_l1")
     void adminAlreadyL2_conflict() throws Exception {
         tenantId = TestIdGenerator.uniqueTenantId();
-        AdminGuardTestSupport.grantTenantAdmin(jdbc, tenantId, testUser.getId());
+        long roleId = AdminGuardTestSupport.grantTenantAdmin(jdbc, tenantId, testUser.getId());
+        Long memberId = AdminGuardTestSupport.findActiveMemberId(jdbc, tenantId, testUser.getId());
+        AdminGuardTestSupport.grantPermissionToRole(jdbc, tenantId, roleId,
+                MetaPermission.ACP_MEMORY_ADMIN, "ACP Memory Admin", "acp", "memory", "admin");
 
         String pid = insertL2(tenantId, String.valueOf(testUser.getId()),
                 "already promoted " + UniqueIdGenerator.generate(), 7);
 
         MockMvc mockMvc = AdminGuardTestSupport.buildMockMvc(
                 webApplicationContext, tenantId, testUser.getId(),
-                testUser.getPid(), testUser.getUserName());
+                testUser.getPid(), testUser.getUserName(), memberId);
 
         mockMvc.perform(post("/api/admin/memory/" + pid + "/promote-now")
                         .contentType(MediaType.APPLICATION_JSON)

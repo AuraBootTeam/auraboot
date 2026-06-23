@@ -16,15 +16,16 @@ public interface AiTraceMapper extends BaseMapper<AiTrace> {
 
     @Insert("""
         INSERT INTO ab_ai_trace (
-            trace_id, tenant_id, session_id, name, user_id, input, status, metadata, start_time
+            trace_id, otel_trace_id, tenant_id, session_id, name, user_id, input, status, metadata, start_time
         ) VALUES (
-            #{traceId}, #{tenantId}, #{sessionId}, #{name}, #{userId}, #{input}, #{status},
+            #{traceId}, #{otelTraceId}, #{tenantId}, #{sessionId}, #{name}, #{userId}, #{input}, #{status},
             CAST(#{metadataJson} AS jsonb), #{startTime}
         )
     """)
     @InterceptorIgnore(tenantLine = "true")
     int insertTraceRecord(
             @Param("traceId") String traceId,
+            @Param("otelTraceId") String otelTraceId,
             @Param("tenantId") Long tenantId,
             @Param("sessionId") String sessionId,
             @Param("name") String name,
@@ -33,6 +34,12 @@ public interface AiTraceMapper extends BaseMapper<AiTrace> {
             @Param("status") String status,
             @Param("metadataJson") String metadataJson,
             @Param("startTime") java.time.Instant startTime);
+
+    /** Resolve the trace's tenant from its id — fallback when MetaContext is absent
+     *  on a streaming/reactor thread (A-G6 usage ledger, §2.6). */
+    @Select("SELECT tenant_id FROM ab_ai_trace WHERE trace_id = #{traceId} LIMIT 1")
+    @InterceptorIgnore(tenantLine = "true")
+    Long selectTenantByTraceId(@Param("traceId") String traceId);
 
     @Update("""
         UPDATE ab_ai_trace

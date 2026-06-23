@@ -1,10 +1,7 @@
 package com.auraboot.framework.agent.tool;
 
-import com.auraboot.framework.meta.service.CommandExecutor;
-import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.notification.service.EmailSender;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
-import com.auraboot.framework.common.util.UniqueIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -16,7 +13,12 @@ import java.util.Map;
 /**
  * Built-in tool handler for sending customer reply emails.
  * Triggered by CS Agent when it drafts a reply. Requires approval (L2) before execution.
- * On execution: sends email, logs to notification_send_log, creates CRM activity.
+ *
+ * <p>This is a generic platform notification capability: on execution it sends the email and
+ * records a send-log row. It intentionally carries no business (CRM) coupling — logging a CRM
+ * activity for the reply is the agent's responsibility, driven from its prompt via
+ * {@code cmd:crm:create_activity}, so OSS core stays free of vertical command codes
+ * (see scripts/check-agent-eval-boundary.mjs and the cs_agent seed).
  */
 @Slf4j
 @Component
@@ -27,7 +29,6 @@ public class SendCustomerReplyToolHandler {
 
     private final EmailSender emailSender;
     private final DynamicDataMapper dynamicDataMapper;
-    private final CommandExecutor commandExecutor;
 
     public Map<String, Object> execute(Map<String, Object> params, Long tenantId) {
         String recipientEmail = (String) params.get("recipient_email");
@@ -51,18 +52,6 @@ public class SendCustomerReplyToolHandler {
         // 2. Log successful send
         logSend(tenantId, recipientEmail, subject, body, "sent", null);
 
-        // 3. Create CRM activity on the complaint (best-effort)
-        if (complaintIdObj != null) {
-            try {
-                Long complaintId = complaintIdObj instanceof Number
-                    ? ((Number) complaintIdObj).longValue()
-                    : Long.parseLong(complaintIdObj.toString());
-                createReplyActivity(tenantId, complaintId, recipientEmail, subject);
-            } catch (Exception e) {
-                log.warn("Failed to create activity for complaint {}: {}", complaintIdObj, e.getMessage());
-            }
-        }
-
         log.info("Customer reply sent to {} for complaint {}", recipientEmail, complaintIdObj);
         return Map.of("success", true, "message", "Email sent to " + recipientEmail);
     }
@@ -70,7 +59,8 @@ public class SendCustomerReplyToolHandler {
     private void logSend(Long tenantId, String recipient, String subject, String body,
                          String status, String errorMessage) {
         Map<String, Object> logData = new HashMap<>();
-        logData.put("id", UniqueIdGenerator.generate());
+        // ab_notification_send_log.id is a bigint IDENTITY column — let it auto-generate.
+        // (Do not set it to a ULID string; that fails the INSERT with a type mismatch.)
         logData.put("tenant_id", tenantId);
         logData.put("template_code", "cs_agent_reply");
         logData.put("channel", "email");
@@ -82,18 +72,5 @@ public class SendCustomerReplyToolHandler {
         logData.put("sent_at", LocalDateTime.now());
         logData.put("created_at", LocalDateTime.now());
         dynamicDataMapper.insert("ab_notification_send_log", logData);
-    }
-
-    private void createReplyActivity(Long tenantId, Long complaintId, String recipientEmail, String subject) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("crm_act_type", "email");
-        payload.put("crm_act_subject", "Agent Reply: " + subject);
-        payload.put("crm_act_description", "Automated reply sent to " + recipientEmail + " by CS Agent");
-        payload.put("crm_act_date", LocalDateTime.now().toLocalDate().toString());
-        payload.put("crm_act_status", "completed");
-
-        CommandExecuteRequest request = new CommandExecuteRequest();
-        request.setPayload(payload);
-        commandExecutor.execute("crm:create_activity", request);
     }
 }

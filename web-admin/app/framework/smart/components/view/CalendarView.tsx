@@ -17,6 +17,7 @@ import type { FilterConfig } from '~/framework/smart/types/chart';
 import { dynamicService } from '~/shared/services/dynamicService';
 import { cn } from '~/utils/cn';
 import { DataLimitBanner, ViewDiagnostics, ViewEmptyState } from './shared';
+import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 
 /**
  * Props for CalendarView component
@@ -147,7 +148,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
       const calendarEvents: CalendarEvent[] = [];
       for (const record of result.records) {
         const dateVal = record[dateField];
-        const recordPid = String(record.pid ?? record.id ?? '');
+        const recordPid = getLegacyCompatibleRecordPid(record) || '';
         const titleVal = String(record[titleField] ?? record['name'] ?? recordPid);
 
         if (!dateVal) {
@@ -179,7 +180,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
         const color = colorField ? getColorForValue(record[colorField]) : '#3B82F6';
 
         calendarEvents.push({
-          id: String(record.id ?? record.pid ?? ''),
+          id: recordPid,
           title: titleVal,
           start: startVal,
           end: endVal || undefined,
@@ -226,7 +227,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const handleEventClick = useCallback(
     (info: EventClickArg) => {
       const eventRecord = info.event.extendedProps as Record<string, unknown>;
-      const recordId = String(eventRecord.pid ?? eventRecord.id ?? info.event.id ?? '');
+      const recordId = getLegacyCompatibleRecordPid(eventRecord) || info.event.id || '';
       if (recordId) {
         onEventClick?.(recordId);
       }

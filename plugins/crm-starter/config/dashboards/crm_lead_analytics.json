@@ -22,7 +22,7 @@
       "y": 0,
       "w": 3,
       "h": 2,
-      "title": "线索总数",
+      "title": { "zh-CN": "线索总数", "en": "Total Leads" },
       "config": {
         "title": { "zh-CN": "线索总数", "en": "Total Leads" },
         "dataSource": {
@@ -39,7 +39,7 @@
       "y": 0,
       "w": 5,
       "h": 4,
-      "title": "按状态分布",
+      "title": { "zh-CN": "按状态分布", "en": "Leads by Status" },
       "config": {
         "title": { "zh-CN": "按状态分布", "en": "Leads by Status" },
         "dataSource": {
@@ -57,7 +57,7 @@
       "y": 0,
       "w": 4,
       "h": 4,
-      "title": "按来源分布",
+      "title": { "zh-CN": "按来源分布", "en": "Leads by Source" },
       "config": {
         "title": { "zh-CN": "按来源分布", "en": "Leads by Source" },
         "dataSource": {

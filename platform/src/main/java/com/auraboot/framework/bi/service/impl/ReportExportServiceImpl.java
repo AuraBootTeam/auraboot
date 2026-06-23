@@ -1,10 +1,14 @@
 package com.auraboot.framework.bi.service.impl;
 
+import com.auraboot.framework.bi.dao.entity.ReportEntity;
 import com.auraboot.framework.bi.dto.ReportExportFile;
 import com.auraboot.framework.bi.dto.ReportExportRequest;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.service.ReportExportService;
+import com.auraboot.framework.bi.service.ReportStorageService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.dto.AuditTrailEvent;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.NamedQueryTestRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
@@ -14,8 +18,10 @@ import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.NamedQueryService;
+import com.auraboot.framework.meta.service.impl.AuditTrailService;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -29,7 +35,23 @@ import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.ss.util.WorkbookUtil;
+import org.apache.poi.xddf.usermodel.chart.AxisCrosses;
+import org.apache.poi.xddf.usermodel.chart.AxisPosition;
+import org.apache.poi.xddf.usermodel.chart.BarDirection;
+import org.apache.poi.xddf.usermodel.chart.ChartTypes;
+import org.apache.poi.xddf.usermodel.chart.XDDFBarChartData;
+import org.apache.poi.xddf.usermodel.chart.XDDFCategoryAxis;
+import org.apache.poi.xddf.usermodel.chart.XDDFChartData;
+import org.apache.poi.xddf.usermodel.chart.XDDFDataSource;
+import org.apache.poi.xddf.usermodel.chart.XDDFDataSourcesFactory;
+import org.apache.poi.xddf.usermodel.chart.XDDFNumericalDataSource;
+import org.apache.poi.xddf.usermodel.chart.XDDFValueAxis;
+import org.apache.poi.xssf.usermodel.XSSFChart;
+import org.apache.poi.xssf.usermodel.XSSFClientAnchor;
+import org.apache.poi.xssf.usermodel.XSSFDrawing;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -95,6 +117,9 @@ public class ReportExportServiceImpl implements ReportExportService {
     private final ObjectMapper objectMapper;
     private final DynamicDataService dynamicDataService;
     private final NamedQueryService namedQueryService;
+    private final ReportStorageService reportStorageService;
+    private final AuditTrailService auditTrailService;
+    private final ReportRenderClient reportRenderClient;
 
     @Override
     public ReportExportFile exportExcel(ReportExportRequest request) {
@@ -119,7 +144,9 @@ public class ReportExportServiceImpl implements ReportExportService {
             }
 
             workbook.write(output);
-            return new ReportExportFile(output.toByteArray(), safeFilename(title) + ".xlsx", XLSX_CONTENT_TYPE);
+            ReportExportFile file = new ReportExportFile(output.toByteArray(), safeFilename(title) + ".xlsx", XLSX_CONTENT_TYPE);
+            recordExportAudit(request.getReportPid(), "EXPORT_EXCEL", "excel", file.getFilename());
+            return file;
         } catch (ValidationException e) {
             throw e;
         } catch (Exception e) {
@@ -136,17 +163,46 @@ public class ReportExportServiceImpl implements ReportExportService {
 
         Map<String, Object> reportDsl = loadReportDsl(request.getReportPid());
         String title = stringValue(reportDsl.get("title"), "report");
+        Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(reportDsl);
 
+        byte[] pdfBytes = renderPdf(reportDsl, dataSets, title);
+        ReportExportFile file = new ReportExportFile(pdfBytes, safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
+        recordExportAudit(request.getReportPid(), "EXPORT_PDF", "pdf", file.getFilename());
+        return file;
+    }
+
+    /**
+     * Phase 3 (DDR-2026-06-21): render the report to a real WYSIWYG PDF (vector
+     * charts + running header/footer/watermark) via the Node renderer, falling
+     * back to the legacy PDFBox text export when the renderer is unavailable or
+     * fails — logged, never silent.
+     */
+    private byte[] renderPdf(Map<String, Object> reportDsl,
+                             Map<String, List<Map<String, Object>>> dataSets,
+                             String title) {
+        try {
+            byte[] rendered = reportRenderClient.renderPdf(reportDsl, dataSets);
+            if (rendered != null && rendered.length > 0) {
+                return rendered;
+            }
+        } catch (ReportRenderException e) {
+            log.warn("WYSIWYG report renderer failed; falling back to PDFBox text export: {}", e.getMessage());
+        }
+        return renderPdfWithPdfBox(reportDsl, dataSets, title);
+    }
+
+    private byte[] renderPdfWithPdfBox(Map<String, Object> reportDsl,
+                                       Map<String, List<Map<String, Object>>> dataSets,
+                                       String title) {
         try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            Map<String, List<Map<String, Object>>> dataSets = resolveDataSets(reportDsl);
             List<PdfLine> lines = renderPdfLines(reportDsl, dataSets, title);
             writePdfLines(document, lines, resolvePdfPageSize(reportDsl), resolvePdfMargins(reportDsl));
             document.save(output);
-            return new ReportExportFile(output.toByteArray(), safeFilename(title) + ".pdf", PDF_CONTENT_TYPE);
+            return output.toByteArray();
         } catch (ValidationException e) {
             throw e;
         } catch (Exception e) {
-            log.error("Failed to export report as PDF: reportPid={}", request.getReportPid(), e);
+            log.error("Failed to export report as PDF: title={}", title, e);
             throw new ValidationException(ResponseCode.CommonValidationFailed, "PDF export failed: " + e.getMessage());
         }
     }
@@ -167,7 +223,9 @@ public class ReportExportServiceImpl implements ReportExportService {
             payload.put("reportDsl", reportDsl);
             payload.put("dataSets", resolveDataSets(reportDsl));
             byte[] bytes = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsBytes(payload);
-            return new ReportExportFile(bytes, safeFilename(title) + ".report.json", JSON_CONTENT_TYPE);
+            ReportExportFile file = new ReportExportFile(bytes, safeFilename(title) + ".report.json", JSON_CONTENT_TYPE);
+            recordExportAudit(request.getReportPid(), "EXPORT_JSON", "json", file.getFilename());
+            return file;
         } catch (ValidationException e) {
             throw e;
         } catch (Exception e) {
@@ -176,7 +234,79 @@ public class ReportExportServiceImpl implements ReportExportService {
         }
     }
 
+    /**
+     * Emit a tamper-evident audit trail record for a SUCCESSFUL report export (B6 / Q15 — report
+     * actions were previously invisible to the audit subsystem). Export is the highest-value report
+     * audit: it captures sensitive-data egress (who exported which report, when, in which format).
+     *
+     * <p>ADDITIVE: this only records an audit event alongside a completed export; the export output
+     * itself is unchanged. Tenant + actor are sourced from {@link MetaContext} exactly as the sibling
+     * {@code ReportScheduleServiceImpl} does (set on every authenticated request by the tenant
+     * interceptor) — the export controller runs synchronously on the request thread.
+     *
+     * @param reportPid the exported report's pid (used as {@code entityPid})
+     * @param operationType {@code EXPORT_PDF} / {@code EXPORT_EXCEL} / {@code EXPORT_JSON}
+     * @param format        the export format (recorded in {@code metadata})
+     * @param filename      the generated output filename (recorded in {@code metadata})
+     */
+    private void recordExportAudit(String reportPid, String operationType, String format, String filename) {
+        ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put("format", format);
+        metadata.put("filename", filename);
+        auditTrailService.recordAudit(AuditTrailEvent.builder()
+                .tenantId(MetaContext.getCurrentTenantId())
+                .eventType("REPORT_EXPORT")
+                .entityType("report")
+                .entityPid(reportPid)
+                .operationType(operationType)
+                .actorId(MetaContext.getCurrentUserId())
+                .metadata(metadata)
+                .build());
+    }
+
+    /**
+     * Load the ReportDsl for a report, preferring the first-class {@code ab_report} store and
+     * falling back to the legacy page-schema {@code extension.reportDsl} (Phase 4 slice 2b-2).
+     *
+     * <p>Since slice 2b-1 the report designer dual-writes every save into {@code ab_report} keyed
+     * by the SAME pid, so a report saved after that slice is in both stores and the {@code dsl}
+     * stored in {@code ab_report} is the EXACT same ReportDsl JSON the page-schema holds — the
+     * parsed map is structurally identical regardless of source. Reports created before the
+     * dual-write (not yet backfilled into {@code ab_report}) are read from the page-schema; that
+     * fallback is preserved verbatim so no report becomes unreadable. The page-schema read is
+     * removed in a later slice after the backfill.
+     */
     private Map<String, Object> loadReportDsl(String reportPid) {
+        ReportEntity report = reportStorageService.findByPid(reportPid);
+        if (report != null && StringUtils.hasText(report.getDsl())) {
+            return parseAbReportDsl(report.getDsl(), reportPid);
+        }
+        return loadReportDslFromPageSchema(reportPid);
+    }
+
+    /**
+     * Parse the {@code ab_report.dsl} jsonb String into the same {@code Map<String,Object>} shape
+     * {@code loadReportDsl} returns from the page-schema path. The stored value is the exact
+     * ReportDsl JSON written by the dual-write, so the parsed map mirrors the page-schema read.
+     */
+    private Map<String, Object> parseAbReportDsl(String dsl, String reportPid) {
+        try {
+            return objectMapper.readValue(dsl, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            // ab_report.dsl is a jsonb column, so it is always syntactically valid JSON; a parse
+            // failure here is a server fault, not a client validation error.
+            log.error("Failed to parse ab_report dsl: reportPid={}", reportPid, e);
+            throw new ValidationException(ResponseCode.SystemError,
+                    "Stored report dsl is not valid JSON: " + reportPid);
+        }
+    }
+
+    /**
+     * Legacy read path: the report's DSL lives in the page-schema {@code extension.reportDsl}.
+     * Unchanged from before slice 2b-2; retained as the fallback for reports not yet in
+     * {@code ab_report}.
+     */
+    private Map<String, Object> loadReportDslFromPageSchema(String reportPid) {
         PageSchema page = pageSchemaMapper.selectByPid(reportPid);
         if (page == null) {
             throw new ValidationException(ResponseCode.NOT_FOUND, "Report not found: " + reportPid);
@@ -986,9 +1116,63 @@ public class ReportExportServiceImpl implements ReportExportService {
                 row.createCell(0).setCellValue(metric.label());
                 writeCell(row.createCell(1), metric.value());
             }
+            // Phase 3 (DDR-2026-06-21): embed a real native chart over the data
+            // (XSSF/XDDF) so Excel exports show a visualization, not just a data sheet.
+            addNativeChart(sheet, block, title, 2, 1 + metrics.size());
         }
         sheet.autoSizeColumn(0);
         sheet.autoSizeColumn(1);
+    }
+
+    /**
+     * Draw a native Excel chart (bar / line / pie, matching the block's chartType) over the
+     * Category/Value data already written to this sheet. No-op when the sheet is not an
+     * {@code XSSFSheet}. The data range is column A (categories) + B (values), rows
+     * {@code firstDataRow..lastDataRow}.
+     */
+    private void addNativeChart(Sheet sheet, Map<String, Object> block, String title,
+                                int firstDataRow, int lastDataRow) {
+        if (!(sheet instanceof XSSFSheet xssfSheet) || lastDataRow < firstDataRow) {
+            return;
+        }
+        String chartType = stringValue(block.get("chartType"), "bar").toLowerCase(Locale.ROOT);
+
+        XSSFDrawing drawing = xssfSheet.createDrawingPatriarch();
+        // anchor to the right of the data: cols D..N, rows 1..19
+        XSSFClientAnchor anchor = drawing.createAnchor(0, 0, 0, 0, 3, 1, 14, 19);
+        XSSFChart chart = drawing.createChart(anchor);
+        chart.setTitleText(title);
+        chart.setTitleOverlay(false);
+
+        XDDFDataSource<String> categories = XDDFDataSourcesFactory.fromStringCellRange(
+                xssfSheet, new CellRangeAddress(firstDataRow, lastDataRow, 0, 0));
+        XDDFNumericalDataSource<Double> values = XDDFDataSourcesFactory.fromNumericCellRange(
+                xssfSheet, new CellRangeAddress(firstDataRow, lastDataRow, 1, 1));
+
+        if ("pie".equals(chartType)) {
+            XDDFChartData data = chart.createData(ChartTypes.PIE, null, null);
+            data.setVaryColors(true);
+            data.addSeries(categories, values).setTitle(title, null);
+            chart.plot(data);
+            return;
+        }
+
+        XDDFCategoryAxis bottomAxis = chart.createCategoryAxis(AxisPosition.BOTTOM);
+        XDDFValueAxis leftAxis = chart.createValueAxis(AxisPosition.LEFT);
+        leftAxis.setCrosses(AxisCrosses.AUTO_ZERO);
+
+        ChartTypes type = switch (chartType) {
+            case "line", "area" -> ChartTypes.LINE;
+            default -> ChartTypes.BAR;
+        };
+        XDDFChartData data = chart.createData(type, bottomAxis, leftAxis);
+        data.setVaryColors(false);
+        XDDFChartData.Series series = data.addSeries(categories, values);
+        series.setTitle(title, null);
+        if (data instanceof XDDFBarChartData bar) {
+            bar.setBarDirection(BarDirection.COL);
+        }
+        chart.plot(data);
     }
 
     private void writeTextArtifactsSheet(Workbook workbook,

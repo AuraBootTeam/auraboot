@@ -224,9 +224,16 @@
     "refType": "field"
   },
   {
-    "key": "model.crm_lead.crm_lead_assigned_to.label",
+    "key": "model.crm_lead.owner_type.label",
+    "zh-CN": "分配类型",
+    "en-US": "Assign To",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.crm_lead.owner_id.label",
     "zh-CN": "分配给",
-    "en-US": "Assigned To",
+    "en-US": "Assignee",
     "source": "import",
     "refType": "field"
   },

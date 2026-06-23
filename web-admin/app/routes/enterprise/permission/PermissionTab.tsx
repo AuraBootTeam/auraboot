@@ -286,10 +286,10 @@ export default function PermissionTab() {
                   {/* Permission Info */}
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium text-gray-900">{perm.name}</span>
+                      <span className="text-sm font-medium text-gray-900">{t(`permission.${perm.code}`, undefined, perm.name)}</span>
                       <span className="text-xs text-gray-400">{perm.code}</span>
                       {perm.description && (
-                        <span className="text-xs text-gray-500">{perm.description}</span>
+                        <span className="text-xs text-gray-500">{t(`permission.${perm.code}.description`, undefined, perm.description)}</span>
                       )}
                     </div>
                   </td>

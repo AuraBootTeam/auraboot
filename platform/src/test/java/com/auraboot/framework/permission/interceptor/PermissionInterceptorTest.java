@@ -69,6 +69,9 @@ class PermissionInterceptorTest {
         @RequirePermission(value = "model.{pageKey}.read")
         public void dynamicModelRead() {}
 
+        @RequirePermission(MetaPermission.PAGE_SCHEMA_READ)
+        public void publishedPageSchemaRead() {}
+
         @RequirePermission(value = "x.y.z", optional = true)
         public void optionalCheck() {}
 
@@ -233,6 +236,43 @@ class PermissionInterceptorTest {
 
         assertThat(ok).isTrue();
         verify(menuMapper).findPermissionCodeByPageKey(100L, "decisionops_definitions_list");
+    }
+
+    @Test
+    void preHandle_publishedPageSchemaRead_allowsViaMenuPermissionFallback() throws Exception {
+        HandlerMethod hm = handlerMethod(StaticHandler.class, "publishedPageSchemaRead");
+        authenticate(7L);
+        MetaContext.setContext(100L, 7L, "u-pid", "tester");
+        Map<String, String> pathVars = new HashMap<>();
+        pathVars.put("pageKey", "e2et_order_list");
+        when(request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE)).thenReturn(pathVars);
+        when(userPermissionService.hasPermission(7L, MetaPermission.PAGE_SCHEMA_READ)).thenReturn(false);
+        when(menuMapper.findPermissionCodeByPageKey(100L, "e2et_order_list"))
+                .thenReturn("e2et.order.read");
+        when(userPermissionService.hasPermission(7L, "e2et.order.read")).thenReturn(true);
+
+        boolean ok = interceptor.preHandle(request, response, hm);
+
+        assertThat(ok).isTrue();
+        verify(menuMapper).findPermissionCodeByPageKey(100L, "e2et_order_list");
+    }
+
+    @Test
+    void preHandle_publishedPageSchemaRead_allowsViaModelReadFallback() throws Exception {
+        HandlerMethod hm = handlerMethod(StaticHandler.class, "publishedPageSchemaRead");
+        authenticate(7L);
+        MetaContext.setContext(100L, 7L, "u-pid", "tester");
+        Map<String, String> pathVars = new HashMap<>();
+        pathVars.put("pageKey", "e2et_order_list");
+        when(request.getAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE)).thenReturn(pathVars);
+        when(userPermissionService.hasPermission(7L, MetaPermission.PAGE_SCHEMA_READ)).thenReturn(false);
+        when(menuMapper.findPermissionCodeByPageKey(100L, "e2et_order_list")).thenReturn(null);
+        when(userPermissionService.hasPermission(7L, "model.e2et_order.read")).thenReturn(true);
+
+        boolean ok = interceptor.preHandle(request, response, hm);
+
+        assertThat(ok).isTrue();
+        verify(menuMapper).findPermissionCodeByPageKey(100L, "e2et_order_list");
     }
 
     @Test

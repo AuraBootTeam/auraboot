@@ -69,6 +69,10 @@ import {
 } from '~/framework/meta/utils/promptUpload';
 import type { AsyncTask } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
 import { useAsyncTaskModalSink } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
+import {
+  buildCommandTargetParams,
+  getLegacyCompatibleRecordPid,
+} from '~/framework/meta/utils/publicRecordId';
 
 // Navigate function type (compatible with react-router v7)
 import type { NavigateFunction as RouterNavigateFunction } from 'react-router';
@@ -118,10 +122,8 @@ function resolveCommandTargetRecordId(
   );
   return (
     toNonBlankString(explicitTarget) ||
-    toNonBlankString(record?.pid) ||
-    toNonBlankString(record?.id) ||
-    toNonBlankString(context.data?.pid) ||
-    toNonBlankString(context.data?.id)
+    getLegacyCompatibleRecordPid(record) ||
+    getLegacyCompatibleRecordPid(context.data)
   );
 }
 
@@ -129,11 +131,7 @@ function resolveCommandRefreshIds(
   actionDef: Record<string, unknown>,
   button: Record<string, unknown>,
 ): string[] | undefined {
-  const rawRefresh =
-    actionDef.refresh ??
-    actionDef.reload ??
-    button.refresh ??
-    button.reload;
+  const rawRefresh = actionDef.refresh ?? actionDef.reload ?? button.refresh ?? button.reload;
   if (Array.isArray(rawRefresh)) {
     const ids = rawRefresh.map((item) => toNonBlankString(item)).filter(Boolean) as string[];
     return ids.length > 0 ? ids : undefined;
@@ -159,8 +157,7 @@ function resolveCommandPayload(
 
 function formatMessage(params: Record<string, any>, fallback: string): string {
   return Object.entries(params).reduce(
-    (text, [paramKey, paramValue]) =>
-      text.split(`{${paramKey}}`).join(String(paramValue)),
+    (text, [paramKey, paramValue]) => text.split(`{${paramKey}}`).join(String(paramValue)),
     fallback,
   );
 }
@@ -327,6 +324,17 @@ export interface UseActionHandlerResult {
   activeTask: AsyncTask | null;
   /** Dismiss the progress modal (clears `activeTask`). */
   clearActiveTask: () => void;
+  /**
+   * Execute a command directly by code, without going through the action button
+   * pipeline. Exposed so callers (e.g. ReferenceCreateDialog) can fire commands
+   * without needing a ButtonConfig.
+   */
+  executeCommand: (
+    commandCode: string,
+    targetRecordId?: string,
+    payload?: Record<string, any>,
+    operationType?: string,
+  ) => Promise<any>;
 }
 
 /**
@@ -382,7 +390,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           token,
         });
         if (!ResultHelper.isSuccess(res)) {
-          throw new Error((res as any).desc || (res as any).message || 'Async task status unavailable');
+          throw new Error(
+            (res as any).desc || (res as any).message || 'Async task status unavailable',
+          );
         }
         const task = (res as any).data || {};
         const status = String(task.status || '').toLowerCase();
@@ -435,7 +445,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       }
 
       const body: Record<string, any> = {
-        targetRecordId,
+        ...buildCommandTargetParams(targetRecordId),
         payload: payload || {},
       };
       if (normalizedOp) {
@@ -458,7 +468,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       // result.data = { commandCode, phaseReached, data: { async, taskCode } },
       // so the async marker lives on result.data.data (fall back to result.data).
       const envelope = result.data as any;
-      const dispatch = envelope?.data && typeof envelope.data === 'object' ? envelope.data : envelope;
+      const dispatch =
+        envelope?.data && typeof envelope.data === 'object' ? envelope.data : envelope;
       if (dispatch && dispatch.async === true && dispatch.taskCode) {
         notifyToast('已提交,后台处理中…', 'info');
         // Open the progress modal immediately in a running state; pollAsyncTask
@@ -482,75 +493,76 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
    *   - "automation:{pid}" -> /automation/{pid}
    * - Legacy "{modelCode}_{pageType}" e.g. "qo_daily_report_form"
    */
-  const resolveNavigateTo = useCallback((pageKey: string | undefined, record?: Record<string, any>) => {
-    if (!pageKey) {
-      console.error('[useActionHandler] navigate action is missing both "to" and "url" fields');
-      return '';
-    }
-    const recordId = record?.pid || record?.id;
-
-    // Absolute path with template variables — OCP compliant
-    // DSL can write navigateTo: "/dashboard-designer/{pid}" or "/bpmn-designer?pid={pid}"
-    if (pageKey.startsWith('/')) {
-      return pageKey.replace(/\{(\w+)\}/g, (_, key) => {
-        if (record && key in record) return encodeURIComponent(String(record[key] ?? ''));
-        if (key === 'pid' || key === 'id') return encodeURIComponent(String(recordId ?? ''));
+  const resolveNavigateTo = useCallback(
+    (pageKey: string | undefined, record?: Record<string, any>) => {
+      if (!pageKey) {
+        console.error('[useActionHandler] navigate action is missing both "to" and "url" fields');
         return '';
-      });
-    }
-
-    // Cross-designer navigation: dashboard:{code}
-    if (pageKey.startsWith('dashboard:')) {
-      const code = pageKey.substring('dashboard:'.length);
-      return `/dashboards/view/${code}`;
-    }
-
-    // Cross-designer navigation: bpmn-status:{processKey}
-    if (pageKey.startsWith('bpmn-status:')) {
-      const processKey = pageKey.substring('bpmn-status:'.length);
-      const params = new URLSearchParams({ processKey });
-      if (recordId) {
-        params.set('businessKey', String(recordId));
       }
-      return `/bpm/process-status?${params.toString()}`;
-    }
+      const recordId = getLegacyCompatibleRecordPid(record);
 
-    // Cross-designer navigation: automation:{pid}
-    if (pageKey.startsWith('automation:')) {
-      const pid = pageKey.substring('automation:'.length);
-      return `/automation/${pid}`;
-    }
+      // Absolute path with template variables — OCP compliant
+      // DSL can write navigateTo: "/dashboard-designer/{pid}" or "/bpmn-designer?pid={pid}"
+      if (pageKey.startsWith('/')) {
+        return pageKey.replace(/\{(\w+)\}/g, (_, key) => {
+          if (record && key in record) return encodeURIComponent(String(record[key] ?? ''));
+          if (key === 'pid' || key === 'id') return encodeURIComponent(String(recordId ?? ''));
+          return '';
+        });
+      }
 
-    // Cross-designer navigation: bpmn-designer:{pid}
-    if (pageKey.startsWith('bpmn-designer:')) {
-      const pid = pageKey.substring('bpmn-designer:'.length);
-      return pid ? `/bpmn-designer?pid=${pid}` : '/bpmn-designer';
-    }
+      // Cross-designer navigation: dashboard:{code}
+      if (pageKey.startsWith('dashboard:')) {
+        const code = pageKey.substring('dashboard:'.length);
+        return `/dashboards/view/${code}`;
+      }
 
-    // Legacy format: "{modelCode}_{pageType}"
-    // Parse pageKey: last segment is the page type (list/form/detail)
-    const lastUnderscoreIdx = pageKey.lastIndexOf('_');
-    const suffix = pageKey.substring(lastUnderscoreIdx + 1);
-    const modelCodePart = pageKey.substring(0, lastUnderscoreIdx);
+      // Cross-designer navigation: bpmn-status:{processKey}
+      if (pageKey.startsWith('bpmn-status:')) {
+        const processKey = pageKey.substring('bpmn-status:'.length);
+        const params = new URLSearchParams({ processKey });
+        if (recordId) {
+          params.set('businessKey', String(recordId));
+        }
+        return `/bpm/process-status?${params.toString()}`;
+      }
 
-    // Keep model code as-is (underscores) to match page schema keys
+      // Cross-designer navigation: automation:{pid}
+      if (pageKey.startsWith('automation:')) {
+        const pid = pageKey.substring('automation:'.length);
+        return `/automation/${pid}`;
+      }
 
-    switch (suffix) {
-      case 'form':
-        // Route pattern: /p/:pageKey/edit/:recordId (see routes.ts)
-        return recordId
-          ? `/p/${modelCodePart}/edit/${recordId}`
-          : `/p/${modelCodePart}/new`;
-      case 'detail':
-      case 'view':
-        return `/p/${modelCodePart}/view/${recordId}`;
-      case 'list':
-        return `/p/${modelCodePart}`;
-      default:
-        // Fallback: treat as list page
-        return `/p/${modelCodePart}`;
-    }
-  }, []);
+      // Cross-designer navigation: bpmn-designer:{pid}
+      if (pageKey.startsWith('bpmn-designer:')) {
+        const pid = pageKey.substring('bpmn-designer:'.length);
+        return pid ? `/bpmn-designer?pid=${pid}` : '/bpmn-designer';
+      }
+
+      // Legacy format: "{modelCode}_{pageType}"
+      // Parse pageKey: last segment is the page type (list/form/detail)
+      const lastUnderscoreIdx = pageKey.lastIndexOf('_');
+      const suffix = pageKey.substring(lastUnderscoreIdx + 1);
+      const modelCodePart = pageKey.substring(0, lastUnderscoreIdx);
+
+      // Keep model code as-is (underscores) to match page schema keys
+
+      switch (suffix) {
+        case 'form':
+          // Route pattern: /p/:pageKey/edit/:recordId (see routes.ts)
+          return recordId ? `/p/${modelCodePart}/edit/${recordId}` : `/p/${modelCodePart}/new`;
+        case 'detail':
+        case 'view':
+          return `/p/${modelCodePart}/view/${recordId}`;
+        case 'list':
+          return `/p/${modelCodePart}`;
+        default:
+          // Fallback: treat as list page
+          return `/p/${modelCodePart}`;
+      }
+    },
+    [],
+  );
 
   /**
    * Show confirmation dialog and return user's choice
@@ -588,7 +600,10 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             );
             let payload = {
               ...(record || context.data || {}),
-              ...resolveCommandPayload(actionDef as unknown as Record<string, unknown>, runtimeContext),
+              ...resolveCommandPayload(
+                actionDef as unknown as Record<string, unknown>,
+                runtimeContext,
+              ),
             };
             // `promptUpload`: collect a file from the user, upload it, and inject the
             // resulting file id into the payload before the command runs. Strictly
@@ -603,18 +618,12 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               if (!file) return; // user dismissed the picker — nothing to do
               setLoading(true);
               notifyToast(
-                formatMessage(
-                  { filename: file.name },
-                  uploadMessageFallback(locale, 'selected'),
-                ),
+                formatMessage({ filename: file.name }, uploadMessageFallback(locale, 'selected')),
                 'info',
               );
               const fileId = await uploadCommandFile(file, token);
               notifyToast(
-                formatMessage(
-                  { filename: file.name },
-                  uploadMessageFallback(locale, 'uploaded'),
-                ),
+                formatMessage({ filename: file.name }, uploadMessageFallback(locale, 'uploaded')),
                 'info',
               );
               payload = {
@@ -625,14 +634,18 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             }
             const btnLabel = normalizedButton.label;
             const btnCode = normalizedButton.code;
+            const explicitCommand =
+              typeof actionDef.command === 'string' && actionDef.command ? actionDef.command : '';
+            const semanticActionText =
+              `${btnLabel ?? ''} ${btnCode ?? ''} ${explicitCommand}`.toLowerCase();
             const explicitOperationType = toNonBlankString((actionDef as any).operationType);
             const operationType =
               explicitOperationType ||
-              (btnLabel === 'delete' || btnCode === 'delete'
+              (semanticActionText.includes('delete')
                 ? 'delete'
-                : btnLabel === 'create' || btnCode === 'create'
+                : semanticActionText.includes('create')
                   ? 'create'
-                  : btnLabel === 'update' || btnCode === 'update'
+                  : semanticActionText.includes('update')
                     ? 'update'
                     : targetRecordId
                       ? 'update'
@@ -647,10 +660,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // keyed by the derived operationType (create/update/delete). Explicit
             // command still wins.
             const effectiveCommand =
-              (typeof actionDef.command === 'string' && actionDef.command) ||
-              (operationType
-                ? runtime?.getSchema?.()?.commands?.[operationType]
-                : undefined) ||
+              explicitCommand ||
+              (operationType ? runtime?.getSchema?.()?.commands?.[operationType] : undefined) ||
               undefined;
             if (!effectiveCommand) {
               throw new Error(
@@ -687,11 +698,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 payload[resolvePromptUploadFilenameKey(promptUpload)],
               );
               notifyToast(
-                buildPromptUploadCompletedMessage(
-                  locale,
-                  fileName || 'file',
-                  commandResult,
-                ),
+                buildPromptUploadCompletedMessage(locale, fileName || 'file', commandResult),
                 'success',
               );
             }
@@ -759,7 +766,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               return;
             }
             if (dataSourceManager) {
-              const { actionRegistry } = await import('~/framework/meta/runtime/actions/ActionRegistry');
+              const { actionRegistry } =
+                await import('~/framework/meta/runtime/actions/ActionRegistry');
               if (actionRegistry.has(actionDef.name)) {
                 await executeRegistryAction({
                   button: normalizedButton,
@@ -825,9 +833,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 if (resolved) resolvedVars[k] = cursor;
               }
             }
-            const { startProcessFromAction } = await import(
-              '~/plugins/core-bpm/services/bpmWorkbenchService'
-            );
+            const { startProcessFromAction } =
+              await import('~/plugins/core-bpm/services/bpmWorkbenchService');
             const result = await startProcessFromAction({
               processDefinitionKey,
               businessKey: String(businessKeyRaw),
@@ -889,7 +896,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 }
               }
               // Fallback: execute steps via ActionRegistry directly
-              const { actionRegistry } = await import('~/framework/meta/runtime/actions/ActionRegistry');
+              const { actionRegistry } =
+                await import('~/framework/meta/runtime/actions/ActionRegistry');
               const { fetchResult: fr } = await import('~/shared/services/http-client');
               for (const step of actionDef.steps) {
                 if (step.action && actionRegistry.has(step.action)) {
@@ -950,5 +958,6 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
     setError,
     activeTask,
     clearActiveTask,
+    executeCommand,
   };
 }

@@ -262,7 +262,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       expect.objectContaining({
         method: 'post',
         params: expect.objectContaining({
-          targetRecordId: 'QUOTE-123',
+          targetRecordPid: 'QUOTE-123',
           operationType: 'UPDATE',
         }),
       }),
@@ -308,7 +308,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       expect.objectContaining({
         method: 'post',
         params: expect.objectContaining({
-          targetRecordId: 'QUOTE-123',
+          targetRecordPid: 'QUOTE-123',
           operationType: 'UPDATE',
         }),
       }),
@@ -392,7 +392,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       expect.objectContaining({
         method: 'post',
         params: expect.objectContaining({
-          targetRecordId: 'QUOTE-123',
+          targetRecordPid: 'QUOTE-123',
           operationType: 'UPDATE',
           payload: expect.objectContaining({
             corrected_bom_file_id: 'FILE-123',
@@ -660,13 +660,56 @@ describe('useActionHandler - handlerParams.async polling', () => {
       expect.objectContaining({
         method: 'post',
         params: expect.objectContaining({
-          targetRecordId: 'RFQ-123',
+          targetRecordPid: 'RFQ-123',
           operationType: 'UPDATE',
           payload: expect.objectContaining({
             attachment_type: 'raw_bom',
             source_file_id: 'FILE-RFQ-1',
             source_filename: 'raw-bom.xlsx',
           }),
+        }),
+      }),
+    );
+    expect(reload).toHaveBeenCalledWith(['rfqSourceAttachments']);
+  });
+
+  it('infers DELETE operation for row command actions with delete semantics', async () => {
+    fetchResultMock.mockResolvedValueOnce({ code: '0', data: { deleted: 1 } });
+
+    const reload = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'qo_rfq_source_attachment_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        dataSourceManager: { reload } as any,
+        context: {} as any,
+      }),
+    );
+
+    const button = {
+      code: 'delete_source_attachment',
+      label: 'Delete',
+      action: {
+        type: 'command',
+        command: 'qo_rfq_source_attachment_common:delete',
+        refresh: ['rfqSourceAttachments'],
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button, { pid: 'ATTACHMENT-ROW-1' });
+    });
+
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/qo_rfq_source_attachment_common:delete',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          targetRecordPid: 'ATTACHMENT-ROW-1',
+          operationType: 'DELETE',
         }),
       }),
     );

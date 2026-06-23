@@ -93,6 +93,16 @@ public class PluginManifestExtended extends PluginManifest {
     private List<RoleDefinitionDTO> roles;
 
     /**
+     * Field-mask declarations to import (config/fieldMasks.json -> ab_field_mask_config).
+     */
+    private List<FieldMaskDefinitionDTO> fieldMasks;
+
+    /**
+     * Capability declarations to import (config/capabilities.json -> ab_capability).
+     */
+    private List<CapabilityDefinitionDTO> capabilities;
+
+    /**
      * Menu definitions to import.
      */
     private List<MenuDefinitionDTO> menus;

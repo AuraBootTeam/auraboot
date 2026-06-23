@@ -1303,7 +1303,7 @@
           {
             "code": "deploy",
             "visibleWhen": "row.status === 'draft'",
-            "label": "部署",
+            "label": { "zh-CN": "部署", "en-US": "Deploy" },
             "action": {
               "type": "flow",
               "steps": [
@@ -1318,7 +1318,7 @@
           {
             "code": "suspend",
             "visibleWhen": "row.status === 'deployed'",
-            "label": "暂停",
+            "label": { "zh-CN": "暂停", "en-US": "Suspend" },
             "action": {
               "type": "flow",
               "steps": [
@@ -1333,7 +1333,7 @@
           {
             "code": "resume",
             "visibleWhen": "row.status === 'suspended'",
-            "label": "恢复",
+            "label": { "zh-CN": "恢复", "en-US": "Resume" },
             "action": {
               "type": "flow",
               "steps": [
@@ -1349,7 +1349,7 @@
             "code": "delete",
             "visibleWhen": "row.status === 'draft'",
             "danger": true,
-            "label": "删除",
+            "label": { "zh-CN": "删除", "en-US": "Delete" },
             "confirm": "confirm.delete",
             "action": {
               "type": "flow",

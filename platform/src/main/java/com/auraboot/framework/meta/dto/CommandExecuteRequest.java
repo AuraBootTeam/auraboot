@@ -29,9 +29,15 @@ public class CommandExecuteRequest {
     private String operationType;
 
     /**
-     * Optional target record ID (for UPDATE/DELETE)
+     * Optional target record ID (for UPDATE/DELETE).
+     * Kept for compatibility; dynamic command callers should pass public pid values.
      */
     private String targetRecordId;
+
+    /**
+     * Public pid alias for targetRecordId.
+     */
+    private String targetRecordPid;
 
     /**
      * Optional execution-source metadata for audit logs.
@@ -52,4 +58,21 @@ public class CommandExecuteRequest {
      * (BPM triggers, webhooks) are skipped in this mode.
      */
     private boolean dryRun;
+
+    public String getTargetRecordId() {
+        return targetRecordPid != null ? targetRecordPid : targetRecordId;
+    }
+
+    public void setTargetRecordId(String targetRecordId) {
+        this.targetRecordId = targetRecordId;
+    }
+
+    public String getTargetRecordPid() {
+        return targetRecordPid != null ? targetRecordPid : targetRecordId;
+    }
+
+    public void setTargetRecordPid(String targetRecordPid) {
+        this.targetRecordPid = targetRecordPid;
+        this.targetRecordId = targetRecordPid;
+    }
 }

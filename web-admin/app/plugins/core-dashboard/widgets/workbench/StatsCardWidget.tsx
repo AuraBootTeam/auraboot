@@ -6,9 +6,6 @@
  *   - Label (uppercase, 11px) above large value.
  *   - Sparkline + trend text in the footer row.
  *
- * The `gradient` prop is accepted for backward compatibility with existing
- * Dashboard JSON but no longer has any visual effect.
- *
  * @since 6.5.0  introduced
  * @since 6.6.0  redesigned (gradient removed, sparkline added)
  */
@@ -56,8 +53,6 @@ function formatTrend(item: StatItem): string {
 
 interface StatsCardWidgetProps {
   statKey?: string;
-  /** @deprecated kept for dashboard JSON compatibility; has no visual effect since 6.6.0 */
-  gradient?: string;
   linkTo?: string;
   className?: string;
 }

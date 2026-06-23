@@ -382,9 +382,12 @@ test('Permission matrix hosts rule-center ABAC policy and feeds impact graph @go
   await page.getByTestId('role-search-input').fill(role.code);
   await expect(page.getByTestId(`role-item-${role.code}`)).toBeVisible({ timeout: 10_000 });
   await page.getByTestId(`role-item-${role.code}`).click();
-  await expect(page.getByTestId('permission-matrix')).toBeVisible({ timeout: 15_000 });
+  // v2 IA: the raw matrix is folded into the ③ advanced atomic-actions escape hatch.
+  await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('advanced-atomic-toggle').click();
+  await page.getByTestId('advanced-atomic-search').fill(permissionCode);
 
-  const gear = page.getByTestId(`matrix-policy-gear-${resourceCode}-approve`);
+  const gear = page.getByTestId(`atomic-policy-${permissionCode}`);
   await gear.scrollIntoViewIfNeeded();
   await expect(gear).toBeVisible({ timeout: 10_000 });
   await gear.click();
@@ -462,8 +465,11 @@ test('Permission matrix hosts rule-center ABAC policy and feeds impact graph @go
   await expect(page.getByTestId('permission-page')).toBeVisible({ timeout: 15_000 });
   await page.getByTestId('role-search-input').fill(role.code);
   await page.getByTestId(`role-item-${role.code}`).click();
-  await expect(page.getByTestId('permission-matrix')).toBeVisible({ timeout: 15_000 });
-  await page.getByTestId(`matrix-policy-gear-${resourceCode}-approve`).click();
+  // v2 IA: matrix folded into the ③ advanced atomic-actions escape hatch.
+  await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('advanced-atomic-toggle').click();
+  await page.getByTestId('advanced-atomic-search').fill(permissionCode);
+  await page.getByTestId(`atomic-policy-${permissionCode}`).click();
   await expect(form).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId('decision-binding-preview')).toContainText(decisionCode);
   await form.getByLabel('refresh-impact').click();

@@ -105,7 +105,7 @@ test.describe('PM Master Data — Project Role CRUD', () => {
     await navigateToProjectRoles(page);
 
     // Click the DSL "新建" button in toolbar
-    const addBtn = page.locator('button:has-text("新建"), button:has-text("Create")');
+    const addBtn = page.locator('button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")');
     await expect(addBtn.first()).toBeVisible({ timeout: 5000 });
     await addBtn.first().click();
 

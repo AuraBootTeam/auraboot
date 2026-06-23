@@ -278,7 +278,7 @@ test.describe('Asset Permission Control', () => {
 
     // Check if action buttons are visible (based on permissions)
     const createButton = page
-      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create"), button:has-text("create")')
+      .locator('[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create"), button:has-text("create")')
       .first();
     const hasCreateBtn = await createButton.isVisible({ timeout: 3000 }).catch(() => false);
 

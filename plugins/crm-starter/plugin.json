@@ -43,7 +43,8 @@
     "roles": "config/roles.json",
     "savedViews": "config/saved-views.json",
     "dashboards": "config/dashboards",
-    "namedQueries": "config/named-queries"
+    "namedQueries": "config/named-queries",
+    "fieldMasks": "config/fieldMasks.json"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",

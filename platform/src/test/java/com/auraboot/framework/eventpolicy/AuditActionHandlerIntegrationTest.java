@@ -38,16 +38,17 @@ class AuditActionHandlerIntegrationTest extends BaseIntegrationTest {
     @Test
     void writeAuditAction_writesAuditRow_viaRealHandler() throws Exception {
         String code = "it_audit_" + System.nanoTime();
-        definitionService.create(code, "Audit IT", "FORM_SUBMITTED", "FORM", "complaint");
+        String targetKey = code + "_form";
+        definitionService.create(code, "Audit IT", "FORM_SUBMITTED", "FORM", targetKey);
         JsonNode rules = mapper.readTree("""
             [{"ruleCode":"R-AUD","ruleName":"audit high","priority":100,"enabled":true,
               "condition":{"type":"compare",
                  "left":{"type":"path","scope":"record","path":"data.priority","dataType":"enum"},
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
-              "actions":[{"type":"WRITE_AUDIT","target":"AUDIT:complaint","order":10,
+              "actions":[{"type":"WRITE_AUDIT","target":"AUDIT:%s","order":10,
                  "payload":{"message":"high-priority complaint received"},
                  "idempotencyKeyTemplate":"${record.entityCode}:${record.recordId}:${rule.ruleCode}:AUDIT"}]}]
-            """);
+            """.formatted(targetKey));
         var draft = versionService.createDraft(code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
                 ExecutionMode.ORDERED, FailureStrategy.CONTINUE_ON_ERROR, ConflictStrategy.REJECT_ON_CONFLICT,
                 DedupStrategy.BY_IDEMPOTENCY_KEY, rules);
@@ -56,8 +57,8 @@ class AuditActionHandlerIntegrationTest extends BaseIntegrationTest {
 
         Long tid = getTestTenant().getId();
         String recordId = "CMP-AUD-" + System.nanoTime();
-        EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", "complaint",
-                Map.of("record", Map.of("entityCode", "complaint", "recordId", recordId,
+        EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
+                Map.of("record", Map.of("entityCode", targetKey, "recordId", recordId,
                         "data", Map.of("priority", "HIGH"))));
 
         // the policy matched and the WRITE_AUDIT action executed successfully (real handler)
@@ -69,10 +70,10 @@ class AuditActionHandlerIntegrationTest extends BaseIntegrationTest {
         Map<String, Object> audit = jdbcTemplate.queryForMap(
                 "select rule_code, action_type, target, message from ab_drt_action_audit "
                         + "where tenant_id=? and idempotency_key=?",
-                tid, "complaint:" + recordId + ":R-AUD:AUDIT");
+                tid, targetKey + ":" + recordId + ":R-AUD:AUDIT");
         assertThat(audit.get("rule_code")).isEqualTo("R-AUD");
         assertThat(audit.get("action_type")).isEqualTo("WRITE_AUDIT");
-        assertThat(audit.get("target")).isEqualTo("AUDIT:complaint");
+        assertThat(audit.get("target")).isEqualTo("AUDIT:" + targetKey);
         assertThat(audit.get("message")).isEqualTo("high-priority complaint received");
     }
 }

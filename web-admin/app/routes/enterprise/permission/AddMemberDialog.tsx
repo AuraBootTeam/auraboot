@@ -146,7 +146,7 @@ export default function AddMemberDialog({
     try {
       await permissionService.addRoleMembers(rolePid, memberPids);
       showSuccessToast(
-        (t('admin.permission.members.addSuccess') || '{count} member(s) added').replace(
+        (t('admin.permission.members.addSuccess', undefined, '{count} member(s) added')).replace(
           '{count}',
           String(memberPids.length),
         ),
@@ -154,7 +154,7 @@ export default function AddMemberDialog({
       onSuccess();
       onClose();
     } catch (err: any) {
-      showErrorToast(err?.message || t('common.error') || 'Failed');
+      showErrorToast(err?.message || t('common.error', undefined, 'Failed'));
     } finally {
       setSubmitting(false);
     }
@@ -179,7 +179,7 @@ export default function AddMemberDialog({
       >
         <DialogHeader>
           <DialogTitle>
-            {t('admin.permission.members.addTitle') || 'Add Members'}
+            {t('admin.permission.members.addTitle', undefined, 'Add Members')}
           </DialogTitle>
         </DialogHeader>
 
@@ -196,7 +196,7 @@ export default function AddMemberDialog({
               }`}
             >
               <BuildingOffice2Icon className="mr-1.5 h-4 w-4" />
-              {t('admin.permission.members.tabOrg') || 'Organization'}
+              {t('admin.permission.members.tabOrg', undefined, 'Organization')}
             </button>
             <button
               data-testid="add-member-tab-list"
@@ -208,7 +208,7 @@ export default function AddMemberDialog({
               }`}
             >
               <UserGroupIcon className="mr-1.5 h-4 w-4" />
-              {t('admin.permission.members.tabList') || 'Member List'}
+              {t('admin.permission.members.tabList', undefined, 'Member List')}
             </button>
           </nav>
         </div>
@@ -232,7 +232,7 @@ export default function AddMemberDialog({
                   data-testid="add-member-list-search"
                   type="text"
                   placeholder={
-                    t('admin.permission.members.searchMembers') || 'Search members...'
+                    t('admin.permission.members.searchMembers', undefined, 'Search members...')
                   }
                   value={listKeyword}
                   onChange={(e) => setListKeyword(e.target.value)}
@@ -254,8 +254,7 @@ export default function AddMemberDialog({
                     data-testid="candidate-empty-state"
                     className="py-8 text-center text-sm text-gray-400"
                   >
-                    {t('admin.permission.members.noCandidates') ||
-                      'No available members found'}
+                    {t('admin.permission.members.noCandidates', undefined, 'No available members found')}
                   </div>
                 ) : (
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -276,13 +275,13 @@ export default function AddMemberDialog({
                           />
                         </th>
                         <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">
-                          {t('admin.permission.members.colName') || 'Name'}
+                          {t('admin.permission.members.colName', undefined, 'Name')}
                         </th>
                         <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">
-                          {t('admin.permission.members.colEmail') || 'Email'}
+                          {t('admin.permission.members.colEmail', undefined, 'Email')}
                         </th>
                         <th className="px-3 py-2 text-left text-xs font-medium uppercase text-gray-500">
-                          {t('admin.permission.members.colDepartment') || 'Department'}
+                          {t('admin.permission.members.colDepartment', undefined, 'Department')}
                         </th>
                       </tr>
                     </thead>
@@ -336,7 +335,7 @@ export default function AddMemberDialog({
         <div className="mt-3 flex items-center justify-between border-t border-gray-200 pt-3 dark:border-gray-700">
           <span className="text-xs text-gray-500">
             {selectedCount > 0
-              ? (t('admin.permission.members.selectedCount') || '{count} selected').replace(
+              ? (t('admin.permission.members.selectedCount', undefined, '{count} selected')).replace(
                   '{count}',
                   String(selectedCount),
                 )
@@ -349,7 +348,7 @@ export default function AddMemberDialog({
               onClick={onClose}
               className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-800"
             >
-              {t('common.cancel') || 'Cancel'}
+              {t('common.cancel', undefined, 'Cancel')}
             </button>
             <button
               data-testid="add-member-confirm"
@@ -359,8 +358,8 @@ export default function AddMemberDialog({
             >
               <UserPlusIcon className="h-4 w-4" />
               {submitting
-                ? t('common.saving') || 'Adding...'
-                : t('admin.permission.members.addConfirm') || 'Add Selected'}
+                ? t('common.saving', undefined, 'Adding...')
+                : t('admin.permission.members.addConfirm', undefined, 'Add Selected')}
             </button>
           </div>
         </div>

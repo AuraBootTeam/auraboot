@@ -15,8 +15,7 @@
 
 import React, { Suspense } from 'react';
 import { useSchemaLoader } from '~/framework/meta/hooks/useSchemaLoader';
-import { profileRegistry } from '~/framework/meta/profiles/ProfileRegistry';
-import { ProfileProvider } from '~/framework/meta/profiles/ProfileContext';
+import { profileRegistry, ProfileProvider } from '@auraboot/runtime-kernel';
 import { ErrorAlert } from '~/ui/ErrorAlert';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import { isUnconfiguredStubPage } from './isUnconfiguredStubPage';

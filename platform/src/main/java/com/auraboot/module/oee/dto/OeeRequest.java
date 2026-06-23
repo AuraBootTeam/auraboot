@@ -13,7 +13,8 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class OeeRequest {
     private Long tenantId;
-    private String equipmentId;   // pe_equipment primary key (ULID string, do NOT Long.parseLong)
+    private String equipmentId;   // PCBA equipment primary key (ULID string, do NOT Long.parseLong)
+    private String equipmentCode; // business equipment code; telemetry sources may key asset_code by this value
     private LocalDateTime windowStart;
     private LocalDateTime windowEnd;
 }

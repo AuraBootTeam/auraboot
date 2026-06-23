@@ -9,6 +9,7 @@ import com.auraboot.framework.dashboard.service.DashboardService;
 import com.auraboot.framework.environment.service.EnvironmentService;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.menu.service.MenuService;
+import com.auraboot.framework.meta.constant.DslRegistry;
 import com.auraboot.framework.meta.converter.ExtensionConverter;
 import com.auraboot.framework.meta.dto.CommandDefinitionCreateRequest;
 import com.auraboot.framework.meta.dto.CommandDefinitionDTO;
@@ -551,7 +552,7 @@ class PluginResourceImporterImplApplyTest2 {
         verify(pageSchemaMapper).insertForPluginImport(
                 anyString(), eq(1L), eq(99L), eq("draft"),
                 eq("p1"), eq("m1"), any(), any(), any(), eq("list"), eq("admin"),
-                any(), any(), eq(2),
+                any(), any(), eq(DslRegistry.PAGE_SCHEMA_CURRENT_VERSION),
                 eq(false), any(),
                 any(), eq(0), any(), eq("plg"));
     }
@@ -571,7 +572,7 @@ class PluginResourceImporterImplApplyTest2 {
         verify(pageSchemaMapper).insertForPluginImport(
                 anyString(), eq(1L), eq(99L), eq("published"),
                 eq("p2"), any(), any(), any(), any(), any(), any(),
-                any(), any(), eq(2),
+                any(), any(), eq(DslRegistry.PAGE_SCHEMA_CURRENT_VERSION),
                 anyBoolean(), any(),
                 any(), eq(0), any(), eq("plg"));
     }
@@ -595,7 +596,7 @@ class PluginResourceImporterImplApplyTest2 {
         assertThat(result.getAction()).isEqualTo(ResourceAction.UPDATE.code());
         assertThat(result.getResourcePid()).isEqualTo("page-pid-exist");
         verify(pageSchemaMapper).updateForPluginImport(any(), any(), any(), any(), any(), any(),
-                any(), any(), eq(2), anyBoolean(), any(), anyInt(), any(), eq("plg"),
+                any(), any(), eq(DslRegistry.PAGE_SCHEMA_CURRENT_VERSION), anyBoolean(), any(), anyInt(), any(), eq("plg"),
                 eq("page-pid-exist"), eq(1L));
         verify(pageSchemaMapper, never()).publishByPid(anyString());
     }

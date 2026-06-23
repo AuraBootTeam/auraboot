@@ -80,7 +80,7 @@ jobs:
       # Rationale: scripts/check-schema-sql.sh + ida/docs/26-schema-sql-governance.md
       - name: schema.sql syntax + apply gate
         if: steps.changes.outputs.run == 'true'
-        run: scripts/check-schema-sql.sh
+        run: scripts/check-schema-sql.sh --docker
 
       - name: Compile (main + test sources)
         if: steps.changes.outputs.run == 'true'

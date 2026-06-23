@@ -73,4 +73,34 @@ public interface BackgroundDataAccessor {
 
     /** Delete a record by primary key. */
     void delete(long tenantId, String modelCode, String recordId);
+
+    /**
+     * Atomically increment a numeric counter column on the named model, optionally bounded
+     * by a cap column. The operation runs under the given tenant with no implicit user context;
+     * a synthetic system user-id is used for audit columns (changed_by).
+     *
+     * @param tenantId    the tenant to operate under
+     * @param modelCode   model containing the counter
+     * @param recordId    primary key value of the target row
+     * @param counterCode field code of the column to increment (must be numeric)
+     * @param delta       increment amount (positive)
+     * @param capCode     field code of the cap column, or {@code null} for unbounded
+     * @return the new counter value wrapped in {@link Optional}, or {@link Optional#empty()}
+     *         if the row was not found or was already at cap
+     * @throws IllegalArgumentException if {@code counterCode} or {@code capCode} is unknown
+     *                                  or non-numeric on {@code modelCode}
+     * @since 2.6.0
+     */
+    Optional<Long> incrementWithinCap(long tenantId, String modelCode, String recordId,
+                                      String counterCode, long delta, String capCode);
+
+    /**
+     * Atomically increment a numeric counter column with no cap (unbounded).
+     *
+     * @since 2.6.0
+     */
+    default Optional<Long> increment(long tenantId, String modelCode, String recordId,
+                                     String counterCode, long delta) {
+        return incrementWithinCap(tenantId, modelCode, recordId, counterCode, delta, null);
+    }
 }

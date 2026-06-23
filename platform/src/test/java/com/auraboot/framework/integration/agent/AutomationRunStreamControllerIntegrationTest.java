@@ -109,8 +109,10 @@ class AutomationRunStreamControllerIntegrationTest extends BaseIntegrationTest {
         // Publish 2 deltas + terminal aggregate.
         streamPublisher.publish(new AutomationLlmChunkEvent(runPid, nodeId,
                 LlmChunk.delta(0L, "AB"), 0L));
+        waitForBodyContains(mvcResult, "\"delta\":\"AB\"");
         streamPublisher.publish(new AutomationLlmChunkEvent(runPid, nodeId,
                 LlmChunk.delta(1L, "CD"), 1L));
+        waitForBodyContains(mvcResult, "\"delta\":\"CD\"");
         LlmChatResponse aggregate = LlmChatResponse.builder()
                 .stopReason("end_turn")
                 .content(List.of(LlmChatResponse.ContentBlock.builder()
@@ -190,5 +192,18 @@ class AutomationRunStreamControllerIntegrationTest extends BaseIntegrationTest {
         // the publisher behaviour rather than reflective access.
         return true; // best-effort sentinel; the spin-loop above gives the
         // controller enough time to register on every realistic schedule.
+    }
+
+    private void waitForBodyContains(MvcResult mvcResult, String expected) throws Exception {
+        long deadline = System.currentTimeMillis() + 3_000L;
+        String body;
+        do {
+            body = mvcResult.getResponse().getContentAsString();
+            if (body.contains(expected)) {
+                return;
+            }
+            Thread.onSpinWait();
+        } while (System.currentTimeMillis() < deadline);
+        assertThat(body).contains(expected);
     }
 }

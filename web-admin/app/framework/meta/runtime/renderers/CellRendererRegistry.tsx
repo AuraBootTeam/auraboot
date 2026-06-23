@@ -16,6 +16,7 @@
 
 import React from 'react';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
+import { OwnerCell } from '~/framework/meta/runtime/renderers/OwnerCell';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { formatInTimezone } from '~/shared/services/dateTimeFormatService';
@@ -293,6 +294,15 @@ cellRendererRegistry.register('tag', ({ value, column, locale, t }) => {
 });
 
 /**
+ * 归属渲染器 - polymorphic owner (owner_type + owner_id) → 👤 user / 👥 team + name.
+ * Reads the sibling owner_type column from the row; resolves the pid to a name.
+ */
+cellRendererRegistry.register('owner', ({ value, record, column }) => {
+  const typeField = (column.render as any)?.ownerTypeField || 'owner_type';
+  return <OwnerCell ownerType={record?.[typeField]} ownerId={value} />;
+});
+
+/**
  * 日期渲染器
  */
 cellRendererRegistry.register('date', ({ value, locale, column }) => {
@@ -376,18 +386,40 @@ cellRendererRegistry.register('status', ({ value, column }) => {
 /**
  * 进度条渲染器
  */
+const PROGRESS_TONE_BAR: Record<string, string> = {
+  gray: 'bg-status-gray',
+  blue: 'bg-status-blue',
+  amber: 'bg-status-amber',
+  green: 'bg-status-green',
+  red: 'bg-status-red',
+};
+
 cellRendererRegistry.register('progress', ({ value, column }) => {
   const numValue = typeof value === 'number' ? value : parseFloat(value) || 0;
   const percentage = Math.min(100, Math.max(0, numValue));
 
-  const colorConfig = column.render?.progressColor || 'blue';
   const showText = column.render?.showProgressText !== false;
+
+  // Optional threshold-tone coloring (e.g. lead score cold/warm/hot). Thresholds
+  // are ordered ascending by `max`; the first band whose `max` exceeds the value
+  // wins, and a band without `max` is the default/top band. Tones resolve to the
+  // canonical bg-status-* tokens (semantic, and never purged by Tailwind JIT —
+  // unlike the legacy dynamic `bg-<color>-600`). No thresholds → legacy behavior.
+  const thresholds = column.render?.thresholds as Array<{ max?: number; tone: string }> | undefined;
+  let barClass = `bg-${column.render?.progressColor || 'blue'}-600`;
+  if (Array.isArray(thresholds) && thresholds.length > 0) {
+    const match =
+      thresholds.find((t) => typeof t.max === 'number' && percentage < t.max) ||
+      thresholds.find((t) => t.max == null) ||
+      thresholds[thresholds.length - 1];
+    barClass = PROGRESS_TONE_BAR[match?.tone] || PROGRESS_TONE_BAR.blue;
+  }
 
   return (
     <div className="flex items-center gap-2">
       <div className="bg-border h-2 flex-1 rounded-full dark:bg-gray-700">
         <div
-          className={`bg-${colorConfig}-600 h-2 rounded-full transition-all`}
+          className={`${barClass} h-2 rounded-full transition-all`}
           style={{ width: `${percentage}%` }}
         ></div>
       </div>

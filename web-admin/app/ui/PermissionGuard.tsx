@@ -1,55 +1,56 @@
 /**
- * 权限守卫组件
+ * Permission guard component.
  *
- * 用于在UI中根据权限控制组件的显示
+ * Controls whether UI is shown based on the current user's permissions.
  */
 
 import React from 'react';
 import { usePermissions } from '~/contexts/AuthContext';
+import { useSmartText } from '~/utils/i18n';
 
 interface PermissionGuardProps {
   children: React.ReactNode;
-  /** 需要的权限代码 */
+  /** Required permission code */
   permission?: string;
-  /** 需要的权限代码列表（任一） */
+  /** Required permission codes (any of) */
   anyPermission?: string[];
-  /** 需要的权限代码列表（全部） */
+  /** Required permission codes (all of) */
   allPermissions?: string[];
-  /** 需要的角色代码 */
+  /** Required role code */
   role?: string;
-  /** 无权限时显示的内容 */
+  /** Content shown when the user lacks permission */
   fallback?: React.ReactNode;
 }
 
 /**
- * 权限守卫组件
+ * Permission guard component.
  *
  * @example
  * ```tsx
- * // 单个权限
+ * // Single permission
  * <PermissionGuard permission="user:create">
- *   <button>创建用户</button>
+ *   <button>Create user</button>
  * </PermissionGuard>
  *
- * // 任一权限
+ * // Any permission
  * <PermissionGuard anyPermission={["user:create", "user:edit"]}>
- *   <button>编辑用户</button>
+ *   <button>Edit user</button>
  * </PermissionGuard>
  *
- * // 所有权限
+ * // All permissions
  * <PermissionGuard allPermissions={["user:create", "user:delete"]}>
- *   <button>批量操作</button>
+ *   <button>Bulk operation</button>
  * </PermissionGuard>
  *
- * // 角色检查
+ * // Role check
  * <PermissionGuard role="admin">
- *   <button>管理员功能</button>
+ *   <button>Admin features</button>
  * </PermissionGuard>
  *
- * // 带fallback
+ * // With fallback
  * <PermissionGuard
  *   permission="user:view"
- *   fallback={<div>无权限查看</div>}
+ *   fallback={<div>No permission to view</div>}
  * >
  *   <UserList />
  * </PermissionGuard>
@@ -67,22 +68,22 @@ export function PermissionGuard({
 
   let hasAccess = true;
 
-  // 检查单个权限
+  // Check single permission
   if (permission && !hasPermission(permission)) {
     hasAccess = false;
   }
 
-  // 检查任一权限
+  // Check any permission
   if (anyPermission && !hasAnyPermission(anyPermission)) {
     hasAccess = false;
   }
 
-  // 检查所有权限
+  // Check all permissions
   if (allPermissions && !hasAllPermissions(allPermissions)) {
     hasAccess = false;
   }
 
-  // 检查角色
+  // Check role
   if (role && !hasRole(role)) {
     hasAccess = false;
   }
@@ -95,8 +96,8 @@ export function PermissionGuard({
 }
 
 /**
- * 权限按钮组件
- * 自动根据权限禁用按钮
+ * Permission button component.
+ * Disables the button automatically based on permissions.
  */
 interface PermissionButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   permission?: string;
@@ -116,6 +117,7 @@ export function PermissionButton({
   ...props
 }: PermissionButtonProps) {
   const { hasPermission, hasRole, hasAnyPermission, hasAllPermissions } = usePermissions();
+  const st = useSmartText();
 
   let hasAccess = true;
 
@@ -139,7 +141,7 @@ export function PermissionButton({
     <button
       {...props}
       disabled={disabled || !hasAccess}
-      title={!hasAccess ? '无权限' : props.title}
+      title={!hasAccess ? st('$i18n:permission_guard.no_access', 'No permission') : props.title}
     >
       {children}
     </button>

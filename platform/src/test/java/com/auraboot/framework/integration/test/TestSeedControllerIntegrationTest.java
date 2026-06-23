@@ -437,6 +437,30 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
             JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
             long tenantId = body.get("tenantId").asLong();
 
+            long staleTenantId = tenantId + 100_000_000L;
+            jdbcTemplate.update("""
+                    UPDATE mt_showcase_all_fields
+                    SET tenant_id = ?
+                    WHERE tenant_id = ?
+                      AND pid = 'mobile_showcase_iot_gateway'
+                    """, staleTenantId, tenantId);
+
+            mockMvc.perform(post("/api/test/seed")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk());
+
+            Integer restoredRows = jdbcTemplate.queryForObject("""
+                    SELECT COUNT(*)
+                    FROM mt_showcase_all_fields
+                    WHERE tenant_id = ?
+                      AND pid = 'mobile_showcase_iot_gateway'
+                    """, Integer.class, tenantId);
+            Assertions.assertEquals(
+                    1,
+                    restoredRows,
+                    "seed must remove stale canonical mobile rows even when their globally unique pid is stranded under another tenant"
+            );
+
             jdbcTemplate.update("""
                     UPDATE mt_showcase_all_fields
                     SET sc_name = 'IoT Gateway Development Kit',
@@ -535,23 +559,26 @@ class TestSeedControllerIntegrationTest extends BaseIntegrationTest {
         JsonNode createBody = objectMapper.readTree(createResponse);
         Assertions.assertEquals("0", createBody.path("code").asText(),
                 "dynamic create must return ApiResponse OK; body=" + createResponse);
-        Assertions.assertEquals(createdOrderNo, createBody.path("data").path("e2et_order_no").asText(),
+        JsonNode createdData = createBody.path("data");
+        Assertions.assertEquals(createdOrderNo, createdData.path("e2et_order_no").asText(),
                 "dynamic create response must include the created order number; body=" + createResponse);
-        Assertions.assertTrue(createBody.path("data").path("id").isNumber(),
-                "dynamic create response must include a numeric id; body=" + createResponse);
-        long createdId = createBody.path("data").path("id").asLong();
-        Assertions.assertTrue(createdId > explicitId,
-                "dynamic create must allocate an id after the explicit high-id fixture; createdId=" +
-                        createdId + ", explicitId=" + explicitId);
+        Assertions.assertTrue(createdData.path("pid").isTextual() && !createdData.path("pid").asText().isBlank(),
+                "dynamic create public response must include a stable pid; body=" + createResponse);
+        Assertions.assertTrue(createdData.path("id").isMissingNode(),
+                "dynamic create public response must not expose numeric id; body=" + createResponse);
 
-        Integer persistedRows = jdbcTemplate.queryForObject("""
-                SELECT COUNT(*)
+        Long createdId = jdbcTemplate.queryForObject("""
+                SELECT id
                 FROM mt_e2et_order
                 WHERE tenant_id = ?
                   AND e2et_order_no = ?
-                """, Integer.class, tenantId, createdOrderNo);
-        Assertions.assertEquals(1, persistedRows,
+                  AND pid = ?
+                """, Long.class, tenantId, createdOrderNo, createdData.path("pid").asText());
+        Assertions.assertNotNull(createdId,
                 "dynamic create after seed repair must persist exactly one E2E order row");
+        Assertions.assertTrue(createdId > explicitId,
+                "dynamic create must allocate an internal id after the explicit high-id fixture; createdId=" +
+                        createdId + ", explicitId=" + explicitId);
     }
 
     private MockMvc authenticatedMvc(long tenantId, long userId) {

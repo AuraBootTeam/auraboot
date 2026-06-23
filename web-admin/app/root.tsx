@@ -26,7 +26,7 @@ import {
   isAnonymousRuntimeProfile,
   shouldBootCorePlugins,
   type RuntimeProfile,
-} from '~/framework/runtime';
+} from '@auraboot/runtime-kernel';
 import { useFederationStore } from '~/plugins/FederationManager';
 
 export interface RootLoaderData {

@@ -94,14 +94,21 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
         });
     }
 
+    @Override
+    public Optional<Long> incrementWithinCap(long tenantId, String modelCode, String recordId,
+                                              String counterCode, long delta, String capCode) {
+        return withTenant(tenantId, () -> dynamicDataService.incrementWithinCap(modelCode, recordId, counterCode, delta, capCode));
+    }
+
+    /** Synthetic user id for background-context writes. ab_data_change_log
+     * requires non-null changed_by; this matches DigestService convention. */
+    private static final long SYSTEM_USER_ID = 0L;
+
     /**
      * Bind {@code tenantId} to the current thread, run the supplier, restore
      * whatever tenant (if any) was on the thread before. Always restores,
      * even if the supplier throws.
      */
-    /** Synthetic user id for background-context writes. ab_data_change_log
-     * requires non-null changed_by; this matches DigestService convention. */
-    private static final long SYSTEM_USER_ID = 0L;
 
     private <T> T withTenant(long tenantId, Supplier<T> work) {
         boolean hadPriorContext = MetaContext.exists();

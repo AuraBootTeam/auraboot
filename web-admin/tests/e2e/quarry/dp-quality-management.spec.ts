@@ -52,7 +52,7 @@ test.describe('DP Quality Standard -- CRUD', () => {
     // Click create button
     const addBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建")',
+        '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建"):not(:has-text("今日"))',
       )
       .first();
     await addBtn.click();
@@ -279,7 +279,7 @@ test.describe('DP Quality Checkpoint -- CRUD & Lifecycle', () => {
     // Click create button
     const addBtn = page
       .locator(
-        '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建")',
+        '[data-testid="toolbar-btn-create"], button:has-text("New"), button:has-text("Create"), button:has-text("新建"):not(:has-text("今日"))',
       )
       .first();
     await addBtn.click();

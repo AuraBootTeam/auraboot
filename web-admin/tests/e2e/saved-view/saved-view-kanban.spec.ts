@@ -10,33 +10,20 @@
 import { test, expect } from '@playwright/test';
 import { ModelTestHelper } from '../../helpers/model-test-helper';
 import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
-import { uniqueId, todayStr, navigateToDynamicPage } from '../helpers';
+import { uniqueId, todayStr, navigateToDynamicPage, selectSavedViewByName } from '../helpers';
 
 const VIEW_NAME = 'E2E Kanban Board';
 const MODEL_CODE = 'e2et_order';
-const PAGE_KEY = 'e2et_order';
+const ROUTE_PAGE_KEY = 'e2et_order';
+const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
 
-/** Navigate to e2et-order page and select the kanban view via ViewManagePanel */
+/** Navigate to e2et-order page and select the kanban view via ViewSelector dropdown. */
 async function gotoAndSelectKanbanView(page: import('@playwright/test').Page) {
-  await navigateToDynamicPage(page, PAGE_KEY);
+  await navigateToDynamicPage(page, ROUTE_PAGE_KEY);
   // Wait for the list page content to be visible (table renders by default)
   await page.locator('table, [role="table"], [data-testid="dynamic-list"]').first().waitFor({ state: 'visible', timeout: 15000 });
 
-  // Click ViewSelector button to open ViewManagePanel (slide-out dialog)
-  const viewSelector = page.locator('button[aria-haspopup="listbox"]');
-  await viewSelector.click();
-  const panel = page.locator('[role="dialog"]');
-  await panel.waitFor({ state: 'visible', timeout: 5000 });
-  // Find and click the kanban view by name in the panel
-  const viewOption = panel.getByText(VIEW_NAME, { exact: false }).first();
-  await viewOption.waitFor({ state: 'visible', timeout: 5000 });
-  await viewOption.click();
-  // Close the panel after selecting the view (panel does not auto-close)
-  const closeBtn = panel.locator('button[aria-label="Close panel"]');
-  if (await closeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
-    await closeBtn.click();
-  }
-  await panel.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+  expect(await selectSavedViewByName(page, VIEW_NAME)).toBe(true);
 }
 
 test.describe('SavedView — KANBAN View', () => {
@@ -53,7 +40,7 @@ test.describe('SavedView — KANBAN View', () => {
 
     // Clean up leftover views from previous runs
     const existing = await page.request.get(
-      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
+      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${SAVED_VIEW_PAGE_KEY}`,
     );
     if (existing.ok()) {
       const body = await existing.json();
@@ -69,7 +56,7 @@ test.describe('SavedView — KANBAN View', () => {
       data: {
         name: VIEW_NAME,
         modelCode: MODEL_CODE,
-        pageKey: PAGE_KEY,
+        pageKey: SAVED_VIEW_PAGE_KEY,
         viewType: 'kanban',
         scope: 'global',
         viewConfig: {
@@ -124,7 +111,7 @@ test.describe('SavedView — KANBAN View', () => {
       await page.request.delete(`/api/views/${kanbanViewPid}`).catch(() => {});
     }
     const cleanup = await page.request.get(
-      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${PAGE_KEY}`,
+      `/api/views/accessible?modelCode=${MODEL_CODE}&pageKey=${SAVED_VIEW_PAGE_KEY}`,
     );
     if (cleanup.ok()) {
       const body = await cleanup.json();

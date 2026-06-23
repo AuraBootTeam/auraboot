@@ -33,13 +33,9 @@ vi.mock('~/framework/meta/components/subtable/DndSubTableWrapper', () => ({
 }));
 
 vi.mock('~/framework/meta/components/subtable/SortableSubTableRow', () => ({
-  SortableSubTableRow: ({
-    id,
-    children,
-  }: {
-    id: string;
-    children: React.ReactNode;
-  }) => <tr data-testid={`sortable-row-${id}`}>{children}</tr>,
+  SortableSubTableRow: ({ id, children }: { id: string; children: React.ReactNode }) => (
+    <tr data-testid={`sortable-row-${id}`}>{children}</tr>
+  ),
 }));
 
 vi.mock('~/framework/meta/components/subtable/InlineEditableCell', () => ({
@@ -85,17 +81,19 @@ describe('SubTableViewer', () => {
 
     render(
       <SubTableViewer
-        config={{
-          ...buildConfig(),
-          dataSource: {
-            kind: 'namedQuery',
-            queryCode: 'wd_leave_request_approval_history',
-            params: {
-              processInstanceId: '${wd_req_process_instance}',
-              applicantPid: '${record.wd_req_applicant}',
+        config={
+          {
+            ...buildConfig(),
+            dataSource: {
+              kind: 'namedQuery',
+              queryCode: 'wd_leave_request_approval_history',
+              params: {
+                processInstanceId: '${wd_req_process_instance}',
+                applicantPid: '${record.wd_req_applicant}',
+              },
             },
-          },
-        } as any}
+          } as any
+        }
         parentRecordId="record-1"
         parentRecordData={{
           wd_req_process_instance: '1776844530463',
@@ -133,16 +131,18 @@ describe('SubTableViewer', () => {
 
     render(
       <SubTableViewer
-        config={{
-          ...buildConfig(),
-          dataSource: {
-            kind: 'namedQuery',
-            queryCode: 'wd_leave_request_approval_history',
-            params: {
-              processInstanceId: '${missing_process_instance}',
+        config={
+          {
+            ...buildConfig(),
+            dataSource: {
+              kind: 'namedQuery',
+              queryCode: 'wd_leave_request_approval_history',
+              params: {
+                processInstanceId: '${missing_process_instance}',
+              },
             },
-          },
-        } as any}
+          } as any
+        }
         parentRecordId="record-1"
         parentRecordData={{}}
         t={(key) => (key === 'common.noData' ? 'No data' : key)}
@@ -167,18 +167,20 @@ describe('SubTableViewer', () => {
 
     render(
       <SubTableViewer
-        config={{
-          ...buildConfig(),
-          dataSource: {
-            type: 'api',
-            endpoint: '/api/dynamic/showcase_all_fields/list',
-            params: {
-              pageNum: '1',
-              pageSize: '5',
-              filters: '[{"fieldName":"pid","operator":"EQ","value":"${record.pid}"}]',
+        config={
+          {
+            ...buildConfig(),
+            dataSource: {
+              type: 'api',
+              endpoint: '/api/dynamic/showcase_all_fields/list',
+              params: {
+                pageNum: '1',
+                pageSize: '5',
+                filters: '[{"fieldName":"pid","operator":"EQ","value":"${record.pid}"}]',
+              },
             },
-          },
-        } as any}
+          } as any
+        }
         parentRecordId="record-1"
         parentRecordData={{ pid: '01KR8WEQZ0EXXF28KMA2B06YEN' }}
         t={(key) => (key === 'common.noData' ? 'No data' : key)}
@@ -191,8 +193,7 @@ describe('SubTableViewer', () => {
         params: {
           pageNum: '1',
           pageSize: '5',
-          filters:
-            '[{"fieldName":"pid","operator":"EQ","value":"01KR8WEQZ0EXXF28KMA2B06YEN"}]',
+          filters: '[{"fieldName":"pid","operator":"EQ","value":"01KR8WEQZ0EXXF28KMA2B06YEN"}]',
         },
         token: undefined,
       });
@@ -200,6 +201,84 @@ describe('SubTableViewer', () => {
 
     await expect(screen.findByTestId('sortable-row-row-1')).resolves.toBeInTheDocument();
     expect(screen.getByTestId('subtable-viewer').textContent).toContain('D5 DataSource Row');
+  });
+
+  it('uses child field metadata for raw-code-free labels and reference display values', async () => {
+    fetchResultMock.mockImplementation((endpoint: string) => {
+      if (endpoint === '/api/dynamic/inv_inbound_line/field-meta') {
+        return Promise.resolve({
+          code: '0',
+          data: [
+            {
+              code: 'inv_in_line_product_id',
+              displayName: '商品',
+              dataType: 'reference',
+              refTarget: {
+                targetModel: 'prod_product',
+                targetField: 'prod_name',
+              },
+            },
+            {
+              code: 'inv_in_line_qty',
+              displayName: '数量',
+              dataType: 'integer',
+            },
+          ],
+        });
+      }
+      if (endpoint === '/api/dynamic/inv_inbound_line/list') {
+        return Promise.resolve({
+          code: '0',
+          data: {
+            records: [
+              {
+                pid: 'line-1',
+                inv_in_line_receipt_id: 'receipt-1',
+                inv_in_line_product_id: 'prod-1',
+                inv_in_line_product_id_display: 'P-RAW-CODE-001',
+                inv_in_line_qty: 12,
+              },
+            ],
+          },
+        });
+      }
+      if (endpoint === '/api/dynamic/prod_product/list') {
+        return Promise.resolve({
+          code: '0',
+          data: {
+            records: [{ pid: 'prod-1', prod_name: '示范电源模块' }],
+          },
+        });
+      }
+      return Promise.resolve({ code: '0', data: { records: [] } });
+    });
+
+    render(
+      <SubTableViewer
+        config={{
+          childModel: 'inv_inbound_line',
+          parentField: 'inv_in_line_receipt_id',
+          columns: [
+            { field: 'inv_in_line_product_id', width: 250 },
+            { field: 'inv_in_line_qty', width: 120, align: 'right' },
+          ],
+          readOnly: true,
+        }}
+        parentRecordId="receipt-1"
+        t={(key) => (key === 'common.noData' ? 'No data' : key)}
+      />,
+    );
+
+    await expect(screen.findByTestId('sortable-row-line-1')).resolves.toBeInTheDocument();
+    await waitFor(() => {
+      const text = screen.getByTestId('subtable-viewer').textContent ?? '';
+      expect(text).toContain('商品');
+      expect(text).toContain('数量');
+      expect(text).toContain('示范电源模块');
+      expect(text).not.toContain('P-RAW-CODE-001');
+      expect(text).not.toContain('inv_in_line_product_id');
+      expect(text).not.toContain('prod-1');
+    });
   });
 
   it('renders configured empty state copy and action label', async () => {
@@ -236,6 +315,31 @@ describe('SubTableViewer', () => {
       '该客户尚未录入对接人，建议先添加主联系人。',
     );
     expect(screen.getByTestId('subtable-empty-action').textContent).toContain('添加联系人');
+  });
+
+  it('uses a Chinese fallback label for the add-line action when i18n is missing', async () => {
+    fetchResultMock.mockResolvedValue({
+      code: '0',
+      data: {
+        records: [],
+      },
+    });
+
+    render(
+      <SubTableViewer
+        config={{
+          ...buildConfig(),
+          commands: { create: 'crm:create_contact' },
+        }}
+        parentRecordId="record-1"
+        isEditable
+        t={(key) => (key === 'common.noData' ? '暂无数据' : key)}
+      />,
+    );
+
+    await expect(screen.findByTestId('subtable-empty-state')).resolves.toBeInTheDocument();
+    expect(screen.getByTestId('subtable-empty-action').textContent).toContain('添加明细');
+    expect(screen.getByTestId('subtable-empty-action').textContent).not.toContain('Add Line');
   });
 
   it('uses configured action label for the add-row button when rows already exist', async () => {
@@ -390,7 +494,7 @@ describe('SubTableViewer', () => {
         expect.objectContaining({
           method: 'post',
           params: expect.objectContaining({
-            targetRecordId: 'task-1',
+            targetRecordPid: 'task-1',
             operationType: 'UPDATE',
             payload: expect.objectContaining({
               pid: 'task-1',
@@ -427,7 +531,8 @@ describe('SubTableViewer', () => {
               code: 'open_quoteops',
               label: { 'zh-CN': '打开报价', 'en-US': 'Open Quote' },
               action: { type: 'navigate', to: '/p/qo_quote/view/{crm_qs_source_quote_id}' },
-              visibleWhen: "row.crm_qs_source_quote_id !== null && row.crm_qs_source_quote_id !== ''",
+              visibleWhen:
+                "row.crm_qs_source_quote_id !== null && row.crm_qs_source_quote_id !== ''",
             },
           ],
           columns: [

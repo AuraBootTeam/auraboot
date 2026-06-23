@@ -149,6 +149,9 @@ public class MybatisPlusConfig {
                     || "ab_idempotency_record".equals(tableName)      // Scheduler cleanup runs across all tenants
                     || "ab_idempotent_key".equals(tableName)          // Scheduler cleanup runs across all tenants
                     || "ab_export_task".equals(tableName)             // @Async export + scheduler cleanup across tenants
+                    || "ab_behavior_event".equals(tableName)          // MQ consumer/analytics paths pass tenant_id explicitly
+                    || "ab_behavior_quarantine".equals(tableName)     // MQ consumer/replay sink; tenant_id is carried explicitly
+                    || "ab_behavior_outcome_outbox".equals(tableName)  // Server outcome relay scans across tenants; tenant_id is explicit
                     || "ab_cloud_config".equals(tableName)            // PLATFORM-level rows have tenant_id=NULL
                     || "ab_invariant_definition".equals(tableName)    // InvariantAlarmWorker scans across all tenants in thread pool
                     || "ab_decision_definition".equals(tableName)     // DecisionAlarmWorker scans across all tenants in thread pool

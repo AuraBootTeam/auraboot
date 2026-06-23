@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useSearchParams } from 'react-router';
 import {
   ShieldCheckIcon,
   PlusIcon,
@@ -16,17 +15,18 @@ import { useFormSubmit } from '~/hooks/useFormSubmit';
 import { LoadingSpinner } from '~/ui/LoadingSpinner';
 import ConfirmDialog from '~/ui/ConfirmDialog';
 import RoleFormDialog from './permission/RoleFormDialog';
-import PermissionMatrixTab from './permission/PermissionMatrixTab';
+import CapabilityRoleEditor from './permission/capability/CapabilityRoleEditor';
 import RoleMemberTab from './permission/RoleMemberTab';
-import AssignmentTab from './permission/AssignmentTab';
 import type { Role } from './permission/types';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-type TopTabKey = 'roles' | 'assignments';
-type RightTabKey = 'permissions' | 'members';
+// v2 IA: capability is the primary, business-language grant surface (the raw matrix is folded into
+// the capability editor as a collapsed "advanced" escape hatch); the separate flat "assignments"
+// tab is retired. Two surfaces per role remain: capabilities (default) and members.
+type RightTabKey = 'capabilities' | 'members';
 
 const TYPE_BADGE: Record<string, string> = {
   SYSTEM: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
@@ -43,28 +43,14 @@ export default function PermissionManagement() {
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { handleSubmitResult } = useFormSubmit();
 
-  // URL-synced top tab
-  const [searchParams, setSearchParams] = useSearchParams();
-  const topTabParam = searchParams.get('tab');
-  const activeTopTab: TopTabKey = topTabParam === 'assignments' ? 'assignments' : 'roles';
-
-  const setActiveTopTab = useCallback(
-    (tab: TopTabKey) => {
-      const next = new URLSearchParams(searchParams);
-      next.set('tab', tab);
-      setSearchParams(next, { replace: true });
-    },
-    [searchParams, setSearchParams],
-  );
-
   // Role list state
   const [roles, setRoles] = useState<Role[]>([]);
   const [rolesLoading, setRolesLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRolePid, setSelectedRolePid] = useState<string | null>(null);
 
-  // Right panel tab state (inside Roles tab)
-  const [activeRightTab, setActiveRightTab] = useState<RightTabKey>('permissions');
+  // Right panel tab state — capability editor is the default surface.
+  const [activeRightTab, setActiveRightTab] = useState<RightTabKey>('capabilities');
 
   // Dialog state
   const [showRoleForm, setShowRoleForm] = useState(false);
@@ -351,16 +337,16 @@ export default function PermissionManagement() {
         <div className="border-b border-gray-200 px-6 dark:border-gray-700">
           <nav className="-mb-px flex space-x-6">
             <button
-              data-testid="permission-right-tab-permissions"
-              onClick={() => setActiveRightTab('permissions')}
+              data-testid="permission-right-tab-capabilities"
+              onClick={() => setActiveRightTab('capabilities')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                activeRightTab === 'permissions'
+                activeRightTab === 'capabilities'
                   ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400'
               }`}
             >
               <ShieldCheckIcon className="mr-1.5 h-4 w-4" />
-              {t('admin.permission.tab.permissions') || 'Permissions'}
+              {t('admin.permission.tab.capabilities') || 'Capabilities'}
             </button>
             <button
               data-testid="permission-right-tab-members"
@@ -389,16 +375,15 @@ export default function PermissionManagement() {
             </div>
           )}
 
-          {activeRightTab === 'permissions' && <PermissionMatrixTab rolePid={selectedRolePid} />}
+          {activeRightTab === 'capabilities' &&
+            (selectedRole ? (
+              <CapabilityRoleEditor rolePid={selectedRole.pid} />
+            ) : (
+              <div className="text-sm text-gray-400">{t('admin.permission.selectRole') || 'Select a role'}</div>
+            ))}
           {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} />}
         </div>
       </div>
-    </div>
-  );
-
-  const renderAssignmentsTab = () => (
-    <div className="flex-1 overflow-auto p-6">
-      <AssignmentTab preSelectedRole={selectedRole} />
     </div>
   );
 
@@ -423,41 +408,9 @@ export default function PermissionManagement() {
         </div>
       </div>
 
-      {/* Top-level tab bar */}
-      <div className="border-b border-gray-200 px-6 dark:border-gray-700">
-        <nav role="tablist" className="-mb-px flex space-x-6">
-          <button
-            role="tab"
-            data-testid="permission-tab-roles"
-            aria-selected={activeTopTab === 'roles'}
-            onClick={() => setActiveTopTab('roles')}
-            className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-              activeTopTab === 'roles'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400'
-            }`}
-          >
-            {t('admin.permission.tab.roles') || 'Roles'}
-          </button>
-          <button
-            role="tab"
-            data-testid="permission-tab-assignments"
-            aria-selected={activeTopTab === 'assignments'}
-            onClick={() => setActiveTopTab('assignments')}
-            className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-              activeTopTab === 'assignments'
-                ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400'
-            }`}
-          >
-            {t('admin.permission.tab.assignments') || 'Assignments'}
-          </button>
-        </nav>
-      </div>
-
-      {/* Tab content */}
-      <div className="flex flex-1 overflow-hidden">
-        {activeTopTab === 'roles' ? renderRolesTab() : renderAssignmentsTab()}
+      {/* Role management (role list + per-role capability / member editor) */}
+      <div className="flex flex-1 overflow-hidden" data-testid="permission-tab-roles">
+        {renderRolesTab()}
       </div>
 
       {/* Role Form Dialog */}

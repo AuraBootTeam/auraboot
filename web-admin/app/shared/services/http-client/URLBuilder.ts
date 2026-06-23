@@ -52,7 +52,7 @@ export function buildRequest(
   url: string;
   init: RequestInit;
 } {
-  const { method = 'get', params = {}, timeout, apiConfig, signal } = options;
+  const { method = 'get', params = {}, timeout, apiConfig, signal, keepalive } = options;
   const paramsAreArray = Array.isArray(params);
 
   // Step 1: Replace PathVariables and separate params
@@ -96,6 +96,11 @@ export function buildRequest(
       ...init.headers,
       'X-Timezone': context.timezone,
     };
+  }
+
+  // Step 5.2: Set keepalive flag (telemetry beacons must survive page unload)
+  if (keepalive) {
+    init.keepalive = true;
   }
 
   // Step 6: Add request body for non-GET requests. DELETE object params remain

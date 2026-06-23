@@ -22,7 +22,7 @@
       "y": 0,
       "w": 8,
       "h": 4,
-      "title": "最新商机",
+      "title": { "zh-CN": "最新商机", "en": "Latest Opportunities" },
       "config": {
         "modelCode": "crm_opportunity",
         "title": {
@@ -91,7 +91,7 @@
       "y": 4,
       "w": 8,
       "h": 4,
-      "title": "最新线索",
+      "title": { "zh-CN": "最新线索", "en": "Latest Leads" },
       "config": {
         "modelCode": "crm_lead",
         "title": {

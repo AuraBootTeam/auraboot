@@ -6,6 +6,7 @@
 import React, { useState } from 'react';
 import { Settings, FileJson, FileSpreadsheet, History } from 'lucide-react';
 import { useReportStore } from '../store/useReportStore';
+import { useReportDocument } from '../state/ReportDocumentProvider';
 import { DesignerToolbar } from '~/shared/designer/DesignerToolbar';
 import type { PageConfig, PageSize, PageOrientation } from '../types';
 
@@ -28,18 +29,17 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
   onToggleVersionHistory,
   versionCount,
 }) => {
+  const { isSaving, previewMode } = useReportStore();
   const {
     report,
     isDirty,
-    isSaving,
-    previewMode,
     updateTitle,
     updatePageSettings,
     canUndo,
     canRedo,
     undo,
     redo,
-  } = useReportStore();
+  } = useReportDocument();
   const [showSettings, setShowSettings] = useState(false);
 
   if (!report) return null;
@@ -64,8 +64,8 @@ export const ReportToolbar: React.FC<ReportToolbarProps> = ({
         onSave={onSave}
         onUndo={undo}
         onRedo={redo}
-        canUndo={canUndo()}
-        canRedo={canRedo()}
+        canUndo={canUndo}
+        canRedo={canRedo}
         testId="report-designer-toolbar"
       >
         <button

@@ -53,7 +53,7 @@ async function openCrmLeadCreateForm(page: Page): Promise<void> {
   // Now click the create button
   const createBtn = page
     .locator(
-      '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+      '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
     )
     .first();
   await createBtn.waitFor({ state: 'visible', timeout: 10_000 });
@@ -117,7 +117,7 @@ async function openContractCreateForm(page: Page): Promise<void> {
 
   const createBtn = page
     .locator(
-      '[data-testid="toolbar-btn-create"], button:has-text("新建"), button:has-text("Create")',
+      '[data-testid="toolbar-btn-create"], button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
     )
     .first();
   const hasCrateBtn = await createBtn.isVisible({ timeout: 8_000 }).catch(() => false);

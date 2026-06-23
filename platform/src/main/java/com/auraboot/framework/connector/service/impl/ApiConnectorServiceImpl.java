@@ -39,6 +39,28 @@ public class ApiConnectorServiceImpl implements ApiConnectorService {
     private static final int DEFAULT_READ_TIMEOUT_MS = 30_000;
 
     /**
+     * Secret field names inside the {@code auth_config} JSON blob that are
+     * encrypted individually so the surrounding JSON envelope stays valid JSONB.
+     * Covers all known auth types:
+     * <ul>
+     *   <li>BASIC      → password</li>
+     *   <li>API_KEY    → apiKey</li>
+     *   <li>BEARER     → token, bearerToken</li>
+     *   <li>OAUTH2     → clientSecret, secret</li>
+     * </ul>
+     * Package-private so unit tests in the same package can reference the canonical set.
+     */
+    static final Set<String> AUTH_SECRET_FIELDS = Set.of(
+            "password", "apiKey", "token", "bearerToken", "clientSecret", "secret"
+    );
+
+    /**
+     * Alias used by unit tests to reference {@link #AUTH_SECRET_FIELDS} without
+     * reflection. Same set; the extra name makes the intent explicit in test code.
+     */
+    static final Set<String> AUTH_SECRET_FIELDS_FOR_TEST = AUTH_SECRET_FIELDS;
+
+    /**
      * Shared pinned-IP HTTP client (P3-E DNS-rebinding hardening). JDK
      * {@link HttpClient} is what {@link PinnedHttpRequests} targets for
      * pinning the validated IP at connect time.
@@ -66,7 +88,7 @@ public class ApiConnectorServiceImpl implements ApiConnectorService {
         entity.setName(request.getName());
         entity.setBaseUrl(request.getBaseUrl());
         entity.setAuthType(request.getAuthType());
-        entity.setAuthConfig(fieldEncryptionService.encrypt(request.getAuthConfig()));
+        entity.setAuthConfig(fieldEncryptionService.encryptJsonFields(request.getAuthConfig(), AUTH_SECRET_FIELDS));
         entity.setDefaultHeaders(request.getDefaultHeaders());
         entity.setTimeoutMs(request.getTimeoutMs());
         entity.setRetryPolicy(request.getRetryPolicy());
@@ -106,7 +128,7 @@ public class ApiConnectorServiceImpl implements ApiConnectorService {
         existing.setName(request.getName());
         existing.setBaseUrl(request.getBaseUrl());
         existing.setAuthType(request.getAuthType());
-        existing.setAuthConfig(fieldEncryptionService.encrypt(request.getAuthConfig()));
+        existing.setAuthConfig(fieldEncryptionService.encryptJsonFields(request.getAuthConfig(), AUTH_SECRET_FIELDS));
         existing.setDefaultHeaders(request.getDefaultHeaders());
         existing.setTimeoutMs(request.getTimeoutMs());
         existing.setRetryPolicy(request.getRetryPolicy());
@@ -261,7 +283,10 @@ public class ApiConnectorServiceImpl implements ApiConnectorService {
         if (authType == null || "none".equals(authType)) return;
 
         try {
-            String decryptedConfig = fieldEncryptionService.decrypt(connector.getAuthConfig());
+            // Decrypt only the secret fields inside the JSON blob so the
+            // surrounding JSON structure (which is valid JSONB) is preserved.
+            String decryptedConfig = fieldEncryptionService.decryptJsonFields(
+                    connector.getAuthConfig(), AUTH_SECRET_FIELDS);
             Map<String, String> authConfig = decryptedConfig != null
                     ? objectMapper.readValue(decryptedConfig,
                     objectMapper.getTypeFactory().constructMapType(Map.class, String.class, String.class))

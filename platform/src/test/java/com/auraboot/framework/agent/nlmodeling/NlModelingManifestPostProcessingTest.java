@@ -366,6 +366,66 @@ class NlModelingManifestPostProcessingTest {
     }
 
     @Test
+    void buildManifest_rewritesPageFieldLabelsToI18nKeys() throws Exception {
+        // Live LLMs may emit V4 detail blocks with Chinese field labels. The strict import
+        // gate rejects hardcoded non-ASCII text in page labels, so the manifest builder must
+        // deterministically rewrite those labels to model field i18n keys before apply().
+        NlModelingResponse.Resources res = NlModelingResponse.Resources.builder()
+                .models(List.of(mutable("code", "device_inspection", "modelType", "entity")))
+                .fields(List.of(
+                        mutable("code", "device_no", "dataType", "string",
+                                "displayName:zh-CN", "设备编号", "displayName:en", "Device No"),
+                        mutable("code", "inspector", "dataType", "reference",
+                                "displayName:zh-CN", "点检人", "displayName:en", "Inspector")))
+                .pages(List.of(mutable(
+                        "pageKey", "device_inspection_detail",
+                        "kind", "detail",
+                        "schemaVersion", 4,
+                        "modelCode", "device_inspection",
+                        "layout", mutable("type", "stack"),
+                        "blocks", List.of(mutable(
+                                "id", "basic",
+                                "blockType", "description",
+                                "fields", List.of(
+                                        mutable("field", "device_no", "label", "设备编号"),
+                                        mutable("field", "inspector", "label", "点检人")))))))
+                .i18n(new ArrayList<>())
+                .build();
+
+        JsonNode manifest = mapper.readTree(service.buildPluginManifestJson("inspection", res));
+        JsonNode fields = manifest.get("pages").get(0).get("blocks").get(0).get("fields");
+        assertEquals("$i18n:model.device_inspection.device_no.label", fields.get(0).get("label").asText());
+        assertEquals("$i18n:model.device_inspection.inspector.label", fields.get(1).get("label").asText());
+
+        Set<String> i18nKeys = new HashSet<>();
+        manifest.get("i18nResources").forEach(n -> i18nKeys.add(n.get("key").asText()));
+        assertTrue(i18nKeys.contains("model.device_inspection.device_no.label"));
+        assertTrue(i18nKeys.contains("model.device_inspection.inspector.label"));
+    }
+
+    @Test
+    void conformPageTextToI18n_sanitizesRepeatedHyphenCodesWithoutRegexBacktracking() {
+        List<Map<String, Object>> blocks = List.of(mutable(
+                "code", "section-----客户-----summary",
+                "title", "客户概况"));
+        List<Map<String, Object>> pages = List.of(mutable(
+                "pageKey", "device_inspection_detail",
+                "modelCode", "device_inspection",
+                "title", "点检详情",
+                "blocks", blocks));
+        List<Map<String, Object>> i18n = new ArrayList<>();
+
+        NlModelingService.conformPageTextToI18n(pages, List.of(), i18n);
+
+        assertEquals("$i18n:page.device_inspection_detail.section-----_-----summary.title",
+                blocks.get(0).get("title"));
+        Set<String> i18nKeys = new HashSet<>();
+        i18n.forEach(entry -> i18nKeys.add((String) entry.get("key")));
+        assertTrue(i18nKeys.contains(
+                "page.device_inspection_detail.section-----_-----summary.title"));
+    }
+
+    @Test
     void humanize_splitsSnakeAndKebab() {
         assertEquals("Unit Price", NlModelingService.humanize("unit_price"));
         assertEquals("Order Line Item", NlModelingService.humanize("order-line-item"));
