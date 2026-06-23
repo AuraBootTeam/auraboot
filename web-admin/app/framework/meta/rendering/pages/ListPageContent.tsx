@@ -107,6 +107,7 @@ import {
   buildPersonalCopyName,
   canCopySavedView,
   getSavedViewPersistenceMode,
+  isImplicitSavedView,
   isSavedViewLockedPreset,
   mergeViewConfigPatch,
   summarizeViewConfigPatch,
@@ -123,6 +124,13 @@ interface DynamicEntity {
   [key: string]: any;
   id?: string;
   pid?: string;
+}
+
+interface ListLoadDataParams {
+  page?: number;
+  size?: number;
+  filters?: Record<string, any>;
+  sorts?: SortConfig[];
 }
 
 export interface ListReferenceDisplayConfig {
@@ -192,6 +200,74 @@ function normalizePresetFilters(filters: ViewFilterConfig[] | undefined): string
       }),
     )
     .sort();
+}
+
+export function viewConfigFiltersToRuntimeFilters(
+  filters: ViewFilterConfig[] | undefined,
+): Record<string, any> {
+  const restoredFilters: Record<string, any> = {};
+  for (const filter of filters ?? []) {
+    restoredFilters[filter.fieldCode] = filter.value;
+  }
+  return restoredFilters;
+}
+
+function clearTransientViewSearchParams(params: URLSearchParams): void {
+  for (const key of Array.from(params.keys())) {
+    if (
+      key === 'sort' ||
+      key === 'keyword' ||
+      key === 'filters' ||
+      key === 'preset' ||
+      key === 'pageNum' ||
+      key.startsWith('filter_')
+    ) {
+      params.delete(key);
+    }
+  }
+}
+
+function stableConfigString(value: unknown): string {
+  return JSON.stringify(value ?? null);
+}
+
+function isNoopViewConfigPatchEntry(
+  key: keyof ViewConfig,
+  value: unknown,
+  baseValue: unknown,
+): boolean {
+  if (value === undefined) {
+    return true;
+  }
+  if (key === 'sorts') {
+    return areSortsEqual(
+      Array.isArray(baseValue) ? (baseValue as SortConfig[]) : [],
+      Array.isArray(value) ? (value as SortConfig[]) : [],
+    );
+  }
+  if (Array.isArray(value)) {
+    const normalizedBase = Array.isArray(baseValue) ? baseValue : [];
+    return stableConfigString(value) === stableConfigString(normalizedBase);
+  }
+  return stableConfigString(value) === stableConfigString(baseValue);
+}
+
+export function pruneNoopViewConfigPatch(
+  base: ViewConfig | Partial<ViewConfig> | null | undefined,
+  patch: Partial<ViewConfig> | null | undefined,
+): Partial<ViewConfig> | null {
+  if (!patch) {
+    return null;
+  }
+
+  const pruned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch) as Array<[keyof ViewConfig, unknown]>) {
+    if (!isNoopViewConfigPatchEntry(key, value, base?.[key])) {
+      pruned[key] = value;
+    }
+  }
+
+  return Object.keys(pruned).length > 0 ? (pruned as Partial<ViewConfig>) : null;
 }
 
 export function isPersonalPresetSavedViewEdited(
@@ -873,7 +949,7 @@ function ListPageContentInner(props: PageContentProps) {
   // the debounced sort/filter effect so it doesn't re-fetch with empty filters.
   const skipFirstSortFilterEffectRef = useRef(false);
   const loadDataRef = useRef<
-    | ((params?: { page?: number; size?: number; filters?: Record<string, any> }) => Promise<void>)
+    | ((params?: ListLoadDataParams) => Promise<void>)
     | null
   >(null);
 
@@ -894,6 +970,7 @@ function ListPageContentInner(props: PageContentProps) {
     views: savedViews,
     currentView,
     selectView,
+    selectDefaultView,
     createView,
     updateView,
     deleteView: deleteSavedView,
@@ -1065,30 +1142,40 @@ function ListPageContentInner(props: PageContentProps) {
     setActiveViewType((currentView.viewType as ViewType) || 'table');
   }, [currentView?.pid, currentView?.viewType]);
 
-  // Apply SavedView viewConfig (pagination + filters) when view changes
-  useEffect(() => {
-    if (!currentView?.viewConfig) return;
-    const vc = currentView.viewConfig;
-    if (vc.pagination?.pageSize && vc.pagination.pageSize > 0) {
-      setPagination((prev: typeof pagination) => ({
-        ...prev,
-        pageSize: vc.pagination!.pageSize!,
-      }));
-    }
-    // Apply saved filters
-    if (vc.filters && vc.filters.length > 0) {
-      const restoredFilters: Record<string, any> = {};
-      vc.filters.forEach((f) => {
-        restoredFilters[f.fieldCode] = f.value;
-      });
+  const applyViewConfigToListState = useCallback(
+    (viewConfig: ViewConfig | undefined): Record<string, any> => {
+      const vc = viewConfig ?? {};
+      const restoredFilters = viewConfigFiltersToRuntimeFilters(vc.filters);
+
       pendingSavedViewFiltersRef.current = restoredFilters;
       setFilters(restoredFilters);
-    }
-    // Apply saved sorts
-    if (vc.sorts && vc.sorts.length > 0) {
-      setActiveSorts((prev) => (areSortsEqual(prev, vc.sorts) ? prev : vc.sorts!));
-    }
-  }, [currentView, setPagination, setFilters]);
+
+      const restoredSorts = vc.sorts ?? [];
+      setActiveSorts((prev) => (areSortsEqual(prev, restoredSorts) ? prev : restoredSorts));
+
+      if (vc.pagination?.pageSize && vc.pagination.pageSize > 0) {
+        setPagination((prev: typeof pagination) => ({
+          ...prev,
+          pageSize: vc.pagination!.pageSize!,
+        }));
+      }
+
+      return restoredFilters;
+    },
+    [setFilters, setPagination],
+  );
+
+  // Apply SavedView viewConfig (pagination + filters + sorts) when view changes.
+  // Empty config is meaningful: it restores the selected view back to a clean list state.
+  useEffect(() => {
+    if (!currentView) return;
+    applyViewConfigToListState(currentView.viewConfig);
+  }, [currentView?.pid, currentView?.viewConfig, applyViewConfigToListState]);
+
+  const clearKeyword = useCallback(() => {
+    keywordRef.current = '';
+    _setKeyword('');
+  }, []);
 
   // Dict data cache
   const dictDataCache = useRef<Map<string, DictItem[]>>(new Map());
@@ -1292,7 +1379,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Load data from API - P2-1 fix: use destructured pagination
   const loadData = useCallback(
-    async (params?: { page?: number; size?: number; filters?: Record<string, any> }) => {
+    async (params?: ListLoadDataParams) => {
       if (!schema || skipListData) {
         setData([]);
         setError(null);
@@ -1328,6 +1415,7 @@ function ListPageContentInner(props: PageContentProps) {
         const requestedPageNum = (params?.page ?? pagination.current - 1) + 1;
         const requestedPageSize = params?.size ?? pagination.pageSize;
         const requestedPageZeroBased = Math.max(requestedPageNum - 1, 0);
+        const requestedSorts = params?.sorts ?? activeSorts;
         const queryParams: Record<string, any> = {};
 
         if (isApiDatasource) {
@@ -1352,9 +1440,9 @@ function ListPageContentInner(props: PageContentProps) {
               }
             }
           }
-          if (activeSorts.length === 1) {
-            queryParams.sortField = activeSorts[0].fieldCode;
-            queryParams.sortOrder = activeSorts[0].direction;
+          if (requestedSorts.length === 1) {
+            queryParams.sortField = requestedSorts[0].fieldCode;
+            queryParams.sortOrder = requestedSorts[0].direction;
           } else if (tableBlock?.defaultSort?.field) {
             queryParams.sortField = tableBlock.defaultSort.field;
             queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
@@ -1368,13 +1456,13 @@ function ListPageContentInner(props: PageContentProps) {
           }
           // Use active sorts (user-driven) > SavedView sorts > DSL defaultSort
           // Multi-field sort: use sortFields param (field:direction pairs) when >1 sort
-          if (activeSorts.length > 1) {
-            queryParams.sortFields = activeSorts
+          if (requestedSorts.length > 1) {
+            queryParams.sortFields = requestedSorts
               .map((s) => `${s.fieldCode}:${s.direction}`)
               .join(',');
-          } else if (activeSorts.length === 1) {
-            queryParams.sortField = activeSorts[0].fieldCode;
-            queryParams.sortOrder = activeSorts[0].direction;
+          } else if (requestedSorts.length === 1) {
+            queryParams.sortField = requestedSorts[0].fieldCode;
+            queryParams.sortOrder = requestedSorts[0].direction;
           } else if (tableBlock?.defaultSort?.field) {
             queryParams.sortField = tableBlock.defaultSort.field;
             queryParams.sortOrder = String(tableBlock.defaultSort.order || 'desc').toLowerCase();
@@ -1461,12 +1549,48 @@ function ListPageContentInner(props: PageContentProps) {
     loadDataRef.current = loadData;
   }, [loadData]);
 
+  const handleSelectDefaultView = useCallback(() => {
+    const implicitDefaultView =
+      savedViews.find((view) => view.scope === 'personal' && isImplicitSavedView(view)) ?? null;
+    const implicitViewConfig = implicitDefaultView?.viewConfig;
+    const restoredFilters = applyViewConfigToListState(implicitViewConfig);
+    const restoredSorts = implicitViewConfig?.sorts ?? [];
+    setPendingViewConfig(null);
+    selectDefaultView();
+    setActiveQuickFilter(null);
+    clearKeyword();
+    setActiveViewType((implicitDefaultView?.viewType as ViewType) || 'table');
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.delete('view');
+        clearTransientViewSearchParams(p);
+        return p;
+      },
+      { replace: true },
+    );
+    loadData({ page: 0, size: pagination.pageSize, filters: restoredFilters, sorts: restoredSorts });
+  }, [
+    applyViewConfigToListState,
+    clearKeyword,
+    loadData,
+    pagination.pageSize,
+    savedViews,
+    selectDefaultView,
+    setSearchParams,
+  ]);
+
   useEffect(() => {
     const restoredFilters = pendingSavedViewFiltersRef.current;
     if (!restoredFilters) return;
     pendingSavedViewFiltersRef.current = null;
-    loadData({ page: 0, size: pagination.pageSize, filters: restoredFilters });
-  }, [currentView?.pid, loadData, pagination.pageSize]);
+    loadData({
+      page: 0,
+      size: pagination.pageSize,
+      filters: restoredFilters,
+      sorts: currentView?.viewConfig?.sorts ?? [],
+    });
+  }, [currentView?.pid, currentView?.viewConfig?.sorts, loadData, pagination.pageSize]);
 
   // Use unified action handler hook
   // IMPORTANT: Must be declared before any useEffect that references handleAction
@@ -1895,10 +2019,7 @@ function ListPageContentInner(props: PageContentProps) {
       );
     }
     if (viewsLoading) return;
-    if (
-      effectiveViewConfig?.sorts &&
-      areSortsEqual(effectiveViewConfig.sorts, activeSorts)
-    ) {
+    if (areSortsEqual(effectiveViewConfig?.sorts ?? [], activeSorts)) {
       return;
     }
     autoSave({ sorts: activeSorts });
@@ -2792,7 +2913,12 @@ function ListPageContentInner(props: PageContentProps) {
       try {
         const persistenceMode = getSavedViewPersistenceMode(currentView);
         if (persistenceMode === 'personal-persist' || persistenceMode === 'shared-draft') {
-          setPendingViewConfig((prev) => mergeViewConfigPatch(prev, config));
+          setPendingViewConfig((prev) =>
+            pruneNoopViewConfigPatch(
+              currentView?.viewConfig,
+              mergeViewConfigPatch(prev, config),
+            ),
+          );
         } else {
           // No explicit view — use backend auto-save (atomic upsert of implicit view)
           const view = await savedViewService.autoSave({
@@ -2852,6 +2978,41 @@ function ListPageContentInner(props: PageContentProps) {
     showSuccessToast,
     translateCommon,
     updateView,
+  ]);
+
+  const handleDiscardViewDraft = useCallback(() => {
+    if (!currentView) {
+      setPendingViewConfig(null);
+      return;
+    }
+
+    const restoredFilters = applyViewConfigToListState(currentView.viewConfig);
+    const restoredSorts = currentView.viewConfig?.sorts ?? [];
+    setPendingViewConfig(null);
+    setActiveQuickFilter(null);
+    clearKeyword();
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        p.set('view', currentView.pid);
+        clearTransientViewSearchParams(p);
+        return p;
+      },
+      { replace: true },
+    );
+    loadData({
+      page: 0,
+      size: currentView.viewConfig?.pagination?.pageSize ?? pagination.pageSize,
+      filters: restoredFilters,
+      sorts: restoredSorts,
+    });
+  }, [
+    applyViewConfigToListState,
+    clearKeyword,
+    currentView,
+    loadData,
+    pagination.pageSize,
+    setSearchParams,
   ]);
 
   const handleSaveDraftAsPersonalView = useCallback(async () => {
@@ -3663,7 +3824,7 @@ function ListPageContentInner(props: PageContentProps) {
               <button
                 type="button"
                 className="rounded px-2 py-1 text-amber-800 hover:bg-amber-100"
-                onClick={() => setPendingViewConfig(null)}
+                onClick={handleDiscardViewDraft}
                 data-testid={
                   hasPendingPersonalViewConfig
                     ? 'personal-view-discard-draft'
@@ -3688,6 +3849,7 @@ function ListPageContentInner(props: PageContentProps) {
             currentView={currentView}
             viewsLoading={viewsLoading}
             activeViewType={activeViewType}
+            onSelectDefaultView={handleSelectDefaultView}
             onSelectView={(pid) => {
               selectView(pid);
               // Sync view selection to URL

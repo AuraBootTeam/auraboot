@@ -14,15 +14,21 @@ function resolveSavedViewAction(
 }
 
 export function getSavedViewPersistenceMode(
-  view: Pick<SavedView, 'scope' | 'viewConfig'> | null | undefined,
+  view: Pick<SavedView, 'scope' | 'viewConfig' | 'isImplicit'> | null | undefined,
 ): SavedViewPersistenceMode {
-  if (!view) {
+  if (!view || isImplicitSavedView(view)) {
     return 'implicit-autosave';
   }
   if (isSavedViewLockedPreset(view)) {
     return 'shared-draft';
   }
   return view.scope === 'personal' ? 'personal-persist' : 'shared-draft';
+}
+
+export function isImplicitSavedView(
+  view: Pick<SavedView, 'isImplicit'> | null | undefined,
+): boolean {
+  return view?.isImplicit === true;
 }
 
 export function isSavedViewLockedPreset(
@@ -46,9 +52,9 @@ export function canCopySavedView(
 }
 
 export function canManageSavedView(
-  view: Pick<SavedView, 'viewConfig' | 'actions'> | null | undefined,
+  view: Pick<SavedView, 'viewConfig' | 'actions' | 'isImplicit'> | null | undefined,
 ): boolean {
-  if (isSavedViewLockedPreset(view)) {
+  if (isImplicitSavedView(view) || isSavedViewLockedPreset(view)) {
     return false;
   }
   const actionAllowed = resolveSavedViewAction(view, 'manage');
@@ -56,9 +62,9 @@ export function canManageSavedView(
 }
 
 export function canSetDefaultSavedView(
-  view: Pick<SavedView, 'viewConfig' | 'actions' | 'isDefault'> | null | undefined,
+  view: Pick<SavedView, 'viewConfig' | 'actions' | 'isDefault' | 'isImplicit'> | null | undefined,
 ): boolean {
-  if (!view || view.isDefault || isSavedViewLockedPreset(view)) {
+  if (!view || view.isDefault || isImplicitSavedView(view) || isSavedViewLockedPreset(view)) {
     return false;
   }
   const actionAllowed = resolveSavedViewAction(view, 'setDefault');
@@ -66,9 +72,9 @@ export function canSetDefaultSavedView(
 }
 
 export function canDeleteSavedView(
-  view: Pick<SavedView, 'viewConfig' | 'actions' | 'scope'> | null | undefined,
+  view: Pick<SavedView, 'viewConfig' | 'actions' | 'scope' | 'isImplicit'> | null | undefined,
 ): boolean {
-  if (!view || isSavedViewLockedPreset(view)) {
+  if (!view || isImplicitSavedView(view) || isSavedViewLockedPreset(view)) {
     return false;
   }
   const actionAllowed = resolveSavedViewAction(view, 'delete');
@@ -76,9 +82,9 @@ export function canDeleteSavedView(
 }
 
 export function canShareSavedView(
-  view: Pick<SavedView, 'viewConfig' | 'actions'> | null | undefined,
+  view: Pick<SavedView, 'viewConfig' | 'actions' | 'isImplicit'> | null | undefined,
 ): boolean {
-  if (!view || isSavedViewLockedPreset(view)) {
+  if (!view || isImplicitSavedView(view) || isSavedViewLockedPreset(view)) {
     return false;
   }
   const actionAllowed = resolveSavedViewAction(view, 'share');

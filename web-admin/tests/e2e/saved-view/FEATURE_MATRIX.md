@@ -19,9 +19,11 @@ This file separates user-path browser evidence from API/setup evidence. A passin
 | Feature point | User path evidence | Backend/API evidence | Current specs | Status |
 | --- | --- | --- | --- | --- |
 | Selector entry beside page title | Browser opens list page, uses `view-selector-trigger`, switches visible views | Accessible/default views API used as setup/readback | `saved-view-management.spec.ts`, `saved-view-table.spec.ts`, `saved-view-quick-filters.spec.ts` | Covered |
+| Default view baseline | Selector exposes a fixed "默认视图" entry; implicit default views are hidden from normal personal view rows and management actions | Implicit views use `implicit-autosave` persistence and are excluded from manage/default/delete/share actions | `ViewSelector.test.tsx`, `savedViewPersistence.test.ts`, `saved-view-management.spec.ts` `SV-PER-001` | Covered |
 | Create personal view | Browser create/manage path creates named view and sees it in selector | `/api/views` readback validates persisted config | `saved-view-management.spec.ts` | Covered |
 | Manage view metadata | Browser rename/delete/default/duplicate paths drive visible controls | API readback validates saved metadata | `saved-view-management.spec.ts` `SV-PER-002` | Covered for Personal-only management actions; API remains readback/setup evidence only |
 | Personal dirty/save state | Browser changes personal view settings, sees dirty state, saves current personal view or saves as a new personal view | `/api/views/{pid}` update/readback validates persisted personal config | `saved-view-management.spec.ts` `SV-PER-003`, screenshot `04-personal-draft-save.png` | Covered |
+| Personal discard restores saved state | Browser opens a personal view with transient URL sort, sees dirty banner, clicks discard, URL sort is removed and banner stays gone after reload | `/api/views/{pid}` readback confirms saved `sorts: []` was not polluted by the transient URL sort | `saved-view-management.spec.ts` `SV-PER-003b` | Covered |
 | Shared draft and admin shared save | Historical viewer/admin browser paths exercise local draft/copy/save confirmation | API write interception verifies shared save boundary | `saved-view-shared-draft-actions.spec.ts` | Out of current scope; roadmap evidence only |
 | Team/global collaborator productization | Historical browser/component/backend evidence exists | Backend validates supported principal/permission and readback confirms collaborator ACL | `saved-view-follow-up-golden.spec.ts` `SV-FU-001`, `ViewManagePanel.test.tsx`, `SavedViewServiceImplTest` | Out of current scope; roadmap evidence only |
 | Audit panel | Historical shared-view audit evidence exists | SavedView audit DTO hides internal ids; service audit metadata summary records collaborator changes | `saved-view-follow-up-golden.spec.ts` `SV-FU-001`, `ViewManagePanel.test.tsx`, backend controller/service tests | Out of current scope; roadmap evidence only |
@@ -71,7 +73,7 @@ All screenshots below are current release evidence for the Personal-only baselin
 | Redline | Current treatment |
 | --- | --- |
 | `saved-view-timeline.spec.ts` direct `/p/e2et_order` route checks | Removed in WP2; targeted timeline render checks now enter via sidebar link from `/` |
-| Historical direct `/p/` route checks in older specs | Still present in table/form/system/lookup/row-height/button-field specs; treat as smoke or historical debt until replaced with menu/sidebar paths. New follow-up golden specs use sidebar entry for feature flows |
+| Historical direct `/p/` route checks in older specs | Still present in table/form/system/lookup/row-height/button-field specs; treat as smoke or historical debt until replaced with menu/sidebar paths. New follow-up golden specs use sidebar entry for feature flows. The only intentional direct route in the current personal management spec is `SV-PER-003b`, because the product contract is specifically about a shared URL carrying `view` plus transient `sort` |
 | API-heavy setup/readback | Allowed as setup/contract evidence only. It must not be counted as user-flow evidence unless paired with browser interaction |
 | `test.skip` in lookup/comment historical specs | Fixture-dependent skips; do not count skipped rows as coverage |
 | `test.skip` in AI recommendation specs | Deferred product idea; must have backlog before becoming a completion requirement |
@@ -108,9 +110,10 @@ Target files audited for the current Personal-only claim:
 
 Audit result:
 
-- Core Personal-only redline grep found no `test.skip`, `test.fixme`, `skip(true)`, `waitForTimeout`, direct `/p/` feature navigation, `timeout > 5000`, `retries:`, `toBeLessThanOrEqual`, `toBeGreaterThanOrEqual`, `threshold`, or `baseline` in:
+- Core Personal-only redline grep found no `test.skip`, `test.fixme`, `skip(true)`, `waitForTimeout`, `timeout > 5000`, `retries:`, `toBeLessThanOrEqual`, `toBeGreaterThanOrEqual`, `threshold`, or `baseline` in:
   - `saved-view-management.spec.ts`
   - `showcase/view-management.spec.ts`
+- Direct `/p/` navigation exception: `saved-view-management.spec.ts` contains one intentional `page.goto('/p/e2et_order?view=...&sort=...')` in `SV-PER-003b`. This is not used as a generic feature-flow proof; it is the URL-contract regression that verifies "放弃变更" clears transient sort state from a shared link.
 - Core request/browser interaction split:
   - `saved-view-management.spec.ts`: `ui=31`, `request=2`. API calls are setup/readback/cleanup; user actions are browser-driven.
   - `showcase/view-management.spec.ts`: `ui=1`, `request=4`. This is retained as a smoke guard only; the full Personal-only proof is `saved-view-management.spec.ts`.

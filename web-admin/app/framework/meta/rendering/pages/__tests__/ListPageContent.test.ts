@@ -8,6 +8,7 @@ import {
   getSavedQuickFilterPresetKeys,
   findPersonalPresetSavedView,
   isPersonalPresetSavedViewEdited,
+  pruneNoopViewConfigPatch,
   resolveColumnCapabilityDataType,
   resolveFieldMetaDataType,
   resolveFieldMetaDisplayName,
@@ -190,6 +191,35 @@ describe('quick filter preset saved-view lifecycle helpers', () => {
         { now },
       ),
     ).toBe(true);
+  });
+});
+
+describe('pruneNoopViewConfigPatch', () => {
+  it('removes empty sort patches that match the saved view state', () => {
+    expect(
+      pruneNoopViewConfigPatch(
+        { rowHeight: 'medium', sorts: [] },
+        { sorts: [] },
+      ),
+    ).toBeNull();
+  });
+
+  it('keeps empty sort patches when they clear a saved sort', () => {
+    expect(
+      pruneNoopViewConfigPatch(
+        { sorts: [{ fieldCode: 'amount', direction: 'desc' }] },
+        { sorts: [] },
+      ),
+    ).toEqual({ sorts: [] });
+  });
+
+  it('keeps other changed draft sections while pruning no-op sorts', () => {
+    expect(
+      pruneNoopViewConfigPatch(
+        { rowHeight: 'medium', sorts: [] },
+        { rowHeight: 'tall', sorts: [] },
+      ),
+    ).toEqual({ rowHeight: 'tall' });
   });
 });
 
