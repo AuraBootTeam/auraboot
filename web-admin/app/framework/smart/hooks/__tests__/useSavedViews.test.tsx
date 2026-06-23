@@ -10,6 +10,7 @@ vi.mock('~/shared/services/savedViewService', () => ({
     deleteView: vi.fn(),
     setDefaultView: vi.fn(),
     duplicateView: vi.fn(),
+    copyToPersonal: vi.fn(),
   },
 }));
 
@@ -110,6 +111,26 @@ describe('useSavedViews', () => {
 
     act(() => result.current.selectView('v2'));
     expect(result.current.currentView?.pid).toBe('v2');
+  });
+
+  it('reload preserves the selected view when it is still accessible', async () => {
+    const defaultView = makeView({ pid: 'v1', isDefault: true });
+    const treeView = makeView({ pid: 'tree1', name: 'Tree View', viewType: 'tree' });
+    mockService.getAccessibleViews.mockResolvedValue([defaultView, treeView]);
+    mockService.getDefaultView.mockResolvedValue(defaultView);
+
+    const { result } = renderHook(() => useSavedViews({ modelCode: 'order' }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    act(() => result.current.selectView('tree1'));
+    expect(result.current.currentView?.pid).toBe('tree1');
+
+    await act(async () => {
+      await result.current.reload();
+    });
+
+    expect(result.current.currentView?.pid).toBe('tree1');
+    expect(result.current.currentView?.viewType).toBe('tree');
   });
 
   it('selectView does nothing for unknown pid', async () => {
@@ -229,6 +250,37 @@ describe('useSavedViews', () => {
 
     expect(result.current.views).toHaveLength(2);
     expect(result.current.views[1].pid).toBe('v_dup');
+  });
+
+  it('copyToPersonal adds a personal copy and selects it', async () => {
+    const teamView = makeView({ pid: 'team1', name: 'Team View', scope: 'team' });
+    const personalCopy = makeView({
+      pid: 'personal_copy',
+      name: 'My Team View',
+      scope: 'personal',
+      viewConfig: { filters: [] } as any,
+    });
+    mockService.getAccessibleViews.mockResolvedValue([teamView]);
+    mockService.getDefaultView.mockResolvedValue(null);
+    mockService.copyToPersonal.mockResolvedValue(personalCopy);
+
+    const { result } = renderHook(() => useSavedViews({ modelCode: 'order' }));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    await act(async () => {
+      await result.current.copyToPersonal('team1', {
+        name: 'My Team View',
+        viewConfig: { filters: [] } as any,
+      });
+    });
+
+    expect(mockService.copyToPersonal).toHaveBeenCalledWith('team1', {
+      name: 'My Team View',
+      viewConfig: { filters: [] },
+    });
+    expect(result.current.views).toHaveLength(2);
+    expect(result.current.currentView?.pid).toBe('personal_copy');
+    expect(result.current.currentView?.scope).toBe('personal');
   });
 
   it('groupedViews groups by scope', async () => {

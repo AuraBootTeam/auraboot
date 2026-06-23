@@ -1,14 +1,18 @@
 package com.auraboot.framework.tenant.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.time.Instant;
 
 @Data
 public class MemberResponse {
+    @JsonIgnore
     private Long id;
     private String pid;
+    @JsonIgnore
     private Long userId;
+    @JsonIgnore
     private Long tenantId;
     private String status;
     private Instant joinDate;
@@ -23,6 +27,7 @@ public class MemberResponse {
     
     @Data
     public static class UserInfo {
+        @JsonIgnore
         private Long id;
         private String pid;
         private String username;

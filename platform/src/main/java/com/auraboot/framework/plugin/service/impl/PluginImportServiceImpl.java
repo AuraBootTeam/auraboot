@@ -974,7 +974,7 @@ public class PluginImportServiceImpl implements PluginImportService {
             for (SavedViewDefinitionDTO savedView : manifest.getSavedViews()) {
                 List<SavedView> existingViews = savedViewMapper.findGlobalViews(savedView.getModelCode(), savedView.getPageKey());
                 boolean exists = existingViews.stream()
-                        .anyMatch(v -> v.getName().equals(savedView.getName()) && v.getViewType().equals(savedView.getViewType()));
+                        .anyMatch(v -> matchesPluginSavedView(savedView, v));
                 result.addChange(ResourceType.SAVED_VIEW, ImportPreviewResult.ResourceChange.builder()
                         .resourceType(ResourceType.SAVED_VIEW)
                         .resourceCode(savedView.getUniqueKey())
@@ -2314,18 +2314,21 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
 
-            // Check if a view with same name+modelCode+viewType+scope already exists
+            // Check if a plugin preset already exists. Stable viewKey takes precedence
+            // so plugin upgrades can rename presets without creating duplicates.
             List<SavedView> existing = savedViewMapper.findGlobalViews(dto.getModelCode(), pageKey);
             SavedView existingView = existing.stream()
-                    .filter(v -> v.getName().equals(dto.getName()) && v.getViewType().equals(dto.getViewType()))
+                    .filter(v -> matchesPluginSavedView(dto, v))
                     .findFirst()
                     .orElse(null);
 
             if (existingView != null) {
                 // Update existing view config
-                ViewConfig viewConfig = objectMapper.convertValue(dto.getViewConfig(), ViewConfig.class);
+                ViewConfig viewConfig = buildPluginSavedViewConfig(dto);
+                existingView.setName(dto.getName());
                 existingView.setViewConfig(viewConfig);
                 existingView.setDescription(dto.getDescription());
+                existingView.setViewType(dto.getViewType());
                 existingView.setUpdatedAt(Instant.now());
                 if (dto.getIsDefault() != null) existingView.setIsDefault(dto.getIsDefault());
                 if (dto.getSortOrder() != null) existingView.setSortOrder(dto.getSortOrder());
@@ -2343,7 +2346,7 @@ public class PluginImportServiceImpl implements PluginImportService {
                 savedView.setPageKey(pageKey);
                 savedView.setScope(scope);
                 savedView.setViewType(dto.getViewType());
-                ViewConfig viewConfig = objectMapper.convertValue(dto.getViewConfig(), ViewConfig.class);
+                ViewConfig viewConfig = buildPluginSavedViewConfig(dto);
                 savedView.setViewConfig(viewConfig);
                 savedView.setIsDefault(dto.getIsDefault() != null ? dto.getIsDefault() : false);
                 savedView.setSortOrder(dto.getSortOrder() != null ? dto.getSortOrder() : 0);
@@ -2355,6 +2358,83 @@ public class PluginImportServiceImpl implements PluginImportService {
                 log.info("Created saved view: {} ({})", logSafe(dto.getName()), logSafe(dto.getViewType()));
             }
         }
+    }
+
+    private boolean matchesPluginSavedView(SavedViewDefinitionDTO dto, SavedView savedView) {
+        if (dto == null || savedView == null) {
+            return false;
+        }
+
+        String incomingKey = resolvePluginSavedViewKey(dto);
+        String existingKey = getSavedViewMetaKey(savedView);
+        if (!isBlank(incomingKey) && !isBlank(existingKey)) {
+            return Objects.equals(incomingKey, existingKey);
+        }
+
+        return Objects.equals(savedView.getName(), dto.getName())
+                && Objects.equals(savedView.getViewType(), dto.getViewType());
+    }
+
+    private ViewConfig buildPluginSavedViewConfig(SavedViewDefinitionDTO dto) {
+        Map<String, Object> rawConfig = dto.getViewConfig() != null ? dto.getViewConfig() : Collections.emptyMap();
+        ViewConfig viewConfig = objectMapper.convertValue(rawConfig, ViewConfig.class);
+        if (viewConfig == null) {
+            viewConfig = new ViewConfig();
+        }
+
+        ViewConfig.Meta incomingMeta = viewConfig.getMeta();
+        viewConfig.setMeta(ViewConfig.Meta.builder()
+                .viewKey(resolvePluginSavedViewKey(dto))
+                .managedBy(firstNonBlank(dto.getManagedBy(), incomingMeta != null ? incomingMeta.getManagedBy() : null, "plugin"))
+                .locked(firstNonNull(dto.getLocked(), incomingMeta != null ? incomingMeta.getLocked() : null, true))
+                .allowUserCopy(firstNonNull(dto.getAllowUserCopy(), incomingMeta != null ? incomingMeta.getAllowUserCopy() : null, true))
+                .allowUserOverride(firstNonNull(dto.getAllowUserOverride(), incomingMeta != null ? incomingMeta.getAllowUserOverride() : null, true))
+                .originViewPid(incomingMeta != null ? incomingMeta.getOriginViewPid() : null)
+                .capabilityStatus(incomingMeta != null ? incomingMeta.getCapabilityStatus() : null)
+                .build());
+        return viewConfig;
+    }
+
+    private String resolvePluginSavedViewKey(SavedViewDefinitionDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        if (!isBlank(dto.getViewKey())) {
+            return dto.getViewKey().trim();
+        }
+        return dto.getUniqueKey();
+    }
+
+    private String getSavedViewMetaKey(SavedView savedView) {
+        if (savedView == null || savedView.getViewConfig() == null || savedView.getViewConfig().getMeta() == null) {
+            return null;
+        }
+        return savedView.getViewConfig().getMeta().getViewKey();
+    }
+
+    @SafeVarargs
+    private final <T> T firstNonNull(T... values) {
+        if (values == null) {
+            return null;
+        }
+        for (T value : values) {
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (!isBlank(value)) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     /**

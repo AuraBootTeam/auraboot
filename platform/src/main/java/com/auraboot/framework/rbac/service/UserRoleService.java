@@ -1,6 +1,7 @@
 package com.auraboot.framework.rbac.service;
 
 import com.auraboot.framework.rbac.entity.UserRole;
+import com.auraboot.framework.rbac.dto.UserRoleResponse;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 
@@ -17,6 +18,16 @@ public interface UserRoleService extends IService<UserRole> {
      * Assign roles to a member
      */
     boolean assignRolesToMember(Long memberId, List<Long> roleIds, Long tenantId, Long operatorId);
+
+    /**
+     * Assign roles to a member using public member and role PIDs.
+     */
+    boolean assignRolesToMemberByRolePids(String memberPid, List<String> rolePids, Long tenantId, Long operatorId);
+
+    /**
+     * Assign roles to a member using a public member PID and stable role codes.
+     */
+    boolean assignRolesToMemberByRoleCodes(String memberPid, List<String> roleCodes, Long tenantId, Long operatorId);
 
     /**
      * Remove roles from a member
@@ -52,6 +63,19 @@ public interface UserRoleService extends IService<UserRole> {
      * Paginated query
      */
     Page<UserRole> findUserRoles(int pageNum, int pageSize, Long memberId, Long roleId, Long tenantId, Long storeId);
+
+    /**
+     * Paginated public query. Response uses PIDs only.
+     */
+    Page<UserRoleResponse> findUserRoleResponses(
+            int pageNum,
+            int pageSize,
+            String memberPid,
+            String rolePid,
+            Long legacyMemberId,
+            Long legacyRoleId,
+            Long tenantId,
+            Long storeId);
 
     /**
      * Count roles for a member
@@ -92,6 +116,21 @@ public interface UserRoleService extends IService<UserRole> {
      * Get role IDs for a member in a tenant
      */
     List<Long> getRoleIdsByMemberIdAndTenantId(Long memberId, Long tenantId);
+
+    /**
+     * Get role PIDs for a member PID in a tenant.
+     */
+    List<String> getRolePidsByMemberPidAndTenantId(String memberPid, Long tenantId);
+
+    /**
+     * Get member-role assignments for a role PID in a tenant.
+     */
+    List<UserRoleResponse> findRoleMemberResponsesByRolePid(String rolePid, Long tenantId);
+
+    /**
+     * Validate member roles using a public member PID.
+     */
+    Map<String, Object> validateMemberRolesByPid(String memberPid, Long tenantId);
 
     /**
      * Check if a role is in use
