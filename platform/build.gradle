@@ -281,7 +281,7 @@ dependencies {
     // Pulled in transitively only when the iot-tdengine bean profile is
     // active; HikariCP + spring-jdbc come from spring-boot-starter-jdbc
     // already on the classpath.
-    implementation 'com.taosdata.jdbc:taos-jdbcdriver:3.3.3'
+    implementation 'com.taosdata.jdbc:taos-jdbcdriver:3.8.4'
 
     // Micrometer Prometheus registry for metrics export
     implementation 'io.micrometer:micrometer-registry-prometheus'
