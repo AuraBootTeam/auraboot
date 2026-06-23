@@ -45,6 +45,20 @@ public class NamedQueryCreateRequest {
     private String description;
 
     /**
+     * Protected business resource used for DataScope calculation.
+     */
+    @Pattern(regexp = "^[a-zA-Z][a-zA-Z0-9_]*$", message = "资源编码必须以字母开头，只能包含字母、数字和下划线")
+    @Size(max = 100, message = "资源编码长度不能超过100个字符")
+    private String resourceCode;
+
+    /**
+     * Protected action used with resourceCode.
+     */
+    @Pattern(regexp = "^[a-zA-Z][a-zA-Z0-9_]*$", message = "动作编码必须以字母开头，只能包含字母、数字和下划线")
+    @Size(max = 100, message = "动作编码长度不能超过100个字符")
+    private String actionCode;
+
+    /**
      * FROM子句SQL — required unless connector_pid is set
      */
     @Size(max = 5000, message = "FROM子句SQL长度不能超过5000个字符")

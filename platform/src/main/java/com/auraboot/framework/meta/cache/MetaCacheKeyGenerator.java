@@ -111,6 +111,25 @@ public class MetaCacheKeyGenerator implements KeyGenerator {
         }
         return NO_CONTEXT;
     }
+
+    /**
+     * Cache suffix for results whose visibility depends on the current subject's
+     * data scope. Includes tenant, user, member, and bypass state so row-scoped
+     * query results cannot be reused across subjects in the same tenant.
+     */
+    public static String getDataAccessContextSuffix() {
+        if (MetaContext.exists()) {
+            Long tenantId = MetaContext.getCurrentTenantId();
+            Long userId = MetaContext.getCurrentUserId();
+            Long memberId = MetaContext.getCurrentMemberId();
+            return String.format("%s:%s:%s:%s",
+                    tenantId != null ? tenantId : DEFAULT_VALUE,
+                    userId != null ? userId : DEFAULT_VALUE,
+                    memberId != null ? memberId : DEFAULT_VALUE,
+                    MetaContext.isDataPermissionBypassed() ? "bypass" : "scoped");
+        }
+        return NO_CONTEXT;
+    }
     
     /**
      * 检查MetaContext是否存在且有效

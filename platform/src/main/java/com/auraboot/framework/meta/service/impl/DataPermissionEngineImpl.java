@@ -103,6 +103,11 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     @Cacheable(value = "dataPermissionRowFilter",
             key = "#tenantId + ':' + #modelCode + ':' + #userId")
     public String buildRowFilter(Long tenantId, String modelCode, Long userId) {
+        return buildRowFilter(tenantId, modelCode, "read", userId);
+    }
+
+    @Override
+    public String buildRowFilter(Long tenantId, String modelCode, String actionCode, Long userId) {
         // Phase 2: findEffectivePolicies joins ab_user_role on member_id.
         // Get memberId from MetaContext; fall back to userId for backward compat (scheduled tasks etc.)
         Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
@@ -115,7 +120,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         String policyFilter = buildPolicyRowFilter(tenantId, modelCode, userId, memberId);
 
         // 2. Build data scope filter (new ab_role_data_scope)
-        String dataScopeFilter = buildDataScopeFilter(memberId, modelCode);
+        String dataScopeFilter = buildDataScopeFilter(memberId, modelCode, actionCode);
 
         // 3. Combine: both are AND conditions, concatenate them
         StringBuilder result = new StringBuilder();
@@ -201,12 +206,18 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         }
 
         return policyFiltered.stream()
-                .filter(record -> dataScopeAllows(memberId, modelCode, record))
+                .filter(record -> dataScopeAllows(memberId, modelCode, "read", record))
                 .collect(Collectors.toList());
     }
 
     @Override
     public boolean canAccessRecord(Long tenantId, String modelCode, Long userId,
+                                   Map<String, Object> record) {
+        return canAccessRecord(tenantId, modelCode, "read", userId, record);
+    }
+
+    @Override
+    public boolean canAccessRecord(Long tenantId, String modelCode, String actionCode, Long userId,
                                    Map<String, Object> record) {
         if (record == null) {
             return false;
@@ -232,7 +243,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             }
         }
 
-        return dataScopeAllows(memberId, modelCode, record);
+        return dataScopeAllows(memberId, modelCode, actionCode, record);
     }
 
     // ==================== Column-Level Masking ====================
@@ -320,8 +331,9 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
      * @param modelCode model code (used as resource code)
      * @return SQL fragment like "AND created_by = 123" or empty string
      */
-    private String buildDataScopeFilter(Long memberId, String modelCode) {
-        DataScopeCondition condition = dataScopeEvaluator.getCondition(memberId, modelCode, "read");
+    private String buildDataScopeFilter(Long memberId, String modelCode, String actionCode) {
+        String resolvedAction = actionCode != null && !actionCode.isBlank() ? actionCode : "read";
+        DataScopeCondition condition = dataScopeEvaluator.getCondition(memberId, modelCode, resolvedAction);
         String sql = dataScopeConditionToSql(condition);
         if (sql != null && !sql.isBlank()) {
             return "AND " + sql;
@@ -332,8 +344,9 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
     /**
      * Apply the role data-scope guard to in-memory record checks.
      */
-    private boolean dataScopeAllows(Long memberId, String modelCode, Map<String, Object> record) {
-        EvaluationStep step = dataScopeEvaluator.evaluate(memberId, modelCode, "read", record);
+    private boolean dataScopeAllows(Long memberId, String modelCode, String actionCode, Map<String, Object> record) {
+        String resolvedAction = actionCode != null && !actionCode.isBlank() ? actionCode : "read";
+        EvaluationStep step = dataScopeEvaluator.evaluate(memberId, modelCode, resolvedAction, record);
         return step == null || step.verdict() != EvaluationVerdict.DENY;
     }
 

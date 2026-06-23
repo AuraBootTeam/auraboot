@@ -38,6 +38,14 @@ type DynamicRecord = {
   title: string;
 };
 
+type PersonaExpectation = {
+  label: string;
+  page: Page;
+  ownVisible: boolean;
+  adminVisible: boolean;
+  expectedChartCount: number;
+};
+
 type TenantSpace = {
   id?: string | number;
   tenantId?: string | number;
@@ -56,6 +64,7 @@ test.describe('Permission data scope runtime', () => {
     const resolvedBaseURL = baseURL ?? DEFAULT_BASE_URL;
     const uid = uniqueId('rbac_scope');
     const roleCode = `e2e_scope_${uid.replace(/[^a-zA-Z0-9_]/g, '_')}`.slice(0, 60);
+    const titlePrefix = `RBAC Scope ${uid}`;
     const owner: TestUser = {
       email: `${roleCode}@e2e.local`,
       displayName: `RBAC Scope ${uid}`,
@@ -69,29 +78,33 @@ test.describe('Permission data scope runtime', () => {
     const ownerPage = await ownerContext.newPage();
 
     try {
-      const ownerRecord = await createOrder(ownerPage, `RBAC Owner ${uid}`);
-      const adminRecord = await createOrder(page, `RBAC Admin ${uid}`);
+      const ownerRecord = await createOrder(ownerPage, `${titlePrefix} Owner`);
+      const adminRecord = await createOrder(page, `${titlePrefix} Admin`);
 
       await expectScopeMaterialized(page, rolePid);
 
-      const ownerOwnRecords = await listOrdersByKeyword(ownerPage, ownerRecord.title);
-      expect(
-        ownerOwnRecords.some((record) => record.pid === ownerRecord.pid),
-        'self-scoped user should see own record in Dynamic list API',
-      ).toBe(true);
+      const personas: PersonaExpectation[] = [
+        {
+          label: 'self-scoped user',
+          page: ownerPage,
+          ownVisible: true,
+          adminVisible: false,
+          expectedChartCount: 1,
+        },
+        {
+          label: 'tenant admin',
+          page,
+          ownVisible: true,
+          adminVisible: true,
+          expectedChartCount: 2,
+        },
+      ];
 
-      const ownerOtherRecords = await listOrdersByKeyword(ownerPage, adminRecord.title);
-      expect(
-        ownerOtherRecords.some((record) => record.pid === adminRecord.pid),
-        'self-scoped user must not see admin-created record in Dynamic list API',
-      ).toBe(false);
-
-      const deniedDetail = await ownerPage.request.get(`/api/dynamic/${MODEL_CODE}/${adminRecord.pid}`);
-      const deniedBody = await deniedDetail.json().catch(() => ({}));
-      expect(
-        !deniedDetail.ok() || !isSuccessBody(deniedBody) || !deniedBody.data,
-        'self-scoped user must not access admin-created record by detail API',
-      ).toBe(true);
+      for (const persona of personas) {
+        await expectListVisibility(persona, ownerRecord, adminRecord);
+        await expectDetailVisibility(persona, ownerRecord, adminRecord);
+        await expectChartDataCount(persona, titlePrefix);
+      }
 
       await navigateToOrderViaSidebar(ownerPage);
       await searchOrderList(ownerPage, ownerRecord.title);
@@ -106,9 +119,6 @@ test.describe('Permission data scope runtime', () => {
 
       await searchOrderList(page, adminRecord.title);
       await expect(page.getByText(adminRecord.title).first()).toBeVisible({ timeout: 10_000 });
-
-      await expectSuccessfulDetail(page, ownerRecord);
-      await expectSuccessfulDetail(page, adminRecord);
     } finally {
       await ownerContext.close();
     }
@@ -368,6 +378,67 @@ async function listOrdersByKeyword(page: Page, keyword: string): Promise<Array<R
   return body?.data?.records ?? body?.data?.list ?? [];
 }
 
+async function expectListVisibility(
+  persona: PersonaExpectation,
+  ownerRecord: DynamicRecord,
+  adminRecord: DynamicRecord,
+): Promise<void> {
+  const ownRecords = await listOrdersByKeyword(persona.page, ownerRecord.title);
+  expect(
+    ownRecords.some((record) => record.pid === ownerRecord.pid),
+    `${persona.label} own-record list visibility`,
+  ).toBe(persona.ownVisible);
+
+  const adminRecords = await listOrdersByKeyword(persona.page, adminRecord.title);
+  expect(
+    adminRecords.some((record) => record.pid === adminRecord.pid),
+    `${persona.label} admin-record list visibility`,
+  ).toBe(persona.adminVisible);
+}
+
+async function expectDetailVisibility(
+  persona: PersonaExpectation,
+  ownerRecord: DynamicRecord,
+  adminRecord: DynamicRecord,
+): Promise<void> {
+  await expectDetailResult(persona.page, ownerRecord, persona.ownVisible, `${persona.label} own detail`);
+  await expectDetailResult(persona.page, adminRecord, persona.adminVisible, `${persona.label} admin detail`);
+}
+
+async function expectDetailResult(
+  page: Page,
+  record: DynamicRecord,
+  shouldAllow: boolean,
+  label: string,
+): Promise<void> {
+  const resp = await page.request.get(`/api/dynamic/${MODEL_CODE}/${record.pid}`);
+  const body = await resp.json().catch(() => ({}));
+  const allowed = resp.ok() && isSuccessBody(body) && body?.data?.pid === record.pid;
+  expect(allowed, label).toBe(shouldAllow);
+}
+
+async function expectChartDataCount(
+  persona: PersonaExpectation,
+  titlePrefix: string,
+): Promise<void> {
+  const resp = await persona.page.request.post('/api/meta/chart-data', {
+    data: {
+      type: 'aggregate',
+      modelCode: MODEL_CODE,
+      metrics: [{ field: 'pid', aggregation: 'count', alias: 'visible_count' }],
+      filters: [{ field: 'e2et_order_title', operator: 'like', value: titlePrefix }],
+    },
+  });
+  await expectOk(resp, `${persona.label} chart-data aggregate`);
+  const body = await resp.json();
+  expect(isSuccessBody(body), JSON.stringify(body)).toBe(true);
+  const rows = Array.isArray(body?.data?.rows) ? body.data.rows : [];
+  const rawCount = rows[0]?.visible_count ?? rows[0]?.VISIBLE_COUNT ?? rows[0]?.count_pid ?? 0;
+  expect(Number(rawCount), `${persona.label} chart-data visible count`).toBe(
+    persona.expectedChartCount,
+  );
+}
+
 async function searchOrderList(page: Page, keyword: string): Promise<void> {
   const searchInput = page
     .locator(
@@ -415,14 +486,6 @@ async function searchOrderList(page: Page, keyword: string): Promise<void> {
   await expect(page.locator('table, [role="table"], [data-testid="dynamic-list"]').first()).toBeVisible({
     timeout: 10_000,
   });
-}
-
-async function expectSuccessfulDetail(page: Page, record: DynamicRecord): Promise<void> {
-  const resp = await page.request.get(`/api/dynamic/${MODEL_CODE}/${record.pid}`);
-  await expectOk(resp, `fetch detail ${record.pid}`);
-  const body = await resp.json();
-  expect(isSuccessBody(body), JSON.stringify(body)).toBe(true);
-  expect(body?.data?.e2et_order_title).toBe(record.title);
 }
 
 function isSuccessBody(body: any): boolean {

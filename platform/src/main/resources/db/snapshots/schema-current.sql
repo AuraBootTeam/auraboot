@@ -9507,6 +9507,8 @@ CREATE TABLE public.ab_named_query (
     connector_endpoint_code text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    resource_code text,
+    action_code text,
     CONSTRAINT chk_named_query_status CHECK ((status = ANY (ARRAY['draft'::text, 'testing'::text, 'published'::text, 'deprecated'::text, 'archived'::text])))
 );
 
@@ -9516,6 +9518,20 @@ CREATE TABLE public.ab_named_query (
 --
 
 COMMENT ON TABLE public.ab_named_query IS '命名查询表';
+
+
+--
+-- Name: COLUMN ab_named_query.resource_code; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_named_query.resource_code IS 'Protected business resource for DataScope evaluation';
+
+
+--
+-- Name: COLUMN ab_named_query.action_code; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_named_query.action_code IS 'Protected action for DataScope evaluation';
 
 
 --
@@ -24711,6 +24727,13 @@ CREATE INDEX ix_model_field_binding_model ON public.ab_meta_model_field_binding 
 --
 
 CREATE INDEX ix_model_field_binding_pid ON public.ab_meta_model_field_binding USING btree (pid) WHERE (pid IS NOT NULL);
+
+
+--
+-- Name: ix_named_query_data_scope_declaration; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX ix_named_query_data_scope_declaration ON public.ab_named_query USING btree (tenant_id, resource_code, action_code) WHERE ((resource_code IS NOT NULL) AND (action_code IS NOT NULL));
 
 
 --

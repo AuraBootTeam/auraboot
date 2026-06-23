@@ -18,7 +18,9 @@ import com.auraboot.framework.meta.dto.MetaFieldCreateRequest;
 import com.auraboot.framework.meta.dto.MetaFieldDTO;
 import com.auraboot.framework.meta.dto.MetaModelCreateRequest;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
+import com.auraboot.framework.meta.dto.NamedQueryCreateRequest;
 import com.auraboot.framework.meta.dto.NamedQueryDTO;
+import com.auraboot.framework.meta.dto.NamedQueryUpdateRequest;
 import com.auraboot.framework.meta.dto.SchemaOperationResult;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.mapper.BindingRuleMapper;
@@ -771,7 +773,13 @@ class PluginResourceImporterImplApplyTest2 {
         when(namedQueryService.create(any())).thenReturn(created);
 
         NamedQueryDefinitionDTO dto = NamedQueryDefinitionDTO.builder()
-                .code("nq1").title("NQ").fromSql("SELECT 1").status("draft").build();
+                .code("nq1")
+                .title("NQ")
+                .fromSql("SELECT 1")
+                .status("draft")
+                .resourceCode("e2et_order")
+                .actionCode("read")
+                .build();
 
         PluginResource result = importer.importNamedQuery(dto, "plg", "imp", 1L,
                 ImportRequest.ConflictStrategy.OVERWRITE);
@@ -779,7 +787,47 @@ class PluginResourceImporterImplApplyTest2 {
         assertThat(result.getAction()).isEqualTo(ResourceAction.CREATE.code());
         assertThat(result.getResourcePid()).isEqualTo("nq-pid-new");
         assertThat(result.getResourceId()).isEqualTo(7L);
+        ArgumentCaptor<NamedQueryCreateRequest> requestCaptor =
+                ArgumentCaptor.forClass(NamedQueryCreateRequest.class);
+        verify(namedQueryService).create(requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getResourceCode()).isEqualTo("e2et_order");
+        assertThat(requestCaptor.getValue().getActionCode()).isEqualTo("read");
         verify(namedQueryService).markFieldsAsPluginSource("nq1");
+    }
+
+    @Test
+    @DisplayName("importNamedQuery UPDATE branch preserves DataScope declaration")
+    void importNamedQuery_update_preservesDataScopeDeclaration() {
+        NamedQueryDTO existing = new NamedQueryDTO();
+        existing.setPid("nq-pid-existing");
+        existing.setStatus("draft");
+        when(namedQueryService.findByCode("nq1")).thenReturn(existing);
+        when(namedQueryService.findByPid("nq-pid-existing")).thenReturn(existing);
+
+        NamedQuery existingEntity = new NamedQuery();
+        existingEntity.setPid("nq-pid-existing");
+        existingEntity.setId(9L);
+        existingEntity.setCode("nq1");
+        existingEntity.setStatus("draft");
+        when(namedQueryMapper.findByCode("nq1")).thenReturn(existingEntity);
+
+        NamedQueryDefinitionDTO dto = NamedQueryDefinitionDTO.builder()
+                .code("nq1")
+                .title("NQ")
+                .fromSql("SELECT 1")
+                .resourceCode("e2et_order")
+                .actionCode("read")
+                .build();
+
+        PluginResource result = importer.importNamedQuery(dto, "plg", "imp", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        assertThat(result.getAction()).isEqualTo(ResourceAction.UPDATE.code());
+        ArgumentCaptor<NamedQueryUpdateRequest> requestCaptor =
+                ArgumentCaptor.forClass(NamedQueryUpdateRequest.class);
+        verify(namedQueryService).update(eq("nq-pid-existing"), requestCaptor.capture());
+        assertThat(requestCaptor.getValue().getResourceCode()).isEqualTo("e2et_order");
+        assertThat(requestCaptor.getValue().getActionCode()).isEqualTo("read");
     }
 
     @Test

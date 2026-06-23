@@ -16,6 +16,7 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryFieldMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryVersionMapper;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.base.BaseMetaService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -57,6 +58,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     private final NamedQueryRateLimiter rateLimiter;
     private final ApiConnectorService apiConnectorService;
     private final DecisionUsageIndexService usageIndexService;
+    private final DataPermissionEngine dataPermissionEngine;
 
     // DANGEROUS_SQL_PATTERN removed — replaced by SqlSafetyUtils.validateSelectOnlySql()
 
@@ -95,6 +97,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
                 isConnector ? null : request.getFromSql());
         entity.setPid(UlidGenerator.generate());
         entity.setDescription(request.getDescription());
+        entity.setResourceCode(trimToNull(request.getResourceCode()));
+        entity.setActionCode(trimToNull(request.getActionCode()));
         entity.setBaseWhere(request.getBaseWhere());
         entity.setDefaultOrder(request.getDefaultOrder());
         if (request.getPolicy() != null) {
@@ -137,6 +141,12 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         }
         if (request.getDescription() != null) {
             entity.setDescription(request.getDescription());
+        }
+        if (request.getResourceCode() != null) {
+            entity.setResourceCode(trimToNull(request.getResourceCode()));
+        }
+        if (request.getActionCode() != null) {
+            entity.setActionCode(trimToNull(request.getActionCode()));
         }
 
         // Enforce frozen state: from_sql, baseWhere, defaultOrder are read-only when frozen
@@ -682,6 +692,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         params.put("currentUserId", userId != null ? userId.toString() : null);
         params.put("currentUserPid", MetaContext.getCurrentUserPid());
 
+        appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses);
+
         if (!whereClauses.isEmpty()) {
             sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
         }
@@ -794,6 +806,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             params.put("tenantId", tenantId);
             Long userId = getCurrentUserId();
             params.put("currentUserId", userId != null ? userId.toString() : null);
+
+            appendDeclaredDataScopeClause(query, tenantId, userId, whereClauses);
 
             if (!whereClauses.isEmpty()) {
                 sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
@@ -1152,6 +1166,38 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    private void appendDeclaredDataScopeClause(
+            NamedQuery query,
+            Long tenantId,
+            Long userId,
+            List<String> whereClauses) {
+        if (MetaContext.isDataPermissionBypassed()) {
+            return;
+        }
+        String resourceCode = trimToNull(query.getResourceCode());
+        String actionCode = trimToNull(query.getActionCode());
+        if (resourceCode == null || actionCode == null) {
+            return;
+        }
+        try {
+            String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, resourceCode, actionCode, userId);
+            if (rowFilter != null && !rowFilter.isBlank()) {
+                whereClauses.add(stripSqlConditionPrefix(rowFilter));
+            }
+        } catch (Exception e) {
+            log.error("Failed to evaluate NamedQuery DataScope: code={}, resource={}, action={}",
+                    query.getCode(), resourceCode, actionCode, e);
+            throw new MetaServiceException("Data permission evaluation failed for named query: " + query.getCode(), e);
+        }
+    }
+
+    private String stripSqlConditionPrefix(String fragment) {
+        return fragment.trim()
+                .replaceFirst("(?i)^AND\\s+", "")
+                .replaceFirst("(?i)^WHERE\\s+", "")
+                .trim();
+    }
+
     private NamedQueryField createFieldEntity(Long tenantId, String queryCode, NamedQueryFieldRequest request) {
         return createFieldEntity(tenantId, queryCode, request, null);
     }
@@ -1414,6 +1460,8 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         dto.setCode(entity.getCode());
         dto.setTitle(entity.getTitle());
         dto.setDescription(entity.getDescription());
+        dto.setResourceCode(entity.getResourceCode());
+        dto.setActionCode(entity.getActionCode());
         dto.setFromSql(entity.getFromSql());
         dto.setConnectorPid(entity.getConnectorPid());
         dto.setConnectorEndpointCode(entity.getConnectorEndpointCode());

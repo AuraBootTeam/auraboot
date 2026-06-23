@@ -1469,12 +1469,89 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
 
         logOperation("batchDelete", modelCode, recordIds.size());
-        
-        for (String recordId : recordIds) {
-            delete(modelCode, recordId);
+
+        ModelDefinition model = getModelDefinition(modelCode);
+        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
+        String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
+        String primaryKeyColumn = SqlSafetyUtils.requireIdentifier(
+                primaryKey.getColumnName() != null ? primaryKey.getColumnName() : primaryKey.getCode(),
+                "primary key column");
+
+        Long tenantId = getCurrentTenantId();
+        Long userId = getCurrentUserId();
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("tenantId", tenantId);
+        StringBuilder sql = new StringBuilder("DELETE FROM ")
+                .append(tableName)
+                .append(" WHERE tenant_id = #{params.tenantId}")
+                .append(" AND ")
+                .append(primaryKeyColumn)
+                .append(" IN (");
+        for (int i = 0; i < recordIds.size(); i++) {
+            String recordId = recordIds.get(i);
+            if (recordId == null || recordId.isBlank()) {
+                throw new MetaServiceException("Record ID cannot be null or empty");
+            }
+            if (i > 0) {
+                sql.append(", ");
+            }
+            String paramName = "id" + i;
+            sql.append("#{params.").append(paramName).append("}");
+            params.put(paramName, recordId);
+        }
+        sql.append(")");
+
+        if (!MetaContext.isDataPermissionBypassed()) {
+            try {
+                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
+                appendScopedBulkFilter(sql, rowFilter);
+            } catch (Exception e) {
+                log.error("Failed to apply row-level data permission for batch delete on model {} — denying access",
+                        logSafe(modelCode), e);
+                throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
+            }
+
+            try {
+                String domainFilter = dataDomainService.buildDomainFilter(modelCode, userId);
+                appendScopedBulkFilter(sql, domainFilter);
+            } catch (Exception e) {
+                log.error("Failed to apply domain filter for batch delete on model {} — denying access",
+                        logSafe(modelCode), e);
+                throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
+            }
+        }
+
+        int affected = dynamicDataMapper.deleteByQuery(sql.toString(), params);
+        if (affected != recordIds.size()) {
+            throw new MetaServiceException(
+                    "Batch delete denied: only " + affected + " of " + recordIds.size()
+                            + " requested records matched tenant and data scope");
         }
 
         log.info("Batch deleted {} records from model: {}", recordIds.size(), logSafe(modelCode));
+    }
+
+    private void appendScopedBulkFilter(StringBuilder sql, String filter) {
+        if (filter == null || filter.isBlank()) {
+            return;
+        }
+        String normalized = filter.trim();
+        if (normalized.regionMatches(true, 0, "AND ", 0, 4)) {
+            normalized = normalized.substring(4).trim();
+        } else if (normalized.regionMatches(true, 0, "WHERE ", 0, 6)) {
+            normalized = normalized.substring(6).trim();
+        }
+        if (normalized.isBlank()) {
+            return;
+        }
+        rejectStatementInjectionMarkers(normalized);
+        sql.append(" AND ").append(normalized);
+    }
+
+    private void rejectStatementInjectionMarkers(String filter) {
+        if (filter.contains(";") || filter.contains("--") || filter.contains("/*") || filter.contains("*/")) {
+            throw new MetaServiceException("Unsafe data scope filter for batch delete");
+        }
     }
 
     // ==================== Custom Query ====================

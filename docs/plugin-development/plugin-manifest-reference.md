@@ -182,6 +182,43 @@ Maps resource types to file paths relative to the plugin root. The import system
 | 11 | `i18n` | Internationalization entries | JSON array |
 | 12 | `data` | Seed data for initial records | JSON array |
 
+### RBAC Data Scope Fields
+
+Plugin roles can declare a default data scope. The importer applies this default when role-permission bindings are created, without overwriting an explicitly configured scope.
+
+```json
+[
+  {
+    "code": "quote_operator",
+    "name:zh-CN": "报价员",
+    "permissions": ["quote.request.read", "quote.request.create"],
+    "defaultDataScopeType": "self"
+  },
+  {
+    "code": "quote_admin",
+    "name:zh-CN": "报价管理员",
+    "permissions": ["quote.request.read", "quote.request.update"],
+    "defaultDataScopeType": "all"
+  }
+]
+```
+
+Named queries are protected only when they explicitly declare the business resource and action used for DataScope evaluation. The platform does not infer the protected resource from SQL text.
+
+```json
+[
+  {
+    "code": "quote_summary",
+    "name": "Quote Summary",
+    "sql": "select status, count(*) as total from quote_request group by status",
+    "resourceCode": "quote_request",
+    "actionCode": "read"
+  }
+]
+```
+
+Use `self` for ordinary creator-owned roles and `all` for current-tenant administrators. Do not encode administrator behavior in SQL or handler branches.
+
 **File vs. directory paths:**
 
 - If the path ends with `.json`, the system reads it as a single file

@@ -102,23 +102,45 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     }
 
     @Test
-    @DisplayName("batchDelete must route every record through single-record DataScope verdict")
-    void batchDelete_routesThroughSingleRecordDataScopeVerdict() {
+    @DisplayName("batchDelete uses scoped bulk SQL with tenant and DataScope guards")
+    void batchDelete_usesScopedBulkSqlWithTenantAndDataScope() {
         ModelDefinition model = physicalModel(MODEL_CODE, "mt_phase_one_model");
         wireModel(model);
-        wireSingleRecordRead(model, Map.of("pid", RECORD_ID, "created_by", USER_ID));
-        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
-                .thenReturn(true);
-        when(dynamicDataMapper.delete(eq(model.getTableName()), anyMap())).thenReturn(1);
-        lenient().when(secureSqlRewriter.rewriteForDelete(anyString(), eq(model.getTableName())))
-                .thenReturn("DELETE FROM mt_phase_one_model WHERE pid IN (...)");
-        lenient().when(dynamicDataMapper.deleteByQuery(anyString(), anyMap())).thenReturn(1);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+                .thenReturn("AND created_by = 20");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("");
+        when(dynamicDataMapper.deleteByQuery(anyString(), anyMap())).thenReturn(1);
 
         service.batchDelete(MODEL_CODE, List.of(RECORD_ID));
 
-        verify(dataPermissionEngine, atLeastOnce())
-                .canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap());
-        verify(dynamicDataMapper, never()).deleteByQuery(anyString(), anyMap());
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).deleteByQuery(sqlCaptor.capture(), paramsCaptor.capture());
+        assertThat(sqlCaptor.getValue())
+                .contains("DELETE FROM mt_phase_one_model")
+                .contains("tenant_id = #{params.tenantId}")
+                .contains("pid IN (#{params.id0})")
+                .contains("created_by = 20");
+        assertThat(paramsCaptor.getValue())
+                .containsEntry("tenantId", TENANT_ID)
+                .containsEntry("id0", RECORD_ID);
+        verify(dataPermissionEngine, never()).canAccessRecord(any(), anyString(), any(), anyMap());
+        verify(dynamicDataMapper, never()).delete(anyString(), anyMap());
+    }
+
+    @Test
+    @DisplayName("batchDelete fails when scoped bulk delete does not affect every requested ID")
+    void batchDelete_failsOnPartialScopedBulkDelete() {
+        ModelDefinition model = physicalModel(MODEL_CODE, "mt_phase_one_model");
+        wireModel(model);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+                .thenReturn("AND created_by = 20");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("");
+        when(dynamicDataMapper.deleteByQuery(anyString(), anyMap())).thenReturn(1);
+
+        assertThatThrownBy(() -> service.batchDelete(MODEL_CODE, List.of("own", "other")))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("Batch delete denied");
     }
 
     @Test
