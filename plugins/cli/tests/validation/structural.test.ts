@@ -30,7 +30,7 @@ describe('validateStructural plugin manifest schema', () => {
     const result = validateStructural(
       pluginWithManifest({
         pluginId: 'workflow-demo',
-        namespace: 'workflow-demo',
+        namespace: 'workflow_demo',
         version: '1.0.0',
         backend: {
           jarPath: 'backend/build/libs/workflow-demo-plugin-1.0.0.jar',
@@ -41,5 +41,81 @@ describe('validateStructural plugin manifest schema', () => {
 
     expect(result.messages.filter((message) => message.code === 'L1-MANIFEST')).toEqual([]);
     expect(result.errorCount).toBe(0);
+  });
+
+  it('rejects the removed top-level entryPoint field', () => {
+    const result = validateStructural(
+      pluginWithManifest({
+        pluginId: 'legacy-plugin',
+        namespace: 'legacy',
+        version: '1.0.0',
+        entryPoint: 'com.acme.LegacyPlugin',
+      }),
+    );
+
+    expect(result.messages).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'L1-MANIFEST',
+          path: 'plugin.json',
+        }),
+      ]),
+    );
+    expect(result.errorCount).toBeGreaterThan(0);
+  });
+
+  it('rejects removed backend jarFile and entryPoint aliases', () => {
+    const result = validateStructural(
+      pluginWithManifest({
+        pluginId: 'legacy-plugin',
+        namespace: 'legacy',
+        version: '1.0.0',
+        backend: {
+          jarFile: 'backend/legacy.jar',
+          entryPoint: 'com.acme.LegacyPlugin',
+        },
+      }),
+    );
+
+    const manifestErrors = result.messages.filter((message) => message.code === 'L1-MANIFEST');
+    expect(manifestErrors.every((message) => message.path === 'plugin.json/backend')).toBe(true);
+    expect(manifestErrors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining("must have required property 'jarPath'"),
+        }),
+        expect.objectContaining({
+          message: expect.stringContaining("must have required property 'entryClass'"),
+        }),
+        expect.objectContaining({
+          message: expect.stringContaining('must NOT have additional properties'),
+        }),
+      ]),
+    );
+    expect(result.errorCount).toBeGreaterThan(0);
+  });
+
+  it('requires the canonical backend jarPath and entryClass fields together', () => {
+    const result = validateStructural(
+      pluginWithManifest({
+        pluginId: 'partial-backend-plugin',
+        namespace: 'partial_backend',
+        version: '1.0.0',
+        backend: {
+          jarPath: 'backend/partial.jar',
+        },
+      }),
+    );
+
+    const manifestErrors = result.messages.filter((message) => message.code === 'L1-MANIFEST');
+    expect(manifestErrors).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: 'plugin.json/backend',
+          message: expect.stringContaining("must have required property 'entryClass'"),
+        }),
+      ]),
+    );
+    expect(result.errorCount).toBeGreaterThan(0);
   });
 });

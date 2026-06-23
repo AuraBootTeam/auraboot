@@ -117,11 +117,6 @@ public class PluginManifest {
     private List<String> providedCommands;
 
     /**
-     * Plugin entry point class name (fully qualified).
-     */
-    private String entryPoint;
-
-    /**
      * Capabilities this plugin provides to others.
      */
     private List<CapabilityDeclaration> provides;

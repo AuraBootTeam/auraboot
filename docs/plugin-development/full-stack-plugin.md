@@ -144,8 +144,8 @@ plugins/document-approval/
     "createResourcePermissions": true
   },
   "backend": {
-    "jar": "backend/document-approval-1.0.0.jar",
-    "pluginClass": "com.example.docapproval.DocumentApprovalPlugin"
+    "jarPath": "backend/document-approval-1.0.0.jar",
+    "entryClass": "com.example.docapproval.DocumentApprovalPlugin"
   },
   "frontend": {
     "remoteEntry": "frontend/remoteEntry.js",

@@ -34,11 +34,11 @@ AuraBoot recognizes three plugin types declared in the `pluginType` field. Choos
 
 **`config`** plugins contain only JSON resource files. They define models, fields, commands, pages, permissions, menus, dictionaries, and named queries through the declarative DSL. No Java code, no compiled binary. The vast majority of AuraBoot plugins — including most business modules and templates — are config plugins. Choose `config` whenever your behavior can be expressed declaratively through commands, validation rules, side effects, and BPM processes.
 
-**`hybrid`** plugins combine declarative JSON with Java code loaded by the PF4J runtime. They are the right choice when you need a custom command handler that calls an external system, a data provider that integrates a non-relational source, or a specialized action that cannot be expressed in the standard execution modes. The hybrid plugin still carries a `config/` directory; the Java code is added as a JAR plus an `entryPoint` class declared in the manifest. Choose `hybrid` only when JSON alone cannot express the operation.
+**`hybrid`** plugins combine declarative JSON with Java code loaded by the PF4J runtime. They are the right choice when you need a custom command handler that calls an external system, a data provider that integrates a non-relational source, or a specialized action that cannot be expressed in the standard execution modes. The hybrid plugin still carries a `config/` directory; the Java code is added as a JAR plus a `backend.entryClass` declared in the manifest. Choose `hybrid` only when JSON alone cannot express the operation.
 
 **`solution`** plugins are industry-vertical packages. A solution does not usually introduce its own models; instead, it declares dependencies on several config or hybrid plugins, adds cross-plugin glue resources, and ships pre-tuned configurations for a specific industry (manufacturing, asset management, project delivery, and so on). Choose `solution` when you are bundling a curated set of plugins into a deployable industry stack rather than building a single feature.
 
-If a plugin starts as `config` and later needs custom Java behavior, you can promote it to `hybrid` by adding a `backend` block and an `entryPoint`. Going from `config` to `solution` is unusual; solutions are typically designed as solutions from the start.
+If a plugin starts as `config` and later needs custom Java behavior, you can promote it to `hybrid` by adding a `backend` block with `jarPath` and `entryClass`. Going from `config` to `solution` is unusual; solutions are typically designed as solutions from the start.
 
 ## Top-level manifest fields
 
@@ -60,7 +60,6 @@ The manifest schema is defined in `plugin-manifest.schema.json` and is the autho
 | `provides` | array | no | Capabilities this plugin offers to others. |
 | `requires` | array | no | Capabilities this plugin needs from others. |
 | `resourceDirs` | object | no | File paths to the resource directories for models, fields, commands, etc. |
-| `entryPoint` | string | no | Fully-qualified Java class name. Used by hybrid plugins. |
 | `backend` | object | no | JAR file location and entry point for hybrid plugins. |
 | `client` | object | no | Frontend plugin configuration including exposed components. |
 | `importOptions` | object | no | Behavior flags for import (conflict strategy, validation, auto-publish). |
@@ -281,13 +280,13 @@ The manifest of a hybrid plugin adds a `backend` block:
 {
   "pluginType": "hybrid",
   "backend": {
-    "jarFile": "backend/notes-extras-1.0.0.jar",
-    "entryPoint": "com.acme.notes.NotesExtrasPlugin"
+    "jarPath": "backend/notes-extras-1.0.0.jar",
+    "entryClass": "com.acme.notes.NotesExtrasPlugin"
   }
 }
 ```
 
-The platform loads the JAR through PF4J. The `entryPoint` class declares the plugin lifecycle hooks (`start`, `stop`). Inside the JAR you can register PF4J **extensions** that implement platform-defined extension points — most commonly `CommandHandler`, `DataProvider`, or custom action interfaces.
+The platform loads the JAR through PF4J. The class named by `backend.entryClass` declares the plugin lifecycle hooks (`start`, `stop`). Inside the JAR you can register PF4J **extensions** that implement platform-defined extension points — most commonly `CommandHandler`, `DataProvider`, or custom action interfaces.
 
 The connection between a JSON command and its Java handler is the binding rule. A command in `commands.json` carries an `executionConfig.handler` that names the handler bean or class, and the `bindingRules.json` file (registered in `resourceDirs.commands` alongside commands) declares additional binding metadata such as field mappings, event handlers, and triggers.
 

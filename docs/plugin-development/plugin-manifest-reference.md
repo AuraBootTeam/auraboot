@@ -303,16 +303,16 @@ Configuration for the PF4J backend JAR (only for `hybrid` or `solution` plugin t
 ```json
 {
   "backend": {
-    "jar": "backend/my-plugin-1.0.0.jar",
-    "pluginClass": "com.example.MyPlugin"
+    "jarPath": "backend/my-plugin-1.0.0.jar",
+    "entryClass": "com.example.MyPlugin"
   }
 }
 ```
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `jar` | `string` | Yes | Path to the PF4J JAR file, relative to plugin root. |
-| `pluginClass` | `string` | Yes | Fully qualified class name of the main plugin class (must extend `AuraPlugin`). |
+| `jarPath` | `string` | Yes | Path to the PF4J JAR file, relative to plugin root. |
+| `entryClass` | `string` | Yes | Fully qualified class name of the main plugin class (must extend `AuraPlugin`). |
 
 ---
 
@@ -500,8 +500,8 @@ Here is a complete `plugin.json` for a full-stack plugin:
   },
 
   "backend": {
-    "jar": "backend/document-approval-1.2.0.jar",
-    "pluginClass": "com.example.docapproval.DocumentApprovalPlugin"
+    "jarPath": "backend/document-approval-1.2.0.jar",
+    "entryClass": "com.example.docapproval.DocumentApprovalPlugin"
   },
 
   "frontend": {

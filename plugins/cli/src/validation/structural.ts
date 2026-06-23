@@ -4,7 +4,7 @@ import { join, resolve } from 'path';
 import type { PluginFiles } from '../utils/plugin-loader.js';
 import { type ValidationResult, createResult, addMessage } from './types.js';
 
-const SCHEMA_DIR = resolve(import.meta.dirname, '../../../../schemas');
+const SCHEMA_DIR = resolve(import.meta.dirname, '../../../schemas');
 
 const RESOURCE_SCHEMAS: Record<string, string> = {
   models: 'models.schema.json',
@@ -26,14 +26,14 @@ const RESOURCE_SCHEMAS: Record<string, string> = {
  */
 export function validateStructural(plugin: PluginFiles): ValidationResult {
   const result = createResult();
-  const ajv = new Ajv({ allErrors: true, strict: false });
+  const ajv = new Ajv({ allErrors: true, strict: false, validateFormats: false });
 
   // Pre-load DSL schema for $ref resolution from plugin-manifest.schema.json
   const dslSchemaPath = join(SCHEMA_DIR, 'dsl-schema.generated.json');
   if (existsSync(dslSchemaPath)) {
     try {
       const dslSchema = JSON.parse(readFileSync(dslSchemaPath, 'utf-8'));
-      ajv.addSchema(dslSchema, 'dsl-schema.generated.json');
+      ajv.addSchema(dslSchema, 'https://auraboot.io/schemas/dsl-schema.generated.json');
     } catch {
       // Graceful degradation: dslSchema validation skipped if schema unavailable
     }
