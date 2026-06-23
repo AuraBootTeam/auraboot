@@ -3,6 +3,7 @@ package com.auraboot.framework.auth.service;
 import com.auraboot.framework.auth.service.impl.PasswordPolicyServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
@@ -20,10 +21,10 @@ class PasswordPolicyServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new PasswordPolicyServiceImpl();
-        // Default policy: min=8, max=128, uppercase=true, lowercase=true, digit=true, special=false
+        // Default policy: min=8, max=128, uppercase=false, lowercase=true, digit=true, special=false
         ReflectionTestUtils.setField(service, "minLength", 8);
         ReflectionTestUtils.setField(service, "maxLength", 128);
-        ReflectionTestUtils.setField(service, "requireUppercase", true);
+        ReflectionTestUtils.setField(service, "requireUppercase", false);
         ReflectionTestUtils.setField(service, "requireLowercase", true);
         ReflectionTestUtils.setField(service, "requireDigit", true);
         ReflectionTestUtils.setField(service, "requireSpecial", false);
@@ -69,7 +70,22 @@ class PasswordPolicyServiceImplTest {
     // =========================================================
 
     @Test
-    void validate_noUppercase_returnsError() {
+    void defaultRequireUppercaseProperty_isFalse() throws Exception {
+        Value value = PasswordPolicyServiceImpl.class
+                .getDeclaredField("requireUppercase")
+                .getAnnotation(Value.class);
+        assertThat(value.value()).isEqualTo("${security.password.require-uppercase:false}");
+    }
+
+    @Test
+    void validate_noUppercase_passesByDefault() {
+        List<String> errors = service.validate("abcdefgh1");
+        assertThat(errors).noneMatch(e -> e.contains("uppercase"));
+    }
+
+    @Test
+    void validate_noUppercase_returnsErrorWhenConfigured() {
+        ReflectionTestUtils.setField(service, "requireUppercase", true);
         List<String> errors = service.validate("abcdefgh1");
         assertThat(errors).anyMatch(e -> e.contains("uppercase"));
     }
@@ -153,6 +169,7 @@ class PasswordPolicyServiceImplTest {
 
     @Test
     void validate_multipleViolations_returnsAllErrors() {
+        ReflectionTestUtils.setField(service, "requireUppercase", true);
         List<String> errors = service.validate("abc"); // too short, no uppercase, no digit
         assertThat(errors.size()).isGreaterThanOrEqualTo(3);
     }

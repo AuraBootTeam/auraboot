@@ -46,6 +46,15 @@ AuraBoot is configured through environment variables and `application.yml` setti
 4. Rolling restart backend -- new tokens use the new key, old tokens still verify
 5. After one expiration period (24h), remove the `PREVIOUS` env vars
 
+### Registration / Email OTP
+
+Self-registration is controlled by the system config key `system.allow_self_registration`.
+
+- In single-tenant mode, the default is `false`.
+- In multi-tenant or hybrid mode, the default is `true` unless the config key is explicitly set.
+- The same policy applies to `/api/auth/register` and to Email OTP login when the email address does not already belong to a user.
+- Existing users can still use Email OTP login when the `email_code` login channel is enabled; the registration policy only controls creation of new accounts.
+
 ### Redis (Optional)
 
 | Variable | Default | Description |
@@ -132,13 +141,14 @@ security:
   password:
     min-length: 8
     max-length: 128
-    require-uppercase: true
+    require-uppercase: false
     require-lowercase: true
     require-digit: true
     require-special: false
     history-count: 5          # Prevent reuse of last N passwords
     expiry-days: 90           # Force password change after N days
     reset-token-expiry-minutes: 30
+    self-service-enabled: false # When false, only admins can set/reset passwords
   lockout:
     max-attempts: 5           # Lock account after N failed logins
     duration-minutes: 30      # Lockout duration

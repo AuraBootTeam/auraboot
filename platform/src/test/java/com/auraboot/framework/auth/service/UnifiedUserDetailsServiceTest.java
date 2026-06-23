@@ -61,6 +61,15 @@ class UnifiedUserDetailsServiceTest {
     }
 
     @Test
+    void loadUserByUsername_userNameIdentifier_resolvesViaUserNameBeforePid() {
+        when(userService.findByUserName("吴书生")).thenReturn(user);
+
+        UserDetails details = service.loadUserByUsername("吴书生");
+
+        assertThat(details.getUsername()).isEqualTo("吴书生");
+    }
+
+    @Test
     void loadUserByUsername_phoneIdentifier_throwsUnsupported() {
         assertThatThrownBy(() -> service.loadUserByUsername("13800138000"))
                 .isInstanceOf(UnSupportedException.class);

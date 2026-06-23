@@ -43,11 +43,11 @@ public class EmailPasswordAuthStrategy implements AuthStrategy {
 
     @Override
     public AuthenticationResponse authenticate(AuthStrategyRequest request) {
-        String email = request.getEmail();
+        String identifier = request.resolveIdentifier();
         String password = request.getPassword();
 
         // Pre-check: is account locked?
-        User user = findUserByEmail(email);
+        User user = findUserByIdentifier(identifier);
         if (user != null && passwordManagementService.isAccountLocked(user)) {
             throw new RootUnCheckedException(ResponseCode.AccountLocked,
                     "Account is locked due to too many failed login attempts");
@@ -55,7 +55,7 @@ public class EmailPasswordAuthStrategy implements AuthStrategy {
 
         try {
             Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(email, password)
+                    new UsernamePasswordAuthenticationToken(identifier, password)
             );
 
             CustomUserDetails userDetail = (CustomUserDetails) authentication.getPrincipal();
@@ -67,7 +67,7 @@ public class EmailPasswordAuthStrategy implements AuthStrategy {
 
             // Reload user entity to ensure we have full data for JWT
             if (user == null) {
-                user = findUserByEmail(email);
+                user = findUserByIdentifier(identifier);
             }
 
             return loginCompletionHelper.completeLogin(user, request.getIpAddress(), request.getUserAgent());
@@ -81,14 +81,22 @@ public class EmailPasswordAuthStrategy implements AuthStrategy {
         }
     }
 
-    private User findUserByEmail(String email) {
-        try {
-            QueryWrapper<User> qw = new QueryWrapper<>();
-            qw.eq("email", email);
-            return userMapper.selectOne(qw);
-        } catch (Exception e) {
-            log.warn("Failed to lookup user by email: {}", e.getMessage());
+    private User findUserByIdentifier(String identifier) {
+        if (identifier == null || identifier.isBlank()) {
             return null;
         }
+        try {
+            User byEmail = selectOne("email", identifier);
+            return byEmail != null ? byEmail : selectOne("user_name", identifier);
+        } catch (Exception e) {
+            log.warn("Failed to lookup user by login identifier: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private User selectOne(String column, String value) {
+        QueryWrapper<User> qw = new QueryWrapper<>();
+        qw.eq(column, value);
+        return userMapper.selectOne(qw);
     }
 }
