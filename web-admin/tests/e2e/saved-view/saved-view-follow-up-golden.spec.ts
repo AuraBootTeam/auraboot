@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { uniqueId, waitForDynamicPageLoad } from '../helpers';
+import { uniqueId } from '../helpers';
 import { navigateToOrderViaSidebar } from './helpers';
 
 const ORDER_MODEL = 'e2et_order';
@@ -26,10 +26,6 @@ async function apiData<T>(
     throw new Error(`${method.toUpperCase()} ${url} returned ${body.code}: ${body.desc ?? body.message ?? text}`);
   }
   return (body?.data ?? body) as T;
-}
-
-async function getSavedView(page: Page, pid: string): Promise<any> {
-  return apiData<any>(page, 'get', `/api/views/${pid}`);
 }
 
 function toLocalDateString(d: Date): string {
@@ -88,7 +84,7 @@ async function ensureModifiedThisWeekPresetCopy(page: Page): Promise<void> {
 }
 
 test.describe('SavedView Personal-only follow-up golden coverage', () => {
-  test('SV-FU-003: quick preset saved copy shows saved, edited, and reset states', async ({
+  test('SV-FU-003: saved quick preset opens as a personal view without toolbar preset state', async ({
     page,
   }) => {
     await ensureModifiedThisWeekPresetCopy(page);
@@ -97,52 +93,26 @@ test.describe('SavedView Personal-only follow-up golden coverage', () => {
     await expect(page.getByTestId('preset-view-bar')).toHaveCount(0);
 
     const presetChip = page.getByTestId('quick-filter-modified_this_week');
-    await expect(presetChip).toHaveAttribute('data-preset-saved', 'true', { timeout: 10_000 });
-    await presetChip.click();
-    await page.getByTestId('preset-view-save-as-personal').click();
-    await expect(page).toHaveURL(/view=[^&]+/, { timeout: 10_000 });
-
-    const viewPid = new URL(page.url()).searchParams.get('view');
-    expect(viewPid).toBeTruthy();
-    await expect(presetChip).toHaveAttribute('data-preset-saved', 'true');
-
-    const currentView = await getSavedView(page, viewPid!);
-    await apiData(page, 'put', `/api/views/${viewPid}`, {
-      viewConfig: {
-        ...(currentView.viewConfig ?? {}),
-        filters: [
-          {
-            fieldCode: 'e2et_order_title',
-            operator: 'eq',
-            value: `edited-${uniqueId('preset')}`,
-          },
-        ],
-        meta: {
-          ...(currentView.viewConfig?.meta ?? {}),
-          managedBy: 'user',
-          originPresetKey: 'modified_this_week',
-        },
-      },
-    });
-
-    await page.reload({ waitUntil: 'domcontentloaded' });
-    await waitForDynamicPageLoad(page);
-    await expect(presetChip).toHaveAttribute('data-preset-edited', 'true');
-    await expect(page.getByTestId('preset-view-reset-saved')).toBeVisible();
-    await page.screenshot({ path: `${SHOTS}/04-preset-edited-state.png`, fullPage: true });
-
-    const resetResponse = page.waitForResponse(
-      (resp) => resp.request().method() === 'PUT' && resp.url().includes(`/api/views/${viewPid}`),
-      { timeout: 10_000 },
-    );
-    await page.getByTestId('preset-view-reset-saved').click();
-    await expect((await resetResponse).ok()).toBeTruthy();
-    await expect(presetChip).toHaveAttribute('data-preset-edited', 'false');
+    await expect(presetChip).not.toHaveAttribute('data-preset-saved', 'true');
+    await expect(presetChip).not.toHaveAttribute('data-preset-edited', 'true');
     await expect(page.getByTestId('preset-view-reset-saved')).toHaveCount(0);
 
-    const resetView = await getSavedView(page, viewPid!);
-    expect(resetView.viewConfig?.filters?.some((filter: any) => filter.fieldCode === 'updated_at')).toBe(true);
-    expect(resetView.viewConfig?.filters?.some((filter: any) => filter.fieldCode === 'e2et_order_title')).toBe(false);
-    await page.screenshot({ path: `${SHOTS}/05-preset-reset-state.png`, fullPage: true });
+    await presetChip.click();
+    await expect(presetChip).toHaveAttribute('data-preset-active', 'true', { timeout: 10_000 });
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('preset'), { timeout: 10_000 })
+      .toBe('modified_this_week');
+
+    await page.getByTestId('preset-view-save-as-personal').click();
+    await expect(page).toHaveURL(/view=[^&]+/, { timeout: 10_000 });
+    await expect
+      .poll(() => new URL(page.url()).searchParams.get('preset'), { timeout: 10_000 })
+      .toBeNull();
+    await expect(presetChip).toHaveAttribute('data-preset-active', 'false');
+    await expect(presetChip).not.toHaveAttribute('data-preset-saved', 'true');
+    await expect(presetChip).not.toHaveAttribute('data-preset-edited', 'true');
+    await expect(page.getByTestId('preset-view-save-as-personal')).toHaveCount(0);
+    await expect(page.getByTestId('preset-view-reset-saved')).toHaveCount(0);
+    await page.screenshot({ path: `${SHOTS}/04-preset-saved-as-personal-clean-state.png`, fullPage: true });
   });
 });

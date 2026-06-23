@@ -5,7 +5,7 @@
  * Below:  <FilterChipBar .../>
  */
 import React, { useCallback } from 'react';
-import { ArrowPathIcon, CheckCircleIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { PlusIcon } from '@heroicons/react/24/outline';
 import { RowHeightSelector } from '~/framework/smart/components/view/RowHeightSelector';
 import { FilterChipBar } from '~/framework/smart/components/view/FilterChipBar';
 import type { SortConfig, ViewFilterConfig, RowHeight } from '~/framework/smart/types/savedView';
@@ -29,14 +29,6 @@ export interface ListToolbarProps {
   onQuickFilter: (key: QuickFilterKey) => void;
   /** Save the active system preset as a personal SavedView. */
   onSaveActivePreset?: () => void;
-  /** Presets that already have a personal SavedView copy. */
-  savedPresetKeys?: QuickFilterKey[];
-  /** Origin preset key of the active personal SavedView copy. */
-  activeSavedPresetKey?: QuickFilterKey | null;
-  /** Whether the active personal copy differs from the current system preset definition. */
-  activeSavedPresetEdited?: boolean;
-  /** Reset the active personal copy to the current system preset definition. */
-  onResetActiveSavedPreset?: () => void;
 
   /** Sort */
   activeSorts: SortConfig[];
@@ -84,10 +76,6 @@ export function ListToolbar({
   activeQuickFilter,
   onQuickFilter,
   onSaveActivePreset,
-  savedPresetKeys = [],
-  activeSavedPresetKey = null,
-  activeSavedPresetEdited = false,
-  onResetActiveSavedPreset,
   activeSorts,
   onSortsChange,
   sortableColumns,
@@ -111,7 +99,6 @@ export function ListToolbar({
   hideFilterChips,
 }: ListToolbarProps) {
   const { t } = useI18n();
-  const savedPresetSet = new Set(savedPresetKeys);
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter') onSearch();
@@ -134,13 +121,6 @@ export function ListToolbar({
     'common.saved_view_save_preset_to_personal',
     undefined,
     'Save preset as my view',
-  );
-  const savedBadgeLabel = t('common.saved_view_preset_saved_badge', undefined, 'Saved');
-  const editedBadgeLabel = t('common.saved_view_preset_edited_badge', undefined, 'Edited');
-  const resetPresetLabel = t(
-    'common.saved_view_preset_reset',
-    undefined,
-    'Reset saved preset',
   );
   const showInlineControls =
     !hideSort ||
@@ -293,9 +273,7 @@ export function ListToolbar({
             data-testid="quick-filters"
           >
             {quickFilters.map((qf) => {
-              const active = activeQuickFilter === qf.key || activeSavedPresetKey === qf.key;
-              const saved = savedPresetSet.has(qf.key);
-              const edited = activeSavedPresetKey === qf.key && activeSavedPresetEdited;
+              const active = activeQuickFilter === qf.key;
               return (
                 <button
                   key={qf.key}
@@ -303,8 +281,6 @@ export function ListToolbar({
                   onClick={() => onQuickFilter(qf.key)}
                   data-testid={`quick-filter-${qf.key}`}
                   data-preset-active={active ? 'true' : 'false'}
-                  data-preset-saved={saved ? 'true' : 'false'}
-                  data-preset-edited={edited ? 'true' : 'false'}
                   aria-pressed={active}
                   className={`rounded-pill inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium transition-colors ${
                     active
@@ -313,16 +289,6 @@ export function ListToolbar({
                   }`}
                 >
                   <span>{qf.label}</span>
-                  {saved && (
-                    <span
-                      className="text-success inline-flex items-center gap-0.5 text-[10px] font-semibold"
-                      data-testid={`quick-filter-${qf.key}-saved`}
-                      title={savedBadgeLabel}
-                    >
-                      <CheckCircleIcon className="h-3 w-3" aria-hidden />
-                      {edited ? editedBadgeLabel : savedBadgeLabel}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -336,18 +302,6 @@ export function ListToolbar({
                 className="rounded-control text-text-2 hover:bg-hover hover:text-text focus-visible:shadow-focus inline-flex h-7 w-7 items-center justify-center transition-colors focus:outline-none"
               >
                 <PlusIcon className="h-3.5 w-3.5" aria-hidden />
-              </button>
-            )}
-            {activeSavedPresetKey && activeSavedPresetEdited && onResetActiveSavedPreset && (
-              <button
-                type="button"
-                onClick={onResetActiveSavedPreset}
-                data-testid="preset-view-reset-saved"
-                aria-label={resetPresetLabel}
-                title={resetPresetLabel}
-                className="rounded-control text-text-2 hover:bg-hover hover:text-text focus-visible:shadow-focus inline-flex h-7 w-7 items-center justify-center transition-colors focus:outline-none"
-              >
-                <ArrowPathIcon className="h-3.5 w-3.5" aria-hidden />
               </button>
             )}
           </div>

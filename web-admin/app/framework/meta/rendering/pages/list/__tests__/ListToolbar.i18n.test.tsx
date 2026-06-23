@@ -23,9 +23,6 @@ const ZH_TRANSLATIONS = {
     created_today: '今日新建',
     modified_this_week: '本周修改',
     saved_view_save_preset_to_personal: '保存为我的视图',
-    saved_view_preset_saved_badge: '已保存',
-    saved_view_preset_edited_badge: '已编辑',
-    saved_view_preset_reset: '重置预设视图',
   },
 };
 
@@ -105,27 +102,16 @@ describe('ListToolbar i18n', () => {
     expect(onSaveActivePreset).toHaveBeenCalledTimes(1);
   });
 
-  it('shows saved preset lifecycle state on the toolbar quick filter chip', () => {
-    const onResetActiveSavedPreset = vi.fn();
-    renderToolbar({
-      savedPresetKeys: ['modified_this_week'],
-      activeSavedPresetKey: 'modified_this_week',
-      activeSavedPresetEdited: true,
-      onResetActiveSavedPreset,
-    });
+  it('keeps quick filters inactive unless a toolbar preset is selected', () => {
+    renderToolbar();
 
     const modifiedThisWeek = screen.getByTestId('quick-filter-modified_this_week');
-    expect(modifiedThisWeek).toHaveAttribute('data-preset-active', 'true');
-    expect(modifiedThisWeek).toHaveAttribute('data-preset-saved', 'true');
-    expect(modifiedThisWeek).toHaveAttribute('data-preset-edited', 'true');
-    expect(screen.getByTestId('quick-filter-modified_this_week-saved')).toHaveTextContent(
-      '已编辑',
-    );
-
-    const resetButton = screen.getByTestId('preset-view-reset-saved');
-    expect(resetButton).toHaveAttribute('aria-label', '重置预设视图');
-    fireEvent.click(resetButton);
-    expect(onResetActiveSavedPreset).toHaveBeenCalledTimes(1);
+    expect(modifiedThisWeek).toHaveAttribute('data-preset-active', 'false');
+    expect(modifiedThisWeek).not.toHaveAttribute('data-preset-saved');
+    expect(modifiedThisWeek).not.toHaveAttribute('data-preset-edited');
+    expect(screen.queryByTestId('quick-filter-modified_this_week-saved')).toBeNull();
+    expect(screen.queryByTestId('preset-view-reset-saved')).toBeNull();
+    expect(screen.queryByTestId('preset-view-save-as-personal')).toBeNull();
   });
 
   it('renders search placeholder from common.search', () => {
