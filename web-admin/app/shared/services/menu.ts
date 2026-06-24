@@ -1,5 +1,6 @@
 import { ResultHelper } from '~/utils/type';
 import { getTokenFromRequest } from '~/shared/services/session';
+import { fetchResult } from '~/shared/services/http-client';
 
 export interface MenuItem {
   id: number;
@@ -76,22 +77,7 @@ export async function getUserMenus(request: Request): Promise<any[]> {
   }
 
   try {
-    const apiUrl = process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
-    const url = `${apiUrl}/api/menu/user`;
-
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.error('获取用户菜单失败:', response.statusText);
-      return getDefaultUIMenus();
-    }
-
-    const result = await response.json();
+    const result = await fetchResult<MenuItem[]>('/api/menu/user', { token }, request);
 
     if (ResultHelper.isSuccess(result)) {
       const processedMenus = processMenuData(result.data || []);

@@ -37,11 +37,12 @@ function deriveContextFromRoute(
   // /p/:pageKey/view/:recordPid → detail
   if (pathname.match(/^\/p\/[^/]+\/view\/[^/]+/)) {
     const pageKey = params.pageKey || '';
+    const recordPid = params.recordPid ?? params.recordId;
     return {
       pageType: 'detail',
       pageKey,
       modelCode: pageKey,
-      recordPid: params.recordPid,
+      recordPid,
       breadcrumb: [pageKey],
     };
   }
@@ -49,11 +50,12 @@ function deriveContextFromRoute(
   // /p/:pageKey/edit/:recordPid → form (edit)
   if (pathname.match(/^\/p\/[^/]+\/edit\/[^/]+/)) {
     const pageKey = params.pageKey || '';
+    const recordPid = params.recordPid ?? params.recordId;
     return {
       pageType: 'form',
       pageKey,
       modelCode: pageKey,
-      recordPid: params.recordPid,
+      recordPid,
       breadcrumb: [pageKey],
     };
   }

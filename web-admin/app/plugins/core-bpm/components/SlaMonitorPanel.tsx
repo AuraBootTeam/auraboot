@@ -85,6 +85,8 @@ export function SlaMonitorPanel() {
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [drillFilter, setDrillFilter] = useState<string | null>(null);
+  const loadErrorMessage =
+    st('$i18n:bpm.sla.monitor.loadError') || 'Failed to load SLA monitor data';
 
   const loadDashboard = useCallback(async () => {
     setLoading(true);
@@ -92,11 +94,11 @@ export function SlaMonitorPanel() {
       const data = await slaService.getDashboard();
       setDashboard(data);
     } catch {
-      showErrorToast(st('$i18n:bpm.sla.monitor.loadError') || 'Failed to load SLA monitor data');
+      showErrorToast(loadErrorMessage);
     } finally {
       setLoading(false);
     }
-  }, [showErrorToast, st]);
+  }, [loadErrorMessage, showErrorToast]);
 
   useEffect(() => {
     loadDashboard();

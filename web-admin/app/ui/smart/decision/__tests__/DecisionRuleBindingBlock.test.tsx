@@ -115,6 +115,63 @@ describe('DecisionRuleBindingBlock', () => {
     expect(screen.getByLabelText('decision-code')).toHaveValue('sla_deadline');
   });
 
+  it('renders a read-only decision summary without editor debug surfaces', () => {
+    render(
+      <DecisionRuleBindingBlock
+        block={{
+          props: {
+            mode: 'decision',
+            readOnly: true,
+            variant: 'summary',
+            showImpactPreview: true,
+            showTestRunner: true,
+            decisions: [
+              { code: 'complaint_sla_deadline', name: '投诉 SLA 截止时间' },
+              { code: 'sla_deadline', name: 'SLA 截止时间' },
+            ],
+          },
+        }}
+        value={{
+          bindingKind: 'DECISION_REF',
+          decisionBinding: {
+            decisionCode: 'complaint_sla_deadline',
+            versionPolicy: 'LATEST_PUBLISHED',
+            inputMappings: [
+              {
+                input: 'ticketPriority',
+                source: { kind: 'FIELD', scope: 'record', path: 'data.priority' },
+              },
+            ],
+            outputMappings: [
+              {
+                output: 'deadlineMinutes',
+                target: { kind: 'SLA_FIELD', path: 'deadlineMinutes' },
+              },
+            ],
+            fallbackPolicy: { mode: 'FAIL_CLOSED' },
+            traceMode: 'SAMPLED',
+            enabled: true,
+          },
+          enabled: true,
+        }}
+      />,
+    );
+
+    expect(screen.getByTestId('decision-binding-summary')).toBeInTheDocument();
+    expect(screen.getByText('投诉 SLA 截止时间')).toBeInTheDocument();
+    expect(screen.getByText('complaint_sla_deadline')).toBeInTheDocument();
+    expect(screen.getByText('ticketPriority')).toBeInTheDocument();
+    expect(screen.getByText('record.data.priority')).toBeInTheDocument();
+    expect(screen.getByText('deadlineMinutes')).toBeInTheDocument();
+    expect(screen.getByText('SLA_FIELD.deadlineMinutes')).toBeInTheDocument();
+
+    expect(screen.queryByTestId('decision-binding-editor')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('decision-binding-preview')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('decision-code')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('decision-test-runner')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'run-decision-test' })).not.toBeInTheDocument();
+  });
+
   it('hydrates from an existing RuleConsumerBinding value', () => {
     render(
       <DecisionRuleBindingBlock

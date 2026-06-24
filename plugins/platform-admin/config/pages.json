@@ -235,6 +235,143 @@
     ]
   },
   {
+    "pageKey": "sla_config_detail",
+    "name:zh-CN": "SLA 配置详情",
+    "name:en": "SLA Configuration Detail",
+    "modelCode": "sla_config",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "extension": {
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false
+    },
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "edit",
+            "primary": true,
+            "label": {
+              "zh-CN": "编辑配置",
+              "en-US": "Edit Configuration"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "sla_config_form",
+              "command": "admin:update_sla_config"
+            }
+          }
+        ]
+      },
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "name",
+            "colSpan": 6
+          },
+          {
+            "field": "enabled",
+            "colSpan": 6
+          },
+          {
+            "field": "target_type",
+            "colSpan": 4
+          },
+          {
+            "field": "target_key",
+            "colSpan": 4
+          },
+          {
+            "field": "domain_code",
+            "colSpan": 4
+          },
+          {
+            "field": "model_code",
+            "colSpan": 4
+          }
+        ]
+      },
+      {
+        "id": "timer_policy",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "计时策略",
+          "en-US": "Timer Policy"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "deadline_mode",
+            "colSpan": 4
+          },
+          {
+            "field": "deadline_value",
+            "colSpan": 4
+          },
+          {
+            "field": "suspend_policy",
+            "colSpan": 4
+          },
+          {
+            "field": "business_calendar",
+            "colSpan": 4
+          },
+          {
+            "field": "deadline_field",
+            "colSpan": 4
+          },
+          {
+            "field": "priority_field",
+            "colSpan": 4
+          }
+        ]
+      },
+      {
+        "id": "sla_rule_binding",
+        "blockType": "custom",
+        "component": "DecisionRuleBindingBlock",
+        "props": {
+          "mode": "decision",
+          "valueField": "rule_binding",
+          "fieldCatalogMode": "merge",
+          "consumerType": "SLA",
+          "readOnly": true,
+          "variant": "summary",
+          "showImpactPreview": true,
+          "showTestRunner": false,
+          "initialDecisionCode": "complaint_sla_deadline",
+          "initialContextJson": "{\n  \"record\": {\n    \"data\": {\n      \"targetType\": \"NODE\",\n      \"targetKey\": \"approve_task\",\n      \"priority\": \"HIGH\"\n    }\n  }\n}",
+          "fields": [
+            { "scope": "record", "path": "data.targetType", "label": "目标类型", "dataType": "enum", "options": ["PROCESS", "NODE", "TASK"] },
+            { "scope": "record", "path": "data.targetKey", "label": "目标键", "dataType": "string" },
+            { "scope": "record", "path": "data.domainCode", "label": "域编码", "dataType": "string" },
+            { "scope": "record", "path": "data.modelCode", "label": "关联模型", "dataType": "string" },
+            { "scope": "record", "path": "data.priority", "label": "优先级", "dataType": "enum", "options": ["HIGH", "NORMAL", "LOW"] }
+          ],
+          "decisions": [
+            { "code": "complaint_sla_deadline", "name": "投诉 SLA 截止时间" },
+            { "code": "sla_deadline", "name": "SLA 截止时间" },
+            { "code": "approval_routing", "name": "审批路由" }
+          ]
+        }
+      }
+    ]
+  },
+  {
     "pageKey": "bpm_domain_config_list",
     "name:zh-CN": "BPM 域配置",
     "name:en": "BPM Domain Configuration",

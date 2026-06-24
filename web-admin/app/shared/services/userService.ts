@@ -10,6 +10,7 @@
 
 import { ResultHelper } from '~/utils/type';
 import { getTokenFromRequest } from '~/shared/services/session';
+import { fetchResult } from '~/shared/services/http-client';
 import type { User, UserPermissions, Preferences } from '~/utils/type';
 
 /**
@@ -32,21 +33,11 @@ export async function fetchUserInfo(request: Request): Promise<{
   }
 
   try {
-    const apiUrl = process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443';
-
-    const response = await fetch(`${apiUrl}/api/auth/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      console.error('Failed to fetch user info:', response.statusText);
-      return null;
-    }
-
-    const result = await response.json();
+    const result = await fetchResult<{
+      user: User;
+      permissions?: UserPermissions;
+      preferences?: Preferences | null;
+    }>('/api/auth/me', { token }, request);
 
     // 后端返回格式: { code: "0", data: { user: {...}, permissions: {...} } }
     if (!ResultHelper.isSuccess(result) || !result.data) {

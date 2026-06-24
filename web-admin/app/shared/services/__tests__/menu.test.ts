@@ -1,11 +1,20 @@
 /**
  * Unit tests for menu service (pure functions only)
- * getUserMenus uses native fetch + session (too many deps to wire here);
- * we test the pure transformation/logic functions which are the critical logic layer.
+ * Covers the menu transformation helpers and the SSR menu fetch URL resolution.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { getTokenMock } = vi.hoisted(() => ({
+  getTokenMock: vi.fn(),
+}));
+
+vi.mock('~/shared/services/session', () => ({
+  getTokenFromRequest: getTokenMock,
+}));
+
 import type { MenuItem } from '../menu';
 import {
+  getUserMenus,
   processMenuData,
   transformMenuForUI,
   isMenuDirectory,
@@ -25,6 +34,67 @@ function makeMenu(overrides: Partial<MenuItem> & { id: number; name: string; pat
     ...overrides,
   };
 }
+
+// ── getUserMenus ──────────────────────────────────────────────────────────────
+
+describe('getUserMenus', () => {
+  const originalBffInternalUrl = process.env.BFF_INTERNAL_URL;
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    getTokenMock.mockReset();
+    process.env.BFF_INTERNAL_URL = 'http://127.0.0.1:6190';
+    fetchSpy = vi.spyOn(global, 'fetch');
+  });
+
+  afterEach(() => {
+    if (originalBffInternalUrl === undefined) {
+      delete process.env.BFF_INTERNAL_URL;
+    } else {
+      process.env.BFF_INTERNAL_URL = originalBffInternalUrl;
+    }
+    fetchSpy.mockRestore();
+  });
+
+  it('uses the SSR BFF URL and transforms active menu items', async () => {
+    getTokenMock.mockResolvedValue('test-jwt');
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: '0',
+        data: [
+          makeMenu({
+            id: 1,
+            pid: 'decisionops-preview',
+            code: 'decisionops_console_preview',
+            name: '决策中心综合控制台预览',
+            path: '/decision-ops',
+            type: 1,
+            visible: true,
+            orderNo: 1,
+          }),
+        ],
+      }),
+    } as any);
+
+    const result = await getUserMenus(new Request('http://127.0.0.1:5192/decision-ops'));
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://127.0.0.1:6190/api/menu/user',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: 'Bearer test-jwt' }),
+      }),
+    );
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'decisionops-preview',
+        name: '决策中心综合控制台预览',
+        nameKey: 'menu.decisionops_console_preview',
+        path: '/decision-ops',
+      }),
+    ]);
+  });
+});
 
 // ── processMenuData ───────────────────────────────────────────────────────────
 
