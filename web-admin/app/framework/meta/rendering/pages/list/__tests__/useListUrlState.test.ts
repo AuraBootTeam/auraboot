@@ -3,6 +3,7 @@ import {
   encodeSorts,
   decodeSorts,
   areSortsEqual,
+  areFiltersEqual,
   encodeFilters,
   decodeFilters,
 } from '../useListUrlState';
@@ -159,6 +160,30 @@ describe('decodeFilters', () => {
   it('returns empty array for valid base64 of non-JSON', () => {
     const base64 = btoa('hello world');
     expect(decodeFilters(base64)).toEqual([]);
+  });
+});
+
+describe('areFiltersEqual', () => {
+  it('treats equivalent filter arrays as equal even when references differ', () => {
+    const a: ViewFilterConfig[] = [{ fieldCode: 'status', operator: 'eq', value: 'active' }];
+    const b: ViewFilterConfig[] = [{ fieldCode: 'status', operator: 'eq', value: 'active' }];
+
+    expect(a).not.toBe(b);
+    expect(areFiltersEqual(a, b)).toBe(true);
+  });
+
+  it('detects filter value changes', () => {
+    expect(
+      areFiltersEqual(
+        [{ fieldCode: 'status', operator: 'eq', value: 'active' }],
+        [{ fieldCode: 'status', operator: 'eq', value: 'inactive' }],
+      ),
+    ).toBe(false);
+  });
+
+  it('treats nullish and empty filters as equal', () => {
+    expect(areFiltersEqual(undefined, [])).toBe(true);
+    expect(areFiltersEqual(null, [])).toBe(true);
   });
 });
 

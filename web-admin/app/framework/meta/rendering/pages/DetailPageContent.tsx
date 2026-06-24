@@ -1174,7 +1174,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 data-print="hide"
               >
                 <Link
-                  to={`/p/${tableName}`}
+                  to={`/p/${tableName}${location.search}`}
                   className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover border px-4 py-2 text-sm font-medium"
                 >
                   {t('action.back')}

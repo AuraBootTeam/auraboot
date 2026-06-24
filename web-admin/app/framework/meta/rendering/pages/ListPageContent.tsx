@@ -70,7 +70,14 @@ import { ListPagination } from './list/ListPagination';
 import { ListModals } from './list/ListModals';
 import { ListToolbar } from './list/ListToolbar';
 import { ListTable } from './list/ListTable';
-import { areSortsEqual, encodeSorts, decodeSorts } from './list/useListUrlState';
+import {
+  areFiltersEqual,
+  areSortsEqual,
+  decodeFilters,
+  decodeSorts,
+  encodeFilters,
+  encodeSorts,
+} from './list/useListUrlState';
 import {
   type QuickFilterPresetKey,
   buildQuickFilterPreset,
@@ -646,6 +653,7 @@ function ListPageContentInner(props: PageContentProps) {
 
   // Read initial sorts, keyword, and view from URL search params
   const urlSorts = useMemo(() => decodeSorts(searchParams.get('sort')), [searchParams]);
+  const urlChipFilters = useMemo(() => decodeFilters(searchParams.get('filters')), [searchParams]);
   const urlKeyword = useMemo(() => searchParams.get('keyword') || '', [searchParams]);
   const urlViewPid = useMemo(() => searchParams.get('view') || null, [searchParams]);
   // Active preset view (?preset=created_today) — persists across reload.
@@ -701,7 +709,7 @@ function ListPageContentInner(props: PageContentProps) {
   // Active sort state — initialized from URL > SavedView > DSL defaultSort
   const [activeSorts, setActiveSorts] = useState<SortConfig[]>(() => urlSorts);
   // Active filter chips — user-added filters via chip bar (separate from filters)
-  const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>([]);
+  const [chipFilters, setChipFilters] = useState<ViewFilterConfig[]>(() => urlChipFilters);
   // FilterFieldPicker state
   const [fieldPickerOpen, setFieldPickerOpen] = useState(false);
   const [fieldPickerAnchor, setFieldPickerAnchor] = useState<
@@ -755,7 +763,13 @@ function ListPageContentInner(props: PageContentProps) {
     }));
   }, []);
 
-  const shouldPersistPaginationToUrlRef = useRef(urlPageNum != null || urlPageSize != null);
+  const shouldPersistPaginationToUrlRef = useRef(
+    urlPageNum != null ||
+      urlPageSize != null ||
+      urlSorts.length > 0 ||
+      urlChipFilters.length > 0 ||
+      Boolean(urlKeyword),
+  );
   const tableBlock = useMemo(() => {
     if (!schema?.blocks) return null;
     return schema.blocks.find((block: any) => block.blockType === 'table') || null;
@@ -860,6 +874,16 @@ function ListPageContentInner(props: PageContentProps) {
     });
   }, [urlPageNum, urlPageSize]);
 
+  // Sync URL chip filters -> local state (supports refresh and browser back/forward).
+  useEffect(() => {
+    setChipFilters((prev) => (areFiltersEqual(prev, urlChipFilters) ? prev : urlChipFilters));
+  }, [urlChipFilters]);
+
+  // Sync URL sorts -> local state (supports refresh and browser back/forward).
+  useEffect(() => {
+    setActiveSorts((prev) => (areSortsEqual(prev, urlSorts) ? prev : urlSorts));
+  }, [urlSorts]);
+
   // Sync local pagination state -> URL query params (preserve existing filter_* params).
   useEffect(() => {
     if (!shouldPersistPaginationToUrlRef.current) return;
@@ -882,14 +906,23 @@ function ListPageContentInner(props: PageContentProps) {
     },
   });
 
+  const appendListSearch = useCallback(
+    (path: string) => {
+      const query = searchParams.toString();
+      if (!query) return path;
+      return `${path}${path.includes('?') ? '&' : '?'}${query}`;
+    },
+    [searchParams],
+  );
+
   const navigateToRecordView = useCallback(
     (recordPid: string | number | null | undefined) => {
       if (recordPid == null || recordPid === '') {
         return;
       }
-      navigate(`/p/${tableName}/view/${String(recordPid)}`);
+      navigate(appendListSearch(`/p/${tableName}/view/${String(recordPid)}`));
     },
-    [navigate, tableName],
+    [appendListSearch, navigate, tableName],
   );
 
   // Tab state for tabs
@@ -2013,6 +2046,28 @@ function ListPageContentInner(props: PageContentProps) {
     skipListData,
   ]);
 
+  // Sync chip filters to URL so detail navigation and browser back/forward keep the list state.
+  useEffect(() => {
+    if (!schema || skipListData) return;
+    const encoded = encodeFilters(chipFilters);
+    const currentEncoded = searchParams.get('filters');
+    if ((encoded ?? null) === (currentEncoded ?? null)) return;
+    shouldPersistPaginationToUrlRef.current = true;
+    setSearchParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (encoded) {
+          p.set('filters', encoded);
+        } else {
+          p.delete('filters');
+        }
+        p.set('pageNum', '1');
+        return p;
+      },
+      { replace: true },
+    );
+  }, [chipFilters, schema, searchParams, setSearchParams, skipListData]);
+
   const handleImportComplete = useCallback(() => {
     setImportOpen(false);
     loadData({ page: 0, size: pagination.pageSize, filters });
@@ -2815,7 +2870,7 @@ function ListPageContentInner(props: PageContentProps) {
         const resolved = detailUrl.replace(/\{(\w+)\}/g, (_: string, key: string) =>
           String(record[key] ?? ''),
         );
-        navigate(resolved);
+        navigate(appendListSearch(resolved));
         return;
       }
 
@@ -2829,16 +2884,16 @@ function ListPageContentInner(props: PageContentProps) {
         const optionDetailPageKey = (schema as any)?.options?.detailPageKey;
         const resolvedDetailPageKey = relatedDetailPageKey || optionDetailPageKey;
         if (resolvedDetailPageKey) {
-          navigate(`/p/${resolvedDetailPageKey}/view/${pid}`);
+          navigate(appendListSearch(`/p/${resolvedDetailPageKey}/view/${pid}`));
         } else {
-          navigate(`/p/${tableName}/view/${pid}`);
+          navigate(appendListSearch(`/p/${tableName}/view/${pid}`));
         }
         return;
       }
 
       setPreviewRecordId(pid);
     },
-    [schema, tableBlock, tableName, navigate, listExtensions?.disableRowClick],
+    [appendListSearch, schema, tableBlock, tableName, navigate, listExtensions?.disableRowClick],
   );
 
   // All column definitions for ColumnSettingsPanel (with labels)
