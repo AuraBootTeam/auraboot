@@ -127,6 +127,13 @@ cleanup-artifacts.sh
   targeted cleanup for slug/date-scoped Playwright artifacts and storageState
   directories; dry-run by default
 
+plugin-runtime-import-guard.mjs
+  read-only by default guard for plugin import drift: verifies plugin.json,
+  local backend jar SHA, META-INF/extensions.idx, admin token, /api/plugins/hotload
+  runtime path/state, registered command handlers, and optional /api/pages/key
+  schema evidence. Use --hotload-upload and/or --import only when you explicitly
+  want the guard to mutate the running stack.
+
 start-production-like.sh
   starts the B2 production-like frontend service for an existing full isolated
   stack; explicit because the prod build is heavier than daily Vite/BFF smoke
