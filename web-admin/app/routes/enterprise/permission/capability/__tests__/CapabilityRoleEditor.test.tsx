@@ -27,10 +27,10 @@ import { permissionService } from '~/shared/services/permissionService';
 import CapabilityRoleEditor from '../CapabilityRoleEditor';
 
 function cap(code: string, label: string, granted: boolean) {
-  return { code, group: '客户管理', label, sensitive: false, includes: [], granted, conventionDerived: false };
+  return { code, group: '报价单', label, sensitive: false, includes: [], granted, conventionDerived: false };
 }
 const groups: CapabilityGroup[] = [
-  { group: '客户管理', capabilities: [cap('crm.cap.account', '维护客户资料', true), cap('crm.cap.lead', '维护线索', false)] },
+  { group: '报价单', capabilities: [cap('qo.cap.quote_view', '查看报价', true), cap('qo.cap.quote_edit', '编辑报价', false)] },
 ];
 
 const emptyMatrix: PermissionMatrixDTO = { modules: [] };
@@ -53,8 +53,8 @@ describe('CapabilityRoleEditor', () => {
     // ② data-scope bar and ③ advanced section both present
     expect(screen.getByTestId('data-scope-bar')).toBeTruthy();
     expect(screen.getByTestId('advanced-atomic-section')).toBeTruthy();
-    expect((screen.getByTestId('capability-checkbox-crm.cap.account') as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByTestId('capability-checkbox-crm.cap.lead') as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByTestId('capability-checkbox-qo.cap.quote_view') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement).checked).toBe(false);
     expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -64,22 +64,22 @@ describe('CapabilityRoleEditor', () => {
     render(<CapabilityRoleEditor rolePid="role-pid-5" />);
     await waitFor(() => screen.getByTestId('capability-role-editor'));
 
-    fireEvent.click(screen.getByTestId('capability-checkbox-crm.cap.lead')); // select lead -> dirty
+    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit')); // select quote edit -> dirty
     expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(false);
 
     fireEvent.click(screen.getByTestId('capability-save'));
     await waitFor(() =>
-      expect(capabilityService.applySelection).toHaveBeenCalledWith('role-pid-5', ['crm.cap.account', 'crm.cap.lead']),
+      expect(capabilityService.applySelection).toHaveBeenCalledWith('role-pid-5', ['qo.cap.quote_view', 'qo.cap.quote_edit']),
     );
   });
 
   it('applies a tier preset, selecting tiered capabilities and enabling Save', async () => {
     const tieredGroups: CapabilityGroup[] = [
       {
-        group: '客户管理',
+        group: '报价单',
         capabilities: [
-          { code: 'crm.cap.account', group: '客户管理', label: '维护客户资料', sensitive: false, tier: 'viewer', includes: [], granted: false, conventionDerived: false },
-          { code: 'crm.cap.lead', group: '客户管理', label: '维护线索', sensitive: false, tier: 'editor', includes: [], granted: false, conventionDerived: false },
+          { code: 'qo.cap.quote_view', group: '报价单', label: '查看报价', sensitive: false, tier: 'viewer', includes: [], granted: false, conventionDerived: false },
+          { code: 'qo.cap.quote_edit', group: '报价单', label: '编辑报价', sensitive: false, tier: 'editor', includes: [], granted: false, conventionDerived: false },
         ],
       },
     ];
@@ -88,8 +88,44 @@ describe('CapabilityRoleEditor', () => {
     await waitFor(() => screen.getByTestId('capability-role-editor'));
 
     fireEvent.click(screen.getByTestId('capability-preset-viewer')); // viewer preset -> only the viewer-tier capability
-    expect((screen.getByTestId('capability-checkbox-crm.cap.account') as HTMLInputElement).checked).toBe(true);
-    expect((screen.getByTestId('capability-checkbox-crm.cap.lead') as HTMLInputElement).checked).toBe(false);
+    expect((screen.getByTestId('capability-checkbox-qo.cap.quote_view') as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByTestId('capability-checkbox-qo.cap.quote_edit') as HTMLInputElement).checked).toBe(false);
     expect((screen.getByTestId('capability-save') as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('keeps generated model capabilities out of the primary checklist but preserves them on save', async () => {
+    const mixedGroups: CapabilityGroup[] = [
+      {
+        group: '报价单',
+        capabilities: [
+          { code: 'qo.cap.quote_view', group: '报价单', label: '查看报价', sensitive: false, tier: 'viewer', includes: [], granted: true, conventionDerived: false },
+          { code: 'qo.cap.quote_edit', group: '报价单', label: '编辑报价', sensitive: false, tier: 'editor', includes: [], granted: false, conventionDerived: false },
+        ],
+      },
+      {
+        group: 'model',
+        capabilities: [
+          { code: 'model.qo_quote_common', group: 'model', label: 'Qo_quote_common Read', sensitive: false, tier: null, includes: [], granted: true, conventionDerived: true },
+        ],
+      },
+    ];
+    mockData(mixedGroups);
+    (capabilityService.applySelection as ReturnType<typeof vi.fn>).mockResolvedValue(mixedGroups);
+    render(<CapabilityRoleEditor rolePid="role-pid-5" />);
+    await waitFor(() => screen.getByTestId('capability-role-editor'));
+
+    expect(screen.getByTestId('capability-checkbox-qo.cap.quote_view')).toBeTruthy();
+    expect(screen.queryByTestId('capability-checkbox-model.qo_quote_common')).toBeNull();
+    expect(screen.getByTestId('advanced-capability-summary')).toHaveTextContent('1/1');
+
+    fireEvent.click(screen.getByTestId('capability-checkbox-qo.cap.quote_edit'));
+    fireEvent.click(screen.getByTestId('capability-save'));
+    await waitFor(() =>
+      expect(capabilityService.applySelection).toHaveBeenCalledWith('role-pid-5', [
+        'qo.cap.quote_view',
+        'model.qo_quote_common',
+        'qo.cap.quote_edit',
+      ]),
+    );
   });
 });

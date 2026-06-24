@@ -4,7 +4,13 @@ import { useToastContext } from '~/contexts/ToastContext';
 import type { CapabilityGroup } from './types';
 import type { PermissionMatrixDTO } from '../types';
 import { capabilityService } from './capabilityService';
-import { grantedCapabilityCodes, toggleCapability, isDirty, capabilityCodesForTier } from './capabilityHelpers';
+import {
+  grantedCapabilityCodes,
+  toggleCapability,
+  isDirty,
+  capabilityCodesForTier,
+  splitCapabilityGroupsForPrimaryView,
+} from './capabilityHelpers';
 import { deriveCodeSources, exceptionCount } from './coverageHelpers';
 import { permissionService } from '~/shared/services/permissionService';
 import CapabilityChecklist from './CapabilityChecklist';
@@ -32,6 +38,12 @@ export default function CapabilityRoleEditor({ rolePid }: CapabilityRoleEditorPr
   const [matrix, setMatrix] = useState<PermissionMatrixDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const capabilityView = useMemo(() => splitCapabilityGroupsForPrimaryView(groups), [groups]);
+  const primaryCodes = useMemo(
+    () => new Set(capabilityView.primaryGroups.flatMap((group) => group.capabilities.map((capability) => capability.code))),
+    [capabilityView.primaryGroups],
+  );
 
   const loadGroups = useCallback(async () => {
     const fetched = await capabilityService.getForRole(rolePid);
@@ -62,6 +74,14 @@ export default function CapabilityRoleEditor({ rolePid }: CapabilityRoleEditorPr
   const onToggle = useCallback((code: string) => {
     setSelected((current) => toggleCapability(current, code));
   }, []);
+
+  const applyPreset = useCallback(
+    (tier: string) => {
+      const advancedSelection = selected.filter((code) => !primaryCodes.has(code));
+      setSelected([...advancedSelection, ...capabilityCodesForTier(capabilityView.primaryGroups, tier)]);
+    },
+    [capabilityView.primaryGroups, primaryCodes, selected],
+  );
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -155,7 +175,8 @@ export default function CapabilityRoleEditor({ rolePid }: CapabilityRoleEditorPr
     return <div data-testid="capability-editor-loading">{t('common.loading', undefined, '加载中…')}</div>;
   }
 
-  const dirty = isDirty(groups, selected);
+  const primarySelected = selected.filter((code) => primaryCodes.has(code));
+  const dirty = isDirty(capabilityView.primaryGroups, primarySelected);
 
   return (
     <div data-testid="capability-role-editor" className="flex flex-col gap-4">
@@ -175,14 +196,26 @@ export default function CapabilityRoleEditor({ rolePid }: CapabilityRoleEditorPr
               key={p.tier}
               type="button"
               data-testid={`capability-preset-${p.tier}`}
-              onClick={() => setSelected(capabilityCodesForTier(groups, p.tier))}
+              onClick={() => applyPreset(p.tier)}
               className="h-7 rounded-md border border-gray-200 px-2 text-xs text-gray-700 hover:bg-gray-50"
             >
               {p.label}
             </button>
           ))}
         </div>
-        <CapabilityChecklist groups={groups} selected={selected} onToggle={onToggle} />
+        <CapabilityChecklist groups={capabilityView.primaryGroups} selected={selected} onToggle={onToggle} />
+        {capabilityView.advancedTotal > 0 && (
+          <div
+            data-testid="advanced-capability-summary"
+            className="rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+          >
+            {t(
+              'admin.permission.generated.summary',
+              { granted: capabilityView.advancedGranted, total: capabilityView.advancedTotal },
+              `高级模型/系统权限已收纳: ${capabilityView.advancedGranted}/${capabilityView.advancedTotal}`,
+            )}
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <span data-testid="effective-summary" className="text-xs text-gray-500">
             {t('admin.permission.effective.summary', { total: effective.total, exceptions: effective.exceptions },
