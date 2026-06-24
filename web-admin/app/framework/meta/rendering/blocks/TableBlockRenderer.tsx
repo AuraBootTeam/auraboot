@@ -392,6 +392,13 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     }
   };
 
+  const getCellTitle = (column: ColumnConfig, row: any): string | undefined => {
+    if (!column.ellipsis) return undefined;
+    const value = row[column.field];
+    if (value === null || value === undefined) return undefined;
+    return typeof value === 'string' ? value : String(value);
+  };
+
   // 渲染操作按钮
   const renderActionButtons = (row: any, actions: ButtonConfig[]) => {
     return (
@@ -536,7 +543,8 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                       key={column.field}
                       className={`${bodyCellClass} text-text text-sm ${
                         column.ellipsis ? 'truncate' : ''
-                      }`}
+                      } text-${column.align || 'left'}`}
+                      title={getCellTitle(column, row)}
                       style={{
                         maxWidth: column.ellipsis ? column.width : undefined,
                         // Tree indent: apply padding to first column
