@@ -1,5 +1,114 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-23T10:40:37.591Z",
-  "accepted": []
+  "generatedAt": "2026-06-24T14:45:54.329Z",
+  "accepted": [
+    {
+      "key": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK|platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java||dynamic-record-map|Map<String, Object> record = dynamicDataService.getById(modelCode, recordPid);",
+      "code": "S-PUBLIC-RECORD-DYNAMIC-MAP-RISK",
+      "category": "dynamic-read-boundary",
+      "file": "platform/src/main/java/com/auraboot/framework/meta/controller/DynamicController.java",
+      "line": 297,
+      "field": "dynamic-record-map",
+      "evidence": "Map<String, Object> record = dynamicDataService.getById(modelCode, recordPid);"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/framework/meta/rendering/blocks/workbenchBlockUtils.ts||recordId|const targetRecordPid = args.targetRecordPid ?? args.targetRecordId;",
+      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
+      "category": "frontend-runtime",
+      "file": "web-admin/app/framework/meta/rendering/blocks/workbenchBlockUtils.ts",
+      "line": 317,
+      "field": "recordId",
+      "evidence": "const targetRecordPid = args.targetRecordPid ?? args.targetRecordId;"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/plugins/core-aurabot/components-shell/AuraBotProvider.tsx||recordId|const recordPid = params.recordPid ?? params.recordId;",
+      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
+      "category": "frontend-runtime",
+      "file": "web-admin/app/plugins/core-aurabot/components-shell/AuraBotProvider.tsx",
+      "line": 468,
+      "field": "recordId",
+      "evidence": "const recordPid = params.recordPid ?? params.recordId;"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/plugins/core-aurabot/hooks/usePageContext.ts||recordId|const recordPid = params.recordPid ?? params.recordId;",
+      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
+      "category": "frontend-runtime",
+      "file": "web-admin/app/plugins/core-aurabot/hooks/usePageContext.ts",
+      "line": 40,
+      "field": "recordId",
+      "evidence": "const recordPid = params.recordPid ?? params.recordId;"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/routes/dynamic.$tableName.edit.tsx||recordId|const recordPid = params.recordPid ?? params.recordId ?? '';",
+      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
+      "category": "frontend-runtime",
+      "file": "web-admin/app/routes/dynamic.$tableName.edit.tsx",
+      "line": 6,
+      "field": "recordId",
+      "evidence": "const recordPid = params.recordPid ?? params.recordId ?? '';"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/routes/dynamic.$tableName.view.tsx||recordId|const recordPid = params.recordPid ?? params.recordId ?? '';",
+      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
+      "category": "frontend-runtime",
+      "file": "web-admin/app/routes/dynamic.$tableName.view.tsx",
+      "line": 6,
+      "field": "recordId",
+      "evidence": "const recordPid = params.recordPid ?? params.recordId ?? '';"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/routes/p.$pageKey.edit.tsx||recordId|* Dynamic Edit Page — /p/{model_code}/edit/{recordId}",
+      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
+      "category": "frontend-runtime",
+      "file": "web-admin/app/routes/p.$pageKey.edit.tsx",
+      "line": 2,
+      "field": "recordId",
+      "evidence": "* Dynamic Edit Page — /p/{model_code}/edit/{recordId}"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/routes/p.$pageKey.edit.tsx||recordId|const recordPid = params.recordPid ?? params.recordId;",
+      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
+      "category": "frontend-runtime",
+      "file": "web-admin/app/routes/p.$pageKey.edit.tsx",
+      "line": 14,
+      "field": "recordId",
+      "evidence": "const recordPid = params.recordPid ?? params.recordId;"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/routes/p.$pageKey.view.tsx||recordId|* Dynamic Detail/View Page — /p/{model_code}/view/{recordId}",
+      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
+      "category": "frontend-runtime",
+      "file": "web-admin/app/routes/p.$pageKey.view.tsx",
+      "line": 2,
+      "field": "recordId",
+      "evidence": "* Dynamic Detail/View Page — /p/{model_code}/view/{recordId}"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/routes/p.$pageKey.view.tsx||recordId|return params.recordPid ?? params.recordId;",
+      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
+      "category": "frontend-runtime",
+      "file": "web-admin/app/routes/p.$pageKey.view.tsx",
+      "line": 13,
+      "field": "recordId",
+      "evidence": "return params.recordPid ?? params.recordId;"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/routes/p.c.$pageKey.edit.tsx||recordId|* Custom Form Edit Page — /p/c/{pageKey}/edit/{recordId}",
+      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
+      "category": "frontend-runtime",
+      "file": "web-admin/app/routes/p.c.$pageKey.edit.tsx",
+      "line": 2,
+      "field": "recordId",
+      "evidence": "* Custom Form Edit Page — /p/c/{pageKey}/edit/{recordId}"
+    },
+    {
+      "key": "S-PUBLIC-RECORD-FRONTEND-LEGACY|web-admin/app/routes/p.c.$pageKey.edit.tsx||recordId|const recordPid = params.recordPid ?? params.recordId;",
+      "code": "S-PUBLIC-RECORD-FRONTEND-LEGACY",
+      "category": "frontend-runtime",
+      "file": "web-admin/app/routes/p.c.$pageKey.edit.tsx",
+      "line": 22,
+      "field": "recordId",
+      "evidence": "const recordPid = params.recordPid ?? params.recordId;"
+    }
+  ]
 }
