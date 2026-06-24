@@ -131,7 +131,7 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
   const description = getLocalizedText((block as any).description || '', locale, t);
   const emptyTitle = getLocalizedText((block as any).empty?.title || 'Select evidence', locale, t);
   const noteField = (block as any).noteField;
-  const note = noteField ? formatValue(readPath(record, noteField)) : '';
+  const note = noteField ? formatValue(readPath(record, noteField), undefined, undefined, locale, t) : '';
 
   if (!record || Object.keys(record).length === 0) {
     return (
@@ -165,10 +165,16 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
               const key = String(card.key || card.valueField || index);
               const label = getLocalizedText(card.label || key, locale, t);
               const helper = getLocalizedText(card.helper || '', locale, t);
-              const value = formatValue(readPath(record, card.valueField), card.format);
+              const value = formatValue(
+                readPath(record, card.valueField),
+                card.format,
+                card.valueMap,
+                locale,
+                t,
+              );
               const tone =
-                formatValue(readPath(record, card.toneField)) !== '-'
-                  ? formatValue(readPath(record, card.toneField))
+                formatValue(readPath(record, card.toneField), undefined, undefined, locale, t) !== '-'
+                  ? formatValue(readPath(record, card.toneField), undefined, undefined, locale, t)
                   : card.tone;
               const toneClasses = getToneClasses(tone);
 
