@@ -51,15 +51,16 @@ export default function Toast({ message, type, show, onClose, duration = 4000 }:
   };
 
   const getIcon = () => {
+    const iconClass = `h-5 w-5 ${getStyles().icon}`;
     switch (type) {
       case 'success':
-        return <CheckCircleIcon className="h-5 w-5 text-white" />;
+        return <CheckCircleIcon className={iconClass} />;
       case 'error':
-        return <ExclamationTriangleIcon className="h-5 w-5 text-white" />;
+        return <ExclamationTriangleIcon className={iconClass} />;
       case 'warning':
-        return <ExclamationTriangleIcon className="h-5 w-5 text-white" />;
+        return <ExclamationTriangleIcon className={iconClass} />;
       case 'info':
-        return <InformationCircleIcon className="h-5 w-5 text-white" />;
+        return <InformationCircleIcon className={iconClass} />;
     }
   };
 
@@ -67,23 +68,23 @@ export default function Toast({ message, type, show, onClose, duration = 4000 }:
     switch (type) {
       case 'success':
         return {
-          bg: 'bg-emerald-500',
-          shadow: 'shadow-lg shadow-emerald-500/25',
+          icon: 'text-emerald-600',
+          progress: 'bg-emerald-500',
         };
       case 'error':
         return {
-          bg: 'bg-red-500',
-          shadow: 'shadow-lg shadow-red-500/25',
+          icon: 'text-red-600',
+          progress: 'bg-red-500',
         };
       case 'warning':
         return {
-          bg: 'bg-amber-500',
-          shadow: 'shadow-lg shadow-amber-500/25',
+          icon: 'text-amber-600',
+          progress: 'bg-amber-500',
         };
       case 'info':
         return {
-          bg: 'bg-blue-500',
-          shadow: 'shadow-lg shadow-blue-500/25',
+          icon: 'text-blue-600',
+          progress: 'bg-blue-500',
         };
     }
   };
@@ -93,46 +94,43 @@ export default function Toast({ message, type, show, onClose, duration = 4000 }:
   const styles = getStyles();
 
   return (
-    <div className="pointer-events-none fixed top-4 left-1/2 z-50 -translate-x-1/2 transform">
-      <div
-        role="alert"
-        aria-live="assertive"
-        className={`pointer-events-auto w-full max-w-md min-w-80 ${styles.bg} ${styles.shadow} rounded-card transform backdrop-blur-sm transition-all duration-300 ease-out ${
-          isVisible && !isLeaving
-            ? 'translate-y-0 scale-100 opacity-100'
-            : '-translate-y-full scale-95 opacity-0'
-        } `}
-      >
-        <div className="px-4 py-3">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">{getIcon()}</div>
-            <div className="ml-3 flex-1">
-              <p className="text-sm leading-5 font-medium text-white">{message}</p>
-            </div>
-            <div className="ml-4 flex-shrink-0">
-              <button
-                className="rounded-control hover:bg-panel/10 inline-flex p-1 text-white/70 transition-colors duration-200 hover:text-white focus:ring-2 focus:ring-white/30 focus:outline-none"
-                onClick={handleClose}
-              >
-                <XMarkIcon className="h-4 w-4" />
-              </button>
-            </div>
+    <div
+      role="alert"
+      aria-live="assertive"
+      className={`bg-panel border-border pointer-events-auto w-full overflow-hidden rounded-lg border shadow-lg shadow-black/10 backdrop-blur-sm transition-all duration-300 ease-out ${
+        isVisible && !isLeaving
+          ? 'translate-y-0 scale-100 opacity-100'
+          : '-translate-y-3 scale-95 opacity-0'
+      } `}
+    >
+      <div className="px-4 py-3">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 flex-shrink-0">{getIcon()}</div>
+          <div className="min-w-0 flex-1">
+            <p className="text-text text-sm leading-5 font-medium break-words">{message}</p>
           </div>
+          <button
+            className="text-text-3 hover:bg-hover hover:text-text -mr-1 inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md transition-colors duration-200 focus:ring-2 focus:ring-blue-500/30 focus:outline-none"
+            onClick={handleClose}
+            aria-label="Close notification"
+          >
+            <XMarkIcon className="h-4 w-4" />
+          </button>
         </div>
-
-        {/* 进度条 */}
-        {duration > 0 && (
-          <div className="bg-panel/20 h-1 overflow-hidden rounded-b-lg">
-            <div
-              className="bg-panel/40 h-full transition-all ease-linear"
-              style={{
-                width: progressStarted && !isLeaving ? '0%' : '100%',
-                transitionDuration: progressStarted && !isLeaving ? `${duration}ms` : '0ms',
-              }}
-            />
-          </div>
-        )}
       </div>
+
+      {/* 进度条 */}
+      {duration > 0 && (
+        <div className="bg-border/60 h-1 overflow-hidden">
+          <div
+            className={`${styles.progress} h-full transition-all ease-linear`}
+            style={{
+              width: progressStarted && !isLeaving ? '0%' : '100%',
+              transitionDuration: progressStarted && !isLeaving ? `${duration}ms` : '0ms',
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }

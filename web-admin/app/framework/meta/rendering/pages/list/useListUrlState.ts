@@ -58,6 +58,13 @@ export function encodeFilters(filters: ViewFilterConfig[]): string | null {
   return btoa(json);
 }
 
+export function areFiltersEqual(
+  a: ViewFilterConfig[] | null | undefined,
+  b: ViewFilterConfig[] | null | undefined,
+): boolean {
+  return encodeFilters(a ?? []) === encodeFilters(b ?? []);
+}
+
 /**
  * Decode a base64-encoded filter string back to ViewFilterConfig[].
  * Returns empty array for falsy / malformed input (graceful degradation).
