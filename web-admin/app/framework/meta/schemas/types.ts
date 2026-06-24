@@ -263,8 +263,6 @@ export interface ColumnConfig {
 
   // 自定义渲染
   render?: string | Record<string, unknown>;
-  /** Lightweight presentation hint for a built-in renderer; e.g. status-pill. */
-  renderType?: string;
   /** Custom cell renderer registry key. Keep valueType reserved for built-in semantic types. */
   cellRenderer?: string;
 
