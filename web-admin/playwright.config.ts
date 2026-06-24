@@ -58,6 +58,7 @@ const quoteOpsCurrentSpecNames = [
   'quote-bom-visual-feedback-golden',
   'quote-corrected-bom-upload-golden',
   'quote-bom-price-manual-adoption',
+  'quote-bom-price-deepseek-suggestions',
   'quote-process-fee-review',
   'quote-gerber-runtime',
   'quote-excel-download',

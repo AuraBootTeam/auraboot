@@ -67,35 +67,54 @@
     "icon": "team",
     "type": 1,
     "permissionCode": "org_teams",
-    "orderNo": 54,
+    "orderNo": 10,
     "visible": true
   },
   {
     "code": "member_management",
     "parentCode": "org_management",
-    "name": "成员管理",
-    "name:zh-CN": "成员管理",
-    "name:en": "Members",
+    "name": "用户",
+    "name:zh-CN": "用户",
+    "name:en": "Users",
     "path": "/p/tenant_member",
     "component": null,
     "icon": "team",
     "type": 1,
     "permissionCode": "member_management",
-    "orderNo": 49,
+    "orderNo": 20,
     "visible": true
   },
   {
-    "code": "permission_management",
+    "code": "permission_roles",
     "parentCode": "org_management",
-    "name": "权限管理",
-    "name:zh-CN": "权限管理",
-    "name:en": "Permission Management",
+    "name": "角色",
+    "name:zh-CN": "角色",
+    "name:en": "Roles",
     "path": "/enterprise/permissions",
     "component": null,
     "icon": "safety",
     "type": 1,
     "permissionCode": "permission_management",
-    "orderNo": 55,
+    "orderNo": 30,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "permission_management",
+    "parentCode": "org_management",
+    "name": "权限/授权关系",
+    "name:zh-CN": "权限/授权关系",
+    "name:en": "Permissions / Grants",
+    "path": "/enterprise/permissions",
+    "component": null,
+    "icon": "safety",
+    "type": 1,
+    "permissionCode": "permission_management",
+    "orderNo": 40,
     "visible": true,
     "extension": {
       "platforms": [

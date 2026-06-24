@@ -9,6 +9,7 @@ import {
   resolveColumnCapabilityDataType,
   resolveFieldMetaDataType,
   resolveFieldMetaDisplayName,
+  resolveListSystemReferenceDisplayConfig,
   resolveListSavedViewPageKey,
   resolveListMiscBlocksPosition,
   resolveTableBlockRowActions,
@@ -55,6 +56,19 @@ describe('collectListReferenceDisplayConfigs', () => {
     expect(buildListReferenceDisplayCacheKey(configs[0])).toBe(
       'bom_task_project_id|req_requirement_set_pcba_bom|pid|bom_project_name',
     );
+  });
+});
+
+describe('resolveListSystemReferenceDisplayConfig', () => {
+  it('routes sys_user references to the admin user detail endpoint', () => {
+    expect(resolveListSystemReferenceDisplayConfig('sys_user')).toEqual({
+      detailEndpoint: '/api/admin/users',
+      labelFields: ['displayName', 'realName', 'username', 'email'],
+    });
+  });
+
+  it('leaves normal business references on dynamic list resolution', () => {
+    expect(resolveListSystemReferenceDisplayConfig('crm_account_common')).toBeUndefined();
   });
 });
 

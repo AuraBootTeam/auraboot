@@ -109,6 +109,39 @@ describe('workbenchBlockUtils action runner', () => {
     expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
   });
 
+  it('accepts targetRecordId alias for command actions', async () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: { pid: 'QUOTE-1' },
+        global: {},
+        state: {},
+      }),
+    }) as any;
+
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'command.execute',
+      args: {
+        command: 'qo_quote_common:deepseek_price_suggestions',
+        targetRecordId: '${form.pid}',
+        operationType: 'update',
+      },
+    });
+
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/qo_quote_common:deepseek_price_suggestions',
+      {
+        method: 'post',
+        params: {
+          targetRecordPid: 'QUOTE-1',
+          operationType: 'UPDATE',
+          payload: {},
+        },
+      },
+    );
+  });
+
   it('polls async command tasks and reloads dependencies while the task is running', async () => {
     const runtime = makeRuntime() as any;
     fetchResultMock
