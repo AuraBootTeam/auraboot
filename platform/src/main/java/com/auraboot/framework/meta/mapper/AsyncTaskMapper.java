@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -27,4 +28,14 @@ public interface AsyncTaskMapper extends BaseMapper<AsyncTask> {
 
     @Update("UPDATE ab_async_task SET status = #{status} WHERE id = #{id}")
     int updateStatus(@Param("id") Long id, @Param("status") String status);
+
+    @Update("""
+            UPDATE ab_async_task
+            SET status = 'failed',
+                error_message = #{errorMessage},
+                completed_at = #{completedAt}
+            WHERE status = 'running'
+            """)
+    int markRunningTasksFailedOnStartup(@Param("completedAt") Instant completedAt,
+                                        @Param("errorMessage") String errorMessage);
 }
