@@ -72,6 +72,42 @@ function formatValue(
   return String(value);
 }
 
+function getToneClasses(tone: string | undefined) {
+  switch (tone) {
+    case 'success':
+      return {
+        card: 'border-emerald-200 bg-emerald-50/70',
+        value: 'text-emerald-700',
+        marker: 'bg-emerald-500',
+      };
+    case 'warning':
+      return {
+        card: 'border-amber-200 bg-amber-50/70',
+        value: 'text-amber-700',
+        marker: 'bg-amber-500',
+      };
+    case 'danger':
+    case 'error':
+      return {
+        card: 'border-red-200 bg-red-50/70',
+        value: 'text-red-700',
+        marker: 'bg-red-500',
+      };
+    case 'info':
+      return {
+        card: 'border-blue-200 bg-blue-50/70',
+        value: 'text-blue-700',
+        marker: 'bg-blue-500',
+      };
+    default:
+      return {
+        card: 'border-border bg-subtle/40',
+        value: 'text-text',
+        marker: 'bg-gray-300',
+      };
+  }
+}
+
 export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProps> = ({
   block,
   runtime,
@@ -88,8 +124,14 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
     resolveRuntimeValue(runtime, (block as any).context) ||
     readDataSourceRecord(runtime, dataSourceId);
   const sections = Array.isArray((block as any).sections) ? (block as any).sections : [];
+  const summaryCards = Array.isArray((block as any).summaryCards)
+    ? (block as any).summaryCards
+    : [];
   const title = getLocalizedText(block.title || (block as any).label || 'Evidence', locale, t);
+  const description = getLocalizedText((block as any).description || '', locale, t);
   const emptyTitle = getLocalizedText((block as any).empty?.title || 'Select evidence', locale, t);
+  const noteField = (block as any).noteField;
+  const note = noteField ? formatValue(readPath(record, noteField)) : '';
 
   if (!record || Object.keys(record).length === 0) {
     return (
@@ -103,11 +145,53 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
   }
 
   return (
-    <section className="rounded-card border-border bg-panel border" data-testid="evidence-panel">
-      <div className="border-b border-gray-100 px-4 py-3">
-        <h3 className="text-text text-sm font-semibold">{title}</h3>
+    <section className="rounded-lg border border-gray-200 bg-white" data-testid="evidence-panel">
+      <div className="border-b border-gray-100 px-5 py-4">
+        <h3 className="text-text text-base font-semibold">{title}</h3>
+        {description && <p className="text-text-2 mt-1 text-sm">{description}</p>}
       </div>
-      <div className="space-y-3 p-4">
+      <div className="space-y-4 p-5">
+        {note && note !== '-' && (
+          <div
+            className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900"
+            data-testid="evidence-panel-note"
+          >
+            {note}
+          </div>
+        )}
+        {summaryCards.length > 0 && (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" data-testid="evidence-panel-summary">
+            {summaryCards.map((card: any, index: number) => {
+              const key = String(card.key || card.valueField || index);
+              const label = getLocalizedText(card.label || key, locale, t);
+              const helper = getLocalizedText(card.helper || '', locale, t);
+              const value = formatValue(readPath(record, card.valueField), card.format);
+              const tone =
+                formatValue(readPath(record, card.toneField)) !== '-'
+                  ? formatValue(readPath(record, card.toneField))
+                  : card.tone;
+              const toneClasses = getToneClasses(tone);
+
+              return (
+                <div
+                  key={key}
+                  className={`rounded-lg border px-4 py-3 ${toneClasses.card}`}
+                  data-testid={`evidence-panel-summary-${key}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-text-2 text-xs font-medium">{label}</div>
+                    <span className={`h-2 w-2 rounded-full ${toneClasses.marker}`} />
+                  </div>
+                  <div className={`mt-2 text-2xl leading-8 font-semibold ${toneClasses.value}`}>
+                    {value}
+                  </div>
+                  {helper && <div className="text-text-3 mt-1 text-xs">{helper}</div>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="grid gap-3 md:grid-cols-2">
         {sections.map((section: any, index: number) => {
           const key = String(section.key || section.field || index);
           const label = getLocalizedText(section.label || key, locale, t);
@@ -121,8 +205,12 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
           const isJson = section.format === 'json' || value.includes('\n');
 
           return (
-            <div key={key} data-testid={`evidence-panel-section-${key}`}>
-              <div className="text-text-2 text-xs font-medium tracking-wide uppercase">{label}</div>
+            <div
+              key={key}
+              className="rounded-lg border border-gray-100 bg-gray-50/60 p-3"
+              data-testid={`evidence-panel-section-${key}`}
+            >
+              <div className="text-text-2 text-xs font-medium">{label}</div>
               {isJson ? (
                 <pre className="rounded-control bg-subtle text-text-2 mt-1 max-h-48 overflow-auto p-3 text-xs">
                   {value}
@@ -133,6 +221,7 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
             </div>
           );
         })}
+        </div>
       </div>
     </section>
   );
