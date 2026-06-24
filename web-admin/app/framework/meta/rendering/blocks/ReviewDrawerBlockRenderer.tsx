@@ -28,6 +28,24 @@ type PointerState = {
   height?: number;
 };
 
+type DrawerLayoutState = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+const DEFAULT_DRAWER_LAYOUT: DrawerLayoutState = {
+  left: 24,
+  top: 24,
+  width: 1100,
+  height: 640,
+};
+
+const MIN_DRAWER_WIDTH = 760;
+const MIN_DRAWER_HEIGHT = 500;
+const DRAWER_STORAGE_PREFIX = 'auraboot:review-drawer-layout';
+
 const toneClass: Record<Tone, string> = {
   green: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   amber: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -42,6 +60,80 @@ const buttonClass: Record<string, string> = {
   secondary: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50',
   danger: 'bg-rose-600 text-white hover:bg-rose-700',
 };
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function getViewportSize(): { width: number; height: number } {
+  if (typeof window === 'undefined') return { width: 1280, height: 720 };
+  return {
+    width: window.innerWidth || 1280,
+    height: window.innerHeight || 720,
+  };
+}
+
+function normalizeDrawerLayout(layout: DrawerLayoutState): DrawerLayoutState {
+  const viewport = getViewportSize();
+  const maxWidth = Math.max(320, viewport.width - 24);
+  const maxHeight = Math.max(320, viewport.height - 24);
+  const minWidth = Math.min(MIN_DRAWER_WIDTH, maxWidth);
+  const minHeight = Math.min(MIN_DRAWER_HEIGHT, maxHeight);
+  const width = clamp(layout.width, minWidth, maxWidth);
+  const height = clamp(layout.height, minHeight, maxHeight);
+  return {
+    width,
+    height,
+    left: clamp(layout.left, 12, Math.max(12, viewport.width - 180)),
+    top: clamp(layout.top, 12, Math.max(12, viewport.height - 84)),
+  };
+}
+
+function isDrawerLayoutState(value: unknown): value is DrawerLayoutState {
+  if (!value || typeof value !== 'object') return false;
+  const layout = value as Record<string, unknown>;
+  return ['left', 'top', 'width', 'height'].every((key) => Number.isFinite(layout[key]));
+}
+
+function drawerLayoutStorageKey(
+  runtime: SchemaRuntime,
+  block: BlockConfig,
+  context: Record<string, any>,
+): string {
+  const schema = (runtime as any).getSchema?.() || {};
+  const pageKey =
+    context?.$page?.pageKey ||
+    context?.$page?.id ||
+    schema.pageKey ||
+    schema.id ||
+    schema.modelCode ||
+    'global';
+  const modelKey = context?.$page?.modelCode || schema.modelCode || 'model';
+  const blockKey = block.id || block.blockType || 'review-drawer';
+  return `${DRAWER_STORAGE_PREFIX}:${modelKey}:${pageKey}:${blockKey}`;
+}
+
+function readStoredDrawerLayout(storageKey: string): DrawerLayoutState {
+  if (typeof window === 'undefined') return DEFAULT_DRAWER_LAYOUT;
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return DEFAULT_DRAWER_LAYOUT;
+    const parsed = JSON.parse(raw);
+    if (!isDrawerLayoutState(parsed)) return DEFAULT_DRAWER_LAYOUT;
+    return normalizeDrawerLayout(parsed);
+  } catch {
+    return DEFAULT_DRAWER_LAYOUT;
+  }
+}
+
+function persistDrawerLayout(storageKey: string, layout: DrawerLayoutState): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(normalizeDrawerLayout(layout)));
+  } catch {
+    // localStorage may be unavailable in private browsing or strict test environments.
+  }
+}
 
 function parseJsonValue(value: unknown): unknown {
   if (typeof value !== 'string') return value;
@@ -457,16 +549,34 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     : Array.isArray(candidatesConfig.groups)
       ? candidatesConfig.groups
       : [];
+  const layoutStorageKey = drawerLayoutStorageKey(runtime, block, context);
+  const initialLayoutRef = useRef<DrawerLayoutState | null>(null);
+  if (initialLayoutRef.current === null) {
+    initialLayoutRef.current = readStoredDrawerLayout(layoutStorageKey);
+  }
+  const initialLayout = initialLayoutRef.current;
 
   const [selectedCandidateKey, setSelectedCandidateKey] = useState('');
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [position, setPosition] = useState({ left: 24, top: 24 });
-  const [size, setSize] = useState({ width: 1100, height: 640 });
+  const [position, setPosition] = useState({
+    left: initialLayout.left,
+    top: initialLayout.top,
+  });
+  const [size, setSize] = useState({
+    width: initialLayout.width,
+    height: initialLayout.height,
+  });
   const [runningAction, setRunningAction] = useState<string | null>(null);
   const [activeActionForm, setActiveActionForm] = useState<ActionFormState | null>(null);
   const dragRef = useRef<PointerState | null>(null);
   const resizeRef = useRef<PointerState | null>(null);
+  const layoutRef = useRef<DrawerLayoutState>({
+    left: initialLayout.left,
+    top: initialLayout.top,
+    width: initialLayout.width,
+    height: initialLayout.height,
+  });
 
   useRuntimeStateSubscription(runtime);
   useDataSourceSubscription(runtime, contextDataSource);
@@ -502,21 +612,42 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   }, [selectedRecordKey, candidatesConfig.selection?.bind, runtime]);
 
   useEffect(() => {
+    layoutRef.current = {
+      left: position.left,
+      top: position.top,
+      width: size.width,
+      height: size.height,
+    };
+  }, [position.left, position.top, size.height, size.width]);
+
+  useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       if (dragRef.current) {
         const nextLeft = (dragRef.current.left || 0) + event.clientX - dragRef.current.x;
         const nextTop = (dragRef.current.top || 0) + event.clientY - dragRef.current.y;
+        const normalized = normalizeDrawerLayout({
+          left: nextLeft,
+          top: nextTop,
+          width: layoutRef.current.width,
+          height: layoutRef.current.height,
+        });
         setPosition({
-          left: Math.max(12, Math.min(window.innerWidth - 180, nextLeft)),
-          top: Math.max(12, Math.min(window.innerHeight - 84, nextTop)),
+          left: normalized.left,
+          top: normalized.top,
         });
       }
       if (resizeRef.current) {
         const nextWidth = (resizeRef.current.width || 0) + event.clientX - resizeRef.current.x;
         const nextHeight = (resizeRef.current.height || 0) + event.clientY - resizeRef.current.y;
+        const normalized = normalizeDrawerLayout({
+          left: layoutRef.current.left,
+          top: layoutRef.current.top,
+          width: nextWidth,
+          height: nextHeight,
+        });
         setSize({
-          width: Math.max(760, Math.min(window.innerWidth - 24, nextWidth)),
-          height: Math.max(500, Math.min(window.innerHeight - 24, nextHeight)),
+          width: normalized.width,
+          height: normalized.height,
         });
       }
     };
@@ -531,6 +662,16 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
       window.removeEventListener('mouseup', handleMouseUp);
     };
   }, []);
+
+  useEffect(() => {
+    if (isMaximized) return;
+    persistDrawerLayout(layoutStorageKey, {
+      left: position.left,
+      top: position.top,
+      width: size.width,
+      height: size.height,
+    });
+  }, [isMaximized, layoutStorageKey, position.left, position.top, size.height, size.width]);
 
   if (!record || Object.keys(record).length === 0) {
     const emptyTitle = getLocalizedText((block as any).empty?.title || 'Select a row', locale, t);
