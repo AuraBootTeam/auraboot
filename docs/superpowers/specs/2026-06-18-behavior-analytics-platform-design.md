@@ -1,7 +1,8 @@
 ---
-type: design
-status: active
+type: plan-design
+status: superseded
 created: 2026-06-18
+superseded_by: docs/backlog/2026-06-19-unified-telemetry-analytics-platform-architecture.md
 ---
 
 # AuraBoot 行为采集与数据分析平台 — 完整设计方案
