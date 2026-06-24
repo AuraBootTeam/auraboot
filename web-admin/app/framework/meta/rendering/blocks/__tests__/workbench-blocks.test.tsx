@@ -1,5 +1,5 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
@@ -945,6 +945,8 @@ describe('CandidateListBlockRenderer', () => {
 });
 
 describe('ReviewDrawerBlockRenderer', () => {
+  const reviewDrawerStorageKey =
+    'auraboot:review-drawer-layout:test_model:test_schema:review_drawer';
   const selectedLine: Record<string, unknown> = {
     pid: 'std-1',
     bom_std_row_no: 5,
@@ -1214,6 +1216,10 @@ describe('ReviewDrawerBlockRenderer', () => {
     },
   };
 
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
   it('renders the selected row in a unified floating review drawer', () => {
     const runtime = makeReviewDrawerRuntime(selectedLine, {
       bom_me_evidence_json:
@@ -1254,6 +1260,42 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByTestId('review-drawer-minimized')).toHaveTextContent('展开行级复核');
     fireEvent.click(screen.getByRole('button', { name: '展开复核浮层' }));
     expect(screen.getByTestId('review-drawer')).toHaveTextContent('Row 5 · LED1 · 待确认');
+  });
+
+  it('restores the last review drawer position and size from local storage', () => {
+    window.localStorage.setItem(
+      reviewDrawerStorageKey,
+      JSON.stringify({ left: 88, top: 66, width: 900, height: 560 }),
+    );
+    const runtime = makeReviewDrawerRuntime();
+
+    render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+
+    expect(screen.getByTestId('review-drawer')).toHaveStyle({
+      left: '88px',
+      top: '66px',
+      width: '900px',
+      height: '560px',
+    });
+  });
+
+  it('persists the review drawer position after dragging', () => {
+    const runtime = makeReviewDrawerRuntime();
+
+    render(<ReviewDrawerBlockRenderer block={reviewDrawerBlock} runtime={runtime} />);
+
+    fireEvent.mouseDown(screen.getByText('Row 5 · LED1 · 待确认'), {
+      clientX: 100,
+      clientY: 100,
+    });
+    fireEvent.mouseMove(window, { clientX: 150, clientY: 130 });
+    fireEvent.mouseUp(window);
+
+    const stored = JSON.parse(window.localStorage.getItem(reviewDrawerStorageKey) || '{}');
+    expect(stored).toMatchObject({
+      left: 74,
+      top: 54,
+    });
   });
 
   it('renders configured decision fields instead of BOM defaults', () => {
@@ -1923,6 +1965,62 @@ describe('EvidencePanelBlockRenderer', () => {
     expect(section).toHaveTextContent('"fields"');
     expect(section).toHaveTextContent('"spec"');
     expect(section).not.toHaveTextContent('"type": "jsonb"');
+  });
+
+  it('renders summary cards and note text for dense readiness panels', () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: {},
+        global: {},
+        state: {
+          readiness: {
+            note: '缺失值会在 Excel 中留空并写入备注。',
+            missingPriceCount: 7,
+            missingPriceTone: 'warning',
+            documentCount: 2,
+            documentTone: 'success',
+            detail: 'BOM行 38，缺价格 7',
+          },
+        },
+      }),
+    });
+    const block: BlockConfig = {
+      id: 'readiness',
+      blockType: 'evidence-panel',
+      context: '${state.readiness}',
+      title: { 'zh-CN': 'Excel生成提示' },
+      noteField: 'note',
+      summaryCards: [
+        {
+          key: 'missingPrice',
+          label: { 'zh-CN': '缺价格' },
+          valueField: 'missingPriceCount',
+          toneField: 'missingPriceTone',
+        },
+        {
+          key: 'documents',
+          label: { 'zh-CN': '已生成' },
+          valueField: 'documentCount',
+          toneField: 'documentTone',
+        },
+      ],
+      sections: [{ key: 'detail', label: { 'zh-CN': 'BOM价格' }, field: 'detail' }],
+    };
+
+    render(<EvidencePanelBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('evidence-panel-note')).toHaveTextContent(
+      '缺失值会在 Excel 中留空并写入备注。',
+    );
+    expect(screen.getByTestId('evidence-panel-summary-missingPrice')).toHaveTextContent('缺价格');
+    expect(screen.getByTestId('evidence-panel-summary-missingPrice')).toHaveTextContent('7');
+    expect(screen.getByTestId('evidence-panel-summary-documents')).toHaveTextContent('已生成');
+    expect(screen.getByTestId('evidence-panel-summary-documents')).toHaveTextContent('2');
+    expect(screen.getByTestId('evidence-panel-section-detail')).toHaveTextContent(
+      'BOM行 38，缺价格 7',
+    );
   });
 });
 
