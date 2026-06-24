@@ -87,7 +87,7 @@ class ComplaintLoopGoldenIT extends BaseIntegrationTest {
         aReq.setTriggerType("on_record_create");
         aReq.setActions(List.of(AutomationAction.builder()
                 .type("update_record")
-                .config(Map.of("modelCode", complaintModel, "recordId", "${recordId}",
+                .config(Map.of("modelCode", complaintModel, "recordPid", "${recordPid}",
                         "fields", Map.of("c_assignee", "cs-team-a")))
                 .build()));
         aReq.setEnabled(false);

@@ -177,8 +177,7 @@ public class DeclaredAgentToolResolver {
             return ToolDefinition.builder()
                     .toolCode(toolCode)
                     .toolName("Get " + modelCode)
-                    .description("Get a single " + modelCode + " record by pid. Params: recordPid (required); "
-                            + "recordId is accepted for compatibility.")
+                    .description("Get a single " + modelCode + " record by pid. Params: recordPid (required).")
                     .providerCode("dsl")
                     .toolType("dsl_query")
                     .sourceCode(modelCode)
@@ -506,8 +505,6 @@ public class DeclaredAgentToolResolver {
     private Map<String, Object> recordPidProperties(String description) {
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("recordPid", Map.of("type", "string", "description", description));
-        properties.put("recordId", Map.of("type", "string", "description", "Compatibility alias for recordPid"));
-        properties.put("pid", Map.of("type", "string", "description", "Compatibility alias for recordPid"));
         return properties;
     }
 

@@ -114,9 +114,9 @@ function isJsonFieldCode(fieldCode: string): boolean {
 /**
  * Build API endpoint with table name
  */
-export function buildApiEndpoint(tableName: string, recordId?: string): string {
+export function buildApiEndpoint(tableName: string, recordPid?: string): string {
   const base = `/api/dynamic/${tableName}`;
-  return recordId ? `${base}/${recordId}` : base;
+  return recordPid ? `${base}/${recordPid}` : base;
 }
 
 export interface RouteLocationLike {

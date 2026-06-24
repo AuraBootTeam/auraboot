@@ -106,14 +106,14 @@ class AgentApprovalCommandHandlerTest {
 
     private CommandHandlerExtension.CommandContext context(
             String commandType,
-            String recordId,
+            String recordPid,
             Map<String, Object> payload) {
         return CommandHandlerExtension.CommandContext.builder()
                 .tenantId(7L)
                 .namespace("acp")
                 .commandType(commandType)
                 .modelCode("agent_approval")
-                .recordId(recordId)
+                .recordId(recordPid)
                 .payload(payload)
                 .build();
     }

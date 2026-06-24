@@ -196,11 +196,11 @@ describe('resolveAsyncCommandDispatch', () => {
       resolveAsyncCommandDispatch({
         commandCode: 'qo_quote_common:create',
         data: {
-          recordId: 'Q1',
+          recordPid: 'Q1',
         },
       }),
     ).toBeNull();
-    expect(resolveAsyncCommandDispatch({ recordId: 'Q1' })).toBeNull();
+    expect(resolveAsyncCommandDispatch({ recordPid: 'Q1' })).toBeNull();
   });
 });
 
@@ -223,18 +223,18 @@ describe('resolveAfterSubmitRedirect', () => {
     ).toBe('/p/bom_conversion_task_pcba_workbench/view/TASK-START-1');
   });
 
-  it('keeps recordId compatibility for immediate command responses', () => {
+  it('keeps recordPid compatibility for immediate command responses', () => {
     expect(
       resolveAfterSubmitRedirect(
         {
           extension: {
-            afterSubmitRedirect: '/p/bom_conversion_task_pcba_workbench/view/{recordId}',
+            afterSubmitRedirect: '/p/bom_conversion_task_pcba_workbench/view/{recordPid}',
           },
         },
         'bom_start_conversion',
         {
           data: {
-            recordId: 'TASK-LEGACY-1',
+            recordPid: 'TASK-LEGACY-1',
           },
         },
         undefined,
@@ -324,10 +324,10 @@ describe('resolveEditRecordEndpoint', () => {
     expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{pid}' } }, 'qr_code', 'abc'))
       .toBe('/api/qr/abc');
   });
-  it('keeps legacy recordId placeholder compatibility', () => {
-    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordId}' } }, 'qr_code', 'abc'))
+  it('keeps legacy recordPid placeholder compatibility', () => {
+    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordPid}' } }, 'qr_code', 'abc'))
       .toBe('/api/qr/abc');
-    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/${recordId}' } }, 'qr_code', 'abc'))
+    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/${recordPid}' } }, 'qr_code', 'abc'))
       .toBe('/api/qr/abc');
   });
   it('url-encodes the public record pid', () => {

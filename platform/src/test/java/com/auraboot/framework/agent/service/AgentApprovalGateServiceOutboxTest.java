@@ -50,7 +50,7 @@ class AgentApprovalGateServiceOutboxTest {
                 "task-1",
                 "cmd_update_customer",
                 "Update customer",
-                Map.of("recordId", "C-1"),
+                Map.of("recordPid", "C-1"),
                 true);
 
         assertThat(approvalPid).isNotBlank();

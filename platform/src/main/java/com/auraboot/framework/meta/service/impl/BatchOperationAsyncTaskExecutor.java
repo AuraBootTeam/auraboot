@@ -85,8 +85,8 @@ public class BatchOperationAsyncTaskExecutor implements AsyncTaskExecutor {
                     ObjectNode errorEntry = objectMapper.createObjectNode();
                     errorEntry.put("index", i);
                     errorEntry.put("error", e.getMessage());
-                    if (record.has("id")) {
-                        errorEntry.set("recordId", record.get("id"));
+                    if (record.has("pid")) {
+                        errorEntry.set("recordPid", record.get("pid"));
                     }
                     errors.add(errorEntry);
                     log.warn("Batch record {}/{} failed: {}", i + 1, total, e.getMessage());

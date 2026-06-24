@@ -56,7 +56,7 @@ export const DetailTemplate: TemplateGenerator = {
       dataSources: {
         ds_detail: {
           type: 'api',
-          endpoint: `${apiBase}/\${state.recordId}`,
+          endpoint: `${apiBase}/\${state.recordPid}`,
           method: 'get',
           autoFetch: true,
         },
@@ -65,7 +65,7 @@ export const DetailTemplate: TemplateGenerator = {
         onEdit: {
           type: 'flow',
           steps: [
-            { action: 'navigate', args: { path: `/${model.modelCode}/\${state.recordId}/edit` } },
+            { action: 'navigate', args: { path: `/${model.modelCode}/\${state.recordPid}/edit` } },
           ],
         },
         onBack: {
@@ -79,14 +79,14 @@ export const DetailTemplate: TemplateGenerator = {
               action: 'confirm',
               args: { title: '确认删除', message: '删除后无法恢复，确定继续？' },
             },
-            { action: 'apiCall', method: 'delete', endpoint: `${apiBase}/\${state.recordId}` },
+            { action: 'apiCall', method: 'delete', endpoint: `${apiBase}/\${state.recordPid}` },
             { action: 'toast', level: 'success', content: '删除成功' },
             { action: 'navigateBack' },
           ],
         },
       },
       state: {
-        recordId: null,
+        recordPid: null,
       },
     };
   },

@@ -48,7 +48,7 @@ public class SagaStep {
     private Map<String, Object> outputData;
 
     @TableField("record_id")
-    private String recordId;
+    private String recordPid;
 
     @TableField("error_message")
     private String errorMessage;

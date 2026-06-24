@@ -548,8 +548,8 @@ automation:
     validationMode.none: 无验证
     validationMode.signature: 签名验证
     validationMode.token: Token 验证
-    recordId: 记录 ID
-    recordId.desc: 支持表达式引用，如 ${trigger.recordId}
+    recordPid: 记录 PID
+    recordPid.desc: 支持表达式引用，如 ${trigger.recordPid}
     updateFields: 更新字段
     updateFields.desc: 要更新的字段和值，JSON 格式
     createFields: 记录字段

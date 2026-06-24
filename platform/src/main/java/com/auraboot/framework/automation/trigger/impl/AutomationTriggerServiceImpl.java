@@ -84,8 +84,8 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     @Override
     @Async("eventTaskExecutor")
-    public void onRecordCreate(String modelCode, String recordId, Map<String, Object> recordData) {
-        log.debug("Record create event: modelCode={}, recordId={}", modelCode, recordId);
+    public void onRecordCreate(String modelCode, String recordPid, Map<String, Object> recordData) {
+        log.debug("Record create event: modelCode={}, recordPid={}", modelCode, recordPid);
 
         List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
                 modelCode, "on_record_create");
@@ -97,7 +97,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 payload.put("record", recordData);
 
                 if (shouldTrigger(automation, payload)) {
-                    executeAutomationAsync(automation, recordId, payload);
+                    executeAutomationAsync(automation, recordPid, payload);
                 }
             } catch (Exception e) {
                 log.error("Error processing automation {} for record create: {}",
@@ -108,9 +108,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     @Override
     @Async("eventTaskExecutor")
-    public void onRecordUpdate(String modelCode, String recordId,
+    public void onRecordUpdate(String modelCode, String recordPid,
                                Map<String, Object> beforeData, Map<String, Object> afterData) {
-        log.debug("Record update event: modelCode={}, recordId={}", modelCode, recordId);
+        log.debug("Record update event: modelCode={}, recordPid={}", modelCode, recordPid);
 
         List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
                 modelCode, "on_record_update");
@@ -137,7 +137,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 payload.put("record", afterData);
 
                 if (shouldTrigger(automation, payload)) {
-                    executeAutomationAsync(automation, recordId, payload);
+                    executeAutomationAsync(automation, recordPid, payload);
                 }
             } catch (Exception e) {
                 log.error("Error processing automation {} for record update: {}",
@@ -148,10 +148,10 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     @Override
     @Async("eventTaskExecutor")
-    public void onFieldChange(String modelCode, String recordId,
+    public void onFieldChange(String modelCode, String recordPid,
                               String fieldCode, Object oldValue, Object newValue) {
-        log.debug("Field change event: modelCode={}, recordId={}, field={}",
-                modelCode, recordId, fieldCode);
+        log.debug("Field change event: modelCode={}, recordPid={}, field={}",
+                modelCode, recordPid, fieldCode);
 
         List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
                 modelCode, "on_field_change");
@@ -181,7 +181,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 payload.put("newValue", newValue);
 
                 if (shouldTrigger(automation, payload)) {
-                    executeAutomationAsync(automation, recordId, payload);
+                    executeAutomationAsync(automation, recordPid, payload);
                 }
             } catch (Exception e) {
                 log.error("Error processing automation {} for field change: {}",
@@ -192,9 +192,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     @Override
     @Async("eventTaskExecutor")
-    public void onStateChange(String modelCode, String recordId, String fromState, String toState) {
-        log.debug("State change event: modelCode={}, recordId={}, {} -> {}",
-                modelCode, recordId, fromState, toState);
+    public void onStateChange(String modelCode, String recordPid, String fromState, String toState) {
+        log.debug("State change event: modelCode={}, recordPid={}, {} -> {}",
+                modelCode, recordPid, fromState, toState);
 
         List<Automation> automations = automationMapper.findEnabledByModelCodeAndTriggerType(
                 modelCode, "on_state_change");
@@ -222,7 +222,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 payload.put("toState", toState);
 
                 if (shouldTrigger(automation, payload)) {
-                    executeAutomationAsync(automation, recordId, payload);
+                    executeAutomationAsync(automation, recordPid, payload);
                 }
             } catch (Exception e) {
                 log.error("Error processing automation {} for state change: {}",
@@ -284,9 +284,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     @Override
     @Transactional
-    public AutomationLog executeAutomation(Automation automation, String recordId,
+    public AutomationLog executeAutomation(Automation automation, String recordPid,
                                            Map<String, Object> triggerPayload) {
-        log.info("Executing automation: pid={}, recordId={}", automation.getPid(), recordId);
+        log.info("Executing automation: pid={}, recordPid={}", automation.getPid(), recordPid);
 
         Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : automation.getTenantId();
 
@@ -309,7 +309,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             logEntry.setTenantId(tenantId);
             logEntry.setAutomationId(automation.getPid());
             logEntry.setTriggerType(automation.getTriggerType());
-            logEntry.setTriggerRecordId(recordId);
+            logEntry.setTriggerRecordPid(recordPid);
             logEntry.setTriggerPayload(triggerPayload);
             logEntry.setStatus(StatusConstants.RUNNING);
             logEntry.setStartedAt(Instant.now());
@@ -323,7 +323,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             try {
                 // Pass the log id through so AutomationActionServiceTaskDelegate can persist
                 // per-node execution rows linked to this run (G5 runtime overlay).
-                automationProcessRuntime.run(automation, recordId, triggerPayload, logEntry.getId());
+                automationProcessRuntime.run(automation, recordPid, triggerPayload, logEntry.getId());
                 logEntry.setStatus("success");
             } catch (Exception e) {
                 log.error("Automation run failed: pid={}, error={}",
@@ -376,7 +376,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     // ==================== Private Helper Methods ====================
 
-    private void executeAutomationAsync(Automation automation, String recordId,
+    private void executeAutomationAsync(Automation automation, String recordPid,
                                         Map<String, Object> triggerPayload) {
         // Evict stale entries when map grows too large.
         // Use computeIfPresent to atomically check-and-remove only fully-available semaphores.
@@ -392,18 +392,18 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 automation.getPid(), k -> new Semaphore(MAX_CONCURRENT_PER_RULE));
         if (!semaphore.tryAcquire()) {
             log.warn("Automation {} concurrency limit reached ({}), skipping execution for record {}",
-                    automation.getPid(), MAX_CONCURRENT_PER_RULE, recordId);
+                    automation.getPid(), MAX_CONCURRENT_PER_RULE, recordPid);
             return;
         }
 
         try {
-            executeAutomation(automation, recordId, triggerPayload);
+            executeAutomation(automation, recordPid, triggerPayload);
         } catch (Exception e) {
             // This catch handles infrastructure failures (e.g. DB unavailable)
             // that prevent executeAutomation from recording its own FAILED status.
             // Business-level failures are already handled inside executeAutomation().
-            log.error("Automation infrastructure failure (log status may not be recorded): pid={}, recordId={}, error={}",
-                    automation.getPid(), recordId, e.getMessage(), e);
+            log.error("Automation infrastructure failure (log status may not be recorded): pid={}, recordPid={}, error={}",
+                    automation.getPid(), recordPid, e.getMessage(), e);
         } finally {
             semaphore.release();
         }

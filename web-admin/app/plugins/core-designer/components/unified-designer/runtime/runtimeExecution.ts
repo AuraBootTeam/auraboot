@@ -284,7 +284,6 @@ async function executeRuntimeAction(
       {
         clientRequestId: getStringProp(block.props?.clientRequestId) || undefined,
         targetRecordPid: getStringProp(block.props?.targetRecordPid) || undefined,
-        targetRecordId: getStringProp(block.props?.targetRecordId) || undefined,
         operationType: getOperationType(block.props?.operationType),
         auditContext: createRuntimeAuditContext(block, context),
       },
@@ -642,7 +641,7 @@ function mapRowsToPickerOptions(
 ): RuntimePickerOption[] {
   return rows.flatMap((row) => {
     const optionValue =
-      row[request.valueField] ?? row.id ?? row.pid ?? row.code ?? row.key ?? row.value;
+        row[request.valueField] ?? row.pid ?? row.code ?? row.key ?? row.value;
     const optionLabel =
       row[request.displayField] ?? row.name ?? row.title ?? row.label ?? optionValue;
     const value = formatCell(optionValue);

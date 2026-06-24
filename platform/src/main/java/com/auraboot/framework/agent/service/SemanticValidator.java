@@ -83,10 +83,10 @@ public class SemanticValidator {
 
     // Layer 2: Check if scope is complete for the intent
     private ValidationResult validateIntentScope(String intent, Map<String, Object> scope) {
-        // Write operations that target specific records need recordId or filters
+        // Write operations that target specific records need recordPids or filters
         if (Set.of("update", "delete", "transition", "assign").contains(intent)) {
-            boolean hasRecordId = scope != null && scope.get("recordIds") != null;
-            if (!hasRecordId) {
+            boolean hasRecordPids = scope != null && scope.get("recordPids") != null;
+            if (!hasRecordPids) {
                 // Not an error, just reduces confidence (user may clarify)
                 return ValidationResult.builder()
                         .valid(true) // still valid, just lower confidence

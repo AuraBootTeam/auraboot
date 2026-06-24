@@ -1,8 +1,10 @@
 ---
-type: test-report
+type: run-log
 status: closed
 created: 2026-06-23
 updated: 2026-06-23
+distilled_to:
+  - docs/architecture/rbac-data-scope-runtime-and-e2e.md
 area: permission / rbac / data-scope
 ---
 

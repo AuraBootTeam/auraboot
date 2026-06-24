@@ -315,7 +315,7 @@ export async function executeSimpleWorkbenchAction(
     }
 
     const params: Record<string, any> = {
-      targetRecordId: args.targetRecordId ?? args.targetRecordPid,
+      targetRecordPid: args.targetRecordPid ?? args.targetRecordPid,
       operationType: args.operationType ? String(args.operationType).toUpperCase() : undefined,
       payload: { ...(args.payload || {}), ...collectedInputs },
     };

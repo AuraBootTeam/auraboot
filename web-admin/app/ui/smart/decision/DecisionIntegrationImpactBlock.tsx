@@ -109,7 +109,7 @@ export function DecisionIntegrationImpactBlock({
     fallbackModelCode;
   const targetFromRecord = valueFromPath(record, targetCodeField);
   const detailRecordId =
-    stringValue(params.recordId) ??
+    stringValue(params.recordPid) ??
     stringValue(contextRecord.pid) ??
     stringValue(contextRecord.code);
   const shouldResolveRecordField =

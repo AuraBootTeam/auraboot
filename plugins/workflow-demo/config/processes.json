@@ -204,7 +204,7 @@
             "label:zh-CN": "更新状态（通过）",
             "label:en": "Set Status Approved",
             "modelCode": "wd_leave_request",
-            "recordIdVar": "recordId",
+            "recordPidVar": "recordPid",
             "fieldName": "wd_req_status",
             "fieldValue": "approved"
           }
@@ -220,7 +220,7 @@
             "label:zh-CN": "更新状态（驳回）",
             "label:en": "Set Status Rejected",
             "modelCode": "wd_leave_request",
-            "recordIdVar": "recordId",
+            "recordPidVar": "recordPid",
             "fieldName": "wd_req_status",
             "fieldValue": "rejected"
           }

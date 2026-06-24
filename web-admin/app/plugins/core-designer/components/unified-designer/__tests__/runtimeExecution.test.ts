@@ -228,7 +228,7 @@ describe('defaultRuntimeExecutionServices', () => {
         type: 'namedQuery',
         executionMode: 'live',
         queryCode: 'udw_ai_suggestions',
-        parameters: { recordId: 'customer-1' },
+        parameters: { recordPid: 'customer-1' },
         page: 1,
         size: 10,
       },
@@ -240,7 +240,7 @@ describe('defaultRuntimeExecutionServices', () => {
       page: 1,
       size: 10,
       executeQuery: true,
-      parameters: { recordId: 'customer-1' },
+      parameters: { recordPid: 'customer-1' },
     });
     expect(data).toEqual({
       source: 'named-query',

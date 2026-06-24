@@ -101,7 +101,7 @@ class D1GroundingExtendedIntegrationTest extends BaseIntegrationTest {
         // Seed an update command so layer 1 passes
         seedCommand("test_update_lead_" + System.currentTimeMillis(), "crm_lead", "update");
 
-        // Update without recordIds in scope => layer 2 reduces confidence
+        // Update without recordPids in scope => layer 2 reduces confidence
         SemanticValidator.ValidationResult result =
                 semanticValidator.validate("update", "crm_lead", Map.of(), tenantId);
 

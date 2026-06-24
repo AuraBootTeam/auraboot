@@ -344,7 +344,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         }
 
         // Find pending approval for send_customer_reply
-        String approvalSql = "SELECT pid, approval_status, approval_title FROM ab_agent_approval " +
+        String approvalSql = "SELECT pid, run_id, approval_status, approval_title FROM ab_agent_approval " +
                 "WHERE tenant_id = #{params.tenantId} " +
                 "AND approval_status = 'pending' " +
                 "ORDER BY created_at DESC LIMIT 5";
@@ -359,6 +359,7 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
 
         // Approve the first pending approval
         String approvalPid = (String) approvals.get(0).get("pid");
+        String approvedRunPid = (String) approvals.get(0).get("run_id");
         log.info("Approving: pid={}, title={}", approvalPid, approvals.get(0).get("approval_title"));
 
         Map<String, Object> approveResult = approvalGateService.approve(
@@ -366,23 +367,32 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
         assertThat(approveResult).isNotNull();
         assertThat(approveResult.get("approval_status")).isEqualTo("approved");
 
-        // After approval, the agent should resume execution
-        // Wait for the run to complete (the dispatch handler fires executeTaskWithResume)
+        // After approval, the agent should resume execution. With the real LLM path,
+        // the resumed run may either reach a terminal status or pause again for a
+        // second guarded action; the key proof is that any pending state belongs
+        // to a new run linked by resumed_from, not the original approved run.
         await().atMost(120, TimeUnit.SECONDS)
                 .pollInterval(5, TimeUnit.SECONDS)
                 .untilAsserted(() -> {
                     MetaContext.setSystemTenantContext(tenantId);
-                    String sql = "SELECT run_status FROM ab_agent_run " +
+                    String sql = "SELECT pid, run_status, resumed_from FROM ab_agent_run " +
                             "WHERE tenant_id = #{params.tenantId} " +
                             "AND task_id = #{params.taskPid} " +
                             "ORDER BY created_at DESC LIMIT 1";
                     List<Map<String, Object>> runs = dynamicDataMapper.selectByQuery(sql,
                             Map.of("tenantId", tenantId, "taskPid", taskPid));
                     assertThat(runs).isNotEmpty();
-                    String status = (String) runs.get(0).get("run_status");
-                    log.info("Post-approval run status: {}", status);
-                    // After approval, run should either complete or fail (not still pending)
-                    assertThat(status).isIn("completed", "success", "failed");
+                    Map<String, Object> latestRun = runs.get(0);
+                    String latestRunPid = (String) latestRun.get("pid");
+                    String status = (String) latestRun.get("run_status");
+                    String resumedFrom = (String) latestRun.get("resumed_from");
+                    log.info("Post-approval run status: pid={}, status={}, resumed_from={}",
+                            latestRunPid, status, resumedFrom);
+                    assertThat(status).isIn("completed", "success", "failed", "pending");
+                    if ("pending".equals(status)) {
+                        assertThat(latestRunPid).isNotEqualTo(approvedRunPid);
+                        assertThat(resumedFrom).isEqualTo(approvedRunPid);
+                    }
                 });
 
         // Log delivery evidence when the real LLM path reaches send_customer_reply.
@@ -407,9 +417,11 @@ public class CustomerServiceAgentIntegrationTest extends BaseIntegrationTest {
             } else {
                 log.info("Observed reply send log after approval: {}", sendLogs.get(0));
             }
+        } else if ("pending".equals(finalStatus)) {
+            log.info("Approval resumed into another guarded pending action; live LLM path remains under approval control.");
         }
 
-        log.info("Agent resumed and completed after approval");
+        log.info("Agent resumed after approval with status={}", finalStatus);
     }
 
     // ========== Test 4: Agent timeout graceful failure ==========

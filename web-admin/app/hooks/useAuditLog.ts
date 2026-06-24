@@ -19,7 +19,7 @@ export interface FieldChange {
 export interface DataChangeLog {
   id: number;
   modelCode: string;
-  recordId: string;
+  recordPid: string;
   operation: 'create' | 'update' | 'delete';
   changedBy: number;
   changedAt: string;
@@ -76,12 +76,12 @@ export function useAuditLog() {
    * Get change history for a specific record
    */
   const getRecordHistory = useCallback(
-    async (modelCode: string, recordId: string) => {
+    async (modelCode: string, recordPid: string) => {
       setLoading(true);
       try {
         const result = await fetchResult('/api/meta/change-logs/history', {
           method: 'get',
-          params: { modelCode, recordId },
+          params: { modelCode, recordPid },
         });
 
         if (ResultHelper.isSuccess(result) || Array.isArray(result)) {

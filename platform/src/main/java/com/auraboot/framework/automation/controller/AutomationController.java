@@ -243,11 +243,11 @@ public class AutomationController {
     public ApiResponse<AutomationLogDTO> triggerManually(
             @Parameter(description = "Automation PID") @PathVariable @NotBlank String pid,
             @RequestBody(required = false) Map<String, Object> request) {
-        Object recordIdValue = request != null ? request.get("recordId") : null;
-        String recordId = recordIdValue != null ? String.valueOf(recordIdValue) : null;
-        log.info("Manually triggering automation: pid={}, recordId={}", pid, recordId);
+        Object recordPidValue = request != null ? request.get("recordPid") : null;
+        String recordPid = recordPidValue != null ? String.valueOf(recordPidValue) : null;
+        log.info("Manually triggering automation: pid={}, recordPid={}", pid, recordPid);
 
-        AutomationLogDTO result = automationService.triggerManually(pid, recordId);
+        AutomationLogDTO result = automationService.triggerManually(pid, recordPid);
 
         log.info("Automation triggered: logPid={}, status={}", result.getPid(), result.getStatus());
         return ApiResponse.success("Automation triggered", result);

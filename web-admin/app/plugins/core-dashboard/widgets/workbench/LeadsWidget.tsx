@@ -12,7 +12,7 @@ import { useI18n } from '~/contexts/I18nContext';
 interface LeadRecord {
   id?: string;
   pid?: string;
-  recordId?: string;
+  recordPid?: string;
   crm_lead_company?: string;
   crm_lead_contact_name?: string;
   crm_lead_contact_email?: string;
@@ -51,7 +51,7 @@ function formatRelativeTime(dateStr: string, t: (key: string, params?: Record<st
 }
 
 function getLeadRecordId(lead: LeadRecord): string {
-  return lead.pid || lead.id || lead.recordId || '';
+  return lead.pid || lead.id || lead.recordPid || '';
 }
 
 export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidgetProps) {
@@ -99,9 +99,9 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
   }, [maxItems]);
 
   const handleRowClick = (lead: LeadRecord) => {
-    const recordId = getLeadRecordId(lead);
-    if (recordId) {
-      window.location.href = `/p/crm_lead/view/${encodeURIComponent(recordId)}`;
+    const recordPid = getLeadRecordId(lead);
+    if (recordPid) {
+      window.location.href = `/p/crm_lead/view/${encodeURIComponent(recordPid)}`;
     }
   };
 
@@ -205,7 +205,7 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
       {/* Lead rows */}
       <div className="flex-1 space-y-2 overflow-y-auto">
         {leads.map((lead, index) => {
-          const recordId = getLeadRecordId(lead);
+          const recordPid = getLeadRecordId(lead);
           const status = lead.crm_lead_status || 'new';
           const statusStyle = STATUS_STYLES[status] || STATUS_STYLES.new;
           const timeStr = lead.created_at
@@ -214,11 +214,11 @@ export function LeadsWidget({ title, maxItems = 5, className = '' }: LeadsWidget
 
           return (
             <button
-              key={recordId || `${lead.crm_lead_company ?? 'lead'}-${index}`}
-              data-testid={recordId ? `lead-row-${recordId}` : undefined}
+              key={recordPid || `${lead.crm_lead_company ?? 'lead'}-${index}`}
+              data-testid={recordPid ? `lead-row-${recordPid}` : undefined}
               type="button"
               onClick={() => handleRowClick(lead)}
-              disabled={!recordId}
+              disabled={!recordPid}
               className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-gray-100 bg-white p-3 text-left transition-colors hover:border-blue-200 hover:bg-blue-50/30"
             >
               {/* Icon */}

@@ -28,13 +28,13 @@ public class ChangeLogController {
 
     /**
      * Get change history for a specific record.
-     * GET /api/meta/change-logs/history?modelCode=xxx&recordId=xxx
+     * GET /api/meta/change-logs/history?modelCode=xxx&recordPid=xxx
      */
     @GetMapping("/history")
     public ApiResponse<List<DataChangeLog>> getHistory(
             @RequestParam String modelCode,
-            @RequestParam String recordId) {
-        List<DataChangeLog> history = changeLogService.getHistory(modelCode, recordId);
+            @RequestParam String recordPid) {
+        List<DataChangeLog> history = changeLogService.getHistory(modelCode, recordPid);
         return ApiResponse.success(history);
     }
 

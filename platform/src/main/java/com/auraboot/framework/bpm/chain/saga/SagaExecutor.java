@@ -77,8 +77,8 @@ public class SagaExecutor {
         for (SagaStep step : steps) {
             if (SagaStatus.COMPLETED.name().toLowerCase().equals(step.getStatus()) && step.getOutputData() != null) {
                 processVars.put("_step_" + step.getNodeId() + "_result", step.getOutputData());
-                if (step.getRecordId() != null) {
-                    processVars.put("_step_" + step.getNodeId() + "_recordId", step.getRecordId());
+                if (step.getRecordPid() != null) {
+                    processVars.put("_step_" + step.getNodeId() + "_recordPid", step.getRecordPid());
                 }
                 processVars.put("_step_" + step.getNodeId() + "_success", true);
             }

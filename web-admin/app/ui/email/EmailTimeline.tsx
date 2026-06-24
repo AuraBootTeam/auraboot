@@ -3,7 +3,7 @@
  *
  * Props:
  *  - modelCode: the model code of the parent record (e.g., 'crm-contact')
- *  - recordId: the numeric ID of the record
+ *  - recordPid: the public pid of the record
  *
  * Fetches via getMessagesByRecord, renders a timeline with:
  *  - Direction icon (inbound ↓ / outbound ↑)
@@ -26,7 +26,7 @@ import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 
 interface EmailTimelineProps {
   modelCode: string;
-  recordId: number;
+  recordPid: string;
 }
 
 function timeAgo(dateStr: string): string {
@@ -130,19 +130,19 @@ function EmailTimelineItem({ message }: EmailTimelineItemProps) {
   );
 }
 
-export default function EmailTimeline({ modelCode, recordId }: EmailTimelineProps) {
+export default function EmailTimeline({ modelCode, recordPid }: EmailTimelineProps) {
   const [messages, setMessages] = useState<EmailMessage[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setLoading(true);
-    getMessagesByRecord(modelCode, recordId)
+    getMessagesByRecord(modelCode, recordPid)
       .then(setMessages)
       .catch(() => {
         /* non-critical */
       })
       .finally(() => setLoading(false));
-  }, [modelCode, recordId]);
+  }, [modelCode, recordPid]);
 
   if (loading) {
     return (
@@ -165,7 +165,7 @@ export default function EmailTimeline({ modelCode, recordId }: EmailTimelineProp
   }
 
   return (
-    <div className="space-y-0" data-testid={`email-timeline-${modelCode}-${recordId}`}>
+    <div className="space-y-0" data-testid={`email-timeline-${modelCode}-${recordPid}`}>
       {messages.map((message) => (
         <EmailTimelineItem key={message.id} message={message} />
       ))}

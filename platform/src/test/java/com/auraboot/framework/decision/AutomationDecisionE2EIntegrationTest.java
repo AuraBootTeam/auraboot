@@ -102,7 +102,7 @@ class AutomationDecisionE2EIntegrationTest extends BaseIntegrationTest {
         req.setTriggerCondition("#decision['matched'] == true");
         req.setActions(List.of(AutomationAction.builder()
                 .type("update_record")
-                .config(Map.of("modelCode", modelCode, "recordId", "${recordId}",
+                .config(Map.of("modelCode", modelCode, "recordPid", "${recordPid}",
                         "fields", Map.of("note", "auto")))
                 .build()));
         req.setEnabled(true);

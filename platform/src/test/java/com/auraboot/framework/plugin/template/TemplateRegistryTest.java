@@ -176,6 +176,37 @@ class TemplateRegistryTest {
                 .contains("legacy-x");
     }
 
+    @Test
+    @DisplayName("default roots include configured plugins root")
+    void defaultRootsIncludeConfiguredPluginsRoot() throws IOException {
+        createPlugin(
+                tempDir.resolve("plugins/configured-template"),
+                """
+                {
+                  "catalogType": "template",
+                  "displayName": "Configured Template",
+                  "namespace": "ctpl"
+                }
+                """
+        );
+
+        String previous = System.getProperty("aura.registry.root.plugins");
+        try {
+            System.setProperty("aura.registry.root.plugins", tempDir.resolve("plugins").toString());
+
+            TemplateRegistry registry = new TemplateRegistry(objectMapper);
+
+            assertThat(registry.resolveAbsolutePath("configured-template"))
+                    .endsWith("plugins/configured-template");
+        } finally {
+            if (previous == null) {
+                System.clearProperty("aura.registry.root.plugins");
+            } else {
+                System.setProperty("aura.registry.root.plugins", previous);
+            }
+        }
+    }
+
     // ---- helpers ----
 
     private static void createPlugin(Path pluginDir, String pluginJson) throws IOException {

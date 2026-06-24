@@ -160,7 +160,7 @@ class DecisionUsageIndexServiceImplTest {
                         200,
                         DecisionBinding.TraceMode.SAMPLED,
                         true,
-                        RuleValueSource.field(Scope.RECORD, "data.recordId"),
+                        RuleValueSource.field(Scope.RECORD, "data.recordPid"),
                         null),
                 true));
         Automation automation = new Automation();
@@ -189,7 +189,7 @@ class DecisionUsageIndexServiceImplTest {
                         org.assertj.core.groups.Tuple.tuple(
                                 "FIELD", null, "record.data.amount", "RULE_BINDING"),
                         org.assertj.core.groups.Tuple.tuple(
-                                "FIELD", null, "record.data.recordId", "RULE_BINDING"));
+                                "FIELD", null, "record.data.recordPid", "RULE_BINDING"));
     }
 
     @Test

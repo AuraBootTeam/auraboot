@@ -109,7 +109,7 @@ export default function TaskFormModal({ projectId, task, onClose, onSuccess }: T
         params.pm_task_status = status;
         const result = await post<unknown>('/api/meta/commands/execute/pm:update_task', {
           payload: params,
-          targetRecordId: task.pid,
+          targetRecordPid: task.pid,
           operationType: 'update',
         });
         if (ResultHelper.isSuccess(result)) {

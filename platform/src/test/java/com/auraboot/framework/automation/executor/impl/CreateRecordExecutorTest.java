@@ -73,13 +73,13 @@ class CreateRecordExecutorTest {
         when(dynamicDataService.create(any(), any())).thenReturn(Map.of("id", 200L));
 
         Map<String, Object> context = new HashMap<>();
-        context.put("recordId", "lead-456");
+        context.put("recordPid", "lead-456");
         context.put("userId", 789L);
 
         AutomationAction action = buildAction(Map.of(
                 "modelCode", "crm_activity",
                 "fields", Map.of(
-                        "relatedLeadId", "${recordId}",
+                        "relatedLeadId", "${recordPid}",
                         "assigneeId", "${userId}",
                         "title", "Follow up"
                 )

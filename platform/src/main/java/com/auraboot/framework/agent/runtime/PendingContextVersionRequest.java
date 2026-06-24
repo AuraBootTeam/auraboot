@@ -6,10 +6,10 @@ package com.auraboot.framework.agent.runtime;
 public record PendingContextVersionRequest(
         Long tenantId,
         String modelCode,
-        String recordId) {
+        String recordPid) {
 
     public boolean verifiable() {
-        return tenantId != null && hasText(modelCode) && hasText(recordId);
+        return tenantId != null && hasText(modelCode) && hasText(recordPid);
     }
 
     private boolean hasText(String value) {

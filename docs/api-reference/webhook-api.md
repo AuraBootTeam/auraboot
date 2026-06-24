@@ -146,7 +146,7 @@ X-AuraBoot-Timestamp: 1712841600
   "tenantId": 1,
   "modelCode": "sc_showcase",
   "data": {
-    "recordId": "01HXYZ...",
+    "recordPid": "01HXYZ...",
     "recordPid": "01HXYZ...",
     "fields": {
       "sc_name": "New Showcase",

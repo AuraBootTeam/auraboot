@@ -2,6 +2,8 @@ package com.auraboot.framework.meta.entity;
 
 import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -47,6 +49,8 @@ public class OtDataLog {
     @TableField("status")
     private String status;
 
+    @JsonIgnore
+    @Schema(hidden = true)
     @TableField("target_record_id")
     private Long targetRecordId;
 

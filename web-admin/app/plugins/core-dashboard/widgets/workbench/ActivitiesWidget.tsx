@@ -12,7 +12,7 @@ import { useI18n } from '~/contexts/I18nContext';
 interface ActivityRecord {
   id?: string;
   pid?: string;
-  recordId?: string;
+  recordPid?: string;
   crm_act_type?: string;
   crm_act_subject?: string;
   crm_activity_type?: string;
@@ -63,7 +63,7 @@ function formatRelativeTime(dateStr: string, t: (key: string, params?: Record<st
 }
 
 function getActivityRecordId(activity: ActivityRecord): string {
-  return activity.pid || activity.id || activity.recordId || '';
+  return activity.pid || activity.id || activity.recordPid || '';
 }
 
 export function ActivitiesWidget({ title, maxItems = 6, className = '' }: ActivitiesWidgetProps) {
@@ -106,9 +106,9 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
       window.location.href = `/p/${encodeURIComponent(activity.crm_activity_related_model)}/view/${encodeURIComponent(activity.crm_activity_related_id)}`;
       return;
     }
-    const recordId = getActivityRecordId(activity);
-    if (recordId) {
-      window.location.href = `/p/crm_activity/view/${encodeURIComponent(recordId)}`;
+    const recordPid = getActivityRecordId(activity);
+    if (recordPid) {
+      window.location.href = `/p/crm_activity/view/${encodeURIComponent(recordPid)}`;
     }
   };
 
@@ -186,7 +186,7 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
 
         <div className="space-y-3">
           {activities.map((activity, index) => {
-            const recordId = getActivityRecordId(activity);
+            const recordPid = getActivityRecordId(activity);
             const actType = activity.crm_act_type || activity.crm_activity_type || 'note';
             const subject = activity.crm_act_subject || activity.crm_activity_subject;
             const icon = TYPE_ICONS[actType] || '\uD83D\uDCCC';
@@ -195,14 +195,14 @@ export function ActivitiesWidget({ title, maxItems = 6, className = '' }: Activi
               ? formatRelativeTime(activity.created_at, t)
               : '';
             const isClickable = !!(
-              recordId ||
+              recordPid ||
               (activity.crm_activity_related_model && activity.crm_activity_related_id)
             );
 
             return (
               <button
-                key={recordId || `${subject ?? 'activity'}-${index}`}
-                data-testid={recordId ? `activity-row-${recordId}` : undefined}
+                key={recordPid || `${subject ?? 'activity'}-${index}`}
+                data-testid={recordPid ? `activity-row-${recordPid}` : undefined}
                 type="button"
                 onClick={() => handleActivityClick(activity)}
                 disabled={!isClickable}

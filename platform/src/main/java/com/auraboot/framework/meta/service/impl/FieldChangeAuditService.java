@@ -66,6 +66,20 @@ public class FieldChangeAuditService {
                                     String commandCode, Map<String, Object> beforeData,
                                     Map<String, Object> afterData, Long actorId,
                                     String actorName) {
+        recordFieldChanges(tenantId, modelCode, recordId,
+                recordId != null ? String.valueOf(recordId) : null,
+                commandCode, beforeData, afterData, actorId, actorName);
+    }
+
+    /**
+     * Diff beforeData vs afterData and record changes for a public record PID.
+     * The legacy numeric recordId is optional and is retained only for internal compatibility.
+     */
+    @Transactional
+    public void recordFieldChanges(Long tenantId, String modelCode, Long recordId, String recordPid,
+                                    String commandCode, Map<String, Object> beforeData,
+                                    Map<String, Object> afterData, Long actorId,
+                                    String actorName) {
         if (!StringUtils.hasText(modelCode)) {
             return;
         }
@@ -91,7 +105,7 @@ public class FieldChangeAuditService {
                 String fieldCode = entry.getKey();
                 Object newVal = afterData.get(fieldCode);
                 if (newVal != null) {
-                    changeLogs.add(buildChangeLog(tenantId, modelCode, recordId, commandCode,
+                    changeLogs.add(buildChangeLog(tenantId, modelCode, recordId, recordPid, commandCode,
                             fieldCode, fieldLabels.get(fieldCode), null, newVal,
                             fieldTypes.getOrDefault(fieldCode, "string"), "added",
                             actorId, actorName, now));
@@ -103,7 +117,7 @@ public class FieldChangeAuditService {
                 String fieldCode = entry.getKey();
                 Object oldVal = beforeData.get(fieldCode);
                 if (oldVal != null) {
-                    changeLogs.add(buildChangeLog(tenantId, modelCode, recordId, commandCode,
+                    changeLogs.add(buildChangeLog(tenantId, modelCode, recordId, recordPid, commandCode,
                             fieldCode, fieldLabels.get(fieldCode), oldVal, null,
                             fieldTypes.getOrDefault(fieldCode, "string"), "removed",
                             actorId, actorName, now));
@@ -116,7 +130,7 @@ public class FieldChangeAuditService {
                 Object oldVal = beforeData.get(fieldCode);
                 Object newVal = afterData.get(fieldCode);
                 if (!Objects.equals(asString(oldVal), asString(newVal))) {
-                    changeLogs.add(buildChangeLog(tenantId, modelCode, recordId, commandCode,
+                    changeLogs.add(buildChangeLog(tenantId, modelCode, recordId, recordPid, commandCode,
                             fieldCode, fieldLabels.get(fieldCode), oldVal, newVal,
                             fieldTypes.getOrDefault(fieldCode, "string"), "modified",
                             actorId, actorName, now));
@@ -149,11 +163,32 @@ public class FieldChangeAuditService {
     }
 
     /**
+     * Get all field changes for a specific public record PID.
+     */
+    public List<FieldChangeLog> getRecordHistoryByRecordPid(Long tenantId, String modelCode, String recordPid) {
+        if (!StringUtils.hasText(recordPid)) {
+            return List.of();
+        }
+        return changeLogMapper.getByModelAndRecordPid(tenantId, modelCode, recordPid);
+    }
+
+    /**
      * Get change history for a specific field on a record.
      */
     public List<FieldChangeLog> getFieldHistory(Long tenantId, String modelCode,
                                                  Long recordId, String fieldCode) {
         return changeLogMapper.getByField(tenantId, modelCode, recordId, fieldCode);
+    }
+
+    /**
+     * Get change history for a specific field on a public record PID.
+     */
+    public List<FieldChangeLog> getFieldHistoryByRecordPid(Long tenantId, String modelCode,
+                                                            String recordPid, String fieldCode) {
+        if (!StringUtils.hasText(recordPid)) {
+            return List.of();
+        }
+        return changeLogMapper.getByFieldAndRecordPid(tenantId, modelCode, recordPid, fieldCode);
     }
 
     /**
@@ -329,7 +364,7 @@ public class FieldChangeAuditService {
         };
     }
 
-    private FieldChangeLog buildChangeLog(Long tenantId, String modelCode, Long recordId,
+    private FieldChangeLog buildChangeLog(Long tenantId, String modelCode, Long recordId, String recordPid,
                                            String commandCode, String fieldCode, String fieldLabel,
                                            Object oldValue, Object newValue, String valueType,
                                            String changeType, Long actorId, String actorName,
@@ -338,6 +373,7 @@ public class FieldChangeAuditService {
         cl.setTenantId(tenantId);
         cl.setModelCode(modelCode);
         cl.setRecordId(recordId);
+        cl.setRecordPid(recordPid);
         cl.setCommandCode(commandCode);
         cl.setFieldCode(fieldCode);
         cl.setFieldLabel(fieldLabel != null ? fieldLabel : fieldCode);

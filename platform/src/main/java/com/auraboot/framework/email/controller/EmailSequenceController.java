@@ -189,7 +189,7 @@ public class EmailSequenceController {
      * {
      *   "accountId": 1,
      *   "contacts": [
-     *     { "email": "alice@example.com", "modelCode": "crm_contact", "recordId": "42" },
+     *     { "email": "alice@example.com", "modelCode": "crm_contact", "recordPid": "01K..." },
      *     ...
      *   ]
      * }
@@ -217,7 +217,7 @@ public class EmailSequenceController {
                         accountId,
                         c.get("email"),
                         c.get("modelCode"),
-                        c.get("recordId")))
+                        c.get("recordPid")))
                 .toList();
 
         return ApiResponse.ok(enrollments);

@@ -196,11 +196,11 @@ public class EmailSequenceService {
      * @param accountId    email account to send from
      * @param contactEmail recipient email address
      * @param modelCode    DSL model code for the linked CRM record (may be null)
-     * @param recordId     CRM record ID (may be null)
+     * @param recordPid    CRM record pid (may be null)
      * @return the persisted enrollment
      */
     public EmailSequenceEnrollment enroll(Long tenantId, Long sequenceId, Long accountId,
-                                          String contactEmail, String modelCode, String recordId) {
+                                          String contactEmail, String modelCode, String recordPid) {
         // Determine first step delay
         List<EmailSequenceStep> steps = emailSequenceStepMapper.findBySequenceId(sequenceId);
         int firstDelayDays = steps.isEmpty() ? 0 : steps.get(0).getDelayDays();
@@ -214,7 +214,7 @@ public class EmailSequenceService {
         enrollment.setAccountId(accountId);
         enrollment.setContactEmail(contactEmail);
         enrollment.setModelCode(modelCode);
-        enrollment.setRecordId(recordId);
+        enrollment.setRecordPid(recordPid);
         enrollment.setCurrentStep(0);
         enrollment.setStatus(EmailConstants.ENROLLMENT_ACTIVE);
         enrollment.setNextSendAt(firstAt);

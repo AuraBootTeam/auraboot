@@ -1449,28 +1449,16 @@ class CommandExecutorIntegrationTest {
         log.info("CREATE result: phase={}, data={}",
                 createResult.getPhaseReached(), createResult.getData());
 
-        // Get the created record ID from result data
-        Object createdId = createResult.getData() != null ? createResult.getData().get("recordId") : null;
-        if (createdId == null && createResult.getData() != null) {
-            createdId = createResult.getData().get("id");
-        }
-        if (createdId == null) {
-            // Query to get the record ID
-            String selectSql = String.format("SELECT id FROM %s WHERE tenant_id = %d AND name_%s = '%s'",
-                    tableName, testTenant.getId(), suffix, "original_name");
-            List<Map<String, Object>> records = dynamicDataMapper.selectByQuery(selectSql, Map.of());
-            assertFalse(records.isEmpty(), "Record should have been created");
-            createdId = records.get(0).get("id");
-        }
-        assertNotNull(createdId, "Record ID should be available");
-        String recordId = createdId.toString();
+        Object createdPid = createResult.getData() != null ? createResult.getData().get("recordPid") : null;
+        assertNotNull(createdPid, "Record pid should be available");
+        String recordPid = createdPid.toString();
 
         // Execute UPDATE command with target record
-        log.info("Executing UPDATE with recordId={}", recordId);
+        log.info("Executing UPDATE with recordPid={}", recordPid);
         CommandExecuteRequest updateRequest = new CommandExecuteRequest();
         updateRequest.setPayload(Map.of("name", "updated_name", "value", 200));
         updateRequest.setOperationType("update");
-        updateRequest.setTargetRecordId(recordId);
+        updateRequest.setTargetRecordId(recordPid);
         updateRequest.setClientRequestId("req_ct_update_" + UUID.randomUUID());
 
         try {

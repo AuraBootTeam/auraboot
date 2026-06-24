@@ -42,13 +42,13 @@ public class AiFieldController {
      * Fill a specific record's AI field
      *
      * @param modelCode model code
-     * @param recordId record ID
+     * @param recordPid record pid
      * @param request request containing fieldCode, operation, sourceFields, prompt
      */
-    @PostMapping("/models/{modelCode}/records/{recordId}/ai-fill")
+    @PostMapping("/models/{modelCode}/records/{recordPid}/ai-fill")
     public ApiResponse<AiGenerationResult> aiFillField(
             @PathVariable String modelCode,
-            @PathVariable String recordId,
+            @PathVariable String recordPid,
             @RequestBody AiFillRequest request) {
 
         // Build generation request from fill request
@@ -81,18 +81,18 @@ public class AiFieldController {
 
         Map<String, AiGenerationResult> results = new java.util.LinkedHashMap<>();
 
-        for (String recordId : request.getRecordIds()) {
+        for (String recordPid : request.getRecordPids()) {
             AiGenerationRequest genRequest = AiGenerationRequest.builder()
                     .operation(request.getOperation())
                     .prompt(request.getPrompt())
                     .sourceContent(request.getSourceContents() != null
-                            ? request.getSourceContents().getOrDefault(recordId, Map.of())
+                            ? request.getSourceContents().getOrDefault(recordPid, Map.of())
                             : Map.of())
                     .maxTokens(request.getMaxTokens())
                     .temperature(request.getTemperature())
                     .build();
 
-            results.put(recordId, aiFieldProcessor.process(genRequest));
+            results.put(recordPid, aiFieldProcessor.process(genRequest));
         }
 
         return ApiResponse.ok(results);
@@ -135,7 +135,7 @@ public class AiFieldController {
      */
     @lombok.Data
     public static class BatchAiFillRequest {
-        private List<String> recordIds;
+        private List<String> recordPids;
         private String fieldCode;
         private String operation;
         private String prompt;

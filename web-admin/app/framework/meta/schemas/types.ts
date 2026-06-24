@@ -446,7 +446,7 @@ export interface SubTableConfig {
   resolveVia?: ResolveViaConfig;
   /**
    * Values merged into create payloads before editable row input.
-   * String values support the same `${recordId}` / `${record.field}` templates as sub-table data sources.
+   * String values support the same `${recordPid}` / `${record.field}` templates as sub-table data sources.
    */
   defaultValues?: Record<string, unknown>;
   addCommandCode?: string;

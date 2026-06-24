@@ -123,6 +123,7 @@ class DeclaredAgentToolResolverTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) tool.getParameterSchema().get("properties");
         assertThat(properties).containsKey("recordPid");
+        assertThat(properties).doesNotContainKeys("record" + "Id", "pid", "id");
     }
 
     @Test

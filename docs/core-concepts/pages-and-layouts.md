@@ -603,7 +603,7 @@ From the CRM Opportunity plugin, showing sub-tables in three different data mode
                   "params": {
                     "datasourceId": "nq:crm_activities_by_object",
                     "objectType": "opportunity",
-                    "objectId": "${recordId}"
+                    "objectId": "${recordPid}"
                   }
                 },
                 "readOnly": true,

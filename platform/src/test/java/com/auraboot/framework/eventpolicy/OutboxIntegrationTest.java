@@ -43,7 +43,7 @@ class OutboxIntegrationTest extends BaseIntegrationTest {
                  "left":{"type":"path","scope":"record","path":"data.priority","dataType":"enum"},
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
               "actions":[{"type":"NOTIFY","target":"ROLE:mgr","order":10,"payload":{},
-                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordId}:${rule.ruleCode}:NOTIFY"}]}]
+                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:NOTIFY"}]}]
             """);
         var draft = versionService.createDraft(code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
                 ExecutionMode.ORDERED, FailureStrategy.CONTINUE_ON_ERROR, ConflictStrategy.REJECT_ON_CONFLICT,
@@ -54,7 +54,7 @@ class OutboxIntegrationTest extends BaseIntegrationTest {
 
     private JsonNode ctx(String targetKey) throws Exception {
         return mapper.readTree("""
-            {"record":{"entityCode":"%s","recordId":"CMP-OB-1","data":{"priority":"HIGH"}}}""".formatted(targetKey));
+            {"record":{"entityCode":"%s","recordPid":"CMP-OB-1","data":{"priority":"HIGH"}}}""".formatted(targetKey));
     }
 
     @Test

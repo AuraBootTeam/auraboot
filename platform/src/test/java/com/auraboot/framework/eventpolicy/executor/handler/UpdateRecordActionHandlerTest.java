@@ -16,7 +16,7 @@ import static org.mockito.Mockito.verify;
 
 /**
  * Unit test for {@link UpdateRecordActionHandler} — context extraction + payload.fields → update call.
- * The executor→handler dispatch and the entityCode/recordId extraction pattern are already verified
+ * The executor→handler dispatch and the entityCode/recordPid extraction pattern are already verified
  * over the real stack by the comment/notify handler ITs; the full record-mutation real-stack IT
  * (needs a published meta-model + record fixture) is a documented follow-on (gap tracker).
  */
@@ -42,7 +42,7 @@ class UpdateRecordActionHandlerTest {
 
     @Test
     void updatesRecordFieldsFromContextAndPayload() {
-        var record = Map.<String, Object>of("entityCode", "complaint", "recordId", "CMP-1",
+        var record = Map.<String, Object>of("entityCode", "complaint", "recordPid", "CMP-1",
                 "data", Map.of("priority", "HIGH"));
         handler.execute(plan("UPDATE_RECORD", Map.of("fields", Map.of("status", "ESCALATED"))), ctx(record));
         verify(dynamicDataService).update(eq("complaint"), eq("CMP-1"), eq(Map.of("status", "ESCALATED")));
@@ -57,7 +57,7 @@ class UpdateRecordActionHandlerTest {
 
     @Test
     void throwsWhenFieldsMissingOrEmpty() {
-        var record = Map.<String, Object>of("entityCode", "complaint", "recordId", "CMP-1");
+        var record = Map.<String, Object>of("entityCode", "complaint", "recordPid", "CMP-1");
         assertThatThrownBy(() -> handler.execute(plan("UPDATE_RECORD", Map.of()), ctx(record)))
                 .isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> handler.execute(plan("UPDATE_RECORD", Map.of("fields", Map.of())), ctx(record)))

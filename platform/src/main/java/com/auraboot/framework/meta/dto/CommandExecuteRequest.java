@@ -1,5 +1,7 @@
 package com.auraboot.framework.meta.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.util.Map;
@@ -29,14 +31,16 @@ public class CommandExecuteRequest {
     private String operationType;
 
     /**
-     * Optional target record ID (for UPDATE/DELETE).
-     * Kept for compatibility; dynamic command callers should pass public pid values.
+     * Internal pipeline target for UPDATE/DELETE.
+     * Public JSON callers must use targetRecordPid.
      */
+    @JsonIgnore
     private String targetRecordId;
 
     /**
-     * Public pid alias for targetRecordId.
+     * Public target record pid for UPDATE/DELETE.
      */
+    @JsonProperty("targetRecordPid")
     private String targetRecordPid;
 
     /**
@@ -59,18 +63,23 @@ public class CommandExecuteRequest {
      */
     private boolean dryRun;
 
+    @JsonIgnore
     public String getTargetRecordId() {
-        return targetRecordPid != null ? targetRecordPid : targetRecordId;
+        return targetRecordId != null ? targetRecordId : targetRecordPid;
     }
 
+    @JsonIgnore
     public void setTargetRecordId(String targetRecordId) {
         this.targetRecordId = targetRecordId;
+        this.targetRecordPid = targetRecordId;
     }
 
+    @JsonProperty("targetRecordPid")
     public String getTargetRecordPid() {
-        return targetRecordPid != null ? targetRecordPid : targetRecordId;
+        return targetRecordPid;
     }
 
+    @JsonProperty("targetRecordPid")
     public void setTargetRecordPid(String targetRecordPid) {
         this.targetRecordPid = targetRecordPid;
         this.targetRecordId = targetRecordPid;

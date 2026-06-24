@@ -334,7 +334,7 @@ export default function TaskBoard({
       const commandCode = STATUS_COMMAND_MAP[targetStatus];
       try {
         const result = await post(`/api/meta/commands/execute/${commandCode}`, {
-          targetRecordId: taskPid,
+          targetRecordPid: taskPid,
           operationType: 'update',
         });
         if (result.code !== '0') {

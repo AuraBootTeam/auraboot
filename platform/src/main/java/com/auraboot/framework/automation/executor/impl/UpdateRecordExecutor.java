@@ -31,18 +31,18 @@ public class UpdateRecordExecutor implements ActionExecutor {
         }
 
         String modelCode = (String) config.get("modelCode");
-        String recordId = (String) config.get("recordId");
+        String recordPid = (String) config.get("recordPid");
 
-        // Resolve variable substitution in recordId (e.g., ${trigger.recordId})
-        if (recordId != null && recordId.startsWith("${") && recordId.endsWith("}")) {
-            String varName = recordId.substring(2, recordId.length() - 1);
+        // Resolve variable substitution in recordPid (e.g., ${trigger.recordPid})
+        if (recordPid != null && recordPid.startsWith("${") && recordPid.endsWith("}")) {
+            String varName = recordPid.substring(2, recordPid.length() - 1);
             Object resolved = resolveVariable(varName, context);
-            recordId = resolved != null ? resolved.toString() : null;
+            recordPid = resolved != null ? resolved.toString() : null;
         }
 
-        // If recordId not specified, use the triggering record
-        if (recordId == null || recordId.isBlank()) {
-            recordId = (String) context.get("recordId");
+        // If recordPid not specified, use the triggering record
+        if (recordPid == null || recordPid.isBlank()) {
+            recordPid = (String) context.get("recordPid");
         }
 
         // Get field updates
@@ -55,14 +55,14 @@ public class UpdateRecordExecutor implements ActionExecutor {
         // Process field values (may contain expressions)
         Map<String, Object> processedUpdates = processFieldValues(fieldUpdates, context);
 
-        log.info("Updating record: modelCode={}, recordId={}, fields={}",
-                modelCode, recordId, processedUpdates.keySet());
+        log.info("Updating record: modelCode={}, recordPid={}, fields={}",
+                modelCode, recordPid, processedUpdates.keySet());
 
-        Map<String, Object> result = dynamicDataService.update(modelCode, recordId, processedUpdates);
+        Map<String, Object> result = dynamicDataService.update(modelCode, recordPid, processedUpdates);
 
         return Map.of(
                 "success", true,
-                "recordId", recordId,
+                "recordPid", recordPid,
                 "updatedFields", processedUpdates.keySet()
         );
     }

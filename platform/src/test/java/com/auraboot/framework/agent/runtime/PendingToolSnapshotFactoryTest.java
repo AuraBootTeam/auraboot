@@ -264,7 +264,7 @@ class PendingToolSnapshotFactoryTest {
         PendingContextVersionResolver resolver = request -> {
             assertThat(request.tenantId()).isEqualTo(1L);
             assertThat(request.modelCode()).isEqualTo("crm_customer");
-            assertThat(request.recordId()).isEqualTo("C-100");
+            assertThat(request.recordPid()).isEqualTo("C-100");
             return new PendingContextVersion(
                     "crm_customer",
                     "C-100",
@@ -296,12 +296,12 @@ class PendingToolSnapshotFactoryTest {
                 .toolId("toolu-1")
                 .toolName("cmd_update_customer")
                 .modelCode("crm_customer")
-                .input(Map.of("recordId", "C-100", "name", "Acme"))
+                .input(Map.of("recordPid", "C-100", "name", "Acme"))
                 .description("Update customer")
                 .build());
 
         assertThat(pending.getModelCode()).isEqualTo("crm_customer");
-        assertThat(pending.getInput()).containsEntry("recordId", "C-100");
+        assertThat(pending.getInput()).containsEntry("recordPid", "C-100");
         assertThat(pending.getRecordVersion()).isEqualTo("change:42");
         assertThat(pending.getContextVersion()).isEqualTo("crm_customer:C-100:change:42");
         assertThat(pending.getContextConflictPolicy())
@@ -314,7 +314,7 @@ class PendingToolSnapshotFactoryTest {
         PendingContextVersionResolver resolver = request -> {
             assertThat(request.tenantId()).isEqualTo(1L);
             assertThat(request.modelCode()).isEqualTo("crm_customer");
-            assertThat(request.recordId()).isEqualTo("C-200");
+            assertThat(request.recordPid()).isEqualTo("C-200");
             return new PendingContextVersion(
                     "crm_customer",
                     "C-200",

@@ -105,7 +105,7 @@ class SkillEngineIntegrationTest extends BaseIntegrationTest {
     void execute_dslQuery_missingParams_fails() {
         SkillInput input = new SkillInput();
         input.setIntent("query");
-        input.setParameters(Map.of()); // no model, queryCode, or recordId
+        input.setParameters(Map.of()); // no model, queryCode, or recordPid
 
         SkillResult result = skillEngine.execute(tenantId, "test-run", "dsl.query", input, null, null, null);
         assertThat(result.getStatus()).isEqualTo(SkillResult.Status.FAILED);

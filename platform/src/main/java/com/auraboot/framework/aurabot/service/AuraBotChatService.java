@@ -380,7 +380,7 @@ public class AuraBotChatService {
                 Long userIdForGrounding = MetaContext.getCurrentUserId();
                 var gctx = com.auraboot.framework.agent.service.GroundingService.GroundingContext.builder()
                         .pageModel(modelCode)
-                        .recordId(recordPid)
+                        .recordPid(recordPid)
                         .conversationId(request.getSessionId())
                         .sessionId(request.getSessionId())
                         .userId(userIdForGrounding == null ? null : userIdForGrounding.toString())

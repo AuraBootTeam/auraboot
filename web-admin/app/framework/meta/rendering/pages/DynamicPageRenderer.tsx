@@ -10,7 +10,7 @@
  * Usage:
  *   <DynamicPageRenderer tableName="device" pageType="list" />
  *   <DynamicPageRenderer tableName="order" pageType="form" />
- *   <DynamicPageRenderer tableName="order" pageType="form" recordId="123" />  // edit mode
+ *   <DynamicPageRenderer tableName="order" pageType="form" recordPid="123" />  // edit mode
  */
 
 import React, { Suspense } from 'react';
@@ -33,7 +33,7 @@ export interface DynamicPageRendererProps {
   /** Profile name override (default resolves from schema.profile or "admin") */
   profileName?: string;
   /** Record ID for edit/detail modes */
-  recordId?: string;
+  recordPid?: string;
   /** Auth token */
   token?: string | null;
   /** Custom page key (bypasses tableName + pageType generation) */
@@ -44,7 +44,7 @@ export function DynamicPageRenderer({
   tableName,
   pageType,
   profileName = 'admin',
-  recordId,
+  recordPid,
   token,
   pageKey,
 }: DynamicPageRendererProps) {
@@ -125,7 +125,7 @@ export function DynamicPageRenderer({
               <PageContent
                 schema={schema}
                 tableName={tableName}
-                recordId={recordId}
+                recordPid={recordPid}
                 token={token}
               />
             </Suspense>

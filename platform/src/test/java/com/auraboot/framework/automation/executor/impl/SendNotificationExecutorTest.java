@@ -117,12 +117,12 @@ class SendNotificationExecutorTest {
         AutomationAction action = buildAction(Map.of(
                 "type", "in_app",
                 "title", "Task for ${userName}",
-                "content", "Record ${recordId} created",
+                "content", "Record ${recordPid} created",
                 "recipients", List.of("50")
         ));
         Map<String, Object> context = new HashMap<>();
         context.put("userName", "Alice");
-        context.put("recordId", "rec-007");
+        context.put("recordPid", "rec-007");
         context.put("automationPid", "auto-xyz");
 
         executor.execute(action, context);
@@ -173,7 +173,7 @@ class SendNotificationExecutorTest {
     @Test
     void resolvesReferenceTraversalRecipientToOwnerUserId() {
         // asset_maintenance row references asset_id=55; asset 55's current_user_id=77.
-        // DynamicDataService.getById takes a STRING recordId (verified §15).
+        // DynamicDataService.getById takes a STRING pid.
         when(dynamicDataService.getById("asset", "55"))
                 .thenReturn(Map.of("id", 55L, "current_user_id", 77L));
 

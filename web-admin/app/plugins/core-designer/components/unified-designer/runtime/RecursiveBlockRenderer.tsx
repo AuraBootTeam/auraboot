@@ -4049,7 +4049,7 @@ function getRuntimeTableColumns(
 }
 
 function getRuntimeRowId(row: Record<string, unknown>, index: number): string {
-  const id = row.id ?? row.pid ?? row.key ?? row._id ?? index;
+                            const id = row.pid ?? row.key ?? row._id ?? index;
   return String(id);
 }
 

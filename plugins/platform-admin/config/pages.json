@@ -601,7 +601,7 @@
         },
         "dataSource": {
           "type": "api",
-          "url": "/api/meta/data-permissions/${recordId}/roles/list",
+          "url": "/api/meta/data-permissions/${recordPid}/roles/list",
           "method": "get"
         },
         "columns": [
@@ -2228,7 +2228,7 @@
         },
         "dataSource": {
           "type": "api",
-          "url": "/api/scheduled-tasks/${recordId}/logs?limit=50",
+          "url": "/api/scheduled-tasks/${recordPid}/logs?limit=50",
           "method": "get"
         },
         "columns": [

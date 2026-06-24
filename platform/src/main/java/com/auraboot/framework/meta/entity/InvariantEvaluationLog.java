@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.Instant;
@@ -43,6 +45,8 @@ public class InvariantEvaluationLog {
     /**
      * Target record pid (nullable for ALWAYS batch).
      */
+    @JsonProperty("recordPid")
+    @Schema(name = "recordPid", description = "Target record pid; nullable for ALWAYS batch invariants.")
     @TableField("record_id")
     private String recordId;
 

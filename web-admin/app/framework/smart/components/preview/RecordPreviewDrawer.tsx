@@ -30,7 +30,7 @@ export interface RecordPreviewDrawerProps {
   /** Model code (e.g., "crm_opportunity") */
   modelCode: string;
   /** Record PID to preview */
-  recordId: string;
+  recordPid: string;
   /** Optional page key for the detail page (for "Open Detail" link) */
   detailPageKey?: string;
   /** Fields to display in preview. If not provided, shows all non-system fields */
@@ -77,7 +77,7 @@ const SYSTEM_FIELDS = new Set([
 export function RecordPreviewDrawer({
   open,
   modelCode,
-  recordId,
+  recordPid,
   detailPageKey,
   fields,
   apiEndpoint,
@@ -94,14 +94,14 @@ export function RecordPreviewDrawer({
 
   // Load record data
   useEffect(() => {
-    if (!open || !recordId || !modelCode) return;
+    if (!open || !recordPid || !modelCode) return;
 
     setLoading(true);
     setError(null);
 
     const endpoint = apiEndpoint
-      ? `${apiEndpoint}/${recordId}`
-      : `${buildApiEndpoint(modelCode)}/${recordId}`;
+      ? `${apiEndpoint}/${recordPid}`
+      : `${buildApiEndpoint(modelCode)}/${recordPid}`;
     fetchResult<RecordData>(endpoint, { method: 'get' })
       .then((result) => {
         if (ResultHelper.isSuccess(result) && result.data) {
@@ -113,7 +113,7 @@ export function RecordPreviewDrawer({
       })
       .catch(() => setError(t('common.loadError') || 'Failed to load record'))
       .finally(() => setLoading(false));
-  }, [open, recordId, modelCode, apiEndpoint, t, onRecordLoaded]);
+  }, [open, recordPid, modelCode, apiEndpoint, t, onRecordLoaded]);
 
   // Keyboard handler
   useEffect(() => {
@@ -136,8 +136,8 @@ export function RecordPreviewDrawer({
   const displayFields = fields || deriveFieldsFromRecord(record);
 
   const detailUrl = detailPageKey
-    ? `/p/${detailPageKey}/view/${recordId}`
-    : `/p/${modelCode}/view/${recordId}`;
+    ? `/p/${detailPageKey}/view/${recordPid}`
+    : `/p/${modelCode}/view/${recordPid}`;
 
   if (!open) return null;
 

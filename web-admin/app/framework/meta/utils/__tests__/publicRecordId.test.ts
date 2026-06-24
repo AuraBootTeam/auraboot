@@ -15,22 +15,19 @@ describe('publicRecordId utilities', () => {
     expect(toPublicRecordPid(null)).toBeUndefined();
   });
 
-  it('prefers public pid over legacy id compatibility', () => {
+  it('uses public pid and ignores legacy id fields', () => {
     const record = { pid: 'public-pid', id: 1001 };
 
     expect(getPublicRecordPid(record)).toBe('public-pid');
     expect(getLegacyCompatibleRecordPid(record)).toBe('public-pid');
-  });
-
-  it('falls back to legacy id only for old payload compatibility', () => {
-    expect(getLegacyCompatibleRecordPid({ id: 1001 })).toBe('1001');
+    expect(getLegacyCompatibleRecordPid({ id: 1001 })).toBeUndefined();
     expect(getPublicRecordPid({ id: 1001 })).toBeUndefined();
   });
 
-  it('uses configured public key fields before compatibility fallback', () => {
+  it('uses configured public key fields before public pid', () => {
     expect(getPublicRecordKey({ code: 'tree-1', pid: 'pid-1' }, undefined, 'code')).toBe('tree-1');
     expect(getPublicRecordKey({ pid: 'pid-1' }, 'fallback', 'code')).toBe('pid-1');
-    expect(getPublicRecordKey({}, 'fallback', 'code')).toBe('fallback');
+    expect(getPublicRecordKey({}, 'fallback', 'code')).toBeUndefined();
   });
 
   it('builds command params with only targetRecordPid', () => {

@@ -58,7 +58,7 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
                     MARKER_INVOCATIONS.add(Map.of(
                             "type", action.getType(),
                             "config", action.getConfig() != null ? action.getConfig() : Map.of(),
-                            "recordId", String.valueOf(context.get("recordId")),
+                            "recordPid", String.valueOf(context.get("recordPid")),
                             "item", String.valueOf(context.get("item"))));
                     return Map.of("ok", true);
                 }
@@ -110,7 +110,7 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
         assertThat(MARKER_INVOCATIONS)
                 .as("marker action should have fired once via the SmartEngine serviceTask delegate")
                 .hasSize(1);
-        assertThat(MARKER_INVOCATIONS.get(0)).containsEntry("recordId", "rec-1");
+        assertThat(MARKER_INVOCATIONS.get(0)).containsEntry("recordPid", "rec-1");
     }
 
     @Test
@@ -125,7 +125,7 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
         assertThat(MARKER_INVOCATIONS)
                 .as("flow automation should run via executeAutomation → SmartEngine splice")
                 .hasSize(1);
-        assertThat(MARKER_INVOCATIONS.get(0)).containsEntry("recordId", "rec-2");
+        assertThat(MARKER_INVOCATIONS.get(0)).containsEntry("recordPid", "rec-2");
     }
 
     private Automation conditionalMarkerAutomation() {

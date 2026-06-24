@@ -223,7 +223,7 @@ Each delivery sends an HTTP POST with:
   "eventId": "01HXYZ123",
   "eventType": "command:completed",
   "modelCode": "so_order",
-  "recordId": "01HXYZ456",
+  "recordPid": "01HXYZ456",
   "occurredAt": "2026-04-11T10:30:00Z",
   "tenantId": 2,
   "payload": {

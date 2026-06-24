@@ -52,8 +52,8 @@ public class DynamicQueryRequest {
 
     /**
      * Cursor for keyset pagination (optional).
-     * When provided, uses WHERE id > cursor instead of OFFSET for efficient deep pagination.
-     * The value is the last record's ID from the previous page.
+     * When provided, uses WHERE pid > cursor instead of OFFSET for efficient deep pagination.
+     * The value is the last record's public pid from the previous page.
      */
-    private Long cursor;
+    private String cursor;
 }

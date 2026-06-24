@@ -65,7 +65,7 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
       </div>
       <ol className="divide-y divide-gray-100">
         {rows.map((row: any, index: number) => {
-          const rowKey = String(readPath(row, item.keyField) ?? row.pid ?? row.id ?? index);
+    const rowKey = String(readPath(row, item.keyField) ?? row.pid ?? index);
           const titleValue = readPath(row, item.titleField) ?? rowKey;
           const subtitle = readPath(row, item.subtitleField);
           const revision = readPath(row, item.revisionField);

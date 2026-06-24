@@ -25,7 +25,7 @@ const accountField: AutoFillFieldConfig = {
   extension: {
     autoFill: {
       trigger: 'onChange',
-      source: { modelCode: 'crm_account', recordIdField: 'account_id' },
+      source: { modelCode: 'crm_account', recordPidField: 'account_id' },
       mappings: [
         { sourceField: 'industry', targetField: 'opp_industry' },
         { sourceField: 'city', targetField: 'opp_city' },
@@ -78,7 +78,7 @@ describe('useFieldAutoFill', () => {
     expect(mockGet).toHaveBeenCalledOnce();
     expect(mockGet.mock.calls[0][0]).toContain('/api/meta/auto-fill');
     expect(mockGet.mock.calls[0][0]).toContain('modelCode=crm_account');
-    expect(mockGet.mock.calls[0][0]).toContain('recordId=acc-123');
+    expect(mockGet.mock.calls[0][0]).toContain('recordPid=acc-123');
   });
 
   it('fills empty target fields from source record', async () => {

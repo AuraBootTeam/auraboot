@@ -99,7 +99,7 @@ describe('DecisionIntegrationImpactBlock', () => {
       <MemoryRouter initialEntries={['/p/decisionops_webhooks/view/webhook-pid']}>
         <Routes>
           <Route
-            path="/p/decisionops_webhooks/view/:recordId"
+            path="/p/decisionops_webhooks/view/:recordPid"
             element={
               <DecisionIntegrationImpactBlock
                 block={{

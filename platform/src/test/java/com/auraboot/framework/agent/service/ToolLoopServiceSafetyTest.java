@@ -186,7 +186,7 @@ class ToolLoopServiceSafetyTest {
                 .build();
 
         String result = service.executeToolCall(1L, "run-authz-deny", "task-authz-deny", "agent",
-                tool.getName(), Map.of("targetRecordId", "lead-1"), List.of(tool), null);
+                tool.getName(), Map.of("targetRecordPid", "lead-1"), List.of(tool), null);
 
         assertThat(result)
                 .contains("Runtime authorization denied for tool 'cmd:crm:contact_lead'")
@@ -218,7 +218,7 @@ class ToolLoopServiceSafetyTest {
                 .thenReturn("approval-1");
 
         String result = service.executeToolCall(1L, "run-2", "task-2", "agent",
-                tool.getName(), Map.of("pid", "pc-1"), List.of(tool), null);
+                tool.getName(), Map.of("recordPid", "pc-1"), List.of(tool), null);
 
         assertThat(result).contains("\"approvalRequired\":true").contains("\"approvalPid\":\"approval-1\"");
         verifyNoInteractions(commandExecutor);
@@ -240,7 +240,7 @@ class ToolLoopServiceSafetyTest {
                 .thenReturn(null);
 
         String result = service.executeToolCall(1L, "run-3", "task-3", "agent",
-                tool.getName(), Map.of("pid", "pc-1"), List.of(tool), null);
+                tool.getName(), Map.of("recordPid", "pc-1"), List.of(tool), null);
 
         assertThat(result).contains("approval policy").contains("No data was changed");
         verifyNoInteractions(commandExecutor);
@@ -667,8 +667,8 @@ class ToolLoopServiceSafetyTest {
     }
 
     @Test
-    @DisplayName("approved state transition command passes target record id")
-    void approvedStateTransitionCommandPassesTargetRecordId() {
+    @DisplayName("approved state transition command passes target record pid")
+    void approvedStateTransitionCommandPassesTargetRecordPid() {
         AgentToolDefinition tool = AgentToolDefinition.builder()
                 .name("cmd_pe_submit_procurement_comparison")
                 .description("Submit review")
@@ -683,7 +683,7 @@ class ToolLoopServiceSafetyTest {
                         .build());
 
         String result = service.executeToolCall(1L, "run-4", "task-4", "agent",
-                tool.getName(), Map.of("recordId", "PC-1"), List.of(tool), null);
+                tool.getName(), Map.of("recordPid", "PC-1"), List.of(tool), null);
 
         org.mockito.ArgumentCaptor<CommandExecuteRequest> requestCaptor =
                 org.mockito.ArgumentCaptor.forClass(CommandExecuteRequest.class);

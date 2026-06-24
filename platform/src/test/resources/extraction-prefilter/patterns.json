@@ -13,9 +13,9 @@
       "rationale": "Explicit user-preference tool call — always extractable"
     },
     {
-      "id": "p2-tool-success-with-record-id",
+      "id": "p2-tool-success-with-record-pid",
       "match": "response_field_present",
-      "match_value": "data.recordId",
+      "match_value": "data.recordPid",
       "memory_type": "FACT",
       "title_template": "Created {entity_type} {id}",
       "content_template": "{tool_name} created {entity_type} record",

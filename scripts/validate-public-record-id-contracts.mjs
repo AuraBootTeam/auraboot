@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
 const DEFAULT_BASELINE = 'scripts/public-record-id-baseline.json';
 const BASELINE_VERSION = 1;
+const PUBLIC_RESPONSE_FIXTURE_ROOT = 'docs/api-fixtures/public-record';
 
 const SKIP_DIRS = new Set([
   '.git',
@@ -42,6 +43,42 @@ const SQL_SELECT_RE = /\bselect\b[\s\S]{0,1600}\bfrom\b/i;
 const SQL_INTERNAL_FIELD_RE = /(^|[^\w])(?:id|tenant_id|created_by|updated_by)(?:[^\w]|$)/i;
 const DYNAMIC_RECORD_MAP_RE =
   /PaginationResult<\s*Map<String,\s*Object>>|List<\s*Map<String,\s*Object>>|ResponseEntity<\s*Map<String,\s*Object>>|Map<String,\s*Object>\s+(record|row|data|result|response)\b|\bnextCursor\b/;
+const RAW_DYNAMIC_CURSOR_RE =
+  /WHERE id > cursor|ORDER BY id ASC|addCondition\(\s*["']id["']\s*,\s*["']GT["']\s*,\s*request\.getCursor\(\)\s*\)|last record's id|Long\s+nextCursor|nextCursor\s*=\s*\(\(Number\)/;
+const PUBLIC_RESPONSE_FORBIDDEN_KEYS = new Map([
+  ['id', 'id'],
+  ['recordid', 'recordId'],
+  ['recordids', 'recordIds'],
+  ['targetrecordid', 'targetRecordId'],
+  ['targetrecordids', 'targetRecordIds'],
+  ['boundrecordid', 'boundRecordId'],
+  ['triggerrecordid', 'triggerRecordId'],
+  ['record_id', 'record_id'],
+  ['target_record_id', 'target_record_id'],
+  ['bound_record_id', 'bound_record_id'],
+  ['trigger_record_id', 'trigger_record_id'],
+  ['tenant_id', 'tenant_id'],
+  ['created_by', 'created_by'],
+  ['updated_by', 'updated_by'],
+]);
+const PUBLIC_CONFIG_FORBIDDEN_KEYS = new Map([
+  ['recordId', 'recordId'],
+  ['recordIds', 'recordIds'],
+  ['targetRecordId', 'targetRecordId'],
+  ['targetRecordIds', 'targetRecordIds'],
+  ['boundRecordId', 'boundRecordId'],
+  ['triggerRecordId', 'triggerRecordId'],
+  ['recordIdVar', 'recordIdVar'],
+  ['recordIdField', 'recordIdField'],
+]);
+const DYNAMIC_CONTROLLER_NON_RECORD_METHODS = new Set([
+  'getFieldOptions',
+  'getStats',
+  'getMeta',
+  'getFieldMeta',
+  'getPageMetadata',
+  'validate',
+]);
 
 function normalizeRel(file) {
   return file.split(path.sep).join('/');
@@ -107,6 +144,46 @@ function snippet(text, max = 180) {
   return text.replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+function extractSelectProjection(sql) {
+  const selectMatch = /\bselect\b/i.exec(sql);
+  if (!selectMatch) return null;
+
+  let depth = 0;
+  let quote = null;
+  for (let i = selectMatch.index + selectMatch[0].length; i < sql.length; i += 1) {
+    const char = sql[i];
+    if (quote) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === '\'' || char === '"' || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '(') {
+      depth += 1;
+      continue;
+    }
+    if (char === ')') {
+      depth = Math.max(0, depth - 1);
+      continue;
+    }
+    if (
+      depth === 0 &&
+      /\s/.test(char) &&
+      /^from\b/i.test(sql.slice(i + 1))
+    ) {
+      return sql.slice(selectMatch.index + selectMatch[0].length, i);
+    }
+  }
+  return null;
+}
+
+function selectsInternalField(sql) {
+  const projection = extractSelectProjection(sql);
+  return projection !== null && SQL_INTERNAL_FIELD_RE.test(projection);
+}
+
 function makeKey(finding) {
   return [
     finding.code,
@@ -126,6 +203,58 @@ function pushFinding(findings, finding) {
   findings.push(withKey);
 }
 
+function countChar(text, char) {
+  return (text.match(new RegExp(`\\${char}`, 'g')) ?? []).length;
+}
+
+function stripQuotedStrings(text) {
+  return text
+    .replace(/"(?:\\.|[^"\\])*"/g, '""')
+    .replace(/'(?:\\.|[^'\\])*'/g, "''");
+}
+
+function javaMethodBlock(lines, index) {
+  let start = index;
+  while (start >= 0 && !/\b(public|private|protected)\b[\s\S]*\(/.test(lines[start])) {
+    start -= 1;
+  }
+  if (start < 0) {
+    return lines.slice(Math.max(0, index - 5), Math.min(lines.length, index + 10)).join('\n');
+  }
+
+  let depth = 0;
+  let seenBody = false;
+  for (let end = start; end < lines.length; end += 1) {
+    const line = stripQuotedStrings(lines[end]);
+    const opens = countChar(line, '{');
+    const closes = countChar(line, '}');
+    if (opens > 0) seenBody = true;
+    depth += opens - closes;
+    if (seenBody && depth <= 0) {
+      return lines.slice(start, end + 1).join('\n');
+    }
+  }
+
+  return lines.slice(start, Math.min(lines.length, index + 30)).join('\n');
+}
+
+function javaMethodName(block) {
+  const match = /\b(?:public|private|protected)\s+[\s\S]*?\s+([A-Za-z_$][\w$]*)\s*\(/.exec(block);
+  return match?.[1] ?? null;
+}
+
+function dynamicControllerMapRiskIsCovered(lines, index) {
+  const block = javaMethodBlock(lines, index);
+  if (/\bPublicRecordSanitizer\.sanitize(?:Record|Records|Page|Batch)\s*\(/.test(block)) {
+    return true;
+  }
+  if (/\breturn\s+create\s*\(/.test(block)) {
+    return true;
+  }
+  const methodName = javaMethodName(block);
+  return methodName !== null && DYNAMIC_CONTROLLER_NON_RECORD_METHODS.has(methodName);
+}
+
 function recordJsonStringFindings(findings, repoRoot, file, jsonPath, value) {
   if (LEGACY_PLACEHOLDER_RE.test(value)) {
     pushFinding(findings, {
@@ -138,7 +267,7 @@ function recordJsonStringFindings(findings, repoRoot, file, jsonPath, value) {
       message: 'Public DSL/config string still uses recordId/$record.id instead of recordPid/$record.pid.',
     });
   }
-  if (SQL_SELECT_RE.test(value) && SQL_INTERNAL_FIELD_RE.test(value)) {
+  if (SQL_SELECT_RE.test(value) && selectsInternalField(value)) {
     pushFinding(findings, {
       code: 'S-PUBLIC-RECORD-SQL-INTERNAL-FIELD-RISK',
       category: 'named-query-export',
@@ -162,18 +291,19 @@ function visitJson(value, findings, repoRoot, file, jsonPath = '$') {
   }
   if (!value || typeof value !== 'object') return;
 
-  if (
-    Object.prototype.hasOwnProperty.call(value, 'targetRecordId') &&
-    !Object.prototype.hasOwnProperty.call(value, 'targetRecordPid')
-  ) {
+  for (const key of Object.keys(value)) {
+    const canonical = PUBLIC_CONFIG_FORBIDDEN_KEYS.get(key);
+    if (!canonical) continue;
     pushFinding(findings, {
-      code: 'S-PUBLIC-RECORD-TARGET-ID-LEGACY',
+      code: canonical === 'targetRecordId'
+        ? 'S-PUBLIC-RECORD-TARGET-ID-LEGACY'
+        : 'S-PUBLIC-RECORD-CONFIG-LEGACY-KEY',
       category: 'dsl-config',
       file: rel(repoRoot, file),
-      jsonPath,
-      field: 'targetRecordId',
-      evidence: 'targetRecordId',
-      message: 'Public command target uses targetRecordId without targetRecordPid.',
+      jsonPath: `${jsonPath}.${key}`,
+      field: canonical,
+      evidence: canonical,
+      message: 'Public DSL/config still exposes a legacy record identity key; use recordPid/targetRecordPid/recordPidVar/recordPidField.',
     });
   }
 
@@ -206,6 +336,61 @@ function scanJsonConfigs(findings, root) {
   }
 }
 
+function collectPublicResponseFixtureFiles(root) {
+  return walk(path.join(root, PUBLIC_RESPONSE_FIXTURE_ROOT), (file) => file.endsWith('.json'));
+}
+
+function isInternalResponseFixtureObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
+  const audience = value.contractAudience ?? value.__contractAudience ?? value.audience;
+  return typeof audience === 'string' && /^(internal|admin)$/i.test(audience.trim());
+}
+
+function visitPublicResponseFixture(value, findings, repoRoot, file, jsonPath = '$') {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) =>
+      visitPublicResponseFixture(item, findings, repoRoot, file, `${jsonPath}[${index}]`));
+    return;
+  }
+  if (!value || typeof value !== 'object') return;
+  if (isInternalResponseFixtureObject(value)) return;
+
+  for (const [key, child] of Object.entries(value)) {
+    const forbiddenKey = PUBLIC_RESPONSE_FORBIDDEN_KEYS.get(key.toLowerCase());
+    if (forbiddenKey) {
+      pushFinding(findings, {
+        code: 'S-PUBLIC-RECORD-RESPONSE-LEGACY-KEY',
+        category: 'public-response-fixture',
+        file: rel(repoRoot, file),
+        jsonPath: `${jsonPath}.${key}`,
+        field: key,
+        evidence: forbiddenKey,
+        message: 'Public response fixture exposes an internal/legacy record identity key.',
+      });
+    }
+    visitPublicResponseFixture(child, findings, repoRoot, file, `${jsonPath}.${key}`);
+  }
+}
+
+function scanPublicResponseFixtures(findings, root) {
+  for (const file of collectPublicResponseFixtureFiles(root)) {
+    const parsed = safeReadJson(file);
+    if (!parsed.ok) {
+      pushFinding(findings, {
+        code: 'S-PUBLIC-RECORD-RESPONSE-FIXTURE-INVALID-JSON',
+        category: 'public-response-fixture',
+        file: rel(root, file),
+        jsonPath: '$',
+        field: 'json',
+        evidence: parsed.error,
+        message: `Invalid public response fixture JSON: ${parsed.error}`,
+      });
+      continue;
+    }
+    visitPublicResponseFixture(parsed.value, findings, root, file);
+  }
+}
+
 function isTestFile(file) {
   const norm = normalizeRel(file);
   return (
@@ -223,7 +408,8 @@ function scanJava(findings, root) {
     const norm = normalizeRel(file);
     if (norm.includes('/framework/test/')) continue;
     const publicBoundary = norm.includes('/controller/') || text.includes('@RestController');
-    const dynamicBoundary = /DynamicController\.java$|DynamicDataServiceImpl\.java$/.test(norm);
+    const dynamicController = /DynamicController\.java$/.test(norm);
+    const dynamicDataServiceImpl = /DynamicDataServiceImpl\.java$/.test(norm);
     const lines = text.split('\n');
     lines.forEach((line, index) => {
       const lineNo = index + 1;
@@ -242,7 +428,22 @@ function scanJava(findings, root) {
           message: 'Public Java API boundary still exposes recordId/targetRecordId/commentId naming.',
         });
       }
-      if (dynamicBoundary && DYNAMIC_RECORD_MAP_RE.test(line)) {
+      if (
+        dynamicController &&
+        DYNAMIC_RECORD_MAP_RE.test(line) &&
+        !dynamicControllerMapRiskIsCovered(lines, index)
+      ) {
+        pushFinding(findings, {
+          code: 'S-PUBLIC-RECORD-DYNAMIC-MAP-RISK',
+          category: 'dynamic-read-boundary',
+          file: rel(root, file),
+          line: lineNo,
+          field: 'dynamic-record-map',
+          evidence: snippet(line),
+          message: 'Dynamic record boundary uses generic maps/cursors and must be covered by public-record sanitization.',
+        });
+      }
+      if (dynamicDataServiceImpl && RAW_DYNAMIC_CURSOR_RE.test(line)) {
         pushFinding(findings, {
           code: 'S-PUBLIC-RECORD-DYNAMIC-MAP-RISK',
           category: 'dynamic-read-boundary',
@@ -262,7 +463,7 @@ function scanFrontend(findings, root) {
     if (!/\.(ts|tsx|js|jsx)$/.test(file)) return false;
     return !isTestFile(file);
   });
-  const legacyRe = /\btargetRecordId\b|\brecordId\b|\b(row|record|recordData)\.id\b|\$record\.id/;
+  const legacyRe = /\brecordIdVar\b|\btargetRecordId\b|\brecordId\b|\b(row|record|recordData)\.id\b|\$record\.id/;
   for (const file of files) {
     const text = safeRead(file);
     if (text === null) continue;
@@ -275,9 +476,9 @@ function scanFrontend(findings, root) {
         category: 'frontend-runtime',
         file: rel(root, file),
         line: index + 1,
-        field: 'recordId',
+        field: /\brecordIdVar\b/.test(line) ? 'recordIdVar' : 'recordId',
         evidence: snippet(line),
-        message: 'Frontend runtime/service code still references recordId/targetRecordId/record.id compatibility identity.',
+        message: 'Frontend runtime/config code still references recordIdVar/recordId/targetRecordId/record.id compatibility identity.',
       });
     });
   }
@@ -286,6 +487,7 @@ function scanFrontend(findings, root) {
 function collectFindings(repoRoot, options = {}) {
   const findings = [];
   scanJsonConfigs(findings, repoRoot);
+  scanPublicResponseFixtures(findings, repoRoot);
   scanJava(findings, repoRoot);
   scanFrontend(findings, repoRoot);
 

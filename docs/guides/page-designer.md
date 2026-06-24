@@ -389,7 +389,7 @@ Examples:
 
 Rules:
 
-- `${recordId}` resolves to the current detail record id
+- `${recordPid}` resolves to the current detail record id
 - `${record.fieldName}` resolves to the parent record field value
 - `${fieldName}` also resolves to the parent record field value
 - Unknown placeholders should degrade to empty string; never leak raw template text into the outgoing request
@@ -458,7 +458,7 @@ Use explicit configuration only when you want non-default behavior:
 
 Supported values:
 
-- `detail`: navigate to `/p/{model}/view/{recordId}` or the configured detail page
+- `detail`: navigate to `/p/{model}/view/{recordPid}` or the configured detail page
 - `drawer`: open `RecordPreviewDrawer`
 - `none`: disable row-click interaction
 

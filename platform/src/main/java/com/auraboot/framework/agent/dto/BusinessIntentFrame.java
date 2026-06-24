@@ -27,12 +27,12 @@ public class BusinessIntentFrame {
     private String primaryObject;
 
     // scope and filters
-    private Map<String, Object> scope;  // timeRange, orgScope, ownerScope, recordIds
+    private Map<String, Object> scope;  // timeRange, orgScope, ownerScope, recordPids
     private List<Map<String, Object>> filters;           // field-level conditions
     private List<Map<String, Object>> semanticConstraints; // P1: metric/segment
 
     // context
-    private Map<String, Object> context; // pageModel, recordId, conversationId
+    private Map<String, Object> context; // pageModel, recordPid, conversationId
 
     // skill routing
     private List<String> candidateSkills;

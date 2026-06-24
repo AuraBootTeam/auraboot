@@ -101,7 +101,7 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
       fetchResult,
       args: {
         command: 'cr_account:set_credential',
-        targetRecordId: 'A1',
+        targetRecordPid: 'A1',
         operationType: 'update',
         payload: { keep: 'me' },
         inputFieldsTitle: 'Set Credential',
@@ -133,7 +133,7 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
       fetchResult,
       args: {
         command: 'cr_account:set_credential',
-        targetRecordId: 'A1',
+        targetRecordPid: 'A1',
         inputFields: [{ field: 'cookies_json', type: 'textarea', required: true }],
       },
     });
@@ -146,7 +146,7 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
 
     await actionRegistry.execute('command.execute', {
       fetchResult,
-      args: { command: 'x:do', targetRecordId: 'A1', payload: { a: 1 } },
+      args: { command: 'x:do', targetRecordPid: 'A1', payload: { a: 1 } },
     });
 
     expect(fetchResult).toHaveBeenCalledWith(

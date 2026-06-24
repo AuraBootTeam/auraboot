@@ -40,7 +40,7 @@ class DataChangeLogPendingContextVersionResolverTest {
                 "C-100"));
 
         assertThat(version.modelCode()).isEqualTo("crm_customer");
-        assertThat(version.recordId()).isEqualTo("C-100");
+        assertThat(version.recordPid()).isEqualTo("C-100");
         assertThat(version.recordVersion()).isEqualTo("change:42");
         assertThat(version.contextVersion()).isEqualTo("crm_customer:C-100:change:42");
     }

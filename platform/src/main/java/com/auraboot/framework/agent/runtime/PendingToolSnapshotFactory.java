@@ -313,15 +313,15 @@ public class PendingToolSnapshotFactory {
         String modelCode = firstNonBlank(snapshot.getModelCode(), contextScope.modelCode(),
                 stringValue(input, "modelCode"),
                 stringValue(input, "model_code"), stringValue(input, "object"), inferModelCode(snapshot));
-        String recordId = firstNonBlank(contextScope.recordId(), recordIdFromInput(input), stringValue(input, "record_id"));
-        PendingContextVersion unresolved = PendingContextVersion.unresolved(modelCode, recordId);
+        String recordPid = firstNonBlank(contextScope.recordPid(), recordPidFromInput(input));
+        PendingContextVersion unresolved = PendingContextVersion.unresolved(modelCode, recordPid);
         if (contextVersionResolver == null) {
             return unresolved;
         }
         PendingContextVersionRequest request = new PendingContextVersionRequest(
                 ctx != null ? ctx.tenantId() : null,
                 modelCode,
-                recordId);
+                recordPid);
         if (!request.verifiable()) {
             return unresolved;
         }
@@ -343,13 +343,13 @@ public class PendingToolSnapshotFactory {
                 continue;
             }
             AgentContextProvenance provenance = block.provenance();
-            if (!provenance.readWriteRelevant() || provenance.recordIds().isEmpty()) {
+            if (!provenance.readWriteRelevant() || provenance.recordPids().isEmpty()) {
                 continue;
             }
             RecordScope scope = new RecordScope(
                     modelCodeFromProvenance(provenance),
-                    firstNonBlank(provenance.recordIds().toArray(String[]::new)));
-            if (!scope.hasRecordId()) {
+                    firstNonBlank(provenance.recordPids().toArray(String[]::new)));
+            if (!scope.hasRecordPid()) {
                 continue;
             }
             if (provenance.source() == AgentContextSource.RECORD && scope.hasModelCode()) {
@@ -387,7 +387,7 @@ public class PendingToolSnapshotFactory {
         return List.of("list", "detail", "form", "dashboard").contains(value.trim().toLowerCase());
     }
 
-    private record RecordScope(String modelCode, String recordId) {
+    private record RecordScope(String modelCode, String recordPid) {
         static RecordScope empty() {
             return new RecordScope(null, null);
         }
@@ -396,12 +396,12 @@ public class PendingToolSnapshotFactory {
             return modelCode != null && !modelCode.isBlank();
         }
 
-        boolean hasRecordId() {
-            return recordId != null && !recordId.isBlank();
+        boolean hasRecordPid() {
+            return recordPid != null && !recordPid.isBlank();
         }
 
         boolean isEmpty() {
-            return !hasModelCode() && !hasRecordId();
+            return !hasModelCode() && !hasRecordPid();
         }
     }
 
@@ -449,11 +449,11 @@ public class PendingToolSnapshotFactory {
         return null;
     }
 
-    private String recordIdFromInput(Map<String, Object> input) {
+    private String recordPidFromInput(Map<String, Object> input) {
         if (input == null || input.isEmpty()) {
             return null;
         }
-        for (String key : List.of("recordId", "recordPid", "pid", "id")) {
+        for (String key : List.of("recordPid", "targetRecordPid", "record_pid", "target_record_pid")) {
             String value = stringValue(input, key);
             if (value != null) {
                 return value;

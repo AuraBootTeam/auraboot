@@ -23,7 +23,7 @@ public class DataChangeLogPendingContextVersionResolver implements PendingContex
         if (request == null || !request.verifiable()) {
             return PendingContextVersion.unresolved(
                     request != null ? request.modelCode() : null,
-                    request != null ? request.recordId() : null);
+                    request != null ? request.recordPid() : null);
         }
         List<Map<String, Object>> rows = jdbcTemplate.queryForList("""
                 SELECT id, changed_at
@@ -33,15 +33,15 @@ public class DataChangeLogPendingContextVersionResolver implements PendingContex
                    AND record_id = ?
                  ORDER BY changed_at DESC, id DESC
                  LIMIT 1
-                """, request.tenantId(), request.modelCode(), request.recordId());
+                """, request.tenantId(), request.modelCode(), request.recordPid());
         if (rows.isEmpty() || rows.get(0).get("id") == null) {
-            return PendingContextVersion.unresolved(request.modelCode(), request.recordId());
+            return PendingContextVersion.unresolved(request.modelCode(), request.recordPid());
         }
         String recordVersion = "change:" + rows.get(0).get("id");
         return new PendingContextVersion(
                 request.modelCode(),
-                request.recordId(),
+                request.recordPid(),
                 recordVersion,
-                request.modelCode() + ":" + request.recordId() + ":" + recordVersion);
+                request.modelCode() + ":" + request.recordPid() + ":" + recordVersion);
     }
 }

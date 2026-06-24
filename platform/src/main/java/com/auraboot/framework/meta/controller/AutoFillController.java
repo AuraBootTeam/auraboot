@@ -28,7 +28,7 @@ import java.util.*;
  * @since 3.1.0
  */
 @Slf4j
-@Tag(name = "自动填充", description = "引用字段自动填充 - 根据引用记录ID查询并返回字段值")
+@Tag(name = "自动填充", description = "引用字段自动填充 - 根据引用记录 PID 查询并返回字段值")
 @RestController
 @RequestMapping("/api/meta/auto-fill")
 @RequiredArgsConstructor
@@ -48,13 +48,13 @@ public class AutoFillController {
      * returned rather than an error, so the form gracefully handles missing data.</p>
      *
      * @param modelCode target model code (e.g. "crm_account")
-     * @param recordId  primary-key value of the record to look up
+     * @param recordPid public pid value of the record to look up
      * @param fields    comma-separated list of field codes to return
      * @return map of fieldCode → value for the requested fields
      */
     @Operation(
         summary = "获取引用记录字段值",
-        description = "根据引用记录ID查询指定字段的值，用于表单自动填充。" +
+        description = "根据引用记录 PID 查询指定字段的值，用于表单自动填充。" +
                       "返回值以字段编码为 key，仅包含 fields 参数指定的字段。"
     )
     @GetMapping
@@ -62,17 +62,17 @@ public class AutoFillController {
             @Parameter(description = "模型编码，例如 crm_account")
             @RequestParam String modelCode,
 
-            @Parameter(description = "记录ID（主键值）")
-            @RequestParam String recordId,
+            @Parameter(description = "记录 PID")
+            @RequestParam String recordPid,
 
             @Parameter(description = "需要返回的字段编码，多个以逗号分隔，例如 crm_acc_industry,crm_acc_city")
             @RequestParam String fields) {
 
-        log.debug("Auto-fill lookup: modelCode={}, recordId={}, fields={}", modelCode, recordId, fields);
+        log.debug("Auto-fill lookup: modelCode={}, recordPid={}, fields={}", modelCode, recordPid, fields);
 
         // Validate identifier patterns to prevent SQL injection
         validateIdentifier(modelCode, "modelCode");
-        validateIdentifier(recordId, "recordId");
+        validateIdentifier(recordPid, "recordPid");
 
         // Parse requested field codes
         Set<String> requestedFields = parseFieldCodes(fields);
@@ -102,11 +102,11 @@ public class AutoFillController {
         // Fetch the full record — DynamicDataService enforces tenant isolation + row-level ACL
         Map<String, Object> record;
         try {
-            record = dynamicDataService.getById(modelCode, recordId);
+            record = dynamicDataService.getById(modelCode, recordPid);
         } catch (MetaServiceException e) {
             // Record not found or access denied — return empty map so form stays clean
-            log.debug("Auto-fill: record not found or access denied for modelCode={} recordId={}: {}",
-                    modelCode, recordId, e.getMessage());
+            log.debug("Auto-fill: record not found or access denied for modelCode={} recordPid={}: {}",
+                    modelCode, recordPid, e.getMessage());
             return ApiResponse.success(Collections.emptyMap());
         }
 
@@ -130,7 +130,7 @@ public class AutoFillController {
             }
         }
 
-        log.debug("Auto-fill result: modelCode={}, recordId={}, returnedFields={}", modelCode, recordId, result.keySet());
+        log.debug("Auto-fill result: modelCode={}, recordPid={}, returnedFields={}", modelCode, recordPid, result.keySet());
         return ApiResponse.success(result);
     }
 

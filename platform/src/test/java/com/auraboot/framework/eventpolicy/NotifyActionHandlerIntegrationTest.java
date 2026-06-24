@@ -49,7 +49,7 @@ class NotifyActionHandlerIntegrationTest extends BaseIntegrationTest {
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
               "actions":[{"type":"NOTIFY","target":"USER:%d","order":10,
                  "payload":{"title":"High priority complaint","content":"please review"},
-                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordId}:${rule.ruleCode}:NOTIFY"}]}]
+                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:NOTIFY"}]}]
             """.formatted(userId));
         var draft = versionService.createDraft(code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
                 ExecutionMode.ORDERED, FailureStrategy.CONTINUE_ON_ERROR, ConflictStrategy.REJECT_ON_CONFLICT,
@@ -59,7 +59,7 @@ class NotifyActionHandlerIntegrationTest extends BaseIntegrationTest {
 
         Long tid = getTestTenant().getId();
         EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
-                Map.of("record", Map.of("entityCode", targetKey, "recordId", "CMP-N-1",
+                Map.of("record", Map.of("entityCode", targetKey, "recordPid", "CMP-N-1",
                         "data", Map.of("priority", "HIGH"))));
 
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");

@@ -31,7 +31,7 @@ public class StateTransitionEvent {
 
     @JsonCreator
     public StateTransitionEvent(@JsonProperty("modelCode") String modelCode,
-                                @JsonProperty("recordId") String recordId,
+                                @JsonProperty("recordPid") String recordId,
                                 @JsonProperty("fromState") String fromState,
                                 @JsonProperty("toState") String toState,
                                 @JsonProperty("triggerCommand") String triggerCommand,
@@ -47,5 +47,10 @@ public class StateTransitionEvent {
         this.triggerCommand = triggerCommand;
         this.tenantId = tenantId;
         this.userId = userId;
+    }
+
+    @JsonProperty("recordPid")
+    public String getRecordId() {
+        return recordId;
     }
 }

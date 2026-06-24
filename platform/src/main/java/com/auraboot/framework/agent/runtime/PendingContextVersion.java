@@ -5,16 +5,16 @@ package com.auraboot.framework.agent.runtime;
  */
 public record PendingContextVersion(
         String modelCode,
-        String recordId,
+        String recordPid,
         String recordVersion,
         String contextVersion) {
 
-    public static PendingContextVersion unresolved(String modelCode, String recordId) {
-        return new PendingContextVersion(modelCode, recordId, null, null);
+    public static PendingContextVersion unresolved(String modelCode, String recordPid) {
+        return new PendingContextVersion(modelCode, recordPid, null, null);
     }
 
     public boolean verifiable() {
-        return hasText(modelCode) && hasText(recordId) && hasText(recordVersion) && hasText(contextVersion);
+        return hasText(modelCode) && hasText(recordPid) && hasText(recordVersion) && hasText(contextVersion);
     }
 
     private boolean hasText(String value) {

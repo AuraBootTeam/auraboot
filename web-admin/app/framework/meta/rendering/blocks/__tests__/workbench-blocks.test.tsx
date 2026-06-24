@@ -1396,7 +1396,7 @@ describe('ReviewDrawerBlockRenderer', () => {
                   action: 'command.execute',
                   args: {
                     command: 'qo_quote_line_common:record_manual_price',
-                    targetRecordId: '${state.selectedPriceLine.pid}',
+                    targetRecordPid: '${state.selectedPriceLine.pid}',
                     operationType: 'update',
                     payload: {
                       source: 'manual',
@@ -1438,7 +1438,7 @@ describe('ReviewDrawerBlockRenderer', () => {
         expect.objectContaining({
           method: 'post',
           params: expect.objectContaining({
-            targetRecordId: 'QL-1',
+            targetRecordPid: 'QL-1',
             operationType: 'UPDATE',
             payload: expect.objectContaining({
               source: 'manual',

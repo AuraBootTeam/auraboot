@@ -86,7 +86,7 @@ public class RecordCapabilityIntegrationTest extends BaseIntegrationTest {
                 "INSERT INTO mt_showcase_all_fields "
                         + "(pid, tenant_id, sc_status, sc_name, sc_code, created_at, created_by, updated_at, updated_by) "
                         + "VALUES (?, ?, 'draft', ?, ?, NOW(), ?, NOW(), ?)",
-                pid, adminTenantId, name, code, adminUserId.toString(), adminUserId.toString()
+                pid, adminTenantId, name, code, adminUserId, adminUserId
         );
         // Get the created record's ID
         testRecordId = jdbcTemplate.queryForObject(

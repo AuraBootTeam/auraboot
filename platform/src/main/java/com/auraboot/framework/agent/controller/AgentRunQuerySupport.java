@@ -61,7 +61,7 @@ class AgentRunQuerySupport {
 
     List<AgentActionItem> loadActions(Long tenantId, String runId) {
         String sql = "SELECT pid, step_index, tool_call_index, action_code, action_type, " +
-                "       intent_summary, target_model, target_record_id, " +
+                "       intent_summary, target_model, target_record_pid, " +
                 "       before_snapshot::text AS before_snapshot, " +
                 "       after_snapshot::text  AS after_snapshot, " +
                 "       field_changes::text   AS field_changes, " +
@@ -92,7 +92,6 @@ class AgentRunQuerySupport {
         data.put("actionCode", action.getActionCode());
         data.put("actionType", action.getActionType());
         data.put("targetModel", action.getTargetModel());
-        data.put("targetRecordId", action.getTargetRecordId());
         data.put("targetRecordPid", action.getTargetRecordPid());
         data.put("commandCode", action.getCommandCode());
         data.put("commandResult", action.getCommandResult());
@@ -305,8 +304,7 @@ class AgentRunQuerySupport {
                 .actionType(rs.getString("action_type"))
                 .intentSummary(rs.getString("intent_summary"))
                 .targetModel(rs.getString("target_model"))
-                .targetRecordId(rs.getString("target_record_id"))
-                .targetRecordPid(rs.getString("target_record_id"))
+                .targetRecordPid(rs.getString("target_record_pid"))
                 .beforeSnapshot(rs.getString("before_snapshot"))
                 .afterSnapshot(rs.getString("after_snapshot"))
                 .fieldChanges(rs.getString("field_changes"))

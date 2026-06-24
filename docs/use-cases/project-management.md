@@ -771,7 +771,7 @@ stateDiagram-v2
           "type": "create_record",
           "modelCode": "pm_project_member",
           "fields": {
-            "pm_member_project_id": "${recordId}",
+            "pm_member_project_id": "${recordPid}",
             "pm_member_user_id": "${pm_project_owner_user_id}",
             "pm_member_status": "active"
           }

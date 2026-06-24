@@ -198,7 +198,7 @@ export function ProcessFeeRuleMatrixBlock({ block, runtime }: ProcessFeeRuleMatr
     const result = await fetchResult(`/api/meta/commands/execute/${saveCommand}`, {
       method: 'post',
       params: {
-        targetRecordId: quoteId,
+        targetRecordPid: quoteId,
         operationType: 'SAVE',
         payload: {
           ruleSetId: selectedRuleSet.pid,
@@ -449,7 +449,7 @@ function StatusPill({
 
 function toMatrixRows(rows: Array<Record<string, unknown>>): MatrixRow[] {
   return rows.map((row, index) => ({
-    __rowId: String(row.pid || row.id || `row-${index}`),
+    __rowId: String(row.pid || `row-${index}`),
     pid: row.pid == null ? undefined : String(row.pid),
     qo_pfrl_process_stage: value(row.qo_pfrl_process_stage),
     qo_pfrl_component_type: value(row.qo_pfrl_component_type),

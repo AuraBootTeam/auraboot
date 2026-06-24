@@ -874,7 +874,7 @@ The opportunity detail page demonstrates tabbed sub-tables with three different 
                 "params": {
                   "datasourceId": "nq:crm_activities_by_object",
                   "objectType": "opportunity",
-                  "objectId": "${recordId}"
+                  "objectId": "${recordPid}"
                 }
               },
               "readOnly": true,

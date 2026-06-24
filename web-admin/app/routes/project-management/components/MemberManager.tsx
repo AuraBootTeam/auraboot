@@ -212,7 +212,7 @@ export default function MemberManager({ projectId }: MemberManagerProps) {
       setRemovingId(memberPid);
       try {
         const result = await post<unknown>('/api/meta/commands/execute/pm:remove_member', {
-          targetRecordId: memberPid,
+          targetRecordPid: memberPid,
           operationType: 'delete',
         });
         if (ResultHelper.isSuccess(result)) {

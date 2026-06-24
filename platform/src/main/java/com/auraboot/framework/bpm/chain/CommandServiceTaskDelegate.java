@@ -34,7 +34,7 @@ import java.util.Set;
  *   <li>Read the node config: prefer the per-node config injected by CommandChainService
  *       ({@code _chain_nodes}, the JSON command-chain path); fall back to the serviceTask's
  *       own {@code smart:properties} so a hand-authored BPMN can drive a command directly
- *       ({@code commandCode}/{@code operationType}/{@code targetRecordId}/{@code condition}/
+ *       ({@code commandCode}/{@code operationType}/{@code targetRecordPid}/{@code condition}/
  *       {@code onFail} are reserved; every other property is a payload param)</li>
  *   <li>Resolve SpEL expressions in params against current process variables</li>
  *   <li>Build {@link CommandExecuteRequest} and call {@link CommandExecutor#execute}</li>
@@ -65,7 +65,7 @@ public class CommandServiceTaskDelegate implements JavaDelegation {
         // 0. Expose the process's persisted business key to expression resolution. Unlike
         // start-time request variables, the businessKey is persisted on the ProcessInstance
         // and reloaded on continuation, so a serviceTask placed after a userTask wait can
-        // still resolve the record it operates on (e.g. targetRecordId=${processBusinessKey})
+        // still resolve the record it operates on (e.g. targetRecordPid=${processBusinessKey})
         // even though the start-time variables are no longer in getRequest().
         injectProcessBusinessKey(executionContext, processVars);
 
@@ -109,12 +109,12 @@ public class CommandServiceTaskDelegate implements JavaDelegation {
         Map<String, Object> paramTemplate = (Map<String, Object>) nodeConfig.get("params");
         Map<String, Object> resolvedParams = resolveExpressions(paramTemplate, processVars);
 
-        // 5. Resolve targetRecordId if present
-        String targetRecordId = null;
-        String targetRecordIdExpr = (String) nodeConfig.get("targetRecordId");
-        if (targetRecordIdExpr != null && !targetRecordIdExpr.isBlank()) {
-            Object resolved = resolveExpression(targetRecordIdExpr, processVars);
-            targetRecordId = resolved != null ? resolved.toString() : null;
+        // 5. Resolve targetRecordPid if present
+        String targetRecordPid = null;
+        String targetRecordPidExpr = (String) nodeConfig.get("targetRecordPid");
+        if (targetRecordPidExpr != null && !targetRecordPidExpr.isBlank()) {
+            Object resolved = resolveExpression(targetRecordPidExpr, processVars);
+            targetRecordPid = resolved != null ? resolved.toString() : null;
         }
 
         // 6. Log node start
@@ -128,7 +128,7 @@ public class CommandServiceTaskDelegate implements JavaDelegation {
             CommandExecuteRequest request = new CommandExecuteRequest();
             request.setOperationType(operationType);
             request.setPayload(resolvedParams);
-            request.setTargetRecordId(targetRecordId);
+            request.setTargetRecordId(targetRecordPid);
 
             CommandExecuteResult result = commandExecutor.execute(commandCode, request);
 
@@ -139,10 +139,10 @@ public class CommandServiceTaskDelegate implements JavaDelegation {
             if (result.getData() != null) {
                 processVars.put("_step_" + activityId + "_result", result.getData());
             }
-            // Extract recordId from result data if present
-            if (result.getData() != null && result.getData().containsKey("recordId")) {
-                processVars.put("_step_" + activityId + "_recordId",
-                        result.getData().get("recordId"));
+            // Extract recordPid from result data if present
+            if (result.getData() != null && result.getData().containsKey("recordPid")) {
+                processVars.put("_step_" + activityId + "_recordPid",
+                        result.getData().get("recordPid"));
             }
             processVars.put("_step_" + activityId + "_success", true);
 
@@ -172,13 +172,13 @@ public class CommandServiceTaskDelegate implements JavaDelegation {
     /**
      * Variable name exposing the process's persisted business key
      * ({@link ProcessInstance#getBizUniqueId()}) to BPMN expressions, e.g.
-     * {@code smart:targetRecordId="${processBusinessKey}"}.
+     * {@code smart:targetRecordPid="${processBusinessKey}"}.
      */
     static final String PROCESS_BUSINESS_KEY_VAR = "processBusinessKey";
 
     /** smart:property names consumed as command config; everything else is a payload param. */
     private static final Set<String> RESERVED_PROPERTY_KEYS =
-            Set.of("commandCode", "operationType", "onFail", "condition", "targetRecordId");
+            Set.of("commandCode", "operationType", "onFail", "condition", "targetRecordPid");
 
     /**
      * Make the process's persisted business key available to expression resolution under
@@ -237,11 +237,11 @@ public class CommandServiceTaskDelegate implements JavaDelegation {
         if (props.get("condition") != null) {
             cfg.put("condition", props.get("condition"));
         }
-        if (props.get("targetRecordId") != null) {
-            // execute() resolves targetRecordId as a bare SpEL expression (the chain path
+        if (props.get("targetRecordPid") != null) {
+            // execute() resolves targetRecordPid as a bare SpEL expression (the chain path
             // stores it bare). Unwrap the ${...} the BPMN author writes for consistency with
-            // params/conditions so a hand-authored ${recordIdVar} resolves the same way.
-            cfg.put("targetRecordId", unwrapExpression(props.get("targetRecordId")));
+            // params/conditions so a hand-authored ${recordPidVar} resolves the same way.
+            cfg.put("targetRecordPid", unwrapExpression(props.get("targetRecordPid")));
         }
         Map<String, Object> params = new HashMap<>();
         for (Map.Entry<String, String> e : props.entrySet()) {

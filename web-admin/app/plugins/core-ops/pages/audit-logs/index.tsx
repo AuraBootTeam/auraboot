@@ -146,7 +146,7 @@ export default function AuditLogsPage() {
                   <code className="rounded bg-gray-100 px-2 py-0.5 text-xs">{log.modelCode}</code>
                 )}
                 <span className="text-xs text-gray-500">
-                  {l('ID', 'ID')}: {log.recordId}
+                  {l('ID', 'ID')}: {log.recordPid}
                 </span>
               </div>
               <div className="mt-1 text-xs text-gray-500">

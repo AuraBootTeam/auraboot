@@ -36,6 +36,9 @@ public class FieldChangeLog {
     @TableField("record_id")
     private Long recordId;
 
+    @TableField("record_pid")
+    private String recordPid;
+
     @TableField("command_code")
     private String commandCode;
 

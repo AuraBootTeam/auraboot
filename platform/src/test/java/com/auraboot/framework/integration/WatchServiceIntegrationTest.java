@@ -34,6 +34,8 @@ public class WatchServiceIntegrationTest extends BaseIntegrationTest {
     private final String modelCode = "test_watch_" + System.currentTimeMillis();
     private final Long recordId1 = 10001L;
     private final Long recordId2 = 10002L;
+    private final String recordPid1 = "watch_pid_" + testRunId + "_1";
+    private final String recordPid2 = "watch_pid_" + testRunId + "_2";
 
     @AfterAll
     void cleanupTestData() {
@@ -131,5 +133,39 @@ public class WatchServiceIntegrationTest extends BaseIntegrationTest {
         List<Long> watchers = watchService.getWatchers(modelCode, recordId1);
         long count = watchers.stream().filter(id -> id.equals(getTestUser().getId())).count();
         assertThat(count).isEqualTo(1);
+    }
+
+    @Test
+    @Order(10)
+    void toggleWatchByRecordPid_pidOnlyCreatesWatchWithoutNumericRecordId() {
+        boolean result = watchService.toggleWatchByRecordPid(modelCode, recordPid1);
+
+        assertThat(result).isTrue();
+        assertThat(watchService.isWatchingByRecordPid(modelCode, recordPid1)).isTrue();
+
+        AbWatch watch = watchMapper.selectOne(new LambdaQueryWrapper<AbWatch>()
+                .eq(AbWatch::getModelCode, modelCode)
+                .eq(AbWatch::getRecordPid, recordPid1));
+        assertThat(watch).isNotNull();
+        assertThat(watch.getRecordPid()).isEqualTo(recordPid1);
+        assertThat(watch.getRecordId()).isNull();
+    }
+
+    @Test
+    @Order(11)
+    void getWatchersByRecordPid_returnsCurrentUserForNonNumericPid() {
+        List<Long> watchers = watchService.getWatchersByRecordPid(modelCode, recordPid1);
+
+        assertThat(watchers).contains(getTestUser().getId());
+    }
+
+    @Test
+    @Order(12)
+    void getWatchedRecordPids_returnsPidOnlyRecords() {
+        watchService.toggleWatchByRecordPid(modelCode, recordPid2);
+
+        List<String> watched = watchService.getWatchedRecordPids(modelCode, getTestUser().getId());
+
+        assertThat(watched).contains(recordPid1, recordPid2);
     }
 }

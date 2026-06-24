@@ -87,7 +87,7 @@ export function EventPolicyActionsBlock({ block, runtime }: EventPolicyActionsBl
   const props = block?.props ?? {};
   const record = recordFromRuntime(runtime);
   const routePolicyCode =
-    stringValue(params.recordId) ?? policyCodeFromPath(location.pathname);
+    stringValue(params.recordPid) ?? policyCodeFromPath(location.pathname);
   const policyCode =
     stringValue(record.policyCode) ??
     stringValue(record.policy_code) ??

@@ -243,7 +243,7 @@ class ChatToolExecutorCanonicalRuntimeTest {
                 .requiresApproval(true)
                 .inputSchema(Map.of("type", "object"))
                 .build();
-        Map<String, Object> input = Map.of("recordId", "lead-1");
+        Map<String, Object> input = Map.of("recordPid", "lead-1");
         when(chatToolResolver.getAgentToolDefinition("cmd_crm_update_lead")).thenReturn(discovered);
         when(toolLoopService.executeToolCall(eq(7L), eq("run-2"), isNull(), eq("aurabot"),
                 eq("cmd:crm:update_lead"), eq(input), any(), isNull()))

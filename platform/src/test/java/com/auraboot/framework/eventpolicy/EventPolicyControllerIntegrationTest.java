@@ -81,7 +81,7 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
                 "target": "ROLE:support_manager",
                 "order": 1,
                 "payload": { "template": "high_priority_alert" },
-                "idempotencyKeyTemplate": "${record.data.recordId}:${rule.ruleCode}:${action.type}"
+                "idempotencyKeyTemplate": "${record.data.recordPid}:${rule.ruleCode}:${action.type}"
               }
             ]
           },
@@ -102,7 +102,7 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
                 "target": "BPM:complaint_approval",
                 "order": 1,
                 "payload": { "processKey": "complaint_approval" },
-                "idempotencyKeyTemplate": "${record.data.recordId}:${rule.ruleCode}:${action.type}"
+                "idempotencyKeyTemplate": "${record.data.recordPid}:${rule.ruleCode}:${action.type}"
               }
             ]
           },
@@ -123,7 +123,7 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
                 "target": "ASSIGNEE:account_manager",
                 "order": 1,
                 "payload": { "taskTemplate": "vip_follow_up" },
-                "idempotencyKeyTemplate": "${record.data.recordId}:${rule.ruleCode}:${action.type}"
+                "idempotencyKeyTemplate": "${record.data.recordPid}:${rule.ruleCode}:${action.type}"
               }
             ]
           }
@@ -419,7 +419,7 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
                                 "targetKey", targetKey,
                                 "context", Map.of("record", Map.of(
                                         "entityCode", targetKey,
-                                        "recordId", "CMP-1",
+                                        "recordPid", "CMP-1",
                                         "data", Map.of(
                                                 "priority", "HIGH",
                                                 "amount", 20000,

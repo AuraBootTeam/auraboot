@@ -129,7 +129,7 @@ public class TestFixtureController {
                         .fixtureName(fixtureName)
                         .testRunId(runId)
                         .recordsCreated(0)
-                        .recordIds(List.of())
+                        .recordPids(List.of())
                         .metadata(Map.of("error", "Unknown fixture: " + fixtureName))
                         .build();
             };
@@ -176,15 +176,9 @@ public class TestFixtureController {
         try {
             Map<String, Object> created = dynamicDataService.create(modelCode, normalizedPayload);
             if (created != null) {
-                Object id = created.get("pid");
-                if (id == null) {
-                    id = created.get("id");
-                }
-                if (id == null) {
-                    id = created.get("recordId");
-                }
-                if (id != null) {
-                    return id.toString();
+                Object pid = created.get("pid");
+                if (pid != null) {
+                    return pid.toString();
                 }
             }
         } catch (Exception e) {
@@ -204,12 +198,12 @@ public class TestFixtureController {
         request.setOperationType("CREATE");
         CommandExecuteResult result = commandExecutor.execute(commandCode, request);
         if (result.getData() != null) {
-            Object id = result.getData().get("recordId");
-            if (id == null) {
-                id = result.getData().get("pid");
+            Object pid = result.getData().get("recordPid");
+            if (pid == null) {
+                pid = result.getData().get("pid");
             }
-            if (id != null) {
-                return id.toString();
+            if (pid != null) {
+                return pid.toString();
             }
         }
         return null;
@@ -363,48 +357,29 @@ public class TestFixtureController {
         return List.of(action);
     }
 
-    private String buildRouteDeepLink(String modelCode, String recordId, Map<String, Object> params) {
+    private String buildRouteDeepLink(String modelCode, String recordPid, Map<String, Object> params) {
         String template = stringValue(params, "deepLink", null);
         if (template != null) {
             return template
                     .replace("{modelCode}", modelCode)
-                    .replace("{recordId}", recordId);
+                    .replace("{recordPid}", recordPid);
         }
         String host = stringValue(params, "deepLinkHost", "object");
-        return "auraboot://" + host + "/" + modelCode + "/" + recordId;
+        return "auraboot://" + host + "/" + modelCode + "/" + recordPid;
     }
 
-    private String routeCardPayload(String modelCode, String recordId, String deepLink,
+    private String routeCardPayload(String modelCode, String recordPid, String deepLink,
                                     String runId, String title, Map<String, Object> params) throws Exception {
         Map<String, Object> cardData = copyStringKeyMap(params.get("cardData"));
         cardData.putIfAbsent("actions", routeActions(params));
         cardData.putIfAbsent("modelCode", modelCode);
-        cardData.putIfAbsent("recordId", recordId);
+        cardData.putIfAbsent("recordPid", recordPid);
+        cardData.putIfAbsent("sourceRecordPid", recordPid);
         cardData.putIfAbsent("deepLink", deepLink);
         cardData.putIfAbsent("testRunId", runId);
         cardData.putIfAbsent("recordTitle", title);
         cardData.putIfAbsent("nextStep", "Open seeded record");
         return OBJECT_MAPPER.writeValueAsString(cardData);
-    }
-
-    private Long lookupNumericRecordId(String modelCode, String externalRecordId) {
-        Long numericId = parseLongOrNull(externalRecordId);
-        if (numericId != null) {
-            return numericId;
-        }
-        if (modelCode == null || !modelCode.matches("[A-Za-z0-9_]+")) {
-            return null;
-        }
-        try {
-            return jdbcTemplate.queryForObject(
-                    "select id from mt_" + modelCode + " where pid = ?",
-                    Long.class,
-                    externalRecordId
-            );
-        } catch (Exception e) {
-            log.debug("Could not resolve numeric record id for {} / {}: {}", modelCode, externalRecordId, e.getMessage());
-            return null;
-        }
     }
 
     private Long parseLongOrNull(String value) {
@@ -448,7 +423,7 @@ public class TestFixtureController {
                 ? (String) params.get("modelCode")
                 : "e2et_order";
 
-        List<String> recordIds = new ArrayList<>();
+        List<String> recordPids = new ArrayList<>();
         try {
             for (int i = 0; i < count; i++) {
                 Map<String, Object> record = new HashMap<>();
@@ -456,7 +431,7 @@ public class TestFixtureController {
                 record.put("e2et_order_status", "draft");
                 String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
-                    recordIds.add(pid);
+                    recordPids.add(pid);
                 }
             }
             log.info("Records fixture created: runId={}, count={}, model={}", runId, count, modelCode);
@@ -465,7 +440,7 @@ public class TestFixtureController {
                     .fixtureName("records")
                     .testRunId(runId)
                     .recordsCreated(count)
-                    .recordIds(recordIds)
+                    .recordPids(recordPids)
                     .metadata(Map.of("modelCode", modelCode))
                     .build();
         } catch (Exception e) {
@@ -474,8 +449,8 @@ public class TestFixtureController {
                     .success(false)
                     .fixtureName("records")
                     .testRunId(runId)
-                    .recordsCreated(recordIds.size())
-                    .recordIds(recordIds)
+                    .recordsCreated(recordPids.size())
+                    .recordPids(recordPids)
                     .metadata(Map.of("error", e.getMessage()))
                     .build();
         }
@@ -530,7 +505,7 @@ public class TestFixtureController {
         } catch (Exception e) {
             return FixtureResult.builder()
                     .success(false).fixtureName("inbox_route").testRunId(runId)
-                    .recordsCreated(0).recordIds(List.of())
+                    .recordsCreated(0).recordPids(List.of())
                     .metadata(Map.of("error", "Inbox module is not available (enterprise-core not loaded)"))
                     .build();
         }
@@ -553,14 +528,13 @@ public class TestFixtureController {
         if (tenantId == null || userId == null) {
             return FixtureResult.builder()
                     .success(false).fixtureName("inbox_route").testRunId(runId)
-                    .recordsCreated(0).recordIds(List.of())
+                    .recordsCreated(0).recordPids(List.of())
                     .metadata(Map.of("error", "Cannot resolve tenantId/userId — call POST /api/test/seed first"))
                     .build();
         }
 
         List<String> itemIds = new ArrayList<>();
         List<String> routeRecordIds = new ArrayList<>();
-        List<String> numericRecordIds = new ArrayList<>();
         try {
             Class<?> inboxItemClass = Class.forName("com.auraboot.framework.inbox.model.InboxItem");
             Method createItemMethod = inboxService.getClass().getMethod("createItem", inboxItemClass);
@@ -578,7 +552,6 @@ public class TestFixtureController {
                     throw new IllegalStateException("Could not create route record for model " + modelCode);
                 }
 
-                Long numericRecordId = lookupNumericRecordId(modelCode, routeRecordId);
                 String deepLink = buildRouteDeepLink(modelCode, routeRecordId, safeParams);
                 String cardPayload = routeCardPayload(modelCode, routeRecordId, deepLink, runId, recordTitle, safeParams);
 
@@ -593,14 +566,11 @@ public class TestFixtureController {
                 inboxItemClass.getMethod("setSourceType", String.class).invoke(item, "test");
                 inboxItemClass.getMethod("setSourceId", String.class).invoke(item, itemOrdinal);
                 inboxItemClass.getMethod("setModelCode", String.class).invoke(item, modelCode);
+                inboxItemClass.getMethod("setRecordPid", String.class).invoke(item, routeRecordId);
                 inboxItemClass.getMethod("setDeepLink", String.class).invoke(item, deepLink);
                 inboxItemClass.getMethod("setCardPayload", String.class).invoke(item, cardPayload);
                 inboxItemClass.getMethod("setIsRead", Boolean.class).invoke(item, false);
                 inboxItemClass.getMethod("setClientItemId", String.class).invoke(item, "fixture:" + runId + ":" + i);
-                if (numericRecordId != null) {
-                    inboxItemClass.getMethod("setRecordId", Long.class).invoke(item, numericRecordId);
-                    numericRecordIds.add(String.valueOf(numericRecordId));
-                }
 
                 Object created = createItemMethod.invoke(inboxService, item);
                 Object id = inboxItemClass.getMethod("getId").invoke(created);
@@ -613,12 +583,11 @@ public class TestFixtureController {
                     .fixtureName("inbox_route")
                     .testRunId(runId)
                     .recordsCreated(itemIds.size())
-                    .recordIds(itemIds)
+                    .recordPids(itemIds)
                     .metadata(Map.of(
                             "itemType", itemType,
                             "modelCode", modelCode,
                             "routeRecordIds", routeRecordIds,
-                            "numericRecordIds", numericRecordIds,
                             "deepLinkHost", stringValue(safeParams, "deepLinkHost", "object")
                     ))
                     .build();
@@ -629,7 +598,7 @@ public class TestFixtureController {
                     .fixtureName("inbox_route")
                     .testRunId(runId)
                     .recordsCreated(itemIds.size())
-                    .recordIds(itemIds)
+                    .recordPids(itemIds)
                     .metadata(Map.of("error", e.getMessage()))
                     .build();
         }
@@ -655,7 +624,7 @@ public class TestFixtureController {
         } catch (Exception e) {
             return FixtureResult.builder()
                     .success(false).fixtureName(itemType.toLowerCase()).testRunId(runId)
-                    .recordsCreated(0).recordIds(List.of())
+                    .recordsCreated(0).recordPids(List.of())
                     .metadata(Map.of("error", "Inbox module is not available (enterprise-core not loaded)"))
                     .build();
         }
@@ -686,7 +655,7 @@ public class TestFixtureController {
         if (tenantId == null) {
             return FixtureResult.builder()
                     .success(false).fixtureName(itemType.toLowerCase()).testRunId(runId)
-                    .recordsCreated(0).recordIds(List.of())
+                    .recordsCreated(0).recordPids(List.of())
                     .metadata(Map.of("error", "Cannot resolve tenantId — call POST /api/test/seed first"))
                     .build();
         }
@@ -701,7 +670,7 @@ public class TestFixtureController {
         if (userId == null) {
             return FixtureResult.builder()
                     .success(false).fixtureName(itemType.toLowerCase()).testRunId(runId)
-                    .recordsCreated(0).recordIds(List.of())
+                    .recordsCreated(0).recordPids(List.of())
                     .metadata(Map.of("error", "Cannot resolve userId — call POST /api/test/seed first"))
                     .build();
         }
@@ -737,7 +706,7 @@ public class TestFixtureController {
                     .fixtureName(itemType.toLowerCase())
                     .testRunId(runId)
                     .recordsCreated(count)
-                    .recordIds(itemIds)
+                    .recordPids(itemIds)
                     .metadata(Map.of(
                             "itemType", itemType,
                             "tenantId", String.valueOf(tenantId),
@@ -751,7 +720,7 @@ public class TestFixtureController {
                     .fixtureName(itemType.toLowerCase())
                     .testRunId(runId)
                     .recordsCreated(itemIds.size())
-                    .recordIds(itemIds)
+                    .recordPids(itemIds)
                     .metadata(Map.of("error", e.getMessage()))
                     .build();
         }
@@ -767,7 +736,7 @@ public class TestFixtureController {
                 ? ((Number) params.get("count")).intValue()
                 : 3;
         String[] regions = {"east", "south", "north"};
-        List<String> recordIds = new ArrayList<>();
+        List<String> recordPids = new ArrayList<>();
         try {
             for (int i = 0; i < count; i++) {
                 Map<String, Object> record = new HashMap<>();
@@ -776,7 +745,7 @@ public class TestFixtureController {
                 record.put("e2et_cust_region", regions[i % regions.length]);
                 String pid = executeCreateCommand("e2et_customer", record);
                 if (pid != null) {
-                    recordIds.add(pid);
+                    recordPids.add(pid);
                 }
             }
             log.info("Customers fixture created: runId={}, count={}", runId, count);
@@ -785,7 +754,7 @@ public class TestFixtureController {
                     .fixtureName("customers")
                     .testRunId(runId)
                     .recordsCreated(count)
-                    .recordIds(recordIds)
+                    .recordPids(recordPids)
                     .metadata(Map.of("modelCode", "e2et_customer"))
                     .build();
         } catch (Exception e) {
@@ -794,8 +763,8 @@ public class TestFixtureController {
                     .success(false)
                     .fixtureName("customers")
                     .testRunId(runId)
-                    .recordsCreated(recordIds.size())
-                    .recordIds(recordIds)
+                    .recordsCreated(recordPids.size())
+                    .recordPids(recordPids)
                     .metadata(Map.of("error", e.getMessage()))
                     .build();
         }
@@ -822,7 +791,7 @@ public class TestFixtureController {
                 : 6;
 
         String[] statuses = {"draft", "submitted", "approved", "draft", "submitted", "approved"};
-        List<String> recordIds = new ArrayList<>();
+        List<String> recordPids = new ArrayList<>();
         try {
             for (int i = 0; i < count; i++) {
                 Map<String, Object> record = new HashMap<>();
@@ -830,7 +799,7 @@ public class TestFixtureController {
                 record.put("e2et_order_status", statuses[i % statuses.length]);
                 String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
-                    recordIds.add(pid);
+                    recordPids.add(pid);
                 }
             }
             log.info("Multiview fixture created: runId={}, count={}, model={}", runId, count, modelCode);
@@ -839,7 +808,7 @@ public class TestFixtureController {
                     .fixtureName("multiview")
                     .testRunId(runId)
                     .recordsCreated(count)
-                    .recordIds(recordIds)
+                    .recordPids(recordPids)
                     .metadata(Map.of(
                             "modelCode", modelCode,
                             "viewTypes", List.of("list", "kanban", "calendar", "gallery"),
@@ -853,8 +822,8 @@ public class TestFixtureController {
                     .success(false)
                     .fixtureName("multiview")
                     .testRunId(runId)
-                    .recordsCreated(recordIds.size())
-                    .recordIds(recordIds)
+                    .recordsCreated(recordPids.size())
+                    .recordPids(recordPids)
                     .metadata(Map.of("error", e.getMessage()))
                     .build();
         }
@@ -886,7 +855,7 @@ public class TestFixtureController {
         } catch (Exception e) {
             return FixtureResult.builder()
                     .success(false).fixtureName("chat").testRunId(runId)
-                    .recordsCreated(0).recordIds(List.of())
+                    .recordsCreated(0).recordPids(List.of())
                     .metadata(Map.of("error", "IM module is not available (enterprise-im not loaded): " + e.getMessage()))
                     .build();
         }
@@ -897,7 +866,7 @@ public class TestFixtureController {
         if (tenant == null || user == null) {
             return FixtureResult.builder()
                     .success(false).fixtureName("chat").testRunId(runId)
-                    .recordsCreated(0).recordIds(List.of())
+                    .recordsCreated(0).recordPids(List.of())
                     .metadata(Map.of("error", "Cannot resolve tenant/user — call POST /api/test/seed first"))
                     .build();
         }
@@ -943,7 +912,7 @@ public class TestFixtureController {
             if (createConv == null) {
                 return FixtureResult.builder()
                         .success(false).fixtureName("chat").testRunId(runId)
-                        .recordsCreated(0).recordIds(List.of())
+                        .recordsCreated(0).recordPids(List.of())
                         .metadata(Map.of("error", "conversationService.create method not found"))
                         .build();
             }
@@ -998,7 +967,7 @@ public class TestFixtureController {
                     .fixtureName("chat")
                     .testRunId(runId)
                     .recordsCreated(conversationIds.size())
-                    .recordIds(conversationIds)
+                    .recordPids(conversationIds)
                     .metadata(new java.util.HashMap<>(Map.of(
                             "conversationIds", conversationIds,
                             "directConvId", dmId != null ? dmId : "",
@@ -1018,7 +987,7 @@ public class TestFixtureController {
                     .fixtureName("chat")
                     .testRunId(runId)
                     .recordsCreated(conversationIds.size())
-                    .recordIds(conversationIds)
+                    .recordPids(conversationIds)
                     .metadata(Map.of("error", e.getMessage()))
                     .build();
         }
@@ -1044,7 +1013,7 @@ public class TestFixtureController {
         } catch (Exception e) {
             return FixtureResult.builder()
                     .success(false).fixtureName("chat_agent").testRunId(runId)
-                    .recordsCreated(0).recordIds(List.of())
+                    .recordsCreated(0).recordPids(List.of())
                     .metadata(Map.of("error", "IM module is not available: " + e.getMessage()))
                     .build();
         }
@@ -1054,7 +1023,7 @@ public class TestFixtureController {
         if (tenant == null || user == null) {
             return FixtureResult.builder()
                     .success(false).fixtureName("chat_agent").testRunId(runId)
-                    .recordsCreated(0).recordIds(List.of())
+                    .recordsCreated(0).recordPids(List.of())
                     .metadata(Map.of("error", "Cannot resolve tenant/user — call POST /api/test/seed first"))
                     .build();
         }
@@ -1139,7 +1108,7 @@ public class TestFixtureController {
                     .fixtureName("chat_agent")
                     .testRunId(runId)
                     .recordsCreated(1)
-                    .recordIds(List.of(groupId))
+                    .recordPids(List.of(groupId))
                     .metadata(metadata)
                     .build();
         } catch (Exception e) {
@@ -1149,7 +1118,7 @@ public class TestFixtureController {
                     .fixtureName("chat_agent")
                     .testRunId(runId)
                     .recordsCreated(0)
-                    .recordIds(List.of())
+                    .recordPids(List.of())
                     .metadata(Map.of("error", e.getMessage()))
                     .build();
         }
@@ -1342,7 +1311,7 @@ public class TestFixtureController {
                 ? ((Number) params.get("count")).intValue()
                 : 3;
 
-        List<String> recordIds = new ArrayList<>();
+        List<String> recordPids = new ArrayList<>();
         try {
             for (int i = 0; i < count; i++) {
                 Map<String, Object> record = new HashMap<>();
@@ -1350,7 +1319,7 @@ public class TestFixtureController {
                 record.put("e2et_order_status", "draft");
                 String pid = executeCreateCommand(modelCode, record);
                 if (pid != null) {
-                    recordIds.add(pid);
+                    recordPids.add(pid);
                 }
             }
             log.info("Native fields fixture created: runId={}, count={}, model={}", runId, count, modelCode);
@@ -1359,7 +1328,7 @@ public class TestFixtureController {
                     .fixtureName("native_fields")
                     .testRunId(runId)
                     .recordsCreated(count)
-                    .recordIds(recordIds)
+                    .recordPids(recordPids)
                     .metadata(Map.of(
                             "modelCode", modelCode,
                             "titleField", "e2et_order_no",
@@ -1372,8 +1341,8 @@ public class TestFixtureController {
                     .success(false)
                     .fixtureName("native_fields")
                     .testRunId(runId)
-                    .recordsCreated(recordIds.size())
-                    .recordIds(recordIds)
+                    .recordsCreated(recordPids.size())
+                    .recordPids(recordPids)
                     .metadata(Map.of("error", e.getMessage()))
                     .build();
         }
@@ -1384,7 +1353,7 @@ public class TestFixtureController {
         int baseCount = params != null && params.containsKey("count")
                 ? ((Number) params.get("count")).intValue()
                 : 10;
-        List<String> recordIds = new ArrayList<>();
+        List<String> recordPids = new ArrayList<>();
 
         try {
             for (int i = 0; i < baseCount; i++) {
@@ -1395,7 +1364,7 @@ public class TestFixtureController {
                 record.put("e2et_order_status", statuses[i % 3]);
                 String pid = executeCreateCommand("e2et_order", record);
                 if (pid != null) {
-                    recordIds.add(pid);
+                    recordPids.add(pid);
                 }
             }
             return FixtureResult.builder()
@@ -1403,7 +1372,7 @@ public class TestFixtureController {
                     .fixtureName("dashboard")
                     .testRunId(runId)
                     .recordsCreated(baseCount)
-                    .recordIds(recordIds)
+                    .recordPids(recordPids)
                     .metadata(Map.of("totalAmount", baseCount * 550.0))
                     .build();
         } catch (Exception e) {
@@ -1412,8 +1381,8 @@ public class TestFixtureController {
                     .success(false)
                     .fixtureName("dashboard")
                     .testRunId(runId)
-                    .recordsCreated(recordIds.size())
-                    .recordIds(recordIds)
+                    .recordsCreated(recordPids.size())
+                    .recordPids(recordPids)
                     .metadata(Map.of("error", e.getMessage()))
                     .build();
         }

@@ -2,6 +2,7 @@ package com.auraboot.framework.inbox.dto;
 
 import com.auraboot.framework.inbox.dto.InboxItemResponse.CardActionStyle;
 import com.auraboot.framework.inbox.model.InboxItem;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -101,21 +102,44 @@ class InboxItemResponseCardActionsContractTest {
         InboxItem item = new InboxItem();
         item.setId(1L);
         item.setModelCode("crm_campaign");
+        item.setRecordPid("01KTESTCAMPAIGN");
         item.setCardPayload("""
             {
               "modelCode": "crm_campaign",
               "sourceRecordPid": "01KTESTCAMPAIGN",
-              "recordPid": "01KTESTCAMPAIGN",
-              "recordId": "01KTESTCAMPAIGN"
+              "recordPid": "01KTESTCAMPAIGN"
             }
             """);
 
         InboxItemResponse response = InboxItemResponse.from(item);
 
         assertEquals("crm_campaign", response.getSourceModel());
-        assertNull(response.getRecordId(), "legacy numeric recordId must stay null for pid-only rows");
         assertEquals("01KTESTCAMPAIGN", response.getSourceRecordPid());
-        assertEquals("01KTESTCAMPAIGN", response.getSourceRecordId());
+    }
+
+    @Test
+    void responseSerializesOnlySourceRecordPidForBusinessRecordReference() throws Exception {
+        InboxItem item = new InboxItem();
+        item.setId(1L);
+        item.setModelCode("crm_campaign");
+        item.setRecordPid("01KPIDONLYCAMPAIGN");
+        item.setCardPayload("""
+            {
+              "sourceRecordId": "legacy-id-name",
+              "recordId": "legacy-record-id",
+              "sourceRecordPid": "01KPIDONLYCAMPAIGN",
+              "recordPid": "01KPIDONLYCAMPAIGN",
+              "actions": []
+            }
+            """);
+
+        JsonNode json = MAPPER.valueToTree(InboxItemResponse.from(item));
+
+        assertFalse(json.has("recordId"), "public inbox response must not expose legacy recordId");
+        assertFalse(json.has("sourceRecordId"), "public inbox response must not expose legacy sourceRecordId");
+        assertEquals("01KPIDONLYCAMPAIGN", json.get("sourceRecordPid").asText());
+        assertFalse(json.get("cardData").has("recordId"), "cardData must drop top-level legacy recordId");
+        assertFalse(json.get("cardData").has("sourceRecordId"), "cardData must drop top-level legacy sourceRecordId");
     }
 
     @Test

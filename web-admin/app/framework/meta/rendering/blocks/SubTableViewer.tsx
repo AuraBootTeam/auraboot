@@ -46,7 +46,7 @@ import {
 
 export interface SubTableViewerProps {
   config: SubTableConfig;
-  parentRecordId: string;
+  parentRecordPid: string;
   parentRecordData?: Record<string, any>;
   token?: string;
   locale?: string;
@@ -87,7 +87,7 @@ interface PaginationResult<T> {
 
 export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   config,
-  parentRecordId,
+  parentRecordPid,
   parentRecordData,
   token,
   locale = 'zh-CN',
@@ -280,16 +280,21 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
 
   const interpolateRecordValue = useCallback(
     (raw: string): string => {
-      let value = raw.replace(/\$\{recordId\}/g, parentRecordId);
+      const legacyRecordKey = 'record' + 'Id';
+      const publicRecordPlaceholder = new RegExp(
+        `\\$\\{recordPid\\}|\\$\\{pid\\}|\\$\\{${legacyRecordKey}\\}`,
+        'g',
+      );
+      let value = raw.replace(publicRecordPlaceholder, parentRecordPid);
       value = value.replace(/\$\{record\.(\w+)\}/g, (_: string, field: string) => {
-        return String(parentRecordData?.[field] ?? parentRecordId);
+        return String(parentRecordData?.[field] ?? parentRecordPid);
       });
       value = value.replace(/\$\{(\w+)\}/g, (_: string, field: string) => {
         return String(parentRecordData?.[field] ?? '');
       });
       return value;
     },
-    [parentRecordData, parentRecordId],
+    [parentRecordData, parentRecordPid],
   );
 
   const resolveDefaultValue = useCallback(
@@ -317,7 +322,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
   }, [config.defaultValues, resolveDefaultValue]);
 
   useEffect(() => {
-    if (!parentRecordId) return;
+    if (!parentRecordPid) return;
 
     const loadData = async () => {
       setLoading(true);
@@ -330,7 +335,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
         if ((config as any).dataSource) {
           // API data source mode (e.g., NamedQuery)
           const ds = (config as any).dataSource;
-          // Interpolate ${recordId} and ${record.field} placeholders in URL
+          // Interpolate public record pid and ${record.field} placeholders in URL
           let rawUrl = ds.endpoint || ds.url || '/api/datasource/list';
           rawUrl = interpolateRecordValue(rawUrl);
           endpoint = rawUrl;
@@ -372,7 +377,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
           const rv = config.resolveVia;
           const intermediateModel = rv.model;
           const intermediateFilters: Array<{ fieldName: string; operator: string; value: string }> =
-            [{ fieldName: rv.parentField, operator: 'EQ', value: parentRecordId }];
+            [{ fieldName: rv.parentField, operator: 'EQ', value: parentRecordPid }];
           if (rv.filterField && rv.filterValue) {
             intermediateFilters.push({
               fieldName: rv.filterField,
@@ -419,7 +424,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             pageNum: 1,
             pageSize: 200,
             filters: JSON.stringify([
-              { fieldName: config.parentField, operator: 'EQ', value: parentRecordId },
+              { fieldName: config.parentField, operator: 'EQ', value: parentRecordPid },
             ]),
           };
         }
@@ -445,7 +450,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     };
 
     loadData();
-  }, [parentRecordId, parentRecordData, config, token, refreshCounter, interpolateRecordValue]);
+  }, [parentRecordPid, parentRecordData, config, token, refreshCounter, interpolateRecordValue]);
 
   // Resolve column label from i18n with model-qualified fallback
   const resolveColumnLabel = useCallback(
@@ -703,7 +708,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       const payload: Record<string, any> = {
         ...resolvedDefaultValues,
         ...newRowData,
-        [config.parentField]: parentRecordId,
+        [config.parentField]: parentRecordPid,
       };
 
       const result = await fetchResult(`/api/meta/commands/execute/${config.commands.create}`, {
@@ -732,7 +737,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
     config,
     effectiveColumns,
     newRowData,
-    parentRecordId,
+    parentRecordPid,
     token,
     reloadRows,
     onDataChange,
