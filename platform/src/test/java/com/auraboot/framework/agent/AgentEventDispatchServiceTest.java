@@ -260,7 +260,7 @@ class AgentEventDispatchServiceTest extends BaseIntegrationTest {
 
         List<String> taskPids = dispatchService.dispatchMatchedAgents(
                 tenantId, List.of(agentCode), "record_created",
-                Map.of("recordId", "rec-123", "modelCode", "crm_complaint"));
+                Map.of("recordPid", "rec-123", "modelCode", "crm_complaint"));
 
         assertThat(taskPids).hasSize(1);
         String taskPid = taskPids.get(0);

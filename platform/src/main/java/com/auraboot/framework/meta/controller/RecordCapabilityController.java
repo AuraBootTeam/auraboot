@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Record Capability API controller.
  * <p>
- * Exposes {@code GET /api/records/{modelCode}/{recordId}/capabilities} as defined in
+ * Exposes {@code GET /api/records/{modelCode}/{recordPid}/capabilities} as defined in
  * {@code docs/system-reference/subsystems/50-Capability动作能力接口.md}.
  * <p>
  * Returns the dynamic list of actions and tabs available for a specific record,
@@ -49,13 +49,13 @@ public class RecordCapabilityController {
      * </ul>
      *
      * @param modelCode model code, e.g. "crm_opportunity"
-     * @param recordId  primary key of the record
+     * @param recordPid public pid of the record
      * @param platform  "web" or "mobile" (from X-Platform header or query param, default "web")
      * @param context   usage context: "detail" (default), "list", "inbox"
      * @param ifNoneMatch ETag from a previous response for conditional request
      * @return capabilities response with ETag header
      */
-    @GetMapping("/{modelCode}/{recordId}/capabilities")
+    @GetMapping("/{modelCode}/{recordPid}/capabilities")
     @Operation(
             summary = "Get record capabilities",
             description = "Returns available actions and tabs for a record, filtered by user permissions, "
@@ -65,8 +65,8 @@ public class RecordCapabilityController {
             @Parameter(description = "Model code, e.g. crm_opportunity")
             @PathVariable String modelCode,
 
-            @Parameter(description = "Record primary key")
-            @PathVariable String recordId,
+            @Parameter(description = "Record public pid")
+            @PathVariable String recordPid,
 
             @Parameter(description = "Platform: web or mobile")
             @RequestHeader(value = "X-Platform", defaultValue = "web") String platform,
@@ -78,12 +78,12 @@ public class RecordCapabilityController {
             @RequestHeader(value = HttpHeaders.IF_NONE_MATCH, required = false) String ifNoneMatch) {
 
         log.debug("Record capabilities request: model={}, record={}, platform={}, context={}",
-                modelCode, recordId, platform, context);
+                modelCode, recordPid, platform, context);
 
         Long userId = MetaContext.getCurrentUserId();
 
         RecordCapabilities capabilities = recordCapabilityService.getRecordCapabilities(
-                modelCode, recordId, platform, context, userId);
+                modelCode, recordPid, platform, context, userId);
 
         // ETag conditional: if client's ETag matches, return 304
         String etag = capabilities.getEtag();

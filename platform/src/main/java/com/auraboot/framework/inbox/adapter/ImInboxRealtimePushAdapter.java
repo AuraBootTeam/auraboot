@@ -35,7 +35,7 @@ public class ImInboxRealtimePushAdapter implements InboxRealtimePushPort {
         data.put("subtitle", item.getSubtitle());
         data.put("priority", item.getPriority());
         data.put("modelCode", item.getModelCode());
-        data.put("recordId", item.getRecordId());
+        data.put("sourceRecordPid", item.getSourceRecordPid());
         data.put("deepLink", item.getDeepLink());
         data.put("createdAt", item.getCreatedAt() != null ? item.getCreatedAt().toString() : null);
 

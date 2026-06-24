@@ -182,8 +182,8 @@ public class PostExecutionPhase implements CommandPhase {
         String parentRecordId = null;
         if (request != null && StringUtils.hasText(request.getTargetRecordId())) {
             parentRecordId = request.getTargetRecordId();
-        } else if (fieldMapResults != null && fieldMapResults.containsKey("recordId")) {
-            parentRecordId = String.valueOf(fieldMapResults.get("recordId"));
+        } else if (fieldMapResults != null && fieldMapResults.containsKey("recordPid")) {
+            parentRecordId = String.valueOf(fieldMapResults.get("recordPid"));
         }
 
         for (Map<String, Object> postAction : postActions) {
@@ -229,8 +229,7 @@ public class PostExecutionPhase implements CommandPhase {
                         businessKey = businessKeyTemplate
                                 .replace("${modelCode}", command.getModelCode() != null ? command.getModelCode() : "")
                                 .replace("${recordPid}", parentRecordId != null ? parentRecordId : "")
-                                .replace("${pid}", parentRecordId != null ? parentRecordId : "")
-                                .replace("${recordId}", parentRecordId != null ? parentRecordId : "");
+                                .replace("${pid}", parentRecordId != null ? parentRecordId : "");
                     }
                     var chainService = applicationContext.getBean(
                             com.auraboot.framework.bpm.chain.CommandChainService.class);
@@ -354,7 +353,7 @@ public class PostExecutionPhase implements CommandPhase {
         if (command == null || !StringUtils.hasText(command.getModelCode())
                 || !StringUtils.hasText(parentRecordId)) {
             throw new BusinessException(ResponseCode.BadParam,
-                    "withdraw_process postAction requires modelCode and recordId on the current command");
+                    "withdraw_process postAction requires modelCode and recordPid on the current command");
         }
         Map<String, Object> record = dynamicDataService.getById(command.getModelCode(), parentRecordId);
         if (record == null || record.isEmpty()) {
@@ -413,7 +412,7 @@ public class PostExecutionPhase implements CommandPhase {
         if (inner.contains("${") || inner.contains("}")) {
             return null; // compound templates → fall back to string substitution
         }
-        if ("recordPid".equals(inner) || "pid".equals(inner) || "recordId".equals(inner)) {
+        if ("recordPid".equals(inner) || "pid".equals(inner)) {
             return parentRecordId;
         }
         if ("modelCode".equals(inner) && command != null) {
@@ -426,8 +425,7 @@ public class PostExecutionPhase implements CommandPhase {
     }
 
     /**
-     * Resolve {@code ${payload.xxx}}, {@code ${recordPid}}, legacy {@code ${recordId}},
-     * {@code ${modelCode}}
+     * Resolve {@code ${payload.xxx}}, {@code ${recordPid}}, {@code ${modelCode}}
      * placeholders. Only whole-string exact-placeholder substitution is
      * supported for typed returns; embedded substitution uses toString.
      */
@@ -440,7 +438,6 @@ public class PostExecutionPhase implements CommandPhase {
         if (parentRecordId != null) {
             result = result.replace("${recordPid}", parentRecordId);
             result = result.replace("${pid}", parentRecordId);
-            result = result.replace("${recordId}", parentRecordId);
         }
         if (command != null && command.getModelCode() != null) {
             result = result.replace("${modelCode}", command.getModelCode());

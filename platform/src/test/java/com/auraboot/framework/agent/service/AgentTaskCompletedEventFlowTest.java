@@ -68,6 +68,20 @@ class AgentTaskCompletedEventFlowTest {
     }
 
     @Test
+    void failedRunStoresErrorMessage() {
+        AgentRunService.AgentLoopResult result = new AgentRunService.AgentLoopResult();
+        result.success = false;
+
+        service.completeRunRecord(1L, "run-1", "task-1", LocalDateTime.now().minusSeconds(5), result, "m");
+
+        ArgumentCaptor<Map<String, Object>> updateCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).update(org.mockito.Mockito.eq("ab_agent_run"), updateCaptor.capture(), anyMap());
+        assertThat(updateCaptor.getValue())
+                .containsEntry("run_status", "failed")
+                .containsEntry("error_message", "Plan execution did not reach success terminal state");
+    }
+
+    @Test
     void failedRunPublishesBlockedEvent() {
         // failTask also sweeps children — return none
         when(dynamicDataMapper.selectByQuery(contains("task_status IN ('todo', 'backlog')"), anyMap()))

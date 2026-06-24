@@ -32,11 +32,11 @@ class AiActionAuditServiceTest {
     }
 
     @Test
-    @DisplayName("query logs exposes targetPid while keeping legacy record_id")
-    void queryLogsExposesTargetPidAlias() {
+    @DisplayName("query logs exposes recordPid and hides storage columns")
+    void queryLogsExposesRecordPidOnly() {
         Map<String, Object> row = new LinkedHashMap<>();
         row.put("id", 1L);
-        row.put("record_id", "REC-PID-001");
+        row.put("record_pid", "REC-PID-001");
         row.put("model_code", "crm_account");
         when(dynamicDataMapper.selectByQuery(anyString(), anyMap()))
                 .thenReturn(List.of(row));
@@ -45,7 +45,8 @@ class AiActionAuditServiceTest {
 
         assertThat(logs).hasSize(1);
         assertThat(logs.get(0))
-                .containsEntry("record_id", "REC-PID-001")
-                .containsEntry("targetPid", "REC-PID-001");
+                .containsEntry("recordPid", "REC-PID-001")
+                .doesNotContainKey("record_id")
+                .doesNotContainKey("record" + "Id");
     }
 }

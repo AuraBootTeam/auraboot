@@ -170,7 +170,7 @@ public class AuraEventBus {
                 envelope.put("eventType", event.getEventType());
                 envelope.put("tenantId", event.getTenantId());
                 envelope.put("modelCode", event.getModelCode());
-                envelope.put("recordId", event.getRecordId());
+                envelope.put("recordPid", event.getRecordId());
                 envelope.put("payload", event.getPayload());
                 envelope.put("occurredAt", event.getOccurredAt().toString());
                 body = objectMapper.writeValueAsString(envelope);

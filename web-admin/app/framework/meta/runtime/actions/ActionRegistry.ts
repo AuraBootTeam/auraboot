@@ -955,16 +955,12 @@ actionRegistry.register(
     }
 
     let targetRecordPid = args?.targetRecordPid;
-    let targetRecordId = args?.targetRecordId ?? targetRecordPid;
     let payload = args?.payload || {};
     let operationType = args?.operationType;
 
     if (expressionEvaluator && expressionContext) {
       if (typeof targetRecordPid === 'string') {
         targetRecordPid = expressionEvaluator.evaluateTemplate(targetRecordPid, expressionContext);
-      }
-      if (typeof targetRecordId === 'string') {
-        targetRecordId = expressionEvaluator.evaluateTemplate(targetRecordId, expressionContext);
       }
       if (payload && typeof payload === 'object') {
         payload = expressionEvaluator.evaluateObject(payload, expressionContext);
@@ -973,8 +969,8 @@ actionRegistry.register(
         operationType = expressionEvaluator.evaluateTemplate(operationType, expressionContext);
       }
     }
-    targetRecordId = targetRecordId ?? targetRecordPid;
-    targetRecordPid = targetRecordPid ?? targetRecordId;
+    targetRecordPid = targetRecordPid ?? targetRecordPid;
+    targetRecordPid = targetRecordPid ?? targetRecordPid;
 
     // inputFields sugar: pop a small form (reusing FormDialog) to collect a few
     // fields, then merge the collected values into the command payload. Lets a DSL
@@ -991,7 +987,7 @@ actionRegistry.register(
     }
 
     const body: Record<string, any> = {
-      ...buildCommandTargetParams(targetRecordPid ?? targetRecordId),
+      ...buildCommandTargetParams(targetRecordPid ?? targetRecordPid),
       payload,
     };
     if (operationType) {

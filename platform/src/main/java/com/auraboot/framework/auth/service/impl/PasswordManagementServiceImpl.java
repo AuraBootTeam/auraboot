@@ -214,6 +214,27 @@ public class PasswordManagementServiceImpl implements PasswordManagementService 
     }
 
     @Override
+    @Transactional
+    public void resetPasswordByAdmin(String userPid, String newPassword) {
+        QueryWrapper<User> qw = new QueryWrapper<>();
+        qw.eq("pid", userPid);
+        User user = userMapper.selectOne(qw);
+
+        if (user == null) {
+            throw new RootUnCheckedException(ResponseCode.NOT_FOUND, "User not found");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(false);
+        user.setSecurityVersion((user.getSecurityVersion() != null ? user.getSecurityVersion() : 0) + 1);
+        user.setUpdatedAt(Instant.now());
+        userMapper.updateById(user);
+
+        log.info("Admin reset password for user {}, security version incremented to {}",
+                userPid, user.getSecurityVersion());
+    }
+
+    @Override
     public boolean isPasswordExpired(User user) {
         if (expiryDays <= 0) return false;
         // Backward compatible: null passwordChangedAt means not expired

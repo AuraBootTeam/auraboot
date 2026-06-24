@@ -23,8 +23,7 @@ export interface InboxItem {
   sourceId?: string;
   modelCode?: string;
   sourceModel?: string;
-  recordId?: number;
-  sourceRecordId?: string;
+  recordPid?: string;
   sourceRecordPid?: string;
   cardPayload?: string; // JSON string
   cardData?: Record<string, unknown>;

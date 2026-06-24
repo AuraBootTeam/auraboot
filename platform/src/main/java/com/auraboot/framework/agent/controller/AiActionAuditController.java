@@ -63,7 +63,7 @@ public class AiActionAuditController {
         String actionType = (String) body.get("actionType");
         String commandCode = (String) body.get("commandCode");
         String modelCode = (String) body.get("modelCode");
-        String recordId = firstString(body, "targetPid", "recordPid", "targetRecordPid", "targetRecordId", "recordId");
+        String recordPid = firstString(body, "recordPid", "targetRecordPid");
         String riskLevel = (String) body.get("riskLevel");
         String userDecision = (String) body.get("userDecision");
         String executionResult = (String) body.get("executionResult");
@@ -77,7 +77,7 @@ public class AiActionAuditController {
         }
 
         auditService.record(tenantId, userId, conversationId, messageId,
-                actionType, commandCode, modelCode, recordId,
+                actionType, commandCode, modelCode, recordPid,
                 riskLevel != null ? riskLevel : "low", userDecision,
                 executionResult, errorMessage, reasoning, payload);
 

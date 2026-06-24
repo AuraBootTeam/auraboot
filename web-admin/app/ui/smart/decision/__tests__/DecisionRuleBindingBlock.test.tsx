@@ -257,7 +257,7 @@ describe('DecisionRuleBindingBlock', () => {
             initialDecisionCode: 'approval_routing',
             fields: [
               { scope: 'record', path: 'data.amount', label: '金额', dataType: 'decimal' },
-              { scope: 'record', path: 'data.recordId', label: '记录 ID', dataType: 'string' },
+              { scope: 'record', path: 'data.recordPid', label: '记录 ID', dataType: 'string' },
             ],
           },
         }}

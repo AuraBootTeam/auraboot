@@ -528,12 +528,12 @@ public class DecisionRolloutServiceImpl implements DecisionRolloutService {
         if (metaKey != null) {
             return String.valueOf(metaKey);
         }
-        Object recordId = scopedValue(request, "record", "recordId");
-        if (recordId == null) {
-            recordId = scopedValue(request, "record", "id");
+        Object recordPid = scopedValue(request, "record", "recordPid");
+        if (recordPid == null) {
+            recordPid = scopedValue(request, "record", "pid");
         }
-        if (recordId != null) {
-            return String.valueOf(recordId);
+        if (recordPid != null) {
+            return String.valueOf(recordPid);
         }
         if (request.getCorrelationId() != null && !request.getCorrelationId().isBlank()) {
             return request.getCorrelationId();

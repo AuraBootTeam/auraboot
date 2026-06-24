@@ -25,7 +25,7 @@ public class CommandChainResult {
 
     /**
      * Step-level results. Key: nodeId, Value: step result map.
-     * Each step result contains: success, data, recordId, skipped, error.
+     * Each step result contains: success, data, recordPid, skipped, error.
      */
     private Map<String, Object> stepResults;
 

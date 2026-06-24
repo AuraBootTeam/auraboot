@@ -114,7 +114,7 @@ function CompareEditor({
   };
 
   return (
-    <div className="cb-row" data-testid={`cb-row-${id}`} key={row.id ?? id}>
+    <div className="cb-row" data-testid={`cb-row-${id}`} key={id}>
       <select
         aria-label={`field-${id}`}
         value={curKey}

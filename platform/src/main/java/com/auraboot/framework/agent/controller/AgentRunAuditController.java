@@ -252,8 +252,6 @@ public class AgentRunAuditController {
                 AgentRunQuerySupport.text(node, "targetPid"),
                 AgentRunQuerySupport.text(node, "targetRecordPid"),
                 AgentRunQuerySupport.text(node, "recordPid"),
-                AgentRunQuerySupport.text(node, "targetRecordId"),
-                AgentRunQuerySupport.text(node, "recordId"),
                 AgentRunQuerySupport.text(node, "pid"));
         if (direct != null) {
             return direct;

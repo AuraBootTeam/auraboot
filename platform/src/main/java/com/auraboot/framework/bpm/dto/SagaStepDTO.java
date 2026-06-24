@@ -15,7 +15,7 @@ public class SagaStepDTO {
     private String commandCode;
     private String compensationCommand;
     private String status;
-    private String recordId;
+    private String recordPid;
     private String errorMessage;
     private int retryCount;
     private Instant startedAt;
@@ -29,7 +29,7 @@ public class SagaStepDTO {
                 .commandCode(step.getCommandCode())
                 .compensationCommand(step.getCompensationCommand())
                 .status(step.getStatus())
-                .recordId(step.getRecordId())
+                .recordPid(step.getRecordPid())
                 .errorMessage(step.getErrorMessage())
                 .retryCount(step.getRetryCount())
                 .startedAt(step.getStartedAt())

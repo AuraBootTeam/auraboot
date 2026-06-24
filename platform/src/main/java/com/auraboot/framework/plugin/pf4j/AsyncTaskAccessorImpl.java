@@ -33,7 +33,7 @@ public class AsyncTaskAccessorImpl implements AsyncTaskAccessor {
     }
 
     @Override
-    public String submitCommandTask(String commandCode, String modelCode, String recordId,
+    public String submitCommandTask(String commandCode, String modelCode, String recordPid,
                                     Map<String, Object> payload) {
         if (asyncTaskService == null || commandCode == null || commandCode.isBlank()) {
             return null;
@@ -44,7 +44,7 @@ public class AsyncTaskAccessorImpl implements AsyncTaskAccessor {
         input.put("tenantId", tenantId);
         input.put("userId", userId);
         input.put("modelCode", modelCode);
-        input.put("recordId", recordId);
+        input.put("recordPid", recordPid);
         input.put("payload", payload != null ? payload : Map.of());
         input.put("handlerParams", Map.of("async", true));
 

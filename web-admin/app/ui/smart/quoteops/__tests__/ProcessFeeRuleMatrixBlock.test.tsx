@@ -135,7 +135,7 @@ describe('ProcessFeeRuleMatrixBlock', () => {
       expect(mockFetchResult).toHaveBeenCalledWith('/api/meta/commands/execute/qo_quote_common:save_process_fee_rule_matrix', {
         method: 'post',
         params: expect.objectContaining({
-          targetRecordId: 'Q1',
+          targetRecordPid: 'Q1',
           operationType: 'SAVE',
           payload: expect.objectContaining({
             ruleSetId: 'RS1',

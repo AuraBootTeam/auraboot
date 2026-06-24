@@ -137,8 +137,8 @@ function PhaseWaterfall({ phases }: { phases: PhaseEntry[] }) {
 
 const SAMPLE_PAYLOADS: Record<string, string> = {
   create: JSON.stringify({ name: 'Test record', status: 'draft' }, null, 2),
-  update: JSON.stringify({ targetRecordId: '1', name: 'Updated name' }, null, 2),
-  delete: JSON.stringify({ targetRecordId: '1' }, null, 2),
+  update: JSON.stringify({ targetRecordPid: '1', name: 'Updated name' }, null, 2),
+  delete: JSON.stringify({ targetRecordPid: '1' }, null, 2),
 };
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
@@ -149,7 +149,7 @@ export default function CommandWorkbenchPage() {
 
   const [commandCode, setCommandCode] = useState('');
   const [payload, setPayload] = useState('{\n  \n}');
-  const [targetRecordId, setTargetRecordId] = useState('');
+  const [targetRecordPid, setTargetRecordId] = useState('');
   const [running, setRunning] = useState(false);
 
   // Results
@@ -189,8 +189,8 @@ export default function CommandWorkbenchPage() {
 
     const parsedPayload = validatePayload(payload);
     if (!parsedPayload) return;
-    if (targetRecordId.trim()) {
-      parsedPayload['targetRecordId'] = targetRecordId.trim();
+    if (targetRecordPid.trim()) {
+      parsedPayload['targetRecordPid'] = targetRecordPid.trim();
     }
 
     setRunning(true);
@@ -289,7 +289,7 @@ export default function CommandWorkbenchPage() {
             <input
               className="w-full rounded-lg border px-3 py-2 font-mono text-sm"
               placeholder={l('记录 ID', 'Record ID')}
-              value={targetRecordId}
+              value={targetRecordPid}
               onChange={(e) => setTargetRecordId(e.target.value)}
             />
           </div>

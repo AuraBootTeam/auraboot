@@ -35,11 +35,11 @@ public class SagaStepRunner {
         // Resolve SpEL params
         Map<String, Object> resolvedParams = resolveExpressions(step.getInputParams(), processVars);
 
-        // Resolve targetRecordId if present in params
-        String targetRecordId = null;
-        if (resolvedParams.containsKey("targetRecordId")) {
-            Object tid = resolvedParams.remove("targetRecordId");
-            targetRecordId = tid != null ? tid.toString() : null;
+        // Resolve targetRecordPid if present in params
+        String targetRecordPid = null;
+        if (resolvedParams.containsKey("targetRecordPid")) {
+            Object tid = resolvedParams.remove("targetRecordPid");
+            targetRecordPid = tid != null ? tid.toString() : null;
         }
 
         // Determine operationType from params or default to CREATE
@@ -52,21 +52,21 @@ public class SagaStepRunner {
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setOperationType(operationType);
         request.setPayload(resolvedParams);
-        request.setTargetRecordId(targetRecordId);
+        request.setTargetRecordId(targetRecordPid);
 
         CommandExecuteResult result = commandExecutor.execute(step.getCommandCode(), request);
 
         // Store results
         step.setOutputData(result.getData() != null ? result.getData() : Map.of());
-        if (result.getData() != null && result.getData().containsKey("recordId")) {
-            step.setRecordId(result.getData().get("recordId").toString());
+        if (result.getData() != null && result.getData().containsKey("recordPid")) {
+            step.setRecordPid(result.getData().get("recordPid").toString());
         }
         stateManager.updateStepOutput(step);
 
         // Put results into process vars for downstream steps
         processVars.put("_step_" + step.getNodeId() + "_result", result.getData());
-        if (step.getRecordId() != null) {
-            processVars.put("_step_" + step.getNodeId() + "_recordId", step.getRecordId());
+        if (step.getRecordPid() != null) {
+            processVars.put("_step_" + step.getNodeId() + "_recordPid", step.getRecordPid());
         }
         processVars.put("_step_" + step.getNodeId() + "_success", true);
     }

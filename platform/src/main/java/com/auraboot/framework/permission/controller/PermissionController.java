@@ -5,12 +5,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.dto.PermissionBindRequest;
+import com.auraboot.framework.permission.dto.PermissionAuditLogDTO;
 import com.auraboot.framework.permission.dto.PermissionCreateRequest;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.dto.PermissionReferenceDTO;
 import com.auraboot.framework.permission.dto.PermissionTreeNodeDTO;
 import com.auraboot.framework.permission.dto.PermissionUpdateRequest;
 import com.auraboot.framework.permission.entity.PermissionAuditLog;
+import com.auraboot.framework.permission.service.PermissionAuditRecordPidResolver;
 import com.auraboot.framework.permission.service.PermissionAuditService;
 import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
@@ -62,6 +64,7 @@ public class PermissionController {
     private final PermissionService permissionService;
     private final PluginResourceTracker pluginResourceTracker;
     private final PermissionAuditService permissionAuditService;
+    private final PermissionAuditRecordPidResolver auditRecordPidResolver;
     
     /**
      * Get permission tree
@@ -385,7 +388,7 @@ public class PermissionController {
      * @return list of audit entries, newest first
      */
     @GetMapping("/audit")
-    public ApiResponse<List<PermissionAuditLog>> getAuditLog(
+    public ApiResponse<List<PermissionAuditLogDTO>> getAuditLog(
             @RequestParam(required = false) Long memberId,
             @RequestParam(required = false) String resourceCode,
             @RequestParam(defaultValue = "50") int limit) {
@@ -402,7 +405,24 @@ public class PermissionController {
             logs = permissionAuditService.getRecentLogs(tenantId, safeLimit);
         }
 
-        return ApiResponse.success(logs);
+        return ApiResponse.success(logs.stream()
+                .map(this::toAuditLogDTO)
+                .toList());
+    }
+
+    private PermissionAuditLogDTO toAuditLogDTO(PermissionAuditLog logEntry) {
+        return PermissionAuditLogDTO.builder()
+                .id(logEntry.getId())
+                .tenantId(logEntry.getTenantId())
+                .memberId(logEntry.getMemberId())
+                .resourceCode(logEntry.getResourceCode())
+                .actionCode(logEntry.getActionCode())
+                .recordPid(auditRecordPidResolver.resolve(logEntry))
+                .result(logEntry.getResult())
+                .reason(logEntry.getReason())
+                .evaluationTrace(logEntry.getEvaluationTrace())
+                .createdAt(logEntry.getCreatedAt())
+                .build();
     }
 
     /**

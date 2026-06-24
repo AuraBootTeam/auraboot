@@ -21,5 +21,5 @@ public class ConversationCreateRequest {
     private List<Long> agentIds;
 
     private String boundModelCode; // required when type=object
-    private Long boundRecordId;    // required when type=object
+    private String boundRecordPid; // required when type=object
 }

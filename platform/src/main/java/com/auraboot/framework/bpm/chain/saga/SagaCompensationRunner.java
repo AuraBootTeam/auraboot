@@ -31,16 +31,16 @@ public class SagaCompensationRunner {
         if (step.getOutputData() != null) {
             payload.putAll(step.getOutputData());
         }
-        if (step.getRecordId() != null) {
-            payload.put("recordId", step.getRecordId());
-            payload.put("targetRecordId", step.getRecordId());
+        if (step.getRecordPid() != null) {
+            payload.put("recordPid", step.getRecordPid());
+            payload.put("targetRecordPid", step.getRecordPid());
         }
 
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setOperationType("delete"); // Compensation usually deletes/reverts
         request.setPayload(payload);
-        if (step.getRecordId() != null) {
-            request.setTargetRecordId(step.getRecordId());
+        if (step.getRecordPid() != null) {
+            request.setTargetRecordId(step.getRecordPid());
         }
 
         commandExecutor.execute(step.getCompensationCommand(), request);

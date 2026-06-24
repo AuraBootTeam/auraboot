@@ -54,15 +54,15 @@ class EmailSequenceExecutorRenderTest {
     }
 
     // ══════════════════════════════════════════════════════════════════════════
-    // ESR-02: replaces {{modelCode}} and {{recordId}}
+    // ESR-02: replaces {{modelCode}} and {{recordPid}}
     // ══════════════════════════════════════════════════════════════════════════
 
     @Test
-    @DisplayName("ESR-02: {{modelCode}} and {{recordId}} are replaced")
-    void esr02_replacesModelCodeAndRecordId() {
+    @DisplayName("ESR-02: {{modelCode}} and {{recordPid}} are replaced")
+    void esr02_replacesModelCodeAndRecordPid() {
         EmailSequenceEnrollment enrollment = enrollment("bob@example.com", "crm_lead", "42");
         String result = executor.renderTemplate(
-                "Model: {{modelCode}}, Record: {{recordId}}", enrollment);
+                "Model: {{modelCode}}, Record: {{recordPid}}", enrollment);
         assertThat(result).isEqualTo("Model: crm_lead, Record: 42");
     }
 
@@ -107,7 +107,7 @@ class EmailSequenceExecutorRenderTest {
 
         // Null enrollment fields render as empty string (not "null")
         String fieldResult = executor.renderTemplate(
-                "Email=|{{email}}| Model=|{{modelCode}}| Record=|{{recordId}}|", enrollment);
+                "Email=|{{email}}| Model=|{{modelCode}}| Record=|{{recordPid}}|", enrollment);
         assertThat(fieldResult).isEqualTo("Email=|| Model=|| Record=||");
     }
 
@@ -115,11 +115,11 @@ class EmailSequenceExecutorRenderTest {
     // Helper
     // ──────────────────────────────────────────────────────────────────────────
 
-    private EmailSequenceEnrollment enrollment(String email, String modelCode, String recordId) {
+    private EmailSequenceEnrollment enrollment(String email, String modelCode, String recordPid) {
         EmailSequenceEnrollment e = new EmailSequenceEnrollment();
         e.setContactEmail(email);
         e.setModelCode(modelCode);
-        e.setRecordId(recordId);
+        e.setRecordPid(recordPid);
         return e;
     }
 }

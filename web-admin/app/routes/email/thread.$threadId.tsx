@@ -187,7 +187,7 @@ function CrmLinksPanel({ messageId }: CrmLinksPanelProps) {
               className="rounded-md border border-gray-200 px-3 py-2 dark:border-gray-700"
             >
               <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                {link.recordName || `Record #${link.recordId}`}
+                {link.recordName || `Record #${link.recordPid}`}
               </p>
               <p className="text-xs text-gray-400">{link.modelCode}</p>
             </li>

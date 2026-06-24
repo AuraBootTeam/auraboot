@@ -105,7 +105,7 @@ export default function ProjectSettings({
           pm_end_date: endDate,
           pm_project_owner_user_id: ownerUserId,
         },
-        targetRecordId: projectId,
+        targetRecordPid: projectId,
         operationType: 'update',
       });
       if (ResultHelper.isSuccess(result)) {
@@ -209,7 +209,7 @@ export default function ProjectSettings({
       setDeletingLabelId(labelPid);
       try {
         const result = await post<unknown>('/api/meta/commands/execute/pm:delete_label', {
-          targetRecordId: labelPid,
+          targetRecordPid: labelPid,
           operationType: 'delete',
         });
         if (ResultHelper.isSuccess(result)) {

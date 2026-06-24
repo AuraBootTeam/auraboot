@@ -93,7 +93,7 @@ class PostExecutionPhaseWithdrawProcessTest {
 
         Map<String, Object> postAction = new HashMap<>();
         postAction.put("type", "withdraw_process");
-        postAction.put("reason", "Cancelled by ${recordId}");
+        postAction.put("reason", "Cancelled by ${recordPid}");
 
         CommandPipelineContext ctx = buildCtx(postAction, "rec-7", "wd_leave_request");
 

@@ -156,11 +156,11 @@ public class ShadowRunScheduler {
                     // PR-60: project to canonical signature so original/shadow
                     // shapes align. See OutputSignatureProjector javadoc.
                     String actionStatus = (String) origin.get("action_status");
-                    String targetRecordId = (String) origin.get("target_record_id");
+                    String targetRecordPid = (String) origin.get("target_record_pid");
                     Integer affectedCount = origin.get("affected_count") == null ? null
                             : ((Number) origin.get("affected_count")).intValue();
                     Map<String, Object> projection = OutputSignatureProjector.projectOriginal(
-                            projectionToolRef, actionStatus, targetRecordId, affectedCount, originalSnapshotJson);
+                            projectionToolRef, actionStatus, targetRecordPid, affectedCount, originalSnapshotJson);
                     originalOutputHash = OutputSignatureProjector.computeMatchHash(projection);
                 } else {
                     originalOutputHash = CanonicalJsonHasher.sha256CanonicalJsonString(originalSnapshotJson);
@@ -233,7 +233,7 @@ public class ShadowRunScheduler {
                 "SELECT action_status, " +
                         "  EXTRACT(EPOCH FROM (COALESCE(updated_at, executed_at) - executed_at)) * 1000 AS duration_ms, " +
                         "  after_snapshot::text AS after_snapshot_json, " +
-                        "  target_record_id, " +
+                        "  target_record_pid, " +
                         "  affected_count " +
                         "FROM ab_agent_action WHERE run_id = ? LIMIT 1",
                 runId);

@@ -219,7 +219,7 @@ public class PermissionMatrixController {
      * @param memberId member (user) ID
      * @param resource resource identifier (e.g. model code)
      * @param action   action identifier (e.g. "view", "create", "edit", "delete")
-     * @param recordId optional target record ID
+     * @param recordPid optional target record pid
      */
     @GetMapping("/explain")
     @Operation(summary = "Explain permission decision for audit")
@@ -228,8 +228,18 @@ public class PermissionMatrixController {
             @RequestParam Long memberId,
             @RequestParam String resource,
             @RequestParam String action,
-            @RequestParam(required = false) Long recordId) {
-        return ApiResponse.success(permissionEvaluator.explain(memberId, resource, action, recordId));
+            @RequestParam(required = false) String recordPid) {
+        log.debug("Explaining permission decision: memberId={}, resource={}, action={}, recordPid={}",
+                memberId, resource, action, recordPid);
+        PermissionExplanation explanation = permissionEvaluator.explain(memberId, resource, action, null);
+        return ApiResponse.success(new PermissionExplanation(
+                explanation.memberId(),
+                explanation.resource(),
+                explanation.action(),
+                null,
+                recordPid,
+                explanation.finalResult(),
+                explanation.steps()));
     }
 
     private Permission findPermissionByPid(String permissionPid) {

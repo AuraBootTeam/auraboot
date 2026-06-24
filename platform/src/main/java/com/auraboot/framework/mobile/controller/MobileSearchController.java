@@ -117,9 +117,8 @@ public class MobileSearchController {
     }
 
     private MobileSearchResult.SearchHit toHit(String modelCode, String modelLabel, Map<String, Object> record) {
-        String recordId = stringify(firstPresent(record, "id", "recordId"));
         String recordPid = stringify(firstPresent(record, "pid", "recordPid"));
-        String displayName = resolveDisplayName(record, recordPid, recordId);
+        String displayName = resolveDisplayName(record, recordPid);
 
         Map<String, String> fields = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : record.entrySet()) {
@@ -135,17 +134,16 @@ public class MobileSearchController {
         return MobileSearchResult.SearchHit.builder()
                 .modelCode(modelCode)
                 .modelLabel(modelLabel)
-                .recordId(recordId != null ? recordId : recordPid)
                 .recordPid(recordPid)
                 .displayName(displayName)
                 .title(displayName)
                 .type("record")
-                .deepLink(recordId != null ? "auraboot://object/" + modelCode + "/" + recordId : null)
+                .deepLink(recordPid != null ? "auraboot://object/" + modelCode + "/" + recordPid : null)
                 .fields(fields)
                 .build();
     }
 
-    private String resolveDisplayName(Map<String, Object> record, String recordPid, String recordId) {
+    private String resolveDisplayName(Map<String, Object> record, String recordPid) {
         for (String key : List.of("displayName", "name", "title", "label")) {
             String value = stringify(record.get(key));
             if (value != null && !value.isBlank()) return value;
@@ -158,7 +156,6 @@ public class MobileSearchController {
             }
         }
         if (recordPid != null && !recordPid.isBlank()) return recordPid;
-        if (recordId != null && !recordId.isBlank()) return recordId;
         return "Record";
     }
 

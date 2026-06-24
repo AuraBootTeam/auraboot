@@ -67,8 +67,6 @@ type InboxCardPayload = {
   cardType?: string;
   modelCode?: string;
   sourceModel?: string;
-  recordId?: string;
-  sourceRecordId?: string;
   sourceRecordPid?: string;
   recordPid?: string;
   commandCode?: string;
@@ -112,24 +110,20 @@ function resolveWebDeepLink(item: InboxItem, payload: InboxCardPayload | null): 
   if (item.deepLink?.startsWith('auraboot://object/')) {
     const parts = item.deepLink.replace('auraboot://object/', '').split('/');
     if (parts.length >= 2) {
-      const [modelCode, recordId] = parts;
-      return `/p/${modelCode}/view/${recordId}`;
+      const [modelCode, recordPid] = parts;
+      return `/p/${modelCode}/view/${recordPid}`;
     }
   }
   const modelCode = item.sourceModel || item.modelCode || payload?.sourceModel || payload?.modelCode;
-  const recordId = resolveRecordPid(item, payload);
-  return modelCode && recordId ? `/p/${modelCode}/view/${recordId}` : null;
+  const recordPid = resolveRecordPid(item, payload);
+  return modelCode && recordPid ? `/p/${modelCode}/view/${recordPid}` : null;
 }
 
 function resolveRecordPid(item: InboxItem, payload: InboxCardPayload | null): string | undefined {
   return (
     item.sourceRecordPid ||
-    item.sourceRecordId ||
     payload?.sourceRecordPid ||
-    payload?.recordPid ||
-    payload?.sourceRecordId ||
-    payload?.recordId ||
-    (item.recordId != null ? String(item.recordId) : undefined)
+    payload?.recordPid
   );
 }
 
@@ -144,14 +138,14 @@ function getDisplayItem(item: InboxItem) {
     const toState = payload?.toState ? humanizeCode(payload.toState) : '';
     const title =
       fromState && toState ? `${commandLabel}: ${fromState} → ${toState}` : commandLabel;
-    const recordId = resolveRecordPid(item, payload);
+    const recordPid = resolveRecordPid(item, payload);
     return {
       title,
-      subtitle: recordId
-        ? `${modelLabel(item.modelCode || payload?.modelCode)} #${recordId}`
+      subtitle: recordPid
+        ? `${modelLabel(item.modelCode || payload?.modelCode)} #${recordPid}`
         : item.subtitle,
       metaModelCode: item.sourceModel || item.modelCode || payload?.sourceModel || payload?.modelCode,
-      metaRecordId: recordId,
+      metaRecordPid: recordPid,
       actionLabel: webLink ? 'Open' : 'View',
       actionHint: webLink ? 'Opens related record' : 'Marks item as read',
       webLink,
@@ -162,7 +156,7 @@ function getDisplayItem(item: InboxItem) {
     title: item.title,
     subtitle: item.subtitle,
     metaModelCode: item.sourceModel || item.modelCode,
-    metaRecordId: resolveRecordPid(item, payload),
+    metaRecordPid: resolveRecordPid(item, payload),
     actionLabel: item.itemType === 'approval' ? 'Review' : webLink ? 'Open' : 'View',
     actionHint:
       item.itemType === 'approval'
@@ -380,8 +374,8 @@ export default function UnifiedInboxPage() {
           if (!prev) return prev;
           return {
             ...prev,
-            records: prev.records.map((record) =>
-              record.id === item.id ? { ...record, isRead: true } : record,
+        records: prev.records.map((inboxItem) =>
+          inboxItem.id === item.id ? { ...inboxItem, isRead: true } : inboxItem,
             ),
           };
         });
@@ -418,7 +412,7 @@ export default function UnifiedInboxPage() {
         if (!prev) return prev;
         return {
           ...prev,
-          records: prev.records.filter((record) => record.id !== item.id),
+        records: prev.records.filter((inboxItem) => inboxItem.id !== item.id),
           total: Math.max(0, prev.total - 1),
         };
       });
@@ -768,10 +762,10 @@ export default function UnifiedInboxPage() {
                     <div className="flex min-w-0 items-center text-sm text-gray-500 dark:text-gray-400">
                       <div className="min-w-0">
                         {item.sourceType && <p className="truncate">{item.sourceType}</p>}
-                        {(display.metaModelCode || display.metaRecordId != null) && (
+                        {(display.metaModelCode || display.metaRecordPid != null) && (
                           <p className="truncate text-xs text-gray-400 dark:text-gray-500">
                             {display.metaModelCode}
-                            {display.metaRecordId != null ? ` · #${display.metaRecordId}` : ''}
+                            {display.metaRecordPid != null ? ` · #${display.metaRecordPid}` : ''}
                           </p>
                         )}
                       </div>

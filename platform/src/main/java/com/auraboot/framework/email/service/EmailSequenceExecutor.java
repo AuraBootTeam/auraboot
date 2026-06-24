@@ -178,7 +178,7 @@ public class EmailSequenceExecutor {
      * <ul>
      *   <li>{@code {{email}}} — contact email</li>
      *   <li>{@code {{modelCode}}} — CRM model code</li>
-     *   <li>{@code {{recordId}}} — CRM record ID</li>
+     *   <li>{@code {{recordPid}}} — CRM record pid</li>
      * </ul>
      *
      * <p>Unknown variables are left as-is. Null template returns an empty string.
@@ -209,7 +209,7 @@ public class EmailSequenceExecutor {
         return switch (variable) {
             case "email"     -> enrollment.getContactEmail() != null ? enrollment.getContactEmail() : "";
             case "modelCode" -> enrollment.getModelCode()    != null ? enrollment.getModelCode()    : "";
-            case "recordId"  -> enrollment.getRecordId()     != null ? enrollment.getRecordId()     : "";
+            case "recordPid" -> enrollment.getRecordPid()    != null ? enrollment.getRecordPid()    : "";
             default          -> "{{" + variable + "}}"; // leave unknown variables unchanged
         };
     }

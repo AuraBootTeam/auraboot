@@ -28,8 +28,8 @@ import static com.auraboot.framework.common.constant.ResponseCode.*;
 /**
  * User-role management controller.
  * Public read contracts return PIDs only. PID/code mutation paths are the
- * supported contract; ID-based mutation paths are kept temporarily for
- * compatibility and marked deprecated for removal after the migration window.
+ * supported contract. Legacy ID-based mutation paths are explicitly deprecated
+ * user-role endpoints and are outside the public-record pid contract.
  */
 @Slf4j
 @RestController

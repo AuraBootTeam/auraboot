@@ -92,9 +92,9 @@ public class CommandChainDefinition {
         private Map<String, Object> params;
 
         /**
-         * Target record ID expression (for UPDATE/DELETE). Resolved from process variables.
+         * Target record pid expression (for UPDATE/DELETE). Resolved from process variables.
          */
-        private String targetRecordId;
+        private String targetRecordPid;
 
         /**
          * Failure handling strategy.

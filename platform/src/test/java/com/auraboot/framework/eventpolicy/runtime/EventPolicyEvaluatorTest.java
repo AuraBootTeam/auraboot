@@ -44,7 +44,7 @@ class EventPolicyEvaluatorTest {
 
     private static PolicyAction notify(String role) {
         return new PolicyAction("NOTIFY", "ROLE:" + role, 10,
-                Map.of("templateCode", "t"), "${record.entityCode}:${record.recordId}:${rule.ruleCode}:${action.type}");
+                Map.of("templateCode", "t"), "${record.entityCode}:${record.recordPid}:${rule.ruleCode}:${action.type}");
     }
 
     private static PolicyRule rule(String code, int priority, ConditionNode cond, PolicyAction... actions) {
@@ -66,7 +66,7 @@ class EventPolicyEvaluatorTest {
 
     private DecisionContext complaintCtx(Map<String, Object> data) {
         return DecisionContext.builder()
-                .put(Scope.RECORD, Map.of("entityCode", "complaint", "recordId", "CMP-1", "data", data))
+                .put(Scope.RECORD, Map.of("entityCode", "complaint", "recordPid", "CMP-1", "data", data))
                 .build();
     }
 
@@ -75,9 +75,9 @@ class EventPolicyEvaluatorTest {
         EventPolicy p = policy(MatchMode.COLLECT_ALL, List.of(
                 rule("R-101", 100, eq("priority", "HIGH", DataType.ENUM), notify("support_manager")),
                 rule("R-102", 200, gt("amount", 10000), new PolicyAction("START_PROCESS", "BPM:approval", 10, Map.of(),
-                        "${record.recordId}:${rule.ruleCode}")),
+                        "${record.recordPid}:${rule.ruleCode}")),
                 rule("R-103", 300, eq("customerLevel", "VIP", DataType.ENUM),
-                        new PolicyAction("CREATE_TASK", "ROLE:vip_agent", 10, Map.of(), "${record.recordId}:${rule.ruleCode}"))));
+                        new PolicyAction("CREATE_TASK", "ROLE:vip_agent", 10, Map.of(), "${record.recordPid}:${rule.ruleCode}"))));
 
         EventPolicyResult r = evaluator.evaluate(p, complaintCtx(
                 Map.of("priority", "HIGH", "amount", 20000, "customerLevel", "VIP")));

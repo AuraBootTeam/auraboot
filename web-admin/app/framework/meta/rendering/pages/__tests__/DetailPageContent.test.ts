@@ -367,7 +367,7 @@ describe('resolveDetailRecordEndpoint', () => {
       ),
     ).toEqual({ endpoint: '/api/billing/plans/abc%2Fdef', method: 'get' });
   });
-  it('appends /{recordId} when the api endpoint has no placeholder, and honors post', () => {
+  it('appends /{recordPid} when the api endpoint has no placeholder, and honors post', () => {
     expect(
       resolveDetailRecordEndpoint(
         {

@@ -86,7 +86,7 @@ class AutomationDecisionIntegrationTest {
                         200,
                         DecisionBinding.TraceMode.ALWAYS,
                         true,
-                        RuleValueSource.field(Scope.RECORD, "data.recordId"),
+                        RuleValueSource.field(Scope.RECORD, "data.recordPid"),
                         null),
                 true));
         automation.setTriggerConfig(cfg);
@@ -139,13 +139,13 @@ class AutomationDecisionIntegrationTest {
                         null,
                         List.of(),
                         List.of(),
-                        List.of("record.data.amount", "record.data.recordId"),
+                        List.of("record.data.amount", "record.data.recordPid"),
                         List.of("approval_routing")));
         AutomationTriggerServiceImpl s = service();
 
         Map<String, Object> enriched = s.withDecision(
                 automationWithRuleBinding(),
-                Map.of("record", Map.of("amount", 20000, "recordId", "REC-1")));
+                Map.of("record", Map.of("amount", 20000, "recordPid", "REC-1")));
 
         ArgumentCaptor<RuleEvaluationContext> context = ArgumentCaptor.forClass(RuleEvaluationContext.class);
         verify(ruleEvaluationService).evaluateDecisionBinding(any(DecisionBinding.class), context.capture());

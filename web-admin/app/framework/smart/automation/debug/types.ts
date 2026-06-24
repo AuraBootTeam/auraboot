@@ -11,7 +11,7 @@ export type DebugStatus = 'paused' | 'running' | 'completed' | 'failed' | 'stopp
 export interface DebugSession {
   pid: string;
   automationId: string;
-  recordId?: string;
+  recordPid?: string;
   status: DebugStatus;
   currentActionIndex: number;
   totalActions: number;
@@ -26,7 +26,7 @@ export interface DebugSession {
 
 /** Request to create a debug session */
 export interface DebugSessionCreateRequest {
-  recordId?: string;
+  recordPid?: string;
   breakpoints?: number[];
   triggerPayload?: Record<string, unknown>;
 }

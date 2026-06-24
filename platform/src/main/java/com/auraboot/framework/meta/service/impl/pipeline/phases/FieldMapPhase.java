@@ -89,7 +89,7 @@ public class FieldMapPhase implements CommandPhase {
         }
         ctx.setFieldMapResults(fieldMapResults);
 
-        // Propagate record ID from fieldMapResults to request (inline)
+        // Propagate record pid from fieldMapResults to request (inline)
         propagateFieldMapRecordId(ctx.getRequest(), fieldMapResults);
     }
 
@@ -97,9 +97,9 @@ public class FieldMapPhase implements CommandPhase {
         if (request == null || fieldMapResults == null || StringUtils.hasText(request.getTargetRecordId())) {
             return;
         }
-        Object recordId = fieldMapResults.get("recordId");
-        if (recordId instanceof String recordIdStr && StringUtils.hasText(recordIdStr)) {
-            request.setTargetRecordId(recordIdStr);
+        Object recordPid = fieldMapResults.get("recordPid");
+        if (recordPid instanceof String recordPidStr && StringUtils.hasText(recordPidStr)) {
+            request.setTargetRecordId(recordPidStr);
         }
     }
 

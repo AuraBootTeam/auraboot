@@ -11,7 +11,7 @@ export function getPublicRecordPid(record: PublicRecordLike): string | undefined
 }
 
 export function getLegacyCompatibleRecordPid(record: PublicRecordLike): string | undefined {
-  return getPublicRecordPid(record) ?? toPublicRecordPid(record?.id);
+  return getPublicRecordPid(record);
 }
 
 export function getPublicRecordKey(
@@ -20,7 +20,7 @@ export function getPublicRecordKey(
   preferredField?: string,
 ): string | undefined {
   const preferred = preferredField ? toPublicRecordPid(record?.[preferredField]) : undefined;
-  return preferred ?? getLegacyCompatibleRecordPid(record) ?? toPublicRecordPid(fallback);
+  return preferred ?? getPublicRecordPid(record);
 }
 
 export function buildCommandTargetParams(target: unknown): Record<string, string> {

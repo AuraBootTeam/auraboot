@@ -124,7 +124,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
     private String seedAction(String runPid, String actionCode, String status) {
         String pid = UniqueIdGenerator.generate();
         jdbc.update("INSERT INTO ab_agent_action " +
-                        "(pid, tenant_id, run_id, action_code, action_type, target_model, target_record_id, " +
+                        "(pid, tenant_id, run_id, action_code, action_type, target_model, target_record_pid, " +
                         " action_status, executed_at, before_snapshot, after_snapshot, " +
                         " field_changes, risk_level, cost_usd) " +
                         "VALUES (?, ?, ?, ?, 'data_write', 'crm_account', 'REC-PID-001', ?, NOW(), " +
@@ -137,7 +137,7 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
 
     private String seedApproval(String runPid, String toolName) {
         return seedApproval(runPid, "Approve " + toolName, "Tool: " + toolName,
-                "{\"toolName\":\"" + toolName + "\",\"targetRecordId\":\"REC-PID-001\"}");
+                "{\"toolName\":\"" + toolName + "\",\"targetRecordPid\":\"REC-PID-001\"}");
     }
 
     private String seedApproval(String runPid, String title, String description, String requestData) {
@@ -427,7 +427,6 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
         AgentActionItem first = d.getActions().get(0);
         assertThat(first.getActionCode()).startsWith("crm.account.");
         assertThat(first.getTargetModel()).isEqualTo("crm_account");
-        assertThat(first.getTargetRecordId()).isEqualTo("REC-PID-001");
         assertThat(first.getTargetRecordPid()).isEqualTo("REC-PID-001");
         assertThat(first.getRiskLevel()).isEqualTo("L1");
         assertThat(first.getBeforeSnapshot()).contains("\"name\"").contains("old");

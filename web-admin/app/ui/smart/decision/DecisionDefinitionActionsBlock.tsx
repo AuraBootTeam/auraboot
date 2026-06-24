@@ -149,7 +149,7 @@ export function DecisionDefinitionActionsBlock({
   const decisionCode =
     stringValue(record.decisionCode) ??
     stringValue(record.decision_code) ??
-    stringValue(params.recordId) ??
+    stringValue(params.recordPid) ??
     decisionCodeFromPath(location.pathname) ??
     props.initialDecisionCode;
   const rolloutUrl = props.rolloutUrl ?? block?.rolloutUrl ?? DEFAULT_ROLLOUT_URL;

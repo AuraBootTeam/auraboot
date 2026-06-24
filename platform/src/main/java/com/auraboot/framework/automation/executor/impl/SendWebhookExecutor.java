@@ -143,7 +143,7 @@ public class SendWebhookExecutor implements ActionExecutor {
             // Default: emit the trigger context essentials.
             Map<String, Object> def = new HashMap<>();
             def.put("automationPid", context.get("automationPid"));
-            def.put("recordId", context.get("recordId"));
+            def.put("recordPid", context.get("recordPid"));
             def.put("event", context.get("event"));
             if (context.containsKey("record")) {
                 def.put("record", context.get("record"));

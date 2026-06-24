@@ -5,7 +5,7 @@
  * - vi.mock useSchemaLoader to isolate the façade from HTTP
  * - Exercise field state machine (set/get/error/clear/reset/dirty)
  * - Verify permission merge logic (merge mode vs override mode)
- * - Verify pageKey computation (explicit vs tableName+recordId)
+ * - Verify pageKey computation (explicit vs tableName+recordPid)
  * - Verify submit delegates to onSubmit with correct payload
  * - Verify enabled=false suppresses loading/error/schema
  * - Verify rendererProps shape is stable (no deep mutation required)
@@ -132,14 +132,14 @@ describe('useDslForm', () => {
       expect(result.current.pageKey).toBe('order_new');
     });
 
-    it('derives pageKey from tableName+recordId (edit → detail)', () => {
+    it('derives pageKey from tableName+recordPid (edit → detail)', () => {
       const { result } = renderHook(() =>
-        useDslForm({ tableName: 'order', recordId: 'rec-1' }),
+        useDslForm({ tableName: 'order', recordPid: 'rec-1' }),
       );
       expect(result.current.pageKey).toBe('order_detail');
     });
 
-    it('derives pageKey from tableName without recordId (create → new)', () => {
+    it('derives pageKey from tableName without recordPid (create → new)', () => {
       const { result } = renderHook(() =>
         useDslForm({ tableName: 'order' }),
       );
@@ -316,7 +316,7 @@ describe('useDslForm', () => {
   // ── Submit ─────────────────────────────────────────────────────────────────
 
   describe('submit', () => {
-    it('calls onSubmit with current values, recordId, schema, pageKey', async () => {
+    it('calls onSubmit with current values, recordPid, schema, pageKey', async () => {
       const fakeSchema = { modelCode: 'order', fields: [] };
       setupSchemaLoaderWithSchema(fakeSchema);
       const onSubmit = vi.fn().mockResolvedValue(undefined);
@@ -325,7 +325,7 @@ describe('useDslForm', () => {
         useDslForm({
           pageKey: 'order_new',
           initialValues: { status: 'draft' },
-          recordId: 'rec-1',
+          recordPid: 'rec-1',
           onSubmit,
         }),
       );
@@ -336,7 +336,7 @@ describe('useDslForm', () => {
 
       expect(onSubmit).toHaveBeenCalledWith({
         values: { status: 'draft' },
-        recordId: 'rec-1',
+        recordPid: 'rec-1',
         schema: fakeSchema,
         pageKey: 'order_new',
       });
@@ -472,14 +472,14 @@ describe('useDslForm', () => {
   // ── rendererProps shape ────────────────────────────────────────────────────
 
   describe('rendererProps', () => {
-    it('contains schema, tableName, recordId, token', () => {
+    it('contains schema, tableName, recordPid, token', () => {
       const fakeSchema = { modelCode: 'order' };
       setupSchemaLoaderWithSchema(fakeSchema);
       const { result } = renderHook(() =>
         useDslForm({
           pageKey: 'order_detail',
           tableName: 'order',
-          recordId: 'rec-42',
+          recordPid: 'rec-42',
           token: 'tok-abc',
         }),
       );
@@ -487,7 +487,7 @@ describe('useDslForm', () => {
       const rp = result.current.rendererProps;
       expect(rp.schema).toEqual(fakeSchema);
       expect(rp.tableName).toBe('order');
-      expect(rp.recordId).toBe('rec-42');
+      expect(rp.recordPid).toBe('rec-42');
       expect(rp.token).toBe('tok-abc');
     });
 

@@ -5,6 +5,8 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -37,7 +39,9 @@ public class PermissionAuditLog {
     /** Action that was evaluated (e.g. "view", "edit", "delete"). */
     private String actionCode;
 
-    /** Target record ID, nullable for non-record operations. */
+    /** Internal numeric target record ID, nullable for non-record operations. */
+    @JsonIgnore
+    @Schema(hidden = true)
     private Long recordId;
 
     /** Final grant/deny result (true = allowed, false = denied). */

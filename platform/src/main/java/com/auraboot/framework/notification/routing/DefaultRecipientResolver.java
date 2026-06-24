@@ -22,7 +22,7 @@ import java.util.Set;
  * </ul>
  *
  * For strategies other than WATCHERS, watchers are still appended as additional recipients
- * when a modelCode and recordId are present on the event (union behavior).
+ * when a modelCode and recordPid are present on the event (union behavior).
  *
  * @since 6.0.0
  */

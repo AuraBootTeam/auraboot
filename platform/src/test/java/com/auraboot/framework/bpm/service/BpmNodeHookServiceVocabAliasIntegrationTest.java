@@ -39,7 +39,7 @@ import static org.mockito.Mockito.when;
  *       post_complete} normalize to {@code pre_check / post_action}.</li>
  *   <li>actionType aliases: {@code http_callback} normalizes to {@code rest_call}.</li>
  *   <li>New {@code command} actionType invokes {@link CommandExecutor} with the
- *       correct payload/operationType/targetRecordId.</li>
+ *       correct payload/operationType/targetRecordPid.</li>
  *   <li>Backward compat: rows written directly with backend vocab continue to
  *       resolve and dispatch.</li>
  * </ul>
@@ -212,7 +212,7 @@ class BpmNodeHookServiceVocabAliasIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(7)
-    @DisplayName("VOCAB-07: actionType=command invokes CommandExecutor with payload/operationType/targetRecordId")
+    @DisplayName("VOCAB-07: actionType=command invokes CommandExecutor with payload/operationType/targetRecordPid")
     void vocab07_commandActionInvokesExecutor() {
         reset(commandExecutor);
         when(commandExecutor.execute(any(String.class), any(CommandExecuteRequest.class)))
@@ -228,7 +228,7 @@ class BpmNodeHookServiceVocabAliasIntegrationTest extends BaseIntegrationTest {
                         "type", "command",
                         "commandCode", commandCode,
                         "operationType", "create",
-                        "targetRecordId", "rec-123",
+                        "targetRecordPid", "rec-123",
                         "payload", Map.of("userId", "u-1", "amount", 5)
                 )
         ));
@@ -263,7 +263,7 @@ class BpmNodeHookServiceVocabAliasIntegrationTest extends BaseIntegrationTest {
                 Map.of(
                         "type", "command",
                         "commandCode", "wd:update_leave_balance"
-                        // no payload / operationType / targetRecordId
+                        // no payload / operationType / targetRecordPid
                 )
         ));
 

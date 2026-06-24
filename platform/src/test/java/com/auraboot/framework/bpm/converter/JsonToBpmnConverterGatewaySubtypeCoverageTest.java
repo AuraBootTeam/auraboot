@@ -326,11 +326,11 @@ class JsonToBpmnConverterGatewaySubtypeCoverageTest {
         }
 
         @Test
-        @DisplayName("full config should emit recordUpdateServiceTaskDelegate + modelCode/recordIdVar/fieldName/fieldValue")
+        @DisplayName("full config should emit recordUpdateServiceTaskDelegate + modelCode/recordPidVar/fieldName/fieldValue")
         void shouldEmitRecordUpdateTaskDelegate() {
             String json = recordUpdateJson(
                     "{\"type\": \"record-update-task\", \"label\": \"Mark Approved\", "
-                  + "\"modelCode\": \"sl_order\", \"recordIdVar\": \"orderId\", "
+                  + "\"modelCode\": \"sl_order\", \"recordPidVar\": \"orderPid\", "
                   + "\"fieldName\": \"status\", \"fieldValue\": \"APPROVED\"}");
 
             String xml = jsonToBpmn.convert(json);
@@ -340,7 +340,7 @@ class JsonToBpmnConverterGatewaySubtypeCoverageTest {
             assertTrue(xml.contains("class=\"recordUpdateServiceTaskDelegate\""),
                     "record-update-task should use recordUpdateServiceTaskDelegate. XML: " + xml);
             assertTrue(xml.contains("modelCode=\"sl_order\""), "Should carry modelCode. XML: " + xml);
-            assertTrue(xml.contains("recordIdVar=\"orderId\""), "Should carry recordIdVar. XML: " + xml);
+            assertTrue(xml.contains("recordPidVar=\"orderPid\""), "Should carry recordPidVar. XML: " + xml);
             assertTrue(xml.contains("fieldName=\"status\""), "Should carry fieldName. XML: " + xml);
             assertTrue(xml.contains("fieldValue=\"APPROVED\""), "Should carry fieldValue. XML: " + xml);
         }

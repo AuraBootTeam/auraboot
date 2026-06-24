@@ -44,7 +44,7 @@ class AutomationActionServiceTaskDelegateTest {
         Map<String, Object> vars = new HashMap<>();
         vars.put(AutomationActionServiceTaskDelegate.ACTIONS_VAR, Map.of(
                 "a1", Map.of("type", "send_notification", "config", Map.of("title", "hi"))));
-        vars.put("recordId", "rec-1");
+        vars.put("recordPid", "rec-1");
 
         delegate.execute(contextWith("a1", vars));
 

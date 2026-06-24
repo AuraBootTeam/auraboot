@@ -36,7 +36,7 @@ class ToolContextPolicyTest {
     void readOnlyOperationSkipsGate() {
         ToolContextPolicy.ContextDecision d = policy.evaluate(
                 meta(ToolEffectType.INTERNAL_READ),
-                Map.of("recordId", "C-999"),
+                Map.of("recordPid", "C-999"),
                 List.of(block(1L, List.of("C-1"), true)),
                 actor(2L)); // foreign tenant + out-of-scope record, but it's a read
         assertThat(d.allowed()).isTrue();
@@ -45,7 +45,7 @@ class ToolContextPolicyTest {
     @Test
     @DisplayName("null metadata → allow (nothing to gate)")
     void nullMetadataAllows() {
-        assertThat(policy.evaluate(null, Map.of("recordId", "C-2"),
+        assertThat(policy.evaluate(null, Map.of("recordPid", "C-2"),
                 List.of(block(2L, List.of("C-1"), true)), actor(1L)).allowed()).isTrue();
     }
 
@@ -53,7 +53,7 @@ class ToolContextPolicyTest {
     @DisplayName("write with no context → allow (no scope to enforce)")
     void writeWithNoContextAllows() {
         assertThat(policy.evaluate(meta(ToolEffectType.INTERNAL_WRITE),
-                Map.of("recordId", "C-2"), List.of(), actor(1L)).allowed()).isTrue();
+                Map.of("recordPid", "C-2"), List.of(), actor(1L)).allowed()).isTrue();
     }
 
     // ---- cross-tenant deny (the key negative) -------------------------------
@@ -93,7 +93,7 @@ class ToolContextPolicyTest {
     @DisplayName("write targeting a record IN the context scope → allow")
     void writeRecordInScopeAllowed() {
         assertThat(policy.evaluate(meta(ToolEffectType.INTERNAL_WRITE),
-                Map.of("recordId", "C-1"),
+                Map.of("recordPid", "C-1"),
                 List.of(block(1L, List.of("C-1"), true)), actor(1L)).allowed()).isTrue();
     }
 
@@ -102,7 +102,7 @@ class ToolContextPolicyTest {
     void writeRecordOutOfScopeDenied() {
         ToolContextPolicy.ContextDecision d = policy.evaluate(
                 meta(ToolEffectType.INTERNAL_WRITE),
-                Map.of("recordId", "C-2"),
+                Map.of("recordPid", "C-2"),
                 List.of(block(1L, List.of("C-1"), true)), // scope only has C-1
                 actor(1L));
         assertThat(d.allowed()).isFalse();
@@ -110,11 +110,11 @@ class ToolContextPolicyTest {
     }
 
     @Test
-    @DisplayName("alternate record-id key (pid) is recognized → out-of-scope still DENY")
-    void writeRecordOutOfScopeViaPidKey() {
+    @DisplayName("targetRecordPid key is recognized -> out-of-scope still DENY")
+    void writeRecordOutOfScopeViaTargetRecordPidKey() {
         ToolContextPolicy.ContextDecision d = policy.evaluate(
                 meta(ToolEffectType.INTERNAL_WRITE),
-                Map.of("pid", "C-2"),
+                Map.of("targetRecordPid", "C-2"),
                 List.of(block(1L, List.of("C-1"), true)), actor(1L));
         assertThat(d.allowed()).isFalse();
         assertThat(d.reasonCode()).isEqualTo("context_scope_violation");
@@ -123,9 +123,9 @@ class ToolContextPolicyTest {
     @Test
     @DisplayName("write with a target record but EMPTY record scope → allow (no scope to enforce)")
     void writeRecordButEmptyScopeAllowed() {
-        // readWriteRelevant=false → provenance contributes its tenant but no recordIds.
+        // readWriteRelevant=false -> provenance contributes its tenant but no recordPids.
         assertThat(policy.evaluate(meta(ToolEffectType.INTERNAL_WRITE),
-                Map.of("recordId", "C-2"),
+                Map.of("recordPid", "C-2"),
                 List.of(block(1L, List.of("C-1"), false)), actor(1L)).allowed()).isTrue();
     }
 
@@ -139,11 +139,11 @@ class ToolContextPolicyTest {
         return new ToolPolicyActor(tenantId, 99L, Set.of());
     }
 
-    private static AgentContextBlock block(Long tenantId, List<String> recordIds, boolean rwRelevant) {
+    private static AgentContextBlock block(Long tenantId, List<String> recordPids, boolean rwRelevant) {
         return new AgentContextBlock("ctx", "{}",
                 new AgentContextProvenance(
                         AgentContextSource.RECORD, "scope", "fresh", "perm",
                         AgentContextSensitivity.CONFIDENTIAL,
-                        recordIds, tenantId, "web", rwRelevant, Map.of()));
+                        recordPids, tenantId, "web", rwRelevant, Map.of()));
     }
 }

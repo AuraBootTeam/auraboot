@@ -28,7 +28,7 @@ The `commandCode` uses the format `{namespace}:{action}` (e.g., `sc:create_showc
   },
   "clientRequestId": "unique-request-id-for-idempotency",
   "operationType": "CREATE",
-  "targetRecordId": null,
+  "targetRecordPid": null,
   "expectedVersion": null
 }
 ```
@@ -38,7 +38,7 @@ The `commandCode` uses the format `{namespace}:{action}` (e.g., `sc:create_showc
 | `payload` | object | Yes | Key-value pairs of field data to pass to the command |
 | `clientRequestId` | string | No | Idempotency key. If provided, duplicate requests within 24 hours return the original result instead of re-executing |
 | `operationType` | string | No | Hint: `CREATE`, `UPDATE`, or `DELETE` |
-| `targetRecordId` | string | No | Record ID for update/delete/state-transition commands |
+| `targetRecordPid` | string | No | Record ID for update/delete/state-transition commands |
 | `expectedVersion` | integer | No | Optimistic locking: the expected row version. If the current version differs, the command is rejected |
 
 ### Response
@@ -49,7 +49,7 @@ The `commandCode` uses the format `{namespace}:{action}` (e.g., `sc:create_showc
   "message": "success",
   "data": {
     "success": true,
-    "recordId": "01HXYZ...",
+    "recordPid": "01HXYZ...",
     "recordPid": "01HXYZ...",
     "data": {
       "id": 123,
@@ -94,7 +94,7 @@ curl -s -X POST http://localhost:6443/api/meta/commands/execute/sc:update_showca
       "sc_name": "Updated Name",
       "sc_quantity": 200
     },
-    "targetRecordId": "01HXYZ..."
+    "targetRecordPid": "01HXYZ..."
   }'
 ```
 
@@ -105,7 +105,7 @@ curl -s -X POST http://localhost:6443/api/meta/commands/execute/sc:delete_showca
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
   -d '{
-    "targetRecordId": "01HXYZ..."
+    "targetRecordPid": "01HXYZ..."
   }'
 ```
 
@@ -116,7 +116,7 @@ curl -s -X POST http://localhost:6443/api/meta/commands/execute/sc:activate_show
   -H "Authorization: Bearer <jwt>" \
   -H "Content-Type: application/json" \
   -d '{
-    "targetRecordId": "01HXYZ..."
+    "targetRecordPid": "01HXYZ..."
   }'
 ```
 

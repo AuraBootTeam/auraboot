@@ -305,7 +305,7 @@ public class ToolDryRunService {
 
         // Warn about unknown fields
         for (String key : input.keySet()) {
-            if (!properties.containsKey(key) && !"targetRecordId".equals(key) && !"_expectedVersion".equals(key)) {
+            if (!properties.containsKey(key) && !"targetRecordPid".equals(key) && !"_expectedVersion".equals(key)) {
                 warnings.add("Unknown input field: " + key);
             }
         }
@@ -313,12 +313,11 @@ public class ToolDryRunService {
 
     private void validateCommandTarget(Long tenantId, String commandCode, Map<String, Object> input,
                                        List<String> errors, List<String> warnings) {
-        String targetRecordId = null;
-        if (input.get("targetRecordId") instanceof String s) targetRecordId = s;
-        if (input.get("recordId") instanceof String s) targetRecordId = s;
-        if (input.get("pid") instanceof String s) targetRecordId = s;
+        String targetRecordPid = null;
+        if (input.get("targetRecordPid") instanceof String s) targetRecordPid = s;
+        if (input.get("recordPid") instanceof String s) targetRecordPid = s;
 
-        if (targetRecordId == null) return;
+        if (targetRecordPid == null) return;
 
         // Try to find the command definition to get model_code
         try {
@@ -349,9 +348,9 @@ public class ToolDryRunService {
             String recordSql = "SELECT pid FROM " + tableName +
                     " WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
             List<Map<String, Object>> recordRows = dynamicDataMapper.selectByQuery(recordSql,
-                    Map.of("tenantId", tenantId, "pid", targetRecordId));
+                    Map.of("tenantId", tenantId, "pid", targetRecordPid));
             if (recordRows.isEmpty()) {
-                errors.add("Target record not found: " + targetRecordId + " in " + tableName);
+                errors.add("Target record not found: " + targetRecordPid + " in " + tableName);
             }
         } catch (Exception e) {
             warnings.add("Could not validate target record: " + e.getMessage());
@@ -365,12 +364,11 @@ public class ToolDryRunService {
     @SuppressWarnings("unchecked")
     private void validateStateTransition(Long tenantId, String commandCode, Map<String, Object> input,
                                          List<String> errors, List<String> warnings) {
-        String targetRecordId = null;
-        if (input.get("targetRecordId") instanceof String s) targetRecordId = s;
-        if (input.get("recordId") instanceof String s) targetRecordId = s;
-        if (input.get("pid") instanceof String s) targetRecordId = s;
+        String targetRecordPid = null;
+        if (input.get("targetRecordPid") instanceof String s) targetRecordPid = s;
+        if (input.get("recordPid") instanceof String s) targetRecordPid = s;
 
-        if (targetRecordId == null || commandCode == null) return;
+        if (targetRecordPid == null || commandCode == null) return;
 
         try {
             String cmdSql = "SELECT model_code, command_type, execution_config FROM ab_command_definition " +
@@ -412,7 +410,7 @@ public class ToolDryRunService {
             String recordSql = "SELECT " + stateField + " AS current_state FROM " + tableName +
                     " WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
             List<Map<String, Object>> recordRows = dynamicDataMapper.selectByQuery(recordSql,
-                    Map.of("tenantId", tenantId, "pid", targetRecordId));
+                    Map.of("tenantId", tenantId, "pid", targetRecordPid));
             if (recordRows.isEmpty()) return; // Already caught by validateCommandTarget
 
             String currentState = (String) recordRows.get(0).get("current_state");

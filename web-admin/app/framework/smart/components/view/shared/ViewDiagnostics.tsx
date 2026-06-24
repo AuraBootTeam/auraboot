@@ -16,7 +16,7 @@ export interface DiagnosticCategory {
 }
 
 export interface DiagnosticIssue {
-  recordId: string;
+  recordPid: string;
   title: string;
   reason: string;
   details: Record<string, unknown>;
@@ -28,7 +28,7 @@ export interface ViewDiagnosticsProps {
   categories: DiagnosticCategory[];
   issues: DiagnosticIssue[];
   fieldMapping?: Record<string, string>;
-  onRecordClick?: (recordId: string) => void;
+  onRecordClick?: (recordPid: string) => void;
   onOpenViewConfig?: () => void;
   onSwitchToTableView?: () => void;
   onRefresh?: () => void;
@@ -178,12 +178,12 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
           <div className="divide-y divide-gray-100 dark:divide-gray-700">
             {filteredIssues.map((item, idx) => (
               <div
-                key={`${item.recordId}-${idx}`}
+                key={`${item.recordPid}-${idx}`}
                 className={cn(
                   'flex items-center justify-between gap-3 px-3 py-2 text-xs',
                   onRecordClick && 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700',
                 )}
-                onClick={onRecordClick ? () => onRecordClick(item.recordId) : undefined}
+                onClick={onRecordClick ? () => onRecordClick(item.recordPid) : undefined}
               >
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-gray-800 dark:text-gray-200">
@@ -204,7 +204,7 @@ export const ViewDiagnostics: React.FC<ViewDiagnosticsProps> = ({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onRecordClick(item.recordId);
+                      onRecordClick(item.recordPid);
                     }}
                     className="rounded border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                   >

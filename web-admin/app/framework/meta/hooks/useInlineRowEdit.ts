@@ -290,7 +290,7 @@ export function useInlineRowEdit({
       const result = await fetchResult(`/api/meta/commands/execute/${config.commands.update}`, {
         method: 'post',
         params: {
-          targetRecordId: editingRowId,
+          targetRecordPid: editingRowId,
           payload: changed,
           operationType: 'update',
         },

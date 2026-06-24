@@ -38,8 +38,8 @@ public class ActionRecord {
 
     // target
     private String targetModel;
-    private String targetRecordId;
-    private List<String> targetRecordIds;
+    private String targetRecordPid;
+    private List<String> targetRecordPids;
     private int affectedCount;
 
     // change snapshot

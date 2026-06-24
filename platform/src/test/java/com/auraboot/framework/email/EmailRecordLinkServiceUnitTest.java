@@ -53,7 +53,7 @@ class EmailRecordLinkServiceUnitTest {
         assertThat(result.getMessageId()).isEqualTo(100L);
         assertThat(result.getThreadId()).isEqualTo("thread-1");
         assertThat(result.getModelCode()).isEqualTo("crm_contact");
-        assertThat(result.getRecordId()).isEqualTo("REC-1");
+        assertThat(result.getRecordPid()).isEqualTo("REC-1");
         assertThat(result.getLinkType()).isEqualTo(EmailConstants.LINK_TYPE_MANUAL);
         assertThat(result.getCreatedAt()).isNotNull();
         verify(linkMapper).insert(any(EmailRecordLink.class));
@@ -156,7 +156,7 @@ class EmailRecordLinkServiceUnitTest {
         EmailRecordLink sibling = new EmailRecordLink();
         sibling.setMessageId(20L); // different message
         sibling.setModelCode("crm_lead");
-        sibling.setRecordId("LEAD-1");
+        sibling.setRecordPid("LEAD-1");
         when(linkMapper.findByThread(7L, "THR-99")).thenReturn(List.of(sibling));
 
         service.autoLink(m);

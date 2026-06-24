@@ -62,8 +62,8 @@ public class DslCommandShadowInvoker implements ShadowToolInvoker {
             }
             Object operationType = args.get("operation_type");
             if (operationType instanceof String s) req.setOperationType(s);
-            Object targetRecordId = args.get("target_record_id");
-            if (targetRecordId instanceof String s) req.setTargetRecordId(s);
+            Object targetRecordPid = args.get("target_record_pid");
+            if (targetRecordPid instanceof String s) req.setTargetRecordId(s);
         }
 
         // Exception from CommandExecutor propagates to the caller (ShadowExecutor),

@@ -20,7 +20,7 @@ public class DebugSessionDTO {
     private Long id;
     private String pid;
     private String automationId;
-    private String recordId;
+    private String recordPid;
     private String status;
     private Integer currentActionIndex;
     private Integer totalActions;

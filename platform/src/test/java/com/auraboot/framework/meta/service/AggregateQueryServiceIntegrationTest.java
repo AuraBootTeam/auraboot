@@ -33,17 +33,17 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * Create a named query on ab_tenant table with fields: id, name, status
+     * Create a named query on ab_tenant table with pid-only-safe public field aliases.
      */
     private String createTestNamedQuery() {
         String code = generateQueryCode();
 
-        NamedQueryFieldRequest idField = new NamedQueryFieldRequest();
-        idField.setFieldCode("id");
-        idField.setColumnExpr("id");
-        idField.setDataType("number");
-        idField.setOperators(List.of("eq", "ne", "gt", "lt", "in"));
-        idField.setSortable(true);
+        NamedQueryFieldRequest tenantRefField = new NamedQueryFieldRequest();
+        tenantRefField.setFieldCode("tenant_ref");
+        tenantRefField.setColumnExpr("id");
+        tenantRefField.setDataType("number");
+        tenantRefField.setOperators(List.of("eq", "ne", "gt", "lt", "in"));
+        tenantRefField.setSortable(true);
 
         NamedQueryFieldRequest nameField = new NamedQueryFieldRequest();
         nameField.setFieldCode("name");
@@ -65,7 +65,7 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         request.setDescription("Named query for aggregate testing on ab_tenant");
         request.setFromSql("ab_tenant");
         request.setStatus("published");
-        request.setFields(List.of(idField, nameField, statusField));
+        request.setFields(List.of(tenantRefField, nameField, statusField));
 
         namedQueryService.create(request);
         return code;
@@ -274,7 +274,7 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         String queryCode = createTestNamedQuery();
 
         MetricConfig countMetric = new MetricConfig();
-        countMetric.setField("id");
+        countMetric.setField("tenant_ref");
         countMetric.setAggregation("count");
         countMetric.setAlias("total");
 
@@ -298,7 +298,7 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         String queryCode = createTestNamedQuery();
 
         MetricConfig countMetric = new MetricConfig();
-        countMetric.setField("id");
+        countMetric.setField("tenant_ref");
         countMetric.setAggregation("count");
         countMetric.setAlias("tenant_count");
 
@@ -325,7 +325,7 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         String queryCode = createTestNamedQuery();
 
         MetricConfig countMetric = new MetricConfig();
-        countMetric.setField("id");
+        countMetric.setField("tenant_ref");
         countMetric.setAggregation("count");
         countMetric.setAlias("active_count");
 
@@ -354,7 +354,7 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         String queryCode = createTestNamedQuery();
 
         MetricConfig countMetric = new MetricConfig();
-        countMetric.setField("id");
+        countMetric.setField("tenant_ref");
         countMetric.setAggregation("count");
         countMetric.setAlias("count");
 
@@ -405,7 +405,7 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         String queryCode = createTestNamedQuery();
 
         MetricConfig countMetric = new MetricConfig();
-        countMetric.setField("id");
+        countMetric.setField("tenant_ref");
         countMetric.setAggregation("count");
         countMetric.setAlias("total");
 
@@ -431,7 +431,7 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
     void shouldRejectNamedQueryNotFound() {
         // Given: a non-existent query code
         MetricConfig countMetric = new MetricConfig();
-        countMetric.setField("id");
+        countMetric.setField("tenant_ref");
         countMetric.setAggregation("count");
         countMetric.setAlias("total");
 
@@ -506,7 +506,7 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         String queryCode = createTestNamedQuery();
 
         MetricConfig countMetric = new MetricConfig();
-        countMetric.setField("id");
+        countMetric.setField("tenant_ref");
         countMetric.setAggregation("count");
         countMetric.setAlias("total_count");
 

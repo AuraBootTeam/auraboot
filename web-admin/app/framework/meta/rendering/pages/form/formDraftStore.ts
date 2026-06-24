@@ -36,18 +36,18 @@ export interface LoadDraftOptions {
 /**
  * Compose a stable, namespaced Storage key for a form draft.
  *
- * Create forms (no `recordId`) share a single `:new` slot per model+page so a
- * reload mid-create restores. Edit forms are scoped per `recordId` so editing
+ * Create forms (no `recordPid`) share a single `:new` slot per model+page so a
+ * reload mid-create restores. Edit forms are scoped per `recordPid` so editing
  * two records does not cross-contaminate.
  */
 export function draftKey(
   modelCode: string,
   pageKey?: string | null,
-  recordId?: string | null,
+  recordPid?: string | null,
 ): string {
   const safeModel = modelCode || '_';
   const safePage = pageKey || '_';
-  const safeRecord = recordId || 'new';
+  const safeRecord = recordPid || 'new';
   return `${DRAFT_KEY_PREFIX}:${safeModel}:${safePage}:${safeRecord}`;
 }
 

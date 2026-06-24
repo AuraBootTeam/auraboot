@@ -7,7 +7,7 @@ A schema-driven kanban view for `kind=list` pages, rendered via `SavedView` of `
 When a card is dragged to another column, `useKanbanData.moveCard` performs:
 
 - **Method**: `PUT`
-- **URL**: `/api/dynamic/{pageKey}/{recordId}`
+- **URL**: `/api/dynamic/{pageKey}/{recordPid}`
 - **Body**: `{ [groupByField]: targetColumnId }` (partial update — only the group field is sent)
 - **Success**: response body `{ code: '0', ... }` (judged via `ResultHelper.isSuccess`)
 - **Failure**: any non-success code OR network error → optimistic update is rolled back to `sourceColumnId` and `onMoveError({ code, message })` is called

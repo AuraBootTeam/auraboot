@@ -244,7 +244,7 @@ Multiple filters are combined with `AND` by default. Use `logicalOperator` for `
 ### Get Single Record
 
 ```
-GET /api/dynamic/{pageKey}/{recordId}
+GET /api/dynamic/{pageKey}/{recordPid}
 ```
 
 ```bash
@@ -272,7 +272,7 @@ curl -s -X POST http://localhost:6443/api/dynamic/sc_showcase/create \
 ### Update Record
 
 ```
-PUT /api/dynamic/{pageKey}/{recordId}
+PUT /api/dynamic/{pageKey}/{recordPid}
 ```
 
 ```bash
@@ -288,7 +288,7 @@ curl -s -X PUT http://localhost:6443/api/dynamic/sc_showcase/01HXYZ \
 ### Delete Record
 
 ```
-DELETE /api/dynamic/{pageKey}/{recordId}
+DELETE /api/dynamic/{pageKey}/{recordPid}
 ```
 
 ```bash

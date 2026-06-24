@@ -84,7 +84,7 @@ export const ReportGenerateButton: React.FC<ReportGenerateButtonProps> = ({
       try {
         const params: Record<string, unknown> = { ...parameters };
         if (recordPid) {
-          params.recordId = recordPid;
+          params.recordPid = recordPid;
         }
 
         const blob = await reportTemplateService.generate(template.code, params);

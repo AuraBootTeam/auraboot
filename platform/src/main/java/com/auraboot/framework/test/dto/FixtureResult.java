@@ -12,6 +12,6 @@ public class FixtureResult {
     private String fixtureName;
     private String testRunId;
     private int recordsCreated;
-    private List<String> recordIds;
+    private List<String> recordPids;
     private Map<String, Object> metadata;
 }

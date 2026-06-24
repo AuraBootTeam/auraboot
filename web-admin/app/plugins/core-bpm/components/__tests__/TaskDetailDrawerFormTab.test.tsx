@@ -126,7 +126,7 @@ describe('TaskDetailDrawer FormTab', () => {
     const lastCall = useDslFormMock.mock.calls.at(-1)?.[0] as Record<string, unknown>;
     expect(lastCall?.pageKey).toBe('wd_leave_request_detail');
     expect(lastCall?.enabled).toBe(true);
-    expect(lastCall?.recordId).toBe('WDLR-1');
+    expect(lastCall?.recordPid).toBe('WDLR-1');
     expect(lastCall?.fieldPermissions).toEqual({ wd_req_reason: 'readonly' });
   });
 

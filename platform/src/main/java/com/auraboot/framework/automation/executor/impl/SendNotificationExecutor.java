@@ -177,7 +177,7 @@ public class SendNotificationExecutor implements ActionExecutor {
         String refModel = parts[1].endsWith("_id")
                 ? parts[1].substring(0, parts[1].length() - 3) // asset_id -> asset
                 : parts[1];
-        // DynamicDataService.getById(String modelCode, String recordId) — recordId is a String (§15).
+        // DynamicDataService.getById(String modelCode, String recordPid) takes the row pid as a String.
         Map<String, Object> refRow = dynamicDataService.getById(refModel, String.valueOf(refId));
         if (refRow == null) {
             return null;

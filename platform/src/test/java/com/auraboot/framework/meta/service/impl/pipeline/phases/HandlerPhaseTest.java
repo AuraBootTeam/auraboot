@@ -213,10 +213,10 @@ class HandlerPhaseTest {
                 .containsEntry("async", true)
                 .containsEntry("taskCode", "TASK-ASYNC-1")
                 .containsEntry("taskType", "command-handler")
-                // The async envelope surfaces the target record id so a form that
+                // The async envelope surfaces the target record pid so a form that
                 // submits a model-bound async command can redirect to the new
                 // record's detail page instead of falling back to the list route.
-                .containsEntry("recordId", "po-1");
+                .containsEntry("recordPid", "po-1");
         verify(asyncTaskService).submitTask(any(), eq(1L), eq(2L));
     }
 

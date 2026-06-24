@@ -30,7 +30,7 @@ public interface EmailRecordLinkMapper extends BaseMapper<EmailRecordLink> {
         JOIN ab_email_message m ON m.id = l.message_id
         WHERE l.tenant_id  = #{tenantId}
           AND l.model_code = #{modelCode}
-          AND l.record_id  = #{recordId}
+          AND l.record_pid = #{recordPid}
           AND l.message_id IS NOT NULL
         ORDER BY m.gmail_date DESC
         LIMIT  #{limit}
@@ -38,7 +38,7 @@ public interface EmailRecordLinkMapper extends BaseMapper<EmailRecordLink> {
         """)
     List<EmailMessage> findMessagesByRecord(@Param("tenantId") Long tenantId,
                                             @Param("modelCode") String modelCode,
-                                            @Param("recordId") String recordId,
+                                            @Param("recordPid") String recordPid,
                                             @Param("limit") int limit,
                                             @Param("offset") int offset);
 

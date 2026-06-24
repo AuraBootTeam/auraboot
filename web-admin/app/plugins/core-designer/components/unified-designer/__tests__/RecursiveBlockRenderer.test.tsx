@@ -54,8 +54,8 @@ describe('RecursiveBlockRenderer', () => {
                   blockType: 'table',
                   props: {
                     rows: [
-                      { id: 'row_alpha', name: 'Alpha mission' },
-                      { id: 'row_beta', name: 'Beta mission' },
+                      { pid: 'row_alpha', name: 'Alpha mission' },
+                      { pid: 'row_beta', name: 'Beta mission' },
                     ],
                   },
                   blocks: [
@@ -130,8 +130,8 @@ describe('RecursiveBlockRenderer', () => {
                   blockType: 'table',
                   props: {
                     rows: [
-                      { id: 'row_alpha', name: 'Alpha mission', owner: 'alice' },
-                      { id: 'row_beta', name: 'Beta mission', owner: 'bob' },
+                      { pid: 'row_alpha', name: 'Alpha mission', owner: 'alice' },
+                      { pid: 'row_beta', name: 'Beta mission', owner: 'bob' },
                     ],
                   },
                   blocks: [
@@ -2337,8 +2337,8 @@ describe('RecursiveBlockRenderer', () => {
                   blockType: 'table',
                   props: {
                     rows: [
-                      { id: 'row_001', name: 'Ada' },
-                      { id: 'row_002', name: 'Grace' },
+                      { pid: 'row_001', name: 'Ada' },
+                      { pid: 'row_002', name: 'Grace' },
                     ],
                   },
                   blocks: [
@@ -2364,7 +2364,7 @@ describe('RecursiveBlockRenderer', () => {
       expect(runtimeServices.executeAction).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'action_bulk' }),
         expect.objectContaining({
-          selectedRows: [{ id: 'row_001', name: 'Ada' }],
+          selectedRows: [{ pid: 'row_001', name: 'Ada' }],
           selectedRowIds: ['row_001'],
         }),
       );
@@ -2393,8 +2393,8 @@ describe('RecursiveBlockRenderer', () => {
                   blockType: 'table',
                   props: {
                     rows: [
-                      { id: 'row_001', name: 'Ada' },
-                      { id: 'row_002', name: 'Grace' },
+                      { pid: 'row_001', name: 'Ada' },
+                      { pid: 'row_002', name: 'Grace' },
                     ],
                   },
                   blocks: [
@@ -2432,7 +2432,7 @@ describe('RecursiveBlockRenderer', () => {
       expect(runtimeServices.executeAction).toHaveBeenCalledWith(
         expect.objectContaining({ id: 'action_open_row' }),
         expect.objectContaining({
-          currentRow: { id: 'row_002', name: 'Grace' },
+          currentRow: { pid: 'row_002', name: 'Grace' },
           currentRowId: 'row_002',
           blockPath: ['list_root', 'table_customers', 'action_open_row'],
         }),
@@ -2460,9 +2460,9 @@ describe('RecursiveBlockRenderer', () => {
                   blockType: 'table',
                   props: {
                     rows: [
-                      { id: 'row_001', name: 'Ada', status: 'locked' },
-                      { id: 'row_002', name: 'Grace', status: 'hidden' },
-                      { id: 'row_003', name: 'Lin', status: 'active' },
+                      { pid: 'row_001', name: 'Ada', status: 'locked' },
+                      { pid: 'row_002', name: 'Grace', status: 'hidden' },
+                      { pid: 'row_003', name: 'Lin', status: 'active' },
                     ],
                   },
                   blocks: [

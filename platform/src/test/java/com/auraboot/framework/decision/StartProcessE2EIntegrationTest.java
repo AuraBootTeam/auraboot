@@ -75,7 +75,7 @@ class StartProcessE2EIntegrationTest extends BaseIntegrationTest {
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
               "actions":[{"type":"START_PROCESS","target":"BPM","order":10,
                  "payload":{"processDefinitionId":"%s","variables":{"source":"policy"}},
-                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordId}:${rule.ruleCode}:SP"}]}]
+                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:SP"}]}]
             """).formatted(processKey));
         var draft = versionService.createDraft(code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
                 ExecutionMode.ORDERED, FailureStrategy.CONTINUE_ON_ERROR, ConflictStrategy.REJECT_ON_CONFLICT,
@@ -83,10 +83,10 @@ class StartProcessE2EIntegrationTest extends BaseIntegrationTest {
         versionService.validate(draft.getPid());
         versionService.publish(draft.getPid());
 
-        // unique recordId per run so the idempotency key differs (NOT_SUPPORTED commits exec logs)
-        String recordId = "CMP-SP-" + System.nanoTime();
+        // unique recordPid per run so the idempotency key differs (NOT_SUPPORTED commits exec logs)
+        String recordPid = "CMP-SP-" + System.nanoTime();
         var result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
-                Map.of("record", Map.of("entityCode", targetKey, "recordId", recordId,
+                Map.of("record", Map.of("entityCode", targetKey, "recordPid", recordPid,
                         "data", Map.of("priority", "HIGH"))));
 
         // The action SUCCEEDED against the REAL deployed definition: the production handler invoked the

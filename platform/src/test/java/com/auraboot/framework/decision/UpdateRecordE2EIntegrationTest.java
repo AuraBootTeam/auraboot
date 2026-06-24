@@ -127,7 +127,7 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
               "actions":[{"type":"UPDATE_RECORD","target":"RECORD","order":10,
                  "payload":{"fields":{"%s":"ESCALATED"}},
-                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordId}:${rule.ruleCode}:UR"}]}]
+                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:UR"}]}]
             """).formatted(statusField));
         var draft = versionService.createDraft(code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
                 ExecutionMode.ORDERED, FailureStrategy.CONTINUE_ON_ERROR, ConflictStrategy.REJECT_ON_CONFLICT,
@@ -136,7 +136,7 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
         versionService.publish(draft.getPid());
 
         EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", modelCode,
-                Map.of("record", Map.of("entityCode", modelCode, "recordId", recordPid,
+                Map.of("record", Map.of("entityCode", modelCode, "recordPid", recordPid,
                         "data", Map.of("priority", "HIGH"))));
 
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");
