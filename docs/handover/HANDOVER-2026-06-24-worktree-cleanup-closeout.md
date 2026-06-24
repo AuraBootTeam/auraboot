@@ -1,3 +1,11 @@
+---
+type: handover
+status: closed
+created: 2026-06-24
+---
+
+<!-- no-precipitation: session closeout handover; durable workflow update was committed to the cleanup skill and merged PRs. -->
+
 # Session Handover - 2026-06-24 21:40
 
 ## Session Summary
