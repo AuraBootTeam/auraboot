@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { useI18n } from '~/contexts/I18nContext';
 
 import type { ViewFilterConfig } from '~/framework/smart/types/savedView';
 
@@ -40,47 +41,49 @@ export interface FilterValuePopoverProps {
 // Operator definitions per field type
 // ---------------------------------------------------------------------------
 
-type OperatorDef = { value: ViewFilterConfig['operator']; label: string };
+type OperatorDef = { value: ViewFilterConfig['operator']; labelKey: string; fallbackZh: string; fallbackEn: string };
 
 const TEXT_OPS: OperatorDef[] = [
-  { value: 'eq', label: 'Equals' },
-  { value: 'ne', label: 'Not equals' },
-  { value: 'like', label: 'Contains' },
-  { value: 'isNull', label: 'Is empty' },
-  { value: 'isNotNull', label: 'Is not empty' },
+  { value: 'eq', labelKey: 'filter.operator.eq', fallbackZh: '等于', fallbackEn: 'Equals' },
+  { value: 'ne', labelKey: 'filter.operator.ne', fallbackZh: '不等于', fallbackEn: 'Not equals' },
+  { value: 'like', labelKey: 'filter.operator.like', fallbackZh: '包含', fallbackEn: 'Contains' },
+  { value: 'isNull', labelKey: 'filter.operator.isNull', fallbackZh: '为空', fallbackEn: 'Is empty' },
+  { value: 'isNotNull', labelKey: 'filter.operator.isNotNull', fallbackZh: '不为空', fallbackEn: 'Is not empty' },
 ];
 
 const NUMBER_OPS: OperatorDef[] = [
-  { value: 'eq', label: 'Equals' },
-  { value: 'ne', label: 'Not equals' },
-  { value: 'gt', label: 'Greater than' },
-  { value: 'gte', label: 'Greater or equal' },
-  { value: 'lt', label: 'Less than' },
-  { value: 'lte', label: 'Less or equal' },
-  { value: 'isNull', label: 'Is empty' },
-  { value: 'isNotNull', label: 'Is not empty' },
+  { value: 'eq', labelKey: 'filter.operator.eq', fallbackZh: '等于', fallbackEn: 'Equals' },
+  { value: 'ne', labelKey: 'filter.operator.ne', fallbackZh: '不等于', fallbackEn: 'Not equals' },
+  { value: 'gt', labelKey: 'filter.operator.gt', fallbackZh: '大于', fallbackEn: 'Greater than' },
+  { value: 'gte', labelKey: 'filter.operator.gte', fallbackZh: '大于等于', fallbackEn: 'Greater or equal' },
+  { value: 'lt', labelKey: 'filter.operator.lt', fallbackZh: '小于', fallbackEn: 'Less than' },
+  { value: 'lte', labelKey: 'filter.operator.lte', fallbackZh: '小于等于', fallbackEn: 'Less or equal' },
+  { value: 'isNull', labelKey: 'filter.operator.isNull', fallbackZh: '为空', fallbackEn: 'Is empty' },
+  { value: 'isNotNull', labelKey: 'filter.operator.isNotNull', fallbackZh: '不为空', fallbackEn: 'Is not empty' },
 ];
 
 const DATE_OPS: OperatorDef[] = [
-  { value: 'eq', label: 'Equals' },
-  { value: 'gt', label: 'After' },
-  { value: 'gte', label: 'On or after' },
-  { value: 'lt', label: 'Before' },
-  { value: 'lte', label: 'On or before' },
-  { value: 'between', label: 'Between' },
-  { value: 'isNull', label: 'Is empty' },
-  { value: 'isNotNull', label: 'Is not empty' },
+  { value: 'eq', labelKey: 'filter.operator.eq', fallbackZh: '等于', fallbackEn: 'Equals' },
+  { value: 'gt', labelKey: 'filter.operator.after', fallbackZh: '晚于', fallbackEn: 'After' },
+  { value: 'gte', labelKey: 'filter.operator.onOrAfter', fallbackZh: '不早于', fallbackEn: 'On or after' },
+  { value: 'lt', labelKey: 'filter.operator.before', fallbackZh: '早于', fallbackEn: 'Before' },
+  { value: 'lte', labelKey: 'filter.operator.onOrBefore', fallbackZh: '不晚于', fallbackEn: 'On or before' },
+  { value: 'between', labelKey: 'filter.operator.between', fallbackZh: '介于', fallbackEn: 'Between' },
+  { value: 'isNull', labelKey: 'filter.operator.isNull', fallbackZh: '为空', fallbackEn: 'Is empty' },
+  { value: 'isNotNull', labelKey: 'filter.operator.isNotNull', fallbackZh: '不为空', fallbackEn: 'Is not empty' },
 ];
 
 const ENUM_OPS: OperatorDef[] = [
-  { value: 'eq', label: 'Equals' },
-  { value: 'ne', label: 'Not equals' },
-  { value: 'in', label: 'In' },
-  { value: 'isNull', label: 'Is empty' },
-  { value: 'isNotNull', label: 'Is not empty' },
+  { value: 'eq', labelKey: 'filter.operator.eq', fallbackZh: '等于', fallbackEn: 'Equals' },
+  { value: 'ne', labelKey: 'filter.operator.ne', fallbackZh: '不等于', fallbackEn: 'Not equals' },
+  { value: 'in', labelKey: 'filter.operator.in', fallbackZh: '属于', fallbackEn: 'In' },
+  { value: 'isNull', labelKey: 'filter.operator.isNull', fallbackZh: '为空', fallbackEn: 'Is empty' },
+  { value: 'isNotNull', labelKey: 'filter.operator.isNotNull', fallbackZh: '不为空', fallbackEn: 'Is not empty' },
 ];
 
-const BOOLEAN_OPS: OperatorDef[] = [{ value: 'eq', label: 'Equals' }];
+const BOOLEAN_OPS: OperatorDef[] = [
+  { value: 'eq', labelKey: 'filter.operator.eq', fallbackZh: '等于', fallbackEn: 'Equals' },
+];
 
 function operatorsForType(fieldType: string): OperatorDef[] {
   const t = fieldType.toUpperCase();
@@ -112,6 +115,14 @@ function isNullishOp(op: string): boolean {
   return op === 'isNull' || op === 'isNotNull';
 }
 
+function hasMeaningfulFilterValue(value: unknown, operator: string): boolean {
+  if (isNullishOp(operator)) return true;
+  if (Array.isArray(value)) {
+    return value.some((item) => item !== null && item !== undefined && String(item).trim() !== '');
+  }
+  return value !== null && value !== undefined && String(value).trim() !== '';
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -128,10 +139,14 @@ export function FilterValuePopover({
   onApply,
   onCancel,
 }: FilterValuePopoverProps) {
+  const { t, locale } = useI18n();
   const [operator, setOperator] = useState(initialOperator);
   const [value, setValue] = useState<unknown>(initialValue);
   const containerRef = useRef<HTMLDivElement>(null);
   const [dictOptions, setDictOptions] = useState<DictOption[]>([]);
+  const zh = locale === 'zh-CN' || locale.startsWith('zh');
+  const l = (key: string, zhFallback: string, enFallback: string) =>
+    t(key, undefined, zh ? zhFallback : enFallback);
 
   // Load dict options when dictCode is provided
   useEffect(() => {
@@ -184,6 +199,7 @@ export function FilterValuePopover({
   const ops = operatorsForType(effectiveType);
   const showValue = !isNullishOp(operator);
   const ft = effectiveType.toUpperCase();
+  const canApply = hasMeaningfulFilterValue(value, operator);
 
   // ---- Value input renderer ----
   function renderValueInput() {
@@ -197,9 +213,9 @@ export function FilterValuePopover({
           value={String(value ?? '')}
           onChange={(e) => setValue(e.target.value === 'true')}
         >
-          <option value="">-- Select --</option>
-          <option value="true">Yes</option>
-          <option value="false">No</option>
+          <option value="">{l('common.select_placeholder', '请选择', '-- Select --')}</option>
+          <option value="true">{l('common.yes', '是', 'Yes')}</option>
+          <option value="false">{l('common.no', '否', 'No')}</option>
         </select>
       );
     }
@@ -210,7 +226,7 @@ export function FilterValuePopover({
         <input
           type="number"
           className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
-          placeholder="Enter value..."
+          placeholder={l('filter.value.placeholder', '请输入筛选值', 'Enter value...')}
           value={value != null ? String(value) : ''}
           onChange={(e) => {
             const v = e.target.value;
@@ -231,7 +247,7 @@ export function FilterValuePopover({
             value={range[0] || ''}
             onChange={(e) => setValue([e.target.value || '', range[1] || ''])}
           />
-          <span className="text-text-3 text-xs">to</span>
+          <span className="text-text-3 text-xs">{l('filter.range.to', '至', 'to')}</span>
           <input
             type="date"
             className="border-border bg-panel text-text focus:border-accent flex-1 rounded border px-2 py-1.5 text-sm outline-none"
@@ -290,7 +306,7 @@ export function FilterValuePopover({
           value={value != null ? String(value) : ''}
           onChange={(e) => setValue(e.target.value || null)}
         >
-          <option value="">-- Select --</option>
+          <option value="">{l('common.select_placeholder', '请选择', '-- Select --')}</option>
           {dictOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}
@@ -305,7 +321,7 @@ export function FilterValuePopover({
       return (
         <input
           type="text"
-          placeholder="Search by name or ID..."
+          placeholder={l('filter.reference.placeholder', '按名称或 ID 搜索', 'Search by name or ID...')}
           className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
           value={value != null ? String(value) : ''}
           onChange={(e) => setValue(e.target.value || null)}
@@ -318,7 +334,7 @@ export function FilterValuePopover({
       <input
         type="text"
         className="border-border bg-panel text-text placeholder:text-text-3 focus:border-accent w-full rounded border px-2 py-1.5 text-sm outline-none"
-        placeholder="Enter value..."
+        placeholder={l('filter.value.placeholder', '请输入筛选值', 'Enter value...')}
         value={value != null ? String(value) : ''}
         onChange={(e) => setValue(e.target.value || null)}
       />
@@ -345,7 +361,7 @@ export function FilterValuePopover({
         >
           {ops.map((op) => (
             <option key={op.value} value={op.value}>
-              {op.label}
+              {l(op.labelKey, op.fallbackZh, op.fallbackEn)}
             </option>
           ))}
         </select>
@@ -361,14 +377,18 @@ export function FilterValuePopover({
           className="text-text-2 hover:bg-hover rounded px-3 py-1 text-sm"
           onClick={onCancel}
         >
-          Cancel
+          {l('common.cancel', '取消', 'Cancel')}
         </button>
         <button
           type="button"
-          className="bg-accent hover:bg-accent-hover rounded px-3 py-1 text-sm text-white"
-          onClick={() => onApply(operator, isNullishOp(operator) ? null : value)}
+          className="bg-accent hover:bg-accent-hover disabled:bg-disabled disabled:text-text-3 rounded px-3 py-1 text-sm text-white disabled:cursor-not-allowed"
+          disabled={!canApply}
+          onClick={() => {
+            if (!canApply) return;
+            onApply(operator, isNullishOp(operator) ? null : value);
+          }}
         >
-          Apply
+          {l('common.apply', '应用', 'Apply')}
         </button>
       </div>
     </div>

@@ -30,18 +30,21 @@ interface FilterChipBarProps {
 }
 
 /** Map filter operators to concise symbols */
-const OPERATOR_SYMBOLS: Record<string, string> = {
-  eq: '=',
-  ne: '\u2260',
-  gt: '>',
-  gte: '\u2265',
-  lt: '<',
-  lte: '\u2264',
-  like: 'contains',
-  in: 'in',
-  between: 'between',
-  isNull: 'is empty',
-  isNotNull: 'not empty',
+const OPERATOR_LABELS: Record<
+  string,
+  { symbol?: string; key?: string; fallbackZh?: string; fallbackEn?: string }
+> = {
+  eq: { symbol: '=' },
+  ne: { symbol: '\u2260' },
+  gt: { symbol: '>' },
+  gte: { symbol: '\u2265' },
+  lt: { symbol: '<' },
+  lte: { symbol: '\u2264' },
+  like: { key: 'filter.operator.like', fallbackZh: '包含', fallbackEn: 'contains' },
+  in: { key: 'filter.operator.in', fallbackZh: '属于', fallbackEn: 'in' },
+  between: { key: 'filter.operator.between', fallbackZh: '介于', fallbackEn: 'between' },
+  isNull: { key: 'filter.operator.isNull', fallbackZh: '为空', fallbackEn: 'is empty' },
+  isNotNull: { key: 'filter.operator.isNotNull', fallbackZh: '不为空', fallbackEn: 'not empty' },
 };
 
 /**
@@ -72,7 +75,15 @@ const FilterChip = React.memo<FilterChipProps>(function FilterChip({
   valueLabel,
   onRemove,
 }) {
-  const operatorSymbol = OPERATOR_SYMBOLS[filter.operator] ?? filter.operator;
+  const { t, locale } = useI18n();
+  const operatorLabel = OPERATOR_LABELS[filter.operator] ?? { symbol: filter.operator };
+  const operatorSymbol =
+    operatorLabel.symbol ??
+    t(
+      operatorLabel.key ?? filter.operator,
+      undefined,
+      locale.startsWith('zh') ? operatorLabel.fallbackZh : operatorLabel.fallbackEn,
+    );
   const displayValue = valueLabel ?? formatDisplayValue(filter.value);
   const hasValue =
     filter.value !== null &&
@@ -100,7 +111,7 @@ const FilterChip = React.memo<FilterChipProps>(function FilterChip({
           onRemove();
         }}
         className="text-accent hover:bg-accent-weak hover:text-accent-hover ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded transition-colors"
-        aria-label={`Remove filter ${label}`}
+        aria-label={t('filter.remove_filter', { label }, `Remove filter ${label}`)}
       >
         &times;
       </button>
@@ -116,6 +127,7 @@ interface SortChipProps {
 }
 
 const SortChip = React.memo<SortChipProps>(function SortChip({ sort, label, onRemove, onToggle }) {
+  const { t } = useI18n();
   const dirLabel = sort.direction === 'asc' ? '\u2191' : '\u2193';
 
   return (
@@ -141,7 +153,7 @@ const SortChip = React.memo<SortChipProps>(function SortChip({ sort, label, onRe
           onRemove();
         }}
         className="text-status-amber hover:bg-status-amber-bg ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded transition-colors"
-        aria-label={`Remove sort ${label}`}
+        aria-label={t('filter.remove_sort', { label }, `Remove sort ${label}`)}
       >
         &times;
       </button>
@@ -164,7 +176,8 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
   onClearAll,
   resolveValueLabel,
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  const zh = locale.startsWith('zh');
   // Build a lookup map: fieldCode → label
   const labelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -248,7 +261,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
         onClick={(e) => onAddFilter(e)}
         className="border-accent/40 bg-panel text-accent hover:bg-accent-weak hover:border-accent inline-flex items-center gap-0.5 rounded-md border border-dashed px-2 py-1 text-sm transition-colors"
       >
-        + {t('common.add_filter', undefined, 'Add Filter')}
+        + {t('common.add_filter', undefined, zh ? '添加筛选' : 'Add Filter')}
       </button>
 
       {/* Clear All */}
@@ -258,7 +271,7 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
           onClick={onClearAll}
           className="text-text-3 hover:text-status-red ml-1 text-sm transition-colors"
         >
-          {t('common.clear_all', undefined, 'Clear All')}
+          {t('common.clear_all', undefined, zh ? '清除全部' : 'Clear All')}
         </button>
       )}
     </div>
