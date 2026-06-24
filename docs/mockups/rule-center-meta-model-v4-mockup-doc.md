@@ -1,3 +1,9 @@
+---
+type: mockup-reference
+status: active
+created: 2026-06-24
+---
+
 # 规则中心元模型驱动最新 Mockup 说明
 
 ## 1. Mockup 当前状态

@@ -1,3 +1,9 @@
+---
+type: mockup-reference
+status: active
+created: 2026-06-24
+---
+
 # 规则中心元模型驱动方案全量需求
 
 ## 1. 背景与来龙去脉
