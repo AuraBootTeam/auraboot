@@ -165,10 +165,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(
                 model, request.getConditions());
 
-        // Keyset pagination flag — when cursor is present, sort is forced to ORDER BY id ASC
+        // Keyset pagination flag — when cursor is present, sort is forced to ORDER BY pid ASC
         boolean useCursor = request.getCursor() != null;
 
-        // 添加排序 (skipped in cursor mode — cursor pagination requires ORDER BY id ASC)
+        // 添加排序 (skipped in cursor mode — cursor pagination requires ORDER BY pid ASC)
         if (!useCursor) {
             if (request.getSortFields() != null && !request.getSortFields().isEmpty()) {
                 List<SortField> mappedSortFields = mapSortFields(model, request.getSortFields());
@@ -217,12 +217,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             queryBuilder = queryBuilderService.buildKeywordSearch(queryBuilder, request.getKeyword(), model);
         }
 
-        // Keyset (cursor-based) pagination: when cursor is provided, use WHERE id > cursor
+        // Keyset (cursor-based) pagination: when cursor is provided, use WHERE pid > cursor
         // instead of OFFSET for O(1) deep pagination performance.
         if (useCursor) {
-            queryBuilder.addCondition("id", "GT", request.getCursor());
-            // Force ORDER BY id ASC for consistent cursor traversal
-            queryBuilder.addOrderBy("id", "ASC");
+            queryBuilder.addCondition("pid", "GT", request.getCursor());
+            // Force ORDER BY pid ASC for consistent public cursor traversal
+            queryBuilder.addOrderBy("pid", "ASC");
             queryBuilder.setLimit(Math.min(request.getPageSize(), 1000));
         } else {
             // Traditional offset pagination
@@ -328,12 +328,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         records = enrichListRecords(modelCode, records);
 
         if (useCursor) {
-            // Extract nextCursor from the last record's id
-            Long nextCursor = null;
+            // Extract nextCursor from the last record's public pid.
+            String nextCursor = null;
             if (!records.isEmpty()) {
-                Object lastId = records.get(records.size() - 1).get("id");
-                if (lastId instanceof Number) {
-                    nextCursor = ((Number) lastId).longValue();
+                Object lastPid = records.get(records.size() - 1).get("pid");
+                if (lastPid instanceof String pid && !pid.isBlank()) {
+                    nextCursor = pid;
                 }
             }
             return PaginationResult.ofCursor(

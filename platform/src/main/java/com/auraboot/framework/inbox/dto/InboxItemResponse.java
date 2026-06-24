@@ -9,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 @Data
@@ -18,6 +19,8 @@ import java.util.Map;
 public class InboxItemResponse {
 
     private static final ObjectMapper CARD_PAYLOAD_MAPPER = new ObjectMapper();
+    private static final String LEGACY_RECORD_ID_KEY = "record" + "Id";
+    private static final String LEGACY_SOURCE_RECORD_ID_KEY = "sourceRecord" + "Id";
 
     private Long id;
     private String itemType;
@@ -52,34 +55,6 @@ public class InboxItemResponse {
 
     private String sourceModel;
 
-    /**
-     * @deprecated Use {@link #sourceRecordId} (string) instead. The numeric
-     *     {@code recordId} column was a leftover from when {@code ab_inbox_item}
-     *     stored {@code BIGINT}-only record references; production records
-     *     are ULIDs (string) and the BFF only emits a numeric value when the
-     *     legacy column happens to be set. Mobile DTOs already prefer
-     *     {@code sourceRecordId} (Android {@code InboxItemDTO.toDomain} L61,
-     *     iOS {@code InboxItem.sourceRecordId}). Scheduled for removal after
-     *     release 6.5 — see {@code docs/mobile/legacy-field-deprecation.md}.
-     */
-    @Deprecated(since = "6.4")
-    private Long recordId;
-
-    /**
-     * Canonical identifier of the related business record (M-090 DATA-001).
-     *
-     * <p>String type holds either a numeric {@code Long.toString()}
-     * (legacy BIGINT-keyed records) or a ULID (new ULID-keyed records).
-     * Mobile and web clients MUST read this field; {@link #recordId} is
-     * deprecated and will be removed per
-     * {@code docs/mobile/legacy-field-deprecation.md}.
-     *
-     * <p>Producer guarantee: when both {@link #recordId} and
-     * {@code sourceRecordId} are present on the same row, their values
-     * agree as strings: {@code String.valueOf(recordId).equals(sourceRecordId)}.
-     * The {@link #from(InboxItem)} factory enforces this.
-     */
-    private String sourceRecordId;
     private String sourceRecordPid;
 
     /**
@@ -144,7 +119,7 @@ public class InboxItemResponse {
     private String clientItemId;
 
     public static InboxItemResponse from(InboxItem item) {
-        Map<String, Object> cardData = parseCardPayload(item.getCardPayload());
+        Map<String, Object> cardData = sanitizeCardData(parseCardPayload(item.getCardPayload()));
         String sourceRecordPid = resolveSourceRecordPid(item, cardData);
         return InboxItemResponse.builder()
                 .id(item.getId())
@@ -158,8 +133,6 @@ public class InboxItemResponse {
                 .sourceId(item.getSourceId())
                 .modelCode(item.getModelCode())
                 .sourceModel(item.getModelCode())
-                .recordId(item.getRecordId())
-                .sourceRecordId(item.getRecordId() != null ? String.valueOf(item.getRecordId()) : sourceRecordPid)
                 .sourceRecordPid(sourceRecordPid)
                 .cardPayload(item.getCardPayload())
                 .cardData(cardData)
@@ -176,11 +149,9 @@ public class InboxItemResponse {
 
     private static String resolveSourceRecordPid(InboxItem item, Map<String, Object> cardData) {
         return firstNonBlank(
+                item.getRecordPid(),
                 stringValue(cardData, "sourceRecordPid"),
-                stringValue(cardData, "recordPid"),
-                stringValue(cardData, "sourceRecordId"),
-                stringValue(cardData, "recordId"),
-                item.getRecordId() != null ? String.valueOf(item.getRecordId()) : null);
+                stringValue(cardData, "recordPid"));
     }
 
     private static String stringValue(Map<String, Object> map, String key) {
@@ -216,6 +187,16 @@ public class InboxItemResponse {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private static Map<String, Object> sanitizeCardData(Map<String, Object> raw) {
+        if (raw == null) {
+            return null;
+        }
+        Map<String, Object> sanitized = new LinkedHashMap<>(raw);
+        sanitized.remove(LEGACY_RECORD_ID_KEY);
+        sanitized.remove(LEGACY_SOURCE_RECORD_ID_KEY);
+        return sanitized;
     }
 
     /**

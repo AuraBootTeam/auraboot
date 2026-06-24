@@ -195,7 +195,7 @@ Update fields on the triggering record or a related record.
   "label": "Mark as high priority",
   "config": {
     "modelCode": "crm_opportunity",
-    "recordId": "${record.pid}",
+    "recordPid": "${record.pid}",
     "fields": {
       "crm_opp_priority": "high",
       "crm_opp_follow_up_date": "${now()}"
@@ -235,7 +235,7 @@ Execute a DSL Command against the current or another record.
   "label": "Activate the project",
   "config": {
     "commandCode": "pm:activate_project",
-    "targetRecordId": "${actions[0].result.pid}"
+    "targetRecordPid": "${actions[0].result.pid}"
   }
 }
 ```

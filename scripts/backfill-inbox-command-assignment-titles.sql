@@ -72,7 +72,11 @@ WITH normalized AS (
         'g'
       )
     ) AS model_label,
-    coalesce(nullif(i.record_id::text, ''), nullif(i.card_payload->>'recordId', '')) AS record_ref
+    coalesce(
+      nullif(i.record_id::text, ''),
+      nullif(i.card_payload->>'recordPid', ''),
+      nullif(i.card_payload->>'sourceRecordPid', '')
+    ) AS record_ref
   FROM ab_inbox_item i
   WHERE i.item_type = 'assignment'
     AND i.source_type = 'command'
@@ -166,7 +170,11 @@ WITH normalized AS (
         'g'
       )
     ) AS model_label,
-    coalesce(nullif(i.record_id::text, ''), nullif(i.card_payload->>'recordId', '')) AS record_ref
+    coalesce(
+      nullif(i.record_id::text, ''),
+      nullif(i.card_payload->>'recordPid', ''),
+      nullif(i.card_payload->>'sourceRecordPid', '')
+    ) AS record_ref
   FROM ab_inbox_item i
   WHERE i.item_type = 'assignment'
     AND i.source_type = 'command'

@@ -89,14 +89,14 @@ public class BuiltinStartApprovalHandler implements CommandHandler {
             Map<String, Object> stateUpdate = new HashMap<>();
             stateUpdate.put(stateField, PENDING_APPROVAL_STATE);
             dynamicDataService.update(modelCode, recordId, stateUpdate);
-            log.info("Updated record state: model={}, recordId={}, field={} -> {}",
+            log.info("Updated record state: model={}, recordPid={}, field={} -> {}",
                     modelCode, recordId, stateField, PENDING_APPROVAL_STATE);
         }
 
         // 3. Build business data for BPM process
         Map<String, Object> businessData = new HashMap<>();
         businessData.put("modelCode", modelCode);
-        businessData.put("recordId", recordId);
+        businessData.put("recordPid", recordId);
         businessData.put("initiator", String.valueOf(context.getUserId()));
         businessData.put("commandCode", context.getCommandCode());
         if (StringUtils.hasText(stateField)) {

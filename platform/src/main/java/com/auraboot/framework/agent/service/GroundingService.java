@@ -41,7 +41,7 @@ public class GroundingService {
      *
      * @param tenantId    current tenant
      * @param userMessage user's natural language input
-     * @param context     grounding context (pageModel, recordId, etc.)
+     * @param context     grounding context (pageModel, recordPid, etc.)
      * @return BIF with intent, object, confidence, candidateSkills, riskLevel
      */
     public BusinessIntentFrame ground(Long tenantId, String userMessage, GroundingContext context) {
@@ -143,7 +143,7 @@ public class GroundingService {
                 .explanation(explanation)
                 .context(context != null ? Map.of(
                         "pageModel", context.getPageModel() != null ? context.getPageModel() : "",
-                        "recordId", context.getRecordId() != null ? context.getRecordId() : ""
+                        "recordPid", context.getRecordPid() != null ? context.getRecordPid() : ""
                 ) : Map.of())
                 .preContext(preContext)
                 .build();
@@ -216,7 +216,7 @@ public class GroundingService {
     @lombok.NoArgsConstructor
     public static class GroundingContext {
         private String pageModel;
-        private String recordId;
+        private String recordPid;
         private String conversationId;
         private String sessionId;
         /** User id (stringified) — required for Active Memory user-scoped recall. */

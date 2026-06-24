@@ -51,7 +51,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <ul>
  *   <li>the enabled automation fires through the SmartEngine flow (not a flat loop);</li>
  *   <li>{@code execute_command} routes to the real {@link com.auraboot.framework.meta.service.CommandExecutor};</li>
- *   <li>{@code ${recordId}} links the CAPA to the source defect and {@code ${record.<field>}} carries
+ *   <li>{@code ${recordPid}} links the CAPA to the source defect and {@code ${record.<field>}} carries
  *       the defect's description/root-cause across the model boundary;</li>
  *   <li>the create command's AUTO_SET phase still fires under automation drive (code auto-generated,
  *       status fixed to {@code open});</li>
@@ -186,7 +186,7 @@ class QualityAutoCapaChainGoldenIT extends BaseIntegrationTest {
                         + "FROM " + capaTable + " WHERE qcc_source_id = ?", defectPid);
 
         assertThat(capa.get("qcc_source_id"))
-                .as("${recordId} must link the CAPA back to the source defect pid")
+                .as("${recordPid} must link the CAPA back to the source defect pid")
                 .isEqualTo(defectPid);
         assertThat(capa.get("qcc_description"))
                 .as("${record.qcd_description} must carry the defect description across the model boundary")
@@ -209,7 +209,7 @@ class QualityAutoCapaChainGoldenIT extends BaseIntegrationTest {
         AutomationLog persisted = automationLogMapper.selectById(runLog.getId());
         assertThat(persisted).as("ab_automation_log row must survive the run").isNotNull();
         assertThat(persisted.getStatus()).isEqualTo("success");
-        assertThat(persisted.getTriggerRecordId()).isEqualTo(defectPid);
+        assertThat(persisted.getTriggerRecordPid()).isEqualTo(defectPid);
 
         log.info("[S3 auto-CAPA] PASS — defect {} → CAPA {} ({}), log={}",
                 defectPid, capa.get("qcc_code"), capa.get("pid"), persisted.getPid());
@@ -249,7 +249,7 @@ class QualityAutoCapaChainGoldenIT extends BaseIntegrationTest {
         a.setTriggerType("on_record_create");
         a.setTriggerCondition(triggerCondition);
         Map<String, Object> params = new LinkedHashMap<>();
-        params.put("qcc_source_id", "${recordId}");
+        params.put("qcc_source_id", "${recordPid}");
         params.put("qcc_description", "${record.qcd_description}");
         params.put("qcc_root_cause", "${record.qcd_root_cause}");
         a.setFlowConfig(Map.of(

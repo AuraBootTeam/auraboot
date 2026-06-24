@@ -55,7 +55,6 @@ export class CommandActionService {
     options?: {
       clientRequestId?: string;
       targetRecordPid?: string;
-      targetRecordId?: string;
       operationType?: 'create' | 'update' | 'delete';
       auditContext?: Record<string, unknown>;
     },
@@ -63,7 +62,7 @@ export class CommandActionService {
     const normalizedOptions = options
       ? {
           ...options,
-          targetRecordId: options.targetRecordId ?? options.targetRecordPid,
+          targetRecordPid: options.targetRecordPid ?? options.targetRecordPid,
         }
       : undefined;
     const result = await post<CommandExecuteResult>(`/api/meta/commands/execute/${commandCode}`, {

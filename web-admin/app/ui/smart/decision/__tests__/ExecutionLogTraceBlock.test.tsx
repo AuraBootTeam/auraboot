@@ -155,7 +155,7 @@ describe('ExecutionLogTraceBlock', () => {
       <MemoryRouter initialEntries={['/p/decisionops_execution_logs/view/log-1']}>
         <Routes>
           <Route
-            path="/p/decisionops_execution_logs/view/:recordId"
+            path="/p/decisionops_execution_logs/view/:recordPid"
             element={<ExecutionLogTraceBlock block={{ props: { mode: 'detail' } }} />}
           />
         </Routes>

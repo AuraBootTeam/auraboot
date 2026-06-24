@@ -846,7 +846,7 @@ export const DISPLAY_COMPONENT_CONFIGS: ComponentConfig[] = [
         type: 'string',
         group: 'basic',
         description:
-          'Optional explicit target code. Detail pages can omit this and use route recordId.',
+          'Optional explicit target code. Detail pages can omit this and use route recordPid.',
       },
     ],
     tags: ['decisionops', 'impact', 'integration', 'connector', 'webhook', 'custom-block'],

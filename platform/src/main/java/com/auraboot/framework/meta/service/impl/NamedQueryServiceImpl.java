@@ -66,6 +66,10 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             "starts_with", "ends_with", "contains"
     );
 
+    private static final Set<String> PUBLIC_FORBIDDEN_OUTPUT_ALIASES = Set.of(
+            "id", "record_id", "tenant_id", "created_by", "updated_by"
+    );
+
     // ==================== CRUD ====================
 
     @Override
@@ -425,6 +429,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         if (entity == null) {
             throw new MetaServiceException("Field not found: " + queryCode + "." + fieldCode);
         }
+        validatePublicOutputAlias(entity.getFieldCode());
 
         // Apply updates
         if (request.getColumnExpr() != null) {
@@ -521,6 +526,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         for (NamedQueryFieldRequest fieldReq : request.getFields()) {
             try {
+                validatePublicOutputAlias(fieldReq.getFieldCode());
                 NamedQueryField existing = namedQueryFieldMapper.findByQueryAndField(
                         tenantId, queryCode, fieldReq.getFieldCode());
 
@@ -631,6 +637,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         // 3. Get field whitelist
         List<NamedQueryField> fields = namedQueryFieldMapper.findByQueryCode(tenantId, code);
+        validatePublicOutputAliases(fields);
         Map<String, NamedQueryField> fieldMap = fields.stream()
                 .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
 
@@ -742,6 +749,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
         try {
             // 2. Get field whitelist
             List<NamedQueryField> allFields = namedQueryFieldMapper.findByQueryCode(tenantId, code);
+            validatePublicOutputAliases(allFields);
             Map<String, NamedQueryField> fieldMap = allFields.stream()
                     .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
 
@@ -1157,6 +1165,7 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
     }
 
     private NamedQueryField createFieldEntity(Long tenantId, String queryCode, NamedQueryFieldRequest request, String source) {
+        validatePublicOutputAlias(request.getFieldCode());
         NamedQueryField entity = new NamedQueryField(tenantId, queryCode,
                 request.getFieldCode(), request.getColumnExpr(), request.getDataType());
 
@@ -1183,6 +1192,25 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
 
         namedQueryFieldMapper.insert(entity);
         return entity;
+    }
+
+    private void validatePublicOutputAliases(List<NamedQueryField> fields) {
+        if (fields == null || fields.isEmpty()) {
+            return;
+        }
+        for (NamedQueryField field : fields) {
+            validatePublicOutputAlias(field.getFieldCode());
+        }
+    }
+
+    private void validatePublicOutputAlias(String fieldCode) {
+        if (fieldCode == null) {
+            return;
+        }
+        String normalized = fieldCode.trim().toLowerCase(Locale.ROOT);
+        if (PUBLIC_FORBIDDEN_OUTPUT_ALIASES.contains(normalized)) {
+            throw new MetaServiceException("NamedQuery public output field alias is reserved for internal identity: " + fieldCode);
+        }
     }
 
     private void parseBaseWhere(JsonNode baseWhere, List<String> whereClauses, Map<String, Object> params) {

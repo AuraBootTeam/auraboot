@@ -18,7 +18,7 @@ export interface PassthroughConfig {
   /** Target model code */
   modelCode: string;
   /** Target record ID */
-  recordId?: string;
+  recordPid?: string;
   /** Payload fields to send */
   payload: Record<string, any>;
   /** Callback after successful execution */
@@ -41,12 +41,12 @@ export function createPassthroughExecutor(
   fetchFn: typeof fetch = fetch,
 ): PassthroughExecutor {
   return async (config: PassthroughConfig) => {
-    const { commandCode, modelCode, recordId, payload, onSuccess, onError } = config;
+    const { commandCode, modelCode, recordPid, payload, onSuccess, onError } = config;
 
     const body = {
       commandCode,
       modelCode,
-      targetRecordId: recordId,
+      targetRecordPid: recordPid,
       payload,
     };
 
@@ -80,14 +80,14 @@ export const PassthroughOps = {
   /** Increment a numeric field */
   increment(
     modelCode: string,
-    recordId: string,
+    recordPid: string,
     field: string,
     amount: number = 1,
   ): PassthroughConfig {
     return {
       commandCode: `${modelCode}_increment`,
       modelCode,
-      recordId,
+      recordPid,
       payload: { field, amount },
     };
   },
@@ -95,34 +95,34 @@ export const PassthroughOps = {
   /** Decrement a numeric field */
   decrement(
     modelCode: string,
-    recordId: string,
+    recordPid: string,
     field: string,
     amount: number = 1,
   ): PassthroughConfig {
     return {
       commandCode: `${modelCode}_decrement`,
       modelCode,
-      recordId,
+      recordPid,
       payload: { field, amount: -amount },
     };
   },
 
   /** Toggle a boolean field */
-  toggle(modelCode: string, recordId: string, field: string): PassthroughConfig {
+  toggle(modelCode: string, recordPid: string, field: string): PassthroughConfig {
     return {
       commandCode: `${modelCode}_toggle`,
       modelCode,
-      recordId,
+      recordPid,
       payload: { field },
     };
   },
 
   /** Quick status change */
-  setStatus(modelCode: string, recordId: string, status: string): PassthroughConfig {
+  setStatus(modelCode: string, recordPid: string, status: string): PassthroughConfig {
     return {
       commandCode: `${modelCode}_set_status`,
       modelCode,
-      recordId,
+      recordPid,
       payload: { status },
     };
   },

@@ -103,7 +103,6 @@ const DETAIL_RESPONSE = {
       actionType: 'tool_call',
       intentSummary: 'list sales',
       targetModel: 'crm_account',
-      targetRecordId: 'REC-PID-001',
       targetRecordPid: 'REC-PID-001',
       beforeSnapshot: null,
       afterSnapshot: null,

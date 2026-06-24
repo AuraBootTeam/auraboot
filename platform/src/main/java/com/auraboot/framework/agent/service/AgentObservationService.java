@@ -35,8 +35,8 @@ public class AgentObservationService {
     private final ConcurrentHashMap<String, ToolCallTracker> trackers = new ConcurrentHashMap<>();
 
     public void publish(Long tenantId, String agentEventType, String agentId,
-                        String modelCode, String recordId, Map<String, Object> detail) {
-        AgentEvent event = new AgentEvent(tenantId, agentEventType, agentId, modelCode, recordId, detail);
+                        String modelCode, String recordPid, Map<String, Object> detail) {
+        AgentEvent event = new AgentEvent(tenantId, agentEventType, agentId, modelCode, recordPid, detail);
         eventPublisher.publishEvent(event);
     }
 

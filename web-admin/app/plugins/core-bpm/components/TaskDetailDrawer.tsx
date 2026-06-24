@@ -309,7 +309,7 @@ function FormTab({
   const form = useDslForm({
     pageKey: formBinding?.formRef || '',
     enabled: hasForm,
-    recordId: formData?.businessKey || undefined,
+    recordPid: formData?.businessKey || undefined,
     initialValues: (formData?.processVariables as Record<string, unknown>) || undefined,
     fieldPermissions: formBinding?.fieldPermissions || undefined,
     permissionMode: (formBinding?.permissionMode as 'merge' | 'override') || 'merge',

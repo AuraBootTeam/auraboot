@@ -11,12 +11,10 @@ import java.util.Set;
 final class ToolContextPolicy {
 
     private static final Set<String> RECORD_ID_KEYS = Set.of(
-            "recordId",
             "recordPid",
-            "record_id",
             "record_pid",
-            "pid",
-            "customerId",
+            "targetRecordPid",
+            "target_record_pid",
             "customerPid");
 
     record ContextDecision(boolean allowed, String reasonCode, String userSafeMessage) {
@@ -45,11 +43,11 @@ final class ToolContextPolicy {
             return ContextDecision.deny("context_tenant_mismatch",
                     "This action is outside the current tenant context.");
         }
-        String requestedRecordId = requestedRecordId(normalizedArgs);
-        if (requestedRecordId == null || scope.recordIds().isEmpty()) {
+        String requestedRecordPid = requestedRecordPid(normalizedArgs);
+        if (requestedRecordPid == null || scope.recordPids().isEmpty()) {
             return ContextDecision.allow();
         }
-        if (!scope.recordIds().contains(requestedRecordId)) {
+        if (!scope.recordPids().contains(requestedRecordPid)) {
             return ContextDecision.deny("context_scope_violation",
                     "This action targets a record outside the current context.");
         }
@@ -65,7 +63,7 @@ final class ToolContextPolicy {
     }
 
     private ContextScope scopeFrom(List<AgentContextBlock> blocks) {
-        Set<String> recordIds = new LinkedHashSet<>();
+        Set<String> recordPids = new LinkedHashSet<>();
         Set<Long> tenantIds = new LinkedHashSet<>();
         for (AgentContextBlock block : blocks) {
             if (block == null || block.provenance() == null) {
@@ -78,12 +76,12 @@ final class ToolContextPolicy {
             if (!provenance.readWriteRelevant()) {
                 continue;
             }
-            recordIds.addAll(provenance.recordIds());
+            recordPids.addAll(provenance.recordPids());
         }
-        return new ContextScope(Set.copyOf(recordIds), Set.copyOf(tenantIds));
+        return new ContextScope(Set.copyOf(recordPids), Set.copyOf(tenantIds));
     }
 
-    private String requestedRecordId(Map<String, Object> args) {
+    private String requestedRecordPid(Map<String, Object> args) {
         if (args == null || args.isEmpty()) {
             return null;
         }
@@ -100,6 +98,6 @@ final class ToolContextPolicy {
         return null;
     }
 
-    private record ContextScope(Set<String> recordIds, Set<Long> tenantIds) {
+    private record ContextScope(Set<String> recordPids, Set<Long> tenantIds) {
     }
 }

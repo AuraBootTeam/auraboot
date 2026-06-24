@@ -43,7 +43,7 @@ public class AutomationCommandEventBridge {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onCommandCompleted(CommandCompletedEvent event) {
         String modelCode = event.getModelCode();
-        String recordId = event.getRecordId();
+        String recordPid = event.getRecordId();
         String operationType = event.getOperationType();
 
         if (!StringUtils.hasText(modelCode) || !StringUtils.hasText(operationType)) {
@@ -52,28 +52,28 @@ public class AutomationCommandEventBridge {
             return;
         }
 
-        log.debug("Bridging CommandCompletedEvent to automation: command={}, model={}, record={}, op={}",
-                event.getCommandCode(), modelCode, recordId, operationType);
+        log.debug("Bridging CommandCompletedEvent to automation: command={}, model={}, recordPid={}, op={}",
+                event.getCommandCode(), modelCode, recordPid, operationType);
 
         try {
             switch (operationType.toLowerCase()) {
-                case "create" -> handleCreate(event, modelCode, recordId);
-                case "update" -> handleUpdate(event, modelCode, recordId);
-                case "state_transition" -> handleStateTransition(event, modelCode, recordId);
+                case "create" -> handleCreate(event, modelCode, recordPid);
+                case "update" -> handleUpdate(event, modelCode, recordPid);
+                case "state_transition" -> handleStateTransition(event, modelCode, recordPid);
                 case "delete" -> {
                     // delete triggers are not currently modelled in AutomationTriggerService;
                     // log at trace level so we don't spam logs for every delete command.
-                    log.trace("Automation bridge: skipping delete operationType for now (model={}, record={})",
-                            modelCode, recordId);
+                    log.trace("Automation bridge: skipping delete operationType for now (model={}, recordPid={})",
+                            modelCode, recordPid);
                 }
-                default -> log.debug("Automation bridge: unrecognized operationType='{}', skipping (model={}, record={})",
-                        operationType, modelCode, recordId);
+                default -> log.debug("Automation bridge: unrecognized operationType='{}', skipping (model={}, recordPid={})",
+                        operationType, modelCode, recordPid);
             }
         } catch (Exception e) {
             // Automation failures must never propagate back and break the caller.
             // The command already committed — we only lose the automation side-effect.
-            log.error("Error bridging CommandCompletedEvent to automation: command={}, model={}, record={}, op={}: {}",
-                    event.getCommandCode(), modelCode, recordId, operationType, e.getMessage(), e);
+            log.error("Error bridging CommandCompletedEvent to automation: command={}, model={}, recordPid={}, op={}: {}",
+                    event.getCommandCode(), modelCode, recordPid, operationType, e.getMessage(), e);
         }
     }
 
@@ -81,13 +81,13 @@ public class AutomationCommandEventBridge {
     // Private helpers
     // -------------------------------------------------------------------------
 
-    private void handleCreate(CommandCompletedEvent event, String modelCode, String recordId) {
+    private void handleCreate(CommandCompletedEvent event, String modelCode, String recordPid) {
         Map<String, Object> recordData = event.getPayload();
-        log.debug("Triggering onRecordCreate automation: model={}, record={}", modelCode, recordId);
-        automationTriggerService.onRecordCreate(modelCode, recordId, recordData);
+        log.debug("Triggering onRecordCreate automation: model={}, recordPid={}", modelCode, recordPid);
+        automationTriggerService.onRecordCreate(modelCode, recordPid, recordData);
     }
 
-    private void handleUpdate(CommandCompletedEvent event, String modelCode, String recordId) {
+    private void handleUpdate(CommandCompletedEvent event, String modelCode, String recordPid) {
         Map<String, Object> metadata = event.getMetadata();
 
         @SuppressWarnings("unchecked")
@@ -97,8 +97,8 @@ public class AutomationCommandEventBridge {
 
         Map<String, Object> afterData = event.getPayload();
 
-        log.debug("Triggering onRecordUpdate automation: model={}, record={}", modelCode, recordId);
-        automationTriggerService.onRecordUpdate(modelCode, recordId, beforeData, afterData);
+        log.debug("Triggering onRecordUpdate automation: model={}, recordPid={}", modelCode, recordPid);
+        automationTriggerService.onRecordUpdate(modelCode, recordPid, beforeData, afterData);
 
         // Also fire per-field change triggers for each field that changed
         if (beforeData != null && afterData != null) {
@@ -107,15 +107,15 @@ public class AutomationCommandEventBridge {
                 Object newValue = entry.getValue();
                 Object oldValue = beforeData.get(fieldCode);
                 if (!java.util.Objects.equals(oldValue, newValue)) {
-                    log.trace("Triggering onFieldChange automation: model={}, record={}, field={}",
-                            modelCode, recordId, fieldCode);
-                    automationTriggerService.onFieldChange(modelCode, recordId, fieldCode, oldValue, newValue);
+                    log.trace("Triggering onFieldChange automation: model={}, recordPid={}, field={}",
+                            modelCode, recordPid, fieldCode);
+                    automationTriggerService.onFieldChange(modelCode, recordPid, fieldCode, oldValue, newValue);
                 }
             }
         }
     }
 
-    private void handleStateTransition(CommandCompletedEvent event, String modelCode, String recordId) {
+    private void handleStateTransition(CommandCompletedEvent event, String modelCode, String recordPid) {
         Map<String, Object> metadata = event.getMetadata();
         Map<String, Object> payload = event.getPayload();
 
@@ -158,18 +158,18 @@ public class AutomationCommandEventBridge {
         // NPE, crashing EVERY on_state_change automation fired by a state transition.
         if (!StringUtils.hasText(toState) && StringUtils.hasText(stateField)) {
             toState = commandStateCheckExecutor.readCurrentState(
-                    event.getTenantId(), modelCode, recordId, stateField);
+                    event.getTenantId(), modelCode, recordPid, stateField);
         }
 
-        log.debug("Triggering onStateChange automation: model={}, record={}, {} -> {}",
-                modelCode, recordId, fromState, toState);
-        automationTriggerService.onStateChange(modelCode, recordId, fromState, toState);
+        log.debug("Triggering onStateChange automation: model={}, recordPid={}, {} -> {}",
+                modelCode, recordPid, fromState, toState);
+        automationTriggerService.onStateChange(modelCode, recordPid, fromState, toState);
 
         // Also fire update trigger so automations watching field changes also respond
         @SuppressWarnings("unchecked")
         Map<String, Object> beforeData = (metadata != null)
                 ? (Map<String, Object>) metadata.get("beforeSnapshot")
                 : null;
-        automationTriggerService.onRecordUpdate(modelCode, recordId, beforeData, payload);
+        automationTriggerService.onRecordUpdate(modelCode, recordPid, beforeData, payload);
     }
 }

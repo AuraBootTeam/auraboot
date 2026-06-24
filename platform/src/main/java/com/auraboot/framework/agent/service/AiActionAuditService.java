@@ -42,7 +42,7 @@ public class AiActionAuditService {
      * @param actionType      action type (copy, navigate, execute_command, create_task)
      * @param commandCode     command code for execute_command actions (nullable)
      * @param modelCode       target model code (nullable)
-     * @param recordId        target record pid, stored in the legacy record_id column (nullable)
+     * @param recordPid       target record pid (nullable)
      * @param riskLevel       assessed risk level
      * @param userDecision    "confirmed" or "cancelled"
      * @param executionResult "success", "failed", or null if cancelled
@@ -51,7 +51,7 @@ public class AiActionAuditService {
      * @param payload         action payload (nullable)
      */
     public void record(Long tenantId, Long userId, String conversationId, String messageId,
-                       String actionType, String commandCode, String modelCode, String recordId,
+                       String actionType, String commandCode, String modelCode, String recordPid,
                        String riskLevel, String userDecision, String executionResult,
                        String errorMessage, String reasoning, Map<String, Object> payload) {
         Map<String, Object> row = new LinkedHashMap<>();
@@ -62,7 +62,7 @@ public class AiActionAuditService {
         row.put("action_type", actionType);
         row.put("command_code", commandCode);
         row.put("model_code", modelCode);
-        row.put("record_id", recordId);
+        row.put("record_pid", recordPid);
         row.put("risk_level", riskLevel);
         row.put("user_decision", userDecision);
         row.put("execution_result", executionResult);
@@ -97,7 +97,7 @@ public class AiActionAuditService {
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, 100);
 
         String sql = "SELECT id, tenant_id, user_id, conversation_id, message_id, " +
-                "action_type, command_code, model_code, record_id, risk_level, " +
+                "action_type, command_code, model_code, record_pid, risk_level, " +
                 "user_decision, execution_result, error_message, reasoning, payload, created_at " +
                 "FROM " + TABLE_NAME + " " +
                 "WHERE tenant_id = #{params.tenantId} " +
@@ -110,15 +110,17 @@ public class AiActionAuditService {
                 "offset", offset
         ));
         return rows.stream()
-                .map(AiActionAuditService::withTargetPidAlias)
+                .map(AiActionAuditService::withRecordPid)
                 .toList();
     }
 
-    private static Map<String, Object> withTargetPidAlias(Map<String, Object> row) {
+    private static Map<String, Object> withRecordPid(Map<String, Object> row) {
         Map<String, Object> copy = new LinkedHashMap<>(row);
-        Object targetPid = firstValue(copy, "targetPid", "record_id", "recordId");
-        if (targetPid != null) {
-            copy.put("targetPid", targetPid);
+        Object recordPid = firstValue(copy, "recordPid", "record_pid");
+        copy.remove("record_id");
+        copy.remove("record" + "Id");
+        if (recordPid != null) {
+            copy.put("recordPid", recordPid);
         }
         return copy;
     }

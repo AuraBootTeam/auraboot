@@ -3193,7 +3193,7 @@ CREATE TABLE IF NOT EXISTS ab_automation_log (
 
     -- Trigger information
     trigger_type VARCHAR(50),
-    trigger_record_id VARCHAR(26),
+    trigger_record_pid VARCHAR(64),
     trigger_payload JSONB,
 
     -- Execution status
@@ -3215,6 +3215,9 @@ CREATE TABLE IF NOT EXISTS ab_automation_log (
 CREATE INDEX IF NOT EXISTS idx_automation_log_automation ON ab_automation_log(automation_id);
 CREATE INDEX IF NOT EXISTS idx_automation_log_status ON ab_automation_log(status);
 CREATE INDEX IF NOT EXISTS idx_automation_log_created ON ab_automation_log(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_automation_log_trigger_record_pid
+    ON ab_automation_log(tenant_id, trigger_record_pid)
+    WHERE trigger_record_pid IS NOT NULL;
 
 -- Comments
 COMMENT ON TABLE ab_automation_log IS 'Execution history for automation rules';
@@ -3809,7 +3812,7 @@ CREATE TABLE IF NOT EXISTS ab_automation_debug_session (
     pid VARCHAR(26) NOT NULL,
     tenant_id BIGINT NOT NULL,
     automation_id VARCHAR(26) NOT NULL,
-    record_id VARCHAR(255),
+    record_pid VARCHAR(255),
     status VARCHAR(20) NOT NULL DEFAULT 'paused',
     current_action_index INT NOT NULL DEFAULT 0,
     breakpoints JSONB DEFAULT '[]',
@@ -4870,6 +4873,31 @@ COMMENT ON TABLE ab_agent_definition IS 'AI Agent definitions with model, tools,
 COMMENT ON COLUMN ab_agent_definition.visibility IS 'Who can see this agent: private (creator only), team (same dept), tenant (all users)';
 COMMENT ON COLUMN ab_agent_definition.execution_config IS 'JSONB execution-time config (thinking_enabled, thinking_budget_tokens, ...). Read by StepLoopService.resolveThinkingConfig.';
 
+-- Per-business agent eval cases injected via plugin agent-definitions.json.
+-- Mirrors Flyway V20260621000250__agent_eval_case.sql for legacy schema.sql stack initialization.
+CREATE TABLE IF NOT EXISTS ab_agent_eval_case (
+  id                   BIGSERIAL PRIMARY KEY,
+  pid                  VARCHAR(26) UNIQUE NOT NULL,
+  tenant_id            BIGINT NOT NULL,
+  agent_code           VARCHAR(100) NOT NULL,
+  case_id              VARCHAR(150) NOT NULL,
+  category             VARCHAR(100),
+  task_description     TEXT NOT NULL,
+  expected_tool_codes  JSONB NOT NULL DEFAULT '[]',
+  forbidden_tool_codes JSONB NOT NULL DEFAULT '[]',
+  expected_input_keys  JSONB NOT NULL DEFAULT '{}',
+  expected_risk_level  VARCHAR(20),
+  expects_confirmation BOOLEAN NOT NULL DEFAULT FALSE,
+  plugin_source        VARCHAR(100),
+  deleted_flag         BOOLEAN DEFAULT FALSE,
+  created_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+  updated_at           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_eval_case
+  ON ab_agent_eval_case (tenant_id, agent_code, case_id) WHERE deleted_flag = FALSE;
+CREATE INDEX IF NOT EXISTS idx_agent_eval_case_tenant_agent
+  ON ab_agent_eval_case (tenant_id, agent_code) WHERE deleted_flag = FALSE;
+
 -- Mission (north star goal to prevent agent goal drift)
 CREATE TABLE IF NOT EXISTS ab_mission (
   id              BIGSERIAL PRIMARY KEY,
@@ -5900,7 +5928,7 @@ CREATE TABLE IF NOT EXISTS ab_inbox_item (
     source_type     VARCHAR(64),                                -- bpm, im, command, ai, notification
     source_id       VARCHAR(128),                               -- external ID (taskInstanceId, messageId, etc.)
     model_code      VARCHAR(100),                               -- related business model
-    record_id       BIGINT,                                     -- related business record
+    record_pid      VARCHAR(64),                                -- related business record public pid
 
     -- Card Protocol JSON (pre-computed for mobile rendering)
     card_payload    JSONB,
@@ -5932,6 +5960,9 @@ CREATE INDEX IF NOT EXISTS idx_inbox_item_type
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_inbox_item_dedup
     ON ab_inbox_item(tenant_id, client_item_id) WHERE client_item_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_inbox_item_record_pid
+    ON ab_inbox_item(tenant_id, model_code, record_pid) WHERE record_pid IS NOT NULL;
 
 -- ============================================================
 -- GPS Check-in
@@ -7045,8 +7076,8 @@ CREATE TABLE IF NOT EXISTS ab_agent_action (
 
     -- target
     target_model    VARCHAR(100) NOT NULL,
-    target_record_id VARCHAR(26),
-    target_record_ids JSONB,
+    target_record_pid VARCHAR(64),
+    target_record_pids JSONB,
     affected_count  INTEGER DEFAULT 1,
 
     -- change snapshot (diff-based)
@@ -8112,12 +8143,12 @@ CREATE TABLE IF NOT EXISTS ab_email_record_link (
     message_id          BIGINT          REFERENCES ab_email_message(id),
     thread_id           VARCHAR(255),
     model_code          VARCHAR(100)    NOT NULL,
-    record_id           VARCHAR(100)    NOT NULL,
+    record_pid          VARCHAR(100)    NOT NULL,
     link_type           VARCHAR(20)     NOT NULL DEFAULT 'auto',     -- 'auto', 'manual'
     created_at          TIMESTAMPTZ     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX IF NOT EXISTS idx_email_record_link_record
-    ON ab_email_record_link (tenant_id, model_code, record_id);
+CREATE INDEX IF NOT EXISTS idx_email_record_link_record_pid
+    ON ab_email_record_link (tenant_id, model_code, record_pid);
 CREATE INDEX IF NOT EXISTS idx_email_record_link_thread
     ON ab_email_record_link (tenant_id, thread_id);
 
@@ -8171,7 +8202,7 @@ CREATE TABLE IF NOT EXISTS ab_email_sequence_enrollment (
     account_id          BIGINT          NOT NULL REFERENCES ab_email_account(id),
     contact_email       VARCHAR(255)    NOT NULL,
     model_code          VARCHAR(100),
-    record_id           VARCHAR(100),
+    record_pid          VARCHAR(100),
     current_step        INT             NOT NULL DEFAULT 0,
     status              VARCHAR(20)     NOT NULL DEFAULT 'active',   -- 'active', 'paused', 'completed', 'failed', 'unsubscribed'
     next_send_at        TIMESTAMPTZ,
@@ -8183,6 +8214,8 @@ CREATE INDEX IF NOT EXISTS idx_email_enrollment_due
     ON ab_email_sequence_enrollment (status, next_send_at) WHERE status = 'active';
 CREATE INDEX IF NOT EXISTS idx_email_enrollment_contact
     ON ab_email_sequence_enrollment (tenant_id, contact_email);
+CREATE INDEX IF NOT EXISTS idx_email_enrollment_record_pid
+    ON ab_email_sequence_enrollment (tenant_id, model_code, record_pid) WHERE record_pid IS NOT NULL;
 
 -- ============================================================
 -- AI Action Audit Log — tracks every AI-suggested action execution
@@ -8196,7 +8229,7 @@ CREATE TABLE IF NOT EXISTS ab_ai_action_audit_log (
     action_type         VARCHAR(50)     NOT NULL,
     command_code        VARCHAR(200),
     model_code          VARCHAR(200),
-    record_id           VARCHAR(64),
+    record_pid          VARCHAR(64),
     risk_level          VARCHAR(10)     NOT NULL DEFAULT 'low',
     user_decision       VARCHAR(20)     NOT NULL,
     execution_result    VARCHAR(20),
@@ -8249,16 +8282,16 @@ CREATE TABLE IF NOT EXISTS ab_im_conversation (
     conductor_agent_id BIGINT,                                    -- primary AI employee managing this conversation (NULL = no AI)
     ai_context_window  INT             NOT NULL DEFAULT 50,       -- number of recent messages fed to agent as context
     bound_model_code VARCHAR(100),                                -- bound business model code (OBJECT type only)
-    bound_record_id  BIGINT,                                      -- bound business record ID (OBJECT type only)
+    bound_record_pid VARCHAR(64),                                 -- bound business record public pid (OBJECT type only)
     created_at      TIMESTAMPTZ     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMPTZ     NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_ab_im_conversation_tenant ON ab_im_conversation(tenant_id);
 
-CREATE UNIQUE INDEX IF NOT EXISTS uk_ab_im_conv_bound
-  ON ab_im_conversation(tenant_id, bound_model_code, bound_record_id)
-  WHERE bound_model_code IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ab_im_conv_bound_pid
+  ON ab_im_conversation(tenant_id, bound_model_code, bound_record_pid)
+  WHERE bound_model_code IS NOT NULL AND bound_record_pid IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS ab_im_conversation_member (
     conversation_id BIGINT          NOT NULL,

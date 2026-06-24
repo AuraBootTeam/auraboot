@@ -67,7 +67,7 @@ public class SkillAutoGenerator {
         Map<String, Object> qryDef = new LinkedHashMap<>();
         qryDef.put("skill_code", "dsl.query");
         qryDef.put("skill_name", "Query DSL Data");
-        qryDef.put("skill_description", "Query data: list records by model, get single record by ID, or execute a NamedQuery. Routes by presence of recordId/queryCode/model.");
+        qryDef.put("skill_description", "Query data: list records by model, get one record by recordPid, or execute a NamedQuery. Routes by presence of recordPid/queryCode/model.");
         qryDef.put("skill_level", "atomic");
         qryDef.put("skill_category", "analysis");
         qryDef.put("execution_mode", "dsl_dispatch");

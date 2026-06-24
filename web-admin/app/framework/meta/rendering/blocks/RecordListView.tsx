@@ -369,7 +369,7 @@ export function RecordListView({
               onRowClick
                 ? onRowClick(record)
                 : navigate(
-                    `/p/${modelCode}/view/${encodeURIComponent(String(record.pid ?? record.id ?? ''))}`,
+        `/p/${modelCode}/view/${encodeURIComponent(String(record.pid ?? ''))}`,
                   )
             }
             onContextMenu={noop}

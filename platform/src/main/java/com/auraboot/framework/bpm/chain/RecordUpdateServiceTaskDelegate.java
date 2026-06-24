@@ -19,8 +19,8 @@ import java.util.Map;
  * The node XML carries the following {@code smart:*} extension attributes:
  * <ul>
  *   <li>{@code smart:modelCode} — the model to update (required).</li>
- *   <li>{@code smart:recordIdVar} — name of the process variable that holds the
- *       record id (default: {@code "recordId"}).</li>
+ *   <li>{@code smart:recordPidVar} — name of the process variable that holds the
+ *       record pid (default: {@code "recordPid"}).</li>
  *   <li>{@code smart:fieldName} — the field to update (required).</li>
  *   <li>{@code smart:fieldValue} — the literal string value to write (required).</li>
  * </ul>
@@ -47,7 +47,7 @@ public class RecordUpdateServiceTaskDelegate implements JavaDelegation {
         Map<String, String> properties = resolveProperties(executionContext);
 
         String modelCode = properties.get(BpmServiceTaskConstants.ATTR_MODEL_CODE);
-        String recordIdVar = properties.getOrDefault(BpmServiceTaskConstants.ATTR_RECORD_ID_VAR, "recordId");
+        String recordPidVar = properties.getOrDefault(BpmServiceTaskConstants.ATTR_RECORD_PID_VAR, "recordPid");
         String fieldName = properties.get(BpmServiceTaskConstants.ATTR_FIELD_NAME);
         String fieldValue = properties.get(BpmServiceTaskConstants.ATTR_FIELD_VALUE);
 
@@ -61,22 +61,22 @@ public class RecordUpdateServiceTaskDelegate implements JavaDelegation {
             throw new IllegalArgumentException("record-update-task missing 'fieldValue'");
         }
 
-        Object recordIdObj = processVars.get(recordIdVar);
-        if (recordIdObj == null) {
+        Object recordPidObj = processVars.get(recordPidVar);
+        if (recordPidObj == null) {
             throw new IllegalStateException(
-                    "record-update-task: process variable '" + recordIdVar + "' is null");
+                    "record-update-task: process variable '" + recordPidVar + "' is null");
         }
-        String recordId = recordIdObj.toString();
+        String recordPid = recordPidObj.toString();
 
-        log.info("RecordUpdateDelegate: modelCode={}, recordId={}, {}={}",
-                modelCode, recordId, fieldName, fieldValue);
+        log.info("RecordUpdateDelegate: modelCode={}, recordPid={}, {}={}",
+                modelCode, recordPid, fieldName, fieldValue);
 
         Map<String, Object> update = new HashMap<>();
         update.put(fieldName, fieldValue);
-        dynamicDataService.update(modelCode, recordId, update);
+        dynamicDataService.update(modelCode, recordPid, update);
 
         log.info("RecordUpdateDelegate: updated {}.{} = '{}' for record {}",
-                modelCode, fieldName, fieldValue, recordId);
+                modelCode, fieldName, fieldValue, recordPid);
     }
 
     private Map<String, String> resolveProperties(ExecutionContext executionContext) {

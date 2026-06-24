@@ -362,14 +362,14 @@ public class AutomationServiceImpl implements AutomationService {
 
     @Transactional
     @Override
-    public AutomationLogDTO triggerManually(String pid, String recordId) {
-        log.info("Manually triggering automation: pid={}, recordId={}", pid, recordId);
+    public AutomationLogDTO triggerManually(String pid, String recordPid) {
+        log.info("Manually triggering automation: pid={}, recordPid={}", pid, recordPid);
 
         Automation automation = loadOwnedAutomation(pid);
 
         AutomationLog logEntry = automationTriggerService.executeAutomation(
                 automation,
-                recordId,
+                recordPid,
                 Map.of("manualTrigger", true));
 
         return toLogDTO(logEntry);
@@ -536,7 +536,7 @@ public class AutomationServiceImpl implements AutomationService {
                 .tenantId(entity.getTenantId())
                 .automationId(entity.getAutomationId())
                 .triggerType(entity.getTriggerType())
-                .triggerRecordId(entity.getTriggerRecordId())
+                .triggerRecordPid(entity.getTriggerRecordPid())
                 .triggerPayload(entity.getTriggerPayload())
                 .status(entity.getStatus())
                 .startedAt(entity.getStartedAt())

@@ -21,7 +21,7 @@ function summarizeSelection(value: unknown): { count: number; label: string } {
         .map((item) => {
           if (item && typeof item === 'object') {
             const row = item as Record<string, unknown>;
-            return String(row.title ?? row.name ?? row.pid ?? row.id ?? '');
+  return String(row.title ?? row.name ?? row.pid ?? '');
           }
           return String(item ?? '');
         })
@@ -34,7 +34,7 @@ function summarizeSelection(value: unknown): { count: number; label: string } {
     const row = value as Record<string, unknown>;
     return {
       count: 1,
-      label: String(row.title ?? row.name ?? row.pid ?? row.id ?? ''),
+      label: String(row.title ?? row.name ?? row.pid ?? ''),
     };
   }
 

@@ -91,7 +91,7 @@ public class ActionRecorder {
             row.put("business_domain", businessDomain);
             row.put("business_operation", meta.modelCode + "_" + meta.executionType);
             row.put("target_model", meta.modelCode);
-            row.put("target_record_id", recordPid);
+            row.put("target_record_pid", recordPid);
             row.put("affected_count", 1);
             row.put("command_code", commandCode);
             row.put("command_result", isSuccess ? "success" : "failed");
@@ -136,7 +136,7 @@ public class ActionRecorder {
 
             // 6. INSERT with JSONB awareness
             Set<String> jsonbColumns = Set.of("before_snapshot", "after_snapshot", "field_changes",
-                    "target_record_ids", "affected_entities", "artifact_refs");
+                    "target_record_pids", "affected_entities", "artifact_refs");
             dynamicDataMapper.insertWithJsonb("ab_agent_action", row, jsonbColumns);
 
             log.info("Action recorded: pid={}, code={}.{}, model={}, status={}",

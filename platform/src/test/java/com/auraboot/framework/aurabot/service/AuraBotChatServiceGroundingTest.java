@@ -736,7 +736,7 @@ class AuraBotChatServiceGroundingTest {
                 .contains("context-provenance source=PAGE")
                 .contains("context-provenance source=RECORD")
                 .contains("tenant=42")
-                .contains("recordIds=[CUST-1]")
+                .contains("recordPids=[CUST-1]")
                 .contains("sensitivity=CONFIDENTIAL")
                 .contains("<user-data>");
     }

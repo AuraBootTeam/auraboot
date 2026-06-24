@@ -17,8 +17,8 @@ public class AgentEvent extends AuraEvent {
     private final String agentId;
 
     public AgentEvent(Long tenantId, String agentEventType, String agentId,
-                      String modelCode, String recordId, Map<String, Object> payload) {
-        super(tenantId, "agent_" + agentEventType, modelCode, recordId, payload);
+                      String modelCode, String recordPid, Map<String, Object> payload) {
+        super(tenantId, "agent_" + agentEventType, modelCode, recordPid, payload);
         this.agentEventType = agentEventType;
         this.agentId = agentId;
     }

@@ -27,7 +27,7 @@ public class AgentContextAssembler {
                           String schemaModelCode,
                           Map<String, Object> recordData,
                           String recordModelCode,
-                          String recordId,
+                          String recordPid,
                           String ragContext,
                           List<String> knowledgeBaseIds) {
         public Request(Long tenantId,
@@ -70,7 +70,7 @@ public class AgentContextAssembler {
                     request.tenantId(),
                     request.channel(),
                     firstNonBlank(request.recordModelCode(), schemaModelCode),
-                    request.recordId(),
+                    request.recordPid(),
                     request.recordData()));
         }
         if (hasText(request.ragContext())) {
@@ -100,7 +100,7 @@ public class AgentContextAssembler {
                         "CLIENT_REQUEST",
                         "PAGE_CONTEXT",
                         AgentContextSensitivity.INTERNAL,
-                        recordIds(page.getRecordPid()),
+                        recordPids(page.getRecordPid()),
                         tenantId,
                         channel,
                         false,
@@ -108,7 +108,7 @@ public class AgentContextAssembler {
                                 "kind", page.getKind(),
                                 "pageKey", page.getPageKey(),
                                 "modelCode", page.getModelCode(),
-                                "recordId", page.getRecordPid())));
+                                "recordPid", page.getRecordPid())));
     }
 
     private AgentContextBlock schemaBlock(Long tenantId, String channel, String modelCode, String modelSchemaText) {
@@ -147,13 +147,13 @@ public class AgentContextAssembler {
     private AgentContextBlock recordBlock(Long tenantId,
                                           String channel,
                                           String modelCode,
-                                          String recordId,
+                                          String recordPid,
                                           Map<String, Object> recordData) {
         return recordBlock(
                 tenantId,
                 channel,
                 modelCode,
-                recordId,
+                recordPid,
                 recordData,
                 "SERVER_CONTEXT",
                 "STRUCTURED_RECORD_CONTEXT");
@@ -162,7 +162,7 @@ public class AgentContextAssembler {
     private AgentContextBlock recordBlock(Long tenantId,
                                           String channel,
                                           String modelCode,
-                                          String recordId,
+                                          String recordPid,
                                           Map<String, Object> recordData,
                                           String freshness,
                                           String permission) {
@@ -182,17 +182,17 @@ public class AgentContextAssembler {
                 body,
                 new AgentContextProvenance(
                         AgentContextSource.RECORD,
-                        scope(modelCode, recordId),
+                        scope(modelCode, recordPid),
                         freshness,
                         permission,
                         AgentContextSensitivity.CONFIDENTIAL,
-                        recordIds(recordId),
+                        recordPids(recordPid),
                         tenantId,
                         channel,
                         true,
                         metadata(
                                 "modelCode", modelCode,
-                                "recordId", recordId,
+                                "recordPid", recordPid,
                                 "fieldCount", recordData != null ? recordData.size() : 0)));
     }
 
@@ -236,7 +236,7 @@ public class AgentContextAssembler {
         return "unknown";
     }
 
-    private List<String> recordIds(String recordPid) {
+    private List<String> recordPids(String recordPid) {
         return hasText(recordPid) ? List.of(recordPid) : List.of();
     }
 

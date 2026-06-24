@@ -64,7 +64,7 @@ class CompositeActionExecutorTest {
     @Test
     void execute_firstExecutorMatches_delegatesAndReturnsResult() {
         AutomationAction action = buildAction("create_record");
-        Map<String, Object> context = Map.of("recordId", "rec-001");
+        Map<String, Object> context = Map.of("recordPid", "rec-001");
         Map<String, Object> expectedResult = Map.of("success", true);
 
         when(executor1.supports("create_record")).thenReturn(true);

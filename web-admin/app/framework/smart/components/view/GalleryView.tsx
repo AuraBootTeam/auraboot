@@ -23,7 +23,7 @@ export interface GalleryViewProps {
   /** Model code for data fetching */
   modelCode: string;
   /** Callback when a gallery card (record) is clicked */
-  onCardClick?: (recordId: string) => void;
+  onCardClick?: (recordPid: string) => void;
   /** External filter conditions */
   linkageFilters?: FilterConfig[];
   /** Callback to open view configuration */

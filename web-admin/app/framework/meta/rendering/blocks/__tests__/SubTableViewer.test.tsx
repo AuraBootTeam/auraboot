@@ -94,7 +94,7 @@ describe('SubTableViewer', () => {
             },
           } as any
         }
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         parentRecordData={{
           wd_req_process_instance: '1776844530463',
           wd_req_applicant: '01KPT1P5S8F33HPQQXWKY1EJHG',
@@ -143,7 +143,7 @@ describe('SubTableViewer', () => {
             },
           } as any
         }
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         parentRecordData={{}}
         t={(key) => (key === 'common.noData' ? 'No data' : key)}
       />,
@@ -181,7 +181,7 @@ describe('SubTableViewer', () => {
             },
           } as any
         }
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         parentRecordData={{ pid: '01KR8WEQZ0EXXF28KMA2B06YEN' }}
         t={(key) => (key === 'common.noData' ? 'No data' : key)}
       />,
@@ -225,7 +225,7 @@ describe('SubTableViewer', () => {
             },
           } as any
         }
-        parentRecordId="01KR8WEQZ0EXXF28KMA2B06YEN"
+        parentRecordPid="01KR8WEQZ0EXXF28KMA2B06YEN"
         parentRecordData={{ pid: '01KR8WEQZ0EXXF28KMA2B06YEN' }}
         t={(key) => (key === 'common.noData' ? 'No data' : key)}
       />,
@@ -305,7 +305,7 @@ describe('SubTableViewer', () => {
           ],
           readOnly: true,
         }}
-        parentRecordId="receipt-1"
+        parentRecordPid="receipt-1"
         t={(key) => (key === 'common.noData' ? 'No data' : key)}
       />,
     );
@@ -344,7 +344,7 @@ describe('SubTableViewer', () => {
             actionLabel: { 'zh-CN': '添加联系人', 'en-US': 'Add Contact' },
           },
         }}
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         isEditable
         t={(key) => (key === 'common.noData' ? 'No data' : key)}
       />,
@@ -372,7 +372,7 @@ describe('SubTableViewer', () => {
           ...buildConfig(),
           commands: { create: 'crm:create_contact' },
         }}
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         isEditable
         t={(key) => (key === 'common.noData' ? '暂无数据' : key)}
       />,
@@ -401,7 +401,7 @@ describe('SubTableViewer', () => {
             actionLabel: { 'zh-CN': '添加联系人', 'en-US': 'Add Contact' },
           },
         }}
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         isEditable
       />,
     );
@@ -437,7 +437,7 @@ describe('SubTableViewer', () => {
             actionLabel: 'Add Task',
           },
         }}
-        parentRecordId="request-1"
+        parentRecordPid="request-1"
         parentRecordData={{ crm_cr_owner: 'sales-owner' }}
         isEditable
       />,
@@ -521,7 +521,7 @@ describe('SubTableViewer', () => {
             { field: 'crm_act_status', label: 'Status' },
           ],
         }}
-        parentRecordId="request-1"
+        parentRecordPid="request-1"
         isEditable
       />,
     );
@@ -581,7 +581,7 @@ describe('SubTableViewer', () => {
             { field: 'crm_qs_source_quote_id', label: 'Quote ID' },
           ],
         }}
-        parentRecordId="request-1"
+        parentRecordPid="request-1"
         isEditable
       />,
     );

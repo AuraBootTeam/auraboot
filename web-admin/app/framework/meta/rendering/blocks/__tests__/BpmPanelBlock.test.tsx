@@ -97,7 +97,7 @@ describe('BpmPanelBlock', () => {
       <BpmPanelBlock
         block={{ blockType: 'bpm-panel' } as any}
         record={{ id: '42' }}
-        recordId="42"
+        recordPid="42"
       />,
     );
 
@@ -113,7 +113,7 @@ describe('BpmPanelBlock', () => {
       <BpmPanelBlock
         block={{ blockType: 'bpm-panel' } as any}
         record={{ id: '42' }}
-        recordId="42"
+        recordPid="42"
       />,
     );
 
@@ -131,7 +131,7 @@ describe('BpmPanelBlock', () => {
       <BpmPanelBlock
         block={{ blockType: 'bpm-panel' } as any}
         record={{ id: 'rec-1' }}
-        recordId="rec-1"
+        recordPid="rec-1"
       />,
     );
 
@@ -153,7 +153,7 @@ describe('BpmPanelBlock', () => {
       <BpmPanelBlock
         block={{ blockType: 'bpm-panel', bpmPanel: { sections: ['status'] } } as any}
         record={{ id: 'rec-1' }}
-        recordId="rec-1"
+        recordPid="rec-1"
       />,
     );
 
@@ -172,7 +172,7 @@ describe('BpmPanelBlock', () => {
       <BpmPanelBlock
         block={{ blockType: 'bpm-panel' } as any}
         record={{ id: 'rec-1' }}
-        recordId="rec-1"
+        recordPid="rec-1"
       />,
     );
 
@@ -183,7 +183,7 @@ describe('BpmPanelBlock', () => {
     });
   });
 
-  it('uses businessKeyField from record when provided, falls back to recordId otherwise', async () => {
+  it('uses businessKeyField from record when provided, falls back to recordPid otherwise', async () => {
     getInstanceForRecordMock.mockResolvedValue(READY_INSTANCE);
 
     // Case 1: businessKeyField present on record
@@ -191,7 +191,7 @@ describe('BpmPanelBlock', () => {
       <BpmPanelBlock
         block={{ blockType: 'bpm-panel', bpmPanel: { businessKeyField: 'orderNo' } } as any}
         record={{ id: '42', orderNo: 'ORDER-7' }}
-        recordId="42"
+        recordPid="42"
       />,
     );
     await waitFor(() => {
@@ -200,12 +200,12 @@ describe('BpmPanelBlock', () => {
     unmount();
     getInstanceForRecordMock.mockClear();
 
-    // Case 2: no businessKeyField → recordId is used verbatim
+    // Case 2: no businessKeyField → recordPid is used verbatim
     render(
       <BpmPanelBlock
         block={{ blockType: 'bpm-panel' } as any}
         record={{ id: '42' }}
-        recordId="42"
+        recordPid="42"
       />,
     );
     await waitFor(() => {

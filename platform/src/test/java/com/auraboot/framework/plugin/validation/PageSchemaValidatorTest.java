@@ -656,7 +656,7 @@ class PageSchemaValidatorTest {
                         "params", Map.of(
                                 "datasourceId", "nq:pe_consumption_trace_by_lot",
                                 "format", "records",
-                                "workOrderId", "${$page.recordId}"))));
+                                "workOrderPid", "${$page.recordPid}"))));
         manifest.setPages(List.of(p));
         assertNoError(validate(manifest), "S-PAGE-BLOCK-TYPE");
     }

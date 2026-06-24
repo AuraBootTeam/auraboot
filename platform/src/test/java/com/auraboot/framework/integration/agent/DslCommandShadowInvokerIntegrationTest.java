@@ -50,7 +50,7 @@ class DslCommandShadowInvokerIntegrationTest extends BaseIntegrationTest {
         CommandExecuteResult result = CommandExecuteResult.builder()
                 .commandCode("create_lead")
                 .phaseReached("completed_dry_run")
-                .data(Map.of("recordId", "LEAD_01"))
+                .data(Map.of("recordPid", "LEAD_01"))
                 .build();
         when(commandExecutor.execute(eq("create_lead"), any())).thenReturn(result);
 
@@ -108,7 +108,7 @@ class DslCommandShadowInvokerIntegrationTest extends BaseIntegrationTest {
                 CommandExecuteResult.builder()
                         .commandCode("ok_cmd")
                         .phaseReached("completed_dry_run")
-                        .data(Map.of("recordId", "LEAD-1"))
+                        .data(Map.of("recordPid", "LEAD-1"))
                         .build());
 
         Map<String, Object> out = invoker.invokeShadow(10L, "cmd_ok_cmd",

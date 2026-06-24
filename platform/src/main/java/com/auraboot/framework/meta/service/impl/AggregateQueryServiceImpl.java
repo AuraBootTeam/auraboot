@@ -71,6 +71,10 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
             "eq", "ne", "neq", "gt", "gte", "ge", "lt", "lte", "le", "like", "in", "not_in", "is_null", "is_not_null"
     );
 
+    private static final Set<String> PUBLIC_FORBIDDEN_OUTPUT_ALIASES = Set.of(
+            "id", "record_id", "tenant_id", "created_by", "updated_by"
+    );
+
     @Override
     @Transactional(readOnly = true)
     @Cacheable(
@@ -148,6 +152,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         QueryWrapper<NamedQueryField> fieldQuery = new QueryWrapper<>();
         fieldQuery.eq("tenant_id", tenantId).eq("query_code", queryCode).orderByAsc("field_code");
         List<NamedQueryField> fields = namedQueryFieldMapper.selectList(fieldQuery);
+        validatePublicOutputAliases(fields);
         Map<String, NamedQueryField> fieldMap = fields.stream()
                 .collect(Collectors.toMap(NamedQueryField::getFieldCode, f -> f));
 
@@ -248,6 +253,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
                 NamedQueryField field = fieldMap.get(metric.getField());
                 String alias = metric.getAlias() != null ? metric.getAlias()
                         : metric.getField() + "_" + metric.getAggregation().toLowerCase();
+                validatePublicOutputAlias(alias);
                 String agg = metric.getAggregation().toLowerCase();
                 String colExpr = field.getColumnExpr();
                 String aggClause = switch (agg) {
@@ -356,6 +362,25 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         }
 
         return sql.toString();
+    }
+
+    private void validatePublicOutputAliases(List<NamedQueryField> fields) {
+        if (fields == null || fields.isEmpty()) {
+            return;
+        }
+        for (NamedQueryField field : fields) {
+            validatePublicOutputAlias(field.getFieldCode());
+        }
+    }
+
+    private void validatePublicOutputAlias(String alias) {
+        if (alias == null) {
+            return;
+        }
+        String normalized = alias.trim().toLowerCase(Locale.ROOT);
+        if (PUBLIC_FORBIDDEN_OUTPUT_ALIASES.contains(normalized)) {
+            throw new MetaServiceException("NamedQuery public output alias is reserved for internal identity: " + alias);
+        }
     }
 
     /**

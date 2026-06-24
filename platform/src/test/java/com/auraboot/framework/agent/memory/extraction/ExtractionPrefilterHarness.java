@@ -58,7 +58,7 @@ class ExtractionPrefilterHarness {
         // 7 patterns p1-p7 per design doc §3.1
         for (String pid : new String[]{
                 "p1-tool-record-user-preference",
-                "p2-tool-success-with-record-id",
+                "p2-tool-success-with-record-pid",
                 "p3-tool-failure",
                 "p4-bpm-task-assigned",
                 "p5-bpm-task-completed",

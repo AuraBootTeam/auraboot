@@ -135,7 +135,7 @@ export interface SmartKanbanProps {
   terminalStages?: { won?: string[]; lost?: string[] };
   /**
    * Page key used as the dynamic API resource segment for kanban move
-   * persistence (PUT `/api/dynamic/{pageKey}/{recordId}`). When omitted,
+   * persistence (PUT `/api/dynamic/{pageKey}/{recordPid}`). When omitted,
    * card moves stay purely optimistic.
    */
   pageKey?: string;

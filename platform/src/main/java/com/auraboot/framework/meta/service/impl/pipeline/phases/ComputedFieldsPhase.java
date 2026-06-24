@@ -99,7 +99,7 @@ public class ComputedFieldsPhase implements CommandPhase {
 
         String recordIdStr = (request != null && StringUtils.hasText(request.getTargetRecordId()))
                 ? request.getTargetRecordId()
-                : (String) fieldMapResults.get("recordId");
+                : (String) fieldMapResults.get("recordPid");
         if (!computedValues.isEmpty() && StringUtils.hasText(recordIdStr)) {
             String tableName = metaModelService.getTableName(command.getModelCode());
             CommandExecutorUtils.validateSqlIdentifier(tableName, "computed field tableName");
@@ -126,7 +126,7 @@ public class ComputedFieldsPhase implements CommandPhase {
                                                      CommandDefinition command,
                                                      CommandExecuteRequest request) {
         Map<String, Object> combinedContext = new HashMap<>();
-        Object fieldMapRecordId = fieldMapResults != null ? fieldMapResults.get("recordId") : null;
+        Object fieldMapRecordId = fieldMapResults != null ? fieldMapResults.get("recordPid") : null;
         String recordIdStr = (request != null && StringUtils.hasText(request.getTargetRecordId()))
                 ? request.getTargetRecordId()
                 : fieldMapRecordId != null ? String.valueOf(fieldMapRecordId) : null;

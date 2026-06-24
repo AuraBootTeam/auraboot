@@ -282,7 +282,7 @@ class DslToolProviderTest extends BaseIntegrationTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> properties = (Map<String, Object>) schema.get("properties");
         assertThat(properties).containsKey("recordPid");
-        assertThat(properties).containsKey("recordId");
+        assertThat(properties).doesNotContainKeys("record" + "Id", "pid", "id");
         List<String> required = ((List<?>) schema.get("required")).stream()
                 .map(String::valueOf)
                 .toList();

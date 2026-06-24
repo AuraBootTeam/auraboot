@@ -882,10 +882,10 @@ public class JsonToBpmnConverter {
                 }
                 writer.writeAttribute(SMART_NAMESPACE,
                         BpmServiceTaskConstants.ATTR_MODEL_CODE, modelCode);
-                String recordIdVar = getTextOrNull(config, BpmServiceTaskConstants.ATTR_RECORD_ID_VAR);
-                if (recordIdVar != null) {
+                String recordPidVar = getTextOrNull(config, BpmServiceTaskConstants.ATTR_RECORD_PID_VAR);
+                if (recordPidVar != null) {
                     writer.writeAttribute(SMART_NAMESPACE,
-                            BpmServiceTaskConstants.ATTR_RECORD_ID_VAR, recordIdVar);
+                            BpmServiceTaskConstants.ATTR_RECORD_PID_VAR, recordPidVar);
                 }
                 String fieldName = getTextOrNull(config, BpmServiceTaskConstants.ATTR_FIELD_NAME);
                 if (fieldName == null) {

@@ -90,7 +90,7 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
                     "target": "ROLE:support_manager",
                     "order": 1,
                     "payload": { "template": "high_priority_alert" },
-                    "idempotencyKeyTemplate": "${record.data.recordId}:${rule.ruleCode}:${action.type}"
+                    "idempotencyKeyTemplate": "${record.data.recordPid}:${rule.ruleCode}:${action.type}"
                   }
                 ]
               },
@@ -111,7 +111,7 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
                     "target": "BPM:complaint_approval",
                     "order": 1,
                     "payload": { "processKey": "complaint_approval" },
-                    "idempotencyKeyTemplate": "${record.data.recordId}:${rule.ruleCode}:${action.type}"
+                    "idempotencyKeyTemplate": "${record.data.recordPid}:${rule.ruleCode}:${action.type}"
                   }
                 ]
               },
@@ -132,7 +132,7 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
                     "target": "ASSIGNEE:account_manager",
                     "order": 1,
                     "payload": { "taskTemplate": "vip_follow_up" },
-                    "idempotencyKeyTemplate": "${record.data.recordId}:${rule.ruleCode}:${action.type}"
+                    "idempotencyKeyTemplate": "${record.data.recordPid}:${rule.ruleCode}:${action.type}"
                   }
                 ]
               }
@@ -200,7 +200,7 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
                     "target": "ROLE:decision_manager",
                     "order": 1,
                     "payload": { "template": "decision_large_amount" },
-                    "idempotencyKeyTemplate": "${record.data.recordId}:${rule.ruleCode}:${action.type}"
+                    "idempotencyKeyTemplate": "${record.data.recordPid}:${rule.ruleCode}:${action.type}"
                   }
                 ]
               }
@@ -288,7 +288,7 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
                                 "amount", 20000,
                                 "customerLevel", "VIP",
                                 "entityCode", "complaint",
-                                "recordId", "CMP-1"
+                                "recordPid", "CMP-1"
                         )
                 ))
         );
@@ -303,7 +303,7 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
                 .toList();
         assertThat(actionTypes).containsExactly("NOTIFY", "START_PROCESS", "CREATE_TASK");
 
-        // Verify idempotency keys were rendered (template uses record.data.recordId)
+        // Verify idempotency keys were rendered (template uses record.data.recordPid)
         assertThat(result.actionPlans().get(0).idempotencyKey()).contains("CMP-1").contains("R-101").contains("NOTIFY");
         assertThat(result.actionPlans().get(1).idempotencyKey()).contains("CMP-1").contains("R-102").contains("START_PROCESS");
         assertThat(result.actionPlans().get(2).idempotencyKey()).contains("CMP-1").contains("R-103").contains("CREATE_TASK");
@@ -326,7 +326,7 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
                                 "amount", 500,
                                 "customerLevel", "REGULAR",
                                 "entityCode", "complaint",
-                                "recordId", "CMP-2"
+                                "recordPid", "CMP-2"
                         )
                 ))
         );
@@ -350,7 +350,7 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
                         "data", Map.of(
                                 "amount", 20000,
                                 "entityCode", "complaint",
-                                "recordId", "CMP-D1"
+                                "recordPid", "CMP-D1"
                         )
                 ))
         );
@@ -369,7 +369,7 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
                         "data", Map.of(
                                 "amount", 500,
                                 "entityCode", "complaint",
-                                "recordId", "CMP-D2"
+                                "recordPid", "CMP-D2"
                         )
                 ))
         );

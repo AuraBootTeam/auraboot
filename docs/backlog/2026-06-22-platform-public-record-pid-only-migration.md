@@ -2,7 +2,7 @@
 type: backlog
 status: active
 created: 2026-06-22
-updated: 2026-06-23
+updated: 2026-06-24
 relates_to:
   - docs/backlog/2026-06-22-saved-view-feishu-parity-gaps.md
 ---
@@ -28,29 +28,33 @@ SavedView Feishu parity 已经补齐 SavedView、role、member、user-role 等�
 - 当前 stacked slice `codex/watch-field-history-pid` 已补齐 watch/follow 与 field history 的 `recordPid` 写入、查询、通知路由和 schema 迁移；公开边界不再新增 `recordId` alias，public-id gate baseline 从 541 收敛到 529。
 - Canonical agent rule 落点: enterprise `AGENTS.md` 高频红线表已指向 `docs/standards/core/data-and-api.md` §Public Record 双 id 规范和 `docs/agent-rules/public-record-dual-id-contract.md`。反复违背的根因不是策略不清,而是旧 `recordId` 命名惯性、`Map<String,Object>` 绕过 DTO 类型系统、DSL/SQL/NamedQuery 属于数据配置编译器看不到、前端局部 fallback 复制旧写法、以及测试/示例继续教旧契约；当前规则要求遇到这些关键词先跑 inventory gate 和 targeted pid-only 测试。
 - 一次性到位后续计划已落到 `docs/plans/2026-06/2026-06-23-public-record-pid-endgame-follow-up-plan.md`。该计划把剩余 529 项按 backend public API / dynamic read boundary / frontend runtime 分包，并明确区分 API-only、storage-alias、true data migration 三类任务；结论是后续不只是改接口，Inbox 和 IM 等记录关联表需要上线前完成 pid 列与 model-aware backfill，否则未来会产生生产数据迁移。
+- 2026-06-23 当前执行口径已刷新到 `docs/backlog/2026-06-23-public-record-pid-only-remaining-tasks.md`: 本地分支在补齐 inbox/IM/email/share/utility/automation/agent/dynamic/frontend 后 public-record inventory 已清零，其中 backend-public-api 0、dynamic-read-boundary 0、frontend-runtime 0。后续验证仍以该文档为最新任务清单。
+- 2026-06-24 final refresh: current branch has hard-mode pid-only implementation green across static source scan, live OpenAPI scoped + component scan, OSS backend full, frontend `check` + full unit, schema SQL/drift, clean OSS artifact publish, enterprise targeted, enterprise full, and enterprise canonical docs governance. Remaining repository work is PR topology/stage/commit/push, not implementation.
 
 ## Inventory Evidence
 
-OSS public-record-id contract gate on current hardening branch:
+Final OSS public-record-id contract gate on current hard-mode branch:
 
 | Category | Count |
 | --- | ---: |
-| backend-public-api | 91 |
+| backend-public-api | 0 |
 | dsl-config | 0 |
-| dynamic-read-boundary | 79 |
-| frontend-runtime | 359 |
+| dynamic-read-boundary | 0 |
+| frontend-runtime | 0 |
 | named-query-export | 0 |
-| **Total** | **529** |
+| **Total** | **0** |
 
 Gate result:
 
 ```text
 scripts/check-public-record-id-contracts.sh
-Summary: 529 finding(s), 529 accepted, 0 new.
-Node tests: 4/4 passing.
+Summary: 0 finding(s), 0 accepted, 0 new.
+Inventory tests: 7/7 passing.
+OpenAPI scanner tests: 4/4 passing.
 ```
 
-Combined OSS + enterprise canonical inventory was also run without a baseline:
+Historical pre-endgame combined OSS + enterprise canonical inventory was run
+without a baseline and showed the original 529 findings:
 
 ```text
 node scripts/validate-public-record-id-contracts.mjs \
@@ -61,29 +65,81 @@ node scripts/validate-public-record-id-contracts.mjs \
 Summary: 529 finding(s), 0 accepted, 529 new. Baseline: none FAILED.
 ```
 
-The combined run is inventory-only by design. `--no-baseline` reports every finding as new, so it is not a passing gate and should not be used as a merge blocker by itself.
+That combined run is retained as historical inventory context only.
+`--no-baseline` reports every finding as new, so it is not a passing gate and
+should not be used as a merge blocker by itself.
 
 ## Current PR Scope Implemented
 
 - Added a public-record contract inventory gate and CI workflow. Current OSS baseline is 529 accepted findings and fails on newly introduced leaks.
 - Added `PublicRecordSanitizer` and applied it to dynamic list, namedQuery list, detail, create, update, batch create/update, custom query and relation response boundaries.
-- Added `targetRecordPid` as the pid-first command request alias while keeping `targetRecordId` compatible during the migration window.
+- Added `targetRecordPid` as the public command request field and hid public `targetRecordId` from JSON input/output.
 - Added frontend `publicRecordId` helpers and adopted them in high-reuse dynamic runtime paths: list row selection/navigation/inline edit, list table row keys, tree row keys, form command submit, action handler, ActionRegistry, sub-table row actions/inline edit, smart calendar/gallery/timeline/gantt views and kanban persistence.
-- Added `recordPid` placeholder support for detail API endpoints, sub-table API dataSource URLs/params, command sideEffect field mappings, batch sideEffect field mappings, and `start_process` postActions while retaining legacy alias compatibility.
+- Added `recordPid` placeholder support for detail API endpoints, sub-table API dataSource URLs/params, command sideEffect field mappings, batch sideEffect field mappings, and `start_process` postActions; legacy `${recordId}` placeholders no longer resolve in public config.
 - Migrated OSS DSL configs from `${recordId}` / `{recordId}` to `${recordPid}` / `{recordPid}` where the value is the public pid.
 - Removed current NamedQuery/export SQL findings: showcase summary now selects `pid`; workflow approval history no longer exposes SmartEngine task internal `id` as a fake `pid`.
 - Tightened the inventory gate so SQL filters such as `WHERE tenant_id = ...` do not count unless internal fields are selected into public query output.
 - Added `commentPid` to record comments, changed comment edit/delete HTTP paths to pid-only, hid raw comment/actor ids from comment and activity responses, and added tenant-scoped activity lookup.
 - Added record-comment pid schema migration, schema.sql alignment, and generated OSS schema snapshot.
 - Added `ab_watch.record_pid` and `ab_field_change_log.record_pid` migrations, changed watch public controller methods to pid-only path variables, changed notification watcher resolution to `recordPid`, and mapped field-history public responses to DTOs that hide internal ids.
+- Added pid-only record-adjacent storage and public contracts for inbox, IM, email links/enrollments, automation logs/debug sessions, agent/AI audit surfaces, record share, mobile/autofill/capability/change-log/SOD/permission-matrix routes, and high-use frontend runtime paths.
+- Added OpenAPI component-schema coverage so public-record legacy keys in reusable DTO schemas are caught even when the path-level response only references a component.
+- Changed `/api/permissions/audit` from returning the internal entity to `PermissionAuditLogDTO`, resolving public `recordPid` from the internal audit row only when it is model-aware and tenant-scoped.
+- Changed public fixture/seed DTOs from `recordIds` to `recordPids`, and changed explicit FIELD_MAP inserts to return generated `recordPid`.
 - Repaired latest-main regressions discovered during full verification: SavedView semantic fixture drift, audit actor pid lookup, and legacy user-role endpoint deprecation behavior.
 - Enterprise branch `codex/public-record-dual-id-standard` adds the canonical dual-id agent rule and repairs `plugins/test-fixtures` page labels/required flags so latest-main enterprise full validation can pass under current page golden rules.
 
-Remaining items below are still tracked before the compatibility aliases can be removed. A passing baseline means "no new leak beyond the accepted inventory", not "pid-only migration is finished".
+The remaining tables below are historical gap accounting. Current executable
+status lives in `docs/backlog/2026-06-23-public-record-pid-only-remaining-tasks.md`.
 
 ## Verification Status
 
-Passing checks on current OSS hardening branch:
+Fresh 2026-06-24 checks on current hard-mode branch:
+
+- OSS public-record-id contract gate:
+  `scripts/check-public-record-id-contracts.sh`.
+  Result: `Summary: 0 finding(s), 0 accepted, 0 new`; inventory tests 7/7 passing; OpenAPI scanner tests 4/4 passing.
+- OSS live OpenAPI public-record contract scan:
+  `node scripts/check-public-record-openapi-contract.mjs --input /tmp/aura-public-record-proof/oss-v15-openapi.json --json`.
+  Result: `scopedPathCount=145`, `componentSchemaCount=1308`, `findingCount=0`.
+- OSS compile gates:
+  `./gradlew --no-daemon :compileJava --console=plain` and `./gradlew --no-daemon :compileTestJava --console=plain`.
+  Result: both `BUILD SUCCESSFUL`.
+- OSS targeted pid-only backend tests:
+  `TestFixtureControllerRouteInboxTest`, `TestSeedControllerIntegrationTest`, `PermissionAuditServiceIntegrationTest`, `OtDeviceServiceIntegrationTest`, and `Invariant*` tests on DB `aura_public_record_pid_targeted_20260624_v15`.
+  Result: `BUILD SUCCESSFUL in 1m 55s`.
+- OSS backend full test:
+  DB `aura_public_record_pid_oss_full_20260624_v16`, initialized from `platform/src/main/resources/database/schema.sql`.
+  Command used `AURA_ENV=test IMPORT_TEST_FIXTURES=true AURA_REGISTRY_ROOT_PLUGINS=/Users/ghj/work/auraboot/.worktrees/oss-watch-field-history-pid/plugins SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/aura_public_record_pid_oss_full_20260624_v16?charSet=UTF8 ./gradlew --no-daemon cleanTest test -Dspring.test.context.cache.maxSize=8 --console=plain`.
+  Result: `BUILD SUCCESSFUL in 20m 49s`; XML summary `1510` files / `12021` tests / `67` skipped / `0` failures / `0` errors.
+- OSS frontend static gate:
+  `pnpm_config_verify_deps_before_run=false PATH=/tmp/auraboot-pnpm9-shim:$PATH pnpm --dir web-admin check`.
+  Result: typecheck, plugin routes, datetime display, and design-token checks passed; plugin routes `17 ok / 0 fail`; datetime `1839 files / 0 violations`; design-token burn-down `palette=1197`, `i18n=109`.
+- OSS frontend full unit:
+  `pnpm_config_verify_deps_before_run=false PATH=/tmp/auraboot-pnpm9-shim:$PATH pnpm --dir web-admin test:unit:run`.
+  Result: `477` test files / `4885` tests passed / `0` failed. Note: pnpm 11 emits a stderr deprecation warning that breaks CLI tests expecting empty stderr, so final unit evidence uses pnpm `9.15.9`, which satisfies the repository `pnpm >=9` engine.
+- OSS schema SQL gate:
+  `PATH=/opt/homebrew/Cellar/postgresql@17/17.6/bin:$PATH env PG_HOST=localhost PG_PORT=5432 PG_USER=ghj PG_PASSWORD= scripts/check-schema-sql.sh --local`.
+  Result: `schema.sql` has `10674` lines, `312` expected `CREATE TABLE` statements, and applies cleanly with `313` tables created.
+- OSS schema drift gate:
+  `PATH=/opt/homebrew/Cellar/postgresql@17/17.6/bin:$PATH scripts/db/check-schema-drift.sh --edition oss`.
+  Result: committed snapshot matches Flyway result at `v20260623001000`.
+- Clean OSS artifact publish for enterprise validation:
+  `./gradlew --no-daemon publishToMavenLocal -Dmaven.repo.local=/tmp/auraboot-oss-public-record-pid-v15-m2/repository --console=plain` from `platform/`.
+  Result: `BUILD SUCCESSFUL`.
+- Enterprise canonical docs governance:
+  `./scripts/check-docs-governance.sh` on branch `codex/public-record-dual-id-standard`.
+  Result: `profile=full checked=1924 doc(s); 0 errors, 0 warnings`.
+- Enterprise compile gates against the clean OSS artifact:
+  `./gradlew --no-daemon :compileJava :compileTestJava -Dmaven.repo.local=/tmp/auraboot-oss-public-record-pid-v15-m2/repository --console=plain`.
+  Result: `BUILD SUCCESSFUL`.
+- Enterprise targeted pid consumer tests:
+  `AssetCommandExecutionTest` on DB `aura_public_record_pid_enterprise_asset_20260624_v3` passed 43 tests; `QrInspectionClosureIT` on DB `aura_public_record_pid_enterprise_qr_20260624_v4` passed.
+- Enterprise backend full test:
+  DB `aura_public_record_pid_enterprise_full_20260624_v5`, using `AURA_CORE_ROOT=/Users/ghj/work/auraboot/.worktrees/oss-watch-field-history-pid`, `AURA_REGISTRY_ROOT_PLUGINS=/Users/ghj/work/auraboot/plugins`, and the clean OSS Maven repo `/tmp/auraboot-oss-public-record-pid-v15-m2/repository`.
+  Result: `BUILD SUCCESSFUL in 6m 52s`; XML summary `167` files / `987` tests / `48` skipped / `0` failures / `0` errors.
+
+Historical passing checks on current OSS hardening branch:
 
 - OSS public-record-id contract gate:
   `scripts/check-public-record-id-contracts.sh`.
@@ -209,8 +265,8 @@ These gaps were discovered while turning the original inventory into mergeable O
 Status legend:
 
 - `DONE`: fixed and verified in the current OSS main or enterprise PR evidence above.
-- `PARTIAL`: the highest-risk path is covered, but compatibility aliases, docs, schema, or remaining baseline findings still exist.
-- `OPEN`: not implemented in this phase; remains tracked before alias removal.
+- `PARTIAL`: the highest-risk path is covered, but docs, schema, negative tests, or remaining baseline findings still exist.
+- `OPEN`: not implemented in this phase; remains tracked before hard-mode pid-only closure.
 
 | # | Gap | Status |
 | ---: | --- | --- |
@@ -221,30 +277,30 @@ Status legend:
 | 5 | Dynamic custom query responses bypass list/detail sanitization. `executeCustomQuery` returns `List<Map<String,Object>>`. | DONE |
 | 6 | Export/download has no proven shared public-field rule with screen reads. Export must hide the same fields list/detail hide. | PARTIAL |
 | 7 | Cursor pagination can leak internal ids. Current keyset cursor logic derives `nextCursor` from the last row's `id`; public cursor should be opaque or pid-safe. | OPEN |
-| 8 | Public API paths and parameters still expose `recordId`. Dynamic, auto-fill, AI fill, record capability, comments, watch, field history, email, IM, automation and agent audit surfaces still publish `recordId` naming. | OPEN |
+| 8 | Public API paths and parameters still expose `recordId`. Dynamic, auto-fill, AI fill, record capability, comments, watch, field history, email, IM, automation and agent audit surfaces still publish `recordId` naming. | PARTIAL |
 | 9 | `recordId` semantics are mixed. In many paths it already carries pid; in adjacent tables it can still mean numeric id. There is no single normalize boundary. | PARTIAL |
-| 10 | Batch/request bodies lack pid-named fields. Public request contracts need `recordPid`, `recordPids`, `targetRecordPid`, `commentPid`, while legacy fields remain aliases for one compatibility window. | PARTIAL |
-| 11 | `CommandExecuteRequest` lacks pid-first canonical execution semantics. `targetRecordId` remains the dominant public field. | DONE |
-| 12 | Command executor has no single target identity normalization layer. Handlers still interpret `targetRecordId` independently. | PARTIAL |
+| 10 | Batch/request bodies lack pid-named fields. Public request contracts need `recordPid`, `recordPids`, `targetRecordPid`, `commentPid`, and legacy public fields must be rejected or stripped rather than treated as aliases. | PARTIAL |
+| 11 | `CommandExecuteRequest` lacked pid-first canonical execution semantics. Current hard-mode implementation serializes/accepts public `targetRecordPid` and hides `targetRecordId`. | DONE |
+| 12 | Command executor still needs final scan coverage to prove all handler/public envelopes use `targetRecordPid`; internal Java names may remain only behind pid-semantic boundaries. | PARTIAL |
 | 13 | DSL command side effects and post actions still used legacy record-id placeholders. Current OSS `dsl-config` baseline is 0 after migration to `${recordPid}`. | DONE |
-| 14 | DSL `detailEndpoint` templates still use `{recordId}`. These should migrate to `{recordPid}` or explicitly document pid semantics. | DONE |
-| 15 | NamedQuery/DataSource is the major bypass surface. OSS public NamedQuery/export SQL findings are now 0, but a general public field allowlist is still needed before alias removal. | PARTIAL |
+| 14 | DSL `detailEndpoint` templates migrated from `{recordId}` to `{recordPid}` where the value is public record pid. | DONE |
+| 15 | NamedQuery/DataSource is the major bypass surface. OSS public NamedQuery/export SQL findings are now 0, but a general public field allowlist is still needed for hard-mode closure. | PARTIAL |
 | 16 | NamedQuery lacks public field allowlist metadata. The platform cannot distinguish public business ids from internal ids at query result boundary. | OPEN |
 | 17 | Showcase/workflow-demo contain explicit internal-id mappings. Examples include `SELECT id...` and `CAST(t.id AS VARCHAR) AS pid`. | DONE |
 | 18 | Comments only partially use public record identity. Record association uses `recordPid`, but comment edit/delete still needs `commentPid`, and response DTOs must hide internal comment and actor ids. | DONE |
 | 19 | Watch/follow still uses numeric storage. `WatchController` accepted `Long recordId`; `ab_watch` needed `record_pid` or a resolver/backfill layer. | DONE |
 | 20 | Field history still uses numeric storage. `FieldChangeAuditController` accepted `Long recordId`; `ab_field_change_log` needed pid-facing lookup/backfill. | DONE |
 | 21 | Change log naming remains legacy. `ab_data_change_log.record_id` is string-like, but public DTO/API naming and actor id exposure still need cleanup. | PARTIAL |
-| 22 | Record share is mixed id/pid. It already has `record_id` and `record_pid`, but public controller paths still expose `recordId`. | OPEN |
-| 23 | Email, IM and inbox record links still use `recordId`. These record-adjacent surfaces must emit and accept pid-facing identifiers. | OPEN |
-| 24 | Automation/manual trigger still uses `recordId`. Manual trigger and rule context need pid-first aliases and deprecation telemetry. | OPEN |
-| 25 | Agent audit/run/action surfaces still expose mixed identity fields. `targetRecordId`, `targetRecordPid`, and `recordId` coexist without a clear public contract. | PARTIAL |
+| 22 | Record share is mixed id/pid. It already has `record_id` and `record_pid`, but public controller paths still expose `recordId`. | PARTIAL |
+| 23 | Email, IM and inbox record links still use `recordId`. These record-adjacent surfaces must emit and accept pid-facing identifiers. | PARTIAL |
+| 24 | Automation/manual trigger public contracts are moving to `recordPid`; legacy `recordId` must not remain an accepted public alias. | PARTIAL |
+| 25 | Agent audit/run/action surfaces are moving to pid-only public contracts; internal Java names may remain only when JSON/API output is explicitly `recordPid`/`targetRecordPid`. | PARTIAL |
 | 26 | Frontend runtime still relies on `row.pid || row.id`. Latest helper adoption and placeholder cleanup reduced the baseline to 359 frontend-runtime findings, but residual dynamic runtime paths still need cleanup. | PARTIAL |
 | 27 | Frontend lacks a canonical `getRecordPid(row)` helper. Selection, navigation, draft keys, row actions, form edit state and sub-table parent/child identity resolve record ids in many local ways. | DONE |
 | 28 | Route params still use `recordId`. URL compatibility may remain, but the semantic value should be documented and implemented as record pid. | OPEN |
-| 29 | Tests and docs still teach `targetRecordId` and `recordId`. New DSL/plugin examples can continue creating legacy configs unless validators and docs are updated. | OPEN |
+| 29 | Tests and docs still need a final scan so they teach only `targetRecordPid` and `recordPid`; legacy strings may remain only in scanner fixtures and negative tests. | PARTIAL |
 | 30 | Governance gate does not yet cover OpenAPI/response schemas. Current inventory covers source/config patterns, not generated OpenAPI schemas or live API response fixtures. | OPEN |
-| 31 | Deprecation telemetry is missing. Legacy alias usage is not counted, logged, or exposed through metrics, so removal readiness cannot be measured. | OPEN |
+| 31 | Deprecation telemetry is no longer part of the development-stage plan; the merge gate is hard-mode rejection/stripping plus static/OpenAPI/runtime negative tests. | WONT_DO |
 | 32 | Physical schema migrations are missing for record-adjacent tables. `commentPid`, `ab_watch.record_pid`, and `ab_field_change_log.record_pid` are implemented. | DONE |
 | 33 | SavedView enhanced IT fixture drift blocked latest-main verification. | DONE |
 | 34 | Audit actor lookup did not support actor pid query paths. | DONE |
@@ -259,23 +315,23 @@ Status legend:
 - Comment/activity/audit responses expose public identifiers such as `commentPid`, `recordPid`, `actorPid` and display names.
 - NamedQuery/export/list/detail responses pass through a public-record sanitizer or explicit public field allowlist.
 - New public request fields use `recordPid`, `recordPids`, `targetRecordPid` and `commentPid`.
-- Existing `recordId`/`targetRecordId` fields remain compatibility aliases for one window and prefer pid resolution first.
-- Runtime row identity uses pid. `row.id`, `$record.id`, and `targetRecordId` remain deprecated compatibility aliases only.
+- Existing public `recordId`/`targetRecordId` fields are not compatibility aliases in this development branch; they must be removed, rejected, or stripped at public boundaries.
+- Runtime row identity uses pid. Public `row.id`, `$record.id`, and `targetRecordId` are legacy patterns that tests/docs must not teach.
 
 ## Phased Implementation
 
 1. Inventory and regression gate: keep `scripts/validate-public-record-id-contracts.mjs` and baseline in CI so new leaks fail.
 2. Dynamic read boundary: add sanitizer for list/detail/create/update/batch/custom query/relation/export results and convert public cursor to opaque token.
-3. Dynamic write and command boundary: add pid-named request fields, normalize command target identity once at executor boundary, keep legacy fallback with telemetry.
+3. Dynamic write and command boundary: add pid-named request fields, normalize command target identity once at executor boundary, and remove public legacy fallback.
 4. Record-adjacent surfaces: comments, watch/follow, field history, change logs, record share, email/IM/inbox links.
 5. Frontend and DSL cleanup: canonical record identity helper, pid-first action payloads, DSL examples and validator warnings.
-6. Deprecation removal: remove or admin-gate numeric-id fallback after telemetry confirms compatibility window is complete.
+6. Hard-mode removal: reject or admin-gate numeric-id fallback now; telemetry is not a prerequisite in development-stage code.
 
 ## Acceptance Criteria
 
 - Public dynamic list/detail/create/update/batch/custom query/relation/export responses expose `pid` and no top-level internal `id`, `tenant_id`, `created_by`, `updated_by`.
 - Cursor pagination no longer exposes internal numeric ids.
-- Command execution accepts `targetRecordPid`; legacy `targetRecordId` remains compatible during the migration window.
+- Command execution accepts `targetRecordPid`; public `targetRecordId` is not serialized or accepted as an alias.
 - Comments expose `commentPid` and display actor names; edit/delete can be performed without numeric comment id or raw actor id exposure.
 - Watch/follow and field history work with record pid.
 - NamedQuery/DataSource/export cannot leak internal ids in public renderer contexts.

@@ -38,15 +38,15 @@ class AiActionAuditControllerTest {
     }
 
     @Test
-    @DisplayName("record audit accepts targetPid as the pid-first target alias")
-    void recordAuditAcceptsTargetPidAlias() {
+    @DisplayName("record audit accepts targetRecordPid as the pid-first target alias")
+    void recordAuditAcceptsTargetRecordPidAlias() {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("conversationId", "conv-1");
         body.put("messageId", "msg-1");
         body.put("actionType", "execute_command");
         body.put("commandCode", "crm.account.update");
         body.put("modelCode", "crm_account");
-        body.put("targetPid", "REC-PID-001");
+        body.put("targetRecordPid", "REC-PID-001");
         body.put("riskLevel", "medium");
         body.put("userDecision", "confirmed");
         body.put("executionResult", "success");
@@ -70,6 +70,38 @@ class AiActionAuditControllerTest {
                 eq(null),
                 eq("operator confirmed"),
                 eq(Map.of("field", "status"))
+        );
+    }
+
+    @Test
+    @DisplayName("record audit ignores legacy record id aliases")
+    void recordAuditIgnoresLegacyRecordIdAliases() {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("actionType", "execute_command");
+        body.put("commandCode", "crm.account.update");
+        body.put("modelCode", "crm_account");
+        body.put("targetRecord" + "Id", "legacy-target");
+        body.put("record" + "Id", "legacy-record");
+        body.put("riskLevel", "medium");
+        body.put("userDecision", "confirmed");
+
+        controller.recordAudit(body);
+
+        verify(auditService).record(
+                eq(7L),
+                eq(11L),
+                eq(null),
+                eq(null),
+                eq("execute_command"),
+                eq("crm.account.update"),
+                eq("crm_account"),
+                eq(null),
+                eq("medium"),
+                eq("confirmed"),
+                eq(null),
+                eq(null),
+                eq(null),
+                eq(null)
         );
     }
 }

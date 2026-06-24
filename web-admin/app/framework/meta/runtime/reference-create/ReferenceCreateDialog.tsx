@@ -17,7 +17,7 @@ function pickCreatedRecord(result: any): Record<string, any> | undefined {
     (candidate) =>
       candidate &&
       typeof candidate === 'object' &&
-      (candidate.pid !== undefined || candidate.recordId !== undefined),
+      (candidate.pid !== undefined || candidate.recordPid !== undefined),
   );
 }
 
@@ -34,7 +34,7 @@ export interface ReferenceCreateDialogProps {
   /** injected from useActionHandler in the parent */
   executeCommand: (
     commandCode: string,
-    targetRecordId: string | undefined,
+    targetRecordPid: string | undefined,
     payload: Record<string, any>,
     operationType: string,
   ) => Promise<any>;
@@ -67,7 +67,7 @@ export function ReferenceCreateDialog({
         setSubmitError(null);
         const result = await executeCommand(createCommand, undefined, values, 'create');
         const record = pickCreatedRecord(result);
-        const pid = record?.pid ?? record?.recordId;
+        const pid = record?.pid ?? record?.recordPid;
         if (!pid) {
           throw new Error(
             `[ReferenceCreateDialog] create command ${createCommand} returned no pid`,

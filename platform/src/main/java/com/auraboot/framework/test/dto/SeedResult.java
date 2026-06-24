@@ -17,7 +17,7 @@ public class SeedResult {
     private String tenantName;
     /** Test run ID for cross-platform coordination (format: {platform}_{timestamp}_{hex4}) */
     private String testRunId;
-    /** Record IDs created during this seed (empty for idempotent re-seed) */
+    /** Record PIDs created during this seed (empty for idempotent re-seed) */
     @Builder.Default
-    private java.util.List<String> recordIds = java.util.Collections.emptyList();
+    private java.util.List<String> recordPids = java.util.Collections.emptyList();
 }

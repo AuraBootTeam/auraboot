@@ -14,8 +14,8 @@ import java.util.Map;
  */
 @Data
 public class DebugSessionCreateRequest {
-    /** Record ID to use as trigger context */
-    private String recordId;
+    /** Record pid to use as trigger context */
+    private String recordPid;
 
     /** Initial breakpoints (action indices) */
     private List<Integer> breakpoints;

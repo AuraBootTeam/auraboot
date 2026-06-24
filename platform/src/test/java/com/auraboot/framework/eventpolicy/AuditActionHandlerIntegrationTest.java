@@ -47,7 +47,7 @@ class AuditActionHandlerIntegrationTest extends BaseIntegrationTest {
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
               "actions":[{"type":"WRITE_AUDIT","target":"AUDIT:%s","order":10,
                  "payload":{"message":"high-priority complaint received"},
-                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordId}:${rule.ruleCode}:AUDIT"}]}]
+                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:AUDIT"}]}]
             """.formatted(targetKey));
         var draft = versionService.createDraft(code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
                 ExecutionMode.ORDERED, FailureStrategy.CONTINUE_ON_ERROR, ConflictStrategy.REJECT_ON_CONFLICT,
@@ -56,9 +56,9 @@ class AuditActionHandlerIntegrationTest extends BaseIntegrationTest {
         versionService.publish(draft.getPid());
 
         Long tid = getTestTenant().getId();
-        String recordId = "CMP-AUD-" + System.nanoTime();
+        String recordPid = "CMP-AUD-" + System.nanoTime();
         EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
-                Map.of("record", Map.of("entityCode", targetKey, "recordId", recordId,
+                Map.of("record", Map.of("entityCode", targetKey, "recordPid", recordPid,
                         "data", Map.of("priority", "HIGH"))));
 
         // the policy matched and the WRITE_AUDIT action executed successfully (real handler)
@@ -70,7 +70,7 @@ class AuditActionHandlerIntegrationTest extends BaseIntegrationTest {
         Map<String, Object> audit = jdbcTemplate.queryForMap(
                 "select rule_code, action_type, target, message from ab_drt_action_audit "
                         + "where tenant_id=? and idempotency_key=?",
-                tid, targetKey + ":" + recordId + ":R-AUD:AUDIT");
+                tid, targetKey + ":" + recordPid + ":R-AUD:AUDIT");
         assertThat(audit.get("rule_code")).isEqualTo("R-AUD");
         assertThat(audit.get("action_type")).isEqualTo("WRITE_AUDIT");
         assertThat(audit.get("target")).isEqualTo("AUDIT:" + targetKey);

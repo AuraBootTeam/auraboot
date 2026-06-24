@@ -68,7 +68,7 @@ public class AutomationServiceIntegrationTest extends BaseIntegrationTest {
         req.setActions(List.of(
                 AutomationAction.builder()
                         .type("update_record")
-                        .config(Map.of("modelCode", modelCode, "recordId", "${recordId}",
+                        .config(Map.of("modelCode", modelCode, "recordPid", "${recordPid}",
                                 "fields", Map.of("status", "done")))
                         .build()));
         req.setEnabled(false);

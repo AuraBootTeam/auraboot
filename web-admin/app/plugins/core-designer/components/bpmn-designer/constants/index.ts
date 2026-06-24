@@ -222,7 +222,7 @@ export const DEFAULT_NODE_CONFIGS = {
     name: 'Record Update Task',
     description: '',
     modelCode: '',
-    recordIdVar: 'businessKey',
+    recordPidVar: 'businessKey',
     fieldName: '',
     fieldValue: '',
   },

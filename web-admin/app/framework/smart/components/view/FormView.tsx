@@ -24,7 +24,7 @@ import { ViewEmptyState } from './shared';
 interface FormViewProps {
   viewConfig?: ViewConfig;
   modelCode: string;
-  onSubmitSuccess?: (recordId: string) => void;
+  onSubmitSuccess?: (recordPid: string) => void;
   onOpenViewConfig?: () => void;
   className?: string;
 }

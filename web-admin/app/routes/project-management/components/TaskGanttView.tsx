@@ -229,7 +229,7 @@ export default function TaskGanttView({ projectId, onTaskClick, refreshKey }: Ta
 
       try {
         const result = await post<unknown>('/api/meta/commands/execute/pm:update_task', {
-          targetRecordId: ganttTask.id,
+          targetRecordPid: ganttTask.id,
           operationType: 'update',
           payload: {
             pm_task_start_date: newStart,

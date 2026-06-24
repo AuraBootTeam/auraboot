@@ -60,14 +60,14 @@ class CommandSideEffectSpelTest {
     }
 
     @Test
-    @DisplayName("${recordId} resolves to current record id")
+    @DisplayName("legacy recordId placeholder is not resolved")
     void recordIdReference() {
-        Map<String, Object> mapping = Map.of("ref_id", "${recordId}");
-        Map<String, Object> record = Map.of("id", "abc-123");
+        Map<String, Object> mapping = Map.of("ref_id", "${record" + "Id}");
+        Map<String, Object> record = Map.of("id", "abc-123", "record" + "Id", "legacy-123");
 
         Map<String, Object> result = executor.resolveFieldMapping(mapping, record);
 
-        assertEquals("abc-123", result.get("ref_id"));
+        assertNull(result.get("ref_id"));
     }
 
     @Test
@@ -134,11 +134,11 @@ class CommandSideEffectSpelTest {
     void mixedFieldMapping() {
         Map<String, Object> mapping = new HashMap<>();
         mapping.put("status", "approved");
-        mapping.put("ref_id", "${recordId}");
+        mapping.put("ref_pid", "${recordPid}");
         mapping.put("total", "${amount + tax}");
 
         Map<String, Object> record = Map.of(
-                "id", "rec-001",
+                "pid", "rec-001",
                 "amount", 10000,
                 "tax", 1300
         );
@@ -146,7 +146,7 @@ class CommandSideEffectSpelTest {
         Map<String, Object> result = executor.resolveFieldMapping(mapping, record);
 
         assertEquals("approved", result.get("status"));
-        assertEquals("rec-001", result.get("ref_id"));
+        assertEquals("rec-001", result.get("ref_pid"));
         assertEquals(11300, result.get("total"));
     }
 
@@ -166,7 +166,7 @@ class CommandSideEffectSpelTest {
     void nullCurrentRecord() {
         Map<String, Object> mapping = Map.of(
                 "total", "${a + b}",
-                "ref", "${recordId}"
+                "ref", "${recordPid}"
         );
 
         Map<String, Object> result = executor.resolveFieldMapping(mapping, null);

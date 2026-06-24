@@ -6,7 +6,7 @@ import type { MonthlyGridConfig } from '~/framework/meta/schemas/types';
 
 interface MonthlyGridViewerProps {
   config: MonthlyGridConfig;
-  parentRecordId: string;
+  parentRecordPid: string;
   token?: string;
   locale?: string;
   t?: (key: string) => string;
@@ -16,7 +16,7 @@ const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
   config,
-  parentRecordId,
+  parentRecordPid,
   token,
   locale = 'zh-CN',
   t = (key: string) => key,
@@ -29,14 +29,14 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
   >({});
 
   useEffect(() => {
-    if (!parentRecordId) return;
+    if (!parentRecordPid) return;
 
     const load = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const parentRecords = await loadParentRows(config, parentRecordId, token);
+        const parentRecords = await loadParentRows(config, parentRecordPid, token);
         const sortedParents = [...parentRecords].sort((a, b) => {
           const sortField = config.parentSortField;
           if (!sortField) return 0;
@@ -73,7 +73,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
     };
 
     load();
-  }, [config, parentRecordId, token]);
+  }, [config, parentRecordPid, token]);
 
   const metrics = config.metrics || [];
   const displayField = config.parentDisplayField || 'ap_wp_name';
@@ -252,12 +252,12 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
   );
 };
 
-async function loadParentRows(config: MonthlyGridConfig, parentRecordId: string, token?: string) {
+async function loadParentRows(config: MonthlyGridConfig, parentRecordPid: string, token?: string) {
   if (config.resolveVia) {
     const rv = config.resolveVia;
     const intermediateModel = rv.intermediateModel;
     const intermediateFilters: Array<{ fieldName: string; operator: string; value: any }> = [
-      { fieldName: rv.intermediateParentField, operator: 'EQ', value: parentRecordId },
+      { fieldName: rv.intermediateParentField, operator: 'EQ', value: parentRecordPid },
     ];
     if (rv.filterCondition?.field) {
       intermediateFilters.push({
@@ -308,7 +308,7 @@ async function loadParentRows(config: MonthlyGridConfig, parentRecordId: string,
       pageNum: 1,
       pageSize: 500,
       filters: JSON.stringify([
-        { fieldName: config.parentField, operator: 'EQ', value: parentRecordId },
+        { fieldName: config.parentField, operator: 'EQ', value: parentRecordPid },
       ]),
     },
     token,

@@ -141,7 +141,7 @@ export default function TaskListView({
       setTasks((prev) => prev.map((t) => (t.pid === taskPid ? { ...t, [field]: value } : t)));
       try {
         const result = await post<unknown>('/api/meta/commands/execute/pm:update_task', {
-          targetRecordId: taskPid,
+          targetRecordPid: taskPid,
           operationType: 'update',
           payload: { [field]: value },
         });

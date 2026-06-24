@@ -86,7 +86,7 @@ class DefaultRecipientResolverTest {
     @Test
     void resolve_operator_noMetaContext_returnsEmpty() {
         // MetaContext is not set in unit test environment → graceful empty return
-        CommandCompletedEvent event = buildEvent(Map.of("recordId", "r-001"));
+        CommandCompletedEvent event = buildEvent(Map.of("recordPid", "r-001"));
 
         List<Long> result = resolver.resolve(event, "operator", null);
 

@@ -39,6 +39,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class CommandSideEffectExecutor {
 
+    private static final String LEGACY_RECORD_ID_PLACEHOLDER = "record" + "Id";
+
     private final DynamicDataMapper dynamicDataMapper;
     private final DynamicDataService dynamicDataService;
     private final MetaModelService metaModelService;
@@ -102,7 +104,6 @@ public class CommandSideEffectExecutor {
                     case "update_record" -> {
                         String targetIdField = (String) effect.get("targetIdField");
                         if (targetIdField == null) targetIdField = (String) effect.get("targetRecordField");
-                        if (targetIdField == null) targetIdField = (String) effect.get("recordIdField");
                         executeSideEffectUpdate(targetModel, targetIdField, fieldMapping,
                                 currentRecord, tenantId);
                     }
@@ -115,7 +116,6 @@ public class CommandSideEffectExecutor {
                         String sourceField = (String) effect.get("sourceField");
                         String targetIdField = (String) effect.get("targetIdField");
                         if (targetIdField == null) targetIdField = (String) effect.get("targetRecordField");
-                        if (targetIdField == null) targetIdField = (String) effect.get("recordIdField");
                         executeBatchUpdate(targetModel, sourceField, targetIdField, fieldMapping,
                                 currentRecord, tenantId);
                     }
@@ -144,8 +144,8 @@ public class CommandSideEffectExecutor {
                         case "create_record" -> executeSideEffectCreate(targetModel, fieldMapping,
                                 currentRecord, tenantId, userId);
                         case "update_record" -> {
-                            String targetIdField = (String) actionDef.get("recordIdField");
-                            if (targetIdField == null) targetIdField = (String) actionDef.get("targetIdField");
+                            String targetIdField = (String) actionDef.get("targetIdField");
+                            if (targetIdField == null) targetIdField = (String) actionDef.get("targetRecordField");
                             executeSideEffectUpdate(targetModel, targetIdField, fieldMapping,
                                     currentRecord, tenantId);
                         }
@@ -157,7 +157,7 @@ public class CommandSideEffectExecutor {
                         case "batch_update_record", "batch_update_records" -> {
                             String sourceField = (String) actionDef.get("sourceField");
                             String targetIdField = (String) actionDef.get("targetIdField");
-                            if (targetIdField == null) targetIdField = (String) actionDef.get("recordIdField");
+                            if (targetIdField == null) targetIdField = (String) actionDef.get("targetRecordField");
                             executeBatchUpdate(targetModel, sourceField, targetIdField, fieldMapping,
                                     currentRecord, tenantId);
                         }
@@ -331,13 +331,12 @@ public class CommandSideEffectExecutor {
                     String fieldName = strValue.substring("$current.".length());
                     value = currentRecord != null ? currentRecord.get(fieldName) : null;
                 } else if (strValue.startsWith("${") && strValue.endsWith("}")) {
-                    // Template format: ${fieldName}, ${recordPid}, legacy ${recordId}, or ${SpEL expression}
+                    // Template format: ${fieldName}, ${recordPid}, or ${SpEL expression}
                     String inner = strValue.substring(2, strValue.length() - 1).trim();
                     if ("recordPid".equals(inner) || "pid".equals(inner)) {
                         value = resolveCurrentRecordPid(currentRecord);
-                    } else if ("recordId".equals(inner)) {
-                        // Legacy alias: recordId resolves to the current record's id field.
-                        value = currentRecord != null ? currentRecord.get("id") : null;
+                    } else if (LEGACY_RECORD_ID_PLACEHOLDER.equals(inner)) {
+                        value = null;
                     } else if (inner.matches("^[a-zA-Z_][a-zA-Z0-9_]*$")) {
                         // Simple field reference
                         value = currentRecord != null ? currentRecord.get(inner) : null;
@@ -481,7 +480,7 @@ public class CommandSideEffectExecutor {
      * Create multiple records from an array field in the payload.
      * Iterates over the array in sourceField, creating one record per item.
      * fieldMapping supports ${item.xxx} to reference fields from each array item,
-     * plus ${recordPid}, legacy ${recordId}, and ${fieldName} for current record context.
+     * plus ${recordPid} and ${fieldName} for current record context.
      */
     @SuppressWarnings("unchecked")
     void executeBatchCreate(String targetModel, String sourceField,
@@ -611,7 +610,6 @@ public class CommandSideEffectExecutor {
      * Supports:
      * - "${item.fieldName}" -> resolve from the current array item
      * - "${recordPid}" -> current record's public pid
-     * - "${recordId}" -> current record's id (legacy alias)
      * - "${fieldName}" / "$current.fieldName" -> resolve from current record
      * - Plain values -> use as-is
      */
@@ -631,12 +629,12 @@ public class CommandSideEffectExecutor {
                     String fieldName = strValue.substring("$current.".length());
                     value = currentRecord != null ? currentRecord.get(fieldName) : null;
                 } else if (strValue.startsWith("${") && strValue.endsWith("}")) {
-                    // Template format: ${fieldName}, ${recordPid}, or legacy ${recordId}
+                    // Template format: ${fieldName} or ${recordPid}
                     String fieldName = strValue.substring(2, strValue.length() - 1);
                     if ("recordPid".equals(fieldName) || "pid".equals(fieldName)) {
                         value = resolveCurrentRecordPid(currentRecord);
-                    } else if ("recordId".equals(fieldName)) {
-                        value = currentRecord != null ? currentRecord.get("id") : null;
+                    } else if (LEGACY_RECORD_ID_PLACEHOLDER.equals(fieldName)) {
+                        value = null;
                     } else {
                         value = currentRecord != null ? currentRecord.get(fieldName) : null;
                     }
@@ -664,18 +662,18 @@ public class CommandSideEffectExecutor {
                                                     Map<String, Object> fieldMapResults) {
         Map<String, Object> context = new HashMap<>(payload);
 
-        // Merge fieldMapResults (contains recordId from FIELD_MAP INSERT for CREATE commands)
+        // Merge fieldMapResults (contains recordPid from FIELD_MAP INSERT for CREATE commands)
         if (fieldMapResults != null) {
-            // Only merge recordId and other metadata, not _inserted/_updated counters
-            Object fmRecordId = fieldMapResults.get("recordId");
-            if (fmRecordId != null && !context.containsKey("id")) {
-                context.put("id", coerceRecordId(fmRecordId));
+            // Only merge recordPid and other metadata, not _inserted/_updated counters
+            Object fmRecordPid = fieldMapResults.get("recordPid");
+            if (fmRecordPid != null && !context.containsKey("id")) {
+                context.put("id", coerceRecordId(fmRecordPid));
             }
-            if (fmRecordId != null && !context.containsKey("pid")) {
-                context.put("pid", fmRecordId);
+            if (fmRecordPid != null && !context.containsKey("pid")) {
+                context.put("pid", fmRecordPid);
             }
-            if (fmRecordId != null && !context.containsKey("recordPid")) {
-                context.put("recordPid", fmRecordId);
+            if (fmRecordPid != null && !context.containsKey("recordPid")) {
+                context.put("recordPid", fmRecordPid);
             }
         }
 

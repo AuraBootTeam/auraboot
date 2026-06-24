@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * the behavioral contract slice #1 depends on:
  * <ul>
  *   <li>the sideEffect fires and creates exactly one target record;</li>
- *   <li>{@code "${recordId}"} resolves to the source record's pid → the link field;</li>
+ *   <li>{@code "${recordPid}"} resolves to the source record's pid -> the link field;</li>
  *   <li>a payload field (the fault note) flows to the target via {@code "${field}"};</li>
  *   <li>a NOT-NULL target field that the source create-command would auto-generate (the code) is
  *       satisfied because the sideEffect maps it explicitly (the sideEffect path bypasses any
@@ -110,7 +110,7 @@ class CommandCreateRecordSideEffectIT extends BaseIntegrationTest {
                 "targetModel", maintModel,
                 "fieldMapping", new LinkedHashMap<>(Map.of(
                         "m_code", "${a_code}",
-                        "m_asset", "${recordId}",
+                        "m_asset", "${recordPid}",
                         "m_type", "repair",
                         "m_notes", "${a_note}")))));
         CommandDefinitionCreateRequest req = new CommandDefinitionCreateRequest();
@@ -168,7 +168,7 @@ class CommandCreateRecordSideEffectIT extends BaseIntegrationTest {
 
         Map<String, Object> rec = jdbcTemplate.queryForMap(
                 "SELECT m_code, m_asset, m_type, m_notes FROM " + maintTable + " WHERE m_asset = ?", assetPid);
-        assertEquals(assetPid, rec.get("m_asset"), "${recordId} must link the new record to the source pid");
+        assertEquals(assetPid, rec.get("m_asset"), "${recordPid} must link the new record to the source pid");
         assertEquals("repair", rec.get("m_type"), "literal mapping must pass through");
         assertEquals("hydraulic leak", rec.get("m_notes"), "${a_note} payload field must flow to the target");
         assertEquals("A-" + suffix, rec.get("m_code"), "NOT-NULL code must be satisfied via the explicit mapping");

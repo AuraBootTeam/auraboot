@@ -110,7 +110,7 @@ public class RecordCapabilityServiceImpl implements RecordCapabilityService {
 
         return RecordCapabilities.builder()
                 .modelCode(modelCode)
-                .recordId(recordId)
+                .recordPid(recordId)
                 .recordState(recordState)
                 .capabilities(actions)
                 .tabs(tabs)

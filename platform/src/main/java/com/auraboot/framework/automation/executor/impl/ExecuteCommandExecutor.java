@@ -46,9 +46,9 @@ public class ExecuteCommandExecutor implements ActionExecutor {
         }
 
         // Add context values to params
-        String recordId = (String) context.get("recordId");
-        if (recordId != null && !params.containsKey("pid")) {
-            params.put("pid", recordId);
+        String recordPid = (String) context.get("recordPid");
+        if (recordPid != null && !params.containsKey("recordPid")) {
+            params.put("recordPid", recordPid);
         }
 
         // Process parameter values
@@ -59,7 +59,7 @@ public class ExecuteCommandExecutor implements ActionExecutor {
         // Execute command
         CommandExecuteRequest executeRequest = new CommandExecuteRequest();
         executeRequest.setPayload(processedParams);
-        executeRequest.setTargetRecordId(recordId);
+        executeRequest.setTargetRecordId(recordPid);
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, executeRequest);
 

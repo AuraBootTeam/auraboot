@@ -51,7 +51,7 @@ export interface BpmPanelConfig {
 interface BpmPanelBlockProps {
   block: BlockConfig & { bpmPanel?: BpmPanelConfig };
   record: Record<string, unknown> | null | undefined;
-  recordId: string;
+  recordPid: string;
 }
 
 /** Render a single placeholder section with a stable `data-testid`. */
@@ -66,7 +66,7 @@ function SectionPlaceholder({ section }: { section: BpmPanelSection }) {
   );
 }
 
-export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
+export function BpmPanelBlock({ block, record, recordPid }: BpmPanelBlockProps) {
   const { t } = useI18n();
   const config = block.bpmPanel ?? {};
   const sections: BpmPanelSection[] =
@@ -77,12 +77,12 @@ export function BpmPanelBlock({ block, record, recordId }: BpmPanelBlockProps) {
       : [...BPM_PANEL_SECTIONS];
 
   // Resolve businessKey: prefer explicit field on record, fall back to
-  // recordId. We do NOT apply any multi-path fallback chain - a missing
-  // configured field yields `undefined`, which short-circuits to recordId.
+  // recordPid. We do NOT apply any multi-path fallback chain - a missing
+  // configured field yields `undefined`, which short-circuits to recordPid.
   const businessKey =
     config.businessKeyField && record
       ? (record[config.businessKeyField] as string | number | undefined)
-      : recordId;
+      : recordPid;
 
   const [instance, setInstance] = useState<BpmInstanceForRecord | null>(null);
   const [loading, setLoading] = useState(true);

@@ -30,7 +30,7 @@ public class AutomationLogDTO {
     private String automationName;
 
     private String triggerType;
-    private String triggerRecordId;
+    private String triggerRecordPid;
     private Map<String, Object> triggerPayload;
 
     private String status;

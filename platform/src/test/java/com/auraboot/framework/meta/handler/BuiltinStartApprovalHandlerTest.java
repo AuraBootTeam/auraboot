@@ -300,7 +300,7 @@ class BuiltinStartApprovalHandlerTest {
 
         Map<String, Object> businessData = dataCaptor.getValue();
         assertThat(businessData.get("modelCode")).isEqualTo("cc_contract");
-        assertThat(businessData.get("recordId")).isEqualTo("rec-006");
+        assertThat(businessData.get("recordPid")).isEqualTo("rec-006");
         assertThat(businessData.get("initiator")).isEqualTo("99");
         assertThat(businessData.get("cc_contract_amount")).isEqualTo(50000);
     }

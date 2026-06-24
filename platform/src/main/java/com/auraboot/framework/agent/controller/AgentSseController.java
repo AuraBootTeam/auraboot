@@ -28,7 +28,7 @@ public class AgentSseController {
      *
      * Events sent:
      * - "connected": Connection established confirmation
-     * - "agent-event": Agent run status change (type, agentId, recordId, payload)
+     * - "agent-event": Agent run status change (type, agentId, recordPid, payload)
      * - "heartbeat": Keep-alive ping (every 30 seconds)
      */
     @GetMapping(value = "/events/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)

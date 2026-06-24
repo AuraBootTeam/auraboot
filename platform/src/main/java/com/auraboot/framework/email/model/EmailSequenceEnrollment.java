@@ -34,9 +34,9 @@ public class EmailSequenceEnrollment {
     @TableField("model_code")
     private String modelCode;
 
-    /** Primary key of the associated CRM record. */
-    @TableField("record_id")
-    private String recordId;
+    /** Public pid of the associated CRM record. */
+    @TableField("record_pid")
+    private String recordPid;
 
     /** Index of the next step to execute (0 = not started, 1 = first step sent, …). */
     @TableField("current_step")

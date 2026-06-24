@@ -11,7 +11,7 @@ import type { DocumentFlowStep, DocumentFlowStepperProps } from './DocumentFlowC
  * - Current step: blue circle with pulsing ring
  * - Upcoming steps: gray circle with dashed connector
  * - Skipped steps: gray circle with strikethrough
- * - Clickable steps (when recordId exists) for navigation
+ * - Clickable steps (when recordPid exists) for navigation
  * - Status badge under the current step
  * - Responsive: collapses to show only current + adjacent on small screens
  *
@@ -30,7 +30,7 @@ export const DocumentFlowStepper: React.FC<DocumentFlowStepperProps> = ({
 
   const handleStepClick = useCallback(
     (step: DocumentFlowStep) => {
-      if (step.recordId && onStepClick) {
+      if (step.recordPid && onStepClick) {
         onStepClick(step);
       }
     },
@@ -165,7 +165,7 @@ function StepNode({
   onStepClick: (step: DocumentFlowStep) => void;
   compact?: boolean;
 }) {
-  const isClickable = !!step.recordId && step.status !== 'current';
+  const isClickable = !!step.recordPid && step.status !== 'current';
   const isCurrent = step.status === 'current';
   const isCompleted = step.status === 'completed';
   const isSkipped = step.status === 'skipped';

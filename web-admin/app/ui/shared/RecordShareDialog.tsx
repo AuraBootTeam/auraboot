@@ -5,7 +5,7 @@ export interface RecordShareDialogProps {
   open: boolean;
   onClose: () => void;
   resourceCode?: string;
-  recordId?: string | number;
+  recordPid?: string;
 }
 
 export function RecordShareDialog(_props: RecordShareDialogProps): null {

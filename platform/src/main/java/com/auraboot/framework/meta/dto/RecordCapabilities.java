@@ -1,6 +1,8 @@
 package com.auraboot.framework.meta.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 import lombok.Data;
 
@@ -27,8 +29,8 @@ public class RecordCapabilities {
     /** The model code this response belongs to. */
     private String modelCode;
 
-    /** The record ID this response belongs to. */
-    private String recordId;
+    /** The record PID this response belongs to. */
+    private String recordPid;
 
     /** Current record state (normalized to lowercase), e.g. "draft", "active", "proposal". */
     private String recordState;
@@ -39,8 +41,18 @@ public class RecordCapabilities {
     /** Tabs available on the detail page for this model, with visibility and badge info. */
     private List<TabCapability> tabs;
 
-    /** ETag for conditional requests. Format: W/"cap-{recordId}-{timestamp}". */
+    /** ETag for conditional requests. Format: W/"cap-{recordPid}-{timestamp}". */
     private String etag;
+
+    @JsonIgnore
+    @Schema(hidden = true)
+    public String getRecordId() {
+        return recordPid;
+    }
+
+    public void setRecordId(String recordId) {
+        this.recordPid = recordId;
+    }
 
     /**
      * Single action capability descriptor.

@@ -20,7 +20,7 @@ public class ConversationListItem {
     private Boolean muted;
     private Integer memberCount;
     private String boundModelCode;
-    private Long boundRecordId;
+    private String boundRecordPid;
     private Long conductorAgentId;
     private Integer aiContextWindow;
     private Boolean aiEnabled;

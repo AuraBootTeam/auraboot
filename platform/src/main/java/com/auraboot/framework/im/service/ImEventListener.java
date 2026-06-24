@@ -123,45 +123,39 @@ public class ImEventListener {
             return;
         }
 
-        try {
-            Long recordId = Long.parseLong(String.valueOf(event.getRecordId()));
-            ImConversation objConv = conversationService.findByBoundRecord(
-                    event.getModelCode(), recordId, tenantId);
-            if (objConv == null) {
-                return; // No object conversation for this record — skip
-            }
-
-            String cardPayload = buildCardPayload(event);
-            String content = buildContentSummary(event);
-            String clientMsgId = "evt_obj_" + event.getEventId();
-
-            ImMessage saved = messageService.sendSystemMessage(
-                    objConv.getId(), tenantId,
-                    "card", content, cardPayload, clientMsgId);
-
-            // Push to all members of the object conversation
-            List<Long> memberIds = memberMapper.findHumanMemberIds(objConv.getId(), tenantId);
-            WsFrame frame = WsFrame.builder()
-                    .type("message")
-                    .data(Map.of(
-                            "messageId", saved.getId(),
-                            "conversationId", objConv.getId(),
-                            "senderId", saved.getSenderId(),
-                            "seq", saved.getSeq(),
-                            "messageType", saved.getMessageType(),
-                            "content", saved.getContent() != null ? saved.getContent() : "",
-                            "cardPayload", saved.getCardPayload() != null ? saved.getCardPayload() : "",
-                            "createdAt", saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : ""
-                    ))
-                    .build();
-            broadcaster.publish(memberIds, frame);
-
-            log.debug("Dual-delivery to object conversation: eventId={}, convId={}, seq={}",
-                    event.getEventId(), objConv.getId(), saved.getSeq());
-        } catch (NumberFormatException e) {
-            // CATCH: expected — recordId may not be numeric for all models, skip dual-delivery
-            log.debug("Skipping dual-delivery: recordId={} is not numeric", event.getRecordId());
+        ImConversation objConv = conversationService.findByBoundRecord(
+                event.getModelCode(), event.getRecordId(), tenantId);
+        if (objConv == null) {
+            return; // No object conversation for this record — skip
         }
+
+        String cardPayload = buildCardPayload(event);
+        String content = buildContentSummary(event);
+        String clientMsgId = "evt_obj_" + event.getEventId();
+
+        ImMessage saved = messageService.sendSystemMessage(
+                objConv.getId(), tenantId,
+                "card", content, cardPayload, clientMsgId);
+
+        // Push to all members of the object conversation
+        List<Long> memberIds = memberMapper.findHumanMemberIds(objConv.getId(), tenantId);
+        WsFrame frame = WsFrame.builder()
+                .type("message")
+                .data(Map.of(
+                        "messageId", saved.getId(),
+                        "conversationId", objConv.getId(),
+                        "senderId", saved.getSenderId(),
+                        "seq", saved.getSeq(),
+                        "messageType", saved.getMessageType(),
+                        "content", saved.getContent() != null ? saved.getContent() : "",
+                        "cardPayload", saved.getCardPayload() != null ? saved.getCardPayload() : "",
+                        "createdAt", saved.getCreatedAt() != null ? saved.getCreatedAt().toString() : ""
+                ))
+                .build();
+        broadcaster.publish(memberIds, frame);
+
+        log.debug("Dual-delivery to object conversation: eventId={}, convId={}, seq={}",
+                event.getEventId(), objConv.getId(), saved.getSeq());
     }
 
     private String buildCardPayload(CommandCompletedEvent event) {
@@ -170,7 +164,6 @@ public class ImEventListener {
             card.put("cardType", "command_completed");
             card.put("modelCode", event.getModelCode());
             card.put("sourceModel", event.getModelCode());
-            card.put("recordId", event.getRecordId());
             card.put("recordPid", event.getRecordId());
             card.put("sourceRecordPid", event.getRecordId());
             card.put("commandCode", event.getCommandCode());

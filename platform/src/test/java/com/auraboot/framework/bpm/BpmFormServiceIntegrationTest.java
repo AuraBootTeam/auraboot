@@ -455,12 +455,12 @@ class BpmFormServiceIntegrationTest extends BaseIntegrationTest {
         def.setDeletedFlag(false);
         processDefinitionMapper.insert(def);
 
-        // Mock CommandExecutor to return a result with recordId
+        // Mock CommandExecutor to return a result with recordPid
         when(commandExecutor.execute(eq("cc_contract.create"), any(CommandExecuteRequest.class)))
                 .thenReturn(CommandExecuteResult.builder()
                         .commandCode("cc_contract.create")
                         .phaseReached("COMPLETED")
-                        .data(Map.of("id", "record-123"))
+                        .data(Map.of("recordPid", "record-123"))
                         .executionTimeMs(50)
                         .build());
 

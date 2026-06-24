@@ -22,7 +22,7 @@ export interface TreeViewProps {
   /** Model code for data fetching */
   modelCode: string;
   /** Callback when a tree node (record) is clicked */
-  onNodeClick?: (recordId: string) => void;
+  onNodeClick?: (recordPid: string) => void;
   /** External filter conditions */
   linkageFilters?: FilterConfig[];
   /** Custom CSS class */

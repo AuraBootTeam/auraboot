@@ -27,9 +27,9 @@ const block = {
 } as unknown as BlockConfig;
 
 describe('EmbeddedListBlockRenderer', () => {
-  it('builds fixedFilters from parentField + explicit parentRecordId and passes columns/modelCode', () => {
+  it('builds fixedFilters from parentField + explicit parentRecordPid and passes columns/modelCode', () => {
     recordListProps.mockClear();
-    render(<EmbeddedListBlockRenderer block={block} parentRecordId="TASK-1" />);
+    render(<EmbeddedListBlockRenderer block={block} parentRecordPid="TASK-1" />);
 
     expect(screen.getByTestId('record-list-view')).toBeInTheDocument();
     const props = recordListProps.mock.calls.at(-1)![0];
@@ -38,9 +38,9 @@ describe('EmbeddedListBlockRenderer', () => {
     expect(props.columns).toHaveLength(1);
   });
 
-  it('falls back to runtime context $page.recordId when no explicit parent id', () => {
+  it('falls back to runtime context $page.recordPid when no explicit parent id', () => {
     recordListProps.mockClear();
-    const runtime = { getContext: () => ({ $page: { recordId: 'CTX-9' } }) } as any;
+    const runtime = { getContext: () => ({ $page: { recordPid: 'CTX-9' } }) } as any;
     render(<EmbeddedListBlockRenderer block={block} runtime={runtime} />);
 
     const props = recordListProps.mock.calls.at(-1)![0];
@@ -50,7 +50,7 @@ describe('EmbeddedListBlockRenderer', () => {
   it('renders a warning (not RecordListView) when modelCode is missing', () => {
     recordListProps.mockClear();
     const bad = { id: 'x', blockType: 'embedded-list', columns: [] } as unknown as BlockConfig;
-    render(<EmbeddedListBlockRenderer block={bad} parentRecordId="T" />);
+    render(<EmbeddedListBlockRenderer block={bad} parentRecordPid="T" />);
 
     expect(screen.queryByTestId('record-list-view')).not.toBeInTheDocument();
     expect(screen.getByText(/missing modelCode/i)).toBeInTheDocument();

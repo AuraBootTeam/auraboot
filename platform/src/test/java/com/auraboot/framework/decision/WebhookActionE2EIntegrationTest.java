@@ -86,7 +86,7 @@ class WebhookActionE2EIntegrationTest extends BaseIntegrationTest {
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
               "actions":[{"type":"WEBHOOK","target":"%s","order":10,
                  "payload":{"eventType":"%s","caseId":"CMP-WH-1"},
-                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordId}:${rule.ruleCode}:WH"}]}]
+                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:WH"}]}]
             """).formatted(eventType, eventType));
         var draft = versionService.createDraft(code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
                 ExecutionMode.ORDERED, FailureStrategy.CONTINUE_ON_ERROR, ConflictStrategy.REJECT_ON_CONFLICT,
@@ -95,7 +95,7 @@ class WebhookActionE2EIntegrationTest extends BaseIntegrationTest {
         versionService.publish(draft.getPid());
 
         var result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
-                Map.of("record", Map.of("entityCode", targetKey, "recordId", "CMP-WH-1",
+                Map.of("record", Map.of("entityCode", targetKey, "recordPid", "CMP-WH-1",
                         "data", Map.of("priority", "HIGH"))));
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");
         assertThat(result.execution().actions().get(0).status().name()).isEqualTo("SUCCESS");

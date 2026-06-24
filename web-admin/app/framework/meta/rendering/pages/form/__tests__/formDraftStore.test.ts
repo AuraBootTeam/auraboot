@@ -31,13 +31,13 @@ function createFakeStorage(seed: Record<string, string> = {}): Storage {
 }
 
 describe('draftKey', () => {
-  it('composes a stable, namespaced key for create forms (no recordId)', () => {
+  it('composes a stable, namespaced key for create forms (no recordPid)', () => {
     expect(draftKey('crm_account', 'crm_account_form')).toBe(
       'aura_form_draft:crm_account:crm_account_form:new',
     );
   });
 
-  it('scopes edit drafts by recordId so different records do not collide', () => {
+  it('scopes edit drafts by recordPid so different records do not collide', () => {
     const create = draftKey('crm_account', 'crm_account_form');
     const editA = draftKey('crm_account', 'crm_account_form', '01ABC');
     const editB = draftKey('crm_account', 'crm_account_form', '01XYZ');

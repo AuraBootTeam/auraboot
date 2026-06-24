@@ -206,7 +206,7 @@ public class EmailMessageController {
     /**
      * Creates a manual CRM record link for a message.
      *
-     * <p>Request body: {@code {modelCode, recordId, threadId?}}.
+     * <p>Request body: {@code {modelCode, recordPid, threadId?}}.
      *
      * @param id message database ID
      */
@@ -216,7 +216,7 @@ public class EmailMessageController {
                                                    @RequestBody Map<String, String> body) {
         Long   tenantId  = MetaContext.getCurrentTenantId();
         String modelCode = body.get("modelCode");
-        String recordId  = body.get("recordId");
+        String recordPid = body.get("recordPid");
         String threadId  = body.get("threadId");
 
         EmailMessage message = emailMessageMapper.selectById(id);
@@ -226,7 +226,7 @@ public class EmailMessageController {
 
         String effectiveThreadId = threadId != null ? threadId : message.getGmailThreadId();
         EmailRecordLink link = emailRecordLinkService.manualLink(tenantId, id,
-                effectiveThreadId, modelCode, recordId);
+                effectiveThreadId, modelCode, recordPid);
         return ApiResponse.ok(link);
     }
 
@@ -247,7 +247,7 @@ public class EmailMessageController {
      * Returns emails linked to a CRM record (for the CRM Timeline view).
      *
      * @param modelCode DSL model code of the CRM record
-     * @param recordId  primary key of the CRM record
+     * @param recordPid public pid of the CRM record
      * @param pageNum   1-based page number (default 1)
      * @param pageSize  page size (default 10, max 100)
      */
@@ -255,7 +255,7 @@ public class EmailMessageController {
     @Operation(summary = "Get emails linked to a CRM record (for Timeline)")
     public ApiResponse<Map<String, Object>> getByRecord(
             @RequestParam String modelCode,
-            @RequestParam String recordId,
+            @RequestParam String recordPid,
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "10") int pageSize) {
 
@@ -265,7 +265,7 @@ public class EmailMessageController {
 
         int offset = PaginationSafetyUtils.offset(pageNum, pageSize, 100);
         List<EmailMessage> messages = emailRecordLinkMapper.findMessagesByRecord(
-                tenantId, modelCode, recordId, pageSize, offset);
+                tenantId, modelCode, recordPid, pageSize, offset);
 
         return ApiResponse.ok(Map.of(
                 "records", messages,

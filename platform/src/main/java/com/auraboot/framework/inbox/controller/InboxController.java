@@ -148,7 +148,7 @@ public class InboxController {
         detail.put("submittedBy", item.getSubtitle() != null ? item.getSubtitle() : "Requester");
         detail.put("submittedAt", item.getCreatedAt() != null ? item.getCreatedAt().toString() : Instant.now().toString());
         detail.put("sourceModel", item.getModelCode());
-        detail.put("sourceRecordId", item.getRecordId());
+        detail.put("sourceRecordPid", item.getSourceRecordPid());
         detail.put("sourceRecordTitle", item.getTitle());
         detail.put("trail", List.of(currentStep));
         detail.put("comment", null);

@@ -11,6 +11,36 @@ relates_to:
 
 # Public Record PID-Only Endgame Follow-up Plan
 
+> 2026-06-24 final refresh: the executable remaining-task inventory is
+> `docs/backlog/2026-06-23-public-record-pid-only-remaining-tasks.md`.
+> Treat that backlog as current truth when this historical plan conflicts.
+> The original 529-count tables below are historical planning context. After
+> the local inbox/IM/email/share/utility/automation/agent fixes, the source
+> scanner reached 0 findings and live OpenAPI scanning passed 145 scoped
+> public-record paths plus 1308 component schemas with 0 findings. Final OSS
+> backend full v16 passed on a DB initialized from `database/schema.sql`; final
+> frontend `check` and full unit passed with pnpm 9.15.9; final schema SQL and
+> drift gates passed; final enterprise full v5 passed against the clean OSS
+> artifact `/tmp/auraboot-oss-public-record-pid-v15-m2/repository`.
+>
+> The v11 OSS full red was traced to a seedless initialization path:
+> `db/snapshots/schema-current.sql` is schema-only and omits platform seed rows.
+> The same required seeds are present in `database/schema.sql` and baseline
+> Flyway. Seeded OSS targeted v12 and backend full v12 passed on databases
+> initialized from `database/schema.sql`; they are now superseded by v15/v16
+> final proof in the current backlog.
+>
+> 2026-06-23 hard-mode update: user decision is development-stage one-shot
+> pid-only completion. Do not add public compatibility aliases. Record-adjacent
+> legacy columns are backfilled into pid columns and dropped in the same
+> package. Use the remaining-task inventory above as current truth when this
+> historical plan conflicts.
+>
+> Current non-technical close-out: stage/commit/push current OSS and enterprise
+> branches, update existing OSS PR #1060 and enterprise standards PR #657 by
+> push, create the enterprise consumer PR, and merge only after PR
+> topology/review/CI are clean.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` or `superpowers:executing-plans` when implementing this plan. Steps use checkbox syntax for tracking.
 
 **Goal:** Finish the platform public-record pid-only migration without leaving ambiguous `recordId` public contracts, data columns, DSL examples, or frontend fallbacks behind.
@@ -25,15 +55,17 @@ relates_to:
 
 1. This migration is not interface-only. Several remaining surfaces can be fixed by API/DTO naming, but inbox and IM still have numeric business-record columns and require schema + backfill before the public contract is honestly pid-only.
 2. Do the data-layer cleanup before removing aliases. If this waits until after rollout, production data will need model-aware backfills from numeric ids to dynamic-table pids.
-3. Keep compatibility aliases for one measured window only. New public contracts must not add new `recordId` names; legacy names must log/count usage.
-4. Treat `recordId` string columns case by case. Some already store pids in legacy-named columns; they still need public naming cleanup and preferably pid-named storage aliases to stop future regressions.
-5. Do not make one unreviewable code PR for all remaining work. "Once to completion" means one end-state design and complete migration path, then bounded implementation PRs that each reduce the accepted baseline and pass OSS + enterprise gates.
+3. Hard mode supersedes the earlier compatibility-window idea for this branch. New public contracts must not add `recordId` names, and existing public aliases should be removed unless the current backlog explicitly classifies them as internal/admin-only.
+4. Treat `recordId` string columns case by case for backfill correctness. Some already store pids in legacy-named columns, but they still move to pid-named storage aliases before the old columns are dropped.
+5. User direction is now one-shot completion on the current branch, but not one-shot merge without evidence. Keep the final PR coherent and reviewable by using the backlog tracker, a final evidence table, and strict OSS + enterprise gates before PR/merge.
 
-## Current Evidence
+## Historical Starting Evidence
 
 Current branch: `codex/watch-field-history-pid`.
 
-Current public-record inventory gate:
+The table below is the original starting inventory for this follow-up plan, not
+the current merge gate. The current merge gate is the executable backlog linked
+above.
 
 | Category | Findings | Files |
 | --- | ---: | ---: |
@@ -58,8 +90,8 @@ The remaining work is a mix of API-only, storage-alias, and true data migration.
 
 | Surface | Current storage evidence | Migration class | Required decision |
 | --- | --- | --- | --- |
-| Record share | `ab_record_share.record_id BIGINT`, `record_pid VARCHAR(64)` already exists | API + backfill audit | Public controller/DTO should use `recordPid`; ensure `record_pid` is non-null for active shares before alias removal. |
-| Watch/follow | `ab_watch.record_pid` added in current slice | Done | Keep legacy numeric column only as compatibility/internal cleanup target. |
+| Record share | `ab_record_share.record_id BIGINT`, `record_pid VARCHAR(64)` already exists | API + backfill audit | Public controller/DTO should use `recordPid`; ensure `record_pid` is non-null for active shares before dropping legacy public/mixed storage. |
+| Watch/follow | `ab_watch.record_pid` added in current slice | Done | Keep legacy numeric column only as an internal cleanup/drop target. |
 | Field history | `ab_field_change_log.record_pid` added in current slice | Done, with audit | Current backfill uses `record_id::text`; before final hard removal, run a model-aware audit to confirm old numeric rows are not exposed as pids. |
 | Record comments/activity | `ab_record_comment.record_pid` already canonical | Done | No further data migration. |
 | Inbox | `ab_inbox_item.record_id BIGINT` | True migration | Add `record_pid VARCHAR(64)`, backfill from `(tenant_id, model_code, record_id) -> dynamic table pid`, index it, dual-write, then public read uses `recordPid` / `sourceRecordPid`. |
@@ -105,7 +137,7 @@ If this ships without the true migration rows above, a future rollout will requi
 - [ ] Add pid columns and indexes for inbox, IM, email record links, email sequence enrollment, automation log/debug, and any chosen agent audit storage aliases.
 - [ ] Implement model-aware backfill helpers for numeric columns: resolve table name from model metadata, then update pid columns from dynamic table `pid` by `(tenant_id, id)`.
 - [ ] For string legacy columns, backfill with pid-first detection: if a row exists by `pid`, copy directly; otherwise if numeric, resolve by internal `id`.
-- [ ] Keep legacy columns nullable and readable only for one compatibility window.
+- [ ] In hard-mode branches, backfill pid columns and drop legacy public/mixed columns in the same package; only explicitly internal/admin numeric storage may remain.
 - [ ] Add integration tests that seed legacy numeric rows and prove public reads return only pid fields.
 
 **Done when:** `check-schema-sql`, schema drift, and targeted integration tests prove no public surface needs numeric record storage to render or route.
@@ -143,7 +175,7 @@ Current findings: 10 backend-public-api, 1 frontend-runtime.
 **Steps:**
 
 - [ ] Change public request/response fields and paths to `recordPid`.
-- [ ] Keep `recordId` only as deprecated input alias and log usage.
+- [ ] Remove public `recordId` input/output aliases; legacy keys may appear only in negative tests or internal cleanup code that strips them.
 - [ ] Backfill or validate `ab_record_share.record_pid` for all rows before relying on it exclusively.
 - [ ] Add tests for share create/list/revoke using pid-only values and no raw `record_id` in response.
 
@@ -170,11 +202,11 @@ Current findings: 10 backend-public-api across email/IM, 12 frontend-runtime in 
 **Steps:**
 
 - [ ] Migrate inbox and IM storage first as described in P1-DATA.
-- [ ] Change public email link APIs from `recordId` to `recordPid`; keep legacy alias with telemetry.
-- [ ] Change email sequence templates from `{{recordId}}` to `{{recordPid}}`; keep template alias compatibility with a deprecation warning.
-- [ ] Change object conversations to bind by `boundRecordPid`; keep numeric `boundRecordId` only as internal fallback.
-- [ ] Make inbox deep links resolve only from `recordPid` / `sourceRecordPid`; numeric `recordId` should not be the primary path.
-- [ ] Add tests for legacy seeded rows and new pid-only creates.
+- [ ] Change public email link APIs from `recordId` to `recordPid`; reject/strip public legacy keys instead of accepting alias input.
+- [ ] Change email sequence templates from `{{recordId}}` to `{{recordPid}}`; legacy template keys should not resolve.
+- [ ] Change object conversations to bind by `boundRecordPid`; numeric `boundRecordId` may exist only as internal storage before the migration drops it.
+- [ ] Make inbox deep links resolve only from `recordPid` / `sourceRecordPid`; numeric `recordId` must not be a public path.
+- [ ] Add tests for migrated legacy rows and new pid-only creates, plus negative tests for rejected legacy public keys.
 
 **Done when:** inbox/IM/email public flows work from pid-only data, and no public response requires numeric record ids.
 
@@ -198,7 +230,7 @@ Current findings: 11 backend-public-api across automation/agent controllers, plu
 **Steps:**
 
 - [ ] Add pid-named storage aliases for automation logs/debug sessions before changing controller DTOs.
-- [ ] Rename public manual trigger input to `recordPid`; legacy `recordId` remains an alias with telemetry.
+- [ ] Rename public manual trigger input to `recordPid`; do not accept public legacy `recordId` alias input.
 - [ ] Rename public agent audit output fields to `recordPid`, `targetRecordPid`, and `targetRecordPids`.
 - [ ] Keep internal policy/provenance names only if they are explicitly pid-semantic and documented as internal.
 - [ ] Add freshness and dry-run tests that use pid-only input and reject numeric-only public input once aliases are disabled.
@@ -302,11 +334,11 @@ Current findings: 0, but this is still a future regression risk.
 
 **Steps:**
 
-- [ ] Log and count every accepted legacy alias path: `recordId`, `recordIds`, `targetRecordId`, `boundRecordId`, `triggerRecordId`.
-- [ ] Include endpoint, tenant, modelCode, and caller category without logging sensitive payload values.
-- [ ] Define a removal gate: zero legacy alias usage for one release window plus passing pid-only fixtures.
+- [ ] Keep static/runtime scanners proving no public legacy alias paths are accepted: `recordId`, `recordIds`, `targetRecordId`, `boundRecordId`, `triggerRecordId`.
+- [ ] If an internal cleanup path strips legacy keys, test that it does not emit or route by those keys.
+- [ ] Define the merge gate as pid-only fixtures plus negative legacy-alias tests, not a release-window telemetry gate.
 
-**Done when:** alias removal is evidence-based instead of calendar-based.
+**Done when:** pid-only fixtures and negative legacy-alias tests prove public legacy keys are not accepted.
 
 ### P3-HARD-REMOVAL: Compatibility Cleanup
 

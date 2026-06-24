@@ -29,7 +29,6 @@ public class AgentActionItem {
     private String actionType;
     private String intentSummary;
     private String targetModel;
-    private String targetRecordId;
     private String targetRecordPid;
 
     private String beforeSnapshot;   // raw JSON string (JSONB)

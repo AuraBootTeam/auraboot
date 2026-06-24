@@ -390,8 +390,8 @@ export function ListPreview({ visible, model, fieldBindings, onClose }: ListPrev
                         </td>
                       </tr>
                     ) : (
-                      currentPageData.map((row) => (
-                        <tr key={row.id} className="hover:bg-subtle">
+                      currentPageData.map((row, index) => (
+                        <tr key={row.pid ?? index} className="hover:bg-subtle">
                           {sortedBindings.map((binding) => (
                             <td
                               key={binding.fieldCode}

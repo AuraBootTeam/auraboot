@@ -461,7 +461,7 @@ A create command inserts a new record into the model's table.
 An update command modifies an existing record.
 
 **Key behaviors:**
-- `targetRecordId` is required in the request payload.
+- `targetRecordPid` is required in the request payload.
 - Only fields present in the payload are validated and updated (partial update semantics).
 - If a required field is explicitly set to null/empty in the payload, validation fails. This prevents users from clearing mandatory fields through edits.
 - `preconditions` can restrict which records are editable (e.g., only `draft` status).
@@ -622,7 +622,7 @@ public class ApprovalHandler implements CommandHandlerExtension {
     @Override
     public Object execute(CommandContext context) {
         // Custom approval logic
-        String recordId = context.getTargetRecordId();
+        String recordPid = context.getTargetRecordId();
         // ... business logic ...
         return Map.of("approved", true);
     }
@@ -688,7 +688,7 @@ public Object execute(CommandContext context) {
         // host has no async bridge (older runtime) — run inline as a fallback
         parseInline(context, quoteId, fileId);
     }
-    return Map.of("recordId", quoteId);
+    return Map.of("recordPid", quoteId);
 }
 ```
 
@@ -703,7 +703,7 @@ This is what the quote-create flow uses: `create` binds the record and returns i
 
 ### Surfacing progress in the UI
 
-Every background command lands in `ab_async_task` (type `command-handler`) with the target `recordId`, a `status` (`running`/`success`/`failed`), `progress`, `progress_message`, and `error_message`. A detail page shows progress by:
+Every background command lands in `ab_async_task` (type `command-handler`) with the target `recordPid`, a `status` (`running`/`success`/`failed`), `progress`, `progress_message`, and `error_message`. A detail page shows progress by:
 
 1. A named query that joins the latest `command-handler` task for the record (e.g. quote-core's `qo_quote_recompute_status`).
 2. A `status-banner` block on the relevant tab that polls that query (`intervalMs: 1500`) and reloads when the task completes.
@@ -739,7 +739,7 @@ POST /api/meta/commands/execute/sc:update_showcase
 
 {
   "operationType": "UPDATE",
-  "targetRecordId": "rec_abc123",
+  "targetRecordPid": "rec_abc123",
   "data": {
     "sc_name": "Updated Name"
   }
@@ -748,9 +748,9 @@ POST /api/meta/commands/execute/sc:update_showcase
 
 **Frontend-backend contract:**
 - `operationType` must be explicitly provided by the frontend -- the backend does not guess.
-- `operationType=UPDATE` or `DELETE` requires `targetRecordId`.
-- `operationType=CREATE` must not include `targetRecordId`.
-- Mismatched combinations (e.g., UPDATE + empty targetRecordId) return 4xx immediately.
+- `operationType=UPDATE` or `DELETE` requires `targetRecordPid`.
+- `operationType=CREATE` must not include `targetRecordPid`.
+- Mismatched combinations (e.g., UPDATE + empty targetRecordPid) return 4xx immediately.
 
 ### CLI
 
@@ -805,7 +805,7 @@ Side effects execute after the main data write (stage 14) and perform cross-mode
   "action": "CREATE_RECORD",
   "targetModel": "dp_rectification",
   "fieldMapping": {
-    "dp_rect_issue_id": "${recordId}",
+    "dp_rect_issue_id": "${recordPid}",
     "dp_rect_title": "${dp_issue_title}",
     "dp_rect_status": "initiated"
   }
@@ -866,7 +866,7 @@ When a model has roll-up field definitions, stage 14.1 automatically recalculate
 Every completed command publishes a `CommandCompletedEvent` to the `AuraEventBus` (stage 17). The event payload includes:
 
 - `commandCode`, `operationType`, `modelCode`
-- `recordId`, `payload`
+- `recordPid`, `payload`
 - `userId`, `actorName`
 - `beforeSnapshot` (for change auditing)
 

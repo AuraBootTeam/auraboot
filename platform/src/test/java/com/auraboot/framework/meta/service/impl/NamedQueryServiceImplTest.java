@@ -5,8 +5,11 @@ import com.auraboot.framework.connector.service.ApiConnectorService;
 import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.meta.dto.NamedQueryBatchStatusRequest;
 import com.auraboot.framework.meta.dto.NamedQueryCreateRequest;
+import com.auraboot.framework.meta.dto.NamedQueryFieldRequest;
 import com.auraboot.framework.meta.dto.NamedQueryUpdateRequest;
 import com.auraboot.framework.meta.entity.NamedQuery;
+import com.auraboot.framework.meta.entity.NamedQueryField;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryFieldMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
@@ -17,9 +20,11 @@ import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -144,6 +149,21 @@ class NamedQueryServiceImplTest {
         service.batchUpdateStatus(request);
 
         verify(usageIndexService).refreshSource("NAMED_QUERY", "nq-1");
+    }
+
+    @Test
+    void addFieldRejectsInternalPublicOutputAlias() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        NamedQueryFieldRequest request = new NamedQueryFieldRequest();
+        request.setFieldCode("tenant_id");
+        request.setColumnExpr("tenant_id");
+        request.setDataType("number");
+
+        assertThatThrownBy(() -> service.addField("public_query", request))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("reserved for internal identity")
+                .hasMessageContaining("tenant_id");
+        verify(namedQueryFieldMapper, never()).insert(any(NamedQueryField.class));
     }
 
     private NamedQuery connectorQuery() {

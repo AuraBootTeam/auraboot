@@ -114,11 +114,11 @@ class EmailRecordLinkServiceIntegrationTest extends BaseIntegrationTest {
     @DisplayName("ERL-01: manualLink creates link with link_type=manual")
     void erl01_manualLinkCreatesManualLink() {
         String modelCode = "crm_contact";
-        String recordId  = "42";
+        String recordPid = "01KEMAILREC";
         String threadId  = "gmail-thread-" + runId;
 
         EmailRecordLink link = emailRecordLinkService.manualLink(
-                testTenantId, testMessageId, threadId, modelCode, recordId);
+                testTenantId, testMessageId, threadId, modelCode, recordPid);
 
         assertThat(link).isNotNull();
         assertThat(link.getId()).isNotNull();
@@ -126,7 +126,7 @@ class EmailRecordLinkServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(link.getMessageId()).isEqualTo(testMessageId);
         assertThat(link.getThreadId()).isEqualTo(threadId);
         assertThat(link.getModelCode()).isEqualTo(modelCode);
-        assertThat(link.getRecordId()).isEqualTo(recordId);
+        assertThat(link.getRecordPid()).isEqualTo(recordPid);
         assertThat(link.getLinkType()).isEqualTo(EmailConstants.LINK_TYPE_MANUAL);
         assertThat(link.getCreatedAt()).isNotNull();
 

@@ -113,7 +113,7 @@ describe('SchemaRuntime', () => {
         row: { pid: 'quote-1' },
         record: { pid: 'quote-1', status: 'draft' },
         state: { selectedTab: 'bom' },
-        $page: { pageKey: 'quote_detail', recordId: 'quote-1' },
+        $page: { pageKey: 'quote_detail', recordPid: 'quote-1' },
       },
     });
 
@@ -121,7 +121,7 @@ describe('SchemaRuntime', () => {
     expect(context.form.pid).toBe('quote-1');
     expect(context.row.pid).toBe('quote-1');
     expect(context.record.pid).toBe('quote-1');
-    expect(context.$page.recordId).toBe('quote-1');
+    expect(context.$page.recordPid).toBe('quote-1');
     expect(context.state).toMatchObject({ source: 'schema', keep: true, selectedTab: 'bom' });
 
     runtime.syncContext({
@@ -129,14 +129,14 @@ describe('SchemaRuntime', () => {
       row: { pid: 'quote-2' },
       record: { pid: 'quote-2', status: 'review' },
       state: { selectedTab: 'excel' },
-      $page: { pageKey: 'quote_detail', recordId: 'quote-2' },
+      $page: { pageKey: 'quote_detail', recordPid: 'quote-2' },
     });
 
     context = runtime.getContext() as any;
     expect(context.form.pid).toBe('quote-2');
     expect(context.row.pid).toBe('quote-2');
     expect(context.record.status).toBe('review');
-    expect(context.$page.recordId).toBe('quote-2');
+    expect(context.$page.recordPid).toBe('quote-2');
     expect(context.state).toMatchObject({ source: 'schema', keep: true, selectedTab: 'excel' });
 
     runtime.destroy();

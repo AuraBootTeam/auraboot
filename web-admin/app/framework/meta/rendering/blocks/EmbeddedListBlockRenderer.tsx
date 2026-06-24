@@ -3,8 +3,8 @@
  *
  * Renders a {@link RecordListView} scoped to the surrounding record. It resolves
  * the parent record id from explicit props (the detail-page path, which passes
- * `parentRecordId`/`parentRecordData` exactly like sub-table) and falls back to
- * the runtime expression context (`$page.recordId` / `record.pid`) for generic
+ * `parentRecordPid`/`parentRecordData` exactly like sub-table) and falls back to
+ * the runtime expression context (`$page.recordPid` / `record.pid`) for generic
  * composite pages dispatched through BlockRenderer.
  *
  * Block config (flat table contract):
@@ -23,7 +23,7 @@ export interface EmbeddedListBlockRendererProps {
   block: BlockConfig;
   runtime?: SchemaRuntime;
   /** Detail-page path: the surrounding record id (e.g. the conversion task pid). */
-  parentRecordId?: string;
+  parentRecordPid?: string;
   /** Detail-page path: the surrounding record data. */
   parentRecordData?: Record<string, any>;
   /** Optional explicit token; defaults to the session cookie. */
@@ -33,7 +33,7 @@ export interface EmbeddedListBlockRendererProps {
 export function EmbeddedListBlockRenderer({
   block,
   runtime,
-  parentRecordId,
+  parentRecordPid,
   parentRecordData,
   token,
 }: EmbeddedListBlockRendererProps) {
@@ -47,15 +47,15 @@ export function EmbeddedListBlockRenderer({
   // Prefer the explicitly-injected parent id (reliable, route-derived); fall
   // back to the runtime context for generic composite pages.
   const ctx = runtime?.getContext?.() as any;
-  const recordId =
-    parentRecordId ??
-    ctx?.$page?.recordId ??
+  const recordPid =
+    parentRecordPid ??
+    ctx?.$page?.recordPid ??
     parentRecordData?.pid ??
     ctx?.record?.pid ??
     ctx?.record?.id;
 
   const fixedFilters =
-    parentField && recordId != null ? { [parentField]: String(recordId) } : undefined;
+    parentField && recordPid != null ? { [parentField]: String(recordPid) } : undefined;
 
   if (!modelCode) {
     return (

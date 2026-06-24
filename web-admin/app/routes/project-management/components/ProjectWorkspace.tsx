@@ -135,7 +135,7 @@ export default function ProjectWorkspace({
       setActionLoading(action.commandCode);
       try {
         const result = await post<unknown>(`/api/meta/commands/execute/${action.commandCode}`, {
-          targetRecordId: projectId,
+          targetRecordPid: projectId,
           operationType: 'update',
         });
         if (ResultHelper.isSuccess(result)) {

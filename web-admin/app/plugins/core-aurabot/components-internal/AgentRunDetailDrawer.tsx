@@ -370,11 +370,11 @@ function ActionRow({
               {action.intentSummary}
             </div>
           )}
-          {(action.targetModel || action.targetRecordPid || action.targetRecordId) && (
+          {(action.targetModel || action.targetRecordPid || action.targetRecordPid) && (
             <div data-testid={`action-target-${action.pid}`}>
               <span className="text-gray-500">Target PID: </span>
               <span className="font-mono">
-                {[action.targetModel, action.targetRecordPid ?? action.targetRecordId]
+                {[action.targetModel, action.targetRecordPid ?? action.targetRecordPid]
                   .filter(Boolean)
                   .join(' / ')}
               </span>

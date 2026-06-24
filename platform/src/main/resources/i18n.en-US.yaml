@@ -376,8 +376,8 @@ automation:
     validationMode.none: No Validation
     validationMode.signature: Signature Validation
     validationMode.token: Token Validation
-    recordId: Record ID
-    recordId.desc: Supports expression reference, e.g., ${trigger.recordId}
+    recordPid: Record PID
+    recordPid.desc: Supports expression reference, e.g., ${trigger.recordPid}
     updateFields: Update Fields
     updateFields.desc: Fields and values to update, in JSON format
     createFields: Record Fields

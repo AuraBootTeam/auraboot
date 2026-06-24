@@ -833,11 +833,11 @@ function ListPageContentInner(props: PageContentProps) {
   });
 
   const navigateToRecordView = useCallback(
-    (recordId: string | number | null | undefined) => {
-      if (recordId == null || recordId === '') {
+    (recordPid: string | number | null | undefined) => {
+      if (recordPid == null || recordPid === '') {
         return;
       }
-      navigate(`/p/${tableName}/view/${String(recordId)}`);
+      navigate(`/p/${tableName}/view/${String(recordPid)}`);
     },
     [navigate, tableName],
   );
@@ -1921,8 +1921,8 @@ function ListPageContentInner(props: PageContentProps) {
   }, [loadData, pagination.pageSize, filters]);
 
   // Bulk selection handlers (T9 — backed by the cross-page selection model).
-  const toggleRowSelection = useCallback((recordId: string) => {
-    setSelectionState((prev) => selectionToggleRow(prev, recordId));
+  const toggleRowSelection = useCallback((recordPid: string) => {
+    setSelectionState((prev) => selectionToggleRow(prev, recordPid));
   }, []);
 
   // Header checkbox: toggle whole-page selection. If the page is already fully
@@ -2016,7 +2016,7 @@ function ListPageContentInner(props: PageContentProps) {
           method: 'post',
           params: {
             payload: {
-              recordIds: ids,
+              recordPids: ids,
               selectedIds: ids,
               modelCode,
             },

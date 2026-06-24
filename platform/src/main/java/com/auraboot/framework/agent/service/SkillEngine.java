@@ -487,19 +487,19 @@ public class SkillEngine {
 
     /**
      * Execute a DSL query — routes to one of three backends:
-     *   1. getById:    recordId + model → DynamicDataService.getById()
+     *   1. getById:    recordPid + model → DynamicDataService.getById()
      *   2. namedQuery: queryCode → NamedQueryService via ToolLoopService
      *   3. list:       model → DynamicDataService.list()
      */
     @SuppressWarnings("unchecked")
     private SkillResult executeDslQueryDispatch(Long tenantId, Map<String, Object> params) {
-        String recordId = params.get("recordId") instanceof String s ? s : null;
+        String recordPid = params.get("recordPid") instanceof String s ? s : null;
         String queryCode = params.get("queryCode") instanceof String s ? s : null;
         String model = params.get("model") instanceof String s ? s : null;
 
-        if (recordId != null && !recordId.isBlank() && model != null) {
+        if (recordPid != null && !recordPid.isBlank() && model != null) {
             // Route 1: get single record by ID
-            Map<String, Object> record = dynamicDataService.getById(model, recordId);
+            Map<String, Object> record = dynamicDataService.getById(model, recordPid);
             return SkillResult.builder()
                     .status(record != null ? SkillResult.Status.SUCCESS : SkillResult.Status.FAILED)
                     .data(record != null ? Map.of("record", record) : Map.of())
@@ -524,7 +524,7 @@ public class SkillEngine {
 
         return SkillResult.builder()
                 .status(SkillResult.Status.FAILED)
-                .errorMessage("dsl.query requires at least one of: recordId, queryCode, or model")
+                .errorMessage("dsl.query requires at least one of: recordPid, queryCode, or model")
                 .build();
     }
 

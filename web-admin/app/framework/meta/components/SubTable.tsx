@@ -384,7 +384,7 @@ const SortableRow: React.FC<{
 };
 
 function getRowId(row: Record<string, any>): string {
-  return row.pid || row._key || String(row.id || '');
+  return row.pid || row._key || '';
 }
 
 function focusCell(rowIndex: number, colIndex: number): void {

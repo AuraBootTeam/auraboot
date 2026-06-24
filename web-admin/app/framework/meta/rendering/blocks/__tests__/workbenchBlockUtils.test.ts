@@ -87,7 +87,7 @@ describe('workbenchBlockUtils action runner', () => {
       action: 'command.execute',
       args: {
         command: 'bom:confirm_candidate',
-        targetRecordId: '${state.selectedLine.pid}',
+        targetRecordPid: '${state.selectedLine.pid}',
         operationType: 'update',
         payload: {
           materialCode: '${state.selectedCandidate.materialCode}',
@@ -99,7 +99,7 @@ describe('workbenchBlockUtils action runner', () => {
     expect(fetchResultMock).toHaveBeenCalledWith('/api/meta/commands/execute/bom:confirm_candidate', {
       method: 'post',
       params: {
-        targetRecordId: 'LINE-1',
+        targetRecordPid: 'LINE-1',
         operationType: 'UPDATE',
         payload: {
           materialCode: 'MAT-001',
@@ -132,7 +132,7 @@ describe('workbenchBlockUtils action runner', () => {
       action: 'command.execute',
       args: {
         command: 'qo_quote_common:batch_source_prices',
-        targetRecordId: 'QUOTE-1',
+        targetRecordPid: 'QUOTE-1',
         operationType: 'update',
         reload: ['bomPriceMetrics', 'bomPriceWaterfall', 'evidence', 'lines'],
         asyncPollIntervalMs: 0,
@@ -163,7 +163,7 @@ describe('workbenchBlockUtils action runner', () => {
         action: 'command.execute',
         args: {
           command: 'bom:confirm_candidate',
-          targetRecordId: '${state.selectedLine.pid}',
+          targetRecordPid: '${state.selectedLine.pid}',
           operationType: 'update',
           payload: {
             materialCode: '${state.selectedCandidate.materialCode}',
@@ -212,7 +212,7 @@ describe('workbenchBlockUtils action runner', () => {
       action: 'command.execute',
       args: {
         command: 'bom:regenerate_export',
-        targetRecordId: 'TASK-1',
+        targetRecordPid: 'TASK-1',
         reload: ['summary'],
         download: {
           fileIdField: 'fileId',
@@ -223,7 +223,7 @@ describe('workbenchBlockUtils action runner', () => {
     expect(fetchResultMock).toHaveBeenCalledWith('/api/meta/commands/execute/bom:regenerate_export', {
       method: 'post',
       params: {
-        targetRecordId: 'TASK-1',
+        targetRecordPid: 'TASK-1',
         payload: {},
       },
     });

@@ -82,7 +82,7 @@ export interface AiFieldProps {
   /** Model code for API calls */
   modelCode?: string;
   /** Record ID for API calls */
-  recordId?: string;
+  recordPid?: string;
   /** Whether the field is read-only */
   readOnly?: boolean;
   /** Placeholder text */
@@ -118,7 +118,7 @@ export const AiField: React.FC<AiFieldProps> = ({
   aiConfig,
   sourceValues,
   modelCode,
-  recordId,
+  recordPid,
   readOnly = false,
   placeholder = 'AI-generated content will appear here...',
   className,
@@ -204,11 +204,11 @@ export const AiField: React.FC<AiFieldProps> = ({
 
         // Use record-specific endpoint if available
         const url =
-          modelCode && recordId
-            ? `/api/meta/ai/models/${modelCode}/records/${recordId}/ai-fill`
+          modelCode && recordPid
+            ? `/api/meta/ai/models/${modelCode}/records/${recordPid}/ai-fill`
             : '/api/meta/ai/generate';
 
-        if (modelCode && recordId) {
+        if (modelCode && recordPid) {
           (requestBody as Record<string, unknown>).fieldCode = 'ai_field';
         }
 
@@ -241,7 +241,7 @@ export const AiField: React.FC<AiFieldProps> = ({
         setShowOperations(false);
       }
     },
-    [aiConfig, sourceValues, modelCode, recordId, onChange, attachments],
+    [aiConfig, sourceValues, modelCode, recordPid, onChange, attachments],
   );
 
   if (readOnly) {

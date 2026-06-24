@@ -117,7 +117,7 @@ function resolveCommandTargetRecordId(
   context: Record<string, any>,
 ): string | undefined {
   const explicitTarget = resolveRuntimeTemplate(
-    actionDef.targetRecordId ?? actionDef.targetRecordPid,
+    actionDef.targetRecordPid ?? actionDef.targetRecordPid,
     runtimeContext,
   );
   return (
@@ -331,7 +331,7 @@ export interface UseActionHandlerResult {
    */
   executeCommand: (
     commandCode: string,
-    targetRecordId?: string,
+    targetRecordPid?: string,
     payload?: Record<string, any>,
     operationType?: string,
   ) => Promise<any>;
@@ -428,24 +428,24 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
   const executeCommand = useCallback(
     async (
       commandCode: string,
-      targetRecordId?: string,
+      targetRecordPid?: string,
       payload?: Record<string, any>,
       operationType?: string,
     ) => {
       const normalizedOp = operationType?.toUpperCase();
-      if ((normalizedOp === 'update' || normalizedOp === 'delete') && !targetRecordId) {
+      if ((normalizedOp === 'update' || normalizedOp === 'delete') && !targetRecordPid) {
         throw new Error(
-          `Command ${commandCode} requires targetRecordId when operationType=${normalizedOp}`,
+          `Command ${commandCode} requires targetRecordPid when operationType=${normalizedOp}`,
         );
       }
-      if (normalizedOp === 'create' && targetRecordId) {
+      if (normalizedOp === 'create' && targetRecordPid) {
         throw new Error(
-          `Command ${commandCode} should not carry targetRecordId when operationType=CREATE`,
+          `Command ${commandCode} should not carry targetRecordPid when operationType=CREATE`,
         );
       }
 
       const body: Record<string, any> = {
-        ...buildCommandTargetParams(targetRecordId),
+        ...buildCommandTargetParams(targetRecordPid),
         payload: payload || {},
       };
       if (normalizedOp) {
@@ -489,7 +489,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
    * Supported formats:
    * - Cross-designer prefixes:
    *   - "dashboard:{code}" -> /dashboards/view/{code}
-   *   - "bpmn-status:{processKey}" -> /bpm/process-status?processKey={processKey}&businessKey={recordId}
+   *   - "bpmn-status:{processKey}" -> /bpm/process-status?processKey={processKey}&businessKey={recordPid}
    *   - "automation:{pid}" -> /automation/{pid}
    * - Legacy "{modelCode}_{pageType}" e.g. "qo_daily_report_form"
    */
@@ -499,14 +499,14 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         console.error('[useActionHandler] navigate action is missing both "to" and "url" fields');
         return '';
       }
-      const recordId = getLegacyCompatibleRecordPid(record);
+      const recordPid = getLegacyCompatibleRecordPid(record);
 
       // Absolute path with template variables — OCP compliant
       // DSL can write navigateTo: "/dashboard-designer/{pid}" or "/bpmn-designer?pid={pid}"
       if (pageKey.startsWith('/')) {
         return pageKey.replace(/\{(\w+)\}/g, (_, key) => {
           if (record && key in record) return encodeURIComponent(String(record[key] ?? ''));
-          if (key === 'pid' || key === 'id') return encodeURIComponent(String(recordId ?? ''));
+          if (key === 'pid' || key === 'id') return encodeURIComponent(String(recordPid ?? ''));
           return '';
         });
       }
@@ -521,8 +521,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       if (pageKey.startsWith('bpmn-status:')) {
         const processKey = pageKey.substring('bpmn-status:'.length);
         const params = new URLSearchParams({ processKey });
-        if (recordId) {
-          params.set('businessKey', String(recordId));
+        if (recordPid) {
+          params.set('businessKey', String(recordPid));
         }
         return `/bpm/process-status?${params.toString()}`;
       }
@@ -549,11 +549,11 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
 
       switch (suffix) {
         case 'form':
-          // Route pattern: /p/:pageKey/edit/:recordId (see routes.ts)
-          return recordId ? `/p/${modelCodePart}/edit/${recordId}` : `/p/${modelCodePart}/new`;
+          // Route pattern: /p/:pageKey/edit/:recordPid (see routes.ts)
+          return recordPid ? `/p/${modelCodePart}/edit/${recordPid}` : `/p/${modelCodePart}/new`;
         case 'detail':
         case 'view':
-          return `/p/${modelCodePart}/view/${recordId}`;
+          return `/p/${modelCodePart}/view/${recordPid}`;
         case 'list':
           return `/p/${modelCodePart}`;
         default:
@@ -592,7 +592,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               if (!confirmed) return;
             }
             const runtimeContext = (runtime?.getContext?.() ?? {}) as Record<string, unknown>;
-            const targetRecordId = resolveCommandTargetRecordId(
+            const targetRecordPid = resolveCommandTargetRecordId(
               actionDef as unknown as Record<string, unknown>,
               runtimeContext,
               record,
@@ -647,7 +647,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                   ? 'create'
                   : semanticActionText.includes('update')
                     ? 'update'
-                    : targetRecordId
+                    : targetRecordPid
                       ? 'update'
                       : undefined);
             const refreshIds = resolveCommandRefreshIds(
@@ -671,7 +671,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             }
             const commandResult = await executeCommand(
               effectiveCommand,
-              targetRecordId,
+              targetRecordPid,
               payload,
               operationType,
             );
@@ -726,9 +726,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 normalizedButton.code === 'update';
               const sep = path.includes('?') ? '&' : '?';
               const params = [`commandCode=${encodeURIComponent(actionDef.command)}`];
-              const sourceRecordId = record?.pid;
-              if (!isEditAction && sourceRecordId) {
-                params.push(`sourceRecordId=${encodeURIComponent(sourceRecordId)}`);
+              const sourceRecordPid = record?.pid;
+              if (!isEditAction && sourceRecordPid) {
+                params.push(`sourceRecordPid=${encodeURIComponent(sourceRecordPid)}`);
               }
               navigate(`${path}${sep}${params.join('&')}`);
             } else {
@@ -740,18 +740,18 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
           case 'state_transition': {
             // state_transition commands update the target record's status field.
             // They are DSL commands executed via the command engine, same as type=command,
-            // but always require a targetRecordId and always use operationType=update.
+            // but always require a targetRecordPid and always use operationType=update.
             if (confirmKey) {
               const confirmed = await showConfirmDialog(confirmKey);
               if (!confirmed) return;
             }
-            const targetRecordId = record?.pid || (context.data?.pid as string | undefined);
-            if (!targetRecordId) {
+            const targetRecordPid = record?.pid || (context.data?.pid as string | undefined);
+            if (!targetRecordPid) {
               throw new Error(
                 `state_transition command ${actionDef.command} requires a target record`,
               );
             }
-            await executeCommand(actionDef.command, targetRecordId, {}, 'update');
+            await executeCommand(actionDef.command, targetRecordPid, {}, 'update');
             if (context.loadData) {
               await context.loadData();
             } else {
