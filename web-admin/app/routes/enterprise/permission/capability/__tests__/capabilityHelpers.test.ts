@@ -6,6 +6,7 @@ import {
   groupSummary,
   isDirty,
   capabilityCodesForTier,
+  splitCapabilityGroupsForPrimaryView,
 } from '../capabilityHelpers';
 
 function cap(code: string, granted: boolean, sensitive = false) {
@@ -58,5 +59,44 @@ describe('capabilityHelpers', () => {
     expect(capabilityCodesForTier(tiered, 'editor').sort()).toEqual(['a', 'b']);
     expect(capabilityCodesForTier(tiered, 'admin').sort()).toEqual(['a', 'b', 'c']);
     expect(capabilityCodesForTier(tiered, 'nope')).toEqual([]);
+  });
+
+  it('splitCapabilityGroupsForPrimaryView keeps business capabilities primary and folds generated capabilities into advanced', () => {
+    const mixed: CapabilityGroup[] = [
+      {
+        group: '报价单',
+        capabilities: [
+          { code: 'qo.cap.quote_view', group: '报价单', label: '查看报价', sensitive: false, tier: 'viewer', includes: ['qo.quote.read'], granted: true, conventionDerived: false },
+        ],
+      },
+      {
+        group: 'model',
+        capabilities: [
+          { code: 'model.qo_quote_common', group: 'model', label: 'Qo_quote_common Read', sensitive: false, tier: null, includes: ['model.qo_quote_common.read'], granted: true, conventionDerived: true },
+          { code: 'model.crm_account_common', group: 'model', label: 'Crm_account_common Read', sensitive: false, tier: null, includes: ['model.crm_account_common.read'], granted: false, conventionDerived: true },
+        ],
+      },
+      {
+        group: '客户管理',
+        capabilities: [
+          { code: 'crm.cap.account', group: '客户管理', label: '维护客户资料', sensitive: false, tier: 'editor', includes: ['crm.account.manage'], granted: true, conventionDerived: false },
+        ],
+      },
+      {
+        group: 'meta',
+        capabilities: [
+          { code: 'meta.model', group: 'meta', label: 'Meta model read', sensitive: false, tier: null, includes: ['meta.model.read'], granted: true, conventionDerived: true },
+        ],
+      },
+    ];
+
+    const split = splitCapabilityGroupsForPrimaryView(mixed);
+
+    expect(split.primaryGroups.map((group) => group.group)).toEqual(['报价单']);
+    expect(split.primaryGranted).toBe(1);
+    expect(split.primaryTotal).toBe(1);
+    expect(split.advancedGroups.map((group) => group.group)).toEqual(['model', '客户管理', 'meta']);
+    expect(split.advancedGranted).toBe(3);
+    expect(split.advancedTotal).toBe(4);
   });
 });

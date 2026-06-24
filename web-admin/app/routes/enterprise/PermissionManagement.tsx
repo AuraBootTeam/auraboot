@@ -18,6 +18,11 @@ import RoleFormDialog from './permission/RoleFormDialog';
 import CapabilityRoleEditor from './permission/capability/CapabilityRoleEditor';
 import RoleMemberTab from './permission/RoleMemberTab';
 import type { Role } from './permission/types';
+import {
+  isRecommendedBomRole,
+  recommendedBomRoleLabel,
+  sortRolesForPermissionSetup,
+} from './permission/roleDisplayHelpers';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -86,12 +91,19 @@ export default function PermissionManagement() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filteredRoles = useMemo(() => {
-    if (!searchQuery) return roles;
     const q = searchQuery.toLowerCase();
-    return roles.filter(
-      (r) => r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q),
-    );
+    const matched = searchQuery
+      ? roles.filter(
+          (r) => r.name.toLowerCase().includes(q) || r.code.toLowerCase().includes(q),
+        )
+      : roles;
+    return sortRolesForPermissionSetup(matched);
   }, [roles, searchQuery]);
+
+  const recommendedRoleCount = useMemo(
+    () => roles.filter((role) => isRecommendedBomRole(role.code)).length,
+    [roles],
+  );
 
   const selectedRole = useMemo(
     () => roles.find((r) => r.pid === selectedRolePid) || null,
@@ -220,6 +232,15 @@ export default function PermissionManagement() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
+          {recommendedRoleCount > 0 && !searchQuery && (
+            <div className="border-b border-gray-100 px-3 py-2 text-xs text-gray-500 dark:border-gray-800 dark:text-gray-400">
+              {t(
+                'admin.permission.role.recommendedHint',
+                undefined,
+                '建议岗位: 管理员 tenant_admin；销售 qo_sales；采购 qo_procurement；工程 bom_engineering',
+              )}
+            </div>
+          )}
           {rolesLoading && roles.length === 0 ? (
             <div className="py-8">
               <LoadingSpinner />
@@ -274,6 +295,11 @@ export default function PermissionManagement() {
                           >
                             {role.name}
                           </span>
+                          {isRecommendedBomRole(role.code) && (
+                            <span className="inline-flex flex-shrink-0 items-center rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-300">
+                              {recommendedBomRoleLabel(role.code)}
+                            </span>
+                          )}
                         </div>
                         {role.description && (
                           <div className="mt-0.5 truncate text-xs text-gray-500">
