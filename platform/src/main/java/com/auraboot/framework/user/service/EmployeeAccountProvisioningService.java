@@ -155,9 +155,9 @@ public class EmployeeAccountProvisioningService {
     private Map<String, List<String>> buildRoleMapping(Map<String, List<String>> override) {
         Map<String, List<String>> mapping = new LinkedHashMap<>();
         putMapping(mapping, List.of("管理员", "admin", "administrator"), List.of("tenant_admin"));
-        putMapping(mapping, List.of("销售", "sales"), List.of("bom_operator", "qo_quoter"));
-        putMapping(mapping, List.of("采购", "procurement", "purchasing"), List.of("bom_operator", "qo_quoter"));
-        putMapping(mapping, List.of("工程", "engineering", "engineer"), List.of("bom_operator"));
+        putMapping(mapping, List.of("销售", "sales"), List.of("qo_sales"));
+        putMapping(mapping, List.of("采购", "procurement", "purchasing"), List.of("qo_procurement"));
+        putMapping(mapping, List.of("工程", "engineering", "engineer"), List.of("bom_engineering"));
 
         if (override != null) {
             override.forEach((type, roles) -> {

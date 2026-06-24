@@ -28,7 +28,7 @@ public class EmployeeAccountProvisionRequest {
     private Integer randomDigitCount = 4;
 
     /**
-     * Optional override by employee type, e.g. {"销售":["custom_sales"]}.
+     * Optional override by employee type, e.g. {"销售":["qo_sales"]}.
      * Defaults cover 管理员/销售/采购/工程 and common English aliases.
      */
     private Map<String, List<String>> roleMapping;

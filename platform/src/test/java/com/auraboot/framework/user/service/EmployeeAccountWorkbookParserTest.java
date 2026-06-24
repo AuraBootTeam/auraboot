@@ -13,6 +13,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class EmployeeAccountWorkbookParserTest {
+    private static final String SAX_FACTORY_PROPERTY = "javax.xml.parsers.SAXParserFactory";
 
     private final EmployeeAccountWorkbookParser parser = new EmployeeAccountWorkbookParser();
 
@@ -66,5 +67,36 @@ class EmployeeAccountWorkbookParserTest {
         List<EmployeeAccountRow> rows = parser.parse(new ByteArrayInputStream(out.toByteArray()));
 
         assertThat(rows).extracting(EmployeeAccountRow::getName).containsExactly("袁称磊");
+    }
+
+    @Test
+    void parse_doesNotUseGlobalPoiSaxReader() throws Exception {
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("在职人员信息");
+        Row header = sheet.createRow(0);
+        header.createCell(0).setCellValue("姓名");
+        header.createCell(1).setCellValue("类型");
+        Row row = sheet.createRow(1);
+        row.createCell(0).setCellValue("验证工程A");
+        row.createCell(1).setCellValue("工程");
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        workbook.close();
+
+        String previous = System.getProperty(SAX_FACTORY_PROPERTY);
+        System.setProperty(SAX_FACTORY_PROPERTY, "com.example.DoesNotExistSaxParserFactory");
+        try {
+            List<EmployeeAccountRow> rows = parser.parse(new ByteArrayInputStream(out.toByteArray()));
+
+            assertThat(rows).hasSize(1);
+            assertThat(rows.get(0).getName()).isEqualTo("验证工程A");
+        } finally {
+            if (previous == null) {
+                System.clearProperty(SAX_FACTORY_PROPERTY);
+            } else {
+                System.setProperty(SAX_FACTORY_PROPERTY, previous);
+            }
+        }
     }
 }
