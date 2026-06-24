@@ -19,6 +19,10 @@ const BOM_WORKBENCH_PATH = '/p/bom_conversion_task_pcba_workbench';
 const BOM_REVIEW_QUEUE_PATH = '/p/bom_review_queue';
 const BOM_MATERIAL_LIBRARY_PATH = '/p/bom_material_master';
 const BOM_FORMAT_PROFILE_PATH = '/p/bom_source_format_profile';
+const BOM_FIELD_COMPOSITION_RULE_PATH = '/p/bom_field_composition_rule';
+const RBAC_TEAM_PATH = '/organization/teams';
+const RBAC_USER_PATH = '/p/tenant_member';
+const RBAC_PERMISSION_PATH = '/enterprise/permissions';
 const BOM_MATERIAL_SYNC_COMMAND = 'bom:sync_material_incremental_now';
 const BOM_MATERIAL_SYNC_DRY_RUN = { dryRun: true };
 
@@ -151,6 +155,29 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     }
   });
 
+  test('admin sidebar restores minimal permission management menu in focused runtime', async ({
+    page,
+  }) => {
+    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+    await ensureSidebarExpanded(page);
+
+    const sidebar = page.getByTestId('sidebar');
+    await expect(sidebar).toBeVisible({ timeout: 15_000 });
+    await expect(sidebar.getByText('权限管理', { exact: true }).first()).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(sidebar.locator(`a[href="${RBAC_TEAM_PATH}"]`)).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(sidebar.locator(`a[href="${RBAC_USER_PATH}"]`)).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(sidebar.getByText('用户', { exact: true }).first()).toBeVisible();
+    await expect(sidebar.getByText('角色', { exact: true }).first()).toBeVisible();
+    await expect(sidebar.getByText('权限/授权关系', { exact: true }).first()).toBeVisible();
+    await expect(sidebar.locator(`a[href="${RBAC_PERMISSION_PATH}"]`)).toHaveCount(2);
+  });
+
   test('role snapshots expose only current QuoteOps and BOM permissions', async ({ browser }) => {
     await withRolePage(browser, users.qoSales, async (page) => {
       const snapshot = await fetchRoleSnapshot(page);
@@ -216,12 +243,17 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       );
       expectIncludes(
         snapshot.menuPaths,
-        [BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH],
+        [
+          BOM_PROJECTS_PATH,
+          BOM_WORKBENCH_PATH,
+          BOM_FORMAT_PROFILE_PATH,
+          BOM_FIELD_COMPOSITION_RULE_PATH,
+        ],
         'bom_operator menu paths',
       );
       expectExcludes(
         snapshot.menuPaths,
-        [BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH, BOM_MATERIAL_LIBRARY_PATH],
+        [BOM_REVIEW_QUEUE_PATH, BOM_MATERIAL_LIBRARY_PATH],
         'bom_operator menu paths',
       );
       expectNoQuoteMenus(snapshot, 'bom_operator');
@@ -238,14 +270,16 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       expectExcludes(snapshot.permissionCodes, QUOTE_PERMISSIONS, 'bom_admin permissions');
       expectIncludes(
         snapshot.menuPaths,
-        [BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH, BOM_MATERIAL_LIBRARY_PATH],
+        [
+          BOM_PROJECTS_PATH,
+          BOM_WORKBENCH_PATH,
+          BOM_MATERIAL_LIBRARY_PATH,
+          BOM_FORMAT_PROFILE_PATH,
+          BOM_FIELD_COMPOSITION_RULE_PATH,
+        ],
         'bom_admin menu paths',
       );
-      expectExcludes(
-        snapshot.menuPaths,
-        [BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH],
-        'bom_admin menu paths',
-      );
+      expectExcludes(snapshot.menuPaths, [BOM_REVIEW_QUEUE_PATH], 'bom_admin menu paths');
       expectNoQuoteMenus(snapshot, 'bom_admin');
     });
 
@@ -284,12 +318,16 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     await withRolePage(browser, users.bomOperator, async (page) => {
       await assertSidebarLinks(
         page,
-        [BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH],
+        [
+          BOM_PROJECTS_PATH,
+          BOM_WORKBENCH_PATH,
+          BOM_FORMAT_PROFILE_PATH,
+          BOM_FIELD_COMPOSITION_RULE_PATH,
+        ],
         [
           QUOTE_MENU_PATH,
           PRICE_LIBRARY_MENU_PATH,
           BOM_REVIEW_QUEUE_PATH,
-          BOM_FORMAT_PROFILE_PATH,
           BOM_MATERIAL_LIBRARY_PATH,
         ],
       );
@@ -299,8 +337,14 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     await withRolePage(browser, users.bomAdmin, async (page) => {
       await assertSidebarLinks(
         page,
-        [BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH, BOM_MATERIAL_LIBRARY_PATH],
-        [QUOTE_MENU_PATH, PRICE_LIBRARY_MENU_PATH, BOM_REVIEW_QUEUE_PATH, BOM_FORMAT_PROFILE_PATH],
+        [
+          BOM_PROJECTS_PATH,
+          BOM_WORKBENCH_PATH,
+          BOM_MATERIAL_LIBRARY_PATH,
+          BOM_FORMAT_PROFILE_PATH,
+          BOM_FIELD_COMPOSITION_RULE_PATH,
+        ],
+        [QUOTE_MENU_PATH, PRICE_LIBRARY_MENU_PATH, BOM_REVIEW_QUEUE_PATH],
       );
       await expectUnavailableByDirectUrl(page, QUOTE_MENU_PATH);
     });

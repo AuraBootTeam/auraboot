@@ -144,6 +144,38 @@ export function buildListReferenceDisplayCacheKey(config: ListReferenceDisplayCo
   return `${config.field}|${config.modelCode}|${config.valueField}|${config.displayField}`;
 }
 
+interface ListSystemReferenceDisplayConfig {
+  detailEndpoint: string;
+  labelFields: string[];
+}
+
+const LIST_SYSTEM_REFERENCE_DISPLAY_MODELS: Record<string, ListSystemReferenceDisplayConfig> = {
+  sys_user: {
+    detailEndpoint: '/api/admin/users',
+    labelFields: ['displayName', 'realName', 'username', 'email'],
+  },
+};
+
+export function resolveListSystemReferenceDisplayConfig(
+  modelCode: string,
+): ListSystemReferenceDisplayConfig | undefined {
+  return LIST_SYSTEM_REFERENCE_DISPLAY_MODELS[modelCode];
+}
+
+function pickSystemReferenceLabel(
+  row: Record<string, any>,
+  configuredDisplayField: string,
+  labelFields: string[],
+): string | undefined {
+  for (const field of [configuredDisplayField, ...labelFields]) {
+    const value = row[field];
+    if (value === null || value === undefined) continue;
+    const text = String(value).trim();
+    if (text) return text;
+  }
+  return undefined;
+}
+
 export function findPersonalPresetSavedView(
   savedViews: Array<Pick<SavedView, 'pid' | 'scope' | 'viewConfig' | 'viewType'>>,
   presetKey: QuickFilterPresetKey,
@@ -2596,6 +2628,31 @@ function ListPageContentInner(props: PageContentProps) {
       await Promise.all(
         pendingByConfig.map(async ({ config, cacheKey, values }) => {
           try {
+            const systemConfig = resolveListSystemReferenceDisplayConfig(config.modelCode);
+            if (systemConfig) {
+              await Promise.all(
+                values.map(async (value) => {
+                  const result = await fetchResult<Record<string, any>>(
+                    `${systemConfig.detailEndpoint}/${encodeURIComponent(value)}`,
+                    {
+                      method: 'get',
+                      token: token || undefined,
+                    },
+                  );
+                  if (cancelled || !ResultHelper.isSuccess(result) || !result.data) return;
+                  const label = pickSystemReferenceLabel(
+                    result.data,
+                    config.displayField,
+                    systemConfig.labelFields,
+                  );
+                  if (!label) return;
+                  updates[cacheKey] = updates[cacheKey] || {};
+                  updates[cacheKey][value] = label;
+                }),
+              );
+              return;
+            }
+
             const result = await fetchResult<PaginationResult<DynamicEntity> | DynamicEntity[]>(
               `${buildApiEndpoint(config.modelCode)}/list`,
               {

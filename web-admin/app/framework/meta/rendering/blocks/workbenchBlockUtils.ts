@@ -314,13 +314,14 @@ export async function executeSimpleWorkbenchAction(
       }
     }
 
+    const targetRecordPid = args.targetRecordPid ?? args.targetRecordId;
     const params: Record<string, any> = {
-      targetRecordPid: args.targetRecordPid ?? args.targetRecordPid,
+      targetRecordPid,
       operationType: args.operationType ? String(args.operationType).toUpperCase() : undefined,
       payload: { ...(args.payload || {}), ...collectedInputs },
     };
-    if (args.targetRecordPid) {
-      params.targetRecordPid = args.targetRecordPid;
+    if (targetRecordPid) {
+      params.targetRecordPid = targetRecordPid;
     }
     Object.keys(params).forEach((key) => {
       if (params[key] === undefined) delete params[key];

@@ -98,7 +98,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
         }
         CommandHandlerExtension handler = pluginHandler.get();
 
-        callback.report(5, "Starting " + (commandCode != null ? commandCode : handlerCode));
+        callback.report(1, "Starting " + (commandCode != null ? commandCode : handlerCode));
 
         try {
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
