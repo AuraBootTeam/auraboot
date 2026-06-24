@@ -548,13 +548,15 @@ describe('canonicalizePageSchemaDto', () => {
     });
   });
 
-  it('hosts SLA rule-center binding in the platform-admin DSL form', () => {
+  it('hosts SLA rule-center binding in the platform-admin DSL form and detail pages', () => {
     const root = resolve(process.cwd(), '..');
     const pagesFile = resolve(root, 'plugins/platform-admin/config/pages.json');
     const pages = readPages(pagesFile);
     const formPage = pages.find((candidate) => candidate.pageKey === 'sla_config_form');
+    const detailPage = pages.find((candidate) => candidate.pageKey === 'sla_config_detail');
 
     expect(formPage).toBeDefined();
+    expect(detailPage).toBeDefined();
 
     const schema = canonicalizePageSchemaDto(formPage!);
     expect(validateStructure(schema)).toEqual([]);
@@ -569,6 +571,76 @@ describe('canonicalizePageSchemaDto', () => {
         consumerType: 'SLA',
         initialDecisionCode: 'complaint_sla_deadline',
       },
+    });
+
+    const detailSchema = canonicalizePageSchemaDto(detailPage!);
+    expect(validateStructure(detailSchema)).toEqual([]);
+    expect(detailSchema.kind).toBe('detail');
+    expect(detailSchema.extension).toMatchObject({
+      showShare: false,
+      showReport: false,
+      showPrint: false,
+    });
+    expect(detailSchema.blocks.find((block: any) => block.id === 'actions')).toMatchObject({
+      blockType: 'toolbar',
+      buttons: [
+        expect.objectContaining({
+          code: 'edit',
+          primary: true,
+          action: {
+            type: 'navigate',
+            to: 'sla_config_form',
+            command: 'admin:update_sla_config',
+          },
+        }),
+      ],
+    });
+    expect(detailSchema.blocks.find((block: any) => block.id === 'basic')).toMatchObject({
+      blockType: 'form-section',
+      readOnly: true,
+    });
+    expect(detailSchema.blocks.find((block: any) => block.id === 'timer_policy')).toMatchObject({
+      blockType: 'form-section',
+      readOnly: true,
+    });
+    expect(detailSchema.blocks.find((block: any) => block.id === 'sla_rule_binding')).toMatchObject({
+      blockType: 'custom',
+      component: 'DecisionRuleBindingBlock',
+      props: {
+        mode: 'decision',
+        valueField: 'rule_binding',
+        consumerType: 'SLA',
+        readOnly: true,
+        variant: 'summary',
+        showTestRunner: false,
+      },
+    });
+  });
+
+  it('keeps the BPM process list aligned with the imported model field contract', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/platform-admin/config/pages.json');
+    const pages = readPages(pagesFile);
+    const listPage = pages.find(
+      (candidate) => candidate.pageKey === 'bpm_process_management_list',
+    );
+
+    expect(listPage).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(listPage!);
+    expect(schema.dataSource).toMatchObject({
+      type: 'api',
+      endpoint: '/api/bpm/process-definitions',
+      method: 'get',
+    });
+    const tableBlock = schema.blocks.find((block: any) => block.blockType === 'table') as any;
+    const columns = tableBlock.table?.columns ?? tableBlock.columns;
+    const fields = columns.map((column: any) => column.field);
+
+    expect(fields).toEqual(expect.arrayContaining(['process_key', 'process_name', 'deployed_at']));
+    expect(fields).not.toEqual(expect.arrayContaining(['processKey', 'processName', 'deployedAt']));
+    expect(columns.find((column: any) => column.field === 'status')).toMatchObject({
+      dictCode: 'member_status',
     });
   });
 

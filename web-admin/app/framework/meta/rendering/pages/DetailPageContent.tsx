@@ -965,7 +965,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 {headerMiscBlocks.map((block: BlockConfig, blockIndex: number) => (
                   <BlockRenderer
                     key={block.id || `misc-header-${blockIndex}`}
-                    block={resolveChartBlockRecordParams(block, recordData, recordPid!)}
+                    block={prepareDetailRuntimeBlock(block, recordData, recordPid!)}
                     runtime={runtime}
                     areaId="detail-tabs-header"
                   />
@@ -1048,7 +1048,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 .map((block: BlockConfig, blockIndex: number) => (
                   <BlockRenderer
                     key={block.id || `misc-header-${blockIndex}`}
-                    block={resolveChartBlockRecordParams(block, recordData, recordPid!)}
+                    block={prepareDetailRuntimeBlock(block, recordData, recordPid!)}
                     runtime={runtime}
                     areaId="detail-direct"
                   />
@@ -1148,7 +1148,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 .map((block: BlockConfig, blockIndex: number) => (
                   <BlockRenderer
                     key={block.id || `misc-${blockIndex}`}
-                    block={resolveChartBlockRecordParams(block, recordData, recordPid!)}
+                    block={prepareDetailRuntimeBlock(block, recordData, recordPid!)}
                     runtime={runtime}
                     areaId="detail-direct"
                   />
@@ -1239,6 +1239,53 @@ function resolveChartBlockRecordParams(
     ...block,
     chartConfig: { ...chartConfig, dataSource: { ...ds, parameters: resolved } },
   } as BlockConfig;
+}
+
+function readDetailRecordField(recordData: RecordData, fieldCode: string): unknown {
+  if (!fieldCode) return undefined;
+  if (Object.prototype.hasOwnProperty.call(recordData, fieldCode)) {
+    return recordData[fieldCode];
+  }
+  const camelField = fieldCode.replace(/_([a-z])/g, (_match, letter: string) =>
+    letter.toUpperCase(),
+  );
+  if (camelField !== fieldCode && Object.prototype.hasOwnProperty.call(recordData, camelField)) {
+    return recordData[camelField];
+  }
+  const snakeField = fieldCode.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+  if (snakeField !== fieldCode && Object.prototype.hasOwnProperty.call(recordData, snakeField)) {
+    return recordData[snakeField];
+  }
+  return undefined;
+}
+
+export function injectDetailRecordValueIntoCustomBlock(
+  block: BlockConfig,
+  recordData: RecordData,
+): BlockConfig {
+  if (block.blockType !== 'custom') return block;
+  const props = ((block as any).props || {}) as Record<string, unknown>;
+  if (props.value !== undefined) return block;
+  const valueField = typeof props.valueField === 'string' ? props.valueField.trim() : '';
+  if (!valueField) return block;
+  const value = readDetailRecordField(recordData, valueField);
+  if (value === undefined) return block;
+  return {
+    ...block,
+    props: {
+      ...props,
+      value,
+    },
+  } as BlockConfig;
+}
+
+function prepareDetailRuntimeBlock(
+  block: BlockConfig,
+  recordData: RecordData,
+  recordPid: string,
+): BlockConfig {
+  const valueBoundBlock = injectDetailRecordValueIntoCustomBlock(block, recordData);
+  return resolveChartBlockRecordParams(valueBoundBlock, recordData, recordPid);
 }
 
 /**
@@ -1601,7 +1648,7 @@ function DetailBlockRenderer({
   if (runtime) {
     // Chart blocks fed by a record-scoped namedQuery need their ${record.*}/${recordPid}
     // params resolved here (the chart's runtime context does not carry the detail record).
-    const dispatchBlock = resolveChartBlockRecordParams(block, recordData, recordPid);
+    const dispatchBlock = prepareDetailRuntimeBlock(block, recordData, recordPid);
     return <BlockRenderer block={dispatchBlock} runtime={runtime} areaId="detail-tab" />;
   }
 

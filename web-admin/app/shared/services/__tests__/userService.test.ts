@@ -144,6 +144,7 @@ describe('hasAllPermissions', () => {
 
 describe('fetchUserInfo', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
+  const originalBffInternalUrl = process.env.BFF_INTERNAL_URL;
 
   beforeEach(() => {
     getTokenMock.mockReset();
@@ -151,6 +152,11 @@ describe('fetchUserInfo', () => {
   });
 
   afterEach(() => {
+    if (originalBffInternalUrl === undefined) {
+      delete process.env.BFF_INTERNAL_URL;
+    } else {
+      process.env.BFF_INTERNAL_URL = originalBffInternalUrl;
+    }
     fetchSpy.mockRestore();
   });
 
@@ -234,6 +240,32 @@ describe('fetchUserInfo', () => {
 
     expect(result!.permissions).toEqual({ roles: [], permissions: [] });
     expect(result!.preferences).toBeNull();
+  });
+
+  it('uses the SSR BFF URL instead of the Spring Boot fallback', async () => {
+    process.env.BFF_INTERNAL_URL = 'http://127.0.0.1:6190';
+    getTokenMock.mockResolvedValue(TOKEN);
+
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        code: '0',
+        data: {
+          user: { id: 42, name: 'Alice' },
+          permissions: { roles: [], permissions: [] },
+          preferences: null,
+        },
+      }),
+    } as any);
+
+    await fetchUserInfo(FAKE_REQUEST);
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'http://127.0.0.1:6190/api/auth/me',
+      expect.objectContaining({
+        headers: expect.objectContaining({ Authorization: `Bearer ${TOKEN}` }),
+      }),
+    );
   });
 });
 

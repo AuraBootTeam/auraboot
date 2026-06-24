@@ -127,6 +127,8 @@ interface DecisionRuleBindingBlockProps {
       consumerType?: string;
       consumerCode?: string;
       consumerNodeId?: string;
+      readOnly?: boolean;
+      variant?: 'editor' | 'summary';
       showImpactPreview?: boolean;
       showTestRunner?: boolean;
       initialContextJson?: string;
@@ -410,6 +412,151 @@ function impactCount(impact: DecisionImpact | null): number {
   return (impact?.incoming?.length ?? 0) + (impact?.outgoing?.length ?? 0);
 }
 
+function getDecisionName(decisions: DecisionOption[], decisionCode: string): string {
+  const decision = decisions.find((candidate) => candidate.code === decisionCode);
+  return decision?.name || decisionCode || '未选择决策';
+}
+
+function formatInputMapping(mapping: InputMapping): string {
+  return `${mapping.scope}.${mapping.path}`;
+}
+
+function formatOutputMapping(mapping: OutputMapping): string {
+  return `${mapping.targetKind}.${mapping.targetPath}`;
+}
+
+function DecisionBindingSummary({
+  binding,
+  decisions,
+  showImpactPreview,
+  impact,
+  impactLoading,
+  impactError,
+  onRefreshImpact,
+}: {
+  binding: DecisionBindingDraft;
+  decisions: DecisionOption[];
+  showImpactPreview: boolean;
+  impact: DecisionImpact | null;
+  impactLoading: boolean;
+  impactError: string;
+  onRefreshImpact: () => void;
+}) {
+  const decisionName = getDecisionName(decisions, binding.decisionCode);
+  const inputCount = binding.inputMappings.length;
+  const outputCount = binding.outputMappings.length;
+
+  return (
+    <div className="decision-rule-binding-summary" data-testid="decision-binding-summary">
+      <div className="decision-rule-summary-head">
+        <div>
+          <div className="decision-rule-kicker">规则中心绑定</div>
+          <h3>{decisionName}</h3>
+          <p>{binding.decisionCode}</p>
+        </div>
+        <div className="decision-rule-summary-badges">
+          <span>{binding.versionPolicy}</span>
+          <span>{binding.fallbackMode}</span>
+        </div>
+      </div>
+
+      <div className="decision-rule-summary-grid">
+        <div>
+          <span>输入映射</span>
+          <strong>{inputCount}</strong>
+        </div>
+        <div>
+          <span>输出映射</span>
+          <strong>{outputCount}</strong>
+        </div>
+        <div>
+          <span>影响引用</span>
+          <strong>{impact ? impactCount(impact) : '—'}</strong>
+        </div>
+        <div>
+          <span>发布风险</span>
+          <strong>{impact?.risk?.blocking ? '需确认' : impact ? '可继续' : '未加载'}</strong>
+        </div>
+      </div>
+
+      <div className="decision-rule-summary-columns">
+        <div className="decision-rule-summary-panel">
+          <div className="decision-rule-summary-panel-head">
+            <strong>输入映射</strong>
+            <span>{inputCount} 条</span>
+          </div>
+          {inputCount === 0 ? (
+            <div className="decision-rule-empty" data-testid="decision-binding-empty">
+              未配置输入映射
+            </div>
+          ) : (
+            <ul>
+              {binding.inputMappings.map((mapping, index) => (
+                <li key={`${mapping.input}-${index}`}>
+                  <span>{mapping.input}</span>
+                  <code>{formatInputMapping(mapping)}</code>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="decision-rule-summary-panel">
+          <div className="decision-rule-summary-panel-head">
+            <strong>输出映射</strong>
+            <span>{outputCount} 条</span>
+          </div>
+          {outputCount === 0 ? (
+            <div className="decision-rule-empty" data-testid="decision-output-mapping-empty">
+              未配置输出映射
+            </div>
+          ) : (
+            <ul>
+              {binding.outputMappings.map((mapping, index) => (
+                <li key={`${mapping.output}-${index}`}>
+                  <span>{mapping.output}</span>
+                  <code>{formatOutputMapping(mapping)}</code>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      {showImpactPreview && (
+        <div className="decision-rule-summary-impact" data-testid="decision-impact-preview">
+          <div className="decision-rule-summary-panel-head">
+            <strong>影响预览</strong>
+            <button
+              type="button"
+              aria-label="refresh-impact"
+              disabled={impactLoading}
+              onClick={onRefreshImpact}
+            >
+              {impactLoading ? '加载中' : '刷新影响'}
+            </button>
+          </div>
+          {impactError ? (
+            <div className="decision-rule-error" data-testid="decision-impact-error">
+              {impactError}
+            </div>
+          ) : impact ? (
+            <div className="decision-rule-impact-summary" data-testid="decision-impact-summary">
+              <strong>{impact.risk?.summary ?? '无影响摘要'}</strong>
+              <span>{impactCount(impact)} 个引用</span>
+              <span>{impact.risk?.blocking ? '需确认' : '可继续'}</span>
+            </div>
+          ) : (
+            <div className="decision-rule-empty" data-testid="decision-impact-empty">
+              尚未加载影响
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function DecisionRuleBindingBlock({
   block,
   runtime,
@@ -421,6 +568,7 @@ export function DecisionRuleBindingBlock({
   const mode = props.mode ?? 'combined';
   const configuredFields = props.fields && props.fields.length > 0 ? props.fields : undefined;
   const fieldCatalogMode = props.fieldCatalogMode ?? 'disabled';
+  const readOnly = props.readOnly === true || props.variant === 'summary';
   const [catalogFields, setCatalogFields] = useState<FieldOption[]>([]);
   const fields =
     fieldCatalogMode === 'merge'
@@ -688,7 +836,17 @@ export function DecisionRuleBindingBlock({
         </div>
       )}
 
-      {showDecision && (
+      {showDecision && readOnly ? (
+        <DecisionBindingSummary
+          binding={binding}
+          decisions={decisions}
+          showImpactPreview={showImpactPreview}
+          impact={impact}
+          impactLoading={impactLoading}
+          impactError={impactError}
+          onRefreshImpact={refreshImpact}
+        />
+      ) : showDecision ? (
         <div className="decision-rule-binding-section" data-testid="decision-binding-editor">
           <div className="decision-rule-binding-heading">
             <strong>引用规则中心</strong>
@@ -968,7 +1126,7 @@ export function DecisionRuleBindingBlock({
             </div>
           )}
         </div>
-      )}
+      ) : null}
     </section>
   );
 }

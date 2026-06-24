@@ -86,6 +86,8 @@ export function SlaRecordListPanel({ statusFilter, onClose }: SlaRecordListPanel
   const { showErrorToast } = useToastContext();
   const [records, setRecords] = useState<SlaRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadErrorMessage =
+    st('$i18n:bpm.sla.drilldown.loadError') || 'Failed to load SLA records';
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -95,11 +97,11 @@ export function SlaRecordListPanel({ statusFilter, onClose }: SlaRecordListPanel
       );
       setRecords(data);
     } catch {
-      showErrorToast(st('$i18n:bpm.sla.drilldown.loadError') || 'Failed to load SLA records');
+      showErrorToast(loadErrorMessage);
     } finally {
       setLoading(false);
     }
-  }, [statusFilter, showErrorToast, st]);
+  }, [loadErrorMessage, showErrorToast, statusFilter]);
 
   useEffect(() => {
     loadRecords();

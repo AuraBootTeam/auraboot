@@ -5,6 +5,7 @@ import {
   buildViewManageFieldOptions,
   collectListReferenceDisplayConfigs,
   findPersonalPresetSavedView,
+  getListFieldValueWithAlias,
   pruneNoopViewConfigPatch,
   resolveColumnCapabilityDataType,
   resolveFieldMetaDataType,
@@ -17,6 +18,26 @@ import {
   shouldSkipModelFieldMeta,
   useRestoreSavedViewFromUrl,
 } from '../ListPageContent';
+
+describe('getListFieldValueWithAlias', () => {
+  it('reads camelCase API fields for snake_case DSL table columns', () => {
+    const record = {
+      processKey: 'wd_leave_approval',
+      processName: '请假审批',
+      deployedAt: '2026-06-24T02:35:57Z',
+    };
+
+    expect(getListFieldValueWithAlias(record, 'process_key')).toBe('wd_leave_approval');
+    expect(getListFieldValueWithAlias(record, 'process_name')).toBe('请假审批');
+    expect(getListFieldValueWithAlias(record, 'deployed_at')).toBe('2026-06-24T02:35:57Z');
+  });
+
+  it('keeps the exact list field value when both exact and alias keys exist', () => {
+    expect(
+      getListFieldValueWithAlias({ process_key: 'exact', processKey: 'alias' }, 'process_key'),
+    ).toBe('exact');
+  });
+});
 
 describe('collectListReferenceDisplayConfigs', () => {
   it('uses model field refTarget metadata to resolve reference display labels', () => {

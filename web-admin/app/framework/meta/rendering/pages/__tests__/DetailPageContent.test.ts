@@ -5,6 +5,7 @@ import {
   enrichDetailField,
   extractBlockDataRows,
   getByDataPath,
+  injectDetailRecordValueIntoCustomBlock,
   mergeDetailDisplayFields,
   resolveActiveDetailTab,
   resolveDetailFieldComponent,
@@ -91,6 +92,53 @@ describe('shouldRenderDefaultDetailEditAction', () => {
 
   it('hides the default edit action when extension.showEdit is false', () => {
     expect(shouldRenderDefaultDetailEditAction({ extension: { showEdit: false } })).toBe(false);
+  });
+});
+
+describe('injectDetailRecordValueIntoCustomBlock', () => {
+  it('passes a detail record valueField into custom block props', () => {
+    const block = {
+      id: 'sla_rule_binding',
+      blockType: 'custom',
+      component: 'DecisionRuleBindingBlock',
+      props: {
+        valueField: 'rule_binding',
+        variant: 'summary',
+      },
+    } as any;
+    const ruleBinding = {
+      type: 'jsonb',
+      value:
+        '{"bindingKind":"DECISION_REF","decisionBinding":{"decisionCode":"complaint_sla_deadline","inputMappings":[{"input":"priority","source":{"kind":"FIELD","scope":"record","path":"data.priority"}}],"outputMappings":[],"versionPolicy":"LATEST_PUBLISHED","fallbackPolicy":{"mode":"FAIL_CLOSED"},"traceMode":"SAMPLED","enabled":true},"enabled":true}',
+      null: false,
+    };
+
+    const injected = injectDetailRecordValueIntoCustomBlock(block, {
+      pid: 'record-1',
+      rule_binding: ruleBinding,
+    });
+
+    expect((injected as any).props.value).toBe(ruleBinding);
+    expect((injected as any).props.valueField).toBe('rule_binding');
+  });
+
+  it('does not overwrite an explicit custom block value', () => {
+    const explicit = { bindingKind: 'DECISION_REF' };
+    const block = {
+      id: 'sla_rule_binding',
+      blockType: 'custom',
+      component: 'DecisionRuleBindingBlock',
+      props: {
+        valueField: 'rule_binding',
+        value: explicit,
+      },
+    } as any;
+
+    const injected = injectDetailRecordValueIntoCustomBlock(block, {
+      rule_binding: { bindingKind: 'OTHER' },
+    });
+
+    expect((injected as any).props.value).toBe(explicit);
   });
 });
 

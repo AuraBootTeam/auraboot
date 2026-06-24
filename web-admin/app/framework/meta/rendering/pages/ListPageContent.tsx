@@ -269,6 +269,25 @@ export function resolveListSavedViewPageKey(
   return schema?.pageKey || routeTableName;
 }
 
+function snakeToCamel(value: string): string {
+  return value.replace(/_([a-zA-Z0-9])/g, (_, char: string) => char.toUpperCase());
+}
+
+function camelToSnake(value: string): string {
+  return value.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
+}
+
+export function getListFieldValueWithAlias(record: Record<string, any>, fieldCode: string): unknown {
+  if (Object.prototype.hasOwnProperty.call(record, fieldCode)) {
+    return record[fieldCode];
+  }
+  const alias = fieldCode.includes('_') ? snakeToCamel(fieldCode) : camelToSnake(fieldCode);
+  if (alias !== fieldCode && Object.prototype.hasOwnProperty.call(record, alias)) {
+    return record[alias];
+  }
+  return undefined;
+}
+
 export function useRestoreSavedViewFromUrl({
   urlViewPid,
   savedViews,
@@ -2279,19 +2298,22 @@ function ListPageContentInner(props: PageContentProps) {
   // Render cell content using CellRendererRegistry
   const renderCellContent = useCallback(
     (column: ColumnConfig, record: DynamicEntity, rowIndex: number) => {
-      const value = record[column.field];
+      const value = getListFieldValueWithAlias(record, column.field);
+      const recordWithAliasedField = Object.prototype.hasOwnProperty.call(record, column.field)
+        ? record
+        : { ...record, [column.field]: value };
       const referenceConfig = collectListReferenceDisplayConfigs([column], modelFieldMap)[0];
       const cacheKey = referenceConfig
         ? buildListReferenceDisplayCacheKey(referenceConfig)
         : undefined;
       const referenceDisplayValue =
         referenceConfig && value !== null && value !== undefined
-          ? record[referenceConfig.displayKey] ||
+          ? recordWithAliasedField[referenceConfig.displayKey] ||
             referenceDisplayCache[cacheKey || '']?.[String(value)]
           : undefined;
       const recordForRenderer = referenceDisplayValue
-        ? { ...record, [referenceConfig!.displayKey]: referenceDisplayValue }
-        : record;
+        ? { ...recordWithAliasedField, [referenceConfig!.displayKey]: referenceDisplayValue }
+        : recordWithAliasedField;
       const effectiveValueType = referenceConfig
         ? 'reference'
         : inferValueType(column, value, recordForRenderer);
@@ -2333,7 +2355,7 @@ function ListPageContentInner(props: PageContentProps) {
           const evaluator = runtime.getEvaluator();
           const rendered = evaluator.evaluateTemplate(column.render, {
             ...context,
-            row: record,
+            row: recordForRenderer,
           });
           return <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(rendered) }} />;
         } catch (err) {

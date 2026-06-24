@@ -1,0 +1,1471 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>规则中心策略编排器 V3</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        --bg: #f4f6f9;
+        --ink: #111827;
+        --text: #172033;
+        --muted: #667085;
+        --subtle: #98a2b3;
+        --panel: #ffffff;
+        --soft: #f9fafb;
+        --line: #d8dee9;
+        --line-soft: #e7ebf2;
+        --blue: #2563eb;
+        --blue-soft: #eaf1ff;
+        --teal: #0f766e;
+        --teal-soft: #e7f6f2;
+        --amber: #b45309;
+        --amber-soft: #fff2d8;
+        --red: #b42318;
+        --red-soft: #fee4e2;
+        --green: #15803d;
+        --green-soft: #e8f7ee;
+        --purple: #7c3aed;
+        --purple-soft: #f1eaff;
+        --shadow: 0 14px 38px rgba(15, 23, 42, 0.08);
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--text);
+        background: var(--bg);
+      }
+
+      button,
+      input,
+      select,
+      textarea {
+        font: inherit;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 224px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        padding: 18px 14px;
+        color: #d1d5db;
+        background: #111827;
+      }
+
+      .brand {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 8px 10px 18px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 32px;
+        height: 32px;
+        place-items: center;
+        color: #0f172a;
+        background: #dbeafe;
+        border-radius: 7px;
+        font-weight: 850;
+      }
+
+      .brand-title {
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 780;
+      }
+
+      .brand-subtitle {
+        margin-top: 2px;
+        color: #9ca3af;
+        font-size: 12px;
+      }
+
+      .nav-title {
+        padding: 18px 10px 8px;
+        color: #818cf8;
+        font-size: 12px;
+        font-weight: 780;
+      }
+
+      .nav-item {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+        min-height: 36px;
+        margin: 2px 0;
+        padding: 8px 10px;
+        color: #d1d5db;
+        text-align: left;
+        background: transparent;
+        border: 0;
+        border-radius: 7px;
+      }
+
+      .nav-item.active {
+        color: #fff;
+        background: #1d4ed8;
+      }
+
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+        background: currentColor;
+      }
+
+      .main {
+        min-width: 0;
+      }
+
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        height: 56px;
+        padding: 0 24px;
+        background: #fff;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .crumb {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .top-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .btn {
+        display: inline-flex;
+        gap: 7px;
+        align-items: center;
+        justify-content: center;
+        min-height: 34px;
+        padding: 0 12px;
+        color: var(--text);
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        font-size: 13px;
+        font-weight: 720;
+        white-space: nowrap;
+      }
+
+      .btn.primary {
+        color: #fff;
+        background: var(--blue);
+        border-color: var(--blue);
+      }
+
+      .btn.soft {
+        background: var(--soft);
+      }
+
+      .page {
+        padding: 18px 24px 28px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        gap: 16px;
+        margin-bottom: 16px;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line-soft);
+        border-radius: 8px;
+        box-shadow: var(--shadow);
+      }
+
+      .hero-main {
+        padding: 18px 20px;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: 24px;
+        line-height: 1.24;
+        letter-spacing: 0;
+      }
+
+      .scenario-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .scenario-tab {
+        min-height: 32px;
+        padding: 0 12px;
+        color: var(--muted);
+        background: var(--soft);
+        border: 1px solid var(--line-soft);
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 760;
+      }
+
+      .scenario-tab.active {
+        color: #1d4ed8;
+        background: var(--blue-soft);
+        border-color: #9dbbff;
+      }
+
+      .hero-stats {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .stat {
+        min-height: 78px;
+        padding: 14px;
+        border-right: 1px solid var(--line-soft);
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .stat:nth-child(2n) {
+        border-right: 0;
+      }
+
+      .stat:nth-last-child(-n + 2) {
+        border-bottom: 0;
+      }
+
+      .stat-label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .stat-value {
+        margin-top: 6px;
+        font-size: 18px;
+        font-weight: 850;
+      }
+
+      .workspace {
+        display: grid;
+        grid-template-columns: 280px minmax(0, 1fr) 330px;
+        gap: 16px;
+        align-items: start;
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 50px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .panel-title {
+        font-size: 14px;
+        font-weight: 850;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 22px;
+        padding: 0 8px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 780;
+        white-space: nowrap;
+      }
+
+      .blue {
+        color: #1d4ed8;
+        background: var(--blue-soft);
+      }
+
+      .teal {
+        color: var(--teal);
+        background: var(--teal-soft);
+      }
+
+      .amber {
+        color: var(--amber);
+        background: var(--amber-soft);
+      }
+
+      .red {
+        color: var(--red);
+        background: var(--red-soft);
+      }
+
+      .green {
+        color: var(--green);
+        background: var(--green-soft);
+      }
+
+      .purple {
+        color: var(--purple);
+        background: var(--purple-soft);
+      }
+
+      .left-stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .template-list,
+      .fact-list,
+      .action-catalog {
+        display: grid;
+        gap: 10px;
+        padding: 12px;
+      }
+
+      .template-card,
+      .fact-card,
+      .action-card {
+        width: 100%;
+        padding: 11px;
+        text-align: left;
+        background: var(--soft);
+        border: 1px solid var(--line-soft);
+        border-radius: 8px;
+      }
+
+      .template-card.active,
+      .action-card.active {
+        background: var(--blue-soft);
+        border-color: #9dbbff;
+        box-shadow: inset 0 0 0 1px #9dbbff;
+      }
+
+      .card-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .card-title {
+        font-size: 13px;
+        font-weight: 820;
+      }
+
+      .card-sub {
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .fact-card {
+        display: grid;
+        gap: 7px;
+      }
+
+      .fact-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .fact-row strong {
+        color: var(--text);
+        text-align: right;
+      }
+
+      .center {
+        min-width: 0;
+      }
+
+      .canvas-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        padding: 14px;
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .strategy-name {
+        font-size: 18px;
+        font-weight: 880;
+      }
+
+      .strategy-meta {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .canvas {
+        padding: 14px;
+      }
+
+      .chain {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .chain-block {
+        min-height: 190px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        background: #fff;
+      }
+
+      .block-head {
+        display: flex;
+        justify-content: space-between;
+        min-height: 42px;
+        padding: 10px 12px;
+        background: var(--soft);
+        border-bottom: 1px solid var(--line-soft);
+        font-size: 13px;
+        font-weight: 850;
+      }
+
+      .block-body {
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+      }
+
+      .node {
+        padding: 10px;
+        background: #fff;
+        border: 1px solid var(--line-soft);
+        border-radius: 7px;
+      }
+
+      .node-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 12px;
+        font-weight: 820;
+      }
+
+      .node-code {
+        margin-top: 6px;
+        color: #344054;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 11px;
+        line-height: 1.45;
+        overflow-wrap: anywhere;
+      }
+
+      .output-grid {
+        display: grid;
+        gap: 8px;
+      }
+
+      .output-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+        align-items: center;
+        min-height: 36px;
+        padding: 8px 10px;
+        background: #f8fbff;
+        border: 1px solid #d7e5ff;
+        border-radius: 7px;
+      }
+
+      .output-name {
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 11px;
+        color: #344054;
+      }
+
+      .output-row .pill {
+        justify-content: flex-start;
+        width: fit-content;
+        max-width: 100%;
+        min-height: 24px;
+        padding-top: 3px;
+        padding-bottom: 3px;
+        line-height: 1.3;
+        white-space: normal;
+      }
+
+      .action-sequence {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .sequence-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        min-height: 42px;
+        padding: 0 12px;
+        background: var(--soft);
+        border-bottom: 1px solid var(--line-soft);
+        font-size: 13px;
+        font-weight: 850;
+      }
+
+      .sequence-list {
+        display: grid;
+        gap: 8px;
+        padding: 10px;
+      }
+
+      .seq-card {
+        display: grid;
+        grid-template-columns: 34px minmax(0, 1fr) 128px;
+        gap: 10px;
+        align-items: start;
+        min-height: 64px;
+        padding: 10px;
+        background: #fff;
+        border: 1px solid var(--line-soft);
+        border-radius: 8px;
+      }
+
+      .seq-no {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        place-items: center;
+        color: #fff;
+        background: var(--blue);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 850;
+      }
+
+      .seq-title {
+        font-size: 13px;
+        font-weight: 840;
+      }
+
+      .seq-sub {
+        margin-top: 5px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .seq-policy {
+        display: grid;
+        gap: 5px;
+        justify-items: end;
+      }
+
+      .right-stack {
+        display: grid;
+        gap: 16px;
+      }
+
+      .catalog-filter {
+        display: flex;
+        gap: 6px;
+        padding: 12px 12px 0;
+      }
+
+      .filter-chip {
+        min-height: 26px;
+        padding: 0 9px;
+        color: var(--muted);
+        background: var(--soft);
+        border: 1px solid var(--line-soft);
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 760;
+      }
+
+      .filter-chip.active {
+        color: #1d4ed8;
+        background: var(--blue-soft);
+        border-color: #9dbbff;
+      }
+
+      .inspector {
+        padding: 12px;
+      }
+
+      .inspector-title {
+        font-size: 15px;
+        font-weight: 860;
+      }
+
+      .inspector-sub {
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .form-grid {
+        display: grid;
+        gap: 10px;
+        margin-top: 12px;
+      }
+
+      .field label {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 760;
+      }
+
+      .field input,
+      .field select,
+      .field textarea {
+        width: 100%;
+        min-height: 34px;
+        padding: 7px 9px;
+        color: var(--text);
+        background: #fff;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        font-size: 13px;
+      }
+
+      .field textarea {
+        min-height: 68px;
+        resize: vertical;
+      }
+
+      .replay {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+        gap: 16px;
+        margin-top: 16px;
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+      }
+
+      .table th {
+        height: 38px;
+        padding: 0 12px;
+        color: var(--muted);
+        text-align: left;
+        background: var(--soft);
+        border-bottom: 1px solid var(--line-soft);
+      }
+
+      .table td {
+        min-height: 44px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--line-soft);
+        vertical-align: top;
+      }
+
+      .table tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .trace-list {
+        display: grid;
+        gap: 9px;
+        padding: 12px;
+      }
+
+      .trace-item {
+        display: grid;
+        grid-template-columns: 10px minmax(0, 1fr) auto;
+        gap: 9px;
+        align-items: start;
+      }
+
+      .trace-dot {
+        width: 10px;
+        height: 10px;
+        margin-top: 4px;
+        border-radius: 50%;
+        background: var(--blue);
+      }
+
+      .trace-title {
+        font-size: 12px;
+        font-weight: 820;
+      }
+
+      .trace-sub {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      @media (max-width: 1280px) {
+        .hero,
+        .workspace,
+        .replay {
+          grid-template-columns: 1fr;
+        }
+
+        .right-stack {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 900px) {
+        .app {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          display: none;
+        }
+
+        .topbar {
+          height: auto;
+          padding: 12px 14px;
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .page {
+          padding: 14px;
+        }
+
+        .hero-stats,
+        .chain,
+        .right-stack {
+          grid-template-columns: 1fr;
+        }
+
+        .stat,
+        .stat:nth-child(2n),
+        .stat:nth-last-child(-n + 2) {
+          border-right: 0;
+          border-bottom: 1px solid var(--line-soft);
+        }
+
+        .stat:last-child {
+          border-bottom: 0;
+        }
+
+        .seq-card {
+          grid-template-columns: 34px minmax(0, 1fr);
+        }
+
+        .seq-policy {
+          grid-column: 2;
+          justify-items: start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">A</div>
+          <div>
+            <div class="brand-title">AuraBoot Admin</div>
+            <div class="brand-subtitle">Strategy Studio</div>
+          </div>
+        </div>
+
+        <div class="nav-title">策略设计</div>
+        <button class="nav-item active"><span class="dot"></span>策略编排器</button>
+        <button class="nav-item"><span class="dot"></span>规则资产</button>
+        <button class="nav-item"><span class="dot"></span>动作库</button>
+        <button class="nav-item"><span class="dot"></span>事实模型</button>
+
+        <div class="nav-title">治理运行</div>
+        <button class="nav-item"><span class="dot"></span>影响分析</button>
+        <button class="nav-item"><span class="dot"></span>发布计划</button>
+        <button class="nav-item"><span class="dot"></span>执行回放</button>
+        <button class="nav-item"><span class="dot"></span>失败重试</button>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="crumb">首页 / 规则中心 / 策略编排器</div>
+          <div class="top-actions">
+            <button class="btn soft">保存草稿</button>
+            <button class="btn" id="runDryTest">试运行</button>
+            <button class="btn">影响分析</button>
+            <button class="btn primary">发布 v13</button>
+          </div>
+        </header>
+
+        <div class="page">
+          <section class="hero">
+            <div class="panel hero-main">
+              <h1>投诉处理策略 · v13 草稿</h1>
+              <div class="scenario-tabs">
+                <button class="scenario-tab active" data-scenario="sla">SLA 超时升级</button>
+                <button class="scenario-tab" data-scenario="bpm">BPM 审批路由</button>
+                <button class="scenario-tab" data-scenario="risk">高风险客户响应</button>
+                <button class="scenario-tab" data-scenario="channel">多渠道通知</button>
+              </div>
+            </div>
+
+            <div class="panel hero-stats">
+              <div class="stat">
+                <div class="stat-label">场景引用</div>
+                <div class="stat-value" id="statRefs">14</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">动作类型</div>
+                <div class="stat-value">12</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">今日命中</div>
+                <div class="stat-value" id="statHits">328</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">试运行</div>
+                <div class="stat-value" id="statDryRun">未执行</div>
+              </div>
+            </div>
+          </section>
+
+          <section class="workspace">
+            <div class="left-stack">
+              <section class="panel">
+                <div class="panel-head">
+                  <div class="panel-title">场景模板</div>
+                  <span class="pill blue">Trigger</span>
+                </div>
+                <div class="template-list">
+                  <button class="template-card active" data-scenario="sla">
+                    <div class="card-top"><span class="card-title">SLA 超时升级</span><span class="pill red">SLA</span></div>
+                    <div class="card-sub">超时后通知责任人，未处理则短信/IM 兜底并抄送主管。</div>
+                  </button>
+                  <button class="template-card" data-scenario="bpm">
+                    <div class="card-top"><span class="card-title">BPM 审批路由</span><span class="pill teal">BPM</span></div>
+                    <div class="card-sub">按金额、风险、部门输出审批人、候选组和任务时限。</div>
+                  </button>
+                  <button class="template-card" data-scenario="risk">
+                    <div class="card-top"><span class="card-title">高风险客户响应</span><span class="pill amber">Risk</span></div>
+                    <div class="card-sub">风险标签复用为 SLA、权限、消息和 BPM 的公共条件。</div>
+                  </button>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head">
+                  <div class="panel-title">事实模型</div>
+                  <span class="pill teal">Data pills</span>
+                </div>
+                <div class="fact-list" id="factList"></div>
+              </section>
+            </div>
+
+            <section class="panel center">
+              <div class="canvas-head">
+                <div>
+                  <div class="strategy-name" id="strategyName">SLA 超时升级策略</div>
+                  <div class="strategy-meta" id="strategyMeta">trigger.sla.breached · R-SLA-001 · actionGroup: complaint_escalation</div>
+                </div>
+                <div class="top-actions">
+                  <span class="pill green" id="strategyStatus">可发布</span>
+                  <button class="btn">版本差异</button>
+                </div>
+              </div>
+
+              <div class="canvas">
+                <div class="chain">
+                  <div class="chain-block">
+                    <div class="block-head"><span>触发源</span><span class="pill blue" id="triggerType">SLA</span></div>
+                    <div class="block-body" id="triggerNodes"></div>
+                  </div>
+
+                  <div class="chain-block">
+                    <div class="block-head"><span>条件</span><span class="pill amber" id="conditionMode">AND</span></div>
+                    <div class="block-body" id="conditionNodes"></div>
+                  </div>
+
+                  <div class="chain-block">
+                    <div class="block-head"><span>输出变量</span><span class="pill purple">Schema</span></div>
+                    <div class="block-body">
+                      <div class="output-grid" id="outputNodes"></div>
+                    </div>
+                  </div>
+
+                  <div class="chain-block">
+                    <div class="block-head"><span>治理</span><span class="pill green">Guardrails</span></div>
+                    <div class="block-body" id="guardrailNodes"></div>
+                  </div>
+                </div>
+
+                <div class="action-sequence">
+                  <div class="sequence-head">
+                    <span>动作编排</span>
+                    <div class="top-actions">
+                      <span class="pill blue" id="actionCount">6 steps</span>
+                      <button class="btn" id="addSelectedAction">添加选中动作</button>
+                    </div>
+                  </div>
+                  <div class="sequence-list" id="sequenceList"></div>
+                </div>
+              </div>
+            </section>
+
+            <aside class="right-stack">
+              <section class="panel">
+                <div class="panel-head">
+                  <div class="panel-title">动作库</div>
+                  <span class="pill blue">Action Catalog</span>
+                </div>
+                <div class="catalog-filter">
+                  <button class="filter-chip active">全部</button>
+                  <button class="filter-chip">通知</button>
+                  <button class="filter-chip">任务</button>
+                  <button class="filter-chip">集成</button>
+                </div>
+                <div class="action-catalog">
+                  <button class="action-card active" data-action="send_message">
+                    <div class="card-top"><span class="card-title">发送站内信</span><span class="pill green">in_app</span></div>
+                    <div class="card-sub">收件人、模板、变量、已读等待和兜底通道。</div>
+                  </button>
+                  <button class="action-card" data-action="send_sms">
+                    <div class="card-top"><span class="card-title">发送短信</span><span class="pill amber">sms</span></div>
+                    <div class="card-sub">手机号来源、签名模板、频控、失败重试。</div>
+                  </button>
+                  <button class="action-card" data-action="send_im">
+                    <div class="card-top"><span class="card-title">发送 IM</span><span class="pill teal">IM</span></div>
+                    <div class="card-sub">企业微信/钉钉/Slack 机器人和群组路由。</div>
+                  </button>
+                  <button class="action-card" data-action="cc_task">
+                    <div class="card-top"><span class="card-title">抄送任务</span><span class="pill blue">task</span></div>
+                    <div class="card-sub">创建只读待办，支持到期提醒和确认回执。</div>
+                  </button>
+                  <button class="action-card" data-action="assign_approver">
+                    <div class="card-top"><span class="card-title">设置审批人</span><span class="pill purple">BPM</span></div>
+                    <div class="card-sub">写入 assignee、candidateUsers、candidateGroups。</div>
+                  </button>
+                  <button class="action-card" data-action="webhook">
+                    <div class="card-top"><span class="card-title">调用 Webhook</span><span class="pill red">API</span></div>
+                    <div class="card-sub">URL、签名、超时、响应映射和重试策略。</div>
+                  </button>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head">
+                  <div class="panel-title">动作配置</div>
+                  <span class="pill teal" id="inspectorType">send_message</span>
+                </div>
+                <div class="inspector">
+                  <div class="inspector-title" id="inspectorTitle">发送站内信</div>
+                  <div class="inspector-sub" id="inspectorSub">使用规则输出变量填充收件人和模板参数。</div>
+                  <div class="form-grid" id="inspectorFields"></div>
+                </div>
+              </section>
+            </aside>
+          </section>
+
+          <section class="replay">
+            <section class="panel">
+              <div class="panel-head">
+                <div class="panel-title">试运行回放</div>
+                <span class="pill green" id="replayStatus">Ready</span>
+              </div>
+              <div class="trace-list" id="traceList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-head">
+                <div class="panel-title">影响面</div>
+                <span class="pill blue">Impact</span>
+              </div>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>消费方</th>
+                    <th>引用</th>
+                    <th>变更影响</th>
+                  </tr>
+                </thead>
+                <tbody id="impactRows"></tbody>
+              </table>
+            </section>
+          </section>
+        </div>
+      </main>
+    </div>
+
+    <script>
+      const scenarios = {
+        sla: {
+          name: "SLA 超时升级策略",
+          meta: "trigger.sla.breached · R-SLA-001 · actionGroup: complaint_escalation",
+          refs: "14",
+          hits: "328",
+          triggerType: "SLA",
+          conditionMode: "AND",
+          facts: [
+            ["ticket", "投诉单记录"],
+            ["sla", "剩余/超时时长"],
+            ["owner", "责任人与主管"],
+            ["customer", "等级与风险"],
+          ],
+          triggers: [
+            ["事件", "SLA breached"],
+            ["对象", "ticket.type == 'COMPLAINT'"],
+            ["时机", "overdueMinutes >= 0"],
+          ],
+          conditions: [
+            ["超时", "sla.status == 'OVERDUE'"],
+            ["优先级", "ticket.priority in ['P0', 'P1']"],
+            ["风险片段", "R-COM-009.customerRisk == 'HIGH'"],
+          ],
+          outputs: [
+            ["recipients", "owner, owner.manager"],
+            ["escalationLevel", "L2"],
+            ["channels", "in_app, sms, im"],
+            ["taskDueAt", "now + 2h"],
+          ],
+          guardrails: [
+            ["幂等键", "ticket.pid + rule.version"],
+            ["失败策略", "SMS/IM 可重试 3 次"],
+            ["频控", "同一投诉单 30 分钟内只通知一次"],
+          ],
+          actions: [
+            ["发送站内信", "to=${outputs.recipients}, template=sla_overdue_notice", "同步", "retry=1"],
+            ["等待已读", "wait 10m for owner.acknowledged", "等待", "timeout=10m"],
+            ["发送短信", "phone=${owner.mobile}, template=sla_sms", "兜底", "retry=3"],
+            ["发送 IM", "bot=ops_group, mention=${owner.manager}", "并行", "retry=2"],
+            ["抄送任务", "assignee=${owner.manager}, dueAt=${outputs.taskDueAt}", "任务", "idempotent"],
+            ["更新记录", "ticket.escalationLevel='L2'", "写入", "audit"],
+          ],
+          trace: [
+            ["触发", "SLA breached · complaint-20260624-1187", "0ms"],
+            ["条件", "R-SLA-001 命中，R-COM-009 命中", "18ms"],
+            ["输出", "recipients=张三, 李经理 · escalationLevel=L2", "22ms"],
+            ["动作", "站内信成功，SMS 未触发，IM 等待分支", "148ms"],
+          ],
+          impact: [
+            ["SLA 监控", "complaint_sla_config → R-SLA-001", "超时卡片、消息、升级字段"],
+            ["消息中心", "sla_overdue_notice → outputs.recipients", "模板变量和渠道路由"],
+            ["任务中心", "cc_task → owner.manager", "新增主管抄送待办"],
+          ],
+        },
+        bpm: {
+          name: "BPM 审批路由策略",
+          meta: "trigger.bpm.user_task.entered · R-BPM-004 · actionGroup: approval_routing",
+          refs: "9",
+          hits: "86",
+          triggerType: "BPM",
+          conditionMode: "FIRST_MATCH",
+          facts: [
+            ["process", "流程实例与节点"],
+            ["request", "金额、部门、供应商"],
+            ["applicant", "申请人组织"],
+            ["risk", "公共风险片段"],
+          ],
+          triggers: [
+            ["事件", "User task entered"],
+            ["节点", "purchase_approval.review"],
+            ["时机", "before assignment"],
+          ],
+          conditions: [
+            ["金额分支", "request.amount >= 100000"],
+            ["风险分支", "R-COM-009.customerRisk == 'HIGH'"],
+            ["部门分支", "request.department in ['采购', '工程']"],
+          ],
+          outputs: [
+            ["approver", "finance_director"],
+            ["candidateGroups", "legal, risk_control"],
+            ["approvalRoute", "DIRECTOR_REVIEW"],
+            ["taskDueAt", "now + 24h"],
+          ],
+          guardrails: [
+            ["空审批人", "fallback department_manager"],
+            ["权限校验", "approver must approve purchase"],
+            ["版本锁定", "流程实例使用启动时版本"],
+          ],
+          actions: [
+            ["设置审批人", "assignee=${outputs.approver}", "BPM", "required"],
+            ["设置候选组", "candidateGroups=${outputs.candidateGroups}", "BPM", "merge"],
+            ["设置流程变量", "approvalRoute=${outputs.approvalRoute}", "写入", "audit"],
+            ["发送 IM", "to=${outputs.approver}, template=approval_waiting", "通知", "retry=2"],
+            ["创建超时提醒", "dueAt=${outputs.taskDueAt}", "任务", "idempotent"],
+          ],
+          trace: [
+            ["触发", "purchase_approval.review entered", "0ms"],
+            ["条件", "金额分支命中，风险片段命中", "11ms"],
+            ["输出", "approver=财务总监 · route=DIRECTOR_REVIEW", "19ms"],
+            ["动作", "审批人写入成功，IM 已发送", "96ms"],
+          ],
+          impact: [
+            ["BPM 设计器", "review userTask → R-BPM-004", "候选审批人与任务期限"],
+            ["流程实例", "approvalRoute variable", "路由追踪和审批 SLA"],
+            ["消息中心", "approval_waiting", "审批提醒模板"],
+          ],
+        },
+        risk: {
+          name: "高风险客户响应策略",
+          meta: "trigger.customer.risk_changed · R-COM-009 · actionGroup: risk_response",
+          refs: "21",
+          hits: "512",
+          triggerType: "Risk",
+          conditionMode: "OR",
+          facts: [
+            ["customer", "客户等级与信用"],
+            ["history", "投诉、逾期、退货"],
+            ["case", "在途工单"],
+            ["org", "客户负责人组织"],
+          ],
+          triggers: [
+            ["事件", "customer risk changed"],
+            ["来源", "daily score job / manual review"],
+            ["时机", "after risk label updated"],
+          ],
+          conditions: [
+            ["等级", "customer.tier == 'VIP'"],
+            ["逾期", "history.overdueCount >= 2"],
+            ["投诉", "history.complaintCount >= 3"],
+          ],
+          outputs: [
+            ["customerRisk", "HIGH"],
+            ["watchers", "owner, risk_team"],
+            ["policyTag", "manual_review_required"],
+            ["visibleScope", "manager_only"],
+          ],
+          guardrails: [
+            ["引用方式", "只作为片段或输出变量"],
+            ["敏感字段", "信用评分默认脱敏"],
+            ["传播范围", "权限策略需二次确认"],
+          ],
+          actions: [
+            ["更新记录", "customer.riskTag='HIGH'", "写入", "audit"],
+            ["抄送任务", "assignee=${outputs.watchers}", "任务", "due=1d"],
+            ["发送站内信", "template=risk_changed_notice", "通知", "retry=1"],
+            ["调用 Webhook", "url=${riskRadar.webhook}", "集成", "signed"],
+          ],
+          trace: [
+            ["触发", "customer risk score changed", "0ms"],
+            ["条件", "VIP + 逾期次数命中", "15ms"],
+            ["输出", "customerRisk=HIGH · policyTag=manual_review_required", "21ms"],
+            ["动作", "记录更新成功，风险组收到抄送任务", "121ms"],
+          ],
+          impact: [
+            ["SLA 策略", "R-SLA-001 includes R-COM-009", "超时升级更敏感"],
+            ["BPM 路由", "R-BPM-004 includes R-COM-009", "审批层级上浮"],
+            ["权限策略", "case_visibility reads visibleScope", "高风险客户记录收紧"],
+          ],
+        },
+        channel: {
+          name: "多渠道通知策略",
+          meta: "trigger.message.requested · R-MSG-006 · actionGroup: omnichannel_notice",
+          refs: "17",
+          hits: "941",
+          triggerType: "Message",
+          conditionMode: "CHANNEL_POLICY",
+          facts: [
+            ["recipient", "用户、角色、组织"],
+            ["preference", "渠道偏好"],
+            ["template", "模板与变量"],
+            ["delivery", "已读、失败、退订"],
+          ],
+          triggers: [
+            ["事件", "message requested"],
+            ["来源", "SLA / BPM / Automation"],
+            ["时机", "before delivery"],
+          ],
+          conditions: [
+            ["偏好", "preference.imEnabled == true"],
+            ["频控", "delivery.sentInLast30m == false"],
+            ["紧急度", "message.priority in ['P0','P1']"],
+          ],
+          outputs: [
+            ["primaryChannel", "IM"],
+            ["fallbackChannel", "SMS"],
+            ["recipientGroup", "owner.manager"],
+            ["template", "urgent_notice"],
+          ],
+          guardrails: [
+            ["退订", "SMS respects optOut"],
+            ["已读等待", "IM unread 10m 后转 SMS"],
+            ["审计", "每个渠道独立记录"],
+          ],
+          actions: [
+            ["发送 IM", "channel=${outputs.primaryChannel}", "主通道", "retry=2"],
+            ["等待已读", "wait 10m", "等待", "timeout=10m"],
+            ["发送短信", "channel=${outputs.fallbackChannel}", "兜底", "rateLimit"],
+            ["写审计", "delivery.audit per channel", "审计", "required"],
+          ],
+          trace: [
+            ["触发", "message requested by SLA strategy", "0ms"],
+            ["条件", "IM 开启，30 分钟内未发送", "7ms"],
+            ["输出", "primaryChannel=IM · fallbackChannel=SMS", "12ms"],
+            ["动作", "IM 成功，等待已读中", "72ms"],
+          ],
+          impact: [
+            ["SLA 超时", "R-SLA-001 → R-MSG-006", "统一通知渠道和兜底"],
+            ["BPM 审批", "approval_waiting → R-MSG-006", "审批提醒使用同一渠道策略"],
+            ["消息中心", "delivery policy", "频控、退订、审计统一"],
+          ],
+        },
+      };
+
+      const actionDetails = {
+        send_message: {
+          title: "发送站内信",
+          type: "send_message",
+          sub: "发送系统内通知，并可等待已读后触发兜底动作。",
+          fields: [
+            ["收件人", "${outputs.recipients}"],
+            ["模板", "sla_overdue_notice"],
+            ["已读等待", "10m"],
+            ["输出", "message.deliveryPid"],
+          ],
+        },
+        send_sms: {
+          title: "发送短信",
+          type: "send_sms",
+          sub: "短信动作带签名模板、频控、失败重试和退订校验。",
+          fields: [
+            ["手机号", "${owner.mobile}"],
+            ["模板", "sla_sms_urgent"],
+            ["频控", "1 / 30m / record"],
+            ["失败策略", "retry 3, exponential"],
+          ],
+        },
+        send_im: {
+          title: "发送 IM",
+          type: "send_im",
+          sub: "支持企业微信、钉钉、Slack 和群机器人。",
+          fields: [
+            ["机器人", "ops_group_bot"],
+            ["提及", "${owner.manager}"],
+            ["渠道", "wecom / dingtalk / slack"],
+            ["失败策略", "fallback to sms"],
+          ],
+        },
+        cc_task: {
+          title: "抄送任务",
+          type: "cc_task",
+          sub: "创建只读待办，可要求确认、到期提醒和自动关闭。",
+          fields: [
+            ["抄送人", "${outputs.recipients}"],
+            ["任务标题", "SLA 超时待关注"],
+            ["到期时间", "${outputs.taskDueAt}"],
+            ["回执", "required"],
+          ],
+        },
+        assign_approver: {
+          title: "设置审批人",
+          type: "assign_approver",
+          sub: "写入 BPM 用户任务 assignee / candidateUsers / candidateGroups。",
+          fields: [
+            ["审批人", "${outputs.approver}"],
+            ["候选组", "${outputs.candidateGroups}"],
+            ["流程变量", "approvalRoute"],
+            ["空值兜底", "department_manager"],
+          ],
+        },
+        webhook: {
+          title: "调用 Webhook",
+          type: "webhook",
+          sub: "对接外部系统，支持签名、超时、重试和响应映射。",
+          fields: [
+            ["URL", "${connector.riskRadar.webhook}"],
+            ["签名", "HMAC-SHA256"],
+            ["超时", "15s"],
+            ["响应映射", "riskRadar.ticketId"],
+          ],
+        },
+      };
+
+      let activeScenario = "sla";
+      let selectedAction = "send_message";
+
+      function badgeFor(index) {
+        return index % 4 === 0 ? "blue" : index % 4 === 1 ? "teal" : index % 4 === 2 ? "amber" : "purple";
+      }
+
+      function renderScenario(key) {
+        const data = scenarios[key];
+        activeScenario = key;
+        document.getElementById("strategyName").textContent = data.name;
+        document.getElementById("strategyMeta").textContent = data.meta;
+        document.getElementById("statRefs").textContent = data.refs;
+        document.getElementById("statHits").textContent = data.hits;
+        document.getElementById("statDryRun").textContent = "未执行";
+        document.getElementById("strategyStatus").textContent = key === "bpm" ? "灰度中" : "可发布";
+        document.getElementById("triggerType").textContent = data.triggerType;
+        document.getElementById("conditionMode").textContent = data.conditionMode;
+        document.getElementById("actionCount").textContent = `${data.actions.length} steps`;
+        document.getElementById("replayStatus").textContent = "Ready";
+
+        document.querySelectorAll("[data-scenario]").forEach((node) => {
+          node.classList.toggle("active", node.dataset.scenario === key);
+        });
+
+        document.getElementById("factList").innerHTML = data.facts
+          .map(([name, desc]) => `<div class="fact-card"><div class="fact-row"><span>${name}</span><strong>${desc}</strong></div></div>`)
+          .join("");
+
+        document.getElementById("triggerNodes").innerHTML = data.triggers
+          .map(([title, code], i) => nodeHtml(title, code, badgeFor(i)))
+          .join("");
+        document.getElementById("conditionNodes").innerHTML = data.conditions
+          .map(([title, code], i) => nodeHtml(title, code, badgeFor(i + 1)))
+          .join("");
+        document.getElementById("outputNodes").innerHTML = data.outputs
+          .map(([name, value], i) => `<div class="output-row"><span class="output-name">${name}</span><span class="pill ${badgeFor(i)}">${value}</span></div>`)
+          .join("");
+        document.getElementById("guardrailNodes").innerHTML = data.guardrails
+          .map(([title, code], i) => nodeHtml(title, code, badgeFor(i + 2)))
+          .join("");
+        document.getElementById("sequenceList").innerHTML = data.actions
+          .map(
+            ([title, sub, kind, policy], i) => `
+              <div class="seq-card">
+                <div class="seq-no">${i + 1}</div>
+                <div>
+                  <div class="seq-title">${title}</div>
+                  <div class="seq-sub">${sub}</div>
+                </div>
+                <div class="seq-policy">
+                  <span class="pill ${badgeFor(i)}">${kind}</span>
+                  <span class="pill green">${policy}</span>
+                </div>
+              </div>
+            `,
+          )
+          .join("");
+        renderTrace(data.trace);
+        document.getElementById("impactRows").innerHTML = data.impact
+          .map(
+            ([consumer, ref, impact]) => `
+              <tr>
+                <td><strong>${consumer}</strong></td>
+                <td><code>${ref}</code></td>
+                <td>${impact}</td>
+              </tr>
+            `,
+          )
+          .join("");
+      }
+
+      function nodeHtml(title, code, color) {
+        return `
+          <div class="node">
+            <div class="node-title"><span>${title}</span><span class="pill ${color}">配置</span></div>
+            <div class="node-code">${code}</div>
+          </div>
+        `;
+      }
+
+      function renderTrace(items) {
+        document.getElementById("traceList").innerHTML = items
+          .map(
+            ([title, sub, time], i) => `
+              <div class="trace-item">
+                <span class="trace-dot"></span>
+                <div>
+                  <div class="trace-title">${title}</div>
+                  <div class="trace-sub">${sub}</div>
+                </div>
+                <span class="pill ${i === items.length - 1 ? "green" : "blue"}">${time}</span>
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      function renderAction(key) {
+        selectedAction = key;
+        const data = actionDetails[key];
+        document.querySelectorAll(".action-card").forEach((node) => {
+          node.classList.toggle("active", node.dataset.action === key);
+        });
+        document.getElementById("inspectorType").textContent = data.type;
+        document.getElementById("inspectorTitle").textContent = data.title;
+        document.getElementById("inspectorSub").textContent = data.sub;
+        document.getElementById("inspectorFields").innerHTML = data.fields
+          .map(
+            ([label, value]) => `
+              <div class="field">
+                <label>${label}</label>
+                <input value="${value}" />
+              </div>
+            `,
+          )
+          .join("");
+      }
+
+      document.querySelectorAll(".scenario-tab, .template-card").forEach((node) => {
+        node.addEventListener("click", () => renderScenario(node.dataset.scenario));
+      });
+
+      document.querySelectorAll(".action-card").forEach((node) => {
+        node.addEventListener("click", () => renderAction(node.dataset.action));
+      });
+
+      document.getElementById("addSelectedAction").addEventListener("click", () => {
+        const detail = actionDetails[selectedAction];
+        const list = document.getElementById("sequenceList");
+        const next = list.children.length + 1;
+        const item = document.createElement("div");
+        item.className = "seq-card";
+        item.innerHTML = `
+          <div class="seq-no">${next}</div>
+          <div>
+            <div class="seq-title">${detail.title}</div>
+            <div class="seq-sub">${detail.sub}</div>
+          </div>
+          <div class="seq-policy">
+            <span class="pill purple">新增</span>
+            <span class="pill green">schema ok</span>
+          </div>
+        `;
+        list.appendChild(item);
+        document.getElementById("actionCount").textContent = `${next} steps`;
+      });
+
+      document.getElementById("runDryTest").addEventListener("click", () => {
+        const data = scenarios[activeScenario];
+        document.getElementById("statDryRun").textContent = "通过";
+        document.getElementById("replayStatus").textContent = "Passed";
+        renderTrace([...data.trace, ["试运行", "动作 schema、变量绑定、幂等键、影响面校验通过", "203ms"]]);
+      });
+
+      renderScenario("sla");
+      renderAction("send_message");
+    </script>
+  </body>
+</html>

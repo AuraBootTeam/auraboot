@@ -19,6 +19,27 @@
     }
   },
   {
+    "code": "decisionops_console_preview",
+    "parentCode": "decisionops_console",
+    "name": "综合控制台预览",
+    "name:zh-CN": "综合控制台预览",
+    "name:en": "Console Preview",
+    "path": "/decision-ops",
+    "component": null,
+    "icon": "layout-dashboard",
+    "type": 1,
+    "permissionCode": "decision.definition.read",
+    "orderNo": 23,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ],
+      "implementation": "react-console-preview",
+      "pairedDslEntry": "/p/decisionops_rollouts"
+    }
+  },
+  {
     "code": "decisionops_definitions",
     "parentCode": "decisionops_console",
     "name": "决策定义",
