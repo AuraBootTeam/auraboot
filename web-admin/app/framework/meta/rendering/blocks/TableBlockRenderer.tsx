@@ -40,7 +40,28 @@ interface DictItem {
   extension?: Record<string, any>;
 }
 
+type StatusPillTone = 'gray' | 'blue' | 'amber' | 'green' | 'red';
+
 const FILE_PID_URL_PATTERN = /^\/?([0-9A-HJKMNP-TV-Z]{26})(?:\.[A-Za-z0-9]+)?$/;
+
+const STATUS_PILL_CLASS: Record<StatusPillTone, string> = {
+  gray: 'border-gray-200 bg-gray-100 text-gray-700',
+  blue: 'border-blue-200 bg-blue-50 text-blue-700',
+  amber: 'border-amber-200 bg-amber-50 text-amber-700',
+  green: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  red: 'border-rose-200 bg-rose-50 text-rose-700',
+};
+
+function renderStatusPill(tone: StatusPillTone, label: React.ReactNode): React.ReactNode {
+  return (
+    <span
+      data-testid="table-status-pill"
+      className={`rounded-pill inline-flex max-w-full items-center border px-3 py-1 text-sm leading-5 font-semibold ${STATUS_PILL_CLASS[tone]}`}
+    >
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
 
 function renderConfig(column: ColumnConfig): Record<string, any> {
   return column.render && typeof column.render === 'object' && !Array.isArray(column.render)
@@ -304,9 +325,13 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       if (dictItems) {
         const item = dictItems.find((i) => String(i.value) === String(value));
         if (item) {
+          const tone = resolveStatusTone(item.extension?.color);
+          if (column.renderType === 'status-pill') {
+            return renderStatusPill(tone, item.label);
+          }
           // §3 / §1.3: dict-coded status renders as 色点 + 文字 (semantic dot + label),
           // not a filled pill. Color from extension.color → canonical tone.
-          return <StatusDot tone={resolveStatusTone(item.extension?.color)} label={item.label} />;
+          return <StatusDot tone={tone} label={item.label} />;
         }
       }
       // 字典未加载或未找到匹配项时显示原始值
