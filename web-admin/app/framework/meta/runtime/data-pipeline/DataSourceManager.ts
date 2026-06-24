@@ -111,6 +111,27 @@ function existingFilters(
   }
 }
 
+const RESULT_ENVELOPE_KEYS = new Set(['code', 'desc', 'message', 'success', 'data', 'context']);
+
+function unwrapApiResult(result: any): any {
+  if (ResultHelper.isSuccess(result)) {
+    return result.data;
+  }
+
+  if (result && typeof result === 'object') {
+    const rawKeys = Object.keys(result).filter((key) => !RESULT_ENVELOPE_KEYS.has(key));
+    const hasNoEnvelopeCode = result.code === undefined || result.code === null || result.code === '';
+    if (hasNoEnvelopeCode && result.data == null && rawKeys.length > 0) {
+      return rawKeys.reduce<Record<string, any>>((raw, key) => {
+        raw[key] = result[key];
+        return raw;
+      }, {});
+    }
+  }
+
+  throw new Error(result?.desc || result?.message || 'API request failed');
+}
+
 /**
  * 数据源管理器
  */
@@ -466,20 +487,17 @@ export class DataSourceManager {
       ...extraParams,
     };
 
-    const requestParams = normalizeApiParams(config.endpoint, mergedParams);
+    const endpoint = expressionEvaluator.evaluateTemplate(config.endpoint, this.getContext());
+    const requestParams = normalizeApiParams(endpoint, mergedParams);
 
     // 发起请求
-    const result = await fetchResult(config.endpoint, {
+    const result = await fetchResult(endpoint, {
       method: config.method,
       params: requestParams,
     });
 
-    if (!ResultHelper.isSuccess(result)) {
-      throw new Error(result.desc || 'API request failed');
-    }
-
     // 适配数据
-    return this.adaptData(result.data, config);
+    return this.adaptData(unwrapApiResult(result), config);
   }
 
   /**
