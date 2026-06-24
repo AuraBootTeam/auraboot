@@ -151,7 +151,7 @@ function matchedRuleLabels(raw: unknown): string[] {
         if (typeof item === 'string') return item;
         if (!item || typeof item !== 'object') return null;
         const row = item as Record<string, unknown>;
-        const candidate = row.ruleId ?? row.ruleCode ?? row.id ?? row.name ?? row.reason;
+        const candidate = row.ruleId ?? row.ruleCode ?? row.name ?? row.reason;
         return typeof candidate === 'string' && candidate.trim() ? candidate : null;
       })
       .filter((item): item is string => Boolean(item));
@@ -180,7 +180,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
   const pageSize = props.pageSize ?? 50;
   const record = useMemo(() => recordFromRuntime(runtime), [runtime]);
   const routePid =
-    stringValue(record.pid) ?? stringValue(params.recordId) ?? pidFromPath(location.pathname);
+    stringValue(record.pid) ?? stringValue(params.recordPid) ?? pidFromPath(location.pathname);
   const initialFilters = useMemo(
     () => filtersFromSearch(location.search, props, record),
     [location.search, props.initialDecisionCode, props.initialKeyword, record],

@@ -53,7 +53,7 @@ class DataChangeLogPendingContextFreshnessValidatorTest {
                 .tenantId(1L)
                 .modelCode("crm_customer")
                 .recordVersion("change:42")
-                .input(Map.of("recordId", "C-1"))
+                .input(Map.of("recordPid", "C-1"))
                 .build());
 
         assertThat(decision.fresh()).isTrue();
@@ -74,7 +74,7 @@ class DataChangeLogPendingContextFreshnessValidatorTest {
                 .modelCode("crm_customer")
                 .recordVersion("change:42")
                 .contextConflictPolicy(ContextConflictPolicy.ASK_USER_TO_CONFIRM_AGAIN.name())
-                .input(Map.of("recordId", "C-1"))
+                .input(Map.of("recordPid", "C-1"))
                 .build());
 
         assertThat(decision.fresh()).isFalse();

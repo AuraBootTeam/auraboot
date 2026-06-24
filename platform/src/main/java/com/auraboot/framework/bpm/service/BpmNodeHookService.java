@@ -570,7 +570,7 @@ public class BpmNodeHookService {
      *   { "type": "command",
      *     "commandCode": "wd:create_leave_balance",
      *     "operationType": "create",       // optional (create/update/delete)
-     *     "targetRecordId": "...",         // optional
+     *     "targetRecordPid": "...",        // optional
      *     "payload": { ... } }             // optional; defaults to hook variables
      * </pre>
      *
@@ -587,7 +587,7 @@ public class BpmNodeHookService {
         }
 
         String operationType = (String) config.get("operationType");
-        String targetRecordId = (String) config.get("targetRecordId");
+        String targetRecordPid = (String) config.get("targetRecordPid");
         Object payloadRaw = config.get("payload");
         Map<String, Object> payload = payloadRaw instanceof Map
                 ? (Map<String, Object>) payloadRaw
@@ -595,7 +595,7 @@ public class BpmNodeHookService {
 
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setOperationType(operationType);
-        request.setTargetRecordId(targetRecordId);
+        request.setTargetRecordId(targetRecordPid);
         request.setPayload(payload);
 
         CommandExecuteResult result = commandExecutor.execute(commandCode, request);

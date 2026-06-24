@@ -279,14 +279,14 @@ describe('emailService', () => {
   });
 
   describe('linkToRecord', () => {
-    it('POSTs /api/email/messages/:id/links with modelCode + recordId', async () => {
+    it('POSTs /api/email/messages/:id/links with modelCode + recordPid', async () => {
       fetchResultMock.mockResolvedValue(ok(null));
 
-      await linkToRecord(5, 'order', 100);
+      await linkToRecord(5, 'order', 'order-pid-100');
 
       expect(fetchResultMock).toHaveBeenCalledWith('/api/email/messages/5/links', {
         method: 'post',
-        params: { modelCode: 'order', recordId: 100 },
+        params: { modelCode: 'order', recordPid: 'order-pid-100' },
       });
     });
   });
@@ -302,15 +302,15 @@ describe('emailService', () => {
   });
 
   describe('getMessagesByRecord', () => {
-    it('GETs /api/email/messages/by-record with modelCode + recordId', async () => {
+    it('GETs /api/email/messages/by-record with modelCode + recordPid', async () => {
       const msgs = [{ id: 1, subject: 'Hi' }];
       fetchResultMock.mockResolvedValue(ok(msgs));
 
-      const result = await getMessagesByRecord('order', 50);
+      const result = await getMessagesByRecord('order', 'order-pid-50');
 
       expect(fetchResultMock).toHaveBeenCalledWith('/api/email/messages/by-record', {
         method: 'get',
-        params: { modelCode: 'order', recordId: 50 },
+        params: { modelCode: 'order', recordPid: 'order-pid-50' },
       });
       expect(result).toEqual(msgs);
     });
@@ -318,13 +318,13 @@ describe('emailService', () => {
     it('returns empty array on failure', async () => {
       fetchResultMock.mockResolvedValue(fail());
 
-      expect(await getMessagesByRecord('order', 1)).toEqual([]);
+      expect(await getMessagesByRecord('order', 'order-pid-1')).toEqual([]);
     });
   });
 
   describe('getMessageLinks', () => {
     it('GETs /api/email/messages/:id/links', async () => {
-      const links = [{ id: 1, messageId: 5, modelCode: 'order', recordId: 1, createdAt: '2024-01-01' }];
+      const links = [{ id: 1, messageId: 5, modelCode: 'order', recordPid: 'order-pid-1', createdAt: '2024-01-01' }];
       fetchResultMock.mockResolvedValue(ok(links));
 
       const result = await getMessageLinks(5);

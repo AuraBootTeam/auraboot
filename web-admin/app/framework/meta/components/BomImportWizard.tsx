@@ -380,7 +380,7 @@ export const BomImportWizard: React.FC<BomImportWizardProps> = ({
       });
 
       const resultData = bomResult?.data?.data;
-      const bomId = resultData?.pid ?? resultData?.id ?? resultData?.recordId;
+      const bomId = resultData?.pid ?? resultData?.id ?? resultData?.recordPid;
       if (!bomId) {
         throw new Error(
           bomResult?.data?.errorMessage ?? bomResult?.message ?? 'Failed to create BOM header',

@@ -219,8 +219,7 @@
           "permissionCode": "crm.lead.manage",
           "visibleWhen": "row.crm_lead_status == 'new' || row.crm_lead_status == 'contacted'",
           "confirm": "delete.confirm",
-          "label": { "zh-CN": "删除", "en-US": "Delete" },
-          "action": { "type": "command", "command": "crm:delete_lead" }
+          "label": { "zh-CN": "删除", "en-US": "Delete" }
         }
       ],
       "searchFields": [

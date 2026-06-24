@@ -133,7 +133,6 @@ public class SodController {
     /**
      * Perform a manual SoD check (for testing and validation).
      * POST /api/sod/check
-     * Body: { "commandCode": "pe:approve_purchase_order", "actorId": 123, "entityType": "pe_purchase_order", "entityId": 456 }
      * Body: { "commandCode": "pe:approve_purchase_order", "actorId": 123, "entityType": "pe_purchase_order", "entityPid": "01K..." }
      */
     @PostMapping("/check")
@@ -143,35 +142,17 @@ public class SodController {
         Long actorId = body.get("actorId") != null ? Long.valueOf(body.get("actorId").toString()) : MetaContext.getCurrentUserId();
         String actorName = (String) body.getOrDefault("actorName", MetaContext.getCurrentUsername());
         String entityType = (String) body.get("entityType");
-        Long entityId = parseLong(body.get("entityId"));
         String entityPid = firstText(body.get("entityPid"), body.get("targetRecordPid"));
-        if (!StringUtils.hasText(entityPid) && entityId == null) {
-            Object targetRecordId = body.get("targetRecordId");
-            Long parsedTargetId = parseLong(targetRecordId);
-            if (parsedTargetId != null) {
-                entityId = parsedTargetId;
-            } else {
-                entityPid = firstText(targetRecordId);
-            }
+        if (!StringUtils.hasText(entityPid)) {
+            throw new IllegalArgumentException("entityPid is required");
         }
 
         try {
-            SodCheckResult result = sodService.checkSod(commandCode, actorId, actorName, entityType, entityId, entityPid);
+            SodCheckResult result = sodService.checkSod(commandCode, actorId, actorName, entityType, null, entityPid);
             return ApiResponse.success(result);
         } catch (com.auraboot.framework.exception.SodViolationException e) {
             // For manual check, return the result instead of throwing
             return ApiResponse.success(e.getCheckResult());
-        }
-    }
-
-    private Long parseLong(Object value) {
-        if (value == null) {
-            return null;
-        }
-        try {
-            return Long.valueOf(value.toString());
-        } catch (NumberFormatException e) {
-            return null;
         }
     }
 

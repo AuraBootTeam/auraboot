@@ -121,7 +121,7 @@ describe('EventPolicyDesignerWorkflow', () => {
                 target: 'QUEUE:vip-support',
                 order: 1,
                 payload: { severity: 'high' },
-                idempotencyKeyTemplate: '${record.recordId}:vip',
+                idempotencyKeyTemplate: '${record.recordPid}:vip',
               },
             ],
           },

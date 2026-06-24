@@ -117,8 +117,8 @@ public class DynamicController {
             @Parameter(description = "NamedQuery code — when provided, data is fetched from a NamedQuery instead of the model table")
             @RequestParam(required = false) String queryCode,
 
-            @Parameter(description = "Cursor for keyset pagination. Pass the nextCursor value from the previous response to fetch the next page efficiently. When provided, pageNum is ignored and WHERE id > cursor is used instead of OFFSET.")
-            @RequestParam(required = false) Long cursor) {
+            @Parameter(description = "Public pid cursor for keyset pagination. Pass the nextCursor value from the previous response to fetch the next page efficiently. When provided, pageNum is ignored and WHERE pid > cursor is used instead of OFFSET.")
+            @RequestParam(required = false) String cursor) {
 
         log.info("分页查询数据: pageKey={}, pageNum={}, pageSize={}, keyword={}, filters={}, sortFields={}, queryCode={}, cursor={}",
             logSafe(pageKey), pageNum, pageSize, logSafe(keyword), logSafe(filters),
@@ -325,17 +325,17 @@ public class DynamicController {
         return result;
     }
     /**
-     * 根据ID获取单条数据
+     * 根据 PID 获取单条数据
      */
-    @GetMapping("/{pageKey}/{recordId}")
-    @Operation(summary = "获取单条数据", description = "根据ID获取单条数据")
+    @GetMapping("/{pageKey}/{recordPid}")
+    @Operation(summary = "获取单条数据", description = "根据记录 PID 获取单条数据")
     @RequirePermission("model.{pageKey}.read")
     public ApiResponse<Map<String, Object>> getById(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
-            @Parameter(description = "记录ID") @PathVariable String recordId) {
-        log.info("获取单条数据: {} - {}", logSafe(pageKey), logSafe(recordId));
+            @Parameter(description = "记录 PID") @PathVariable String recordPid) {
+        log.info("获取单条数据: pageKey={}, recordPid={}", logSafe(pageKey), logSafe(recordPid));
         String modelCode = resolveModelCode(pageKey);
-        Map<String, Object> result = dynamicDataService.getById(modelCode, recordId);
+        Map<String, Object> result = dynamicDataService.getById(modelCode, recordPid);
         return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
     }
 
@@ -344,23 +344,23 @@ public class DynamicController {
      * Returns actions filtered by: user permission + record state + platform + context.
      * Mobile Action Bar renders the top 2 (by priority) as primary buttons.
      */
-    @GetMapping("/{pageKey}/{recordId}/capabilities")
+    @GetMapping("/{pageKey}/{recordPid}/capabilities")
     @Operation(summary = "Get record capabilities",
             description = "Returns available actions for a record, filtered by user permissions, record state, platform, and context")
     @RequirePermission("model.{pageKey}.read")
     public ApiResponse<RecordCapabilities> getRecordCapabilities(
             @Parameter(description = "Page key") @PathVariable String pageKey,
-            @Parameter(description = "Record ID") @PathVariable String recordId,
+            @Parameter(description = "Record PID") @PathVariable String recordPid,
             @Parameter(description = "Platform: web or mobile") @RequestParam(defaultValue = "web") String platform,
             @Parameter(description = "Context: detail, list, or inbox") @RequestParam(defaultValue = "detail") String context) {
 
-        log.info("Get record capabilities: pageKey={}, recordId={}, platform={}, context={}",
-                logSafe(pageKey), logSafe(recordId), logSafe(platform), logSafe(context));
+        log.info("Get record capabilities: pageKey={}, recordPid={}, platform={}, context={}",
+                logSafe(pageKey), logSafe(recordPid), logSafe(platform), logSafe(context));
         String modelCode = resolveModelCode(pageKey);
         Long userId = MetaContext.getCurrentUserId();
 
         RecordCapabilities capabilities = recordCapabilityService.getRecordCapabilities(
-                modelCode, recordId, platform, context, userId);
+                modelCode, recordPid, platform, context, userId);
         return ApiResponse.success(capabilities);
     }
 
@@ -395,31 +395,31 @@ public class DynamicController {
     /**
      * 更新数据
      */
-    @PutMapping("/{pageKey}/{recordId}")
+    @PutMapping("/{pageKey}/{recordPid}")
     @Operation(summary = "更新数据", description = "根据页面定义更新数据")
     @RequirePermission("model.{pageKey}.update")
     public ApiResponse<Map<String, Object>> update(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
-            @Parameter(description = "记录ID") @PathVariable String recordId,
+            @Parameter(description = "记录 PID") @PathVariable String recordPid,
             @RequestBody Map<String, Object> data) {
-        log.info("更新数据: {} - {}", logSafe(pageKey), logSafe(recordId));
+        log.info("更新数据: pageKey={}, recordPid={}", logSafe(pageKey), logSafe(recordPid));
         String modelCode = resolveModelCode(pageKey);
-        Map<String, Object> result = dynamicDataService.update(modelCode, recordId, data);
+        Map<String, Object> result = dynamicDataService.update(modelCode, recordPid, data);
         return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
     }
 
     /**
      * 删除数据
      */
-    @DeleteMapping("/{pageKey}/{recordId}")
+    @DeleteMapping("/{pageKey}/{recordPid}")
     @Operation(summary = "删除数据", description = "根据页面定义删除数据")
     @RequirePermission("model.{pageKey}.delete")
     public ApiResponse<Void> delete(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
-            @Parameter(description = "记录ID") @PathVariable String recordId) {
-        log.info("删除数据: {} - {}", logSafe(pageKey), logSafe(recordId));
+            @Parameter(description = "记录 PID") @PathVariable String recordPid) {
+        log.info("删除数据: pageKey={}, recordPid={}", logSafe(pageKey), logSafe(recordPid));
         String modelCode = resolveModelCode(pageKey);
-        dynamicDataService.delete(modelCode, recordId);
+        dynamicDataService.delete(modelCode, recordPid);
         return ApiResponse.success(null);
     }
 
@@ -467,13 +467,13 @@ public class DynamicController {
     @RequirePermission("model.{pageKey}.delete")
     public ApiResponse<Void> batchDelete(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
-            @RequestBody List<String> recordIds) {
-        if (recordIds.size() > MAX_BATCH_SIZE) {
-            return ApiResponse.error("Batch size " + recordIds.size() + " exceeds maximum " + MAX_BATCH_SIZE);
+            @RequestBody List<String> recordPids) {
+        if (recordPids.size() > MAX_BATCH_SIZE) {
+            return ApiResponse.error("Batch size " + recordPids.size() + " exceeds maximum " + MAX_BATCH_SIZE);
         }
-        log.info("批量删除数据: {}, 数量: {}", logSafe(pageKey), recordIds.size());
+        log.info("批量删除数据: pageKey={}, count={}", logSafe(pageKey), recordPids.size());
         String modelCode = resolveModelCode(pageKey);
-        dynamicDataService.batchDelete(modelCode, recordIds);
+        dynamicDataService.batchDelete(modelCode, recordPids);
         return ApiResponse.success(null);
     }
 
@@ -796,18 +796,19 @@ public class DynamicController {
     /**
      * 获取关联数据
      */
-    @GetMapping("/{pageKey}/{recordId}/relations/{relationName}")
+    @GetMapping("/{pageKey}/{recordPid}/relations/{relationName}")
     @Operation(summary = "获取关联数据", description = "获取指定记录的关联数据")
     @RequirePermission("model.{pageKey}.read")
     public ApiResponse<List<Map<String, Object>>> getRelationData(
             @Parameter(description = "页面Key") @PathVariable String pageKey,
-            @Parameter(description = "记录ID") @PathVariable String recordId,
+            @Parameter(description = "记录 PID") @PathVariable String recordPid,
             @Parameter(description = "关联名称") @PathVariable String relationName) {
-        log.info("获取关联数据: {} - {} - {}", logSafe(pageKey), logSafe(recordId), logSafe(relationName));
+        log.info("获取关联数据: pageKey={}, recordPid={}, relationName={}",
+                logSafe(pageKey), logSafe(recordPid), logSafe(relationName));
         
         // 转换为新的接口调用
         String modelCode = resolveModelCode(pageKey);
-        List<Map<String, Object>> result = dynamicDataService.getRelationData(modelCode, recordId, relationName, Collections.emptyMap());
+        List<Map<String, Object>> result = dynamicDataService.getRelationData(modelCode, recordPid, relationName, Collections.emptyMap());
         return ApiResponse.success(PublicRecordSanitizer.sanitizeRecords(result));
     }
 

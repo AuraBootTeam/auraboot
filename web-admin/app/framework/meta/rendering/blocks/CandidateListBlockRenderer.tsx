@@ -70,7 +70,7 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
     >
       <div className={`space-y-2 ${maxHeight ? 'min-h-0 flex-1 overflow-y-auto pr-1' : ''}`}>
         {rows.map((row: any, index: number) => {
-          const rowKey = String(row.pid ?? row.id ?? index);
+    const rowKey = String(row.pid ?? index);
           const title = readPath(row, item.titleField) ?? rowKey;
           const subtitle = readPath(row, item.subtitleField);
           const description = readPath(row, item.descriptionField);

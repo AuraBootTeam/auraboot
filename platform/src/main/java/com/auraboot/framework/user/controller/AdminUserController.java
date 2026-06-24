@@ -8,31 +8,26 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.annotation.RequirePermission;
-import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.dto.EmployeeAccountProvisionRequest;
 import com.auraboot.framework.user.dto.EmployeeAccountProvisionResponse;
 import com.auraboot.framework.user.dto.UserProvisionRequest;
 import com.auraboot.framework.user.dto.UserProvisionResponse;
 import com.auraboot.framework.user.dto.UserSearchDTO;
-import com.auraboot.framework.user.mapper.UserMapper;
 import com.auraboot.framework.user.service.EmployeeAccountProvisioningService;
 import com.auraboot.framework.user.service.EmployeeAccountWorkbookParser;
 import com.auraboot.framework.user.service.UserProvisioningService;
 import com.auraboot.framework.user.service.UserService;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.security.SecureRandom;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
@@ -43,8 +38,6 @@ import java.util.Map;
 @Tag(name = "Admin User Management", description = "Administrator user management operations")
 public class AdminUserController {
 
-    private final UserMapper userMapper;
-    private final PasswordEncoder passwordEncoder;
     private final PasswordManagementService passwordManagementService;
     private final UserProvisioningService userProvisioningService;
     private final EmployeeAccountProvisioningService employeeAccountProvisioningService;
@@ -177,22 +170,8 @@ public class AdminUserController {
     @PostMapping("/{userPid}/reset-password")
     @Operation(summary = "Admin reset user password")
     public ApiResponse<Map<String, String>> resetPassword(@PathVariable String userPid) {
-        QueryWrapper<User> qw = new QueryWrapper<>();
-        qw.eq("pid", userPid);
-        User user = userMapper.selectOne(qw);
-
-        if (user == null) {
-            throw new RootUnCheckedException(ResponseCode.NOT_FOUND, "User not found");
-        }
-
-        // Generate random temporary password
         String tempPassword = generateRandomPassword(12);
-
-        user.setPassword(passwordEncoder.encode(tempPassword));
-        user.setMustChangePassword(false);
-        user.setSecurityVersion((user.getSecurityVersion() != null ? user.getSecurityVersion() : 0) + 1);
-        user.setUpdatedAt(Instant.now());
-        userMapper.updateById(user);
+        passwordManagementService.resetPasswordByAdmin(userPid, tempPassword);
 
         log.info("Admin reset password for user {}, mustChangePassword=false", userPid);
 

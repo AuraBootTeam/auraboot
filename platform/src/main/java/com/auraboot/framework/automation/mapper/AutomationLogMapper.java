@@ -49,16 +49,16 @@ public interface AutomationLogMapper extends BaseMapper<AutomationLog> {
             @Param("limit") int limit);
 
     /**
-     * Find logs by record ID (what automations were triggered for a record)
+     * Find logs by trigger record pid.
      */
     @Select("""
         SELECT * FROM ab_automation_log
-        WHERE trigger_record_id = #{recordId}
+        WHERE trigger_record_pid = #{recordPid}
         ORDER BY created_at DESC
         LIMIT #{limit}
         """)
-    List<AutomationLog> findByTriggerRecordId(
-            @Param("recordId") String recordId,
+    List<AutomationLog> findByTriggerRecordPid(
+            @Param("recordPid") String recordPid,
             @Param("limit") int limit);
 
     /**
@@ -101,11 +101,11 @@ public interface AutomationLogMapper extends BaseMapper<AutomationLog> {
      */
     @Insert("""
         INSERT INTO ab_automation_log (
-            pid, tenant_id, automation_id, trigger_type, trigger_record_id,
+            pid, tenant_id, automation_id, trigger_type, trigger_record_pid,
             trigger_payload, status, started_at, completed_at, error_message,
             action_results, created_at
         ) VALUES (
-            #{pid}, #{tenantId}, #{automationId}, #{triggerType}, #{triggerRecordId},
+            #{pid}, #{tenantId}, #{automationId}, #{triggerType}, #{triggerRecordPid},
             #{triggerPayload, typeHandler=com.auraboot.framework.automation.typehandler.TriggerPayloadTypeHandler},
             #{status}, #{startedAt}, #{completedAt}, #{errorMessage},
             #{actionResults, typeHandler=com.auraboot.framework.automation.typehandler.ActionResultsTypeHandler},

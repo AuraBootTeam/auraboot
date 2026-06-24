@@ -163,7 +163,7 @@ public class CommandFieldMapExecutorIntegrationTest extends BaseIntegrationTest 
                 .satisfies(ex -> {
                     BusinessException be = (BusinessException) ex;
                     assertThat(be.getResponseCode()).isEqualTo(ResponseCode.BadParam);
-                    assertThat(be.getMessage()).contains("targetRecordId").contains("delete");
+                    assertThat(be.getMessage()).contains("targetRecordPid").contains("delete");
                 });
 
         // Critical: confirm NO row was inserted with our marker name
@@ -218,7 +218,7 @@ public class CommandFieldMapExecutorIntegrationTest extends BaseIntegrationTest 
                 .satisfies(ex -> {
                     BusinessException be = (BusinessException) ex;
                     assertThat(be.getResponseCode()).isEqualTo(ResponseCode.BadParam);
-                    assertThat(be.getMessage()).contains("targetRecordId").contains("update");
+                    assertThat(be.getMessage()).contains("targetRecordPid").contains("update");
                 });
 
         Map<String, Object> params = new HashMap<>();
@@ -255,7 +255,7 @@ public class CommandFieldMapExecutorIntegrationTest extends BaseIntegrationTest 
                 .satisfies(ex -> {
                     BusinessException be = (BusinessException) ex;
                     assertThat(be.getResponseCode()).isEqualTo(ResponseCode.BadParam);
-                    assertThat(be.getMessage()).contains("targetRecordId");
+                    assertThat(be.getMessage()).contains("targetRecordPid");
                 });
 
         Map<String, Object> params = new HashMap<>();

@@ -250,7 +250,7 @@ Create or update related records:
         "targetModel": "activity_log",
         "fields": {
           "log_type": "state_change",
-          "object_id": "${recordId}",
+          "object_id": "${recordPid}",
           "description": "Opportunity moved to closed_won"
         }
       }

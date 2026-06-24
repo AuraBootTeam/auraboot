@@ -43,10 +43,10 @@ public class AutomationLog {
     private String triggerType;
 
     /**
-     * ID of the record that triggered the automation
+     * PID of the record that triggered the automation.
      */
-    @TableField("trigger_record_id")
-    private String triggerRecordId;
+    @TableField("trigger_record_pid")
+    private String triggerRecordPid;
 
     /**
      * Payload data that triggered the automation (JSONB)

@@ -199,14 +199,14 @@ public class AiScoringService {
         return null;
     }
 
-    private Map.Entry<String, Object> resolveIdColumn(String recordId) {
-        if (recordId.length() == 26 && recordId.matches("^[0-9A-Z]+$")) {
-            return Map.entry("pid", recordId);
+    private Map.Entry<String, Object> resolveIdColumn(String recordKey) {
+        if (recordKey.length() == 26 && recordKey.matches("^[0-9A-Z]+$")) {
+            return Map.entry("pid", recordKey);
         }
         try {
-            return Map.entry("id", Long.parseLong(recordId));
+            return Map.entry("id", Long.parseLong(recordKey));
         } catch (NumberFormatException e) {
-            return Map.entry("pid", recordId);
+            return Map.entry("pid", recordKey);
         }
     }
 }

@@ -49,7 +49,7 @@ const ChartLoadingFallback: React.FC = () => (
 );
 
 /**
- * Interpolate `${record.<field>}`, `${recordId}`, and `${<field>}` placeholders in a
+ * Interpolate `${record.<field>}`, `${recordPid}`, and `${<field>}` placeholders in a
  * named-query params object against the current record. Returns a new object with string
  * values resolved; non-string values pass through unchanged. Exported for unit testing.
  *
@@ -59,7 +59,7 @@ const ChartLoadingFallback: React.FC = () => (
 export function resolveRecordParams(
   params: Record<string, unknown> | undefined,
   record: Record<string, unknown> | undefined,
-  recordId: unknown,
+  recordPid: unknown,
 ): Record<string, unknown> | undefined {
   if (!params || typeof params !== 'object') return params;
   const out: Record<string, unknown> = {};
@@ -69,7 +69,7 @@ export function resolveRecordParams(
       continue;
     }
     out[key] = value
-      .replace(/\$\{recordId\}/g, String(recordId ?? ''))
+      .replace(/\$\{recordPid\}/g, String(recordPid ?? ''))
       .replace(/\$\{record\.(\w+)\}/g, (_m, f: string) => String(record?.[f] ?? ''))
       .replace(/\$\{(\w+)\}/g, (_m, f: string) => String(record?.[f] ?? ''));
   }
@@ -97,7 +97,7 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
       : config.dataSource;
 
     // Normalize legacy `params` → `parameters` (the key useChartData/the backend read).
-    // Record-scoped `${record.*}`/`${recordId}` templates are resolved upstream by the page
+    // Record-scoped `${record.*}`/`${recordPid}` templates are resolved upstream by the page
     // renderer (DetailBlockRenderer), where the current record is available.
     let resolvedDataSource = dataSource;
     if (dataSource && (dataSource as any).params && !(dataSource as any).parameters) {

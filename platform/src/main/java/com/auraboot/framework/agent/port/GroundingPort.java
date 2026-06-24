@@ -18,10 +18,10 @@ public interface GroundingPort {
      * @param tenantId    current tenant ID
      * @param userMessage the raw user message text
      * @param pageModel   current page model code (nullable, provides context)
-     * @param recordId    current record ID (nullable, provides context)
+     * @param recordPid   current record pid (nullable, provides context)
      * @return grounding result with intent, object, confidence, and candidate skills
      */
-    GroundingResult ground(Long tenantId, String userMessage, String pageModel, String recordId);
+    GroundingResult ground(Long tenantId, String userMessage, String pageModel, String recordPid);
 
     /**
      * Result of grounding a user message — captures intent, target object, and candidate skills.

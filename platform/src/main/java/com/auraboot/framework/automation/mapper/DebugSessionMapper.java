@@ -23,7 +23,7 @@ public interface DebugSessionMapper extends BaseMapper<DebugSession> {
             @Result(column = "pid", property = "pid"),
             @Result(column = "tenant_id", property = "tenantId"),
             @Result(column = "automation_id", property = "automationId"),
-            @Result(column = "record_id", property = "recordId"),
+            @Result(column = "record_pid", property = "recordPid"),
             @Result(column = "status", property = "status"),
             @Result(column = "current_action_index", property = "currentActionIndex"),
             @Result(column = "breakpoints", property = "breakpoints", typeHandler = BreakpointsTypeHandler.class),
@@ -59,12 +59,12 @@ public interface DebugSessionMapper extends BaseMapper<DebugSession> {
 
     @Insert("""
         INSERT INTO ab_automation_debug_session (
-            pid, tenant_id, automation_id, record_id, status,
+            pid, tenant_id, automation_id, record_pid, status,
             current_action_index, breakpoints, execution_context,
             action_results, trigger_payload, error_message,
             created_at, updated_at, created_by
         ) VALUES (
-            #{pid}, #{tenantId}, #{automationId}, #{recordId}, #{status},
+            #{pid}, #{tenantId}, #{automationId}, #{recordPid}, #{status},
             #{currentActionIndex},
             #{breakpoints, typeHandler=com.auraboot.framework.automation.typehandler.BreakpointsTypeHandler},
             #{executionContext, typeHandler=com.auraboot.framework.automation.typehandler.TriggerPayloadTypeHandler},

@@ -462,26 +462,26 @@ function derivePageContextFromRoute(
     };
   }
 
-  // /p/:pageKey/view/:recordId → detail
+  // /p/:pageKey/view/:recordPid → detail
   if (pathname.match(/^\/p\/[^/]+\/view\/[^/]+/)) {
     const pageKey = params.pageKey || '';
     return {
       pageType: 'detail',
       pageKey,
       modelCode: pageKey,
-      recordPid: params.recordId,
+      recordPid: params.recordPid,
       breadcrumb: [pageKey],
     };
   }
 
-  // /p/:pageKey/edit/:recordId → form (edit)
+  // /p/:pageKey/edit/:recordPid → form (edit)
   if (pathname.match(/^\/p\/[^/]+\/edit\/[^/]+/)) {
     const pageKey = params.pageKey || '';
     return {
       pageType: 'form',
       pageKey,
       modelCode: pageKey,
-      recordPid: params.recordId,
+      recordPid: params.recordPid,
       breadcrumb: [pageKey],
     };
   }

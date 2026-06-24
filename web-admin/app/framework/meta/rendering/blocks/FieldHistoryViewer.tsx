@@ -26,7 +26,7 @@ interface FieldChangeLog {
 
 export interface FieldHistoryViewerProps {
   modelCode: string;
-  recordId: string; // numeric id (not pid)
+  recordPid: string; // numeric id (not pid)
   token?: string;
   locale?: string;
   t?: (key: string) => string;
@@ -34,7 +34,7 @@ export interface FieldHistoryViewerProps {
 
 export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
   modelCode,
-  recordId,
+  recordPid,
   token,
   locale = 'zh-CN',
 }) => {
@@ -43,7 +43,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!modelCode || !recordId) {
+    if (!modelCode || !recordPid) {
       setLoading(false);
       return;
     }
@@ -54,7 +54,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
       try {
         const result = await fetchResult<FieldChangeLog[]>('/api/audit/field-changes', {
           method: 'get',
-          params: { modelCode, recordId },
+          params: { modelCode, recordPid },
           token,
         });
         if (ResultHelper.isSuccess(result) && Array.isArray(result.data)) {
@@ -75,7 +75,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
     };
 
     load();
-  }, [modelCode, recordId, token, locale]);
+  }, [modelCode, recordPid, token, locale]);
 
   if (loading) {
     return (

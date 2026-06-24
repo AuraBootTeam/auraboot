@@ -19,7 +19,6 @@ public class MobileSearchResult {
     public static class SearchHit {
         private String modelCode;
         private String modelLabel;
-        private String recordId;
         private String recordPid;
         private String displayName;
         private String title;

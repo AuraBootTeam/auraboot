@@ -15,8 +15,8 @@ import java.util.Map;
  * Production {@code START_PROCESS} {@link ActionHandler} (docs/2.md §7): starts a BPM process instance
  * via the platform {@link ProcessEngineService} when a policy rule matches (e.g. open an approval
  * flow for a high-value case). Additive — reuses the BPM engine. {@code payload.processDefinitionId}
- * selects the process; the business key defaults to the event's record id; {@code payload.variables}
- * (plus the record id) are passed as process variables.
+ * selects the process; the business key defaults to the event's record pid; {@code payload.variables}
+ * (plus the record pid) are passed as process variables.
  */
 @Slf4j
 @Component
@@ -38,17 +38,17 @@ public class StartProcessActionHandler implements ActionHandler {
         if (pdId == null || String.valueOf(pdId).isBlank()) {
             throw new IllegalArgumentException("START_PROCESS requires payload.processDefinitionId");
         }
-        String recordId = resolveString(context, "recordId");
+        String recordPid = resolveString(context, "recordPid");
         Object bk = payload.get("businessKey");
-        String businessKey = bk != null ? String.valueOf(bk) : recordId;
+        String businessKey = bk != null ? String.valueOf(bk) : recordPid;
 
         java.util.Map<String, Object> variables = new java.util.HashMap<>();
         Object vars = payload.get("variables");
         if (vars instanceof Map<?, ?> m) {
             variables.putAll((Map<String, Object>) m);
         }
-        if (recordId != null) {
-            variables.putIfAbsent("recordId", recordId);
+        if (recordPid != null) {
+            variables.putIfAbsent("recordPid", recordPid);
         }
         // the policy-initiated process's starter is the current user (drives 'starter' assignee
         // resolution); set it when available unless the caller already provided one

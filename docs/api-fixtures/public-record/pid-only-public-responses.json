@@ -1,0 +1,107 @@
+{
+  "contractAudience": "public",
+  "dynamicList": {
+    "code": 0,
+    "data": {
+      "records": [
+        {
+          "pid": "rec_order_001",
+          "recordPid": "rec_order_001",
+          "name": "Order A",
+          "createdByPid": "usr_001",
+          "updatedByPid": "usr_002"
+        }
+      ],
+      "nextCursor": "rec_order_001"
+    }
+  },
+  "dynamicDetail": {
+    "code": 0,
+    "data": {
+      "pid": "rec_order_001",
+      "recordPid": "rec_order_001",
+      "status": "draft"
+    }
+  },
+  "recordShare": {
+    "code": 0,
+    "data": {
+      "sharePid": "shr_001",
+      "recordPid": "rec_order_001",
+      "memberPid": "mbr_001"
+    }
+  },
+  "emailRecordLink": {
+    "code": 0,
+    "data": {
+      "messagePid": "emsg_001",
+      "threadPid": "eth_001",
+      "recordPid": "rec_order_001"
+    }
+  },
+  "inbox": {
+    "code": 0,
+    "data": {
+      "items": [
+        {
+          "itemPid": "inb_001",
+          "sourceRecordPid": "rec_order_001",
+          "cardData": {
+            "recordPid": "rec_order_001",
+            "sourceRecordPid": "rec_order_001"
+          }
+        }
+      ]
+    }
+  },
+  "automation": {
+    "code": 0,
+    "data": {
+      "logPid": "alog_001",
+      "triggerRecordPid": "rec_order_001",
+      "debugSessionPid": "adbg_001",
+      "recordPid": "rec_order_001"
+    }
+  },
+  "agentAudit": {
+    "code": 0,
+    "data": {
+      "actionPid": "act_001",
+      "targetRecordPid": "rec_order_001",
+      "targetRecordPids": [
+        "rec_order_001"
+      ]
+    }
+  },
+  "mobileSearch": {
+    "code": 0,
+    "data": {
+      "results": [
+        {
+          "modelCode": "order",
+          "recordPid": "rec_order_001",
+          "title": "Order A"
+        }
+      ]
+    }
+  },
+  "autoFill": {
+    "code": 0,
+    "data": {
+      "recordPid": "rec_order_001",
+      "suggestions": {
+        "ownerPid": "usr_001"
+      }
+    }
+  },
+  "recordCapability": {
+    "code": 0,
+    "data": {
+      "recordPid": "rec_order_001",
+      "capabilities": [
+        "read",
+        "update"
+      ]
+    }
+  }
+}

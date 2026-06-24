@@ -26,13 +26,13 @@ interface UseDocumentFlowResult {
  * Resolves the document flow chain for a given model and record.
  *
  * @param modelCode - The model code of the document being viewed (e.g., "pe_sales_order")
- * @param recordId  - The ID of the current record
+ * @param recordPid  - The ID of the current record
  * @param record    - The full record data (key-value pairs from the API)
  * @returns The resolved steps and a flag indicating whether a flow exists
  */
 export function useDocumentFlow(
   modelCode: string,
-  recordId: string,
+  recordPid: string,
   record: Record<string, any>,
 ): UseDocumentFlowResult {
   const steps = useMemo(() => {

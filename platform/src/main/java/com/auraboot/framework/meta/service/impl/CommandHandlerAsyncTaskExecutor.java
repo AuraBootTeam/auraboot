@@ -44,7 +44,7 @@ import java.util.Optional;
  *   "tenantId": 123,
  *   "userId": 45,
  *   "modelCode": "bom_material_master",
- *   "recordId": null,
+ *   "recordPid": null,
  *   "payload": { "source_file_id": "01K..." },
  *   "handlerParams": { "async": true }
  * }
@@ -88,7 +88,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
         Long tenantId = longValue(inputParams, "tenantId");
         Long userId = longValue(inputParams, "userId");
         String modelCode = text(inputParams, "modelCode");
-        String recordId = text(inputParams, "recordId");
+        String recordPid = text(inputParams, "recordPid");
         Map<String, Object> payload = mapValue(inputParams.get("payload"));
         Map<String, Object> handlerParams = mapValue(inputParams.get("handlerParams"));
 
@@ -129,7 +129,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                             .namespace(namespace)
                             .commandType(handlerCode)
                             .modelCode(modelCode)
-                            .recordId(recordId)
+                            .recordId(recordPid)
                             .payload(payload)
                             .settings(pluginSettings)
                             .dryRun(false)

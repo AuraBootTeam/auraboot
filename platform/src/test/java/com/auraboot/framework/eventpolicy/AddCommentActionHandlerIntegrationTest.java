@@ -48,7 +48,7 @@ class AddCommentActionHandlerIntegrationTest extends BaseIntegrationTest {
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
               "actions":[{"type":"ADD_COMMENT","target":"RECORD","order":10,
                  "payload":{"content":"auto: high-priority — please triage"},
-                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordId}:${rule.ruleCode}:CMT"}]}]
+                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:CMT"}]}]
             """);
         var draft = versionService.createDraft(code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
                 ExecutionMode.ORDERED, FailureStrategy.CONTINUE_ON_ERROR, ConflictStrategy.REJECT_ON_CONFLICT,
@@ -60,7 +60,7 @@ class AddCommentActionHandlerIntegrationTest extends BaseIntegrationTest {
         EventPolicyExecutionResult result = runtimeService.runAndExecute("FORM_SUBMITTED", "FORM", targetKey,
                 Map.of("record", Map.of(
                         "entityCode", targetKey,
-                        "recordId", recordPid,
+                        "recordPid", recordPid,
                         "data", Map.of("priority", "HIGH"))));
 
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");

@@ -117,7 +117,7 @@ class AggregateQueryServiceImplDataScopeTest {
         NamedQuery query = namedQuery();
         when(namedQueryMapper.findByCode("phase_one_summary")).thenReturn(query);
         when(namedQueryFieldMapper.selectList(any())).thenReturn(List.of(
-                new NamedQueryField(TENANT_ID, "phase_one_summary", "id", "id", "integer")
+                new NamedQueryField(TENANT_ID, "phase_one_summary", "pid", "pid", "string")
         ));
         when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, "read", USER_ID))
                 .thenReturn("AND created_by = 20");
@@ -135,7 +135,7 @@ class AggregateQueryServiceImplDataScopeTest {
 
     private AggregateQueryRequest countRequest() {
         MetricConfig metric = new MetricConfig();
-        metric.setField("id");
+        metric.setField("pid");
         metric.setAggregation("count");
         metric.setAlias("total");
 

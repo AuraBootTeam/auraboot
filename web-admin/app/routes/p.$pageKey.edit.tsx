@@ -1,5 +1,5 @@
 /**
- * Dynamic Edit Page — /p/{model_code}/edit/{recordId}
+ * Dynamic Edit Page — /p/{model_code}/edit/{recordPid}
  *
  * URL segment is the model_code. PageKey derived as {model_code}_form.
  */
@@ -10,14 +10,14 @@ import { getTokenFromRequest } from '~/shared/services/session';
 import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPageRenderer';
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
-  const { pageKey, recordId } = params;
-  if (!pageKey || !recordId) {
+  const { pageKey, recordPid } = params;
+  if (!pageKey || !recordPid) {
     throw new Response('Page key and record ID are required', { status: 400 });
   }
 
   try {
     const token = await getTokenFromRequest(request);
-    return { tableName: pageKey, recordId, token };
+    return { tableName: pageKey, recordPid, token };
   } catch (error) {
     console.error('Failed to load edit page:', error);
     if (error instanceof Response) {
@@ -28,8 +28,8 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 };
 
 export default function DynamicFormEdit() {
-  const { tableName, recordId, token } = useLoaderData<typeof loader>();
+  const { tableName, recordPid, token } = useLoaderData<typeof loader>();
   return (
-    <DynamicPageRenderer tableName={tableName} pageType="form" token={token} recordId={recordId} />
+    <DynamicPageRenderer tableName={tableName} pageType="form" token={token} recordPid={recordPid} />
   );
 }

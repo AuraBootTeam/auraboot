@@ -141,7 +141,7 @@ describe('DataSourceManager', () => {
       autoFetch: false,
       params: {
         quoteId: '${form.pid}',
-        recordId: '${record.pid}',
+        recordPid: '${record.pid}',
         source: '${state.selectedSource}',
       },
     });
@@ -156,7 +156,7 @@ describe('DataSourceManager', () => {
           datasourceId: 'nq:qo_quote_bom_price_waterfall',
           format: 'records',
           quoteId: 'quote-1',
-          recordId: 'quote-1',
+          recordPid: 'quote-1',
           source: 'kingdee',
         }),
       }),

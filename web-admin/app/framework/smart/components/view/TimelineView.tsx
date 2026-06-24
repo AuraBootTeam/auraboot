@@ -23,7 +23,7 @@ import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecor
 interface TimelineViewProps {
   viewConfig?: ViewConfig;
   modelCode: string;
-  onItemClick?: (recordId: string) => void;
+  onItemClick?: (recordPid: string) => void;
   onOpenViewConfig?: () => void;
   onSwitchToTableView?: () => void;
   linkageFilters?: FilterConfig[];
@@ -93,7 +93,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       invalidDate = 0,
       valid = 0;
     const issues: Array<{
-      recordId: string;
+      recordPid: string;
       title: string;
       reason: string;
       details: Record<string, unknown>;
@@ -102,8 +102,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     for (const record of data) {
       const startVal = record[startField || ''];
       const endVal = endField ? record[endField] : startVal;
-      const recordId = getLegacyCompatibleRecordPid(record) || '';
-      const titleVal = String(record[titleField] || recordId);
+      const recordPid = getLegacyCompatibleRecordPid(record) || '';
+      const titleVal = String(record[titleField] || recordPid);
       const hasStart = startVal != null && startVal !== '';
       const hasEnd = endVal != null && endVal !== '';
 
@@ -111,7 +111,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         missingBoth++;
         if (issues.length < 10)
           issues.push({
-            recordId,
+            recordPid,
             title: titleVal,
             reason: 'missing_both',
             details: {
@@ -127,7 +127,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         missingStart++;
         if (issues.length < 10)
           issues.push({
-            recordId,
+            recordPid,
             title: titleVal,
             reason: 'missing_start',
             details: { startField: startField || '', startValue: startVal },
@@ -138,7 +138,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         missingEnd++;
         if (issues.length < 10)
           issues.push({
-            recordId,
+            recordPid,
             title: titleVal,
             reason: 'missing_end',
             details: { endField: endField || '', endValue: endVal },
@@ -152,7 +152,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         invalidDate++;
         if (issues.length < 10)
           issues.push({
-            recordId,
+            recordPid,
             title: titleVal,
             reason: 'invalid_date',
             details: { startValue: startVal, endValue: endVal },
@@ -168,7 +168,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
       if (end.getTime() > maxDate) maxDate = end.getTime();
 
       parsedItems.push({
-        id: recordId,
+        id: recordPid,
         title: String(record[titleField] || ''),
         resource,
         start,

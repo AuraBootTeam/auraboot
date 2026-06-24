@@ -39,7 +39,7 @@ describe('useAuditLog', () => {
   });
 
   it('getRecordHistory populates changeLogs', async () => {
-    const logs = [{ id: 1, modelCode: 'order', recordId: 'r1', operation: 'create' }];
+    const logs = [{ id: 1, modelCode: 'order', recordPid: 'r1', operation: 'create' }];
     mockFetch.mockResolvedValue(ok(logs));
 
     const { result } = renderHook(() => useAuditLog());
@@ -50,14 +50,14 @@ describe('useAuditLog', () => {
 
     expect(mockFetch).toHaveBeenCalledWith(
       '/api/meta/change-logs/history',
-      expect.objectContaining({ params: { modelCode: 'order', recordId: 'r1' } }),
+      expect.objectContaining({ params: { modelCode: 'order', recordPid: 'r1' } }),
     );
     expect(result.current.changeLogs).toEqual(logs);
     expect(data).toEqual(logs);
   });
 
   it('getRecordHistory handles array response directly', async () => {
-    const logs = [{ id: 2, modelCode: 'task', recordId: 'r2', operation: 'update' }];
+    const logs = [{ id: 2, modelCode: 'task', recordPid: 'r2', operation: 'update' }];
     mockFetch.mockResolvedValue(logs); // raw array
 
     const { result } = renderHook(() => useAuditLog());
@@ -131,7 +131,7 @@ describe('useAuditLog', () => {
   });
 
   it('getChangeLogById returns data on success', async () => {
-    const log = { id: 10, modelCode: 'order', recordId: 'r10', operation: 'delete' };
+    const log = { id: 10, modelCode: 'order', recordPid: 'r10', operation: 'delete' };
     mockFetch.mockResolvedValue(ok(log));
 
     const { result } = renderHook(() => useAuditLog());

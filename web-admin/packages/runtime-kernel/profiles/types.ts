@@ -19,7 +19,7 @@ export interface BlockRendererProps {
 export interface PageContentProps {
   schema: any; // UnifiedSchema
   tableName: string;
-  recordId?: string;
+  recordPid?: string;
   token?: string | null;
   listExtensions?: {
     onDataChange?: (records: Record<string, any>[]) => void;

@@ -47,12 +47,12 @@ class ExtractionRuleMatcherTest {
     }
 
     @Test
-    @DisplayName("p2: tool response with data.recordId + success=true → FACT")
+    @DisplayName("p2: tool response with data.recordPid + success=true -> FACT")
     void p2() {
         ExtractedMemoryCandidate c = ExtractionRuleMatcher.tryMatchRecordCreated(
                 toolResp("create_order", Map.of(
                         "success", true,
-                        "data", Map.of("recordId", "01XYZ123", "entityType", "Order"))));
+                        "data", Map.of("recordPid", "01XYZ123", "entityType", "Order"))));
         assertNotNull(c);
         assertEquals("FACT", c.memoryType());
         assertTrue(c.title().contains("Order 01XYZ123"));
@@ -62,12 +62,12 @@ class ExtractionRuleMatcherTest {
     @DisplayName("p2 ignored when success=false")
     void p2NoMatchOnFailure() {
         assertNull(ExtractionRuleMatcher.tryMatchRecordCreated(
-                toolResp("create_order", Map.of("success", false, "data", Map.of("recordId", "X")))));
+                toolResp("create_order", Map.of("success", false, "data", Map.of("recordPid", "X")))));
     }
 
     @Test
-    @DisplayName("p2 ignored when no recordId")
-    void p2NoMatchWithoutRecordId() {
+    @DisplayName("p2 ignored when no recordPid")
+    void p2NoMatchWithoutRecordPid() {
         assertNull(ExtractionRuleMatcher.tryMatchRecordCreated(
                 toolResp("ping", Map.of("success", true, "data", Map.of("status", "ok")))));
     }

@@ -270,6 +270,29 @@ class PasswordManagementServiceImplTest {
     }
 
     @Test
+    @DisplayName("resetPasswordByAdmin updates password and increments security version")
+    void resetPasswordByAdminHappy() {
+        User u = user(1L, "hash");
+        u.setSecurityVersion(2);
+        when(userMapper.selectOne(any(QueryWrapper.class))).thenReturn(u);
+        when(passwordEncoder.encode("TempPass1!")).thenReturn("enc");
+
+        service.resetPasswordByAdmin("u-1", "TempPass1!");
+
+        org.junit.jupiter.api.Assertions.assertEquals("enc", u.getPassword());
+        org.junit.jupiter.api.Assertions.assertFalse(u.getMustChangePassword());
+        org.junit.jupiter.api.Assertions.assertEquals(3, u.getSecurityVersion());
+        verify(userMapper).updateById(u);
+    }
+
+    @Test
+    @DisplayName("resetPasswordByAdmin throws when user missing")
+    void resetPasswordByAdminMissing() {
+        when(userMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
+        assertThrows(RootUnCheckedException.class, () -> service.resetPasswordByAdmin("missing", "TempPass1!"));
+    }
+
+    @Test
     @DisplayName("isPasswordExpired false when expiryDays<=0")
     void isPasswordExpiredDisabled() {
         ReflectionTestUtils.setField(service, "expiryDays", 0);

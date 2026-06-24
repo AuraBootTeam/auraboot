@@ -330,7 +330,7 @@ export const Table: React.FC<TableProps> = ({
 
   // 获取行键值
   const getRowKey = (record: any, index: number): string | number => {
-    return record.id || record.key || index;
+    return record.pid || record.key || index;
   };
 
   // 渲染单元格内容

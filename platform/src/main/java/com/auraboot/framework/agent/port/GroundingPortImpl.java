@@ -26,10 +26,10 @@ public class GroundingPortImpl implements GroundingPort {
     private final GroundingService groundingService;
 
     @Override
-    public GroundingResult ground(Long tenantId, String userMessage, String pageModel, String recordId) {
+    public GroundingResult ground(Long tenantId, String userMessage, String pageModel, String recordPid) {
         GroundingContext context = GroundingContext.builder()
                 .pageModel(pageModel)
-                .recordId(recordId)
+                .recordPid(recordPid)
                 .build();
 
         BusinessIntentFrame bif = groundingService.ground(tenantId, userMessage, context);

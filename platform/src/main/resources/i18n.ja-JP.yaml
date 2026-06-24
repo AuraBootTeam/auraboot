@@ -221,8 +221,8 @@ automation:
     validationMode.none: 検証なし
     validationMode.signature: 署名検証
     validationMode.token: トークン検証
-    recordId: レコード ID
-    recordId.desc: 式参照をサポート（例：${trigger.recordId}）
+    recordPid: レコード PID
+    recordPid.desc: 式参照をサポート（例：${trigger.recordPid}）
     updateFields: 更新フィールド
     updateFields.desc: 更新するフィールドと値（JSON 形式）
     createFields: レコードフィールド

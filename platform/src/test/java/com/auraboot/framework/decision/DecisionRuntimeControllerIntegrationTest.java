@@ -883,7 +883,7 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                                 200,
                                 DecisionBinding.TraceMode.ALWAYS,
                                 true,
-                                RuleValueSource.field(Scope.RECORD, "data.recordId"),
+                                RuleValueSource.field(Scope.RECORD, "data.recordPid"),
                                 null),
                         true))
                 .build());
@@ -916,9 +916,9 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         assertTrue(impact.path("incoming").findValuesAsText("binding").contains("RULE_BINDING"));
 
         String fieldBody = mockMvc.perform(get("/api/decision/fields/impact")
-                        .param("fieldRef", "record.data.recordId"))
+                        .param("fieldRef", "record.data.recordPid"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.fieldRef").value("record.data.recordId"))
+                .andExpect(jsonPath("$.data.fieldRef").value("record.data.recordPid"))
                 .andExpect(jsonPath("$.data.risk.blocking").value(true))
                 .andReturn().getResponse().getContentAsString();
 

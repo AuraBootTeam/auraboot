@@ -2,7 +2,7 @@
  * useKanbanData.persistence.test.ts
  *
  * Phase 1 Task 2: pin contract that moveCard persists the column change via
- * PUT /api/dynamic/{pageKey}/{recordId} with optimistic update + rollback
+ * PUT /api/dynamic/{pageKey}/{recordPid} with optimistic update + rollback
  * when pageKey is supplied. Without pageKey, moveCard stays purely optimistic
  * (back-compat with existing callers).
  */
@@ -22,9 +22,9 @@ import type { KanbanDataSource } from '~/framework/smart/types/kanban';
 const mockFetchResult = vi.mocked(fetchResult);
 
 const STATIC_DATA = [
-  { id: 'c1', title: 'Card 1', status: 'todo' },
-  { id: 'c2', title: 'Card 2', status: 'todo' },
-  { id: 'c3', title: 'Card 3', status: 'doing' },
+  { pid: 'c1', title: 'Card 1', status: 'todo' },
+  { pid: 'c2', title: 'Card 2', status: 'todo' },
+  { pid: 'c3', title: 'Card 3', status: 'doing' },
 ];
 
 function makeDataSource(): KanbanDataSource {
@@ -53,7 +53,7 @@ describe('useKanbanData - moveCard persistence', () => {
       code: '0',
       desc: '',
       message: '',
-      data: { id: 'c1', status: 'doing' },
+      data: { pid: 'c1', status: 'doing' },
     } as any);
 
     const { result } = renderHook(() => {

@@ -56,7 +56,7 @@ export interface AutomationLog {
   automationId: string;
   automationName?: string;
   triggerType?: string;
-  triggerRecordId?: string;
+  triggerRecordPid?: string;
   triggerPayload?: Record<string, unknown>;
   status: 'pending' | 'running' | 'success' | 'failed' | 'skipped';
   startedAt?: string;

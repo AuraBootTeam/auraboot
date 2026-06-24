@@ -47,7 +47,7 @@ interface ActionInputField {
 DSL:
 ```json
 { "action": "command.execute", "args": {
-    "command": "cr_account:set_credential", "targetRecordId": "${form.pid}",
+    "command": "cr_account:set_credential", "targetRecordPid": "${form.pid}",
     "operationType": "update",
     "inputFieldsTitle": {"zh-CN": "录入凭据"},
     "inputFields": [

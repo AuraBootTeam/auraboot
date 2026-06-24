@@ -3,6 +3,8 @@ type: plan-design
 status: closed
 created: 2026-06-23
 updated: 2026-06-23
+distilled_to:
+  - docs/architecture/rbac-data-scope-runtime-and-e2e.md
 area: permission / rbac / data-scope
 source:
   - docs/backlog/2026-06-23-rbac-data-scope-follow-up-tasks.md

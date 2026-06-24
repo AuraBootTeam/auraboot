@@ -495,7 +495,7 @@ class ChatTurnRuntimeTest {
                                 .type("tool_use")
                                 .id("tool-out-of-scope")
                                 .name("cmd:crm_customer_update")
-                                .input(Map.of("recordId", "C-2", "name", "Renamed"))
+                                .input(Map.of("recordPid", "C-2", "name", "Renamed"))
                                 .build()))
                         .build())
                 .thenReturn(response("I cannot update a record outside the current context."));
@@ -512,7 +512,7 @@ class ChatTurnRuntimeTest {
                         1L,
                         "web",
                         true,
-                        Map.of("modelCode", "crm_customer", "recordId", "C-1"))));
+                        Map.of("modelCode", "crm_customer", "recordPid", "C-1"))));
         PolicyCallbacks callbacks = new PolicyCallbacks(ExecutionEnvelope.writeCatalogWithGate(), contextBlocks);
 
         TurnOutcome outcome = runtime.runToolLoop(
@@ -667,7 +667,7 @@ class ChatTurnRuntimeTest {
                         1L,
                         "web",
                         true,
-                        Map.of("modelCode", "crm_customer", "recordId", "C-100"))));
+                        Map.of("modelCode", "crm_customer", "recordPid", "C-100"))));
         PolicyCallbacks callbacks = new PolicyCallbacks(ExecutionEnvelope.writeCatalogWithGate(), contextBlocks);
 
         TurnOutcome outcome = runtime.runToolLoop(

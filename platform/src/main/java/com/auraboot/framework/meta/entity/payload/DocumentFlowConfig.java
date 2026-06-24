@@ -16,7 +16,7 @@ import java.util.Map;
  * <p>Supported expression formats in {@code fieldMapping} values:</p>
  * <ul>
  *   <li>{@code ${record.fieldCode}} — lookup field value from source record</li>
- *   <li>{@code ${recordId}} — source record PID</li>
+ *   <li>{@code ${recordPid}} — source record PID</li>
  *   <li>{@code 'literal'} — string literal (single quotes stripped)</li>
  *   <li>Plain values — used as-is</li>
  * </ul>
@@ -39,7 +39,7 @@ public class DocumentFlowConfig {
 
     /**
      * Header-level field mapping: target field code → source expression.
-     * Supports ${record.xxx}, ${recordId}, and 'literal' syntax.
+     * Supports ${record.xxx}, ${recordPid}, and 'literal' syntax.
      */
     private Map<String, String> fieldMapping;
 
@@ -86,7 +86,7 @@ public class DocumentFlowConfig {
         /**
          * Field mapping for each line: target line field code → source expression.
          * Supports ${record.xxx} (source header), ${line.xxx} (source line item),
-         * ${recordId} (source header PID), and 'literal' syntax.
+         * ${recordPid} (source header PID), and 'literal' syntax.
          */
         private Map<String, String> fieldMapping;
     }

@@ -125,7 +125,7 @@
         "variables": {
           "days": "${payload.wd_req_days}",
           "type": "${payload.wd_req_type}",
-          "recordId": "${recordPid}",
+          "recordPid": "${recordPid}",
           "applicantUserId": "${payload.wd_req_applicant}"
         },
         "storeInstanceIdIn": "wd_req_process_instance"
@@ -196,7 +196,7 @@
         "variables": {
           "days": "${payload.wd_req_days}",
           "type": "${payload.wd_req_type}",
-          "recordId": "${recordPid}",
+          "recordPid": "${recordPid}",
           "applicantUserId": "${payload.wd_req_applicant}"
         },
         "storeInstanceIdIn": "wd_req_process_instance"

@@ -28,7 +28,7 @@ import java.util.Map;
  * <ul>
  *   <li>{@code processKey} (required) — the process definition key to start.</li>
  *   <li>{@code businessKey} (optional) — supports {@code ${var}} interpolation against the
- *       trigger context; defaults to the trigger {@code recordId} so the started instance
+ *       trigger context; defaults to the trigger {@code recordPid} so the started instance
  *       is correlatable back to the record.</li>
  *   <li>{@code variables} (optional) — a Map of process variables; String values support
  *       {@code ${var}} interpolation.</li>
@@ -59,8 +59,8 @@ public class StartProcessActionExecutor implements ActionExecutor {
 
         String businessKey = resolveVariable((String) config.get("businessKey"), context);
         if (businessKey == null || businessKey.isBlank()) {
-            Object recordId = context.get("recordId");
-            businessKey = recordId != null ? recordId.toString() : null;
+            Object recordPid = context.get("recordPid");
+            businessKey = recordPid != null ? recordPid.toString() : null;
         }
 
         Map<String, Object> variables = resolveVariables(config.get("variables"), context);

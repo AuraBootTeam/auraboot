@@ -192,14 +192,14 @@ public class BpmFormService {
     @Transactional
     public Map<String, Object> startProcessWithForm(String processKey, ProcessStartRequest request) {
         SaveStrategy strategy = SaveStrategy.fromCode(request.getSaveStrategy());
-        String recordId = null;
+        String recordPid = null;
 
         log.info("Starting process with form: processKey={}, strategy={}, modelCode={}",
                 processKey, strategy, request.getModelCode());
 
         // 1. Create business record if strategy requires it
         if (strategy != SaveStrategy.VARIABLE_ONLY && request.getModelCode() != null) {
-            recordId = createBusinessRecord(request.getModelCode(), request.getBusinessData());
+            recordPid = createBusinessRecord(request.getModelCode(), request.getBusinessData());
         }
 
         // 2. Build process variables
@@ -216,15 +216,15 @@ public class BpmFormService {
         }
 
         // 4. Start process — processKey IS the processDefinitionId in SmartEngine
-        ProcessInstance instance = processEngineService.startProcess(processKey, recordId, variables);
+        ProcessInstance instance = processEngineService.startProcess(processKey, recordPid, variables);
 
         // 5. Return result
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("processInstanceId", instance.getInstanceId());
-        result.put("businessKey", recordId);
+        result.put("businessKey", recordPid);
 
         log.info("Process started with form: processInstanceId={}, businessKey={}",
-                instance.getInstanceId(), recordId);
+                instance.getInstanceId(), recordPid);
         return result;
     }
 
@@ -233,7 +233,7 @@ public class BpmFormService {
      *
      * @param modelCode    the model code (e.g., "cc_contract")
      * @param businessData the record data
-     * @return the created record's ID
+     * @return the created record's pid
      */
     private String createBusinessRecord(String modelCode, Map<String, Object> businessData) {
         if (businessData == null || businessData.isEmpty()) {
@@ -253,18 +253,15 @@ public class BpmFormService {
             log.info("Business record created: commandCode={}, phase={}, timeMs={}",
                     result.getCommandCode(), result.getPhaseReached(), result.getExecutionTimeMs());
 
-            // Extract recordId from result data
+            // Extract the public record pid from result data.
             if (result.getData() != null) {
-                Object id = result.getData().get("id");
-                if (id == null) {
-                    id = result.getData().get("recordId");
-                }
-                if (id != null) {
-                    return id.toString();
+                Object recordPid = result.getData().get("recordPid");
+                if (recordPid != null) {
+                    return recordPid.toString();
                 }
             }
 
-            log.warn("No recordId found in command result data for commandCode={}", commandCode);
+            log.warn("No recordPid found in command result data for commandCode={}", commandCode);
             return null;
         } catch (Exception e) {
             log.error("Failed to create business record: commandCode={}", commandCode, e);

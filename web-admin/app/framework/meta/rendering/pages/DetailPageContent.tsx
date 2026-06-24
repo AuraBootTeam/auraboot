@@ -2,7 +2,7 @@
  * DetailPageContent - Page content component for detail/view pages
  *
  * Extracted from dynamic.$tableName.view.tsx route.
- * Receives schema + tableName + recordId + token from DynamicPageRenderer,
+ * Receives schema + tableName + recordPid + token from DynamicPageRenderer,
  * loads record data client-side, and renders the full detail view.
  *
  * Supports:
@@ -121,8 +121,8 @@ export function resolveDetailFieldComponent(meta?: {
   }
 }
 
-function applyRecordEndpointTemplate(template: string, recordId: string): string {
-  const encoded = encodeURIComponent(recordId);
+function applyRecordEndpointTemplate(template: string, recordPid: string): string {
+  const encoded = encodeURIComponent(recordPid);
   const legacyRecordKey = 'record' + 'Id';
   return template
     .replace(/\{recordPid\}/g, encoded)
@@ -412,11 +412,11 @@ export function resolveHiddenSystemTabKeys(
 
 export function resolveVisibleDetailTabs(
   allTabs: DetailTabConfig[],
-  recordId: string | undefined,
+  recordPid: string | undefined,
   schema: { extension?: Record<string, any> } | undefined | null,
 ): DetailTabConfig[] {
   const hiddenSystemTabKeys = resolveHiddenSystemTabKeys(schema);
-  return (recordId ? allTabs : allTabs.filter((tab) => !tab.system)).filter((tab) => {
+  return (recordPid ? allTabs : allTabs.filter((tab) => !tab.system)).filter((tab) => {
     if (!tab.system) return true;
     const key = typeof tab.key === 'string' ? tab.key : '';
     return !hiddenSystemTabKeys.has(key);
@@ -453,11 +453,11 @@ export function resolveActiveDetailTab(
  * this component loads record data client-side using fetchResult in a useEffect.
  */
 function DetailPageContentInner(props: PageContentProps) {
-  const { schema, tableName, recordId, token } = props;
+  const { schema, tableName, recordPid, token } = props;
   const location = useLocation();
   const routerNavigate = useRouterNavigate();
   const recordModelCode = schema?.modelCode || tableName;
-  const routeRecordPid = useMemo(() => getPublicRecordPid({ pid: recordId }) || '', [recordId]);
+  const routeRecordPid = useMemo(() => getPublicRecordPid({ pid: recordPid }) || '', [recordPid]);
 
   // Client-side record + model field loading (parallelized)
   const [recordData, setRecordData] = useState<RecordData>({});
@@ -611,10 +611,10 @@ function DetailPageContentInner(props: PageContentProps) {
         kind: (schema as any)?.kind,
         modelCode: (schema as any)?.modelCode,
         pageKey: (schema as any)?.pageKey,
-        recordId: recordId || undefined,
+        recordPid: recordPid || undefined,
       },
     }),
-    [recordData, recordId, schema],
+    [recordData, recordPid, schema],
   );
 
   // Use usePageRuntime instead of useDynamicPageSetup
@@ -771,10 +771,10 @@ function DetailPageContentInner(props: PageContentProps) {
     [directMiscBlocks],
   );
 
-  // System tabs are injected by backend into dsl_schema. Filter out system tabs when no recordId (new record).
+  // System tabs are injected by backend into dsl_schema. Filter out system tabs when no recordPid (new record).
   const tabsBlockVisible = !tabsBlock?.visibleWhen || evaluateVisibleWhen(tabsBlock.visibleWhen);
   const allTabs = tabsBlockVisible ? ((tabsBlock?.tabs || []) as DetailTabConfig[]) : [];
-  const tabs = resolveVisibleDetailTabs(allTabs, recordId, schema);
+  const tabs = resolveVisibleDetailTabs(allTabs, recordPid, schema);
   const [activeTab, setActiveTab] = useState(0);
 
   const tabHashKeys = useMemo(
@@ -965,7 +965,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 {headerMiscBlocks.map((block: BlockConfig, blockIndex: number) => (
                   <BlockRenderer
                     key={block.id || `misc-header-${blockIndex}`}
-                    block={resolveChartBlockRecordParams(block, recordData, recordId!)}
+                    block={resolveChartBlockRecordParams(block, recordData, recordPid!)}
                     runtime={runtime}
                     areaId="detail-tabs-header"
                   />
@@ -1013,7 +1013,7 @@ function DetailPageContentInner(props: PageContentProps) {
                       block={block}
                       recordData={recordData}
                       rawData={rawData}
-                      recordId={recordId!}
+                      recordPid={recordPid!}
                       token={token || undefined}
                       locale={locale}
                       t={t}
@@ -1048,7 +1048,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 .map((block: BlockConfig, blockIndex: number) => (
                   <BlockRenderer
                     key={block.id || `misc-header-${blockIndex}`}
-                    block={resolveChartBlockRecordParams(block, recordData, recordId!)}
+                    block={resolveChartBlockRecordParams(block, recordData, recordPid!)}
                     runtime={runtime}
                     areaId="detail-direct"
                   />
@@ -1059,7 +1059,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 block={block}
                 recordData={recordData}
                 rawData={rawData}
-                recordId={recordId!}
+                recordPid={recordPid!}
                 token={token || undefined}
                 locale={locale}
                 t={t}
@@ -1079,7 +1079,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 block={block}
                 recordData={recordData}
                 rawData={rawData}
-                recordId={recordId!}
+                recordPid={recordPid!}
                 token={token || undefined}
                 locale={locale}
                 t={t}
@@ -1099,7 +1099,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 block={block}
                 recordData={recordData}
                 rawData={rawData}
-                recordId={recordId!}
+                recordPid={recordPid!}
                 token={token || undefined}
                 locale={locale}
                 t={t}
@@ -1119,7 +1119,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 block={block}
                 recordData={recordData}
                 rawData={rawData}
-                recordId={recordId!}
+                recordPid={recordPid!}
                 token={token || undefined}
                 locale={locale}
                 t={t}
@@ -1148,7 +1148,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 .map((block: BlockConfig, blockIndex: number) => (
                   <BlockRenderer
                     key={block.id || `misc-${blockIndex}`}
-                    block={resolveChartBlockRecordParams(block, recordData, recordId!)}
+                    block={resolveChartBlockRecordParams(block, recordData, recordPid!)}
                     runtime={runtime}
                     areaId="detail-direct"
                   />
@@ -1181,7 +1181,7 @@ function DetailPageContentInner(props: PageContentProps) {
                 </Link>
                 {showDefaultEditAction && (
                   <Link
-                    to={`/p/${tableName}/edit/${recordId}`}
+                    to={`/p/${tableName}/edit/${recordPid}`}
                     className="rounded-control bg-accent hover:bg-accent-hover px-4 py-2 text-sm font-medium text-white"
                   >
                     {t('action.update')}
@@ -1194,12 +1194,12 @@ function DetailPageContentInner(props: PageContentProps) {
       </div>
 
       {/* Record Share Dialog */}
-      {shareDialogOpen && recordId && (
+      {shareDialogOpen && recordPid && (
         <RecordShareDialog
           open={shareDialogOpen}
           onClose={() => setShareDialogOpen(false)}
           resourceCode={schema?.modelCode || tableName}
-          recordId={recordId}
+          recordPid={recordPid}
         />
       )}
 
@@ -1218,23 +1218,23 @@ export function DetailPageContent(props: PageContentProps) {
 }
 
 /**
- * Resolve `${record.*}` / `${recordId}` templates in a chart block's namedQuery dataSource
+ * Resolve `${record.*}` / `${recordPid}` templates in a chart block's namedQuery dataSource
  * params against the current record, returning a cloned block with resolved `parameters`.
  * The chart's own runtime context does not carry the detail record, so this must happen here
- * (where recordData/recordId are available) before the block is dispatched to BlockRenderer.
+ * (where recordData/recordPid are available) before the block is dispatched to BlockRenderer.
  * Non-chart blocks and charts without templated params pass through unchanged.
  */
 function resolveChartBlockRecordParams(
   block: BlockConfig,
   recordData: RecordData,
-  recordId: string,
+  recordPid: string,
 ): BlockConfig {
   if (block.blockType !== 'chart') return block;
   const chartConfig = (block as any).chartConfig;
   const ds = chartConfig?.dataSource;
   const rawParams = ds?.params ?? ds?.parameters;
   if (!ds || !rawParams || typeof rawParams !== 'object') return block;
-  const resolved = resolveRecordParams(rawParams, recordData as Record<string, unknown>, recordId);
+  const resolved = resolveRecordParams(rawParams, recordData as Record<string, unknown>, recordPid);
   return {
     ...block,
     chartConfig: { ...chartConfig, dataSource: { ...ds, parameters: resolved } },
@@ -1348,7 +1348,7 @@ function DetailBlockRenderer({
   block,
   recordData,
   rawData,
-  recordId,
+  recordPid,
   token,
   locale,
   t,
@@ -1364,7 +1364,7 @@ function DetailBlockRenderer({
   block: BlockConfig;
   recordData: RecordData;
   rawData?: any;
-  recordId: string;
+  recordPid: string;
   token?: string;
   locale: string;
   t: (key: string) => string;
@@ -1505,7 +1505,7 @@ function DetailBlockRenderer({
           )}
           <SubTableViewer
             config={subTableConfig}
-            parentRecordId={recordId}
+            parentRecordPid={recordPid}
             parentRecordData={recordData}
             token={token}
             locale={locale}
@@ -1523,7 +1523,7 @@ function DetailBlockRenderer({
       <EmbeddedListBlockRenderer
         block={block}
         runtime={runtime}
-        parentRecordId={recordId}
+        parentRecordPid={recordPid}
         parentRecordData={recordData}
         token={token}
       />
@@ -1532,7 +1532,7 @@ function DetailBlockRenderer({
 
   if (block.blockType === 'activity-timeline') {
     // Activity API uses record PID, not numeric ID
-    const pid = recordData?.pid || recordId;
+    const pid = recordData?.pid || recordPid;
     return (
       <ActivityTimeline
         modelCode={modelCode || ''}
@@ -1545,7 +1545,7 @@ function DetailBlockRenderer({
   }
 
   if (block.blockType === 'record-comments') {
-    const pid = recordData?.pid || recordId;
+    const pid = recordData?.pid || recordPid;
     return (
       <RecordComments
         modelCode={modelCode || ''}
@@ -1559,11 +1559,11 @@ function DetailBlockRenderer({
 
   if (block.blockType === 'field-history') {
     // Audit API expects numeric record ID, not PID
-    const numericId = recordData?.id || recordId;
+    const numericId = recordData?.id || recordPid;
     return (
       <FieldHistoryViewer
         modelCode={modelCode || ''}
-        recordId={String(numericId)}
+        recordPid={String(numericId)}
         token={token}
         locale={locale}
         t={t}
@@ -1572,7 +1572,7 @@ function DetailBlockRenderer({
   }
 
   if (block.blockType === 'bpm-panel') {
-    return <BpmPanelBlock block={block as any} record={recordData} recordId={recordId} />;
+    return <BpmPanelBlock block={block as any} record={recordData} recordPid={recordPid} />;
   }
 
   if (block.blockType === 'monthly-grid' && block.monthlyGrid) {
@@ -1585,7 +1585,7 @@ function DetailBlockRenderer({
         )}
         <MonthlyGridViewer
           config={block.monthlyGrid}
-          parentRecordId={recordId}
+          parentRecordPid={recordPid}
           token={token}
           locale={locale}
           t={t}
@@ -1599,9 +1599,9 @@ function DetailBlockRenderer({
   // stat-card / form / filters / etc.). Renders an "Unknown block type"
   // placeholder if no renderer is registered — NEVER silently null.
   if (runtime) {
-    // Chart blocks fed by a record-scoped namedQuery need their ${record.*}/${recordId}
+    // Chart blocks fed by a record-scoped namedQuery need their ${record.*}/${recordPid}
     // params resolved here (the chart's runtime context does not carry the detail record).
-    const dispatchBlock = resolveChartBlockRecordParams(block, recordData, recordId);
+    const dispatchBlock = resolveChartBlockRecordParams(block, recordData, recordPid);
     return <BlockRenderer block={dispatchBlock} runtime={runtime} areaId="detail-tab" />;
   }
 

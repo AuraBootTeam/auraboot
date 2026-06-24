@@ -67,23 +67,23 @@ public class EmailRecordLinkService {
 
         for (String email : addresses) {
             // Match against CRM Contact
-            List<String> contactIds = findCrmContactIdsByEmail(tenantId, email);
-            for (String contactId : contactIds) {
-                links.add(buildLink(tenantId, messageId, threadId, "crm_contact", contactId,
+            List<String> contactPids = findCrmContactPidsByEmail(tenantId, email);
+            for (String contactPid : contactPids) {
+                links.add(buildLink(tenantId, messageId, threadId, "crm_contact", contactPid,
                         EmailConstants.LINK_TYPE_AUTO));
 
                 // Also link to related Opportunities via opp_contact junction
-                List<String> oppIds = findRelatedOpportunityIds(tenantId, contactId);
-                for (String oppId : oppIds) {
-                    links.add(buildLink(tenantId, messageId, threadId, "crm_opportunity", oppId,
+                List<String> oppPids = findRelatedOpportunityPids(tenantId, contactPid);
+                for (String oppPid : oppPids) {
+                    links.add(buildLink(tenantId, messageId, threadId, "crm_opportunity", oppPid,
                             EmailConstants.LINK_TYPE_AUTO));
                 }
             }
 
             // Match against CRM Lead
-            List<String> leadIds = findCrmLeadIdsByEmail(tenantId, email);
-            for (String leadId : leadIds) {
-                links.add(buildLink(tenantId, messageId, threadId, "crm_lead", leadId,
+            List<String> leadPids = findCrmLeadPidsByEmail(tenantId, email);
+            for (String leadPid : leadPids) {
+                links.add(buildLink(tenantId, messageId, threadId, "crm_lead", leadPid,
                         EmailConstants.LINK_TYPE_AUTO));
             }
         }
@@ -94,7 +94,7 @@ public class EmailRecordLinkService {
             for (EmailRecordLink tl : threadLinks) {
                 if (tl.getMessageId() != null && !tl.getMessageId().equals(messageId)) {
                     links.add(buildLink(tenantId, messageId, threadId, tl.getModelCode(),
-                            tl.getRecordId(), EmailConstants.LINK_TYPE_AUTO));
+                            tl.getRecordPid(), EmailConstants.LINK_TYPE_AUTO));
                 }
             }
         }
@@ -103,8 +103,8 @@ public class EmailRecordLinkService {
             try {
                 emailRecordLinkMapper.insert(link);
             } catch (Exception e) {
-                log.warn("Failed to insert auto-link messageId={} modelCode={} recordId={}: {}",
-                        messageId, link.getModelCode(), link.getRecordId(), e.getMessage());
+                log.warn("Failed to insert auto-link messageId={} modelCode={} recordPid={}: {}",
+                        messageId, link.getModelCode(), link.getRecordPid(), e.getMessage());
             }
         }
 
@@ -122,15 +122,15 @@ public class EmailRecordLinkService {
      * @param messageId message to link (may be null for thread-level links)
      * @param threadId  Gmail thread ID (may be null if message-level only)
      * @param modelCode DSL model code (e.g. {@code crm_contact})
-     * @param recordId  primary key of the CRM record
+     * @param recordPid public pid of the CRM record
      * @return the persisted link
      */
     public EmailRecordLink manualLink(Long tenantId, Long messageId, String threadId,
-                                      String modelCode, String recordId) {
-        EmailRecordLink link = buildLink(tenantId, messageId, threadId, modelCode, recordId,
+                                      String modelCode, String recordPid) {
+        EmailRecordLink link = buildLink(tenantId, messageId, threadId, modelCode, recordPid,
                 EmailConstants.LINK_TYPE_MANUAL);
         emailRecordLinkMapper.insert(link);
-        log.info("manualLink: messageId={} → modelCode={} recordId={}", messageId, modelCode, recordId);
+        log.info("manualLink: messageId={} → modelCode={} recordPid={}", messageId, modelCode, recordPid);
         return link;
     }
 
@@ -187,11 +187,11 @@ public class EmailRecordLinkService {
         }
     }
 
-    /** Queries mt_crm_contact for records with the given email address. */
-    private List<String> findCrmContactIdsByEmail(Long tenantId, String email) {
+    /** Queries mt_crm_contact for record pids with the given email address. */
+    private List<String> findCrmContactPidsByEmail(Long tenantId, String email) {
         try {
             return jdbcTemplate.queryForList(
-                    "SELECT id::text FROM mt_crm_contact WHERE tenant_id = ? AND lower(crm_ct_email) = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
+                    "SELECT pid::text FROM mt_crm_contact WHERE tenant_id = ? AND lower(crm_ct_email) = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
                     String.class, tenantId, email);
         } catch (Exception e) {
             log.debug("CRM contact lookup skipped (table may not exist): {}", e.getMessage());
@@ -199,11 +199,11 @@ public class EmailRecordLinkService {
         }
     }
 
-    /** Queries mt_crm_lead for records with the given email address. */
-    private List<String> findCrmLeadIdsByEmail(Long tenantId, String email) {
+    /** Queries mt_crm_lead for record pids with the given email address. */
+    private List<String> findCrmLeadPidsByEmail(Long tenantId, String email) {
         try {
             return jdbcTemplate.queryForList(
-                    "SELECT id::text FROM mt_crm_lead WHERE tenant_id = ? AND lower(crm_lead_contact_email) = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
+                    "SELECT pid::text FROM mt_crm_lead WHERE tenant_id = ? AND lower(crm_lead_contact_email) = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
                     String.class, tenantId, email);
         } catch (Exception e) {
             log.debug("CRM lead lookup skipped (table may not exist): {}", e.getMessage());
@@ -211,12 +211,12 @@ public class EmailRecordLinkService {
         }
     }
 
-    /** Finds Opportunity IDs linked to the given contact via the opp_contact junction table. */
-    private List<String> findRelatedOpportunityIds(Long tenantId, String contactId) {
+    /** Finds Opportunity pids linked to the given contact via the opp_contact junction table. */
+    private List<String> findRelatedOpportunityPids(Long tenantId, String contactPid) {
         try {
             return jdbcTemplate.queryForList(
                     "SELECT crm_opc_opp_id::text FROM mt_crm_opp_contact WHERE tenant_id = ? AND crm_opc_contact_id::text = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
-                    String.class, tenantId, contactId);
+                    String.class, tenantId, contactPid);
         } catch (Exception e) {
             log.debug("Opportunity junction lookup skipped (table may not exist): {}", e.getMessage());
             return List.of();
@@ -224,13 +224,13 @@ public class EmailRecordLinkService {
     }
 
     private EmailRecordLink buildLink(Long tenantId, Long messageId, String threadId,
-                                      String modelCode, String recordId, String linkType) {
+                                      String modelCode, String recordPid, String linkType) {
         EmailRecordLink link = new EmailRecordLink();
         link.setTenantId(tenantId);
         link.setMessageId(messageId);
         link.setThreadId(threadId);
         link.setModelCode(modelCode);
-        link.setRecordId(recordId);
+        link.setRecordPid(recordPid);
         link.setLinkType(linkType);
         link.setCreatedAt(Instant.now());
         return link;

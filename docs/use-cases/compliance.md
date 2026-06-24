@@ -377,7 +377,7 @@ The triage command is the most sophisticated command in the dual prevention plug
           "type": "create_record",
           "modelCode": "dp_rectification",
           "fields": {
-            "dp_rect_issue_id": "${recordId}",
+            "dp_rect_issue_id": "${recordPid}",
             "dp_rect_title": "${dp_issue_title}",
             "dp_rect_status": "initiated"
           }
@@ -391,7 +391,7 @@ The triage command is the most sophisticated command in the dual prevention plug
           "type": "create_record",
           "modelCode": "dp_inspection_task",
           "fields": {
-            "dp_task_issue_id": "${recordId}",
+            "dp_task_issue_id": "${recordPid}",
             "dp_task_area": "${dp_issue_area}",
             "dp_task_status": "pending"
           }
@@ -426,7 +426,7 @@ When rectification is accepted, the source issue is automatically updated to "re
         {
           "type": "update_record",
           "modelCode": "dp_issue",
-          "recordIdField": "dp_rect_issue_id",
+          "recordPidField": "dp_rect_issue_id",
           "fields": { "dp_issue_status": "rectified" }
         }
       ]

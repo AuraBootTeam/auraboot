@@ -58,7 +58,7 @@ class ExecuteCommandExecutorTest {
 
         Map<String, Object> params = new HashMap<>(Map.of("reason", "auto-approved"));
         AutomationAction action = buildAction(new HashMap<>(Map.of("commandCode", "approve_lead", "params", params)));
-        Map<String, Object> context = Map.of("recordId", "lead-001");
+        Map<String, Object> context = Map.of("recordPid", "lead-001");
 
         Map<String, Object> result = (Map<String, Object>) executor.execute(action, context);
 
@@ -70,20 +70,20 @@ class ExecuteCommandExecutorTest {
     }
 
     @Test
-    void execute_recordIdFromContext_addedAsPidIfNotInParams() {
+    void execute_recordPidFromContext_addedAsRecordPidIfNotInParams() {
         CommandExecuteResult cmdResult = mock(CommandExecuteResult.class);
         when(cmdResult.getData()).thenReturn(Map.of());
         when(commandExecutor.execute(any(), any())).thenReturn(cmdResult);
 
         AutomationAction action = buildAction(Map.of("commandCode", "close_ticket"));
-        Map<String, Object> context = Map.of("recordId", "ticket-999");
+        Map<String, Object> context = Map.of("recordPid", "ticket-999");
 
         executor.execute(action, context);
 
         ArgumentCaptor<CommandExecuteRequest> captor = ArgumentCaptor.forClass(CommandExecuteRequest.class);
         verify(commandExecutor).execute(eq("close_ticket"), captor.capture());
         CommandExecuteRequest req = captor.getValue();
-        assertThat(req.getPayload()).containsEntry("pid", "ticket-999");
+        assertThat(req.getPayload()).containsEntry("recordPid", "ticket-999");
         assertThat(req.getTargetRecordId()).isEqualTo("ticket-999");
     }
 
@@ -94,7 +94,7 @@ class ExecuteCommandExecutorTest {
         when(commandExecutor.execute(any(), any())).thenReturn(cmdResult);
 
         Map<String, Object> context = new HashMap<>();
-        context.put("recordId", "rec-123");
+        context.put("recordPid", "rec-123");
         context.put("assigneeId", "user-456");
 
         Map<String, Object> params2 = new HashMap<>(Map.of("assignee", "${assigneeId}", "note", "auto-assigned"));

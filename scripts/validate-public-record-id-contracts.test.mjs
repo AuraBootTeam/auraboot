@@ -27,7 +27,7 @@ function codes(result) {
   return result.findings.map((finding) => finding.code);
 }
 
-test('inventories legacy targetRecordId config without targetRecordPid', () => {
+test('inventories legacy public record identity config keys', () => {
   const root = makeRepo();
   writeJson(root, 'plugins/demo/config/pages/order_list.json', {
     blocks: [
@@ -36,6 +36,11 @@ test('inventories legacy targetRecordId config without targetRecordPid', () => {
         action: {
           command: 'demo:update_order',
           targetRecordId: '${recordId}',
+          targetRecordPid: '${recordPid}',
+        },
+        task: {
+          recordIdVar: 'recordId',
+          recordIdField: 'source_id',
         },
       },
     ],
@@ -44,9 +49,10 @@ test('inventories legacy targetRecordId config without targetRecordPid', () => {
   const result = auditRepo(root, { ossOnly: true, baselinePath: null });
 
   assert.ok(codes(result).includes('S-PUBLIC-RECORD-TARGET-ID-LEGACY'));
+  assert.ok(codes(result).includes('S-PUBLIC-RECORD-CONFIG-LEGACY-KEY'));
   assert.ok(codes(result).includes('S-PUBLIC-RECORD-PLACEHOLDER-LEGACY'));
-  assert.equal(result.summary.total, 2);
-  assert.equal(result.summary.new, 2);
+  assert.equal(result.summary.total, 4);
+  assert.equal(result.summary.new, 4);
 });
 
 test('baseline accepts current findings while still failing newly introduced leaks', () => {
@@ -88,6 +94,30 @@ test('inventories backend public record-id and dynamic map response risks', () =
   assert.ok(codes(result).includes('S-PUBLIC-RECORD-DYNAMIC-MAP-RISK'));
 });
 
+test('does not inventory sanitized dynamic controller record maps', () => {
+  const root = makeRepo();
+  write(root, 'platform/src/main/java/com/acme/DynamicController.java', `
+    @RestController
+    class DynamicController {
+      @GetMapping("/{pageKey}/{recordPid}")
+      ApiResponse<Map<String, Object>> get(@PathVariable String recordPid) {
+        Map<String, Object> result = dynamicDataService.getById("order", recordPid);
+        return ApiResponse.success(PublicRecordSanitizer.sanitizeRecord(result));
+      }
+
+      @GetMapping("/{pageKey}/list")
+      ApiResponse<PaginationResult<Map<String, Object>>> list(String cursor) {
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list("order", request);
+        return ApiResponse.success(PublicRecordSanitizer.sanitizePage(result));
+      }
+    }
+  `);
+
+  const result = auditRepo(root, { ossOnly: true, baselinePath: null });
+
+  assert.ok(!codes(result).includes('S-PUBLIC-RECORD-DYNAMIC-MAP-RISK'));
+});
+
 test('inventories named query internal-field bypass risk without blanket matching business ids', () => {
   const root = makeRepo();
   writeJson(root, 'plugins/demo/config/named-queries/orders.json', {
@@ -101,4 +131,45 @@ test('inventories named query internal-field bypass risk without blanket matchin
 
   assert.equal(sqlFindings.length, 1);
   assert.equal(sqlFindings[0].jsonPath, '$.riskyQuery');
+});
+
+test('inventories public response fixtures that expose legacy record identity keys', () => {
+  const root = makeRepo();
+  writeJson(root, 'docs/api-fixtures/public-record/dynamic-list.json', {
+    code: 0,
+    data: {
+      records: [
+        {
+          pid: 'rec-pid-1',
+          recordId: 1001,
+        },
+      ],
+    },
+  });
+
+  const result = auditRepo(root, { ossOnly: true, baselinePath: null });
+  const responseFindings = result.findings.filter((finding) =>
+    finding.code === 'S-PUBLIC-RECORD-RESPONSE-LEGACY-KEY');
+
+  assert.equal(responseFindings.length, 1);
+  assert.equal(responseFindings[0].jsonPath, '$.data.records[0].recordId');
+});
+
+test('inventories frontend public config defaults that expose recordIdVar', () => {
+  const root = makeRepo();
+  write(root, 'web-admin/app/plugins/core-designer/components/bpmn-designer/constants/index.ts', `
+    export const defaults = {
+      recordUpdateTask: {
+        modelCode: '',
+        recordIdVar: 'businessKey',
+      },
+    };
+  `);
+
+  const result = auditRepo(root, { ossOnly: true, baselinePath: null });
+  const findings = result.findings.filter((finding) =>
+    finding.code === 'S-PUBLIC-RECORD-FRONTEND-LEGACY');
+
+  assert.equal(findings.length, 1);
+  assert.equal(findings[0].field, 'recordIdVar');
 });

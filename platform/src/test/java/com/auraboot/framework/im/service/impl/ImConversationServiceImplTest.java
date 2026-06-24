@@ -105,14 +105,14 @@ class ImConversationServiceImplTest {
         ConversationCreateRequest r = req(ImConstants.TYPE_OBJECT);
         assertThatThrownBy(() -> service.create(r, USER_ID, TENANT_ID))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("boundModelCode");
+                .hasMessageContaining("boundRecordPid");
     }
 
     @Test
     void create_objectReturnsExistingByBoundRecord() {
         ConversationCreateRequest r = req(ImConstants.TYPE_OBJECT);
         r.setBoundModelCode("crm_lead");
-        r.setBoundRecordId(5L);
+        r.setBoundRecordPid("01KLEADPID0000000000000001");
 
         ImConversation existing = conv(CONV_ID, ImConstants.TYPE_OBJECT, USER_ID);
         when(conversationMapper.selectOne(any())).thenReturn(existing);
@@ -144,14 +144,15 @@ class ImConversationServiceImplTest {
     void create_objectAutoNamesIfNull() {
         ConversationCreateRequest r = req(ImConstants.TYPE_OBJECT);
         r.setBoundModelCode("crm_lead");
-        r.setBoundRecordId(42L);
+        r.setBoundRecordPid("01KLEADPID0000000000000002");
         when(conversationMapper.selectOne(any())).thenReturn(null);
 
         service.create(r, USER_ID, TENANT_ID);
 
         ArgumentCaptor<ImConversation> captor = ArgumentCaptor.forClass(ImConversation.class);
         verify(conversationMapper).insert(captor.capture());
-        assertThat(captor.getValue().getName()).isEqualTo("crm_lead #42");
+        assertThat(captor.getValue().getBoundRecordPid()).isEqualTo("01KLEADPID0000000000000002");
+        assertThat(captor.getValue().getName()).isEqualTo("crm_lead #01KLEADPID0000000000000002");
     }
 
     @Test
@@ -708,7 +709,7 @@ class ImConversationServiceImplTest {
     void findByBoundRecord_delegatesToMapper() {
         ImConversation c = conv(CONV_ID, ImConstants.TYPE_OBJECT, USER_ID);
         when(conversationMapper.selectOne(any())).thenReturn(c);
-        assertThat(service.findByBoundRecord("crm_lead", 1L, TENANT_ID)).isSameAs(c);
+        assertThat(service.findByBoundRecord("crm_lead", "01KLEADPID0000000000000003", TENANT_ID)).isSameAs(c);
     }
 
     @Test

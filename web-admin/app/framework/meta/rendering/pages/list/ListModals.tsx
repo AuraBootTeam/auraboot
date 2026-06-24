@@ -309,7 +309,7 @@ export function ListModals({
       <RecordPreviewDrawer
         open={!!previewRecordId}
         modelCode={modelCode}
-        recordId={previewRecordId || ''}
+        recordPid={previewRecordId || ''}
         apiEndpoint={previewApiEndpoint}
         detailPageKey={previewDetailPageKey}
         onClose={onPreviewClose}

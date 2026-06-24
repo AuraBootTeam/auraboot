@@ -214,7 +214,7 @@ public class InvariantEngineImpl implements InvariantEngine {
             }
         }
 
-        context.setVariable("recordId", recordId);
+        context.setVariable("recordPid", recordId);
         context.setVariable("state", currentState);
 
         if (result != null) {

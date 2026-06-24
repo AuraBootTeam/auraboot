@@ -117,7 +117,6 @@ public class InboxEventListener {
             String[] parts = businessKey.split(":", 2);
             card.put("modelCode", parts[0]);
             card.put("sourceModel", parts[0]);
-            card.put("recordId", parts[1]);
             card.put("recordPid", parts[1]);
             card.put("sourceRecordPid", parts[1]);
         }
@@ -147,7 +146,7 @@ public class InboxEventListener {
         if (businessKey != null && businessKey.contains(":")) {
             String[] parts = businessKey.split(":", 2);
             item.setModelCode(parts[0]);
-            try { item.setRecordId(Long.parseLong(parts[1])); } catch (NumberFormatException ignored) {}
+            item.setRecordPid(parts[1]);
         }
 
         inboxService.createItem(item);
@@ -353,7 +352,6 @@ public class InboxEventListener {
         card.put("cardType", "state_transition");
         card.put("modelCode", event.getModelCode());
         card.put("sourceModel", event.getModelCode());
-        card.put("recordId", event.getRecordId());
         card.put("recordPid", event.getRecordId());
         card.put("sourceRecordPid", event.getRecordId());
         card.put("commandCode", event.getCommandCode());
@@ -377,7 +375,7 @@ public class InboxEventListener {
         item.setSourceType("command");
         item.setSourceId(event.getEventId());
         item.setModelCode(event.getModelCode());
-        try { item.setRecordId(Long.parseLong(event.getRecordId())); } catch (Exception ignored) {}
+        item.setRecordPid(event.getRecordId());
         item.setDeepLink("auraboot://object/" + event.getModelCode() + "/" + event.getRecordId());
         item.setCardPayload(toJson(card));
         item.setClientItemId("cmd_" + event.getEventId());

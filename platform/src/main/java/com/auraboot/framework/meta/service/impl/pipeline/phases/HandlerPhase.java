@@ -217,7 +217,7 @@ public class HandlerPhase implements CommandPhase {
 
         String recordIdStr = (request != null && StringUtils.hasText(request.getTargetRecordId()))
                 ? request.getTargetRecordId()
-                : fieldMapResults != null ? (String) fieldMapResults.get("recordId") : null;
+                : fieldMapResults != null ? (String) fieldMapResults.get("recordPid") : null;
         if (!StringUtils.hasText(recordIdStr)) {
             return;
         }
@@ -322,14 +322,14 @@ public class HandlerPhase implements CommandPhase {
             handlerResults.put("async", true);
             handlerResults.put("taskCode", taskCode);
             handlerResults.put("taskType", CommandHandlerAsyncTaskExecutor.TASK_TYPE);
-            // Surface the target record id so callers (e.g. a form submitting a
+            // Surface the target record pid so callers (e.g. a form submitting a
             // model-bound async command) can redirect to the just-created record's
-            // detail page. The synchronous handler return carries this id naturally;
+            // detail page. The synchronous handler return carries this pid naturally;
             // the async envelope otherwise only had {async, taskCode}, leaving the UI
             // with no record to navigate to. Purely additive — existing consumers
             // ignore the extra key.
             if (StringUtils.hasText(effectiveRecordId)) {
-                handlerResults.put("recordId", effectiveRecordId);
+                handlerResults.put("recordPid", effectiveRecordId);
             }
             log.info("Command {} dispatched asynchronously (handler={}): taskCode={}",
                     commandCode, handlerCode, taskCode);
@@ -440,7 +440,7 @@ public class HandlerPhase implements CommandPhase {
     }
 
     private String submitAsyncHandlerTask(String handlerCode, String commandCode, String modelCode,
-                                          String recordId, Map<String, Object> payload,
+                                          String recordPid, Map<String, Object> payload,
                                           Map<String, Object> handlerParams, Long tenantId, Long userId) {
         Map<String, Object> input = new HashMap<>();
         input.put("handlerCode", handlerCode);
@@ -448,7 +448,7 @@ public class HandlerPhase implements CommandPhase {
         input.put("tenantId", tenantId);
         input.put("userId", userId);
         input.put("modelCode", modelCode);
-        input.put("recordId", recordId);
+        input.put("recordPid", recordPid);
         input.put("payload", payload != null ? payload : Collections.emptyMap());
         input.put("handlerParams", handlerParams);
 
@@ -501,15 +501,15 @@ public class HandlerPhase implements CommandPhase {
             return;
         }
 
-        String recordId = request != null ? request.getTargetRecordId() : null;
-        String businessKey = command.getModelCode() + ":" + (recordId != null ? recordId : "new");
+        String recordPid = request != null ? request.getTargetRecordId() : null;
+        String businessKey = command.getModelCode() + ":" + (recordPid != null ? recordPid : "new");
 
         String titleTemplate = (String) trigger.getOrDefault("titleTemplate", command.getCode());
         String title = resolveBpmTitle(titleTemplate, payload, command);
 
         Map<String, Object> businessData = new HashMap<>();
         businessData.put("modelCode", command.getModelCode());
-        businessData.put("recordId", recordId);
+        businessData.put("recordPid", recordPid);
         businessData.put("commandCode", command.getCode());
         if (payload != null) {
             businessData.put("payload", payload);
@@ -551,7 +551,7 @@ public class HandlerPhase implements CommandPhase {
         if (fieldMapResults == null) {
             return null;
         }
-        Object recordId = fieldMapResults.get("recordId");
+        Object recordId = fieldMapResults.get("recordPid");
         if (recordId instanceof String recordIdStr && StringUtils.hasText(recordIdStr)) {
             return recordIdStr;
         }

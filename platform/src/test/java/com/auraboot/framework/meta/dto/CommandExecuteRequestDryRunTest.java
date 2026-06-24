@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.dto;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -47,15 +48,24 @@ class CommandExecuteRequestDryRunTest {
     }
 
     @Test
-    @DisplayName("targetRecordPid is the pid-first public alias while targetRecordId remains compatible")
-    void target_record_pid_alias() {
+    @DisplayName("targetRecordPid is the only public JSON target field")
+    void target_record_pid_public_json_contract() throws Exception {
+        ObjectMapper mapper = new ObjectMapper();
         CommandExecuteRequest req = new CommandExecuteRequest();
 
-        req.setTargetRecordId("legacy-pid");
-        assertThat(req.getTargetRecordPid()).isEqualTo("legacy-pid");
+        req.setTargetRecordId("internal-pid");
+        String json = mapper.writeValueAsString(req);
 
-        req.setTargetRecordPid("public-pid");
-        assertThat(req.getTargetRecordPid()).isEqualTo("public-pid");
-        assertThat(req.getTargetRecordId()).isEqualTo("public-pid");
+        assertThat(json).contains("\"targetRecordPid\":\"internal-pid\"");
+        assertThat(json).doesNotContain("targetRecordId");
+
+        CommandExecuteRequest fromPublicPid =
+                mapper.readValue("{\"targetRecordPid\":\"public-pid\"}", CommandExecuteRequest.class);
+        assertThat(fromPublicPid.getTargetRecordId()).isEqualTo("public-pid");
+        assertThat(fromPublicPid.getTargetRecordPid()).isEqualTo("public-pid");
+
+        CommandExecuteRequest fromLegacyId =
+                mapper.readValue("{\"targetRecordId\":\"legacy-pid\"}", CommandExecuteRequest.class);
+        assertThat(fromLegacyId.getTargetRecordId()).isNull();
     }
 }

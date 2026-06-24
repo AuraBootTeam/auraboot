@@ -32,10 +32,10 @@ public class AddCommentActionHandler implements ActionHandler {
     @Override
     public void execute(ResolvedActionPlan plan, DecisionContext context) {
         String modelCode = resolveString(context, "entityCode");
-        String recordPid = resolveString(context, "recordId");
+        String recordPid = resolveString(context, "recordPid");
         if (modelCode == null || recordPid == null) {
             throw new IllegalStateException(
-                    "ADD_COMMENT requires record.entityCode + record.recordId in the context; got model="
+                    "ADD_COMMENT requires record.entityCode + record.recordPid in the context; got model="
                             + modelCode + ", record=" + recordPid);
         }
         Map<String, Object> payload = plan.payload() != null ? plan.payload() : Map.of();

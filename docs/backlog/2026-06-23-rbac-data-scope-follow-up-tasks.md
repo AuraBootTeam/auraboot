@@ -8,9 +8,6 @@ relates_to:
   - docs/architecture/rbac-data-scope-runtime-and-e2e.md
   - docs/plans/2026-06/2026-06-23-rbac-data-scope-endgame-matrix.md
   - docs/superpowers/reports/feature-coverage-rbac-data-scope-2026-06-23.md
-  - https://github.com/AuraBootTeam/auraboot/pull/1061
-  - https://github.com/AuraBootTeam/auraboot/pull/1063
-  - https://github.com/AuraBootTeam/auraboot/pull/1065
 ---
 
 # RBAC Data Scope Follow-up Tasks

@@ -185,7 +185,7 @@ public class DslToolProvider implements ToolProvider {
             tools.add(ToolDefinition.builder()
                     .toolCode(PREFIX_GET + modelHint)
                     .toolName("Get " + modelHint)
-                    .description("Get a single " + modelHint + " record by pid. Params: recordPid (required); recordId is accepted for compatibility.")
+                    .description("Get a single " + modelHint + " record by pid. Params: recordPid (required).")
                     .providerCode("dsl")
                     .toolType("dsl_query")
                     .sourceCode(modelHint)
@@ -280,8 +280,6 @@ public class DslToolProvider implements ToolProvider {
     private Map<String, Object> recordPidProperties(String description) {
         Map<String, Object> properties = new LinkedHashMap<>();
         properties.put("recordPid", Map.of("type", "string", "description", description));
-        properties.put("recordId", Map.of("type", "string", "description", "Compatibility alias for recordPid"));
-        properties.put("pid", Map.of("type", "string", "description", "Compatibility alias for recordPid"));
         return properties;
     }
 
@@ -505,30 +503,27 @@ public class DslToolProvider implements ToolProvider {
     }
 
     private ProviderExecutionResult executeGetById(String modelCode, Map<String, Object> params, long start) {
-        String recordId = extractRecordId(params);
-        if (recordId == null) {
+        String recordPid = extractRecordPid(params);
+        if (recordPid == null) {
             return ProviderExecutionResult.builder()
                     .success(false)
                     .errorMessage("recordPid is required for get: tool")
                     .durationMs(System.currentTimeMillis() - start)
                     .build();
         }
-        Map<String, Object> record = dynamicDataService.getById(modelCode, recordId);
+        Map<String, Object> record = dynamicDataService.getById(modelCode, recordPid);
         return ProviderExecutionResult.builder()
                 .success(record != null)
                 .data(record != null ? Map.of("record", record) : Map.of())
-                .errorMessage(record == null ? "Record not found: " + recordId : null)
+                .errorMessage(record == null ? "Record not found: " + recordPid : null)
                 .durationMs(System.currentTimeMillis() - start)
                 .build();
     }
 
-    private String extractRecordId(Map<String, Object> params) {
+    private String extractRecordPid(Map<String, Object> params) {
         if (params == null) return null;
-        Object recordId = params.get("recordPid");
-        if (recordId == null) recordId = params.get("recordId");
-        if (recordId == null) recordId = params.get("pid");
-        if (recordId == null) recordId = params.get("id");
-        return recordId != null ? String.valueOf(recordId) : null;
+        Object recordPid = params.get("recordPid");
+        return recordPid != null ? String.valueOf(recordPid) : null;
     }
 
     // ========== Helpers ==========
@@ -631,7 +626,7 @@ public class DslToolProvider implements ToolProvider {
     }
 
     private boolean isDetailQueryCommand(String commandCode, Map<String, Object> params) {
-        if (params != null && (params.containsKey("recordId") || params.containsKey("pid") || params.containsKey("id"))) {
+        if (params != null && params.containsKey("recordPid")) {
             String code = commandCode != null ? commandCode.toLowerCase(Locale.ROOT) : "";
             return code.contains(":detail_") || code.contains(":get_");
         }
@@ -684,7 +679,7 @@ public class DslToolProvider implements ToolProvider {
         Map<String, Object> extra = new LinkedHashMap<>(params);
         extra.keySet().removeAll(List.of(
                 "pageNum", "page", "pageSize", "keyword", "search", "filters",
-                "sortField", "sortOrder", "sortFields", "recordPid", "recordId", "pid", "id"));
+                "sortField", "sortOrder", "sortFields", "recordPid"));
         return extra.isEmpty() ? Collections.emptyMap() : extra;
     }
 }

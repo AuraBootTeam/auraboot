@@ -56,7 +56,7 @@ public final class BpmServiceTaskConstants {
 
     // record-update-task attributes
     public static final String ATTR_MODEL_CODE = "modelCode";
-    public static final String ATTR_RECORD_ID_VAR = "recordIdVar";
+    public static final String ATTR_RECORD_PID_VAR = "recordPidVar";
     public static final String ATTR_FIELD_NAME = "fieldName";
     public static final String ATTR_FIELD_VALUE = "fieldValue";
 

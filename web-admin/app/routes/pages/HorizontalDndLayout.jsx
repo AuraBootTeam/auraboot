@@ -28,7 +28,7 @@ export const HorizontalDndLayout = forwardRef(
       if (initialComponents.length > 0) {
         setRows([
           {
-            id: 'row-1',
+            rowKey: 'row-1',
             components: initialComponents,
           },
         ]);
@@ -170,7 +170,7 @@ export const HorizontalDndLayout = forwardRef(
           } else {
             // 交换行操作 - 创建新行并插入到适当位置
             const newRow = {
-              id: `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              rowKey: `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               components: [sourceComponent],
             };
 
@@ -184,14 +184,14 @@ export const HorizontalDndLayout = forwardRef(
             }
           }
 
-          // 移除空行，但确保每行都有有效的 id
+          // 移除空行，但确保每行都有有效的 rowKey
           const filteredRows = newRows
             .filter((row) => row && row.components && row.components.length > 0)
             .map((row) => {
-              if (!row.id) {
+              if (!row.rowKey) {
                 return {
                   ...row,
-                  id: `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                  rowKey: `row-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
                 };
               }
               return row;
@@ -229,7 +229,7 @@ export const HorizontalDndLayout = forwardRef(
         setRows((prevRows) => [
           ...prevRows,
           {
-            id: `row-${Date.now()}`,
+            rowKey: `row-${Date.now()}`,
             components: [newComponent],
           },
         ]);
@@ -313,7 +313,7 @@ export const HorizontalDndLayout = forwardRef(
           <SortableContext items={getAllComponentIds()} strategy={rectSwappingStrategy}>
             {rows.map((row) => (
               <div
-                key={row.id}
+                key={row.rowKey}
                 style={{
                   display: 'flex',
                   width: '100%',
