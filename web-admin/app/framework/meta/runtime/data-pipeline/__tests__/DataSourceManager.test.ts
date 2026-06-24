@@ -61,6 +61,68 @@ describe('DataSourceManager', () => {
     ]);
   });
 
+  it('evaluates API endpoints against nested runtime state', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: { metrics: { http_requests: 12 }, cost: { total: 3.7 } },
+    } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        state: { selectedUsageJob: { pid: 'job-pid-1' } },
+      } as any),
+    );
+    manager.register('selectedJobUsage', {
+      type: 'api',
+      endpoint: '/api/ext/cr/jobs/${state.selectedUsageJob.pid}/usage',
+      method: 'get',
+      adaptor: 'object',
+      autoFetch: false,
+      dependOn: ['state.selectedUsageJob.pid'],
+    });
+
+    await manager.fetch('selectedJobUsage');
+
+    expect(mockedFetchResult).toHaveBeenCalledWith(
+      '/api/ext/cr/jobs/job-pid-1/usage',
+      expect.objectContaining({ method: 'get' }),
+    );
+  });
+
+  it('accepts raw JSON objects from custom API data sources', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '',
+      desc: '',
+      message: '',
+      success: false,
+      data: null,
+      context: null,
+      metrics: { http_requests: 1842, render_requests: 316 },
+      cost: { total: 50.28, currency: 'CNY' },
+    } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        state: { selectedUsageJob: { pid: 'job-pid-1' } },
+      } as any),
+    );
+    manager.register('selectedJobUsage', {
+      type: 'api',
+      endpoint: '/api/ext/cr/jobs/${state.selectedUsageJob.pid}/usage',
+      method: 'get',
+      adaptor: 'object',
+      autoFetch: false,
+      dependOn: ['state.selectedUsageJob.pid'],
+    });
+
+    await manager.fetch('selectedJobUsage');
+
+    expect(manager.getData('selectedJobUsage')).toEqual({
+      metrics: { http_requests: 1842, render_requests: 316 },
+      cost: { total: 50.28, currency: 'CNY' },
+    });
+  });
+
   it('table adaptor treats a plain top-level array as records (custom REST endpoint returning data:[...])', async () => {
     // A custom endpoint (e.g. GET /api/qr) returns ResultData with `data` being a plain array, not a
     // paginated { records } object. The `table` adaptor must surface those rows so a DSL table column
