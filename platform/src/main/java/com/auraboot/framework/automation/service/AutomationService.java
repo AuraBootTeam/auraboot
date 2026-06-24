@@ -118,5 +118,5 @@ public interface AutomationService {
     /**
      * Manually trigger an automation for testing
      */
-    AutomationLogDTO triggerManually(String pid, String recordId);
+    AutomationLogDTO triggerManually(String pid, String recordPid);
 }

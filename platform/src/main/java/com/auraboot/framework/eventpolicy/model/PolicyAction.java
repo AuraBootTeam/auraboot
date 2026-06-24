@@ -11,7 +11,7 @@ import java.util.Map;
  * @param order  intra-rule ordering hint (lower runs first)
  * @param payload action parameters (value-mapping only; no business logic)
  * @param idempotencyKeyTemplate template like
- *        {@code "${record.entityCode}:${record.recordId}:${rule.ruleCode}:${action.type}"}
+ *        {@code "${record.entityCode}:${record.recordPid}:${rule.ruleCode}:${action.type}"}
  */
 public record PolicyAction(
         String type,

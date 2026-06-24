@@ -49,6 +49,11 @@ public interface PasswordManagementService {
     void resetPasswordWithToken(String token, String newPassword);
 
     /**
+     * Reset a user password from an administrator flow.
+     */
+    void resetPasswordByAdmin(String userPid, String newPassword);
+
+    /**
      * Check if password is expired based on configured expiry days.
      */
     boolean isPasswordExpired(com.auraboot.framework.user.dao.entity.User user);

@@ -75,7 +75,7 @@ class TestFixtureControllerRouteInboxTest {
 
         assertNotNull(result);
         assertTrue(result.isSuccess());
-        assertEquals(List.of("7100"), result.getRecordIds());
+        assertEquals(List.of("7100"), result.getRecordPids());
         assertEquals("100", result.getMetadata().get("tenantId"));
         assertEquals("300", result.getMetadata().get("userId"));
 
@@ -146,7 +146,7 @@ class TestFixtureControllerRouteInboxTest {
         assertTrue(result.isSuccess());
         assertEquals("inbox_route", result.getFixtureName());
         assertEquals(1, result.getRecordsCreated());
-        assertEquals(List.of("7000"), result.getRecordIds());
+        assertEquals(List.of("7000"), result.getRecordPids());
         assertEquals("e2et_order", result.getMetadata().get("modelCode"));
         assertEquals(List.of("01KROUTE000000000000000001"), result.getMetadata().get("routeRecordIds"));
 
@@ -159,14 +159,15 @@ class TestFixtureControllerRouteInboxTest {
         assertEquals("normal", item.getPriority());
         assertEquals("pending", item.getStatus());
         assertEquals("e2et_order", item.getModelCode());
-        assertEquals(9001L, item.getRecordId());
+        assertEquals("01KROUTE000000000000000001", item.getRecordPid());
         assertEquals("auraboot://object/e2et_order/01KROUTE000000000000000001", item.getDeepLink());
         assertFalse(item.getIsRead());
 
         Map<String, Object> cardData = MAPPER.readValue(item.getCardPayload(), new TypeReference<>() {});
         assertEquals("RouteCo", cardData.get("accountName"));
         assertEquals("e2et_order", cardData.get("modelCode"));
-        assertEquals("01KROUTE000000000000000001", cardData.get("recordId"));
+        assertEquals("01KROUTE000000000000000001", cardData.get("recordPid"));
+        assertEquals("01KROUTE000000000000000001", cardData.get("sourceRecordPid"));
         assertEquals(item.getDeepLink(), cardData.get("deepLink"));
 
         List<?> actions = (List<?>) cardData.get("actions");

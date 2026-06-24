@@ -766,5 +766,5 @@ function extractDisplayText(record: any): string {
     }
   }
 
-  return record.pid || record.id || 'Unknown';
+  return record.pid || 'Unknown';
 }

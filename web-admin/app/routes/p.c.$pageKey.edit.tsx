@@ -1,5 +1,5 @@
 /**
- * Custom Form Edit Page — /p/c/{pageKey}/edit/{recordId}
+ * Custom Form Edit Page — /p/c/{pageKey}/edit/{recordPid}
  *
  * Uses the URL pageKey to load a custom form schema, then uses that schema's
  * modelCode to load the edited record.
@@ -18,8 +18,8 @@ interface PageInfo {
 }
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
-  const { pageKey, recordId } = params;
-  if (!pageKey || !recordId) {
+  const { pageKey, recordPid } = params;
+  if (!pageKey || !recordPid) {
     throw new Response('Page key and record ID are required', { status: 400 });
   }
 
@@ -39,7 +39,7 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
     }
 
     const tableName = pageResult.data.modelCode || pageKey;
-    return { pageKey, recordId, tableName, token };
+    return { pageKey, recordPid, tableName, token };
   } catch (error) {
     if (error instanceof Response) {
       throw error;
@@ -50,14 +50,14 @@ export const loader = async ({ params, request }: LoaderFunctionArgs) => {
 };
 
 export default function CustomFormEditPage() {
-  const { pageKey, recordId, tableName, token } = useLoaderData<typeof loader>();
+  const { pageKey, recordPid, tableName, token } = useLoaderData<typeof loader>();
   return (
     <DynamicPageRenderer
       tableName={tableName}
       pageType="form"
       pageKey={pageKey}
       token={token}
-      recordId={recordId}
+      recordPid={recordPid}
     />
   );
 }

@@ -946,7 +946,7 @@ class AgentRuntimeArchitectureTest {
                 .contains(
                         "freshness",
                         "permission",
-                        "recordIds");
+                        "recordPids");
     }
 
     @Test

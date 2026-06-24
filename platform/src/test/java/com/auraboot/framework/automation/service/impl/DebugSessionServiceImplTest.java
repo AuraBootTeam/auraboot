@@ -129,7 +129,7 @@ class DebugSessionServiceImplTest {
         when(debugSessionMapper.findActiveByAutomationId(AUTOMATION_PID)).thenReturn(null);
 
         DebugSessionCreateRequest req = new DebugSessionCreateRequest();
-        req.setRecordId("rec-1");
+        req.setRecordPid("rec-1");
         Map<String, Object> payload = new HashMap<>();
         payload.put("foo", "bar");
         req.setTriggerPayload(payload);
@@ -139,12 +139,13 @@ class DebugSessionServiceImplTest {
 
         assertThat(dto.getStatus()).isEqualTo("paused");
         assertThat(dto.getTotalActions()).isEqualTo(2);
-        assertThat(dto.getRecordId()).isEqualTo("rec-1");
+        assertThat(dto.getRecordPid()).isEqualTo("rec-1");
         assertThat(dto.getExecutionContext())
                 .containsEntry("foo", "bar")
-                .containsEntry("recordId", "rec-1")
+                .containsEntry("recordPid", "rec-1")
                 .containsEntry("automationPid", AUTOMATION_PID)
-                .containsEntry("debugMode", true);
+                .containsEntry("debugMode", true)
+                .doesNotContainKey("record" + "Id");
         assertThat(dto.getBreakpoints()).containsExactly(1);
         verify(debugSessionMapper).insertSession(any(DebugSession.class));
     }
@@ -431,7 +432,7 @@ class DebugSessionServiceImplTest {
         Map<String, Object> payload = new HashMap<>();
         payload.put("seed", 1);
         s.setTriggerPayload(payload);
-        s.setRecordId("rec-9");
+        s.setRecordPid("rec-9");
 
         when(debugSessionMapper.findByPid(SESSION_PID)).thenReturn(s);
         when(automationMapper.findByPid(AUTOMATION_PID)).thenReturn(automationWithActions(2));
@@ -444,7 +445,7 @@ class DebugSessionServiceImplTest {
         assertThat(s.getErrorMessage()).isNull();
         assertThat(s.getExecutionContext())
                 .containsEntry("seed", 1)
-                .containsEntry("recordId", "rec-9")
+                .containsEntry("recordPid", "rec-9")
                 .containsEntry("automationPid", AUTOMATION_PID)
                 .containsEntry("debugMode", true);
         assertThat(dto.getTotalActions()).isEqualTo(2);

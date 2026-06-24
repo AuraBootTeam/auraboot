@@ -74,12 +74,12 @@ async function executeSingle(
   const resp = await client.post(`/api/meta/commands/execute/${commandCode}`, body);
   if (resp.ok) {
     const resultData = (resp.data as any)?.data ?? {};
-    const recordId = resultData?.recordId ?? resultData?.pid ?? resultData?.id ?? '';
+    const recordPid = resultData?.recordPid ?? '';
     if (outputOpts.format === 'json') {
       console.log(JSON.stringify(resp.data, null, outputOpts.agentMode ? 0 : 2));
     } else {
       console.log(chalk.green('✓'), `${commandCode} executed`);
-      if (recordId) console.log(`  Record: ${recordId}`);
+      if (recordPid) console.log(`  Record: ${recordPid}`);
     }
   } else {
     if (outputOpts.format === 'json') {
@@ -107,9 +107,9 @@ async function executeBatch(
     if (resp.ok) {
       successCount++;
       const resultData = (resp.data as any)?.data ?? {};
-      const recordId = resultData?.recordId ?? resultData?.pid ?? resultData?.id ?? '';
+      const recordPid = resultData?.recordPid ?? '';
       if (outputOpts.format !== 'json') {
-        console.log(`  [${i + 1}/${bodies.length}] ${chalk.green('✓')} Executed${recordId ? ` (${recordId})` : ''}`);
+        console.log(`  [${i + 1}/${bodies.length}] ${chalk.green('✓')} Executed${recordPid ? ` (${recordPid})` : ''}`);
       }
       results.push(resp.data);
     } else {

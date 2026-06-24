@@ -91,6 +91,9 @@ public class RunLifecycleService {
         runUpdate.put("input_tokens", result.totalInputTokens);
         runUpdate.put("output_tokens", result.totalOutputTokens);
         runUpdate.put("total_cost", result.totalCost);
+        if (!result.success) {
+            runUpdate.put("error_message", "Plan execution did not reach success terminal state");
+        }
         runUpdate.put("updated_at", completedAt);
         dynamicDataMapper.update("ab_agent_run", runUpdate, Map.of("pid", runPid));
 

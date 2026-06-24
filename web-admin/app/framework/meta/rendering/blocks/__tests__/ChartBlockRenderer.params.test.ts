@@ -2,11 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { resolveRecordParams } from '~/framework/meta/rendering/blocks/ChartBlockRenderer';
 
 describe('resolveRecordParams', () => {
-  it('resolves ${record.<field>}, ${recordId} and ${<field>} against the record', () => {
+  it('resolves ${record.<field>}, ${recordPid} and ${<field>} against the record', () => {
     const out = resolveRecordParams(
       {
         chartId: '${record.pid}',
-        byId: '${recordId}',
+        byId: '${recordPid}',
         shortField: '${qc_spc_name}',
       },
       { pid: '01ABC', qc_spc_name: 'Paste Thickness' },

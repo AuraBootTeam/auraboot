@@ -79,7 +79,7 @@ class IdempotencyServiceIntegrationTest extends BaseIntegrationTest {
         String clientRequestId = "check_req_" + UUID.randomUUID();
         String commandCode = "test_command";
         Map<String, Object> payload = Map.of("field", "value");
-        Map<String, Object> outcome = Map.of("recordId", "rec_002", "status", "success");
+        Map<String, Object> outcome = Map.of("recordPid", "rec_002", "status", "success");
         Long tenantId = getTestTenant().getId();
 
         idempotencyService.recordOutcome(clientRequestId, commandCode, payload, outcome, tenantId);

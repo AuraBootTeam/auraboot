@@ -60,15 +60,15 @@ public final class ExtractionRuleMatcher {
         Object data = s.payload().get("data");
         if (!(data instanceof Map)) return null;
         Map<String, Object> dataMap = (Map<String, Object>) data;
-        Object recordId = dataMap.get("recordId");
-        if (recordId == null) return null;
+        Object recordPid = dataMap.get("recordPid");
+        if (recordPid == null) return null;
         Object success = s.payload().get("success");
         if (!Boolean.TRUE.equals(success)) return null;
         Object entityTypeRaw = dataMap.getOrDefault("entityType", "record");
         String entityType = entityTypeRaw == null ? "record" : entityTypeRaw.toString();
-        return new ExtractedMemoryCandidate("p2-tool-success-with-record-id",
+        return new ExtractedMemoryCandidate("p2-tool-success-with-record-pid",
                 "FACT",
-                "Created " + entityType + " " + recordId,
+                "Created " + entityType + " " + recordPid,
                 s.name() + " created " + entityType + " record",
                 3,
                 "Recordable entity created");

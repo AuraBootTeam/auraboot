@@ -59,7 +59,7 @@ export function useTreeData(
     // Default: all nodes with children expanded
     const ids = new Set<string>();
     for (const row of rows) {
-      const pid = row.pid ?? row.id;
+      const pid = row.pid;
       if (pid && childrenMap.has(pid)) {
         ids.add(pid);
       }
@@ -74,7 +74,7 @@ export function useTreeData(
     function walk(parentId: string | null, depth: number) {
       const children = childrenMap.get(parentId) ?? [];
       for (const row of children) {
-        const rowId = row.pid ?? row.id;
+        const rowId = row.pid;
         const hasChildren = childrenMap.has(rowId) && (childrenMap.get(rowId)?.length ?? 0) > 0;
         result.push({
           ...row,

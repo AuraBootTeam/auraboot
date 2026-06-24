@@ -60,7 +60,7 @@ export const FormTemplate: TemplateGenerator = {
       dataSources: {
         ds_detail: {
           type: 'api',
-          endpoint: `${apiBase}/\${state.recordId}`,
+          endpoint: `${apiBase}/\${state.recordPid}`,
           method: 'get',
           autoFetch: false,
         },
@@ -72,7 +72,7 @@ export const FormTemplate: TemplateGenerator = {
           steps: [
             {
               type: 'if',
-              condition: '${state.recordId}',
+              condition: '${state.recordPid}',
               action: 'fetchDataSource',
               args: { sourceId: 'ds_detail' },
             },
@@ -84,15 +84,15 @@ export const FormTemplate: TemplateGenerator = {
             { action: 'validateForm' },
             {
               type: 'if',
-              condition: '${state.recordId}',
+              condition: '${state.recordPid}',
               action: 'apiCall',
               method: 'put',
-              endpoint: `${apiBase}/\${state.recordId}`,
+              endpoint: `${apiBase}/\${state.recordPid}`,
               body: '${formData}',
             },
             {
               type: 'if',
-              condition: '${!state.recordId}',
+              condition: '${!state.recordPid}',
               action: 'apiCall',
               method: 'post',
               endpoint: apiBase,
@@ -108,7 +108,7 @@ export const FormTemplate: TemplateGenerator = {
         },
       },
       state: {
-        recordId: null,
+        recordPid: null,
         formData: {},
         mode: 'create',
       },

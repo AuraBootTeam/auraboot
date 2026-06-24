@@ -57,8 +57,8 @@ public class InboxItem {
     @TableField("model_code")
     private String modelCode;
 
-    @TableField("record_id")
-    private Long recordId;
+    @TableField("record_pid")
+    private String recordPid;
 
     // Card Protocol JSON
     @TableField(value = "card_payload", typeHandler = JsonbStringTypeHandler.class, jdbcType = JdbcType.OTHER)
@@ -103,21 +103,13 @@ public class InboxItem {
         return modelCode;
     }
 
-    @JsonProperty("sourceRecordId")
-    public String getSourceRecordId() {
-        String recordPid = getSourceRecordPid();
-        return recordPid != null ? recordPid : (recordId != null ? String.valueOf(recordId) : null);
-    }
-
     @JsonProperty("sourceRecordPid")
     public String getSourceRecordPid() {
         Map<String, Object> data = getCardData();
         return firstNonBlank(
+                recordPid,
                 stringValue(data, "sourceRecordPid"),
-                stringValue(data, "recordPid"),
-                stringValue(data, "sourceRecordId"),
-                stringValue(data, "recordId"),
-                recordId != null ? String.valueOf(recordId) : null);
+                stringValue(data, "recordPid"));
     }
 
     @JsonProperty("cardData")

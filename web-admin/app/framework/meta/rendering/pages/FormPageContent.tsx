@@ -504,13 +504,13 @@ export function resolveAfterSubmitRedirect(
   schema: any,
   tableName: string,
   responseData: any,
-  recordId: string | null | undefined,
+  recordPid: string | null | undefined,
 ): string {
   const template = (schema?.extension as any)?.afterSubmitRedirect;
   if (typeof template !== 'string' || !template) {
     return `/p/${tableName}`;
   }
-  // Build placeholder bag: response payload fields + the original recordId.
+  // Build placeholder bag: response payload fields + the original recordPid.
   const bag: Record<string, any> = {
     ...(responseData && typeof responseData === 'object' ? responseData : {}),
   };
@@ -521,10 +521,10 @@ export function resolveAfterSubmitRedirect(
   if (nestedData && typeof nestedData === 'object') {
     Object.assign(bag, nestedData);
   }
-  if (bag.pid == null && bag.recordId != null) bag.pid = bag.recordId;
-  if (bag.id == null && bag.recordId != null) bag.id = bag.recordId;
-  if (recordId && bag.pid == null) bag.pid = recordId;
-  if (recordId && bag.id == null) bag.id = recordId;
+  if (bag.pid == null && bag.recordPid != null) bag.pid = bag.recordPid;
+  if (bag.id == null && bag.recordPid != null) bag.id = bag.recordPid;
+  if (recordPid && bag.pid == null) bag.pid = recordPid;
+  if (recordPid && bag.id == null) bag.id = recordPid;
   return template.replace(/\{(\w+)\}/g, (_match, key: string) => {
     const value = bag[key];
     return value != null ? String(value) : '';
@@ -717,13 +717,13 @@ export function FormPageContent(props: PageContentProps) {
 
   // Read URL params:
   // - commandCode: explicit submit command provided by navigation actions
-  // - sourceRecordId: source business record id for create-by-context flows
+  // - sourceRecordPid: source business record id for create-by-context flows
   const [searchParams] = useSearchParams();
   const urlCommandCode = searchParams.get('commandCode');
-  const sourceRecordId = searchParams.get('sourceRecordId');
-  const recordId = props.recordId;
-  const isEditMode = !!recordId;
-  const recordPid = useMemo(() => getPublicRecordPid({ pid: recordId }) || '', [recordId]);
+  const sourceRecordPid = searchParams.get('sourceRecordPid');
+  const routeRecordPid = props.recordPid;
+  const isEditMode = !!routeRecordPid;
+  const recordPid = useMemo(() => getPublicRecordPid({ pid: routeRecordPid }) || '', [routeRecordPid]);
 
   // Flat field-name set from schema (form-section blocks).
   // Used for generic URL aliasing (e.g. ?modelCode=xxx → model_code) and for
@@ -809,7 +809,7 @@ export function FormPageContent(props: PageContentProps) {
         modelCode: (schema as any)?.modelCode,
         pageKey: (schema as any)?.pageKey,
         mode,
-        recordId: recordId || undefined,
+        recordPid: recordPid || undefined,
       },
     },
   });
@@ -955,10 +955,10 @@ export function FormPageContent(props: PageContentProps) {
       if (!runtime) return;
       const scopeId = runtime.getScopeId();
       runtime.getStateManager().updateScope(scopeId, {
-        form: recordId ? { ...nextFormData, pid: recordId } : nextFormData,
+        form: recordPid ? { ...nextFormData, pid: recordPid } : nextFormData,
       });
     },
-    [runtime, recordId],
+    [runtime, recordPid],
   );
 
   const syncRuntimeFieldValue = useCallback(
@@ -969,11 +969,11 @@ export function FormPageContent(props: PageContentProps) {
         form: {
           ...(prev.form || {}),
           [fieldCode]: value,
-          ...(recordId ? { pid: recordId } : {}),
+          ...(recordPid ? { pid: recordPid } : {}),
         },
       }));
     },
-    [runtime, recordId],
+    [runtime, recordPid],
   );
 
   // Sync formData with runtime scope state
@@ -1196,7 +1196,7 @@ export function FormPageContent(props: PageContentProps) {
     }
     const nextFieldErrors: Record<string, string> = {};
     const nextSummaryErrors: string[] = [];
-    const submissionData = recordId ? { ...(initialFormData || {}), ...formData } : formData;
+    const submissionData = recordPid ? { ...(initialFormData || {}), ...formData } : formData;
     const blocks = schema.blocks;
     const formSectionBlocks = blocks.filter((b: any) => b.blockType === 'form-section');
 
@@ -1338,7 +1338,7 @@ export function FormPageContent(props: PageContentProps) {
     locale,
     formData,
     initialFormData,
-    recordId,
+    recordPid,
     hasModelCodeAndKindFields,
     kindCapabilities,
   ]);
@@ -1403,13 +1403,13 @@ export function FormPageContent(props: PageContentProps) {
         });
         return;
       }
-      const mergedEditData = recordId
-        ? { ...(initialFormData || {}), ...formData, pid: recordId }
+      const mergedEditData = recordPid
+        ? { ...(initialFormData || {}), ...formData, pid: recordPid }
         : formData;
-      const actionRecord = recordId
+      const actionRecord = recordPid
         ? mergedEditData
-        : sourceRecordId
-          ? { ...formData, sourceRecordId }
+        : sourceRecordPid
+          ? { ...formData, sourceRecordPid }
           : formData;
       const effectiveAction = button.action;
       const effectiveActionType = resolveActionType(effectiveAction);
@@ -1443,7 +1443,7 @@ export function FormPageContent(props: PageContentProps) {
           effectiveButton.commandCode ||
           (typeof actionCommandCode === 'string' ? actionCommandCode : null) ||
           null,
-        Boolean(recordId),
+        Boolean(recordPid),
       );
       // Convention over configuration: an explicit command (URL / button /
       // action) wins; otherwise route through the model's CRUD command the
@@ -1453,7 +1453,7 @@ export function FormPageContent(props: PageContentProps) {
       const effectiveCommandCode = resolveSubmitCommandCode(
         explicitCommandCode,
         schema?.commands as Record<string, string> | undefined,
-        Boolean(recordId),
+        Boolean(recordPid),
       );
       const shouldValidate =
         ['submit', 'create', 'update', 'edit', 'save', 'command'].includes(
@@ -1481,9 +1481,9 @@ export function FormPageContent(props: PageContentProps) {
       const modelFieldEntries = Object.entries(modelFields);
       const commandPayload = buildFormCommandPayload(actionRecord, modelFields, schema?.blocks);
 
-      // Ensure sourceRecordId is passed through to backend for SideEffect resolution
-      if (sourceRecordId && !commandPayload.sourceRecordId) {
-        commandPayload.sourceRecordId = sourceRecordId;
+      // Ensure sourceRecordPid is passed through to backend for SideEffect resolution
+      if (sourceRecordPid && !commandPayload.sourceRecordPid) {
+        commandPayload.sourceRecordPid = sourceRecordPid;
       }
 
       // Form command path: execute command directly with explicit operation context.
@@ -1497,13 +1497,13 @@ export function FormPageContent(props: PageContentProps) {
               : effectiveActionType === 'edit' || effectiveActionType === 'update'
                 ? 'update'
                 : effectiveActionType === 'save' || effectiveActionType === 'command'
-                  ? recordId
+                  ? recordPid
                     ? 'update'
                     : 'create'
                   : undefined;
-        const targetRecordId = recordId || undefined;
+        const targetRecordPid = recordPid || undefined;
 
-        if ((operationType === 'update' || operationType === 'delete') && !targetRecordId) {
+        if ((operationType === 'update' || operationType === 'delete') && !targetRecordPid) {
           showErrorToast('Missing target record for update/delete');
           return;
         }
@@ -1511,7 +1511,7 @@ export function FormPageContent(props: PageContentProps) {
         fetchResult(`/api/meta/commands/execute/${effectiveCommandCode}`, {
           method: 'post',
           params: {
-            ...buildCommandTargetParams(targetRecordId),
+            ...buildCommandTargetParams(targetRecordPid),
             payload: commandPayload,
             operationType,
           },
@@ -1543,7 +1543,7 @@ export function FormPageContent(props: PageContentProps) {
             setSummaryErrors([]);
             dirtyFieldsRef.current.clear();
             clearFormDraftRef.current();
-            navigate(resolveAfterSubmitRedirect(schema, tableName, responseData, recordId));
+            navigate(resolveAfterSubmitRedirect(schema, tableName, responseData, recordPid));
           })
           .catch((err) => {
             const errorMessage = err instanceof Error ? err.message : 'Failed to execute command';
@@ -1561,7 +1561,7 @@ export function FormPageContent(props: PageContentProps) {
         const targetModelCode = schema?.modelCode || tableName;
         const endpoint =
           effectiveActionType === 'update'
-            ? `/api/dynamic/${targetModelCode}/${recordId}`
+            ? `/api/dynamic/${targetModelCode}/${recordPid}`
             : `/api/dynamic/${targetModelCode}`;
         const method = effectiveActionType === 'update' ? 'put' : 'post';
         const payload =
@@ -1617,7 +1617,7 @@ export function FormPageContent(props: PageContentProps) {
           showSuccessToast(t('common.saveSuccess') || 'Saved successfully');
           dirtyFieldsRef.current.clear();
           clearFormDraftRef.current();
-          navigate(resolveAfterSubmitRedirect(schema, targetModelCode, result.data, recordId));
+          navigate(resolveAfterSubmitRedirect(schema, targetModelCode, result.data, recordPid));
         });
       }
 
@@ -1631,7 +1631,7 @@ export function FormPageContent(props: PageContentProps) {
       navigate,
       onSubmitOverride,
       notifyValidationFailure,
-      recordId,
+      recordPid,
       schema?.modelCode,
       schema?.blocks,
       setError,
@@ -1640,7 +1640,7 @@ export function FormPageContent(props: PageContentProps) {
       showErrorToast,
       showInfoToast,
       showSuccessToast,
-      sourceRecordId,
+      sourceRecordPid,
       t,
       tableName,
       token,
@@ -1660,9 +1660,9 @@ export function FormPageContent(props: PageContentProps) {
 
   // Edit mode: fetch existing record data to populate form
   useEffect(() => {
-    if (!recordId) return;
+    if (!recordPid) return;
     void loadMainRecord({ preserveDirty: true });
-  }, [recordId, loadMainRecord]);
+  }, [recordPid, loadMainRecord]);
 
   // L1 SDK: merge external initialValues into form state (overlay on top of loaded data)
   useEffect(() => {
@@ -1777,7 +1777,7 @@ export function FormPageContent(props: PageContentProps) {
 
   // Edit mode: fetch existing child records for sub-table blocks
   useEffect(() => {
-    if (!recordId) return; // Create mode -- no children to load
+    if (!recordPid) return; // Create mode -- no children to load
     if (!schema) return; // Wait for schema to load first
 
     if (subTableBlocks.length === 0) {
@@ -1805,7 +1805,7 @@ export function FormPageContent(props: PageContentProps) {
                 {
                   fieldName: parentField,
                   operator: 'EQ',
-                  value: recordId,
+                  value: recordPid,
                 },
               ]),
             },
@@ -1830,7 +1830,7 @@ export function FormPageContent(props: PageContentProps) {
 
     loadChildren();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordId, schema, token]);
+  }, [recordPid, schema, token]);
 
   // Render smart field using utility
   const renderSmartField = useMemo(
@@ -1854,7 +1854,7 @@ export function FormPageContent(props: PageContentProps) {
     () => ({
       record: formData,
       initialRecord: initialFormData ?? formData,
-      recordId,
+      recordPid,
       tableName,
       token,
       locale,
@@ -1876,7 +1876,7 @@ export function FormPageContent(props: PageContentProps) {
     [
       formData,
       initialFormData,
-      recordId,
+      recordPid,
       tableName,
       token,
       locale,
@@ -1891,7 +1891,7 @@ export function FormPageContent(props: PageContentProps) {
   // reload/navigation doesn't lose work, with restore-on-reopen + clear-on-submit.
   // Scoped to create mode: edit forms hydrate from the server record and we don't
   // want a stale local draft to silently shadow loaded values. (The store key
-  // still scopes by recordId, so enabling edit later is a one-line change.)
+  // still scopes by recordPid, so enabling edit later is a one-line change.)
   const draftModelCode = (schema as any)?.modelCode || tableName;
   const draftPageKey = (schema as any)?.pageKey;
   const draftEnabled = !isEditMode && !onSubmitOverride;
@@ -1904,7 +1904,7 @@ export function FormPageContent(props: PageContentProps) {
     enabled: draftEnabled,
     modelCode: draftModelCode,
     pageKey: draftPageKey,
-    recordId,
+    recordPid,
     values: formData,
     initialValues: useMemo(
       () => ({ ...schemaDefaultValues, ...urlDefaultValues }),
@@ -2235,9 +2235,9 @@ export function FormPageContent(props: PageContentProps) {
                   {isEditMode && hasCommands && subTableConfig ? (
                     /* Edit mode with commands: use SubTableViewer for command-based CRUD */
                     <SubTableViewer
-                      key={`${blockKey}-${recordId}`}
+                      key={`${blockKey}-${recordPid}`}
                       config={subTableConfig}
-                      parentRecordId={recordId!}
+                      parentRecordPid={recordPid!}
                       token={token || undefined}
                       locale={locale}
                       t={t}
@@ -2256,7 +2256,7 @@ export function FormPageContent(props: PageContentProps) {
                     </div>
                   ) : columns && columns.length > 0 ? (
                     <SubTable
-                      key={`${blockKey}-${recordId || 'new'}`}
+                      key={`${blockKey}-${recordPid || 'new'}`}
                       columns={columns}
                       value={subTableData[blockKey] || []}
                       onChange={(rows) =>

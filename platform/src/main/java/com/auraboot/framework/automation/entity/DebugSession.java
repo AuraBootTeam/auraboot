@@ -36,9 +36,9 @@ public class DebugSession {
     @TableField("automation_id")
     private String automationId;
 
-    /** Optional record ID for context */
-    @TableField("record_id")
-    private String recordId;
+    /** Optional record pid for context */
+    @TableField("record_pid")
+    private String recordPid;
 
     /** Session status: PAUSED, RUNNING, COMPLETED, FAILED, STOPPED */
     @TableField("status")

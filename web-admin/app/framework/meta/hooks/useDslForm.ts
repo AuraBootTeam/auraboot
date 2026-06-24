@@ -40,7 +40,7 @@ export interface UseDslFormOptions {
   /** Alternative: model table name + type will be combined into pageKey */
   tableName?: string;
   /** Record ID for edit mode (omit for create) */
-  recordId?: string;
+  recordPid?: string;
   /** Auth token override (uses session token if omitted) */
   token?: string;
   /** Initial field values to pre-populate the form */
@@ -71,7 +71,7 @@ export interface FormSubmitPayload {
   /** Current form field values */
   values: Record<string, any>;
   /** The record ID (present in edit mode) */
-  recordId?: string;
+  recordPid?: string;
   /** The loaded DSL schema */
   schema: any;
   /** The resolved page key */
@@ -181,7 +181,7 @@ export function useDslForm(options: UseDslFormOptions): UseDslFormReturn {
   const {
     pageKey: pageKeyOpt,
     tableName,
-    recordId,
+    recordPid,
     token,
     initialValues = {},
     fieldPermissions: callerPermissions = {},
@@ -194,11 +194,11 @@ export function useDslForm(options: UseDslFormOptions): UseDslFormReturn {
   const pageKey = useMemo(() => {
     if (pageKeyOpt) return pageKeyOpt;
     if (tableName) {
-      const type = recordId ? 'detail' : 'new';
+      const type = recordPid ? 'detail' : 'new';
       return `${tableName}_${type}`;
     }
     return '';
-  }, [pageKeyOpt, tableName, recordId]);
+  }, [pageKeyOpt, tableName, recordPid]);
 
   // --- Schema loading (skipped when disabled or no pageKey) ---
   const schemaLoaderOpts: UseSchemaLoaderOptions = useMemo(
@@ -289,21 +289,21 @@ export function useDslForm(options: UseDslFormOptions): UseDslFormReturn {
     try {
       await onSubmit({
         values,
-        recordId,
+        recordPid,
         schema,
         pageKey,
       });
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, onSubmit, values, recordId, schema, pageKey]);
+  }, [submitting, onSubmit, values, recordPid, schema, pageKey]);
 
   // --- Renderer props ---
   const rendererProps: PageContentProps = useMemo(
     () => ({
       schema: schema ?? {},
       tableName: tableName || (schema?.modelCode as string) || '',
-      recordId,
+      recordPid,
       token,
       initialValues: Object.keys(initialValues).length > 0 ? initialValues : undefined,
       fieldPermissions:
@@ -312,14 +312,14 @@ export function useDslForm(options: UseDslFormOptions): UseDslFormReturn {
         ? async (data: Record<string, any>) => {
             await onSubmit({
               values: data,
-              recordId,
+              recordPid,
               schema,
               pageKey,
             });
           }
         : undefined,
     }),
-    [schema, tableName, recordId, token, initialValues, effectivePermissions, onSubmit, pageKey],
+    [schema, tableName, recordPid, token, initialValues, effectivePermissions, onSubmit, pageKey],
   );
 
   return {

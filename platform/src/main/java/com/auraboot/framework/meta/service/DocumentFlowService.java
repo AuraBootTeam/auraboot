@@ -22,7 +22,7 @@ import java.util.Map;
  * <p>Expression formats supported in fieldMapping values:</p>
  * <ul>
  *   <li>{@code ${record.fieldCode}} — value from source header record</li>
- *   <li>{@code ${recordId}} — source record PID</li>
+ *   <li>{@code ${recordPid}} — source record PID</li>
  *   <li>{@code 'literal'} — string literal (single quotes stripped)</li>
  *   <li>Plain string/non-string — used as-is</li>
  * </ul>
@@ -177,7 +177,7 @@ public class DocumentFlowService {
      * <ul>
      *   <li>{@code ${record.fieldCode}} — value from source header record</li>
      *   <li>{@code ${line.fieldCode}} — value from current source line item (if present)</li>
-     *   <li>{@code ${recordId}} — source record PID</li>
+     *   <li>{@code ${recordPid}} — source record PID</li>
      *   <li>{@code 'literal'} — string literal with single quotes stripped</li>
      *   <li>Other strings / non-strings — returned as-is</li>
      * </ul>
@@ -207,8 +207,8 @@ public class DocumentFlowService {
             return sourceLine != null ? sourceLine.get(fieldCode) : null;
         }
 
-        // ${recordId}
-        if ("${recordId}".equals(expr)) {
+        // ${recordPid}
+        if ("${recordPid}".equals(expr)) {
             return sourceRecordId;
         }
 

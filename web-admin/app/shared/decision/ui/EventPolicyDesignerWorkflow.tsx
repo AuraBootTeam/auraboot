@@ -37,7 +37,7 @@ const STEPS: { key: DesignerStep; label: string }[] = [
   { key: 'history', label: 'History' },
 ];
 
-const DEFAULT_IDEMPOTENCY = '${record.entityCode}:${record.recordId}:${rule.ruleCode}:${action.type}';
+const DEFAULT_IDEMPOTENCY = '${record.entityCode}:${record.recordPid}:${rule.ruleCode}:${action.type}';
 const POLICY_PHASES: readonly PolicyPhase[] = ['BEFORE_SUBMIT', 'AFTER_COMMIT', 'ASYNC_WORKER'];
 const EXECUTION_MODES: readonly ExecutionMode[] = ['ORDERED', 'UNORDERED'];
 const FAILURE_STRATEGIES: readonly FailureStrategy[] = [

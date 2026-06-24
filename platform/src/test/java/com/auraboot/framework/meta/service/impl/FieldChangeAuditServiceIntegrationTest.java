@@ -548,6 +548,55 @@ class FieldChangeAuditServiceIntegrationTest {
         assertEquals("name", nameLogs.get(0).getFieldCode());
     }
 
+    @Test
+    @DisplayName("recordFieldChanges stores and queries pid-only history by recordPid")
+    void recordFieldChanges_pidOnlyHistoryByRecordPid() {
+        String model = modelCode("pidonly");
+        String recordPid = "field_pid_" + RUN + "_only";
+        fieldChangeAuditService.configureFieldAudit(testTenant.getId(), model, "status", true, false, false);
+
+        fieldChangeAuditService.recordFieldChanges(
+                testTenant.getId(), model, null, recordPid, "create_cmd",
+                null, Map.of("status", "draft"),
+                testUser.getId(), testUser.getUserName());
+
+        List<FieldChangeLog> history = fieldChangeAuditService.getRecordHistoryByRecordPid(
+                testTenant.getId(), model, recordPid);
+        assertEquals(1, history.size());
+
+        FieldChangeLog log = history.get(0);
+        assertEquals(recordPid, log.getRecordPid());
+        assertNull(log.getRecordId(), "pid-only field history must not require legacy numeric record_id");
+        assertEquals("status", log.getFieldCode());
+        assertEquals("draft", log.getNewValue());
+    }
+
+    @Test
+    @DisplayName("getFieldHistoryByRecordPid filters one field for a non-numeric recordPid")
+    void getFieldHistoryByRecordPid_filtersByField() {
+        String model = modelCode("pidfield");
+        String recordPid = "field_pid_" + RUN + "_field";
+        fieldChangeAuditService.configureFieldAudit(testTenant.getId(), model, "status", true, false, false);
+        fieldChangeAuditService.configureFieldAudit(testTenant.getId(), model, "name", true, false, false);
+
+        fieldChangeAuditService.recordFieldChanges(
+                testTenant.getId(), model, 610L, recordPid, "create_cmd",
+                null, Map.of("status", "draft", "name", "Widget"),
+                testUser.getId(), testUser.getUserName());
+
+        List<FieldChangeLog> statusLogs = fieldChangeAuditService.getFieldHistoryByRecordPid(
+                testTenant.getId(), model, recordPid, "status");
+        List<FieldChangeLog> nameLogs = fieldChangeAuditService.getFieldHistoryByRecordPid(
+                testTenant.getId(), model, recordPid, "name");
+
+        assertEquals(1, statusLogs.size());
+        assertEquals(recordPid, statusLogs.get(0).getRecordPid());
+        assertEquals("status", statusLogs.get(0).getFieldCode());
+        assertEquals(1, nameLogs.size());
+        assertEquals(recordPid, nameLogs.get(0).getRecordPid());
+        assertEquals("name", nameLogs.get(0).getFieldCode());
+    }
+
     // ==================== getChangesByActor ====================
 
     @Test

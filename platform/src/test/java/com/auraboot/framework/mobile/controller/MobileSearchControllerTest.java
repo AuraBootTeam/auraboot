@@ -65,8 +65,8 @@ class MobileSearchControllerTest {
         assertFalse(response.getData().getHits().isEmpty());
         MobileSearchResult.SearchHit hit = response.getData().getHits().get(0);
         assertEquals("e2et_order", hit.getModelCode());
-        assertEquals("1001", hit.getRecordId());
         assertEquals("order-pid-1", hit.getRecordPid());
+        assertEquals("auraboot://object/e2et_order/order-pid-1", hit.getDeepLink());
         assertEquals("visual_order_1", hit.getDisplayName());
         assertEquals("record", hit.getType());
         assertFalse(hit.getFields().containsKey("created_by"));

@@ -31,5 +31,5 @@ public interface AsyncTaskAccessor {
      * @param payload     the command payload
      * @return the submitted task code, or {@code null} when submission is unavailable
      */
-    String submitCommandTask(String commandCode, String modelCode, String recordId, Map<String, Object> payload);
+    String submitCommandTask(String commandCode, String modelCode, String recordPid, Map<String, Object> payload);
 }

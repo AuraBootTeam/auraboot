@@ -35,9 +35,9 @@ public class EmailRecordLink {
     @TableField("model_code")
     private String modelCode;
 
-    /** Primary key of the linked CRM record (stored as string for flexibility). */
-    @TableField("record_id")
-    private String recordId;
+    /** Public pid of the linked CRM record. */
+    @TableField("record_pid")
+    private String recordPid;
 
     /** How the link was created: 'auto' (system-detected) or 'manual' (user-created). */
     @TableField("link_type")

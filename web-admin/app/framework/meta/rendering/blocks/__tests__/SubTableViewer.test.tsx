@@ -94,7 +94,7 @@ describe('SubTableViewer', () => {
             },
           } as any
         }
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         parentRecordData={{
           wd_req_process_instance: '1776844530463',
           wd_req_applicant: '01KPT1P5S8F33HPQQXWKY1EJHG',
@@ -143,7 +143,7 @@ describe('SubTableViewer', () => {
             },
           } as any
         }
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         parentRecordData={{}}
         t={(key) => (key === 'common.noData' ? 'No data' : key)}
       />,
@@ -181,7 +181,7 @@ describe('SubTableViewer', () => {
             },
           } as any
         }
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         parentRecordData={{ pid: '01KR8WEQZ0EXXF28KMA2B06YEN' }}
         t={(key) => (key === 'common.noData' ? 'No data' : key)}
       />,
@@ -201,6 +201,47 @@ describe('SubTableViewer', () => {
 
     await expect(screen.findByTestId('sortable-row-row-1')).resolves.toBeInTheDocument();
     expect(screen.getByTestId('subtable-viewer').textContent).toContain('D5 DataSource Row');
+  });
+
+  it('resolves recordPid placeholders in API dataSource URLs and params', async () => {
+    fetchResultMock.mockResolvedValue({
+      code: '0',
+      data: {
+        records: [{ pid: 'row-pid', taskName: 'Record PID DataSource Row', status: 'active' }],
+      },
+    });
+
+    render(
+      <SubTableViewer
+        config={
+          {
+            ...buildConfig(),
+            dataSource: {
+              type: 'api',
+              url: '/api/scheduled-tasks/${recordPid}/logs',
+              params: {
+                owner: '${recordPid}',
+              },
+            },
+          } as any
+        }
+        parentRecordPid="01KR8WEQZ0EXXF28KMA2B06YEN"
+        parentRecordData={{ pid: '01KR8WEQZ0EXXF28KMA2B06YEN' }}
+        t={(key) => (key === 'common.noData' ? 'No data' : key)}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(fetchResultMock).toHaveBeenCalledWith('/api/scheduled-tasks/01KR8WEQZ0EXXF28KMA2B06YEN/logs', {
+        method: 'get',
+        params: {
+          owner: '01KR8WEQZ0EXXF28KMA2B06YEN',
+        },
+        token: undefined,
+      });
+    });
+
+    await expect(screen.findByTestId('sortable-row-row-pid')).resolves.toBeInTheDocument();
   });
 
   it('uses child field metadata for raw-code-free labels and reference display values', async () => {
@@ -264,7 +305,7 @@ describe('SubTableViewer', () => {
           ],
           readOnly: true,
         }}
-        parentRecordId="receipt-1"
+        parentRecordPid="receipt-1"
         t={(key) => (key === 'common.noData' ? 'No data' : key)}
       />,
     );
@@ -303,7 +344,7 @@ describe('SubTableViewer', () => {
             actionLabel: { 'zh-CN': '添加联系人', 'en-US': 'Add Contact' },
           },
         }}
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         isEditable
         t={(key) => (key === 'common.noData' ? 'No data' : key)}
       />,
@@ -331,7 +372,7 @@ describe('SubTableViewer', () => {
           ...buildConfig(),
           commands: { create: 'crm:create_contact' },
         }}
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         isEditable
         t={(key) => (key === 'common.noData' ? '暂无数据' : key)}
       />,
@@ -360,7 +401,7 @@ describe('SubTableViewer', () => {
             actionLabel: { 'zh-CN': '添加联系人', 'en-US': 'Add Contact' },
           },
         }}
-        parentRecordId="record-1"
+        parentRecordPid="record-1"
         isEditable
       />,
     );
@@ -396,7 +437,7 @@ describe('SubTableViewer', () => {
             actionLabel: 'Add Task',
           },
         }}
-        parentRecordId="request-1"
+        parentRecordPid="request-1"
         parentRecordData={{ crm_cr_owner: 'sales-owner' }}
         isEditable
       />,
@@ -480,7 +521,7 @@ describe('SubTableViewer', () => {
             { field: 'crm_act_status', label: 'Status' },
           ],
         }}
-        parentRecordId="request-1"
+        parentRecordPid="request-1"
         isEditable
       />,
     );
@@ -540,7 +581,7 @@ describe('SubTableViewer', () => {
             { field: 'crm_qs_source_quote_id', label: 'Quote ID' },
           ],
         }}
-        parentRecordId="request-1"
+        parentRecordPid="request-1"
         isEditable
       />,
     );

@@ -206,10 +206,10 @@ twice.
   "description": "Submit Expense Report — Submit a drafted expense report for manager approval. Use after the employee has confirmed totals and attached receipts. Reversible via expense.report.recall before final approval.",
   "inputSchema": {
     "type": "object",
-    "required": ["operationType", "targetRecordId"],
+    "required": ["operationType", "targetRecordPid"],
     "properties": {
       "operationType": { "type": "string", "enum": ["UPDATE"] },
-      "targetRecordId": { "type": "string", "description": "ID of the draft report to submit." }
+      "targetRecordPid": { "type": "string", "description": "ID of the draft report to submit." }
     }
   },
   "annotations": {
@@ -266,7 +266,7 @@ The agent searches its tool catalog and finds two relevant commands:
 
 **Step 5: call.**
 
-The agent calls `expense.report.submit` with the report's `targetRecordId` and the correctly typed `operationType` (`UPDATE`, since the command transitions an existing record). The pipeline runs all 20 stages. Audit records are written. A domain event fires after commit and triggers the approval workflow.
+The agent calls `expense.report.submit` with the report's `targetRecordPid` and the correctly typed `operationType` (`UPDATE`, since the command transitions an existing record). The pipeline runs all 20 stages. Audit records are written. A domain event fires after commit and triggers the approval workflow.
 
 **Step 6: handle failure.**
 
@@ -314,7 +314,7 @@ A representative audit row, conceptually:
 | Field | Value |
 |---|---|
 | `cmdCode` | `expense.report.submit` |
-| `payload` | `{ "operationType": "UPDATE", "targetRecordId": "01HQ..." }` |
+| `payload` | `{ "operationType": "UPDATE", "targetRecordPid": "01HQ..." }` |
 | `userId` | Alice |
 | `agentId` | `aura-bot/v3` |
 | `agentVersion` | `2026.04.18` |

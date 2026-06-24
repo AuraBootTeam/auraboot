@@ -15,7 +15,7 @@
  *       "trigger": "onChange",
  *       "source": {
  *         "modelCode": "crm_account",
- *         "recordIdField": "crm_opp_account_id"
+ *         "recordPidField": "crm_opp_account_id"
  *       },
  *       "mappings": [
  *         { "sourceField": "crm_acc_industry", "targetField": "crm_opp_industry" },
@@ -48,8 +48,8 @@ export interface AutoFillConfig {
   source: {
     /** Model code of the referenced entity, e.g. "crm_account" */
     modelCode: string;
-    /** Field code whose value is the record ID to look up */
-    recordIdField: string;
+    /** Field code whose value is the record pid to look up */
+    recordPidField: string;
   };
   /** Field value mappings: sourceField on the referenced model → targetField on this form */
   mappings: Array<{
@@ -119,16 +119,16 @@ export function useFieldAutoFill(
     const processAutoFill = async () => {
       for (const field of triggerFields) {
         const cfg = field.extension!.autoFill!;
-        const recordId = formValues[cfg.source.recordIdField];
+        const recordPid = formValues[cfg.source.recordPidField];
 
-        if (recordId == null || recordId === '') continue;
+        if (recordPid == null || recordPid === '') continue;
 
         const sourceFields = cfg.mappings.map((m) => m.sourceField).join(',');
 
         try {
           const params = new URLSearchParams({
             modelCode: cfg.source.modelCode,
-            recordId: String(recordId),
+            recordPid: String(recordPid),
             fields: sourceFields,
           });
 

@@ -194,7 +194,7 @@
         "targetModel": "tasset_maintenance",
         "fieldMapping": {
           "tasset_mn_code": "${tasset_as_code}",
-          "tasset_mn_asset_id": "${recordId}",
+          "tasset_mn_asset_id": "${recordPid}",
           "tasset_mn_type": "repair",
           "tasset_mn_status": "scheduled",
           "tasset_mn_notes": "${tasset_as_notes}"

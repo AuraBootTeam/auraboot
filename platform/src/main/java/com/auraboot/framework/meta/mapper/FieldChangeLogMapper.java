@@ -30,6 +30,16 @@ public interface FieldChangeLogMapper extends BaseMapper<FieldChangeLog> {
                                               @Param("recordId") Long recordId);
 
     /**
+     * Get all field changes for a specific public record PID on a model.
+     */
+    @Select("SELECT * FROM ab_field_change_log " +
+            "WHERE tenant_id = #{tenantId} AND model_code = #{modelCode} AND record_pid = #{recordPid} " +
+            "ORDER BY changed_at DESC")
+    List<FieldChangeLog> getByModelAndRecordPid(@Param("tenantId") Long tenantId,
+                                                 @Param("modelCode") String modelCode,
+                                                 @Param("recordPid") String recordPid);
+
+    /**
      * Get change history for a specific field on a specific record.
      */
     @Select("SELECT * FROM ab_field_change_log " +
@@ -40,6 +50,18 @@ public interface FieldChangeLogMapper extends BaseMapper<FieldChangeLog> {
                                      @Param("modelCode") String modelCode,
                                      @Param("recordId") Long recordId,
                                      @Param("fieldCode") String fieldCode);
+
+    /**
+     * Get change history for a specific field on a public record PID.
+     */
+    @Select("SELECT * FROM ab_field_change_log " +
+            "WHERE tenant_id = #{tenantId} AND model_code = #{modelCode} " +
+            "AND record_pid = #{recordPid} AND field_code = #{fieldCode} " +
+            "ORDER BY changed_at DESC")
+    List<FieldChangeLog> getByFieldAndRecordPid(@Param("tenantId") Long tenantId,
+                                                 @Param("modelCode") String modelCode,
+                                                 @Param("recordPid") String recordPid,
+                                                 @Param("fieldCode") String fieldCode);
 
     /**
      * Get all field changes made by a specific actor within a time range.

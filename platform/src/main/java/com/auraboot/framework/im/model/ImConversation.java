@@ -41,8 +41,8 @@ public class ImConversation {
     @TableField("bound_model_code")
     private String boundModelCode;
 
-    @TableField("bound_record_id")
-    private Long boundRecordId;
+    @TableField("bound_record_pid")
+    private String boundRecordPid;
 
     @TableField("conductor_agent_id")
     private Long conductorAgentId;

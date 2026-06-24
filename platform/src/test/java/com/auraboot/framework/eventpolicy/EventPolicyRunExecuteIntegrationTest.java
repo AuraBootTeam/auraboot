@@ -74,7 +74,7 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
                  "left":{"type":"path","scope":"record","path":"data.priority","dataType":"enum"},
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
               "actions":[{"type":"TEST_NOTIFY","target":"ROLE:mgr","order":10,"payload":{},
-                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordId}:${rule.ruleCode}:NOTIFY"}]}]
+                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:NOTIFY"}]}]
             """;
         JsonNode rulesJson = mapper.readTree(rules);
         DrtPolicyVersionEntity draft = versionService.createDraft(
@@ -87,7 +87,7 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
     }
 
     private Map<String, Map<String, Object>> ctx(String targetKey, String priority) {
-        return Map.of("record", Map.of("entityCode", targetKey, "recordId", "CMP-RX-1",
+        return Map.of("record", Map.of("entityCode", targetKey, "recordPid", "CMP-RX-1",
                 "data", Map.of("priority", priority)));
     }
 

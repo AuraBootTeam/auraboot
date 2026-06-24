@@ -355,8 +355,6 @@ CREATE TABLE public.ab_agent_action (
     business_domain character varying(50),
     business_operation character varying(100),
     target_model character varying(100) NOT NULL,
-    target_record_id character varying(26),
-    target_record_ids jsonb,
     affected_count integer DEFAULT 1,
     before_snapshot jsonb,
     after_snapshot jsonb,
@@ -391,6 +389,8 @@ CREATE TABLE public.ab_agent_action (
     parallel_index integer,
     actual_effects jsonb,
     rejected_by jsonb,
+    target_record_pid character varying(64),
+    target_record_pids jsonb,
     CONSTRAINT ab_agent_action_actual_effects_check CHECK (((actual_effects IS NULL) OR public.valid_effect_class_array(actual_effects)))
 );
 
@@ -2227,14 +2227,14 @@ CREATE TABLE public.ab_ai_action_audit_log (
     action_type character varying(50) NOT NULL,
     command_code character varying(200),
     model_code character varying(200),
-    record_id character varying(64),
     risk_level character varying(10) DEFAULT 'low'::character varying NOT NULL,
     user_decision character varying(20) NOT NULL,
     execution_result character varying(20),
     error_message text,
     reasoning text,
     payload jsonb,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    record_pid character varying(64)
 );
 
 
@@ -2787,7 +2787,6 @@ CREATE TABLE public.ab_automation_debug_session (
     pid character varying(26) NOT NULL,
     tenant_id bigint NOT NULL,
     automation_id character varying(26) NOT NULL,
-    record_id character varying(255),
     status character varying(20) DEFAULT 'paused'::character varying NOT NULL,
     current_action_index integer DEFAULT 0 NOT NULL,
     breakpoints jsonb DEFAULT '[]'::jsonb,
@@ -2797,7 +2796,8 @@ CREATE TABLE public.ab_automation_debug_session (
     error_message text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    created_by character varying(100)
+    created_by character varying(100),
+    record_pid character varying(255)
 );
 
 
@@ -2893,7 +2893,6 @@ CREATE TABLE public.ab_automation_log (
     tenant_id bigint NOT NULL,
     automation_id character varying(26) NOT NULL,
     trigger_type character varying(50),
-    trigger_record_id character varying(26),
     trigger_payload jsonb,
     status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
     started_at timestamp with time zone,
@@ -2901,6 +2900,7 @@ CREATE TABLE public.ab_automation_log (
     error_message text,
     action_results jsonb,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    trigger_record_pid character varying(64),
     CONSTRAINT chk_automation_log_status CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'running'::character varying, 'success'::character varying, 'failed'::character varying, 'skipped'::character varying])::text[])))
 );
 
@@ -6207,9 +6207,9 @@ CREATE TABLE public.ab_email_record_link (
     message_id bigint,
     thread_id character varying(255),
     model_code character varying(100) NOT NULL,
-    record_id character varying(100) NOT NULL,
     link_type character varying(20) DEFAULT 'auto'::character varying NOT NULL,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    record_pid character varying(100) NOT NULL
 );
 
 
@@ -6255,13 +6255,13 @@ CREATE TABLE public.ab_email_sequence_enrollment (
     account_id bigint NOT NULL,
     contact_email character varying(255) NOT NULL,
     model_code character varying(100),
-    record_id character varying(100),
     current_step integer DEFAULT 0 NOT NULL,
     status character varying(20) DEFAULT 'active'::character varying NOT NULL,
     next_send_at timestamp with time zone,
     enrolled_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     completed_at timestamp with time zone,
-    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    record_pid character varying(100)
 );
 
 
@@ -6926,7 +6926,8 @@ CREATE TABLE public.ab_field_change_log (
     tenant_id bigint NOT NULL,
     audit_trail_id bigint,
     model_code character varying(255) NOT NULL,
-    record_id bigint NOT NULL,
+    record_id bigint,
+    record_pid character varying(64),
     command_code character varying(255),
     field_code character varying(255) NOT NULL,
     field_label character varying(255),
@@ -7697,9 +7698,9 @@ CREATE TABLE public.ab_im_conversation (
     conductor_agent_id bigint,
     ai_context_window integer DEFAULT 50 NOT NULL,
     bound_model_code character varying(100),
-    bound_record_id bigint,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    bound_record_pid character varying(64)
 );
 
 
@@ -7994,7 +7995,6 @@ CREATE TABLE public.ab_inbox_item (
     source_type character varying(64),
     source_id character varying(128),
     model_code character varying(100),
-    record_id bigint,
     card_payload jsonb,
     action_taken character varying(64),
     acted_at timestamp with time zone,
@@ -8003,7 +8003,8 @@ CREATE TABLE public.ab_inbox_item (
     read_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     expires_at timestamp with time zone,
-    client_item_id character varying(128)
+    client_item_id character varying(128),
+    record_pid character varying(64)
 );
 
 
@@ -11769,6 +11770,7 @@ ALTER TABLE public.ab_reconciliation_run ALTER COLUMN id ADD GENERATED BY DEFAUL
 
 CREATE TABLE public.ab_record_comment (
     id bigint NOT NULL,
+    pid character varying(26) NOT NULL,
     tenant_id bigint NOT NULL,
     model_code character varying(100) NOT NULL,
     record_pid character varying(26) NOT NULL,
@@ -13688,7 +13690,8 @@ CREATE TABLE public.ab_watch (
     tenant_id bigint NOT NULL,
     user_id bigint NOT NULL,
     model_code character varying(100) NOT NULL,
-    record_id bigint NOT NULL,
+    record_id bigint,
+    record_pid character varying(64),
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
@@ -19885,14 +19888,6 @@ ALTER TABLE ONLY public.ab_user_data_domain
 
 
 --
--- Name: ab_watch uq_watch; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.ab_watch
-    ADD CONSTRAINT uq_watch UNIQUE (tenant_id, user_id, model_code, record_id);
-
-
---
 -- Name: email_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -21503,6 +21498,13 @@ CREATE INDEX idx_automation_log_status ON public.ab_automation_log USING btree (
 
 
 --
+-- Name: idx_automation_log_trigger_record_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_automation_log_trigger_record_pid ON public.ab_automation_log USING btree (tenant_id, trigger_record_pid) WHERE (trigger_record_pid IS NOT NULL);
+
+
+--
 -- Name: idx_automation_model_code; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -22525,6 +22527,13 @@ CREATE INDEX idx_email_enrollment_due ON public.ab_email_sequence_enrollment USI
 
 
 --
+-- Name: idx_email_enrollment_record_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_email_enrollment_record_pid ON public.ab_email_sequence_enrollment USING btree (tenant_id, model_code, record_pid) WHERE (record_pid IS NOT NULL);
+
+
+--
 -- Name: idx_email_message_assigned; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -22560,10 +22569,10 @@ CREATE INDEX idx_email_message_thread ON public.ab_email_message USING btree (te
 
 
 --
--- Name: idx_email_record_link_record; Type: INDEX; Schema: public; Owner: -
+-- Name: idx_email_record_link_record_pid; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE INDEX idx_email_record_link_record ON public.ab_email_record_link USING btree (tenant_id, model_code, record_id);
+CREATE INDEX idx_email_record_link_record_pid ON public.ab_email_record_link USING btree (tenant_id, model_code, record_pid);
 
 
 --
@@ -22711,6 +22720,13 @@ CREATE INDEX idx_field_change_field ON public.ab_field_change_log USING btree (t
 --
 
 CREATE INDEX idx_field_change_model_record ON public.ab_field_change_log USING btree (tenant_id, model_code, record_id);
+
+
+--
+-- Name: idx_field_change_model_record_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_field_change_model_record_pid ON public.ab_field_change_log USING btree (tenant_id, model_code, record_pid);
 
 
 --
@@ -22956,6 +22972,13 @@ CREATE INDEX idx_inbound_message_tenant_created ON public.ab_inbound_message USI
 --
 
 CREATE UNIQUE INDEX idx_inbox_item_dedup ON public.ab_inbox_item USING btree (tenant_id, client_item_id) WHERE (client_item_id IS NOT NULL);
+
+
+--
+-- Name: idx_inbox_item_record_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_inbox_item_record_pid ON public.ab_inbox_item USING btree (tenant_id, model_code, record_pid) WHERE (record_pid IS NOT NULL);
 
 
 --
@@ -24646,6 +24669,13 @@ CREATE INDEX idx_watch_record ON public.ab_watch USING btree (tenant_id, model_c
 
 
 --
+-- Name: idx_watch_record_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_watch_record_pid ON public.ab_watch USING btree (tenant_id, model_code, record_pid);
+
+
+--
 -- Name: idx_watch_user; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -24828,10 +24858,10 @@ CREATE UNIQUE INDEX uk_ab_behavior_outcome_outbox_tenant_event ON public.ab_beha
 
 
 --
--- Name: uk_ab_im_conv_bound; Type: INDEX; Schema: public; Owner: -
+-- Name: uk_ab_im_conv_bound_pid; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX uk_ab_im_conv_bound ON public.ab_im_conversation USING btree (tenant_id, bound_model_code, bound_record_id) WHERE (bound_model_code IS NOT NULL);
+CREATE UNIQUE INDEX uk_ab_im_conv_bound_pid ON public.ab_im_conversation USING btree (tenant_id, bound_model_code, bound_record_pid) WHERE ((bound_model_code IS NOT NULL) AND (bound_record_pid IS NOT NULL));
 
 
 --
@@ -25245,6 +25275,27 @@ CREATE UNIQUE INDEX uq_user_soul_profile_active ON public.ab_agent_user_soul_pro
 --
 
 CREATE UNIQUE INDEX user_name_idx ON public.ab_user USING btree (user_name) WHERE (deleted_flag = false);
+
+
+--
+-- Name: ux_ab_record_comment_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_ab_record_comment_pid ON public.ab_record_comment USING btree (pid);
+
+
+--
+-- Name: ux_ab_watch_record_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_ab_watch_record_id ON public.ab_watch USING btree (tenant_id, user_id, model_code, record_id) WHERE (record_id IS NOT NULL);
+
+
+--
+-- Name: ux_ab_watch_record_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_ab_watch_record_pid ON public.ab_watch USING btree (tenant_id, user_id, model_code, record_pid) WHERE (record_pid IS NOT NULL);
 
 
 --

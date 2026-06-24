@@ -15,7 +15,7 @@ import java.util.Map;
  * Production {@code UPDATE_RECORD} / {@code PATCH_RECORD} {@link ActionHandler} (docs/2.md §7):
  * updates fields on the event's record via the platform {@link DynamicDataService} when a policy rule
  * matches — the most common policy side effect (e.g. set status=ESCALATED). The record
- * (modelCode/recordId) is read from the decision context; the fields come from {@code payload.fields}.
+ * (modelCode/recordPid) is read from the decision context; the fields come from {@code payload.fields}.
  * Additive — no change to the dynamic-data subsystem; {@code update} applies a partial field map
  * (PATCH semantics), so both action types map to it.
  */
@@ -35,18 +35,18 @@ public class UpdateRecordActionHandler implements ActionHandler {
     @SuppressWarnings("unchecked")
     public void execute(ResolvedActionPlan plan, DecisionContext context) {
         String modelCode = resolveString(context, "entityCode");
-        String recordId = resolveString(context, "recordId");
-        if (modelCode == null || recordId == null) {
+        String recordPid = resolveString(context, "recordPid");
+        if (modelCode == null || recordPid == null) {
             throw new IllegalStateException(
-                    "UPDATE_RECORD requires record.entityCode + record.recordId in the context; got model="
-                            + modelCode + ", record=" + recordId);
+                    "UPDATE_RECORD requires record.entityCode + record.recordPid in the context; got model="
+                            + modelCode + ", record=" + recordPid);
         }
         Map<String, Object> payload = plan.payload() != null ? plan.payload() : Map.of();
         Object fieldsObj = payload.get("fields");
         if (!(fieldsObj instanceof Map<?, ?> fields) || fields.isEmpty()) {
             throw new IllegalArgumentException("UPDATE_RECORD requires a non-empty payload.fields object");
         }
-        dynamicDataService.update(modelCode, recordId, (Map<String, Object>) fields);
+        dynamicDataService.update(modelCode, recordPid, (Map<String, Object>) fields);
     }
 
     private static String resolveString(DecisionContext context, String field) {

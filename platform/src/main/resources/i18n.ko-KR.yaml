@@ -221,8 +221,8 @@ automation:
     validationMode.none: 검증 없음
     validationMode.signature: 서명 검증
     validationMode.token: 토큰 검증
-    recordId: 레코드 ID
-    recordId.desc: "표현식 참조 지원 (예: ${trigger.recordId})"
+    recordPid: 레코드 PID
+    recordPid.desc: 표현식 참조 지원 (예: ${trigger.recordPid})
     updateFields: 수정 필드
     updateFields.desc: 수정할 필드와 값 (JSON 형식)
     createFields: 레코드 필드

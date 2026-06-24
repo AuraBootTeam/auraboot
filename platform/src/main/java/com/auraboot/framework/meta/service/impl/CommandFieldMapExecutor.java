@@ -135,20 +135,21 @@ public class CommandFieldMapExecutor {
                 int deleted = dynamicDataMapper.delete(tableName, conditions);
                 results.put(targetModel + "_deleted", deleted);
             } else {
-                // Defense: reject delete/update without targetRecordId.
+                // Defense: reject delete/update without targetRecordPid.
                 // Without this guard the code falls through to INSERT and silently
                 // creates a blank row (only DB NOT NULL constraints catch it, by accident).
                 if ("delete".equalsIgnoreCase(operationType)) {
                     throw new BusinessException(ResponseCode.BadParam,
-                            "targetRecordId is required for delete operations");
+                            "targetRecordPid is required for delete operations");
                 }
                 if ("update".equalsIgnoreCase(operationType)) {
                     throw new BusinessException(ResponseCode.BadParam,
-                            "targetRecordId is required for update operations");
+                            "targetRecordPid is required for update operations");
                 }
                 // Default: INSERT - generate pid and set audit timestamps for new records
+                String newPid = UniqueIdGenerator.generate();
                 Instant now = Instant.now();
-                columnData.put("pid", UniqueIdGenerator.generate());
+                columnData.put("pid", newPid);
                 columnData.putIfAbsent("created_at", now);
                 columnData.putIfAbsent("updated_at", now);
                 // Populate record ownership so row-level data scoping (self/department)
@@ -163,6 +164,7 @@ public class CommandFieldMapExecutor {
                         ? dynamicDataMapper.insert(tableName, columnData)
                         : dynamicDataMapper.insertWithJsonb(tableName, columnData, jsonbCols);
                 results.put(targetModel + "_inserted", inserted);
+                results.put("recordPid", newPid);
             }
         }
 
@@ -304,16 +306,16 @@ public class CommandFieldMapExecutor {
             results.put(modelCode + "_deleted", deleted);
             log.info("Implicit FIELD_MAP DELETE: {} rows in {} (command={})", deleted, modelCode, command.getCode());
         } else {
-            // Defense: reject delete/update without targetRecordId.
+            // Defense: reject delete/update without targetRecordPid.
             // Without this guard the code falls through to INSERT and silently
             // creates a blank row (only DB NOT NULL constraints catch it, by accident).
             if ("delete".equalsIgnoreCase(operationType)) {
                 throw new BusinessException(ResponseCode.BadParam,
-                        "targetRecordId is required for delete operations");
+                        "targetRecordPid is required for delete operations");
             }
             if ("update".equalsIgnoreCase(operationType) || "state_transition".equalsIgnoreCase(operationType)) {
                 throw new BusinessException(ResponseCode.BadParam,
-                        "targetRecordId is required for update operations");
+                        "targetRecordPid is required for update operations");
             }
             // INSERT: generate pid and set audit timestamps for new records
             String newPid = UniqueIdGenerator.generate();
@@ -332,7 +334,7 @@ public class CommandFieldMapExecutor {
                     ? dynamicDataMapper.insert(tableName, columnData)
                     : dynamicDataMapper.insertWithJsonb(tableName, columnData, jsonbColumns);
             results.put(modelCode + "_inserted", inserted);
-            results.put("recordId", newPid);
+            results.put("recordPid", newPid);
             log.info("Implicit FIELD_MAP INSERT: {} rows in {} (pid={}, command={})", inserted, modelCode, newPid, command.getCode());
         }
 

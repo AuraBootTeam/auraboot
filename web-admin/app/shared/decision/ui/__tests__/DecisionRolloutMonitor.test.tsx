@@ -223,7 +223,7 @@ describe('DecisionRolloutMonitor', () => {
     });
     fireEvent.change(screen.getByLabelText('rollout-percentage'), { target: { value: '5' } });
     fireEvent.change(screen.getByLabelText('rollout-routing-key'), {
-      target: { value: 'recordId' },
+      target: { value: 'recordPid' },
     });
     fireEvent.change(screen.getByLabelText('rollout-cohort-routing-keys'), {
       target: { value: 'record-1, record-2' },
@@ -247,7 +247,7 @@ describe('DecisionRolloutMonitor', () => {
           traceIdPrefix: ['vip-', 'beta-'],
         },
         segment: { tenantSegments: ['early', 'beta'] },
-        routingKeyExpr: 'recordId',
+        routingKeyExpr: 'recordPid',
         salt: 'stable-salt',
       }),
     );

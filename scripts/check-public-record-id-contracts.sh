@@ -6,3 +6,4 @@ node scripts/validate-public-record-id-contracts.mjs \
   --baseline=scripts/public-record-id-baseline.json
 
 node --test scripts/validate-public-record-id-contracts.test.mjs
+node --test scripts/check-public-record-openapi-contract.test.mjs

@@ -75,8 +75,8 @@ public class AutomationProcessRuntime {
      * per-node action specs travel via the {@code _automation_actions} process
      * variable consumed by {@link AutomationActionServiceTaskDelegate}.
      */
-    public void run(Automation automation, String recordId, Map<String, Object> triggerPayload) {
-        run(automation, recordId, triggerPayload, null);
+    public void run(Automation automation, String recordPid, Map<String, Object> triggerPayload) {
+        run(automation, recordPid, triggerPayload, null);
     }
 
     /**
@@ -88,7 +88,7 @@ public class AutomationProcessRuntime {
      * <p>Passing {@code null} disables per-node recording — useful for synthetic /
      * test contexts that have no log row.
      */
-    public void run(Automation automation, String recordId,
+    public void run(Automation automation, String recordPid,
                     Map<String, Object> triggerPayload, Long automationLogId) {
         AutomationFlowCompiler.CompiledFlow compiled = compiler.compile(automation);
 
@@ -96,8 +96,8 @@ public class AutomationProcessRuntime {
         if (triggerPayload != null) {
             variables.putAll(triggerPayload);
         }
-        if (recordId != null) {
-            variables.put("recordId", recordId);
+        if (recordPid != null) {
+            variables.put("recordPid", recordPid);
         }
         variables.put(AutomationActionServiceTaskDelegate.ACTIONS_VAR, compiled.actionsByNodeId());
         if (automationLogId != null) {
@@ -127,7 +127,7 @@ public class AutomationProcessRuntime {
         PersisterSession.create();
         StorageModeHolder.set(com.auraboot.smart.framework.engine.storage.StorageMode.CUSTOM);
         try {
-            processEngineService.startProcess(compiled.processKey(), recordId, variables);
+            processEngineService.startProcess(compiled.processKey(), recordPid, variables);
         } finally {
             StorageModeHolder.clear();
             PersisterSession.destroySession();

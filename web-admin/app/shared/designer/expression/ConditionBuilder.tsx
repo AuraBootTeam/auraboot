@@ -48,7 +48,7 @@ export function ConditionBuilder({ group, fields, onChange }: ConditionBuilderPr
   return (
     <div data-testid="condition-builder">
       {group.conditions.map((row, index) => (
-        <React.Fragment key={row.id}>
+        <React.Fragment key={`${row.field || 'condition'}-${index}`}>
           <ConditionRow
             row={row}
             fields={fields}

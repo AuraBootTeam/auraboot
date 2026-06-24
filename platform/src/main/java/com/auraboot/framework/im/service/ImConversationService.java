@@ -50,7 +50,7 @@ public interface ImConversationService {
      * Find object conversation bound to a specific business record.
      * Returns null if not found. Does NOT auto-create.
      */
-    ImConversation findByBoundRecord(String modelCode, Long recordId, Long tenantId);
+    ImConversation findByBoundRecord(String modelCode, String recordPid, Long tenantId);
 
     /**
      * List conversations for a user, optionally filtered by type.

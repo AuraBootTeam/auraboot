@@ -141,7 +141,7 @@ export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesigner
     stringValue(block?.policyCode) ??
     stringValue(record.policyCode) ??
     stringValue(record.policy_code) ??
-    stringValue(params.recordId);
+    stringValue(params.recordPid);
   const [catalogFields, setCatalogFields] = useState<FieldOption[]>([]);
   const fields = configuredFields ?? mergeFieldOptions(catalogFields, DEFAULT_FIELDS);
   const [policy, setPolicy] = useState<EventPolicySummary | null>(null);

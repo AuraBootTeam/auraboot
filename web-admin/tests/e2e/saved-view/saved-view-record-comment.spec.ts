@@ -33,7 +33,10 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     expect(resp.ok()).toBeTruthy();
     const body = await resp.json();
     expect(body.data?.content).toBe(comment);
-    expect(body.data?.id).toBeTruthy();
+    expect(body.data?.commentPid).toBeTruthy();
+    expect(body.data?.actorName).toBeTruthy();
+    expect(body.data?.id).toBeUndefined();
+    expect(body.data?.created_by).toBeUndefined();
   });
 
   test('RC-002: list comments for a record', async ({ page }) => {
@@ -60,6 +63,9 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     const comments = (await resp.json()).data;
     expect(Array.isArray(comments)).toBe(true);
     expect(comments.length).toBeGreaterThan(0);
+    expect(comments[0]?.commentPid).toBeTruthy();
+    expect(comments[0]?.id).toBeUndefined();
+    expect(comments[0]?.created_by).toBeUndefined();
   });
 
   test('RC-003: edit a comment shows edited flag', async ({ page }) => {
@@ -77,12 +83,12 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     const addResp = await page.request.post(`/api/records/e2et_order/${recordPid}/comments`, {
       data: { content: `Original ${uniqueId()}` },
     });
-    const commentId = (await addResp.json()).data?.id;
-    expect(commentId).toBeTruthy();
+    const commentPid = (await addResp.json()).data?.commentPid;
+    expect(commentPid).toBeTruthy();
 
     // Edit
     const editResp = await page.request.put(
-      `/api/records/e2et_order/${recordPid}/comments/${commentId}`,
+      `/api/records/e2et_order/${recordPid}/comments/${commentPid}`,
       {
         data: { content: 'Edited content' },
       },
@@ -108,18 +114,19 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     const addResp = await page.request.post(`/api/records/e2et_order/${recordPid}/comments`, {
       data: { content: `Delete me ${uniqueId()}` },
     });
-    const commentId = (await addResp.json()).data?.id;
+    const commentPid = (await addResp.json()).data?.commentPid;
+    expect(commentPid).toBeTruthy();
 
     // Delete
     const delResp = await page.request.delete(
-      `/api/records/e2et_order/${recordPid}/comments/${commentId}`,
+      `/api/records/e2et_order/${recordPid}/comments/${commentPid}`,
     );
     expect(delResp.ok()).toBeTruthy();
 
     // Verify it's gone (soft-deleted)
     const listAfter = await page.request.get(`/api/records/e2et_order/${recordPid}/comments`);
     const remaining = (await listAfter.json()).data;
-    const found = (remaining as any[]).find((c: any) => c.id === commentId);
+    const found = (remaining as any[]).find((c: any) => c.commentPid === commentPid);
     expect(found).toBeFalsy();
   });
 
@@ -139,6 +146,11 @@ test.describe('Record Comment & Activity History (GAP-123)', () => {
     expect(resp.ok()).toBeTruthy();
     const activity = (await resp.json()).data;
     expect(Array.isArray(activity)).toBe(true);
+    if (activity.length > 0) {
+      expect(activity[0]?.activityPid).toBeTruthy();
+      expect(activity[0]?.id).toBeUndefined();
+      expect(activity[0]?.actor_id).toBeUndefined();
+    }
   });
 
   test('RC-006: comment with @mentions', async ({ page }) => {

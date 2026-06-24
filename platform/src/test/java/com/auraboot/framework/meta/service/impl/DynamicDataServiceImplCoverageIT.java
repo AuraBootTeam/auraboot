@@ -362,7 +362,7 @@ class DynamicDataServiceImplCoverageIT {
     // ==================== executeCustomAction ====================
 
     @Test
-    @DisplayName("executeCustomAction: count, unsupported-action and truncate (with re-seed restore)")
+    @DisplayName("executeCustomAction: count and unsupported actions")
     void executeCustomActionBranches() {
         // count — read-only aggregate over the model's own physical table
         ActionExecutionResult count = dynamicDataService.executeCustomAction(modelCode, "count", Map.of());
@@ -375,12 +375,11 @@ class DynamicDataServiceImplCoverageIT {
         assertNotNull(unknown);
         assertFalse(unknown.getSuccess());
 
-        // truncate — deletes all tenant rows; re-seed afterward so shared state stays test-order independent
+        // truncate — destructive bulk actions are intentionally not part of this public custom-action surface
         ActionExecutionResult truncate = dynamicDataService.executeCustomAction(modelCode, "truncate", Map.of());
         assertNotNull(truncate);
-        assertTrue(truncate.getSuccess(), "truncate action should succeed");
-        assertNotNull(truncate.getResultData().get("deletedCount"));
-        seedData(9);
+        assertFalse(truncate.getSuccess());
+        assertTrue(truncate.getErrorMessage().contains("Unsupported action"));
     }
 
     // ==================== relation methods (no relations defined -> reject) ====================

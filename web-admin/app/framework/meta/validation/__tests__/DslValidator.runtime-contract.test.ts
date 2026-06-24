@@ -221,7 +221,7 @@ describe('DslValidator runtime contract compatibility', () => {
         dataSource: {
           type: 'api',
           endpoint: '/api/event-policy/definitions',
-          detailEndpoint: '/api/event-policy/definitions/{recordId}',
+          detailEndpoint: '/api/event-policy/definitions/{recordPid}',
           method: 'get',
         },
         skipFieldMeta: true,

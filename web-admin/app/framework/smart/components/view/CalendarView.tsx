@@ -28,9 +28,9 @@ export interface CalendarViewProps {
   /** Model code for data fetching */
   modelCode: string;
   /** Callback when an event (record) is clicked */
-  onEventClick?: (recordId: string) => void;
+  onEventClick?: (recordPid: string) => void;
   /** Callback when an event is moved (date changed via drag) */
-  onEventMove?: (recordId: string, newStart: string, newEnd: string | null) => void;
+  onEventMove?: (recordPid: string, newStart: string, newEnd: string | null) => void;
   /** External filter conditions */
   linkageFilters?: FilterConfig[];
   /** Callback to open view configuration */
@@ -77,7 +77,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
     invalidDate: 0,
   });
   const [issueRecords, setIssueRecords] = useState<
-    Array<{ recordId: string; title: string; reason: string; details: Record<string, unknown> }>
+    Array<{ recordPid: string; title: string; reason: string; details: Record<string, unknown> }>
   >([]);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -155,7 +155,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           missingDate++;
           if (issues.length < 10)
             issues.push({
-              recordId: recordPid,
+              recordPid: recordPid,
               title: titleVal,
               reason: 'missing_date',
               details: { dateField, dateValue: dateVal },
@@ -166,7 +166,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           invalidDate++;
           if (issues.length < 10)
             issues.push({
-              recordId: recordPid,
+              recordPid: recordPid,
               title: titleVal,
               reason: 'invalid_date',
               details: { dateField, dateValue: dateVal },
@@ -227,9 +227,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   const handleEventClick = useCallback(
     (info: EventClickArg) => {
       const eventRecord = info.event.extendedProps as Record<string, unknown>;
-      const recordId = getLegacyCompatibleRecordPid(eventRecord) || info.event.id || '';
-      if (recordId) {
-        onEventClick?.(recordId);
+      const recordPid = getLegacyCompatibleRecordPid(eventRecord) || info.event.id || '';
+      if (recordPid) {
+        onEventClick?.(recordPid);
       }
     },
     [onEventClick],
@@ -238,11 +238,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
   // Handle event drag (date change)
   const handleEventDrop = useCallback(
     async (info: EventDropArg) => {
-      const recordId = info.event.id;
+      const recordPid = info.event.id;
       const newStart = info.event.startStr;
       const newEnd = info.event.endStr || null;
 
-      if (!dateField || !recordId) {
+      if (!dateField || !recordPid) {
         info.revert();
         return;
       }
@@ -255,8 +255,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({
           updateData[endDateField] = newEnd;
         }
 
-        await dynamicService.update(modelCode, recordId, updateData);
-        onEventMove?.(recordId, newStart, newEnd);
+        await dynamicService.update(modelCode, recordPid, updateData);
+        onEventMove?.(recordPid, newStart, newEnd);
       } catch {
         info.revert();
       }

@@ -157,7 +157,7 @@ function buildOverdueTaskAlert(): AutomationTemplate {
             config: {
               actionType: 'update_record',
               modelCode: 'task',
-              recordId: '${trigger.recordId}',
+              recordPid: '${trigger.recordPid}',
               fields: '{ "priority": "high" }',
             },
           },
@@ -426,7 +426,7 @@ function buildSlaBreachEscalation(): AutomationTemplate {
             config: {
               actionType: 'update_record',
               modelCode: 'support_ticket',
-              recordId: '${trigger.recordId}',
+              recordPid: '${trigger.recordPid}',
               fields: '{ "priority": "critical" }',
             },
           },

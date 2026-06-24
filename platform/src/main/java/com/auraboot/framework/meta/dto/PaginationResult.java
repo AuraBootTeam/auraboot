@@ -15,11 +15,11 @@ public class PaginationResult<T> {
 
     /**
      * Cursor for keyset pagination.
-     * Contains the last record's ID from this page.
+     * Contains the last record's public pid from this page.
      * Pass this value as the "cursor" parameter to fetch the next page.
      * Null when using traditional offset pagination or when there are no more results.
      */
-    private Long nextCursor;
+    private String nextCursor;
 
     public PaginationResult() {}
 
@@ -38,7 +38,7 @@ public class PaginationResult<T> {
     /**
      * Create a PaginationResult with keyset cursor.
      */
-    public static <T> PaginationResult<T> ofCursor(List<T> records, Long total, Integer pageSize, Long nextCursor) {
+    public static <T> PaginationResult<T> ofCursor(List<T> records, Long total, Integer pageSize, String nextCursor) {
         PaginationResult<T> result = new PaginationResult<>(records, total, 0, pageSize);
         result.setNextCursor(nextCursor);
         return result;

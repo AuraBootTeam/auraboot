@@ -165,7 +165,7 @@ class EmailSequenceExecutorProcessTest {
     @DisplayName("Send next step → emailSendService.send invoked + advances enrollment")
     void sendsNextStep_andAdvances() throws Exception {
         EmailSequenceEnrollment e = enrollment(4L, 8L, 0);
-        e.setRecordId("REC");
+        e.setRecordPid("REC");
         e.setModelCode("crm_contact");
         EmailAccount account = new EmailAccount();
         account.setId(8L);
@@ -173,7 +173,7 @@ class EmailSequenceExecutorProcessTest {
         when(accountMapper.selectById(8L)).thenReturn(account);
         when(messageMapper.countInboundFrom(anyLong(), anyString(), any())).thenReturn(0);
         when(stepMapper.findBySequenceId(99L)).thenReturn(List.of(
-                step(1, 0, "Hi {{email}}", "Hello {{recordId}}"),
+                step(1, 0, "Hi {{email}}", "Hello {{recordPid}}"),
                 step(2, 5, "Followup", "FU body")
         ));
 

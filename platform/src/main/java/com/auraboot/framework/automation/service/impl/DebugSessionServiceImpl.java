@@ -73,22 +73,17 @@ public class DebugSessionServiceImpl implements DebugSessionService {
             eventPublisher.closeSession(existing.getPid());
         }
 
-        // Build initial context
-        Map<String, Object> context = new HashMap<>();
-        if (request.getTriggerPayload() != null) {
-            context.putAll(request.getTriggerPayload());
-        }
-        if (request.getRecordId() != null) {
-            context.put("recordId", request.getRecordId());
-        }
-        context.put("automationPid", automationId);
-        context.put("debugMode", true);
+        // Build initial context. Action executors consume recordPid only.
+        Map<String, Object> context = buildInternalExecutionContext(
+                request.getTriggerPayload(),
+                request.getRecordPid(),
+                automationId);
 
         DebugSession session = new DebugSession();
         session.setPid(UniqueIdGenerator.generate());
         session.setTenantId(MetaContext.getCurrentTenantId());
         session.setAutomationId(automationId);
-        session.setRecordId(request.getRecordId());
+        session.setRecordPid(request.getRecordPid());
         session.setStatus("paused");
         session.setCurrentActionIndex(0);
         session.setBreakpoints(request.getBreakpoints() != null ? request.getBreakpoints() : List.of());
@@ -306,15 +301,10 @@ public class DebugSessionServiceImpl implements DebugSessionService {
         session.setErrorMessage(null);
 
         // Reset context to initial state
-        Map<String, Object> context = new HashMap<>();
-        if (session.getTriggerPayload() != null) {
-            context.putAll(session.getTriggerPayload());
-        }
-        if (session.getRecordId() != null) {
-            context.put("recordId", session.getRecordId());
-        }
-        context.put("automationPid", session.getAutomationId());
-        context.put("debugMode", true);
+        Map<String, Object> context = buildInternalExecutionContext(
+                session.getTriggerPayload(),
+                session.getRecordPid(),
+                session.getAutomationId());
         session.setExecutionContext(context);
 
         session.setUpdatedAt(Instant.now());
@@ -513,11 +503,38 @@ public class DebugSessionServiceImpl implements DebugSessionService {
         if (session.getExecutionContext() != null) {
             context.putAll(session.getExecutionContext());
         }
-        if (session.getRecordId() != null) {
-            context.putIfAbsent("recordId", session.getRecordId());
+        if (session.getRecordPid() != null) {
+            context.putIfAbsent("recordPid", session.getRecordPid());
         }
         context.putIfAbsent("automationPid", session.getAutomationId());
         context.putIfAbsent("debugMode", true);
+        return context;
+    }
+
+    private Map<String, Object> buildInternalExecutionContext(
+            Map<String, Object> triggerPayload,
+            String recordPid,
+            String automationId) {
+        Map<String, Object> context = new HashMap<>();
+        if (triggerPayload != null) {
+            context.putAll(triggerPayload);
+        }
+        if (recordPid != null) {
+            context.put("recordPid", recordPid);
+        }
+        context.put("automationPid", automationId);
+        context.put("debugMode", true);
+        return context;
+    }
+
+    private Map<String, Object> publicExecutionContext(DebugSession session) {
+        Map<String, Object> context = new HashMap<>();
+        if (session.getExecutionContext() != null) {
+            context.putAll(session.getExecutionContext());
+        }
+        if (session.getRecordPid() != null) {
+            context.put("recordPid", session.getRecordPid());
+        }
         return context;
     }
 
@@ -530,7 +547,7 @@ public class DebugSessionServiceImpl implements DebugSessionService {
                 .actionType(action != null ? action.getType() : null)
                 .actionLabel(action != null ? action.getLabel() : null)
                 .actionResult(result)
-                .context(session.getExecutionContext())
+                .context(publicExecutionContext(session))
                 .errorMessage(result != null ? result.getErrorMessage() : session.getErrorMessage())
                 .timestamp(Instant.now())
                 .build();
@@ -543,12 +560,12 @@ public class DebugSessionServiceImpl implements DebugSessionService {
                 .id(session.getId())
                 .pid(session.getPid())
                 .automationId(session.getAutomationId())
-                .recordId(session.getRecordId())
+                .recordPid(session.getRecordPid())
                 .status(session.getStatus())
                 .currentActionIndex(session.getCurrentActionIndex())
                 .totalActions(totalActions)
                 .breakpoints(session.getBreakpoints())
-                .executionContext(session.getExecutionContext())
+                .executionContext(publicExecutionContext(session))
                 .actionResults(session.getActionResults())
                 .triggerPayload(session.getTriggerPayload())
                 .errorMessage(session.getErrorMessage())

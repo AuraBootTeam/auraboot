@@ -95,13 +95,12 @@ export const CONTEXT_VARIABLES: FieldOption[] = [
   { code: '$page.modelCode', name: 'Page Model Code', category: 'string', group: '$page' },
   { code: '$page.pageKey', name: 'Page Key', category: 'string', group: '$page' },
   { code: '$page.mode', name: 'Page Mode (create/edit/view)', category: 'string', group: '$page' },
-  { code: '$page.recordId', name: 'Current Record ID', category: 'string', group: '$page' },
+  { code: '$page.recordPid', name: 'Current Record PID', category: 'string', group: '$page' },
 
   // $record — current row data (table row actions, detail pages)
-  { code: '$record.id', name: 'Record ID', category: 'string', group: '$record' },
   { code: '$record.pid', name: 'Record PID', category: 'string', group: '$record' },
 
   // $state — page state
   { code: '$state.filters', name: 'Active Filters', category: 'string', group: '$state' },
-  { code: '$state.selectedIds', name: 'Selected Row IDs', category: 'array', group: '$state' },
+  { code: '$state.selectedPids', name: 'Selected Row PIDs', category: 'array', group: '$state' },
 ];

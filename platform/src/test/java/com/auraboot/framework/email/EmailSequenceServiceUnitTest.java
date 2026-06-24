@@ -164,6 +164,7 @@ class EmailSequenceServiceUnitTest {
         assertThat(e.getSequenceId()).isEqualTo(40L);
         assertThat(e.getCurrentStep()).isEqualTo(0);
         assertThat(e.getStatus()).isEqualTo(EmailConstants.ENROLLMENT_ACTIVE);
+        assertThat(e.getRecordPid()).isEqualTo("REC1");
         assertThat(e.getEnrolledAt()).isNotNull();
         assertThat(e.getNextSendAt()).isAfter(e.getEnrolledAt().minusSeconds(1));
         verify(enrollmentMapper).insert(e);

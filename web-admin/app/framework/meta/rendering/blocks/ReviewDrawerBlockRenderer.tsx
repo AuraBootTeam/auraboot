@@ -485,7 +485,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
         ) || contextRecord
       : contextRecord;
   const selectedRecordKey = record
-    ? String(record.pid ?? record.id ?? record.bom_std_row_no ?? '')
+                      ? String(record.pid ?? record.bom_std_row_no ?? '')
     : '';
   const candidates = readDataSourceRows(runtime, candidateDataSource);
   const exportRows = readDataSourceRows(runtime, exportDataSource);
@@ -1025,7 +1025,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       <ol className="rounded-card border-border bg-panel divide-y divide-gray-100 border">
                         {exportRows.map((row: any, index: number) => (
                           <li
-                            key={String(row.pid ?? row.id ?? index)}
+                      key={String(row.pid ?? index)}
                             className="text-text-2 px-3 py-2 text-sm"
                           >
                             <span className="font-mono font-semibold">

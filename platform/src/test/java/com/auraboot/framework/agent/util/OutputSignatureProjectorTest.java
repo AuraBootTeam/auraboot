@@ -94,7 +94,7 @@ class OutputSignatureProjectorTest {
     // ========================================================================
 
     @Test
-    @DisplayName("command projection: same tool_ref + target_record_id + success across phases → same hash")
+    @DisplayName("command projection: same tool_ref + target_record_pid + success across phases -> same hash")
     void command_projection_equals_across_phases() {
         // Shadow-side returns phase_reached="COMPLETE"; original side carries
         // action_status="success". Different shape but same semantic outcome
@@ -102,7 +102,7 @@ class OutputSignatureProjectorTest {
         Map<String, Object> shadow = Map.of(
                 "command_code", "update_lead",
                 "phase_reached", "COMPLETE",
-                "data", Map.of("recordId", "LEAD-42"));
+                "data", Map.of("recordPid", "LEAD-42"));
         Map<String, Object> projShadow = OutputSignatureProjector.projectShadow("cmd_update_lead", shadow);
         Map<String, Object> projOrig = OutputSignatureProjector.projectOriginal(
                 "cmd_update_lead", "success", "LEAD-42", null, null);
@@ -112,8 +112,8 @@ class OutputSignatureProjectorTest {
     }
 
     @Test
-    @DisplayName("command projection: different target_record_id → different hash")
-    void command_projection_record_id_matters() {
+    @DisplayName("command projection: different target_record_pid -> different hash")
+    void command_projection_record_pid_matters() {
         Map<String, Object> projA = OutputSignatureProjector.projectOriginal(
                 "cmd_update_lead", "success", "LEAD-42", null, null);
         Map<String, Object> projB = OutputSignatureProjector.projectOriginal(
@@ -124,12 +124,12 @@ class OutputSignatureProjectorTest {
     }
 
     @Test
-    @DisplayName("command projection: null target_record_id matches null on both sides")
-    void command_projection_null_record_id_matches() {
+    @DisplayName("command projection: null target_record_pid matches null on both sides")
+    void command_projection_null_record_pid_matches() {
         Map<String, Object> shadow = new LinkedHashMap<>();
         shadow.put("command_code", "no_op");
         shadow.put("phase_reached", "COMPLETE");
-        shadow.put("data", Map.of());  // no recordId
+        shadow.put("data", Map.of());  // no recordPid
 
         Map<String, Object> projShadow = OutputSignatureProjector.projectShadow("cmd_no_op", shadow);
         Map<String, Object> projOrig = OutputSignatureProjector.projectOriginal(
@@ -148,7 +148,7 @@ class OutputSignatureProjectorTest {
         shadow.put("command_code", "cmd_x");
         shadow.put("phase_reached", "validation");
         shadow.put("success", false);
-        shadow.put("data", Map.of("recordId", "LEAD-42"));
+        shadow.put("data", Map.of("recordPid", "LEAD-42"));
 
         Map<String, Object> projExplicit = OutputSignatureProjector.projectShadow("cmd_x", shadow);
         assertThat(projExplicit.get("success")).isEqualTo(false);
@@ -157,7 +157,7 @@ class OutputSignatureProjectorTest {
         Map<String, Object> legacy = new LinkedHashMap<>();
         legacy.put("command_code", "cmd_x");
         legacy.put("phase_reached", "validation");
-        legacy.put("data", Map.of("recordId", "LEAD-42"));
+        legacy.put("data", Map.of("recordPid", "LEAD-42"));
         Map<String, Object> projLegacy = OutputSignatureProjector.projectShadow("cmd_x", legacy);
         assertThat(projLegacy.get("success")).isEqualTo(true);
     }

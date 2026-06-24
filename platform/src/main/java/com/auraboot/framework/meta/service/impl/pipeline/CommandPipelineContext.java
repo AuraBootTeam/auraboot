@@ -48,7 +48,7 @@ public class CommandPipelineContext {
     @Builder.Default
     private Map<String, List<BindingRule>> rulesByType = new HashMap<>();
 
-    /** Results from the FIELD_MAP phase (recordId, etc.) */
+    /** Results from the FIELD_MAP phase (recordPid, etc.) */
     @Builder.Default
     private Map<String, Object> fieldMapResults = new HashMap<>();
 

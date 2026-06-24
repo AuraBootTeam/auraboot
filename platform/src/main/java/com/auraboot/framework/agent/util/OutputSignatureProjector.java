@@ -101,9 +101,9 @@ public final class OutputSignatureProjector {
                 return queryProjection(toolRef, extractRecordCount(shadowResult));
             }
             if (isCommandTool(toolRef)) {
-                String recordId = extractCommandRecordId(shadowResult);
+                String recordPid = extractCommandRecordPid(shadowResult);
                 boolean success = extractCommandSuccess(shadowResult);
-                return commandProjection(toolRef, recordId, success);
+                return commandProjection(toolRef, recordPid, success);
             }
             return unknownProjection(toolRef, shadowResult);
         } catch (RuntimeException e) {
@@ -125,7 +125,7 @@ public final class OutputSignatureProjector {
      *                          is unreliable for legacy rows, and the draft's
      *                          declared tool_ref is what the shadow side used)
      * @param actionStatus      {@code ab_agent_action.action_status}
-     * @param targetRecordId    {@code ab_agent_action.target_record_id}; null for reads
+     * @param targetRecordPid   {@code ab_agent_action.target_record_pid}; null for reads
      * @param affectedCount     {@code ab_agent_action.affected_count}; for reads this
      *                          is the query result count
      * @param afterSnapshotJson raw {@code after_snapshot::text}; may be null for reads
@@ -133,7 +133,7 @@ public final class OutputSignatureProjector {
      */
     public static Map<String, Object> projectOriginal(String toolRef,
                                                       String actionStatus,
-                                                      String targetRecordId,
+                                                      String targetRecordPid,
                                                       Integer affectedCount,
                                                       String afterSnapshotJson) {
         try {
@@ -144,7 +144,7 @@ public final class OutputSignatureProjector {
             }
             if (isCommandTool(toolRef)) {
                 boolean success = "success".equals(actionStatus);
-                return commandProjection(toolRef, targetRecordId, success);
+                return commandProjection(toolRef, targetRecordPid, success);
             }
             // Unknown: hash the after_snapshot as a map if we can parse it; else fall back to empty.
             Map<String, Object> snapshot = parseSnapshot(afterSnapshotJson);
@@ -175,11 +175,11 @@ public final class OutputSignatureProjector {
         return out;
     }
 
-    private static Map<String, Object> commandProjection(String toolRef, String recordId, boolean success) {
+    private static Map<String, Object> commandProjection(String toolRef, String recordPid, boolean success) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("type", TYPE_COMMAND);
         out.put("tool_ref", toolRef);
-        out.put("target_record_id", recordId);     // may be null — both sides will match on null
+        out.put("target_record_pid", recordPid);     // may be null — both sides will match on null
         out.put("success", success);
         return out;
     }
@@ -209,20 +209,19 @@ public final class OutputSignatureProjector {
         return 0L;
     }
 
-    // TODO(record_ids): tighten query projection once ActionRecorder
-    // persists row IDs — see ActionRecorder#recordReadAction. Until then,
+    // TODO(record_pids): tighten query projection once ActionRecorder
+    // persists row pids — see ActionRecorder#recordReadAction. Until then,
     // the query projection can only compare record_count symmetrically.
 
-    private static String extractCommandRecordId(Map<String, Object> shadowResult) {
+    private static String extractCommandRecordPid(Map<String, Object> shadowResult) {
         if (shadowResult == null) return null;
         Object data = shadowResult.get("data");
         if (data instanceof Map<?, ?> m) {
-            Object v = m.get("recordId");
+            Object v = m.get("recordPid");
             if (v == null) v = m.get("pid");
-            if (v == null) v = m.get("id");
             if (v != null) return String.valueOf(v);
         }
-        Object direct = shadowResult.get("target_record_id");
+        Object direct = shadowResult.get("target_record_pid");
         return direct == null ? null : String.valueOf(direct);
     }
 

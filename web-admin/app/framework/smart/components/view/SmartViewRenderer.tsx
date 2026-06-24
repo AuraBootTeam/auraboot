@@ -37,19 +37,19 @@ export interface SmartViewRendererProps {
   /** Callback when a kanban card is moved */
   onCardMove?: (event: KanbanCardMoveEvent) => void;
   /** Callback when a calendar event (record) is clicked */
-  onEventClick?: (recordId: string) => void;
+  onEventClick?: (recordPid: string) => void;
   /** Callback when a calendar event is moved (date changed) */
-  onEventMove?: (recordId: string, newStart: string, newEnd: string | null) => void;
+  onEventMove?: (recordPid: string, newStart: string, newEnd: string | null) => void;
   /** Callback when a gallery card (record) is clicked */
-  onGalleryCardClick?: (recordId: string) => void;
+  onGalleryCardClick?: (recordPid: string) => void;
   /** Callback when a gantt task (record) is clicked */
-  onGanttTaskClick?: (recordId: string) => void;
+  onGanttTaskClick?: (recordPid: string) => void;
   /** Callback when a tree node (record) is clicked */
-  onTreeNodeClick?: (recordId: string) => void;
+  onTreeNodeClick?: (recordPid: string) => void;
   /** Callback when a gantt task date is changed */
-  onGanttTaskDateChange?: (recordId: string, start: string, end: string) => void;
+  onGanttTaskDateChange?: (recordPid: string, start: string, end: string) => void;
   /** Callback when a gantt task progress is changed */
-  onGanttTaskProgressChange?: (recordId: string, progress: number) => void;
+  onGanttTaskProgressChange?: (recordPid: string, progress: number) => void;
   /** Callback to open current view settings */
   onOpenViewConfig?: () => void;
   /** Callback to switch to table view */
@@ -58,7 +58,7 @@ export interface SmartViewRendererProps {
   linkageFilters?: FilterConfig[];
   /**
    * Optional page key. When provided, the kanban view persists card moves
-   * via PUT `/api/dynamic/{pageKey}/{recordId}` (matching the dynamic list
+   * via PUT `/api/dynamic/{pageKey}/{recordPid}` (matching the dynamic list
    * URL pattern); without it, the kanban stays purely optimistic. See
    * backlog 2026-05-08 Gap 2 — drag-to-stage persistence requires this
    * binding to the dynamic page contract.

@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
  * task-completion variables flow into the next request — so the userTask here is
  * completed with an <strong>empty</strong> variable map (mirroring a production operator
  * who does not re-pass {@code alarmEventPid}). The business key, persisted on the
- * {@link ProcessInstance}, must still drive {@code targetRecordId}.
+ * {@link ProcessInstance}, must still drive {@code targetRecordPid}.
  *
  * <p>The downstream command pipeline is mocked ({@link CommandExecutor}) so the assertion
  * isolates the F1 resolution behaviour; the full command→handler→DB chain is already
@@ -78,7 +78,7 @@ class CommandServiceTaskBusinessKeyContinuationIntegrationTest extends BaseInteg
                                   smart:class="commandServiceTaskDelegate"
                                   smart:commandCode="it_f1:clear"
                                   smart:operationType="update"
-                                  smart:targetRecordId="${processBusinessKey}">
+                                  smart:targetRecordPid="${processBusinessKey}">
                   <bpmn:incoming>f2</bpmn:incoming>
                   <bpmn:outgoing>f3</bpmn:outgoing>
                 </bpmn:serviceTask>
@@ -89,7 +89,7 @@ class CommandServiceTaskBusinessKeyContinuationIntegrationTest extends BaseInteg
             """;
 
     @Test
-    @DisplayName("serviceTask after userTask resolves targetRecordId from the persisted business key")
+    @DisplayName("serviceTask after userTask resolves targetRecordPid from the persisted business key")
     void serviceTaskAfterUserTaskResolvesTargetFromBusinessKey() {
         // The command pipeline is mocked: succeed and capture the request.
         when(commandExecutor.execute(eq("it_f1:clear"), any(CommandExecuteRequest.class)))
@@ -125,12 +125,12 @@ class CommandServiceTaskBusinessKeyContinuationIntegrationTest extends BaseInteg
         // the continuation request; only the persisted ProcessInstance.bizUniqueId remains.
         taskService.completeTask(handleTask.getInstanceId(), new HashMap<>());
 
-        // The serviceTask ran on continuation and resolved targetRecordId from the
+        // The serviceTask ran on continuation and resolved targetRecordPid from the
         // persisted business key — not from a (now absent) request variable.
         ArgumentCaptor<CommandExecuteRequest> captor = ArgumentCaptor.forClass(CommandExecuteRequest.class);
         org.mockito.Mockito.verify(commandExecutor).execute(eq("it_f1:clear"), captor.capture());
         assertThat(captor.getValue().getTargetRecordId())
-                .as("targetRecordId resolves from the persisted business key after the userTask")
+                .as("targetRecordPid resolves from the persisted business key after the userTask")
                 .isEqualTo(businessKey);
     }
 }

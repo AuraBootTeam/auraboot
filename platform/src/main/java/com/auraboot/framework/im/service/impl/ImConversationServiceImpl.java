@@ -67,12 +67,13 @@ public class ImConversationServiceImpl implements ImConversationService {
 
         // For OBJECT conversations, check if one already exists for this record
         if (ImConstants.TYPE_OBJECT.equals(request.getType())) {
-            if (request.getBoundModelCode() == null || request.getBoundRecordId() == null) {
+            if (request.getBoundModelCode() == null || request.getBoundRecordPid() == null
+                    || request.getBoundRecordPid().isBlank()) {
                 throw new IllegalArgumentException(
-                        "boundModelCode and boundRecordId are required for object conversations");
+                        "boundModelCode and boundRecordPid are required for object conversations");
             }
             ImConversation existing = findByBoundRecord(
-                    request.getBoundModelCode(), request.getBoundRecordId(), tenantId);
+                    request.getBoundModelCode(), request.getBoundRecordPid(), tenantId);
             if (existing != null) {
                 return existing;
             }
@@ -86,9 +87,9 @@ public class ImConversationServiceImpl implements ImConversationService {
 
         if (ImConstants.TYPE_OBJECT.equals(request.getType())) {
             conv.setBoundModelCode(request.getBoundModelCode());
-            conv.setBoundRecordId(request.getBoundRecordId());
+            conv.setBoundRecordPid(request.getBoundRecordPid());
             if (conv.getName() == null) {
-                conv.setName(request.getBoundModelCode() + " #" + request.getBoundRecordId());
+                conv.setName(request.getBoundModelCode() + " #" + request.getBoundRecordPid());
             }
         }
         conv.setMaxSeq(0L);
@@ -156,7 +157,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                     .name(conv.getName())
                     .avatarUrl(conv.getAvatarUrl())
                     .boundModelCode(conv.getBoundModelCode())
-                    .boundRecordId(conv.getBoundRecordId())
+                    .boundRecordPid(conv.getBoundRecordPid())
                     .conductorAgentId(conv.getConductorAgentId())
                     .aiContextWindow(conv.getAiContextWindow())
                     .aiEnabled(conv.getConductorAgentId() != null)
@@ -189,7 +190,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                 .name(conv.getName())
                 .avatarUrl(conv.getAvatarUrl())
                 .boundModelCode(conv.getBoundModelCode())
-                .boundRecordId(conv.getBoundRecordId())
+                .boundRecordPid(conv.getBoundRecordPid())
                 .conductorAgentId(conv.getConductorAgentId())
                 .aiContextWindow(conv.getAiContextWindow())
                 .aiEnabled(conv.getConductorAgentId() != null)
@@ -235,7 +236,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                 .name(conv.getName())
                 .avatarUrl(conv.getAvatarUrl())
                 .boundModelCode(conv.getBoundModelCode())
-                .boundRecordId(conv.getBoundRecordId())
+                .boundRecordPid(conv.getBoundRecordPid())
                 .conductorAgentId(conv.getConductorAgentId())
                 .aiContextWindow(conv.getAiContextWindow())
                 .aiEnabled(conv.getConductorAgentId() != null)
@@ -371,12 +372,12 @@ public class ImConversationServiceImpl implements ImConversationService {
     }
 
     @Override
-    public ImConversation findByBoundRecord(String modelCode, Long recordId, Long tenantId) {
+    public ImConversation findByBoundRecord(String modelCode, String recordPid, Long tenantId) {
         return conversationMapper.selectOne(
                 new QueryWrapper<ImConversation>()
                         .eq("tenant_id", tenantId)
                         .eq("bound_model_code", modelCode)
-                        .eq("bound_record_id", recordId));
+                        .eq("bound_record_pid", recordPid));
     }
 
     @Override

@@ -103,7 +103,7 @@ export interface EmailSequenceEnrollment {
   accountId: number;
   contactEmail: string;
   modelCode?: string;
-  recordId?: number;
+  recordPid?: string;
   currentStep: number;
   status: string; // 'active' | 'paused' | 'completed' | 'unsubscribed'
   nextSendAt?: string;
@@ -127,7 +127,7 @@ export interface CrmLink {
   id: number;
   messageId: number;
   modelCode: string;
-  recordId: number;
+  recordPid: string;
   recordName?: string;
   createdAt: string;
 }
@@ -301,11 +301,11 @@ export async function markMessageRead(messageId: number): Promise<void> {
 export async function linkToRecord(
   messageId: number,
   modelCode: string,
-  recordId: number,
+  recordPid: string,
 ): Promise<void> {
   await fetchResult(`${BASE}/messages/${messageId}/links`, {
     method: 'post',
-    params: { modelCode, recordId },
+    params: { modelCode, recordPid },
   });
 }
 
@@ -323,11 +323,11 @@ export async function unlinkRecord(messageId: number, linkId: number): Promise<v
  */
 export async function getMessagesByRecord(
   modelCode: string,
-  recordId: number,
+  recordPid: string,
 ): Promise<EmailMessage[]> {
   const result = await fetchResult<EmailMessage[]>(`${BASE}/messages/by-record`, {
     method: 'get',
-    params: { modelCode, recordId },
+    params: { modelCode, recordPid },
   });
   if (ResultHelper.isSuccess(result) && result.data) {
     return result.data;
@@ -494,7 +494,7 @@ export async function enrollContacts(
     accountId: number;
     contactEmail: string;
     modelCode?: string;
-    recordId?: number;
+    recordPid?: string;
   }>,
 ): Promise<void> {
   await fetchResult(`${BASE}/sequences/${sequenceId}/enroll`, {

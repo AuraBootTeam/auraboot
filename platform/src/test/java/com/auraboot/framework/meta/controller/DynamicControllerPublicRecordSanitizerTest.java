@@ -11,7 +11,11 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,6 +35,47 @@ class DynamicControllerPublicRecordSanitizerTest {
 
     @Mock
     private MetaModelService metaModelService;
+
+    @Test
+    void publicRecordRoutesUseRecordPidTemplates() throws NoSuchMethodException {
+        assertMappingUsesRecordPid(DynamicController.class.getMethod("getById", String.class, String.class));
+        assertMappingUsesRecordPid(DynamicController.class.getMethod(
+                "getRecordCapabilities", String.class, String.class, String.class, String.class));
+        assertMappingUsesRecordPid(DynamicController.class.getMethod(
+                "update", String.class, String.class, Map.class));
+        assertMappingUsesRecordPid(DynamicController.class.getMethod("delete", String.class, String.class));
+        assertMappingUsesRecordPid(DynamicController.class.getMethod(
+                "getRelationData", String.class, String.class, String.class));
+    }
+
+    @Test
+    void publicListCursorUsesPidToken() throws NoSuchMethodException {
+        Method listMethod = DynamicController.class.getMethod(
+                "list",
+                String.class,
+                Integer.class,
+                Integer.class,
+                String.class,
+                String.class,
+                String.class,
+                String.class,
+                String.class,
+                String.class,
+                String.class);
+
+        assertThat(listMethod.getParameterTypes()[9]).isEqualTo(String.class);
+    }
+
+    @Test
+    void paginationCursorAcceptsPublicPidToken() {
+        PaginationResult<Map<String, Object>> result = PaginationResult.ofCursor(
+                List.of(Map.of("pid", "rec-next")),
+                2L,
+                1,
+                "rec-next");
+
+        assertThat(result.getNextCursor()).isEqualTo("rec-next");
+    }
 
     @Test
     void listSanitizesPublicRecords() {
@@ -139,6 +184,28 @@ class DynamicControllerPublicRecordSanitizerTest {
     private static void assertPublicRecord(Map<String, Object> record, String pid) {
         assertThat(record).containsEntry("pid", pid);
         assertThat(record).doesNotContainKeys("id", "tenant_id", "created_by", "updated_by");
+    }
+
+    private static void assertMappingUsesRecordPid(Method method) {
+        String mapping = routeTemplate(method);
+        assertThat(mapping).contains("{recordPid}");
+        assertThat(mapping).doesNotContain("{recordId}");
+    }
+
+    private static String routeTemplate(Method method) {
+        GetMapping getMapping = method.getAnnotation(GetMapping.class);
+        if (getMapping != null) {
+            return String.join(",", getMapping.value());
+        }
+        PutMapping putMapping = method.getAnnotation(PutMapping.class);
+        if (putMapping != null) {
+            return String.join(",", putMapping.value());
+        }
+        DeleteMapping deleteMapping = method.getAnnotation(DeleteMapping.class);
+        if (deleteMapping != null) {
+            return String.join(",", deleteMapping.value());
+        }
+        throw new AssertionError("Missing route mapping on " + method.getName());
     }
 
     @SuppressWarnings("unchecked")

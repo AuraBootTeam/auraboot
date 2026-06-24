@@ -276,7 +276,7 @@ export default function TaskDetailDrawer({
       setActionLoading(action.commandCode);
       try {
         const result = await post<unknown>(`/api/meta/commands/execute/${action.commandCode}`, {
-          targetRecordId: task.pid,
+          targetRecordPid: task.pid,
           operationType: 'update',
         });
         if (ResultHelper.isSuccess(result)) {
@@ -300,7 +300,7 @@ export default function TaskDetailDrawer({
     setActionLoading('delete');
     try {
       const result = await post<unknown>('/api/meta/commands/execute/pm:delete_task', {
-        targetRecordId: task.pid,
+        targetRecordPid: task.pid,
         operationType: 'delete',
       });
       if (ResultHelper.isSuccess(result)) {

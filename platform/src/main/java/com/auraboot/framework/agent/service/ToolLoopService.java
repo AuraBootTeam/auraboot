@@ -1013,9 +1013,6 @@ public class ToolLoopService {
     private String extractRecordPidFromInput(Map<String, Object> input) {
         if (input == null) return null;
         Object pid = input.get("recordPid");
-        if (pid == null) pid = input.get("recordId");
-        if (pid == null) pid = input.get("pid");
-        if (pid == null) pid = input.get("id");
         return pid != null ? pid.toString() : null;
     }
 

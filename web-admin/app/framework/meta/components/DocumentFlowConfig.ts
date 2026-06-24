@@ -18,7 +18,7 @@ export interface DocumentFlowStep {
   /** Model code of this step's document */
   modelCode: string;
   /** Record ID of the related document (resolved at runtime) */
-  recordId?: string;
+  recordPid?: string;
   /** Step status: completed, current, upcoming, or skipped */
   status: 'completed' | 'current' | 'upcoming' | 'skipped';
   /** Field name to check for status display */
@@ -270,23 +270,23 @@ export function resolveFlowSteps(
     // Try to resolve the related record ID from the current record.
     // If this step's model has a refField mapping FROM the current model,
     // the current record may directly contain that reference value.
-    let recordId: string | undefined;
+    let recordPid: string | undefined;
 
     if (index === currentIndex) {
       // Current step: use the record's own ID
-      recordId = record.id || record.pid;
+    recordPid = record.pid;
     } else if (stepDef.refFields) {
       // Check if the current model has a ref field pointing to this step's model
       // (or vice versa)
       const refField = stepDef.refFields[modelCode];
       if (refField && record[refField]) {
-        recordId = String(record[refField]);
+        recordPid = String(record[refField]);
       }
     }
 
     // Also check if the current record has a field that references this step's model.
     // Common pattern: field named like `pe_{prefix}_{step_model_suffix}_id`
-    if (!recordId && index !== currentIndex) {
+    if (!recordPid && index !== currentIndex) {
       // Scan record fields for any that might reference this model
       for (const [key, value] of Object.entries(record)) {
         if (value && typeof value === 'string' && key.endsWith('_id')) {
@@ -305,7 +305,7 @@ export function resolveFlowSteps(
     return {
       label: stepDef.label,
       modelCode: stepDef.modelCode,
-      recordId,
+      recordPid,
       status,
       statusField: stepDef.statusField,
       statusValue,

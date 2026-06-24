@@ -66,11 +66,11 @@ class PostExecutionPhaseStartProcessTest {
         Map<String, Object> postAction = new HashMap<>();
         postAction.put("type", "start_process");
         postAction.put("processKey", "wd_leave_approval");
-        postAction.put("businessKey", "${recordId}");
+        postAction.put("businessKey", "${recordPid}");
         postAction.put("title", "${payload.wd_req_code}");
         Map<String, Object> variables = new HashMap<>();
         variables.put("days", "${payload.wd_req_days}");
-        variables.put("recordId", "${recordId}");
+        variables.put("recordPid", "${recordPid}");
         postAction.put("variables", variables);
         postAction.put("storeInstanceIdIn", "wd_req_process_instance");
 
@@ -103,11 +103,53 @@ class PostExecutionPhaseStartProcessTest {
                 eq("wd_leave_approval"), eq("rec-7"), varsCaptor.capture(), eq("WDLR-20260415-001"));
         Map<String, Object> sent = varsCaptor.getValue();
         assertThat(sent).containsEntry("days", 3);
-        assertThat(sent).containsEntry("recordId", "rec-7");
+        assertThat(sent).containsEntry("recordPid", "rec-7");
 
         // storeInstanceIdIn triggers an update on the record.
         ArgumentCaptor<Map<String, Object>> upd = ArgumentCaptor.forClass((Class) Map.class);
         verify(dynamicDataService).update(eq("wd_leave_request"), eq("rec-7"), upd.capture());
         assertThat(upd.getValue()).containsEntry("wd_req_process_instance", "proc-42");
+    }
+
+    @Test
+    void startProcess_resolvesRecordPidTemplates() {
+        ProcessInstance instance = org.mockito.Mockito.mock(ProcessInstance.class);
+        when(bpmIntegrationService.startBusinessProcess(
+                eq("wd_leave_approval"), eq("rec-8"), any(), eq("rec-8")))
+                .thenReturn(instance);
+
+        Map<String, Object> postAction = new HashMap<>();
+        postAction.put("type", "start_process");
+        postAction.put("processKey", "wd_leave_approval");
+        postAction.put("businessKey", "${recordPid}");
+        postAction.put("title", "${recordPid}");
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("recordPid", "${recordPid}");
+        postAction.put("variables", variables);
+
+        Map<String, Object> execConfig = new HashMap<>();
+        execConfig.put("postActions", List.of(postAction));
+
+        CommandDefinition command = new CommandDefinition();
+        command.setModelCode("wd_leave_request");
+
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setTargetRecordId("rec-8");
+
+        CommandPipelineContext ctx = CommandPipelineContext.builder()
+                .execConfig(execConfig)
+                .payload(Map.of())
+                .command(command)
+                .request(request)
+                .tenantId(1L)
+                .userId(1L)
+                .build();
+
+        phase.execute(ctx);
+
+        ArgumentCaptor<Map<String, Object>> varsCaptor = ArgumentCaptor.forClass((Class) Map.class);
+        verify(bpmIntegrationService).startBusinessProcess(
+                eq("wd_leave_approval"), eq("rec-8"), varsCaptor.capture(), eq("rec-8"));
+        assertThat(varsCaptor.getValue()).containsEntry("recordPid", "rec-8");
     }
 }

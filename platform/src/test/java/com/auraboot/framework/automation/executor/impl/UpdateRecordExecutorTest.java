@@ -49,19 +49,19 @@ class UpdateRecordExecutorTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void execute_withExplicitRecordId_updatesCorrectRecord() {
+    void execute_withExplicitRecordPid_updatesCorrectRecord() {
         when(dynamicDataService.update(any(), any(), any())).thenReturn(Map.of());
 
         AutomationAction action = buildAction(Map.of(
                 "modelCode", "crm_lead",
-                "recordId", "lead-123",
+                "recordPid", "lead-123",
                 "fields", Map.of("status", "qualified")
         ));
 
         Map<String, Object> result = (Map<String, Object>) executor.execute(action, Map.of());
 
         assertThat(result.get("success")).isEqualTo(true);
-        assertThat(result.get("recordId")).isEqualTo("lead-123");
+        assertThat(result.get("recordPid")).isEqualTo("lead-123");
         @SuppressWarnings("unchecked")
         Set<String> updatedFields = (Set<String>) result.get("updatedFields");
         assertThat(updatedFields).contains("status");
@@ -71,19 +71,19 @@ class UpdateRecordExecutorTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void execute_recordIdFromContext_usesContextRecordId() {
+    void execute_recordPidFromContext_usesContextRecordPid() {
         when(dynamicDataService.update(any(), any(), any())).thenReturn(Map.of());
 
         AutomationAction action = buildAction(Map.of(
                 "modelCode", "crm_lead",
                 "fields", Map.of("priority", "high")
         ));
-        Map<String, Object> context = Map.of("recordId", "ctx-record-789");
+        Map<String, Object> context = Map.of("recordPid", "ctx-record-789");
 
         Map<String, Object> result = (Map<String, Object>) executor.execute(action, context);
 
         assertThat(result.get("success")).isEqualTo(true);
-        assertThat(result.get("recordId")).isEqualTo("ctx-record-789");
+        assertThat(result.get("recordPid")).isEqualTo("ctx-record-789");
         verify(dynamicDataService).update(eq("crm_lead"), eq("ctx-record-789"), any());
     }
 
@@ -93,7 +93,7 @@ class UpdateRecordExecutorTest {
         when(dynamicDataService.update(any(), any(), any())).thenReturn(Map.of());
 
         Map<String, Object> context = new HashMap<>();
-        context.put("recordId", "rec-111");
+        context.put("recordPid", "rec-111");
         context.put("newStatus", "closed");
 
         AutomationAction action = buildAction(Map.of(
@@ -115,7 +115,7 @@ class UpdateRecordExecutorTest {
 
         Map<String, Object> record = Map.of("owner", "user-42");
         Map<String, Object> context = new HashMap<>();
-        context.put("recordId", "rec-200");
+        context.put("recordPid", "rec-200");
         context.put("record", record);
 
         AutomationAction action = buildAction(Map.of(
@@ -150,7 +150,7 @@ class UpdateRecordExecutorTest {
     void execute_emptyFields_throwsIllegalArgument() {
         AutomationAction action = buildAction(Map.of(
                 "modelCode", "crm_lead",
-                "recordId", "rec-001",
+                "recordPid", "rec-001",
                 "fields", Map.of()
         ));
 
@@ -163,7 +163,7 @@ class UpdateRecordExecutorTest {
     void execute_nullFields_throwsIllegalArgument() {
         Map<String, Object> config = new HashMap<>();
         config.put("modelCode", "crm_lead");
-        config.put("recordId", "rec-001");
+        config.put("recordPid", "rec-001");
         config.put("fields", null);
         AutomationAction action = buildAction(config);
 

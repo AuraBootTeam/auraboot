@@ -165,7 +165,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       action: {
         type: 'command',
         command: 'qo_quote_common:import_corrected_bom',
-        targetRecordId: '${form.pid}',
+        targetRecordPid: '${form.pid}',
         refresh: ['quoteRecomputeStatus', 'lines', 'quoteBomImports'],
       },
     } as unknown as ButtonConfig;
@@ -227,7 +227,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect((onError.mock.calls[0][0] as Error).message).toContain('BOM_PRICE_MISSING');
   });
 
-  it('uses an explicit command targetRecordId template from runtime context for nested toolbar actions', async () => {
+  it('uses an explicit command targetRecordPid template from runtime context for nested toolbar actions', async () => {
     fetchResultMock.mockResolvedValueOnce({ code: '0', data: { updated: 1 } });
 
     const loadData = vi.fn().mockResolvedValue(undefined);
@@ -249,7 +249,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       action: {
         type: 'command',
         command: 'qo_quote_common:compute_process_fee',
-        targetRecordId: '${form.pid}',
+        targetRecordPid: '${form.pid}',
       },
     } as unknown as ButtonConfig;
 
@@ -294,7 +294,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       action: {
         type: 'command',
         command: 'qo_quote_common:compute_process_fee',
-        targetRecordId: '${form.pid}',
+        targetRecordPid: '${form.pid}',
         refresh: ['processCostItems', 'lines', 'quoteSummary'],
       },
     } as unknown as ButtonConfig;
@@ -378,7 +378,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       action: {
         type: 'command',
         command: 'qo_quote_common:import_corrected_bom',
-        targetRecordId: '${form.pid}',
+        targetRecordPid: '${form.pid}',
         refresh: ['lines', 'quoteSummary'],
       },
     } as unknown as ButtonConfig;
@@ -436,7 +436,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       action: {
         type: 'command',
         command: 'qo_quote_common:import_corrected_bom',
-        targetRecordId: '${form.pid}',
+        targetRecordPid: '${form.pid}',
         refresh: ['lines', 'quoteBomImports', 'quoteSummary'],
       },
     } as unknown as ButtonConfig;
@@ -506,7 +506,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       action: {
         type: 'command',
         command: 'qo_quote_common:import_process_fee_rules',
-        targetRecordId: '${form.pid}',
+        targetRecordPid: '${form.pid}',
         refresh: ['processFeeMetrics', 'processFeeRuleHits', 'quoteSummary'],
       },
     } as unknown as ButtonConfig;
@@ -578,7 +578,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
         action: {
           type: 'command',
           command: 'qo_quote_common:import_process_fee_rules',
-          targetRecordId: '${form.pid}',
+          targetRecordPid: '${form.pid}',
           refresh: ['processFeeMetrics', 'processFeeRuleHits', 'quoteSummary'],
         },
       } as unknown as ButtonConfig;
@@ -643,7 +643,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
       action: {
         type: 'command',
         command: 'crm_customer_request_pcba_rfq:upload_source_attachment',
-        targetRecordId: '${form.pid}',
+        targetRecordPid: '${form.pid}',
         payload: {
           attachment_type: 'raw_bom',
         },

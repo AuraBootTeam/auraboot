@@ -150,7 +150,7 @@ export function BpmTaskDrawer({
   const form = useDslForm({
     pageKey: taskData?.formBinding?.formRef || '',
     enabled: hasForm,
-    recordId: taskData?.businessKey || undefined,
+    recordPid: taskData?.businessKey || undefined,
     initialValues: taskData?.processVariables || undefined,
     fieldPermissions: taskData?.formBinding?.fieldPermissions || undefined,
     permissionMode: (taskData?.formBinding?.permissionMode as any) || 'merge',

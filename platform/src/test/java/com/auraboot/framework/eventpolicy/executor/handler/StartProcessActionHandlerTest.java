@@ -35,26 +35,26 @@ class StartProcessActionHandlerTest {
 
     @Test
     void startsProcessWithBusinessKeyAndVariables() {
-        var record = Map.<String, Object>of("entityCode", "complaint", "recordId", "CMP-9");
+        var record = Map.<String, Object>of("entityCode", "complaint", "recordPid", "CMP-9");
         handler.execute(plan(Map.of("processDefinitionId", "approval_v1",
                 "variables", Map.of("level", "HIGH"))), ctx(record));
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> vars = ArgumentCaptor.forClass(Map.class);
         verify(processEngineService).startProcess(eq("approval_v1"), eq("CMP-9"), vars.capture());
-        assertThat(vars.getValue()).containsEntry("level", "HIGH").containsEntry("recordId", "CMP-9");
+        assertThat(vars.getValue()).containsEntry("level", "HIGH").containsEntry("recordPid", "CMP-9");
     }
 
     @Test
     void explicitBusinessKeyOverridesRecordId() {
-        var record = Map.<String, Object>of("recordId", "CMP-9");
+        var record = Map.<String, Object>of("recordPid", "CMP-9");
         handler.execute(plan(Map.of("processDefinitionId", "p1", "businessKey", "BK-1")), ctx(record));
         verify(processEngineService).startProcess(eq("p1"), eq("BK-1"), org.mockito.ArgumentMatchers.anyMap());
     }
 
     @Test
     void throwsWhenProcessDefinitionMissing() {
-        assertThatThrownBy(() -> handler.execute(plan(Map.of("variables", Map.of())), ctx(Map.of("recordId", "X"))))
+        assertThatThrownBy(() -> handler.execute(plan(Map.of("variables", Map.of())), ctx(Map.of("recordPid", "X"))))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

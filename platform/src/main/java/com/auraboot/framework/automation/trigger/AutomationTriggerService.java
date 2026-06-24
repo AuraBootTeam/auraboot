@@ -17,43 +17,43 @@ public interface AutomationTriggerService {
      * Handle record creation event
      *
      * @param modelCode model code
-     * @param recordId created record ID
+     * @param recordPid created record pid
      * @param recordData created record data
      */
-    void onRecordCreate(String modelCode, String recordId, Map<String, Object> recordData);
+    void onRecordCreate(String modelCode, String recordPid, Map<String, Object> recordData);
 
     /**
      * Handle record update event
      *
      * @param modelCode model code
-     * @param recordId updated record ID
+     * @param recordPid updated record pid
      * @param beforeData data before update
      * @param afterData data after update
      */
-    void onRecordUpdate(String modelCode, String recordId,
+    void onRecordUpdate(String modelCode, String recordPid,
                         Map<String, Object> beforeData, Map<String, Object> afterData);
 
     /**
      * Handle field change event
      *
      * @param modelCode model code
-     * @param recordId record ID
+     * @param recordPid record pid
      * @param fieldCode changed field code
      * @param oldValue old value
      * @param newValue new value
      */
-    void onFieldChange(String modelCode, String recordId,
+    void onFieldChange(String modelCode, String recordPid,
                        String fieldCode, Object oldValue, Object newValue);
 
     /**
      * Handle state change event
      *
      * @param modelCode model code
-     * @param recordId record ID
+     * @param recordPid record pid
      * @param fromState previous state
      * @param toState new state
      */
-    void onStateChange(String modelCode, String recordId, String fromState, String toState);
+    void onStateChange(String modelCode, String recordPid, String fromState, String toState);
 
     /**
      * Handle BPM event (process started, task completed, etc.)
@@ -69,11 +69,11 @@ public interface AutomationTriggerService {
      * Execute an automation
      *
      * @param automation the automation to execute
-     * @param recordId triggering record ID (may be null for scheduled)
+     * @param recordPid triggering record pid (may be null for scheduled)
      * @param triggerPayload trigger context data
      * @return execution log
      */
-    AutomationLog executeAutomation(Automation automation, String recordId, Map<String, Object> triggerPayload);
+    AutomationLog executeAutomation(Automation automation, String recordPid, Map<String, Object> triggerPayload);
 
     /**
      * Evaluate trigger condition using SpEL

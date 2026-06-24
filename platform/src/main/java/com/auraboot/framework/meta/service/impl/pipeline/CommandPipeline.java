@@ -94,12 +94,12 @@ public class CommandPipeline {
 
     private void mergeEffectiveRecordId(java.util.Map<String, Object> resultData,
                                          com.auraboot.framework.meta.dto.CommandExecuteRequest request) {
-        if (resultData == null || resultData.containsKey("recordId") || request == null) {
+        if (resultData == null || resultData.containsKey("recordPid") || request == null) {
             return;
         }
-        String recordId = request.getTargetRecordId();
-        if (recordId != null && !recordId.isBlank()) {
-            resultData.put("recordId", recordId);
+        String recordPid = request.getTargetRecordId();
+        if (recordPid != null && !recordPid.isBlank()) {
+            resultData.put("recordPid", recordPid);
         }
     }
 }

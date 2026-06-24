@@ -51,10 +51,10 @@ public class ImConversationController {
     @GetMapping("/by-record")
     public ApiResponse<ConversationListItem> findByRecord(
             @RequestParam String modelCode,
-            @RequestParam Long recordId) {
+            @RequestParam String recordPid) {
         Long userId = MetaContext.getCurrentUserId();
         Long tenantId = MetaContext.getCurrentTenantId();
-        ImConversation conv = conversationService.findByBoundRecord(modelCode, recordId, tenantId);
+        ImConversation conv = conversationService.findByBoundRecord(modelCode, recordPid, tenantId);
         if (conv == null) {
             return ApiResponse.success(null);
         }

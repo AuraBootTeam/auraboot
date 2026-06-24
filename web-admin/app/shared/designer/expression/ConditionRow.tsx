@@ -21,7 +21,7 @@ export function ConditionRow({ row, fields, onChange, onDelete }: ConditionRowPr
   }
 
   return (
-    <div className="flex items-center gap-1.5 mb-1.5" data-testid={`condition-row-${row.id}`}>
+    <div className="flex items-center gap-1.5 mb-1.5" data-testid={`condition-row-${row.field || 'new'}`}>
       <select
         className="h-7 flex-1 min-w-0 rounded border border-gray-300 bg-white px-1.5 text-xs focus:border-blue-500 focus:outline-none"
         value={row.field}

@@ -177,7 +177,7 @@ class SagaExecutorTest {
         List<SagaStep> steps = new ArrayList<>(List.of(
                 SagaStep.builder().id("S1").nodeId("step_1").commandCode("test:create")
                         .stepOrder(1).status("completed").retryCount(0)
-                        .outputData(Map.of("recordId", "R1")).recordId("R1").build(),
+                        .outputData(Map.of("recordPid", "R1")).recordPid("R1").build(),
                 failedStep,
                 SagaStep.builder().id("S3").nodeId("step_3").commandCode("test:notify")
                         .stepOrder(3).status("pending").retryCount(0).build()

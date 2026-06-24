@@ -25,11 +25,11 @@ export interface GanttViewProps {
   /** Model code for data fetching */
   modelCode: string;
   /** Callback when a task (record) is clicked */
-  onTaskClick?: (recordId: string) => void;
+  onTaskClick?: (recordPid: string) => void;
   /** Callback when a task date is changed via drag */
-  onTaskDateChange?: (recordId: string, start: string, end: string) => void;
+  onTaskDateChange?: (recordPid: string, start: string, end: string) => void;
   /** Callback when task progress is changed */
-  onTaskProgressChange?: (recordId: string, progress: number) => void;
+  onTaskProgressChange?: (recordPid: string, progress: number) => void;
   /** Callback to open current view configuration */
   onOpenViewConfig?: () => void;
   /** Callback to switch back to table view */
@@ -60,7 +60,7 @@ interface GanttDataDiagnostics {
 type GanttIssueReason = 'missing_both' | 'missing_start' | 'missing_end' | 'invalid_date';
 
 interface GanttIssueRecord {
-  recordId: string;
+  recordPid: string;
   title: string;
   reason: GanttIssueReason;
   startValue: unknown;
@@ -154,7 +154,7 @@ export const GanttView: React.FC<GanttViewProps> = ({
         if (!hasStart && !hasEnd) {
           nextDiagnostics.missingBoth += 1;
           nextIssues.push({
-            recordId: recordPid,
+            recordPid: recordPid,
             title: titleVal,
             reason: 'missing_both',
             startValue: startRaw,
@@ -165,7 +165,7 @@ export const GanttView: React.FC<GanttViewProps> = ({
         if (!hasStart) {
           nextDiagnostics.missingStartOnly += 1;
           nextIssues.push({
-            recordId: recordPid,
+            recordPid: recordPid,
             title: titleVal,
             reason: 'missing_start',
             startValue: startRaw,
@@ -176,7 +176,7 @@ export const GanttView: React.FC<GanttViewProps> = ({
         if (!hasEnd) {
           nextDiagnostics.missingEndOnly += 1;
           nextIssues.push({
-            recordId: recordPid,
+            recordPid: recordPid,
             title: titleVal,
             reason: 'missing_end',
             startValue: startRaw,
@@ -190,7 +190,7 @@ export const GanttView: React.FC<GanttViewProps> = ({
         if (isNaN(startVal.getTime()) || isNaN(endVal.getTime())) {
           nextDiagnostics.invalidDateRecords += 1;
           nextIssues.push({
-            recordId: recordPid,
+            recordPid: recordPid,
             title: titleVal,
             reason: 'invalid_date',
             startValue: startRaw,
@@ -500,7 +500,7 @@ export const GanttView: React.FC<GanttViewProps> = ({
               },
             ]}
             issues={issueRecords.map((ir) => ({
-              recordId: ir.recordId,
+              recordPid: ir.recordPid,
               title: ir.title,
               reason: ir.reason,
               details: { startValue: ir.startValue, endValue: ir.endValue },

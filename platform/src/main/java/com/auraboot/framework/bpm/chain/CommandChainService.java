@@ -211,7 +211,7 @@ public class CommandChainService {
             config.put("commandCode", node.getData().getCommandCode());
             config.put("operationType", node.getData().getOperationType());
             config.put("params", node.getData().getParams());
-            config.put("targetRecordId", node.getData().getTargetRecordId());
+            config.put("targetRecordPid", node.getData().getTargetRecordPid());
             config.put("onFail", node.getData().getOnFail() != null
                     ? node.getData().getOnFail().name() : "abort");
             config.put("condition", node.getData().getCondition());
@@ -373,9 +373,9 @@ public class CommandChainService {
                 stepResult.put("data", result);
             }
 
-            Object recordId = processVars.get("_step_" + nodeId + "_recordId");
-            if (recordId != null) {
-                stepResult.put("recordId", recordId);
+            Object recordPid = processVars.get("_step_" + nodeId + "_recordPid");
+            if (recordPid != null) {
+                stepResult.put("recordPid", recordPid);
             }
 
             Object skipped = processVars.get("_step_" + nodeId + "_skipped");

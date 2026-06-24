@@ -2,6 +2,8 @@ package com.auraboot.framework.meta.entity;
 
 import com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler;
 import com.baomidou.mybatisplus.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
@@ -28,7 +30,17 @@ public class DataChangeLog {
     private String modelCode;
 
     @TableField("record_id")
-    private String recordId;
+    private String recordPid;
+
+    @JsonIgnore
+    @Schema(hidden = true)
+    public String getRecordId() {
+        return recordPid;
+    }
+
+    public void setRecordId(String recordId) {
+        this.recordPid = recordId;
+    }
 
     /**
      * Operation type: CREATE / UPDATE / DELETE.

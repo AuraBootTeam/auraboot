@@ -35,7 +35,7 @@ public class DataChangeLogPendingContextFreshnessValidator implements PendingCon
                    AND record_id = ?
                  ORDER BY changed_at DESC, id DESC
                  LIMIT 1
-                """, ref.tenantId(), ref.modelCode(), ref.recordId());
+                """, ref.tenantId(), ref.modelCode(), ref.recordPid());
         if (rows.isEmpty()) {
             return stale(pending, ref, "record_version_unavailable");
         }
@@ -51,7 +51,7 @@ public class DataChangeLogPendingContextFreshnessValidator implements PendingCon
         return PendingContextFreshnessDecision.stale(
                 conflictPolicy(pending),
                 reasonCode,
-                "Pending context is stale for " + ref.modelCode() + "/" + ref.recordId());
+                "Pending context is stale for " + ref.modelCode() + "/" + ref.recordPid());
     }
 
     private FreshnessRef resolveRef(PendingToolSnapshot pending) {
@@ -60,12 +60,12 @@ public class DataChangeLogPendingContextFreshnessValidator implements PendingCon
         }
         ParsedContextVersion parsed = parseContextVersion(pending.getContextVersion());
         String modelCode = firstNonBlank(pending.getModelCode(), parsed.modelCode());
-        String recordId = firstNonBlank(recordIdFromInput(pending.getInput()), parsed.recordId());
+        String recordPid = firstNonBlank(recordPidFromInput(pending.getInput()), parsed.recordPid());
         String expectedVersion = firstNonBlank(pending.getRecordVersion(), parsed.expectedVersion());
-        if (!hasText(modelCode) || !hasText(recordId) || !hasText(expectedVersion)) {
+        if (!hasText(modelCode) || !hasText(recordPid) || !hasText(expectedVersion)) {
             return FreshnessRef.unverifiable();
         }
-        return new FreshnessRef(pending.getTenantId(), modelCode, recordId, expectedVersion);
+        return new FreshnessRef(pending.getTenantId(), modelCode, recordPid, expectedVersion);
     }
 
     private ParsedContextVersion parseContextVersion(String contextVersion) {
@@ -83,11 +83,11 @@ public class DataChangeLogPendingContextFreshnessValidator implements PendingCon
         return new ParsedContextVersion(parts[0], parts[1], expected.toString());
     }
 
-    private String recordIdFromInput(Map<String, Object> input) {
+    private String recordPidFromInput(Map<String, Object> input) {
         if (input == null || input.isEmpty()) {
             return null;
         }
-        for (String key : List.of("recordId", "recordPid", "pid", "id")) {
+        for (String key : List.of("recordPid", "targetRecordPid", "record_pid", "target_record_pid")) {
             Object value = input.get(key);
             if (value != null && hasText(String.valueOf(value))) {
                 return String.valueOf(value);
@@ -138,7 +138,7 @@ public class DataChangeLogPendingContextFreshnessValidator implements PendingCon
         return value != null && !value.isBlank();
     }
 
-    private record FreshnessRef(Long tenantId, String modelCode, String recordId, String expectedVersion) {
+    private record FreshnessRef(Long tenantId, String modelCode, String recordPid, String expectedVersion) {
         static FreshnessRef unverifiable() {
             return new FreshnessRef(null, null, null, null);
         }
@@ -146,12 +146,12 @@ public class DataChangeLogPendingContextFreshnessValidator implements PendingCon
         boolean verifiable() {
             return tenantId != null
                     && modelCode != null && !modelCode.isBlank()
-                    && recordId != null && !recordId.isBlank()
+                    && recordPid != null && !recordPid.isBlank()
                     && expectedVersion != null && !expectedVersion.isBlank();
         }
     }
 
-    private record ParsedContextVersion(String modelCode, String recordId, String expectedVersion) {
+    private record ParsedContextVersion(String modelCode, String recordPid, String expectedVersion) {
         static ParsedContextVersion empty() {
             return new ParsedContextVersion(null, null, null);
         }

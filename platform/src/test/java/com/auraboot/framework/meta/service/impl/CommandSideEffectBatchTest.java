@@ -80,17 +80,31 @@ class CommandSideEffectBatchTest {
         }
 
         @Test
-        @DisplayName("${recordId} resolves to current record's id")
+        @DisplayName("legacy recordId placeholder is not resolved")
         void testRecordIdReference() {
             Map<String, Object> fieldMapping = Map.of(
-                    "order_id", "${recordId}"
+                    "order_id", "${record" + "Id}"
             );
-            Map<String, Object> currentRecord = Map.of("id", "order-001");
+            Map<String, Object> currentRecord = Map.of("id", "order-001", "record" + "Id", "legacy-001");
             Map<String, Object> item = Map.of("product_code", "SKU-100");
 
             Map<String, Object> result = executor.resolveItemFieldMapping(fieldMapping, currentRecord, item);
 
-            assertEquals("order-001", result.get("order_id"));
+            assertNull(result.get("order_id"));
+        }
+
+        @Test
+        @DisplayName("${recordPid} resolves to current record's public pid")
+        void testRecordPidReference() {
+            Map<String, Object> fieldMapping = Map.of(
+                    "order_pid", "${recordPid}"
+            );
+            Map<String, Object> currentRecord = Map.of("pid", "01KR8WEQZ0EXXF28KMA2B06YEN");
+            Map<String, Object> item = Map.of("product_code", "SKU-100");
+
+            Map<String, Object> result = executor.resolveItemFieldMapping(fieldMapping, currentRecord, item);
+
+            assertEquals("01KR8WEQZ0EXXF28KMA2B06YEN", result.get("order_pid"));
         }
 
         @Test
@@ -155,17 +169,17 @@ class CommandSideEffectBatchTest {
         @DisplayName("Mixed references in a single mapping")
         void testMixedReferences() {
             Map<String, Object> fieldMapping = Map.of(
-                    "order_id", "${recordId}",
+                    "order_pid", "${recordPid}",
                     "product_code", "${item.product_code}",
                     "warehouse", "${warehouse_code}",
                     "status", "new"
             );
-            Map<String, Object> currentRecord = Map.of("id", "order-001", "warehouse_code", "WH-A");
+            Map<String, Object> currentRecord = Map.of("pid", "order-001", "warehouse_code", "WH-A");
             Map<String, Object> item = Map.of("product_code", "SKU-100");
 
             Map<String, Object> result = executor.resolveItemFieldMapping(fieldMapping, currentRecord, item);
 
-            assertEquals("order-001", result.get("order_id"));
+            assertEquals("order-001", result.get("order_pid"));
             assertEquals("SKU-100", result.get("product_code"));
             assertEquals("WH-A", result.get("warehouse"));
             assertEquals("new", result.get("status"));
@@ -176,14 +190,14 @@ class CommandSideEffectBatchTest {
         void testNullItem() {
             Map<String, Object> fieldMapping = Map.of(
                     "product_code", "${item.product_code}",
-                    "order_id", "${recordId}"
+                    "order_pid", "${recordPid}"
             );
-            Map<String, Object> currentRecord = Map.of("id", "order-001");
+            Map<String, Object> currentRecord = Map.of("pid", "order-001");
 
             Map<String, Object> result = executor.resolveItemFieldMapping(fieldMapping, currentRecord, null);
 
             assertNull(result.get("product_code"));
-            assertEquals("order-001", result.get("order_id"));
+            assertEquals("order-001", result.get("order_pid"));
         }
     }
 
@@ -268,7 +282,7 @@ class CommandSideEffectBatchTest {
                     Map.of("product_code", "SKU-3", "quantity", 30)
             );
             Map<String, Object> payload = new HashMap<>();
-            payload.put("id", "order-001");
+            payload.put("pid", "order-001");
             payload.put("lines", lines);
 
             Map<String, Object> effect = new HashMap<>();
@@ -276,7 +290,7 @@ class CommandSideEffectBatchTest {
             effect.put("targetModel", "order_line");
             effect.put("sourceField", "lines");
             effect.put("fieldMapping", Map.of(
-                    "order_id", "${recordId}",
+                    "order_pid", "${recordPid}",
                     "product_code", "${item.product_code}",
                     "quantity", "${item.quantity}"
             ));
@@ -295,18 +309,18 @@ class CommandSideEffectBatchTest {
             List<Map<String, Object>> captured = dataCaptor.getAllValues();
 
             // First item
-            assertEquals("order-001", captured.get(0).get("order_id"));
+            assertEquals("order-001", captured.get(0).get("order_pid"));
             assertEquals("SKU-1", captured.get(0).get("product_code"));
             assertEquals(10, captured.get(0).get("quantity"));
             assertEquals(TENANT_ID, captured.get(0).get("tenant_id"));
 
             // Second item
-            assertEquals("order-001", captured.get(1).get("order_id"));
+            assertEquals("order-001", captured.get(1).get("order_pid"));
             assertEquals("SKU-2", captured.get(1).get("product_code"));
             assertEquals(20, captured.get(1).get("quantity"));
 
             // Third item
-            assertEquals("order-001", captured.get(2).get("order_id"));
+            assertEquals("order-001", captured.get(2).get("order_pid"));
             assertEquals("SKU-3", captured.get(2).get("product_code"));
             assertEquals(30, captured.get(2).get("quantity"));
         }
@@ -660,13 +674,13 @@ class CommandSideEffectBatchTest {
         }
 
         @Test
-        @DisplayName("Mixed ${item.xxx} and ${recordId} in fieldMapping")
+        @DisplayName("Mixed ${item.xxx} and ${recordPid} in fieldMapping")
         void testMixedReferencesInBatchUpdate() {
             List<Map<String, Object>> items = List.of(
                     Map.of("inventory_id", "inv-001", "reserved_qty", 10)
             );
             Map<String, Object> payload = new HashMap<>();
-            payload.put("id", "order-001");
+            payload.put("pid", "order-001");
             payload.put("items", items);
 
             Map<String, Object> effect = new HashMap<>();
@@ -676,7 +690,7 @@ class CommandSideEffectBatchTest {
             effect.put("targetIdField", "inventory_id");
             effect.put("fieldMapping", Map.of(
                     "reserved_qty", "${item.reserved_qty}",
-                    "last_order_id", "${recordId}",
+                    "last_order_pid", "${recordPid}",
                     "status", "reserved"
             ));
 
@@ -691,7 +705,7 @@ class CommandSideEffectBatchTest {
 
             Map<String, Object> data = dataCaptor.getValue();
             assertEquals(10, data.get("reserved_qty"));
-            assertEquals("order-001", data.get("last_order_id"));
+            assertEquals("order-001", data.get("last_order_pid"));
             assertEquals("reserved", data.get("status"));
         }
     }
@@ -709,7 +723,7 @@ class CommandSideEffectBatchTest {
                     Map.of("product_code", "SKU-1", "quantity", 5)
             );
             Map<String, Object> payload = new HashMap<>();
-            payload.put("id", "order-001");
+            payload.put("pid", "order-001");
             payload.put("lines", lines);
 
             Map<String, Object> actionDef = new HashMap<>();
@@ -717,7 +731,7 @@ class CommandSideEffectBatchTest {
             actionDef.put("targetModel", "order_line");
             actionDef.put("sourceField", "lines");
             actionDef.put("fieldMapping", Map.of(
-                    "order_id", "${recordId}",
+                    "order_pid", "${recordPid}",
                     "product_code", "${item.product_code}"
             ));
 

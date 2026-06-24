@@ -66,8 +66,8 @@ export function detailTestId(modelCode: string, element?: string): string {
   return deriveTestId('detail', normalize(modelCode), element || 'container');
 }
 
-export function rowTestId(modelCode: string, recordId: string): string {
-  return deriveTestId('list', normalize(modelCode), 'row', recordId);
+export function rowTestId(modelCode: string, recordPid: string): string {
+  return deriveTestId('list', normalize(modelCode), 'row', recordPid);
 }
 
 export function colTestId(modelCode: string, fieldCode: string): string {

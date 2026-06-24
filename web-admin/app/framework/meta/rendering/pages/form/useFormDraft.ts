@@ -40,7 +40,7 @@ export interface UseFormDraftParams {
   /** Page key identifying the specific form page. */
   pageKey?: string | null;
   /** Edit-mode record id; omitted/empty for create forms. */
-  recordId?: string | null;
+  recordPid?: string | null;
   /** Current live form values (autosaved, debounced). */
   values: Record<string, unknown>;
   /** Baseline values to diff against when deciding whether to offer restore. */
@@ -82,7 +82,7 @@ export function useFormDraft(params: UseFormDraftParams): UseFormDraftResult {
     enabled,
     modelCode,
     pageKey,
-    recordId,
+    recordPid,
     values,
     initialValues,
     debounceMs = 500,
@@ -90,7 +90,7 @@ export function useFormDraft(params: UseFormDraftParams): UseFormDraftResult {
   } = params;
 
   const storage = params.storage !== undefined ? params.storage : getDraftStorage();
-  const key = useMemo(() => draftKey(modelCode, pageKey, recordId), [modelCode, pageKey, recordId]);
+  const key = useMemo(() => draftKey(modelCode, pageKey, recordPid), [modelCode, pageKey, recordPid]);
 
   const [restorable, setRestorable] = useState<FormDraft | null>(null);
 

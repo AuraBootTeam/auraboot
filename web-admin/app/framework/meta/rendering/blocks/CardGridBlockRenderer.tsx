@@ -177,7 +177,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
       className={`grid gap-4 ${columnsClass}`}
     >
       {rows.map((row: any, idx: number) => {
-        const rowKey = row.pid || row.id || String(idx);
+    const rowKey = row.pid || String(idx);
         const title = getLocalizedText(row[titleField], locale, t);
         const description = descriptionField ? getLocalizedText(row[descriptionField], locale, t) : undefined;
         const category = categoryField ? getLocalizedText(row[categoryField], locale, t) : undefined;

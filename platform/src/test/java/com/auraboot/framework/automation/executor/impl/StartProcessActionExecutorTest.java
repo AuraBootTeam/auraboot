@@ -52,7 +52,7 @@ class StartProcessActionExecutorTest {
         AutomationAction action = new AutomationAction();
         Map<String, Object> config = new HashMap<>();
         config.put("processKey", "e2et_payment_approval");
-        config.put("businessKey", "${recordId}");
+        config.put("businessKey", "${recordPid}");
         Map<String, Object> vars = new HashMap<>();
         vars.put("amount", "${record.amount}");
         vars.put("literal", "x");
@@ -60,7 +60,7 @@ class StartProcessActionExecutorTest {
         action.setConfig(config);
 
         Map<String, Object> context = new HashMap<>();
-        context.put("recordId", "ORD-1");
+        context.put("recordPid", "ORD-1");
         context.put("record", Map.of("amount", "500"));
 
         Object out = executor.execute(action, context);
@@ -72,7 +72,7 @@ class StartProcessActionExecutorTest {
         verify(bpmIntegrationService).startBusinessProcess(keyCap.capture(), bizCap.capture(), varsCap.capture(), anyString());
 
         assertThat(keyCap.getValue()).isEqualTo("e2et_payment_approval");
-        assertThat(bizCap.getValue()).isEqualTo("ORD-1"); // ${recordId} resolved
+        assertThat(bizCap.getValue()).isEqualTo("ORD-1"); // ${recordPid} resolved
         assertThat(varsCap.getValue()).containsEntry("amount", "500"); // ${record.amount} resolved
         assertThat(varsCap.getValue()).containsEntry("literal", "x");
 
@@ -84,7 +84,7 @@ class StartProcessActionExecutorTest {
     }
 
     @Test
-    void execute_defaultsBusinessKeyToRecordId_whenNotConfigured() {
+    void execute_defaultsBusinessKeyToRecordPid_whenNotConfigured() {
         when(bpmIntegrationService.startBusinessProcess(anyString(), anyString(), anyMap(), anyString()))
                 .thenReturn(null);
 
@@ -94,7 +94,7 @@ class StartProcessActionExecutorTest {
         action.setConfig(config);
 
         Map<String, Object> context = new HashMap<>();
-        context.put("recordId", "REC-9");
+        context.put("recordPid", "REC-9");
 
         executor.execute(action, context);
 

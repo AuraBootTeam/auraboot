@@ -95,7 +95,7 @@ class CommandServiceTaskDelegateTest {
             CommandExecuteResult result = CommandExecuteResult.builder()
                     .commandCode("pe:create_order")
                     .phaseReached("completed")
-                    .data(Map.of("recordId", "rec-123", "order_no", "ORD-001"))
+                    .data(Map.of("recordPid", "rec-123", "order_no", "ORD-001"))
                     .executionTimeMs(50)
                     .build();
 
@@ -115,7 +115,7 @@ class CommandServiceTaskDelegateTest {
             // Verify results written to process variables
             assertTrue((Boolean) processVars.get("_step_create_order_success"));
             assertNotNull(processVars.get("_step_create_order_result"));
-            assertEquals("rec-123", processVars.get("_step_create_order_recordId"));
+            assertEquals("rec-123", processVars.get("_step_create_order_recordPid"));
         }
 
         @Test
@@ -350,7 +350,7 @@ class CommandServiceTaskDelegateTest {
         }
 
         @Test
-        @DisplayName("reads commandCode/operationType/targetRecordId + payload params from smart:properties")
+        @DisplayName("reads commandCode/operationType/targetRecordPid + payload params from smart:properties")
         void readsCommandConfigFromProperties() {
             Map<String, Object> processVars = new HashMap<>();
             processVars.put("alarmEventPid", "alarm-77");
@@ -358,7 +358,7 @@ class CommandServiceTaskDelegateTest {
             Map<String, String> props = new HashMap<>();
             props.put("commandCode", "iot_alarm_event:clear");
             props.put("operationType", "update");
-            props.put("targetRecordId", "${alarmEventPid}");
+            props.put("targetRecordPid", "${alarmEventPid}");
             props.put("status", "CLEARED"); // a payload param, not a reserved key
             setupPropertiesContext("auto_clear", props, processVars);
 
@@ -378,13 +378,13 @@ class CommandServiceTaskDelegateTest {
             // reserved keys must not leak into the command payload
             assertFalse(req.getPayload().containsKey("commandCode"));
             assertFalse(req.getPayload().containsKey("operationType"));
-            assertFalse(req.getPayload().containsKey("targetRecordId"));
+            assertFalse(req.getPayload().containsKey("targetRecordPid"));
             assertTrue((Boolean) processVars.get("_step_auto_clear_success"));
         }
 
         @Test
-        @DisplayName("resolves targetRecordId from the persisted business key after a userTask drops request vars (F1)")
-        void resolvesTargetRecordIdFromBusinessKeyAfterUserTask() {
+        @DisplayName("resolves targetRecordPid from the persisted business key after a userTask drops request vars (F1)")
+        void resolvesTargetRecordPidFromBusinessKeyAfterUserTask() {
             // After a userTask wait, the start-time request variables (e.g. alarmEventPid)
             // are gone — executionContext.getRequest() carries only the task-completion
             // variables. The serviceTask must still resolve the record it operates on, from
@@ -395,7 +395,7 @@ class CommandServiceTaskDelegateTest {
             Map<String, String> props = new HashMap<>();
             props.put("commandCode", "iot_alarm_event:clear");
             props.put("operationType", "update");
-            props.put("targetRecordId", "${processBusinessKey}");
+            props.put("targetRecordPid", "${processBusinessKey}");
             setupPropertiesContext("auto_clear", props, processVars);
 
             ProcessInstance processInstance = mock(ProcessInstance.class);
@@ -412,7 +412,7 @@ class CommandServiceTaskDelegateTest {
             ArgumentCaptor<CommandExecuteRequest> captor = ArgumentCaptor.forClass(CommandExecuteRequest.class);
             verify(commandExecutor).execute(eq("iot_alarm_event:clear"), captor.capture());
             assertEquals("alarm-77", captor.getValue().getTargetRecordId(),
-                    "targetRecordId must resolve from the persisted business key, not the lost request var");
+                    "targetRecordPid must resolve from the persisted business key, not the lost request var");
         }
 
         @Test

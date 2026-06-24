@@ -98,7 +98,7 @@ public class AgentSseServiceImpl implements AgentSseService {
         Map<String, Object> eventData = Map.of(
                 "type", event.getAgentEventType(),
                 "agentId", event.getAgentId() != null ? event.getAgentId() : "",
-                "recordId", event.getRecordId() != null ? event.getRecordId() : "",
+                "recordPid", event.getRecordId() != null ? event.getRecordId() : "",
                 "payload", event.getPayload() != null ? event.getPayload() : Map.of()
         );
         broadcast(event.getTenantId(), "agent-event", eventData);

@@ -191,7 +191,7 @@ class NamedQueryServiceImplIntegrationTest {
         String code = uniqueCode("withfields");
         NamedQueryCreateRequest req = newRequest(code, "Query With Fields");
         req.setFields(List.of(
-                newFieldRequest("tenant_id", "tenant_id", "number"),
+                newFieldRequest("query_tenant_ref", "tenant_id", "number"),
                 newFieldRequest("code", "code", "string")
         ));
 
@@ -201,7 +201,7 @@ class NamedQueryServiceImplIntegrationTest {
         // verify fields were stored
         List<NamedQueryFieldDTO> fields = namedQueryService.getFields(code);
         assertEquals(2, fields.size());
-        assertTrue(fields.stream().anyMatch(f -> "tenant_id".equals(f.getFieldCode())));
+        assertTrue(fields.stream().anyMatch(f -> "query_tenant_ref".equals(f.getFieldCode())));
         assertTrue(fields.stream().anyMatch(f -> "code".equals(f.getFieldCode())));
     }
 
@@ -871,7 +871,7 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryDTO dto = namedQueryService.create(createReq);
 
         // Add a field
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
 
         NamedQueryTestRequest req = new NamedQueryTestRequest();
         req.setSize(5);
@@ -894,7 +894,7 @@ class NamedQueryServiceImplIntegrationTest {
         namedQueryService.create(createReq);
 
         // Add a field so SELECT columns are explicit
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
         namedQueryService.addField(code, newFieldRequest("code", "code", "string"));
 
         NamedQueryTestRequest req = new NamedQueryTestRequest();
@@ -981,7 +981,7 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Export CSV Query");
         createReq.setFromSql("SELECT id, code, status FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
         namedQueryService.addField(code, newFieldRequest("code", "code", "string"));
 
         NamedQueryDataExportRequest req = new NamedQueryDataExportRequest();
@@ -1005,7 +1005,7 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Export JSON Query");
         createReq.setFromSql("SELECT id, code FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
 
         NamedQueryDataExportRequest req = new NamedQueryDataExportRequest();
         req.setFormat(DataExportRequest.ExportFormat.JSON);
@@ -1027,7 +1027,7 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Export Excel Query");
         createReq.setFromSql("SELECT id, code FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
         namedQueryService.addField(code, newFieldRequest("code", "code", "string"));
 
         NamedQueryDataExportRequest req = new NamedQueryDataExportRequest();
@@ -1049,13 +1049,13 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Export Subset");
         createReq.setFromSql("SELECT id, code, status FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
         namedQueryService.addField(code, newFieldRequest("code", "code", "string"));
         namedQueryService.addField(code, newFieldRequest("status", "status", "string"));
 
         NamedQueryDataExportRequest req = new NamedQueryDataExportRequest();
         req.setFormat(DataExportRequest.ExportFormat.CSV);
-        req.setFields(List.of("id", "code")); // only 2 of 3 fields
+        req.setFields(List.of("query_ref", "code")); // only 2 of 3 fields
         req.setLimit(10);
 
         ExportResult result = namedQueryService.exportData(code, req);
@@ -1095,11 +1095,11 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Export Invalid Field");
         createReq.setFromSql("SELECT id FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
 
         NamedQueryDataExportRequest req = new NamedQueryDataExportRequest();
         req.setFormat(DataExportRequest.ExportFormat.CSV);
-        req.setFields(List.of("id", "nonexistent_field_xyz"));
+        req.setFields(List.of("query_ref", "nonexistent_field_xyz"));
         assertThrows(MetaServiceException.class, () ->
                 namedQueryService.exportData(code, req));
     }
@@ -1113,7 +1113,7 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Query With Where");
         createReq.setFromSql("SELECT id, code, status FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
         namedQueryService.addField(code, newFieldRequest("code", "code", "string"));
         namedQueryService.addField(code, newFieldRequest("status", "status", "string"));
 
@@ -1142,7 +1142,7 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Query With Order");
         createReq.setFromSql("SELECT id, code FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
         NamedQueryFieldRequest codeFieldReq = newFieldRequest("code", "code", "string");
         codeFieldReq.setSortable(true);
         namedQueryService.addField(code, codeFieldReq);
@@ -1304,11 +1304,11 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Query GT");
         createReq.setFromSql("SELECT id FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
 
         com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
         com.fasterxml.jackson.databind.JsonNode whereConditions = om.readTree(
-                "[{\"field\":\"id\",\"operator\":\"gt\",\"value\":0}]");
+                "[{\"field\":\"query_ref\",\"operator\":\"gt\",\"value\":0}]");
 
         NamedQueryTestRequest req = new NamedQueryTestRequest();
         req.setWhereConditions(whereConditions);
@@ -1326,11 +1326,11 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Query Between");
         createReq.setFromSql("SELECT id FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
 
         com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
         com.fasterxml.jackson.databind.JsonNode whereConditions = om.readTree(
-                "[{\"field\":\"id\",\"operator\":\"between\",\"value\":[1, 999999999]}]");
+                "[{\"field\":\"query_ref\",\"operator\":\"between\",\"value\":[1, 999999999]}]");
 
         NamedQueryTestRequest req = new NamedQueryTestRequest();
         req.setWhereConditions(whereConditions);
@@ -1458,13 +1458,13 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Query GTE LTE");
         createReq.setFromSql("SELECT id FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
 
         com.fasterxml.jackson.databind.ObjectMapper om = new com.fasterxml.jackson.databind.ObjectMapper();
 
         // gte
         com.fasterxml.jackson.databind.JsonNode gteWhere = om.readTree(
-                "[{\"field\":\"id\",\"operator\":\"gte\",\"value\":1}]");
+                "[{\"field\":\"query_ref\",\"operator\":\"gte\",\"value\":1}]");
         NamedQueryTestRequest gteReq = new NamedQueryTestRequest();
         gteReq.setWhereConditions(gteWhere);
         gteReq.setPage(1);
@@ -1474,7 +1474,7 @@ class NamedQueryServiceImplIntegrationTest {
 
         // lte
         com.fasterxml.jackson.databind.JsonNode lteWhere = om.readTree(
-                "[{\"field\":\"id\",\"operator\":\"lte\",\"value\":999999999}]");
+                "[{\"field\":\"query_ref\",\"operator\":\"lte\",\"value\":999999999}]");
         NamedQueryTestRequest lteReq = new NamedQueryTestRequest();
         lteReq.setWhereConditions(lteWhere);
         lteReq.setPage(1);
@@ -1512,7 +1512,7 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Query With Params");
         createReq.setFromSql("SELECT id, code FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
 
         NamedQueryTestRequest req = new NamedQueryTestRequest();
         req.setPage(1);
@@ -1530,7 +1530,7 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Subquery Test");
         createReq.setFromSql("SELECT id, code, status FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
         namedQueryService.addField(code, newFieldRequest("code", "code", "string"));
 
         NamedQueryTestRequest req = new NamedQueryTestRequest();
@@ -1549,7 +1549,7 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Testing Status Query");
         createReq.setFromSql("SELECT id FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         NamedQueryDTO dto = namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
         namedQueryService.updateStatus(dto.getPid(), "testing");
 
         NamedQueryTestRequest req = new NamedQueryTestRequest();
@@ -1567,7 +1567,7 @@ class NamedQueryServiceImplIntegrationTest {
         NamedQueryCreateRequest createReq = newRequest(code, "Published Status Query");
         createReq.setFromSql("SELECT id FROM ab_named_query WHERE tenant_id = #{params.tenantId}");
         NamedQueryDTO dto = namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
         namedQueryService.updateStatus(dto.getPid(), "testing");
         namedQueryService.updateStatus(dto.getPid(), "published");
 
@@ -1607,7 +1607,7 @@ class NamedQueryServiceImplIntegrationTest {
         createReq.setBaseWhere(om.readTree(
                 "[{\"field\":\"status\",\"operator\":\"eq\",\"value\":\"draft\"}]"));
         namedQueryService.create(createReq);
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
         namedQueryService.addField(code, newFieldRequest("status", "status", "string"));
 
         NamedQueryTestRequest req = new NamedQueryTestRequest();
@@ -1706,7 +1706,7 @@ class NamedQueryServiceImplIntegrationTest {
     void multiplePublishCreatesMultipleVersions() {
         String code = uniqueCode("multiver");
         NamedQueryDTO dto = namedQueryService.create(newRequest(code, "Multi Version"));
-        namedQueryService.addField(code, newFieldRequest("id", "id", "number"));
+        namedQueryService.addField(code, newFieldRequest("query_ref", "id", "number"));
 
         // First publish: version 1
         namedQueryService.updateStatus(dto.getPid(), "testing");

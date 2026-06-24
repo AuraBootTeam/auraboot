@@ -49,29 +49,20 @@ public class RecordShareController {
      * List all active shares for a record.
      *
      * @param resourceCode model/resource code (e.g. "crm_opportunity")
-     * @param recordId     legacy numeric record ID
-     * @param recordPid    stable public record PID
+     * @param recordPid stable public record PID
      * @return list of share entries
      */
     @GetMapping
     @Operation(summary = "List shares for a record")
     public ApiResponse<List<RecordShare>> listShares(
             @RequestParam @NotBlank String resourceCode,
-            @RequestParam(required = false) Long recordId,
-            @RequestParam(required = false) String recordPid) {
+            @RequestParam @NotBlank String recordPid) {
 
         Long tenantId = MetaContext.getCurrentTenantId();
-        log.debug("Listing shares: resourceCode={}, recordId={}, recordPid={}, tenantId={}",
-                resourceCode, recordId, recordPid, tenantId);
+        log.debug("Listing shares: resourceCode={}, recordPid={}, tenantId={}",
+                resourceCode, recordPid, tenantId);
 
-        List<RecordShare> shares;
-        if (StringUtils.hasText(recordPid)) {
-            shares = recordShareService.listByRecordPid(tenantId, resourceCode, recordPid);
-        } else if (recordId != null) {
-            shares = recordShareService.listByRecord(tenantId, resourceCode, recordId);
-        } else {
-            throw new RootUnCheckedException(BadParam, "recordId or recordPid is required");
-        }
+        List<RecordShare> shares = recordShareService.listByRecordPid(tenantId, resourceCode, recordPid);
         return ApiResponse.success(shares);
     }
 
@@ -85,39 +76,25 @@ public class RecordShareController {
     @Operation(summary = "Share a record with a subject")
     public ApiResponse<Void> shareRecord(@Valid @RequestBody RecordShareRequest request) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        log.info("Sharing record: resourceCode={}, recordId={}, recordPid={}, subjectType={}, subjectId={}, subjectPid={}, tenantId={}",
-                request.getResourceCode(), request.getRecordId(), request.getRecordPid(),
+        log.info("Sharing record: resourceCode={}, recordPid={}, subjectType={}, subjectId={}, subjectPid={}, tenantId={}",
+                request.getResourceCode(), request.getRecordPid(),
                 request.getSubjectType(), request.getSubjectId(), request.getSubjectPid(), tenantId);
 
-        if (StringUtils.hasText(request.getRecordPid())) {
-            if (request.getSubjectId() == null && !StringUtils.hasText(request.getSubjectPid())) {
-                throw new RootUnCheckedException(BadParam, "subjectId or subjectPid is required");
-            }
-            recordShareService.shareRecordByPid(
-                    tenantId,
-                    request.getResourceCode(),
-                    request.getRecordPid(),
-                    request.getSubjectType(),
-                    request.getSubjectId(),
-                    request.getSubjectPid(),
-                    request.getPermissionMask(),
-                    request.getExpiresAt());
-        } else {
-            if (request.getRecordId() == null) {
-                throw new RootUnCheckedException(BadParam, "recordId or recordPid is required");
-            }
-            if (request.getSubjectId() == null) {
-                throw new RootUnCheckedException(BadParam, "subjectId is required when sharing by recordId");
-            }
-            recordShareService.shareRecord(
-                    tenantId,
-                    request.getResourceCode(),
-                    request.getRecordId(),
-                    request.getSubjectType(),
-                    request.getSubjectId(),
-                    request.getPermissionMask(),
-                    request.getExpiresAt());
+        if (!StringUtils.hasText(request.getRecordPid())) {
+            throw new RootUnCheckedException(BadParam, "recordPid is required");
         }
+        if (request.getSubjectId() == null && !StringUtils.hasText(request.getSubjectPid())) {
+            throw new RootUnCheckedException(BadParam, "subjectId or subjectPid is required");
+        }
+        recordShareService.shareRecordByPid(
+                tenantId,
+                request.getResourceCode(),
+                request.getRecordPid(),
+                request.getSubjectType(),
+                request.getSubjectId(),
+                request.getSubjectPid(),
+                request.getPermissionMask(),
+                request.getExpiresAt());
 
         return ApiResponse.success();
     }
@@ -148,9 +125,6 @@ public class RecordShareController {
         /** Model/resource code (e.g. "crm_opportunity") */
         @NotBlank
         private String resourceCode;
-
-        /** Legacy numeric record ID */
-        private Long recordId;
 
         /** Stable public record PID */
         private String recordPid;

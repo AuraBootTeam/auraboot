@@ -91,7 +91,7 @@ describe('ReferenceCreateDialog', () => {
       data: {
         commandCode: 'customer:create',
         data: {
-          recordId: '01NESTED',
+          recordPid: '01NESTED',
           name: 'Nested Cust',
         },
       },

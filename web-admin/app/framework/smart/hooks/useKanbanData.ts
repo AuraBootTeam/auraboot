@@ -39,7 +39,7 @@ export interface UseKanbanDataOptions {
   groupByDictItems?: { value: string; label: string }[];
   /**
    * Page key used as the dynamic API resource segment for persistence.
-   * When provided, moveCard PUTs `/api/dynamic/{pageKey}/{recordId}` to
+   * When provided, moveCard PUTs `/api/dynamic/{pageKey}/{recordPid}` to
    * persist the column change with optimistic-update + rollback semantics.
    * When omitted, moveCard remains purely optimistic (back-compat).
    */
@@ -76,7 +76,7 @@ export interface UseKanbanDataResult {
    * Move a card between columns with optimistic update.
    *
    * When the hook is configured with a `pageKey`, the change is persisted via
-   * PUT `/api/dynamic/{pageKey}/{recordId}` and rolled back on failure. The
+   * PUT `/api/dynamic/{pageKey}/{recordPid}` and rolled back on failure. The
    * returned promise resolves regardless of success/failure; failures are
    * surfaced through `onMoveError` to keep the call site simple.
    */
@@ -372,7 +372,7 @@ export function useKanbanData(options: UseKanbanDataOptions): UseKanbanDataResul
    * 1. Optimistically rewrites the card's groupByField in local rawData so
    *    the UI updates instantly.
    * 2. If pageKey is provided, persists the change via
-   *    PUT `/api/dynamic/{pageKey}/{recordId}` with body
+   *    PUT `/api/dynamic/{pageKey}/{recordPid}` with body
    *    `{ [groupByField]: targetColumnId }`.
    * 3. On non-success Result code OR network rejection, rolls back the
    *    optimistic update by restoring the source column value, then invokes

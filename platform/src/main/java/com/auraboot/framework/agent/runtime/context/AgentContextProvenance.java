@@ -12,7 +12,7 @@ public record AgentContextProvenance(
         String freshness,
         String permission,
         AgentContextSensitivity sensitivity,
-        List<String> recordIds,
+        List<String> recordPids,
         Long tenantId,
         String channel,
         boolean readWriteRelevant,
@@ -24,7 +24,7 @@ public record AgentContextProvenance(
         freshness = hasText(freshness) ? freshness : "UNKNOWN";
         permission = hasText(permission) ? permission : "UNKNOWN";
         sensitivity = sensitivity == null ? AgentContextSensitivity.INTERNAL : sensitivity;
-        recordIds = recordIds == null ? List.of() : List.copyOf(recordIds);
+        recordPids = recordPids == null ? List.of() : List.copyOf(recordPids);
         metadata = metadata == null ? Map.of() : Map.copyOf(metadata);
     }
 
@@ -37,7 +37,7 @@ public record AgentContextProvenance(
                 + " sensitivity=" + sensitivity
                 + " tenant=" + (tenantId != null ? tenantId : "")
                 + " channel=" + (channel != null ? channel : "")
-                + " recordIds=" + recordIds
+                + " recordPids=" + recordPids
                 + " readWriteRelevant=" + readWriteRelevant
                 + " metadata=" + metadata;
     }

@@ -11,7 +11,7 @@ import lombok.Data;
 public class ChangeLogQueryRequest {
 
     private String modelCode;
-    private String recordId;
+    private String recordPid;
     private String operation;   // CREATE / UPDATE / DELETE (filter)
     private int pageNum = 1;
     private int pageSize = 20;

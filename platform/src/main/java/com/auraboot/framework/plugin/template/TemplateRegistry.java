@@ -191,9 +191,14 @@ public class TemplateRegistry {
 
             Path workspaceRoot = repoRoot.getParent();
             if (workspaceRoot != null && "auraboot-enterprise".equals(repoRoot.getFileName().toString())) {
+                addCandidate(candidates, workspaceRoot);
                 addCandidate(candidates, workspaceRoot.resolve("auraboot"));
             }
         }
+
+        addRootOverride(candidates, "aura.core.root", "AURA_CORE_ROOT");
+        addPluginsRootOverride(candidates, "aura.registry.root.plugins", "AURA_REGISTRY_ROOT_PLUGINS");
+        addDelimitedRootOverrides(candidates, "aura.template.roots", "AURA_TEMPLATE_ROOTS");
 
         return candidates;
     }
@@ -223,6 +228,54 @@ public class TemplateRegistry {
             return;
         }
         candidates.add(normalized);
+    }
+
+    private static void addRootOverride(List<Path> candidates, String propertyName, String envName) {
+        String value = firstNonBlank(System.getProperty(propertyName), System.getenv(envName));
+        if (value == null) {
+            return;
+        }
+        addCandidate(candidates, Paths.get(value));
+    }
+
+    private static void addPluginsRootOverride(List<Path> candidates, String propertyName, String envName) {
+        String value = firstNonBlank(System.getProperty(propertyName), System.getenv(envName));
+        if (value == null) {
+            return;
+        }
+        addRootOrPluginsParent(candidates, Paths.get(value));
+    }
+
+    private static void addDelimitedRootOverrides(List<Path> candidates, String propertyName, String envName) {
+        String value = firstNonBlank(System.getProperty(propertyName), System.getenv(envName));
+        if (value == null) {
+            return;
+        }
+
+        String separator = System.getProperty("path.separator");
+        for (String part : value.split(java.util.regex.Pattern.quote(separator))) {
+            if (!part.isBlank()) {
+                addRootOrPluginsParent(candidates, Paths.get(part));
+            }
+        }
+    }
+
+    private static void addRootOrPluginsParent(List<Path> candidates, Path rootOrPluginsDir) {
+        Path normalized = rootOrPluginsDir.normalize();
+        if ("plugins".equals(normalized.getFileName() != null ? normalized.getFileName().toString() : "")) {
+            addCandidate(candidates, normalized.getParent());
+        }
+        addCandidate(candidates, normalized);
+    }
+
+    private static String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
     }
 
     /**
