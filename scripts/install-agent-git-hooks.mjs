@@ -114,20 +114,42 @@ export function resolveHookPath(repoPath) {
   };
 }
 
+function readHookIfPresent(hookPath) {
+  try {
+    return fs.readFileSync(hookPath, 'utf8');
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+function writeHookAtomically(hookPath, content) {
+  const tempPath = `${hookPath}.tmp-${process.pid}-${defaultTimestamp()}`;
+  try {
+    fs.writeFileSync(tempPath, content, { mode: 0o755, flag: 'wx' });
+    fs.renameSync(tempPath, hookPath);
+  } catch (error) {
+    try {
+      fs.rmSync(tempPath, { force: true });
+    } catch {
+      // Best-effort cleanup only; preserve the original write error.
+    }
+    throw error;
+  }
+}
+
 export function installAgentGitHooks(repoPath, options = {}) {
   const { hookDir, hookPath, repoRoot } = resolveHookPath(repoPath);
   fs.mkdirSync(hookDir, { recursive: true });
 
   let backupPath;
-  if (fs.existsSync(hookPath)) {
-    const existing = fs.readFileSync(hookPath, 'utf8');
-    if (!existing.includes(hookMarker)) {
-      backupPath = `${hookPath}.backup-${(options.timestamp || defaultTimestamp)()}`;
-      fs.renameSync(hookPath, backupPath);
-    }
+  const existing = readHookIfPresent(hookPath);
+  if (existing !== null && !existing.includes(hookMarker)) {
+    backupPath = `${hookPath}.backup-${(options.timestamp || defaultTimestamp)()}`;
+    fs.renameSync(hookPath, backupPath);
   }
 
-  fs.writeFileSync(hookPath, buildPostCheckoutHook());
+  writeHookAtomically(hookPath, buildPostCheckoutHook());
   fs.chmodSync(hookPath, 0o755);
 
   return {

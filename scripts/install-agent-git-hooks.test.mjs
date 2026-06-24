@@ -35,10 +35,8 @@ test('installs executable post-checkout hook that invokes the repo-local git gua
 
   assert.equal(result.installed, true);
   assert.equal(path.basename(result.hookPath), 'post-checkout');
-  assert.equal(fs.existsSync(result.hookPath), true);
-  assert.equal(fs.statSync(result.hookPath).mode & 0o111, 0o111);
-
   const hook = fs.readFileSync(result.hookPath, 'utf8');
+  assert.equal(fs.statSync(result.hookPath).mode & 0o111, 0o111);
   assert.match(hook, /aura-agent-git-guard-managed/);
   assert.match(hook, /scripts\/agent-git-guard\.mjs/);
   assert.match(hook, /--post-checkout/);
@@ -55,7 +53,6 @@ test('backs up an existing unmanaged post-checkout hook before replacing it', ()
 
   assert.equal(result.installed, true);
   assert.equal(result.backupPath, `${result.hookPath}.backup-20260624100102`);
-  assert.equal(fs.existsSync(result.backupPath), true);
   assert.match(fs.readFileSync(result.backupPath, 'utf8'), /existing-hook/);
   assert.match(fs.readFileSync(hookPath, 'utf8'), /aura-agent-git-guard-managed/);
 });
