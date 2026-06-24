@@ -1,5 +1,5 @@
 /**
- * Dynamic Detail/View Page — /p/{model_code}/view/{recordPid}
+ * Dynamic Detail/View Page — /p/{model_code}/view/{recordId}
  *
  * URL segment is the model_code. PageKey derived as {model_code}_detail.
  */
@@ -9,8 +9,13 @@ import type { LoaderFunctionArgs } from 'react-router';
 import { getTokenFromRequest } from '~/shared/services/session';
 import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPageRenderer';
 
+export function resolveRouteRecordPid(params: LoaderFunctionArgs['params']): string | undefined {
+  return params.recordPid ?? params.recordId;
+}
+
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
-  const { pageKey, recordPid } = params;
+  const { pageKey } = params;
+  const recordPid = resolveRouteRecordPid(params);
   if (!pageKey || !recordPid) {
     throw new Response('Page key and record ID are required', { status: 400 });
   }

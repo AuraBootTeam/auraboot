@@ -138,6 +138,55 @@ export class DataSourceManager {
     (this.baseContext as any).__dataSourceManager = this;
   }
 
+  private readRows(data: any): any[] {
+    if (Array.isArray(data)) return data;
+    if (Array.isArray(data?.records)) return data.records;
+    if (Array.isArray(data?.list)) return data.list;
+    if (Array.isArray(data?.items)) return data.items;
+    return data ? [data] : [];
+  }
+
+  private buildDataSourceContext(): {
+    data: Record<string, any>;
+    dataSource: Record<string, any>;
+    dataSources: Record<string, any>;
+  } {
+    const data: Record<string, any> = {};
+    const raw: Record<string, any> = {};
+
+    this.dataSourceStates.forEach((state, id) => {
+      raw[id] = state.data;
+      data[id] = this.readRows(state.data)[0];
+    });
+
+    return {
+      data,
+      dataSource: raw,
+      dataSources: raw,
+    };
+  }
+
+  private withDataSourceContext(context: ExpressionContext): ExpressionContext {
+    const dataSourceContext = this.buildDataSourceContext();
+    const ctx = {
+      ...context,
+      data: {
+        ...((context as any).data || {}),
+        ...dataSourceContext.data,
+      },
+      dataSource: {
+        ...((context as any).dataSource || {}),
+        ...dataSourceContext.dataSource,
+      },
+      dataSources: {
+        ...((context as any).dataSources || {}),
+        ...dataSourceContext.dataSources,
+      },
+    } as ExpressionContext;
+    (ctx as any).__dataSourceManager = this;
+    return ctx;
+  }
+
   /**
    * 绑定 ScopedStateManager,用于依赖追踪和上下文刷新
    */
@@ -164,8 +213,7 @@ export class DataSourceManager {
           ...((scopedContext as any).$page || {}),
         },
       } as ExpressionContext;
-      (ctx as any).__dataSourceManager = this;
-      return ctx;
+      return this.withDataSourceContext(ctx);
     };
 
     this.dataSources.forEach((config, id) => {
@@ -176,7 +224,7 @@ export class DataSourceManager {
   }
 
   private getContext(): ExpressionContext {
-    return this.contextGetter ? this.contextGetter() : this.baseContext;
+    return this.contextGetter ? this.contextGetter() : this.withDataSourceContext(this.baseContext);
   }
 
   /**
@@ -293,6 +341,7 @@ export class DataSourceManager {
 
     this.dataSourceStates.set(id, newState);
     this.notifySubscribers(id, newState);
+    void this.notifyDataSourceChanged(id);
   }
 
   /**
@@ -592,6 +641,28 @@ export class DataSourceManager {
         (dependency) => dependency === statePath || dependency.startsWith(`${statePath}.`),
       );
       if (dependsOnStateKey) {
+        ids.push(id);
+      }
+    });
+
+    if (ids.length > 0) {
+      await this.reload(ids);
+    }
+  }
+
+  private async notifyDataSourceChanged(key: string): Promise<void> {
+    const dataPaths = [`data.${key}`, `dataSource.${key}`, `dataSources.${key}`];
+    const ids: string[] = [];
+
+    this.dataSources.forEach((config, id) => {
+      if (id === key || !config.dependOn || config.dependOn.length === 0) {
+        return;
+      }
+
+      const dependsOnDataSource = config.dependOn.some((dependency) => dataPaths.some(
+        (path) => dependency === path || dependency.startsWith(`${path}.`),
+      ));
+      if (dependsOnDataSource) {
         ids.push(id);
       }
     });

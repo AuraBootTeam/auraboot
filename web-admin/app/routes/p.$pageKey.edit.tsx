@@ -1,5 +1,5 @@
 /**
- * Dynamic Edit Page — /p/{model_code}/edit/{recordPid}
+ * Dynamic Edit Page — /p/{model_code}/edit/{recordId}
  *
  * URL segment is the model_code. PageKey derived as {model_code}_form.
  */
@@ -10,7 +10,8 @@ import { getTokenFromRequest } from '~/shared/services/session';
 import { DynamicPageRenderer } from '~/framework/meta/rendering/pages/DynamicPageRenderer';
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
-  const { pageKey, recordPid } = params;
+  const { pageKey } = params;
+  const recordPid = params.recordPid ?? params.recordId;
   if (!pageKey || !recordPid) {
     throw new Response('Page key and record ID are required', { status: 400 });
   }

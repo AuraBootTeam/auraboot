@@ -80,6 +80,11 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
   const record = readDataSourceRecord(runtime, dataSourceId);
   const metrics = Array.isArray((block as any).metrics) ? (block as any).metrics : [];
   const variant = (block as any).variant || 'cards';
+  const configuredColumns = Number((block as any).columns);
+  const cardColumns =
+    Number.isFinite(configuredColumns) && configuredColumns > 0
+      ? Math.min(Math.max(Math.floor(configuredColumns), 1), 12)
+      : undefined;
   const title = block.title ? getLocalizedText(block.title, locale, t) : '';
   const evaluator = runtime.getEvaluator();
 
@@ -214,7 +219,14 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
         className={
           variant === 'chips'
             ? 'flex flex-wrap gap-2'
-            : 'grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6'
+            : cardColumns
+              ? 'grid items-stretch gap-3'
+              : 'grid items-stretch gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6'
+        }
+        style={
+          variant === 'cards' && cardColumns
+            ? { gridTemplateColumns: `repeat(${cardColumns}, minmax(0, 1fr))` }
+            : undefined
         }
         data-testid="metric-strip"
       >

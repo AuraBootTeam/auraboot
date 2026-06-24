@@ -462,4 +462,56 @@ describe('DataSourceManager', () => {
       { fieldName: 'bom_std_task_id', operator: 'EQ', value: 'task-1' },
     ]);
   });
+
+  it('resolves dependent params from previously loaded data source rows', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '0',
+      data: { records: [{ pid: 'url-1' }], total: 1, current: 1, pageSize: 100 },
+    } as any);
+
+    const manager = new DataSourceManager(createExpressionContext({} as any));
+    manager.register('jobSummary', {
+      type: 'api',
+      endpoint: '/api/dynamic/cr_crawl_job/list',
+      method: 'get',
+      adaptor: 'table',
+      autoFetch: false,
+      params: {
+        filters: [{ fieldName: 'pid', operator: 'EQ', value: '${form.pid}' }],
+      },
+    });
+    manager.register('runUrls', {
+      type: 'api',
+      endpoint: '/api/dynamic/cr_crawl_url/list',
+      method: 'get',
+      adaptor: 'table',
+      params: {
+        pageNum: 1,
+        pageSize: 100,
+        filters: [{ fieldName: 'cr_cu_job_id', operator: 'EQ', value: '${data.jobSummary.id}' }],
+      },
+      dependOn: ['data.jobSummary.id'],
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(mockedFetchResult).not.toHaveBeenCalled();
+
+    manager.setData('jobSummary', {
+      records: [{ id: 42, pid: 'job-1', cr_cj_name: 'Current job' }],
+      total: 1,
+      current: 1,
+      pageSize: 1,
+    });
+
+    await waitFor(() => {
+      expect(mockedFetchResult).toHaveBeenCalledWith(
+        '/api/dynamic/cr_crawl_url/list',
+        expect.objectContaining({ method: 'get' }),
+      );
+    });
+    const params = mockedFetchResult.mock.calls.at(-1)?.[1]?.params as Record<string, any>;
+    expect(JSON.parse(params.filters)).toEqual([
+      { fieldName: 'cr_cu_job_id', operator: 'EQ', value: 42 },
+    ]);
+  });
 });

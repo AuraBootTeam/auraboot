@@ -15,7 +15,19 @@ export interface EvidencePanelBlockRendererProps {
   runtime: SchemaRuntime;
 }
 
+function unwrapDynamicJsonEnvelope(value: unknown): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value;
+  const record = value as Record<string, unknown>;
+  const type = typeof record.type === 'string' ? record.type.toLowerCase() : '';
+  if ((type === 'json' || type === 'jsonb') && Object.prototype.hasOwnProperty.call(record, 'value')) {
+    return parseJsonValue(record.value);
+  }
+  return value;
+}
+
 function parseJsonValue(value: unknown): unknown {
+  const unwrapped = unwrapDynamicJsonEnvelope(value);
+  if (unwrapped !== value) return unwrapped;
   if (typeof value !== 'string') return value;
   const trimmed = value.trim();
   if (!trimmed) return '';
@@ -27,7 +39,29 @@ function parseJsonValue(value: unknown): unknown {
   }
 }
 
-function formatValue(value: unknown, format?: string): string {
+function mappedValue(
+  value: unknown,
+  valueMap: unknown,
+  locale: string,
+  t: (key: string) => string,
+): string | null {
+  if (!valueMap || typeof valueMap !== 'object') return null;
+  const key = value === undefined || value === null || value === '' ? '__empty' : String(value);
+  const mapped =
+    (valueMap as Record<string, unknown>)[key] ?? (valueMap as Record<string, unknown>).__default;
+  if (mapped === undefined || mapped === null) return null;
+  return typeof mapped === 'string' ? mapped : getLocalizedText(mapped as any, locale, t);
+}
+
+function formatValue(
+  value: unknown,
+  format: string | undefined,
+  valueMap: unknown,
+  locale: string,
+  t: (key: string) => string,
+): string {
+  const mapped = mappedValue(value, valueMap, locale, t);
+  if (mapped !== null) return mapped;
   if (value === undefined || value === null || value === '') return '-';
   if (format === 'json') {
     return JSON.stringify(parseJsonValue(value), null, 2);
@@ -77,7 +111,13 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
         {sections.map((section: any, index: number) => {
           const key = String(section.key || section.field || index);
           const label = getLocalizedText(section.label || key, locale, t);
-          const value = formatValue(readPath(record, section.field), section.format);
+          const value = formatValue(
+            readPath(record, section.field),
+            section.format,
+            section.valueMap,
+            locale,
+            t,
+          );
           const isJson = section.format === 'json' || value.includes('\n');
 
           return (
