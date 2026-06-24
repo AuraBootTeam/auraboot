@@ -39,6 +39,27 @@ scripts/dev/start-production-like.sh --slug=<slug> --wait --rebuild
 scripts/dev/run-playwright-runner.sh --slug=<slug> --allow-pull
 ```
 
+## Agent git guards
+
+Install the local post-checkout hook once per clone:
+
+```bash
+pnpm agent:install-hooks
+```
+
+Before any code, docs, script, generated artifact, or config write, run:
+
+```bash
+pnpm agent:write-guard -- --repo /path/to/auraboot
+```
+
+The write guard fails closed for a normal checkout on `main`; create a linked
+worktree for feature work. The post-checkout hook calls
+`scripts/agent-git-guard.mjs` and restores canonical normal checkouts back to
+`main` when they are accidentally switched to a feature branch. Use
+`AURA_ALLOW_MAIN_WRITE=1` or `AURA_ALLOW_CANONICAL_BRANCH_SWITCH=1` only for a
+single explicitly authorized command.
+
 Daily bugfix environments are registered globally under the mono-repo root,
 outside any one worktree:
 
