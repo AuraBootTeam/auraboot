@@ -2,12 +2,15 @@ package com.auraboot.framework.meta.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.DynamicBatchResponse;
+import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.meta.dto.QueryCondition;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -25,6 +28,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -102,6 +106,38 @@ class DynamicControllerPublicRecordSanitizerTest {
                 "order", 1, 20, null, null, null, null, null, "order_query", null);
 
         assertPublicRecord(response.getData().getRecords().get(0), "p2");
+    }
+
+    @Test
+    void listResolvesRuntimeRecordInternalIdFilterWithoutExposingRawId() {
+        DynamicController controller = controller();
+        when(metaModelService.getModelDefinition("child")).thenReturn(Optional.of(model("child")));
+        when(dynamicDataService.getById("parent", "parent-pid")).thenReturn(row(42L, "parent-pid"));
+        when(dynamicDataService.list(eq("child"), any()))
+                .thenReturn(PaginationResult.of(List.of(row(11L, "child-pid")), 1L, 1, 20));
+
+        String filters = """
+                [{
+                  "fieldName": "parent_id",
+                  "operator": "EQ",
+                  "value": {
+                    "$recordInternalId": {
+                      "modelCode": "parent",
+                      "recordPid": "parent-pid"
+                    }
+                  }
+                }]
+                """;
+
+        ApiResponse<PaginationResult<Map<String, Object>>> response = controller.list(
+                "child", 1, 20, null, filters, null, null, null, null, null);
+
+        ArgumentCaptor<DynamicQueryRequest> requestCaptor = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("child"), requestCaptor.capture());
+        QueryCondition condition = requestCaptor.getValue().getConditions().get(0);
+        assertThat(condition.getFieldName()).isEqualTo("parent_id");
+        assertThat(condition.getValue()).isEqualTo(42L);
+        assertPublicRecord(response.getData().getRecords().get(0), "child-pid");
     }
 
     @Test

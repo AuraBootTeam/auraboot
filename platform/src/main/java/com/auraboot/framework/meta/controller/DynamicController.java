@@ -53,6 +53,7 @@ import java.util.Set;
 public class DynamicController {
 
     static final int MAX_BATCH_SIZE = 500;
+    static final String RECORD_INTERNAL_ID_RESOLVER = "$recordInternalId";
 
     private static String logSafe(Object value) {
         return LogSanitizer.safe(value);
@@ -124,7 +125,7 @@ public class DynamicController {
             logSafe(pageKey), pageNum, pageSize, logSafe(keyword), logSafe(filters),
                 logSafe(sortFields), logSafe(queryCode), cursor);
 
-        List<QueryCondition> conditions = parseFilters(filters);
+        List<QueryCondition> conditions = resolveRuntimeFilterValues(parseFilters(filters));
         List<SortField> parsedSortFields = parseSortFields(sortFields, sortField, sortOrder);
 
         DynamicQueryRequest queryRequest = DynamicQueryRequest.builder()
@@ -242,6 +243,68 @@ public class DynamicController {
             throw new com.auraboot.framework.meta.exception.MetaServiceException(
                 "Invalid filter format. Expected JSON array, e.g. [{\"fieldName\":\"status\",\"operator\":\"EQ\",\"value\":\"DRAFT\"}]");
         }
+    }
+
+    private List<QueryCondition> resolveRuntimeFilterValues(List<QueryCondition> conditions) {
+        if (conditions == null || conditions.isEmpty()) {
+            return conditions;
+        }
+        for (QueryCondition condition : conditions) {
+            if (condition == null) {
+                continue;
+            }
+            condition.setValue(resolveRuntimeFilterValue(condition.getValue()));
+            if (condition.getValues() != null && !condition.getValues().isEmpty()) {
+                List<Object> resolvedValues = new ArrayList<>(condition.getValues().size());
+                for (Object value : condition.getValues()) {
+                    resolvedValues.add(resolveRuntimeFilterValue(value));
+                }
+                condition.setValues(resolvedValues);
+            }
+            condition.setSubConditions(resolveRuntimeFilterValues(condition.getSubConditions()));
+        }
+        return conditions;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Object resolveRuntimeFilterValue(Object value) {
+        if (value instanceof Map<?, ?> map && map.containsKey(RECORD_INTERNAL_ID_RESOLVER)) {
+            return resolveRecordInternalId(map.get(RECORD_INTERNAL_ID_RESOLVER));
+        }
+        if (value instanceof List<?> list) {
+            List<Object> resolved = new ArrayList<>(list.size());
+            for (Object item : list) {
+                resolved.add(resolveRuntimeFilterValue(item));
+            }
+            return resolved;
+        }
+        return value;
+    }
+
+    private Object resolveRecordInternalId(Object resolverSpec) {
+        if (!(resolverSpec instanceof Map<?, ?> spec)) {
+            throw new com.auraboot.framework.meta.exception.MetaServiceException(
+                    RECORD_INTERNAL_ID_RESOLVER + " requires {modelCode, recordPid}");
+        }
+
+        String modelCode = stringValue(spec.get("modelCode"));
+        String recordPid = stringValue(spec.get("recordPid"));
+        if (modelCode == null || modelCode.isBlank() || recordPid == null || recordPid.isBlank()) {
+            throw new com.auraboot.framework.meta.exception.MetaServiceException(
+                    RECORD_INTERNAL_ID_RESOLVER + " requires non-empty modelCode and recordPid");
+        }
+
+        Map<String, Object> record = dynamicDataService.getById(modelCode, recordPid);
+        Object internalId = record != null ? record.get("id") : null;
+        if (internalId == null) {
+            throw new com.auraboot.framework.meta.exception.MetaServiceException(
+                    "Record internal id not found for model " + modelCode + " pid " + recordPid);
+        }
+        return internalId;
+    }
+
+    private static String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
     }
 
     static final int MAX_SORT_FIELDS = 5;

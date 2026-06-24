@@ -53,6 +53,20 @@ function interpolateTemplate(template: string, record: Record<string, any>): str
   });
 }
 
+function mappedValue(
+  value: unknown,
+  valueMap: unknown,
+  locale: string,
+  t: (key: string) => string,
+): string | null {
+  if (!valueMap || typeof valueMap !== 'object') return null;
+  const key = value === undefined || value === null || value === '' ? '__empty' : String(value);
+  const mapped =
+    (valueMap as Record<string, unknown>)[key] ?? (valueMap as Record<string, unknown>).__default;
+  if (mapped === undefined || mapped === null) return null;
+  return typeof mapped === 'string' ? mapped : getLocalizedText(mapped as LocalizedText, locale, t);
+}
+
 function shouldHideSummaryField(field: any): boolean {
   if (field?.hidden === true) return true;
   const fieldName = String(field?.field || field?.key || '')
@@ -276,7 +290,7 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
             if (shouldHideSummaryField(field)) return null;
             const value = readPath(record, field.field);
             if (value === undefined || value === null || value === '') return null;
-            const displayValue = String(value);
+            const displayValue = mappedValue(value, field.valueMap, locale, t) ?? String(value);
             const href = resolveSummaryFieldLink(field, record, displayValue);
             return (
               <div key={key} className="rounded-control min-w-0 bg-white/60 px-3 py-2">

@@ -394,6 +394,31 @@ describe('MetricStripBlockRenderer', () => {
     );
     expect(screen.getByTestId('metric-strip-subtext-rule_file')).toHaveClass('line-clamp-2');
   });
+
+  it('supports configured card columns for full-row metric layouts', () => {
+    const runtime = makeRuntime({
+      data: {
+        summary: { discovered: 9, followed: 6, skipped: 7 },
+      },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'run_metrics',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      columns: 3,
+      metrics: [
+        { key: 'discovered', label: 'Discovered', valueField: 'discovered' },
+        { key: 'followed', label: 'Followed', valueField: 'followed' },
+        { key: 'skipped', label: 'Skipped', valueField: 'skipped' },
+      ],
+    };
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip')).toHaveStyle({
+      gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    });
+  });
 });
 
 describe('WorkbenchActionBarBlockRenderer', () => {
@@ -724,6 +749,95 @@ describe('CandidateListBlockRenderer', () => {
       'selectedCandidate',
       expect.objectContaining({ pid: 'C-1', materialCode: 'D410000098100' }),
     );
+  });
+
+  it('selects the first candidate when defaultFirst is configured', async () => {
+    const runtime = makeRuntime({
+      data: {
+        candidates: [
+          { pid: 'C-1', materialCode: 'D410000098100' },
+          { pid: 'C-2', materialCode: 'D410000098200' },
+        ],
+      },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'candidate_list',
+      blockType: 'candidate-list',
+      dataSource: 'candidates',
+      selection: { mode: 'single', bind: 'selectedCandidate', defaultFirst: true },
+      item: {
+        rowKey: 'pid',
+        titleField: 'materialCode',
+      },
+    };
+
+    render(<CandidateListBlockRenderer block={block} runtime={runtime} />);
+
+    await waitFor(() => {
+      expect(runtime.__updateState).toHaveBeenCalledWith(
+        'scope-1',
+        'selectedCandidate',
+        expect.objectContaining({ pid: 'C-1' }),
+      );
+    });
+    expect(screen.getByTestId('candidate-list-item-C-1')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('renders queue-style record metadata from generic item configuration', () => {
+    const runtime = makeRuntime({
+      data: {
+        candidates: [
+          {
+            pid: 'URL-1',
+            cr_cu_canonical_url: 'https://supplier-demo.auraboot.cn/private/quote/316l-pump',
+            cr_cu_domain: 'supplier-demo.auraboot.cn',
+            cr_cu_status: 'SKIPPED_ROBOTS',
+            cr_cu_last_error: 'Robots 规则禁止访问报价私有目录',
+          },
+        ],
+      },
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: {},
+        global: {},
+        state: {},
+      }),
+    }) as any;
+    const block: BlockConfig = {
+      id: 'url_queue',
+      blockType: 'candidate-list',
+      dataSource: 'candidates',
+      item: {
+        rowKey: 'pid',
+        titleField: 'cr_cu_canonical_url',
+        titleRules: [
+          {
+            when: "row.cr_cu_status == 'SKIPPED_ROBOTS'",
+            text: { 'zh-CN': '私有报价目录 / 316L 泵', en: 'Private quote catalog / 316L pump' },
+          },
+        ],
+        domainField: 'cr_cu_domain',
+        pathFromUrlField: 'cr_cu_canonical_url',
+        reasonField: 'cr_cu_last_error',
+        statusField: 'cr_cu_status',
+        statusValueMap: {
+          SKIPPED_ROBOTS: { 'zh-CN': 'Robots 拒绝', en: 'Skipped by Robots' },
+        },
+        statusToneMap: {
+          SKIPPED_ROBOTS: 'amber',
+        },
+      },
+    };
+
+    render(<CandidateListBlockRenderer block={block} runtime={runtime} />);
+
+    const item = screen.getByTestId('candidate-list-item-URL-1');
+    expect(item).toHaveTextContent('私有报价目录 / 316L 泵');
+    expect(item).toHaveTextContent('supplier-demo.auraboot.cn');
+    expect(item).toHaveTextContent('/private/quote/316l-pump');
+    expect(item).toHaveTextContent('Robots 拒绝');
+    expect(item).toHaveTextContent('Robots 规则禁止访问报价私有目录');
   });
 
   it('runs configured candidate actions after a candidate is selected', async () => {
@@ -1612,6 +1726,34 @@ describe('RecordInspectorBlockRenderer', () => {
     expect(screen.getByText('62R 1% 0603')).toBeInTheDocument();
   });
 
+  it('renders a configured title above the selected record fields', () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: {},
+        global: {},
+        state: {
+          selectedUrl: {
+            cr_cu_status: 'FETCHED',
+          },
+        },
+      }),
+    });
+    const block: BlockConfig = {
+      id: 'url_process',
+      blockType: 'record-inspector',
+      title: { 'zh-CN': '当前 URL / 处理链路', en: 'Current URL / Processing Path' },
+      context: '${state.selectedUrl}',
+      fields: [{ field: 'cr_cu_status', label: { 'zh-CN': '当前状态', en: 'Status' } }],
+    };
+
+    render(<RecordInspectorBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('record-inspector')).toHaveTextContent('当前 URL / 处理链路');
+    expect(screen.getByText('当前状态')).toBeInTheDocument();
+  });
+
   it('rerenders when runtime state selects a record after initial empty render', () => {
     const context: Record<string, any> = {
       locale: 'en-US',
@@ -1747,6 +1889,40 @@ describe('EvidencePanelBlockRenderer', () => {
     expect(screen.getByTestId('evidence-panel-section-conflict')).toHaveTextContent(
       '"brand": "alternative"',
     );
+  });
+
+  it('unwraps dynamic jsonb envelopes before rendering JSON evidence', () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'en-US',
+        t: (k: string) => k,
+        form: {},
+        global: {},
+        state: {
+          selectedDocument: {
+            metadata: {
+              type: 'jsonb',
+              value: '{"fields":["spec","deliveryWindow"],"qa":"passed"}',
+              null: false,
+            },
+          },
+        },
+      }),
+    });
+    const block: BlockConfig = {
+      id: 'evidence',
+      blockType: 'evidence-panel',
+      context: '${state.selectedDocument}',
+      title: 'Evidence',
+      sections: [{ key: 'metadata', label: 'Metadata', field: 'metadata', format: 'json' }],
+    };
+
+    render(<EvidencePanelBlockRenderer block={block} runtime={runtime} />);
+
+    const section = screen.getByTestId('evidence-panel-section-metadata');
+    expect(section).toHaveTextContent('"fields"');
+    expect(section).toHaveTextContent('"spec"');
+    expect(section).not.toHaveTextContent('"type": "jsonb"');
   });
 });
 

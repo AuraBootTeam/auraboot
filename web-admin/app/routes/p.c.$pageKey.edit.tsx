@@ -1,5 +1,5 @@
 /**
- * Custom Form Edit Page — /p/c/{pageKey}/edit/{recordPid}
+ * Custom Form Edit Page — /p/c/{pageKey}/edit/{recordId}
  *
  * Uses the URL pageKey to load a custom form schema, then uses that schema's
  * modelCode to load the edited record.
@@ -18,7 +18,8 @@ interface PageInfo {
 }
 
 export const loader = async ({ params, request }: LoaderFunctionArgs) => {
-  const { pageKey, recordPid } = params;
+  const { pageKey } = params;
+  const recordPid = params.recordPid ?? params.recordId;
   if (!pageKey || !recordPid) {
     throw new Response('Page key and record ID are required', { status: 400 });
   }
