@@ -273,10 +273,10 @@ describe('TableBlockRenderer', () => {
   const baseColumns = [{ field: 'name', label: 'Name' }];
   const baseRow = { id: 'row-1', pid: 'row-1', name: 'Alpha' };
 
-  function makeRuntimeWithData() {
+  function makeRuntimeWithData(row: Record<string, unknown> = baseRow) {
     return makeRuntime({
       getDataSourceManager: () => ({
-        getData: () => [baseRow],
+        getData: () => [row],
         has: () => true,
         register: vi.fn(),
       }),
@@ -567,6 +567,31 @@ describe('TableBlockRenderer', () => {
 
     expect(getByTestId('table-th-name')).toHaveClass('px-3', 'py-2');
     expect(getByTestId('table-row-row-1').querySelector('td')).toHaveClass('px-3', 'py-2');
+  });
+
+  it('applies body alignment and full-value title for ellipsis cells', () => {
+    const runtime = makeRuntimeWithData({
+      ...baseRow,
+      name: 'C100120003500 / very long material specification that should be truncated',
+    });
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        columns: [
+          { field: 'name', label: { en: 'Name' }, width: 120, align: 'center', ellipsis: true },
+        ],
+      },
+    };
+
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    const cell = getByTestId('table-row-row-1').querySelector('td');
+
+    expect(cell).toHaveClass('text-center', 'truncate');
+    expect(cell).toHaveAttribute(
+      'title',
+      'C100120003500 / very long material specification that should be truncated',
+    );
   });
 });
 
