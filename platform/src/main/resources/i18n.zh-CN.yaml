@@ -771,6 +771,83 @@ ai:
   settings:
     title: AI 设置
     subtitle: 配置提供商、工具和 AI 中心治理策略
+  providers:
+    title: 模型服务
+    subtitle: 管理 AI 模型提供商的 API Key、模型和端点
+    count:
+      configured: "已配置 {count} 个提供商"
+    level:
+      platform: 平台
+      tenant: 租户
+    status:
+      active: 已启用
+      unconfigured: 未配置 API Key
+      ready: 待测试
+      disabled: 已停用
+    action:
+      add: 添加提供商
+      create: 创建
+      saveChanges: 保存修改
+      edit: 编辑
+      delete: 删除
+      testConnection: 测试连接
+      testing: 测试中...
+    empty:
+      title: 暂无已配置的模型提供商
+      description: 添加 AI 模型提供商后即可启用 AuraBot 对话、AI 评分和其他智能能力。
+      addFirst: 添加第一个提供商
+    picker:
+      title: 添加提供商
+      subtitle: 选择要配置的模型提供商
+      added: 已添加
+    custom:
+      title: 自定义（OpenAI 兼容）
+      description: 添加自托管或未列出的提供商
+      providerName: 自定义提供商
+    preset:
+      anthropic:
+        desc: Claude 系列：Opus、Sonnet、Haiku
+      openai:
+        desc: GPT-4o、GPT-4、o1 系列
+      deepseek:
+        desc: DeepSeek Chat 与 Reasoner
+      minimaxi:
+        desc: MiniMax-Text-01
+      qianwen:
+        desc: Qwen-Plus、Qwen-Max
+      zhipu:
+        desc: GLM-4、GLM-3-Turbo
+      moonshot:
+        desc: Moonshot-v1-8k/32k/128k
+    panel:
+      configureTitle: "配置 {name}"
+      editTitle: "编辑 {name}"
+      providerCode: 提供商编码
+    field:
+      apiKey: API Key
+      baseUrl: Base URL
+      defaultModel: 默认模型
+      maxTokens: 最大 Token 数
+      displayName: 显示名称
+      apiFormat: API 格式
+      configLevel: 配置层级
+      priority: 优先级
+      enabled: 启用提供商
+    placeholder:
+      customDisplayName: 例如：本地大模型
+    apiFormat:
+      messages: Messages API
+      chat_completions: Chat Completions
+    apiFormatHint:
+      openaiCompatible: OpenAI 兼容
+    card:
+      priority: "优先级 {priority}"
+    hint:
+      priority: 数字越大优先级越高
+    toast:
+      testPassed: 连接测试通过
+      testPassedActivated: 连接测试通过，提供商已启用
+      testFailed: 连接测试失败
   retry: 重试
 
 # Workbench widgets

@@ -29,6 +29,7 @@ import {
   type ServiceType,
 } from '~/shared/admin/cloud-config-core';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
 import { post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
@@ -106,6 +107,21 @@ const API_FORMAT_LABELS: Record<string, string> = {
   chat_completions: 'Chat Completions',
 };
 
+function translateProviderFieldLabel(
+  t: (key: string, params?: Record<string, any>, fallback?: string) => string,
+  key: string,
+  fallback: string,
+): string {
+  return t(`ai.providers.field.${key}`, undefined, fallback);
+}
+
+function translateApiFormatLabel(
+  t: (key: string, params?: Record<string, any>, fallback?: string) => string,
+  format: string,
+): string {
+  return t(`ai.providers.apiFormat.${format}`, undefined, API_FORMAT_LABELS[format] || format);
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -129,6 +145,7 @@ function getProviderStatus(config: CloudConfig): 'active' | 'unconfigured' | 're
 }
 
 function StatusDot({ status }: { status: 'active' | 'unconfigured' | 'ready' | 'disabled' }) {
+  const { t } = useI18n();
   const colors = {
     active: 'bg-emerald-500',
     unconfigured: 'bg-gray-400',
@@ -136,10 +153,10 @@ function StatusDot({ status }: { status: 'active' | 'unconfigured' | 'ready' | '
     disabled: 'bg-gray-400',
   };
   const labels = {
-    active: 'Active',
-    unconfigured: 'No API Key',
-    ready: 'Ready to Test',
-    disabled: 'Disabled',
+    active: t('ai.providers.status.active', undefined, 'Active'),
+    unconfigured: t('ai.providers.status.unconfigured', undefined, 'No API Key'),
+    ready: t('ai.providers.status.ready', undefined, 'Ready to Test'),
+    disabled: t('ai.providers.status.disabled', undefined, 'Disabled'),
   };
   return (
     <span className="flex items-center gap-1.5">
@@ -165,6 +182,7 @@ export function meta() {
 // ---------------------------------------------------------------------------
 
 export default function LlmProvidersPage() {
+  const { t } = useI18n();
   const {
     configs,
     loading,
@@ -265,15 +283,26 @@ export default function LlmProvidersPage() {
         // Auto-enable provider after successful test
         if (!config.enabled) {
           await handleToggleEnabled(config);
-          showSuccessToast('Connection test passed — provider activated');
+          showSuccessToast(
+            t(
+              'ai.providers.toast.testPassedActivated',
+              undefined,
+              'Connection test passed — provider activated',
+            ),
+          );
         } else {
-          showSuccessToast('Connection test passed');
+          showSuccessToast(t('ai.providers.toast.testPassed', undefined, 'Connection test passed'));
         }
       } else {
-        showErrorToast(result.desc || 'Connection test failed');
+        showErrorToast(
+          result.desc ||
+            t('ai.providers.toast.testFailed', undefined, 'Connection test failed'),
+        );
       }
     } catch (e: any) {
-      showErrorToast(e.message || 'Connection test failed');
+      showErrorToast(
+        e.message || t('ai.providers.toast.testFailed', undefined, 'Connection test failed'),
+      );
     } finally {
       setLocalTestingPid(null);
     }
@@ -290,9 +319,15 @@ export default function LlmProvidersPage() {
                 <CloudIcon className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">LLM Providers</h1>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                  {t('ai.providers.title', undefined, 'LLM Providers')}
+                </h1>
                 <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                  Manage API keys, models, and endpoints for AI model providers
+                  {t(
+                    'ai.providers.subtitle',
+                    undefined,
+                    'Manage API keys, models, and endpoints for AI model providers',
+                  )}
                 </p>
               </div>
             </div>
@@ -302,7 +337,7 @@ export default function LlmProvidersPage() {
               className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-violet-700"
             >
               <PlusIcon className="h-4 w-4" />
-              Add Provider
+              {t('ai.providers.action.add', undefined, 'Add Provider')}
             </button>
           </div>
         </div>
@@ -323,12 +358,18 @@ export default function LlmProvidersPage() {
                     : 'text-gray-500 hover:text-gray-700 dark:text-gray-400'
                 }`}
               >
-                {lv === 'platform' ? 'Platform' : 'Tenant'}
+                {lv === 'platform'
+                  ? t('ai.providers.level.platform', undefined, 'Platform')
+                  : t('ai.providers.level.tenant', undefined, 'Tenant')}
               </button>
             ))}
           </div>
           <span className="text-sm text-gray-400">
-            {llmConfigs.length} provider{llmConfigs.length !== 1 ? 's' : ''} configured
+            {t(
+              'ai.providers.count.configured',
+              { count: llmConfigs.length },
+              `${llmConfigs.length} provider${llmConfigs.length !== 1 ? 's' : ''} configured`,
+            )}
           </span>
         </div>
 
@@ -392,23 +433,28 @@ export default function LlmProvidersPage() {
 // ---------------------------------------------------------------------------
 
 function EmptyState({ onAdd }: { onAdd: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="rounded-xl border border-gray-200 bg-white py-16 text-center dark:border-gray-700 dark:bg-gray-800">
       <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100 dark:bg-gray-700">
         <CloudIcon className="h-8 w-8 text-gray-400" />
       </div>
       <h3 className="mb-1 text-base font-medium text-gray-900 dark:text-white">
-        No LLM providers configured
+        {t('ai.providers.empty.title', undefined, 'No LLM providers configured')}
       </h3>
       <p className="mx-auto mb-4 max-w-sm text-sm text-gray-500 dark:text-gray-400">
-        Add an AI model provider to enable AuraBot chat, AI scoring, and other intelligent features.
+        {t(
+          'ai.providers.empty.description',
+          undefined,
+          'Add an AI model provider to enable AuraBot chat, AI scoring, and other intelligent features.',
+        )}
       </p>
       <button
         onClick={onAdd}
         className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700"
       >
         <PlusIcon className="h-4 w-4" />
-        Add your first provider
+        {t('ai.providers.empty.addFirst', undefined, 'Add your first provider')}
       </button>
     </div>
   );
@@ -433,6 +479,7 @@ function ProviderCard({
   onTest: () => void;
   onToggle: () => void;
 }) {
+  const { t } = useI18n();
   const parsed = safeParseJSON(config.config);
   const status = getProviderStatus(config);
   const icon = PROVIDER_ICONS[config.providerCode] || '\u{2699}\uFE0F';
@@ -479,12 +526,12 @@ function ProviderCard({
           )}
           {apiFormat && API_FORMAT_LABELS[apiFormat] && (
             <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-              {API_FORMAT_LABELS[apiFormat]}
+              {translateApiFormatLabel(t, apiFormat)}
             </span>
           )}
           {config.priority > 0 && (
             <span className="inline-flex items-center rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-              Priority {config.priority}
+              {t('ai.providers.card.priority', { priority: config.priority }, `Priority ${config.priority}`)}
             </span>
           )}
         </div>
@@ -514,7 +561,7 @@ function ProviderCard({
               onClick={onTest}
               disabled={testing}
               className="rounded-md p-1.5 text-gray-400 transition-colors hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-emerald-400"
-              title="Test Connection"
+              title={t('ai.providers.action.testConnection', undefined, 'Test Connection')}
               data-testid={`provider-test-${config.providerCode}`}
             >
               {testing ? (
@@ -526,7 +573,7 @@ function ProviderCard({
             <button
               onClick={onEdit}
               className="rounded-md p-1.5 text-gray-400 transition-colors hover:text-violet-600 dark:hover:text-violet-400"
-              title="Edit"
+              title={t('ai.providers.action.edit', undefined, 'Edit')}
               data-testid={`provider-edit-${config.providerCode}`}
             >
               <PencilIcon className="h-4 w-4" />
@@ -534,7 +581,7 @@ function ProviderCard({
             <button
               onClick={onDelete}
               className="rounded-md p-1.5 text-gray-400 transition-colors hover:text-red-600 dark:hover:text-red-400"
-              title="Delete"
+              title={t('ai.providers.action.delete', undefined, 'Delete')}
               data-testid={`provider-delete-${config.providerCode}`}
             >
               <TrashIcon className="h-4 w-4" />
@@ -561,6 +608,7 @@ function ProviderPickerOverlay({
   onPickCustom: () => void;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 pt-[8vh]">
       <div
@@ -570,9 +618,15 @@ function ProviderPickerOverlay({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add Provider</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {t('ai.providers.picker.title', undefined, 'Add Provider')}
+            </h3>
             <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-              Choose a model provider to configure
+              {t(
+                'ai.providers.picker.subtitle',
+                undefined,
+                'Choose a model provider to configure',
+              )}
             </p>
           </div>
           <button
@@ -608,13 +662,15 @@ function ProviderPickerOverlay({
                       <span className="text-sm font-semibold text-gray-900 dark:text-white">
                         {preset.name}
                       </span>
-                      {alreadyAdded && (
-                        <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-gray-600 dark:text-gray-400">
-                          Added
+                        {alreadyAdded && (
+                          <span className="rounded bg-gray-200 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:bg-gray-600 dark:text-gray-400">
+                            {t('ai.providers.picker.added', undefined, 'Added')}
                         </span>
                       )}
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{preset.desc}</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {t(`ai.providers.preset.${preset.code}.desc`, undefined, preset.desc)}
+                    </span>
                   </div>
                   {!alreadyAdded && (
                     <ChevronRightIcon className="h-4 w-4 shrink-0 text-gray-300 transition-colors group-hover:text-violet-500" />
@@ -634,10 +690,18 @@ function ProviderPickerOverlay({
               </div>
               <div className="min-w-0 flex-1">
                 <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                  Custom (OpenAI-compatible)
+                  {t(
+                    'ai.providers.custom.title',
+                    undefined,
+                    'Custom (OpenAI-compatible)',
+                  )}
                 </span>
                 <span className="block text-xs text-gray-500 dark:text-gray-400">
-                  Add a self-hosted or unlisted provider
+                  {t(
+                    'ai.providers.custom.description',
+                    undefined,
+                    'Add a self-hosted or unlisted provider',
+                  )}
                 </span>
               </div>
               <ChevronRightIcon className="h-4 w-4 shrink-0 text-gray-300 transition-colors group-hover:text-violet-500" />
@@ -681,6 +745,7 @@ function EditSidePanel({
   onTest: (config: CloudConfig) => void;
   testing: string | null;
 }) {
+  const { t } = useI18n();
   const existingParsed = config ? safeParseJSON(config.config) : {};
 
   // --- Form state ---
@@ -732,7 +797,7 @@ function EditSidePanel({
   const preset = PROVIDER_PRESETS.find((p) => p.code === providerCode);
   const icon = PROVIDER_ICONS[providerCode] || (customMode ? '\u{2699}\uFE0F' : '\u{2699}\uFE0F');
   const displayName = customMode
-    ? customDisplayName || 'Custom Provider'
+    ? customDisplayName || t('ai.providers.custom.providerName', undefined, 'Custom Provider')
     : preset?.name || PROVIDER_LABELS[providerCode] || providerCode;
 
   // Sync apiFormat into configValues
@@ -804,7 +869,9 @@ function EditSidePanel({
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="truncate text-base font-semibold text-gray-900 dark:text-white">
-              {isNew ? 'Configure' : 'Edit'} {displayName}
+              {isNew
+                ? t('ai.providers.panel.configureTitle', { name: displayName }, `Configure ${displayName}`)
+                : t('ai.providers.panel.editTitle', { name: displayName }, `Edit ${displayName}`)}
             </h3>
             {!customMode && <span className="font-mono text-xs text-gray-400">{providerCode}</span>}
           </div>
@@ -824,20 +891,26 @@ function EditSidePanel({
               <>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Display Name <span className="text-red-500">*</span>
+                    {t('ai.providers.field.displayName', undefined, 'Display Name')}{' '}
+                    <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={customDisplayName}
                     onChange={(e) => setCustomDisplayName(e.target.value)}
-                    placeholder="e.g., My Local LLM"
+                    placeholder={t(
+                      'ai.providers.placeholder.customDisplayName',
+                      undefined,
+                      'e.g., My Local LLM',
+                    )}
                     required
                     className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:border-violet-500 focus:ring-2 focus:ring-violet-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                     data-testid="custom-display-name"
                   />
                   {customDisplayName && (
                     <p className="mt-1 text-xs text-gray-400">
-                      Provider code: <code className="font-mono">{effectiveProviderCode}</code>
+                      {t('ai.providers.panel.providerCode', undefined, 'Provider code')}:{' '}
+                      <code className="font-mono">{effectiveProviderCode}</code>
                     </p>
                   )}
                 </div>
@@ -847,7 +920,7 @@ function EditSidePanel({
             {/* Config level */}
             <div>
               <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Config Level
+                {t('ai.providers.field.configLevel', undefined, 'Config Level')}
               </label>
               <div className="flex gap-3">
                 {(['platform', 'tenant'] as ConfigLevel[]).map((lv) => (
@@ -862,7 +935,9 @@ function EditSidePanel({
                       disabled={!isNew}
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      {lv === 'platform' ? 'Platform' : 'Tenant'}
+                      {lv === 'platform'
+                        ? t('ai.providers.level.platform', undefined, 'Platform')
+                        : t('ai.providers.level.tenant', undefined, 'Tenant')}
                     </span>
                   </label>
                 ))}
@@ -873,7 +948,7 @@ function EditSidePanel({
             {orderedFields.map((f) => (
               <div key={f.key}>
                 <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {f.label}
+                  {translateProviderFieldLabel(t, f.key, f.label)}
                   {f.required && <span className="ml-0.5 text-red-500">*</span>}
                 </label>
                 <div className="relative">
@@ -908,15 +983,19 @@ function EditSidePanel({
             {/* API Format radio */}
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                API Format
+                {t('ai.providers.field.apiFormat', undefined, 'API Format')}
               </label>
               <div className="flex gap-4">
                 {[
-                  { value: 'messages', label: 'Messages API', hint: 'Anthropic' },
+                  {
+                    value: 'messages',
+                    label: translateApiFormatLabel(t, 'messages'),
+                    hint: 'Anthropic',
+                  },
                   {
                     value: 'chat_completions',
-                    label: 'Chat Completions',
-                    hint: 'OpenAI-compatible',
+                    label: translateApiFormatLabel(t, 'chat_completions'),
+                    hint: t('ai.providers.apiFormatHint.openaiCompatible', undefined, 'OpenAI-compatible'),
                   },
                 ].map((opt) => (
                   <label
@@ -949,7 +1028,7 @@ function EditSidePanel({
             {/* Priority */}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Priority
+                {t('ai.providers.field.priority', undefined, 'Priority')}
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -961,14 +1040,16 @@ function EditSidePanel({
                   className="w-20 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 focus:ring-2 focus:ring-violet-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
                   data-testid="field-priority"
                 />
-                <span className="text-xs text-gray-400">Higher = preferred</span>
+                <span className="text-xs text-gray-400">
+                  {t('ai.providers.hint.priority', undefined, 'Higher = preferred')}
+                </span>
               </div>
             </div>
 
             {/* Enable toggle */}
             <div className="flex items-center justify-between py-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                Enable Provider
+                {t('ai.providers.field.enabled', undefined, 'Enable Provider')}
               </span>
               <button
                 type="button"
@@ -1001,12 +1082,12 @@ function EditSidePanel({
                 {testing === config.pid ? (
                   <>
                     <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-emerald-600" />
-                    Testing...
+                    {t('ai.providers.action.testing', undefined, 'Testing...')}
                   </>
                 ) : (
                   <>
                     <BeakerIcon className="h-4 w-4" />
-                    Test Connection
+                    {t('ai.providers.action.testConnection', undefined, 'Test Connection')}
                   </>
                 )}
               </button>
@@ -1021,7 +1102,7 @@ function EditSidePanel({
             onClick={onClose}
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
-            Cancel
+            {t('common.cancel', undefined, 'Cancel')}
           </button>
           <button
             onClick={handleSubmit as any}
@@ -1033,7 +1114,11 @@ function EditSidePanel({
             className="rounded-lg bg-violet-600 px-5 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
             data-testid="panel-save-btn"
           >
-            {saving ? 'Saving...' : isNew ? 'Create' : 'Save Changes'}
+            {saving
+              ? t('common.saving', undefined, 'Saving...')
+              : isNew
+                ? t('ai.providers.action.create', undefined, 'Create')
+                : t('ai.providers.action.saveChanges', undefined, 'Save Changes')}
           </button>
         </div>
       </div>
