@@ -1,0 +1,64 @@
+The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
+
+ RUN  v4.1.8 /Users/ghj/work/auraboot-core-account-org-settings/web-admin
+
+ ✓ app/framework/meta/utils/__tests__/i18nResolver.confirm.test.ts > resolveConfirmDialog > provides business action fallbacks for cancellation, finalization, and conversion 1ms 63 MB heap used
+ ✓ app/framework/meta/utils/__tests__/i18nResolver.confirm.test.ts > resolveConfirmDialog > accepts localized inline confirm content from page DSL 0ms 64 MB heap used
+ ✓ app/framework/meta/utils/__tests__/i18nResolver.confirm.test.ts > resolveFieldLabel > prefers model-scoped field labels over common field fallbacks 0ms 64 MB heap used
+ ✓ app/framework/meta/utils/__tests__/i18nResolver.confirm.test.ts > resolveColumnLabel > uses model-scoped field labels for columns without explicit labels 0ms 64 MB heap used
+ ✓ app/shared/services/__tests__/profile.test.ts > profile service > getUserProfile > GETs /api/user/profile and returns profile data 2ms 63 MB heap used
+ ✓ app/shared/services/__tests__/profile.test.ts > profile service > getUserProfile > throws when result code is not 0 1ms 63 MB heap used
+ ✓ app/shared/services/__tests__/profile.test.ts > profile service > getUserProfile > throws when data is null 0ms 63 MB heap used
+ ✓ app/shared/services/__tests__/profile.test.ts > profile service > getUserProfile > uses desc from response as error message when present 0ms 64 MB heap used
+ ✓ app/shared/services/__tests__/profile.test.ts > profile service > updateUserProfile > PUTs /api/user/profile with profile data and returns updated profile 0ms 64 MB heap used
+ ✓ app/shared/services/__tests__/profile.test.ts > profile service > updateUserProfile > throws on failure 0ms 64 MB heap used
+ ✓ app/shared/services/__tests__/profile.test.ts > profile service > updateUserProfile > throws with fallback message when desc is empty 0ms 64 MB heap used
+ ✓ app/shared/services/__tests__/profile.test.ts > profile service > uploadAvatar > POSTs multipart data to the backend avatar upload endpoint 1ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry record navigation > prefers pid over id for edit routes 1ms 63 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry record navigation > prefers pid over id for detail routes 0ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry record navigation > executes command actions with evaluated pid target and payload 1ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry command.execute inputFields (command-form sugar) > pops a form (FormDialog) and merges collected values into the command payload 1ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry command.execute inputFields (command-form sugar) > maps paginated API records into input field select options 1ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry command.execute inputFields (command-form sugar) > aborts (does not submit the command) when the user cancels the form 0ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry command.execute inputFields (command-form sugar) > is unchanged for commands without inputFields (backward compatible) 0ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry dialog.confirm > resolves object-form message to zh-CN string before passing to confirm dialog 0ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry dialog.confirm > throws when user cancels (object-form message) 0ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry refresh > prefers explicit data source targets over page-level loadData 0ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry navigate / new / router.push handlers > navigate jumps to args.path 0ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry navigate / new / router.push handlers > navigate logs and is a no-op when the navigate fn is missing 0ms 64 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry navigate / new / router.push handlers > navigate logs and is a no-op when path is missing 0ms 65 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry navigate / new / router.push handlers > new jumps to the model new route 0ms 65 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry navigate / new / router.push handlers > new logs and is a no-op without tableName 0ms 65 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry navigate / new / router.push handlers > router.push navigates to args.path 0ms 65 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry search / reset / setState handlers > search resets to page 1 and reloads with the current filters 0ms 65 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry search / reset / setState handlers > reset clears filters and reloads from page 1 0ms 65 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry search / reset / setState handlers > setState merges args into the filter state 0ms 65 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry search / reset / setState handlers > search/reset/setState log and no-op when required context is missing 0ms 65 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry registry API > register / has / getRegisteredTypes / unregister round-trip 0ms 65 MB heap used
+ ✓ app/framework/meta/runtime/actions/__tests__/ActionRegistry.test.ts > ActionRegistry registry API > registerBatch registers multiple handlers at once 0ms 65 MB heap used
+ ✓ app/shared/services/__tests__/session.test.ts > session recovery > returns the jwt token from the recovered session 56ms 66 MB heap used
+ ✓ app/shared/services/__tests__/session.test.ts > session recovery > revokes the backend session before clearing the BFF cookie on logout 1ms 66 MB heap used
+Not implemented: Window's confirm() method
+Not implemented: Window's confirm() method
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > polls the async task to completion and reloads, instead of treating the immediate ack as the result 9ms 84 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > surfaces temporary passwords returned by administrator reset commands 1ms 85 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > collects command inputFields and merges them into the command payload 2ms 86 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > surfaces a failed async task in the modal instead of throwing to the page 1ms 86 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > refreshes detail data sources when an async task fails so status banners can surface the failure 1ms 87 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > prefers command context.detail over generic HTTP error text 1ms 87 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > uses an explicit command targetRecordPid template from runtime context for nested toolbar actions 1ms 87 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > reloads explicit data sources for nested toolbar commands instead of navigating away 1ms 87 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > uses a hard browser navigation when navigate actions opt into hardReload 1ms 88 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > injects the original filename alongside promptUpload file ids 1ms 88 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > refreshes detail data sources and shows completion feedback after promptUpload commands 1ms 89 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > uses the runtime toast bridge for promptUpload feedback when block renderers do not pass showToast 1ms 89 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > falls back to global toast events for promptUpload feedback when no toast bridge is provided 1ms 90 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > merges action payload with promptUpload file ids for command buttons 1ms 90 MB heap used
+ ✓ app/framework/meta/hooks/__tests__/useActionHandler.async.test.ts > useActionHandler - handlerParams.async polling > infers DELETE operation for row command actions with delete semantics 0ms 90 MB heap used
+
+ Test Files  5 passed (5)
+      Tests  51 passed (51)
+   Start at  10:08:35
+   Duration  980ms (transform 327ms, setup 834ms, import 325ms, tests 95ms, environment 2.75s)
+
+JSON report written to /Users/ghj/work/auraboot-core-account-org-settings/web-admin/test-results/results.json

@@ -2,6 +2,8 @@ package com.auraboot.framework.tenant.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.service.PasswordManagementService;
+import com.auraboot.framework.auth.service.PasswordPolicyService;
+import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -24,6 +26,7 @@ import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.Resource;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Collections;
 import java.util.List;
@@ -39,6 +42,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,8 +53,11 @@ class TenantMemberApplicationServiceImplTest {
     @Mock private TenantMemberService tenantMemberService;
     @Mock private UserService userService;
     @Mock private PasswordManagementService passwordManagementService;
+    @Mock private PasswordPolicyService passwordPolicyService;
+    @Mock private SessionManagementService sessionManagementService;
     @Mock private TeamMemberService teamMemberService;
     @Mock private DynamicDataService dynamicDataService;
+    @Mock private JdbcTemplate jdbcTemplate;
 
     @InjectMocks
     private TenantMemberApplicationServiceImpl service;
@@ -194,6 +201,7 @@ class TenantMemberApplicationServiceImplTest {
     @DisplayName("updateMemberStatus dispatches to activate/deactivate/suspend")
     void updateMemberStatusDispatches() {
         TenantMember m = member(1L, 99L, 5L, StatusConstants.ACTIVE);
+        m.setEmployeeId(88L);
         when(tenantMemberService.findByPid("p")).thenReturn(m);
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
         when(tenantMemberService.activateMember(1L)).thenReturn(true);
@@ -206,6 +214,26 @@ class TenantMemberApplicationServiceImplTest {
         verify(tenantMemberService).activateMember(1L);
         verify(tenantMemberService).deactivateMember(1L);
         verify(tenantMemberService).suspendMember(1L, "r");
+        verify(jdbcTemplate).update(
+                "UPDATE mt_org_employee SET org_emp_status = ?, updated_at = NOW() WHERE id = ?",
+                "resigned", 88L);
+        verify(sessionManagementService, times(2)).revokeAllSessions(5L);
+    }
+
+    @Test
+    @DisplayName("leave member marks employee resigned by member pid when no employee id")
+    void updateMemberStatusLeaveMarksEmployeeByMemberPid() {
+        TenantMember m = member(1L, 99L, 5L, StatusConstants.ACTIVE);
+        when(tenantMemberService.findByPid("p")).thenReturn(m);
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        when(tenantMemberService.deactivateMember(1L)).thenReturn(true);
+
+        assertTrue(service.updateMemberStatus("p", StatusConstants.INACTIVE, null, 7L));
+
+        verify(jdbcTemplate).update(
+                "UPDATE mt_org_employee SET org_emp_status = ?, updated_at = NOW() WHERE org_emp_member_id = ?",
+                "resigned", "mpid-1");
+        verify(sessionManagementService).revokeAllSessions(5L);
     }
 
     @Test
@@ -274,6 +302,24 @@ class TenantMemberApplicationServiceImplTest {
         when(userService.findByUserId(5L)).thenReturn(null);
 
         assertThrows(BusinessException.class, () -> service.sendPasswordResetEmail("p", 7L));
+    }
+
+    @Test
+    @DisplayName("resetMemberPasswordByAdmin retries until temporary password satisfies policy")
+    void resetMemberPasswordByAdminUsesPolicyCompliantTemporaryPassword() {
+        TenantMember m = member(1L, 99L, 5L, StatusConstants.ACTIVE);
+        when(tenantMemberService.findByPid("p")).thenReturn(m);
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        when(userService.findByUserId(5L)).thenReturn(u(5L, "x@y.com"));
+        when(passwordPolicyService.validate(anyString()))
+                .thenReturn(List.of("Password must contain at least one digit"))
+                .thenReturn(List.of());
+
+        String temporaryPassword = service.resetMemberPasswordByAdmin("p", 7L);
+
+        assertNotNull(temporaryPassword);
+        verify(passwordPolicyService, times(2)).validate(anyString());
+        verify(passwordManagementService).resetPasswordByAdmin(eq("up-5"), eq(temporaryPassword));
     }
 
     @Test

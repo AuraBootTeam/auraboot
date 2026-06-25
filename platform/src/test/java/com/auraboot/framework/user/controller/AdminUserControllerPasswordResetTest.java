@@ -1,6 +1,7 @@
 package com.auraboot.framework.user.controller;
 
 import com.auraboot.framework.auth.service.PasswordManagementService;
+import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.user.service.EmployeeAccountProvisioningService;
 import com.auraboot.framework.user.service.EmployeeAccountWorkbookParser;
 import com.auraboot.framework.user.service.UserProvisioningService;
@@ -22,6 +23,8 @@ class AdminUserControllerPasswordResetTest {
     @Mock
     private PasswordManagementService passwordManagementService;
     @Mock
+    private PasswordPolicyService passwordPolicyService;
+    @Mock
     private UserProvisioningService userProvisioningService;
     @Mock
     private EmployeeAccountProvisioningService employeeAccountProvisioningService;
@@ -35,6 +38,8 @@ class AdminUserControllerPasswordResetTest {
 
     @Test
     void resetPassword_keepsPasswordAdminManaged() {
+        org.mockito.Mockito.when(passwordPolicyService.isValid(any(String.class))).thenReturn(true);
+
         var response = controller.resetPassword("u-pid");
 
         String tempPassword = response.getData().get("tempPassword");

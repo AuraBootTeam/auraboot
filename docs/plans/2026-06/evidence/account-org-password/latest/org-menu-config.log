@@ -1,0 +1,13 @@
+▶ org-management RBAC menu configuration
+  ✔ keeps the minimal permission management entries discoverable and ordered (0.974208ms)
+  ✔ allows creating employee records before opening login accounts (0.099875ms)
+  ✔ wires employee open-account command into the list row actions (0.077875ms)
+✔ org-management RBAC menu configuration (1.676875ms)
+ℹ tests 3
+ℹ suites 1
+ℹ pass 3
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 73.995958

@@ -274,6 +274,7 @@ class PasswordManagementServiceImplTest {
     void resetPasswordByAdminHappy() {
         User u = user(1L, "hash");
         u.setSecurityVersion(2);
+        when(passwordPolicyService.validate("TempPass1!")).thenReturn(List.of());
         when(userMapper.selectOne(any(QueryWrapper.class))).thenReturn(u);
         when(passwordEncoder.encode("TempPass1!")).thenReturn("enc");
 
@@ -288,8 +289,18 @@ class PasswordManagementServiceImplTest {
     @Test
     @DisplayName("resetPasswordByAdmin throws when user missing")
     void resetPasswordByAdminMissing() {
+        when(passwordPolicyService.validate("TempPass1!")).thenReturn(List.of());
         when(userMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
         assertThrows(RootUnCheckedException.class, () -> service.resetPasswordByAdmin("missing", "TempPass1!"));
+    }
+
+    @Test
+    @DisplayName("resetPasswordByAdmin rejects passwords that violate policy")
+    void resetPasswordByAdminRejectsWeakPassword() {
+        when(passwordPolicyService.validate("weak")).thenReturn(List.of("too short"));
+
+        assertThrows(RootUnCheckedException.class, () -> service.resetPasswordByAdmin("u-1", "weak"));
+        verify(userMapper, never()).selectOne(any(QueryWrapper.class));
     }
 
     @Test

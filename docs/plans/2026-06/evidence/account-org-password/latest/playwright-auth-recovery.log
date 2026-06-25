@@ -1,0 +1,18 @@
+
+Running 4 tests using 1 worker
+
+[1A[2K(node:64139) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:64139) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[1/4] [chromium] › tests/e2e/auth/auth-recovery-and-signup.spec.ts:20:3 › Auth Recovery & Signup Deep › ARS-001: signup redirects to login when public registration is disabled
+[1A[2K[2/4] [chromium] › tests/e2e/auth/auth-recovery-and-signup.spec.ts:27:3 › Auth Recovery & Signup Deep › ARS-002: login page does not expose public signup link by default
+[1A[2K[3/4] [chromium] › tests/e2e/auth/auth-recovery-and-signup.spec.ts:33:3 › Auth Recovery & Signup Deep › ARS-003: forgot-password shows admin-managed password policy
+[1A[2K[4/4] [chromium] › tests/e2e/auth/auth-recovery-and-signup.spec.ts:42:3 › Auth Recovery & Signup Deep › ARS-004: reset-password shows admin-managed password policy
+🧹 Running global teardown...
+✅ Global teardown complete
+[1A[2K  4 passed (2.5s)

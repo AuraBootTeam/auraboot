@@ -1,0 +1,10 @@
+{
+  "status": 200,
+  "body": {
+    "code": "403",
+    "message": "Self-registration is disabled",
+    "data": null,
+    "context": null,
+    "timestamp": 1782353881632
+  }
+}

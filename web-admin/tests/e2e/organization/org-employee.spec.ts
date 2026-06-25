@@ -17,7 +17,7 @@ import { test, expect } from '../../fixtures';
 import { navigateToDynamicPage, uniqueId, executeCommandViaApi, waitForFormReady, clickRowActionByLocator, fillControlledInput } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
-const EMPLOYEE_PAGE_KEY = 'org-employee';
+const EMPLOYEE_PAGE_KEY = 'org_employee';
 
 test.describe('Organization Employee', () => {
   // Test data is intentionally NOT cleaned up — serves as verification traces
@@ -157,7 +157,7 @@ test.describe('Organization Employee', () => {
    */
   test('ORG-011: create employee via UI @smoke', async ({ page }) => {
     test.setTimeout(30000);
-    const { currentUserLabel, deptName, positionName } = await createEmployeePrerequisites(page);
+    const { deptName, positionName } = await createEmployeePrerequisites(page);
 
     await navigateToDynamicPage(page, EMPLOYEE_PAGE_KEY);
 
@@ -204,7 +204,6 @@ test.describe('Organization Employee', () => {
       await codeInput.fill(`EMP-${Date.now()}`);
     }
 
-    await selectFieldOption(page, 'org_emp_user_id', currentUserLabel);
     await selectFieldOption(page, 'org_emp_dept_id', deptName);
     await selectFieldOption(page, 'org_emp_position_id', positionName);
 
@@ -274,7 +273,7 @@ test.describe('Organization Employee', () => {
     const updateCommandCode = 'org:update_employee';
     if (!/\/edit/.test(page.url())) {
       await page.goto(
-        `/dynamic/${EMPLOYEE_PAGE_KEY}/${result.recordId}/edit?commandCode=${encodeURIComponent(updateCommandCode)}`,
+        `/p/${EMPLOYEE_PAGE_KEY}/${result.recordId}/edit?commandCode=${encodeURIComponent(updateCommandCode)}`,
         { waitUntil: 'domcontentloaded' }
       );
     }
@@ -282,7 +281,7 @@ test.describe('Organization Employee', () => {
     await expect(page).toHaveURL(/\/edit/, { timeout: 10000 });
     if (!page.url().includes('commandCode=')) {
       await page.goto(
-        `/dynamic/${EMPLOYEE_PAGE_KEY}/${result.recordId}/edit?commandCode=${encodeURIComponent(updateCommandCode)}`,
+        `/p/${EMPLOYEE_PAGE_KEY}/${result.recordId}/edit?commandCode=${encodeURIComponent(updateCommandCode)}`,
         { waitUntil: 'domcontentloaded' }
       );
     }

@@ -1,14 +1,18 @@
 package com.auraboot.framework.organization.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.dto.CreateEmployeeRequest;
+import com.auraboot.framework.organization.dto.EmployeeAccountProvisionResponse;
 import com.auraboot.framework.organization.dto.LinkMemberRequest;
 import com.auraboot.framework.organization.dto.OrgEmployeeDTO;
 import com.auraboot.framework.organization.dto.TransferRequest;
 import com.auraboot.framework.organization.service.OrgEmployeeService;
+import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
@@ -20,6 +24,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +47,8 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
 
     private static final String MODEL_EMPLOYEE = "org_employee";
     private static final String DEFAULT_PASSWORD = "AuraBoot2026!";
+    private static final String TEMP_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     // Employee field codes
     private static final String EMP_NAME = "org_emp_name";
@@ -59,6 +67,8 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
     private final UserService userService;
     private final TenantMemberService tenantMemberService;
     private final OrganizationServiceImpl organizationService;
+    private final RoleService roleService;
+    private final PasswordPolicyService passwordPolicyService;
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -95,6 +105,78 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
             employeePid, member.getPid(), user.getId());
 
         return organizationService.toEmployeeDTO(created);
+    }
+
+    @Override
+    @Transactional
+    public EmployeeAccountProvisionResponse openAccount(String employeePid) {
+        log.info("Opening account for employee: {}", employeePid);
+
+        Map<String, Object> employee = dynamicDataService.getById(MODEL_EMPLOYEE, employeePid);
+        if (employee == null) {
+            throw new BusinessException("Employee not found: " + employeePid);
+        }
+        if (hasText(value(employee.get(EMP_MEMBER_ID)))) {
+            throw new BusinessException("Employee is already linked to a tenant member");
+        }
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        if (tenantId == null) {
+            throw new BusinessException("Tenant context is required");
+        }
+
+        String displayName = firstNonBlank(value(employee.get(EMP_NAME)), employeePid);
+        String email = normalizeBlankToNull(value(employee.get(EMP_EMAIL)));
+        String userName = generatedUserName(employeePid);
+        String existingUserPid = normalizeBlankToNull(value(employee.get(EMP_USER_ID)));
+
+        User user = resolveExistingUser(existingUserPid, email, userName);
+        boolean createdUser = false;
+        String temporaryPassword = null;
+        if (user == null) {
+            temporaryPassword = generateTemporaryPassword(12);
+            user = userService.signUp(email, temporaryPassword, displayName, userName);
+            createdUser = true;
+        }
+
+        TenantMember member = tenantMemberService.findByTenantIdAndUserId(tenantId, user.getId());
+        boolean createdMember = false;
+        if (member == null) {
+            member = tenantMemberService.addMember(user.getId(), tenantId, StatusConstants.ACTIVE);
+            createdMember = true;
+        }
+        if (member.getEmployeeId() != null) {
+            throw new BusinessException("Tenant member is already linked to another employee");
+        }
+
+        Long employeeId = extractId(employee);
+        member.setEmployeeId(employeeId);
+        tenantMemberService.updateMember(member);
+
+        Map<String, Object> updateData = new HashMap<>();
+        updateData.put(EMP_USER_ID, user.getPid());
+        updateData.put(EMP_MEMBER_ID, member.getPid());
+        updateData.put(EMP_STATUS, StatusConstants.ACTIVE);
+        dynamicDataService.update(MODEL_EMPLOYEE, employeePid, updateData);
+
+        List<String> assignedRoles = createdMember ? assignDefaultRole(member, tenantId) : List.of();
+
+        log.info("Employee account opened: employeePid={}, userPid={}, memberPid={}, createdUser={}, createdMember={}",
+                employeePid, user.getPid(), member.getPid(), createdUser, createdMember);
+
+        return EmployeeAccountProvisionResponse.builder()
+                .employeePid(employeePid)
+                .userPid(user.getPid())
+                .memberPid(member.getPid())
+                .email(user.getEmail())
+                .userName(user.getUserName())
+                .displayName(displayName)
+                .createdUser(createdUser)
+                .createdMember(createdMember)
+                .adminManaged(true)
+                .temporaryPassword(temporaryPassword)
+                .assignedRoles(assignedRoles)
+                .build();
     }
 
     @Override
@@ -238,5 +320,73 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
             return Long.parseLong(strId);
         }
         throw new BusinessException("Cannot extract employee ID from created record");
+    }
+
+    private User resolveExistingUser(String userPid, String email, String userName) {
+        if (hasText(userPid)) {
+            User byPid = userService.findByPid(userPid);
+            if (byPid == null) {
+                throw new BusinessException("Linked user not found: " + userPid);
+            }
+            return byPid;
+        }
+        if (hasText(email)) {
+            User byEmail = userService.findByEmail(email);
+            if (byEmail != null) {
+                return byEmail;
+            }
+        }
+        if (hasText(userName)) {
+            return userService.findByUserName(userName);
+        }
+        return null;
+    }
+
+    private List<String> assignDefaultRole(TenantMember member, Long tenantId) {
+        List<String> assigned = new ArrayList<>();
+        Role defaultRole = roleService.findDefaultRole(tenantId);
+        if (defaultRole != null) {
+            roleService.assignRoleToMember(member.getId(), defaultRole.getId(), tenantId);
+            assigned.add(defaultRole.getCode());
+        }
+        return assigned;
+    }
+
+    private String generateTemporaryPassword(int length) {
+        for (int attempt = 0; attempt < 100; attempt++) {
+            StringBuilder sb = new StringBuilder(length);
+            for (int i = 0; i < length; i++) {
+                sb.append(TEMP_PASSWORD_CHARS.charAt(RANDOM.nextInt(TEMP_PASSWORD_CHARS.length())));
+            }
+            String candidate = sb.toString();
+            if (passwordPolicyService.validate(candidate).isEmpty()) {
+                return candidate;
+            }
+        }
+        throw new BusinessException("Unable to generate a temporary password that satisfies policy");
+    }
+
+    private String generatedUserName(String employeePid) {
+        String suffix = employeePid == null ? "employee" : employeePid.replaceAll("[^A-Za-z0-9]", "");
+        if (suffix.length() > 40) {
+            suffix = suffix.substring(0, 40);
+        }
+        return "emp_" + suffix;
+    }
+
+    private String firstNonBlank(String preferred, String fallback) {
+        return hasText(preferred) ? preferred.trim() : fallback;
+    }
+
+    private String normalizeBlankToNull(String value) {
+        return hasText(value) ? value.trim() : null;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
+    private String value(Object raw) {
+        return raw == null ? null : raw.toString();
     }
 }

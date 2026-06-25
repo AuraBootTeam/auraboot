@@ -20,6 +20,7 @@ import { useI18n } from '~/contexts/I18nContext';
 const REMEMBER_KEY = 'auth.remember';
 const REMEMBER_EMAIL_KEY = 'auth.rememberedEmail';
 const REMEMBER_PWD_KEY = 'auth.rememberedPwd';
+const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
 
 const CHANNEL_I18N_KEYS: Record<string, string> = {
   EMAIL_PASSWORD: 'auth.channel.emailPassword',
@@ -521,16 +522,17 @@ export default function LoginPage() {
         </div>
       )}
 
-      {/* Sign up link */}
-      <div className="mt-7 text-center text-[14px] text-[#8A8694] dark:text-gray-400">
-        {t('auth.noAccount') || 'No account yet?'}{' '}
-        <Link
-          className="font-semibold text-[#4B3FE4] transition-colors hover:text-[#3B33C9] dark:text-[#a99dff] dark:hover:text-[#c4baff]"
-          to={{ pathname: '/signup', search: searchParams.toString() }}
-        >
-          {t('auth.registerNow') || 'Sign Up'}
-        </Link>
-      </div>
+      {PUBLIC_REGISTRATION_ENABLED && (
+        <div className="mt-7 text-center text-[14px] text-[#8A8694] dark:text-gray-400">
+          {t('auth.noAccount') || 'No account yet?'}{' '}
+          <Link
+            className="font-semibold text-[#4B3FE4] transition-colors hover:text-[#3B33C9] dark:text-[#a99dff] dark:hover:text-[#c4baff]"
+            to={{ pathname: '/signup', search: searchParams.toString() }}
+          >
+            {t('auth.registerNow') || 'Sign Up'}
+          </Link>
+        </div>
+      )}
     </div>
   );
 

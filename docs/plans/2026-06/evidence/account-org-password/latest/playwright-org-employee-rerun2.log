@@ -1,0 +1,18 @@
+
+Running 4 tests using 1 worker
+
+[1A[2K(node:55549) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:55549) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[1/4] [chromium] › tests/e2e/organization/org-employee.spec.ts:138:3 › Organization Employee › ORG-010: employee list page loads @smoke
+[1A[2K[2/4] [chromium] › tests/e2e/organization/org-employee.spec.ts:158:3 › Organization Employee › ORG-011: create employee via UI @smoke
+[1A[2K[3/4] [chromium] › tests/e2e/organization/org-employee.spec.ts:232:3 › Organization Employee › ORG-012: edit employee via UI @critical
+[1A[2K[4/4] [chromium] › tests/e2e/organization/org-employee.spec.ts:335:3 › Organization Employee › ORG-013: employee status transition @critical
+🧹 Running global teardown...
+✅ Global teardown complete
+[1A[2K  4 passed (13.4s)

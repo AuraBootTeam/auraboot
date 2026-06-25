@@ -1,0 +1,18 @@
+
+Running 4 tests using 1 worker
+
+[1A[2K(node:61167) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:61167) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[1/4] [chromium] › tests/e2e/auth/logout.spec.ts:45:3 › Logout Functionality › LO-001: should logout via user menu @smoke
+[1A[2K[2/4] [chromium] › tests/e2e/auth/logout.spec.ts:59:3 › Logout Functionality › LO-002: should clear session after logout
+[1A[2K[3/4] [chromium] › tests/e2e/auth/logout.spec.ts:82:3 › Logout Functionality › LO-003: should redirect to login when accessing protected route after logout
+[1A[2K[4/4] [chromium] › tests/e2e/auth/logout.spec.ts:108:3 › Logout Functionality › LO-004: logout button should be visible for authenticated users
+🧹 Running global teardown...
+✅ Global teardown complete
+[1A[2K  4 passed (5.8s)

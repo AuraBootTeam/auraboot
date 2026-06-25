@@ -28,6 +28,21 @@ describe('resolveConfirmDialog', () => {
       content: '系统将基于当前记录生成下一环节业务单据，确定继续吗？',
     });
   });
+
+  it('accepts localized inline confirm content from page DSL', () => {
+    expect(
+      resolveConfirmDialog(
+        {
+          'zh-CN': '确认为该成员生成新的临时密码？临时密码只会显示一次。',
+          'en-US': 'Generate a new temporary password for this member?',
+        },
+        missingTranslation,
+      ),
+    ).toEqual({
+      title: '确认',
+      content: '确认为该成员生成新的临时密码？临时密码只会显示一次。',
+    });
+  });
 });
 
 describe('resolveFieldLabel', () => {

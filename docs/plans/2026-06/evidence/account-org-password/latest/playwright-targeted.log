@@ -1,0 +1,275 @@
+
+Running 18 tests using 1 worker
+
+[1A[2K(node:44064) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44064) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[1/18] [chromium] › tests/e2e/auth/auth-recovery-and-signup.spec.ts:20:3 › Auth Recovery & Signup Deep › ARS-001: signup redirects to login when public registration is disabled
+[1A[2K[2/18] [chromium] › tests/e2e/auth/auth-recovery-and-signup.spec.ts:27:3 › Auth Recovery & Signup Deep › ARS-002: login page does not expose public signup link by default
+[1A[2K[3/18] [chromium] › tests/e2e/auth/auth-recovery-and-signup.spec.ts:33:3 › Auth Recovery & Signup Deep › ARS-003: forgot-password shows admin-managed password policy
+[1A[2K[4/18] [chromium] › tests/e2e/auth/auth-recovery-and-signup.spec.ts:42:3 › Auth Recovery & Signup Deep › ARS-004: reset-password shows admin-managed password policy
+[1A[2K[5/18] [chromium] › tests/e2e/auth/logout.spec.ts:24:3 › Logout Functionality › LO-001: should logout via user menu @smoke
+[1A[2K  1) [chromium] › tests/e2e/auth/logout.spec.ts:24:3 › Logout Functionality › LO-001: should logout via user menu @smoke
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/auth-logout-Logout-Functio-cf6b9--logout-via-user-menu-smoke-chromium/error-context.md
+
+
+[1A[2K(node:44113) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44113) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[6/18] [chromium] › tests/e2e/auth/logout.spec.ts:46:3 › Logout Functionality › LO-002: should clear session after logout
+[1A[2K  2) [chromium] › tests/e2e/auth/logout.spec.ts:46:3 › Logout Functionality › LO-002: should clear session after logout
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/auth-logout-Logout-Functio-64a06--clear-session-after-logout-chromium/error-context.md
+
+
+[1A[2K(node:44117) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44117) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[7/18] [chromium] › tests/e2e/auth/logout.spec.ts:77:3 › Logout Functionality › LO-003: should redirect to login when accessing protected route after logout
+[1A[2K  3) [chromium] › tests/e2e/auth/logout.spec.ts:77:3 › Logout Functionality › LO-003: should redirect to login when accessing protected route after logout
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/auth-logout-Logout-Functio-c1600-rotected-route-after-logout-chromium/error-context.md
+
+
+[1A[2K(node:44121) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44121) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[8/18] [chromium] › tests/e2e/auth/logout.spec.ts:103:3 › Logout Functionality › LO-004: logout button should be visible for authenticated users
+[1A[2K  4) [chromium] › tests/e2e/auth/logout.spec.ts:103:3 › Logout Functionality › LO-004: logout button should be visible for authenticated users
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/auth-logout-Logout-Functio-d8e96-ble-for-authenticated-users-chromium/error-context.md
+
+
+[1A[2K(node:44126) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44126) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[9/18] [chromium] › tests/e2e/organization/org-employee.spec.ts:138:3 › Organization Employee › ORG-010: employee list page loads @smoke
+[1A[2K  5) [chromium] › tests/e2e/organization/org-employee.spec.ts:138:3 › Organization Employee › ORG-010: employee list page loads @smoke
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-org-employee--26e31-loyee-list-page-loads-smoke-chromium/error-context.md
+
+
+[1A[2K(node:44130) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44130) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[10/18] [chromium] › tests/e2e/organization/org-employee.spec.ts:158:3 › Organization Employee › ORG-011: create employee via UI @smoke
+[1A[2K  6) [chromium] › tests/e2e/organization/org-employee.spec.ts:158:3 › Organization Employee › ORG-011: create employee via UI @smoke
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-org-employee--2a30c-reate-employee-via-UI-smoke-chromium/error-context.md
+
+
+[1A[2K(node:44134) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44134) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[11/18] [chromium] › tests/e2e/organization/org-employee.spec.ts:232:3 › Organization Employee › ORG-012: edit employee via UI @critical
+[1A[2K  7) [chromium] › tests/e2e/organization/org-employee.spec.ts:232:3 › Organization Employee › ORG-012: edit employee via UI @critical
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-org-employee--5f237-it-employee-via-UI-critical-chromium/error-context.md
+
+
+[1A[2K(node:44142) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44142) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[12/18] [chromium] › tests/e2e/organization/org-employee.spec.ts:335:3 › Organization Employee › ORG-013: employee status transition @critical
+[1A[2K  8) [chromium] › tests/e2e/organization/org-employee.spec.ts:335:3 › Organization Employee › ORG-013: employee status transition @critical
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-org-employee--d18a1--status-transition-critical-chromium/error-context.md
+
+
+[1A[2K(node:44229) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44229) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[13/18] [chromium] › tests/e2e/organization/team-management.spec.ts:62:3 › Team Management › TM-001: should display team list page @smoke
+[1A[2K  9) [chromium] › tests/e2e/organization/team-management.spec.ts:62:3 › Team Management › TM-001: should display team list page @smoke
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-5320a-isplay-team-list-page-smoke-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-5320a-isplay-team-list-page-smoke-chromium/error-context.md
+
+
+[1A[2K(node:44273) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44273) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[14/18] [chromium] › tests/e2e/organization/team-management.spec.ts:69:3 › Team Management › TM-002: should create a team via UI @smoke
+[1A[2K  10) [chromium] › tests/e2e/organization/team-management.spec.ts:69:3 › Team Management › TM-002: should create a team via UI @smoke
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-0f121--create-a-team-via-UI-smoke-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-0f121--create-a-team-via-UI-smoke-chromium/error-context.md
+
+
+[1A[2K(node:44277) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44277) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[15/18] [chromium] › tests/e2e/organization/team-management.spec.ts:126:3 › Team Management › TM-003: should edit a team via UI
+[1A[2K  11) [chromium] › tests/e2e/organization/team-management.spec.ts:126:3 › Team Management › TM-003: should edit a team via UI
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-54c47-3-should-edit-a-team-via-UI-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-54c47-3-should-edit-a-team-via-UI-chromium/error-context.md
+
+
+[1A[2K(node:44401) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44401) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[16/18] [chromium] › tests/e2e/organization/team-management.spec.ts:165:3 › Team Management › TM-004: should delete a team via UI
+[1A[2K  12) [chromium] › tests/e2e/organization/team-management.spec.ts:165:3 › Team Management › TM-004: should delete a team via UI
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-cb14b-should-delete-a-team-via-UI-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-cb14b-should-delete-a-team-via-UI-chromium/error-context.md
+
+
+[1A[2K(node:44445) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44445) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[17/18] [chromium] › tests/e2e/organization/team-management.spec.ts:200:3 › Team Management › TM-005: should navigate to team detail and view members @smoke
+[1A[2K  13) [chromium] › tests/e2e/organization/team-management.spec.ts:200:3 › Team Management › TM-005: should navigate to team detail and view members @smoke
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-fcc38-tail-and-view-members-smoke-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-fcc38-tail-and-view-members-smoke-chromium/error-context.md
+
+
+[1A[2K(node:44449) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:44449) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[18/18] [chromium] › tests/e2e/organization/team-management.spec.ts:227:3 › Team Management › TM-006: should add and remove team member via UI
+[1A[2K  14) [chromium] › tests/e2e/organization/team-management.spec.ts:227:3 › Team Management › TM-006: should add and remove team member via UI
+
+    Error: Error reading storage state from ../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json:
+    ENOENT: no such file or directory, open '../docs/plans/2026-06/evidence/account-org-password/latest/pw-storage/admin.json'
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-19df6-d-remove-team-member-via-UI-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output/organization-team-manageme-19df6-d-remove-team-member-via-UI-chromium/error-context.md
+
+
+🧹 Running global teardown...
+  ⚠️ No admin storage found, skipping cleanup
+[1A[2K  14 failed
+    [chromium] › tests/e2e/auth/logout.spec.ts:24:3 › Logout Functionality › LO-001: should logout via user menu @smoke
+    [chromium] › tests/e2e/auth/logout.spec.ts:46:3 › Logout Functionality › LO-002: should clear session after logout
+    [chromium] › tests/e2e/auth/logout.spec.ts:77:3 › Logout Functionality › LO-003: should redirect to login when accessing protected route after logout
+    [chromium] › tests/e2e/auth/logout.spec.ts:103:3 › Logout Functionality › LO-004: logout button should be visible for authenticated users
+    [chromium] › tests/e2e/organization/org-employee.spec.ts:138:3 › Organization Employee › ORG-010: employee list page loads @smoke
+    [chromium] › tests/e2e/organization/org-employee.spec.ts:158:3 › Organization Employee › ORG-011: create employee via UI @smoke
+    [chromium] › tests/e2e/organization/org-employee.spec.ts:232:3 › Organization Employee › ORG-012: edit employee via UI @critical
+    [chromium] › tests/e2e/organization/org-employee.spec.ts:335:3 › Organization Employee › ORG-013: employee status transition @critical
+    [chromium] › tests/e2e/organization/team-management.spec.ts:62:3 › Team Management › TM-001: should display team list page @smoke
+    [chromium] › tests/e2e/organization/team-management.spec.ts:69:3 › Team Management › TM-002: should create a team via UI @smoke
+    [chromium] › tests/e2e/organization/team-management.spec.ts:126:3 › Team Management › TM-003: should edit a team via UI
+    [chromium] › tests/e2e/organization/team-management.spec.ts:165:3 › Team Management › TM-004: should delete a team via UI
+    [chromium] › tests/e2e/organization/team-management.spec.ts:200:3 › Team Management › TM-005: should navigate to team detail and view members @smoke
+    [chromium] › tests/e2e/organization/team-management.spec.ts:227:3 › Team Management › TM-006: should add and remove team member via UI
+  4 passed (8.8s)

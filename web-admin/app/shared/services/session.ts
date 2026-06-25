@@ -51,6 +51,26 @@ export async function createUserSession({
 
 export async function logout(request: Request) {
   const session = await getSessionFromRequest(request);
+  const token = session.get(JWT_TOKEN_KEY);
+
+  if (token) {
+    const backendUrl =
+      typeof process !== 'undefined'
+        ? process.env.SPRING_BOOT_URL || 'http://127.0.0.1:6443'
+        : '';
+    if (backendUrl) {
+      try {
+        await fetch(`${backendUrl}/api/user/sessions/current`, {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      } catch (error) {
+        console.warn('Failed to revoke backend session during logout', error);
+      }
+    }
+  }
 
   // 清除所有token相关信息
   session.unset(JWT_TOKEN_KEY);

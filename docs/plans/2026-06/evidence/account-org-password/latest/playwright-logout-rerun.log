@@ -1,0 +1,51 @@
+
+Running 4 tests using 1 worker
+
+[1A[2K(node:59525) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:59525) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[1/4] [chromium] › tests/e2e/auth/logout.spec.ts:24:3 › Logout Functionality › LO-001: should logout via user menu @smoke
+[1A[2K[2/4] [chromium] › tests/e2e/auth/logout.spec.ts:46:3 › Logout Functionality › LO-002: should clear session after logout
+[1A[2K  1) [chromium] › tests/e2e/auth/logout.spec.ts:46:3 › Logout Functionality › LO-002: should clear session after logout
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32mtrue[39m
+    Received: [31mfalse[39m
+
+      53 |     // Check if authenticated
+      54 |     const isAuthenticated = await header.userAvatar.isVisible({ timeout: 5000 }).catch(() => false);
+    > 55 |     expect(isAuthenticated).toBe(true);
+         |                             ^
+      56 |
+      57 |     // Navigate to logout confirmation and submit it.
+      58 |     await page.goto(`/logout`, { waitUntil: 'commit', timeout: 10000 });
+        at /Users/ghj/work/auraboot-core-account-org-settings/web-admin/tests/e2e/auth/logout.spec.ts:55:29
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-logout-rerun/auth-logout-Logout-Functio-64a06--clear-session-after-logout-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-logout-rerun/auth-logout-Logout-Functio-64a06--clear-session-after-logout-chromium/error-context.md
+
+
+[1A[2K(node:59814) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:59814) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[3/4] [chromium] › tests/e2e/auth/logout.spec.ts:77:3 › Logout Functionality › LO-003: should redirect to login when accessing protected route after logout
+[1A[2K[4/4] [chromium] › tests/e2e/auth/logout.spec.ts:103:3 › Logout Functionality › LO-004: logout button should be visible for authenticated users
+🧹 Running global teardown...
+✅ Global teardown complete
+[1A[2K  1 failed
+    [chromium] › tests/e2e/auth/logout.spec.ts:46:3 › Logout Functionality › LO-002: should clear session after logout
+  3 passed (3.6s)

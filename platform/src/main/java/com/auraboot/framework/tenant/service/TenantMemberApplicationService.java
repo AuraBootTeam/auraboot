@@ -73,6 +73,11 @@ public interface TenantMemberApplicationService {
     boolean sendPasswordResetEmail(String memberPid, Long userId);
 
     /**
+     * Reset a member password using the administrator-managed temporary password flow.
+     */
+    String resetMemberPasswordByAdmin(String memberPid, Long userId);
+
+    /**
      * Get team memberships for a specific member
      * @param memberPid member's business ID
      * @return list of team membership info

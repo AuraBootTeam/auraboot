@@ -1,0 +1,232 @@
+Configuration on demand is an incubating feature.
+> Task :platform-mq-kafka:processResources NO-SOURCE
+> Task :bootBuildInfo
+> Task :platform-plugin-api:compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :platform-plugin-api:processResources NO-SOURCE
+> Task :platform-plugin-api:classes UP-TO-DATE
+> Task :platform-plugin-api:jar UP-TO-DATE
+> Task :compileJava UP-TO-DATE
+> Task :classes
+> Task :jar
+> Task :compileTestJava UP-TO-DATE
+> Task :instrumentMainOffline UP-TO-DATE
+> Task :processTestResources UP-TO-DATE
+> Task :testClasses UP-TO-DATE
+> Task :platform-mq-kafka:compileJava UP-TO-DATE
+> Task :platform-mq-kafka:classes UP-TO-DATE
+> Task :platform-mq-kafka:jar UP-TO-DATE
+OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader classes because bootstrap classpath has been appended
+
+> Task :test
+
+AccountSecurityPolicyControllerTest > getPolicy_returnsReadOnlyAdminManagedDefaults() PASSED
+
+AuthControllerSelfServicePasswordTest > forgotPassword_returnsForbiddenWhenSelfServiceDisabled() PASSED
+
+AuthControllerSelfServicePasswordTest > resetPassword_returnsForbiddenWhenSelfServiceDisabled() PASSED
+
+AuthControllerSelfServicePasswordTest > register_returnsErrorWhenPublicRegistrationDisabled() PASSED
+
+PasswordManagementServiceImpl > resetPasswordByAdmin rejects passwords that violate policy PASSED
+
+PasswordManagementServiceImpl > resetPasswordWithToken throws on expired token PASSED
+
+PasswordManagementServiceImpl > changePassword throws when user not found PASSED
+
+PasswordManagementServiceImpl > resetLoginFailures clears counter when > 0 PASSED
+
+PasswordManagementServiceImpl > isAccountLocked false when lockedAt null PASSED
+
+PasswordManagementServiceImpl > resetPasswordByAdmin updates password and increments security version PASSED
+
+PasswordManagementServiceImpl > isAccountLocked true when within window PASSED
+
+PasswordManagementServiceImpl > recordLoginFailure increments and locks after max attempts PASSED
+
+PasswordManagementServiceImpl > changePassword throws when new password fails policy PASSED
+
+PasswordManagementServiceImpl > sendPasswordResetEmail throws when user missing PASSED
+
+PasswordManagementServiceImpl > changePassword throws when current password mismatch PASSED
+
+PasswordManagementServiceImpl > isPasswordExpired false when never changed PASSED
+
+PasswordManagementServiceImpl > resetPasswordByAdmin throws when user missing PASSED
+
+PasswordManagementServiceImpl > sendPasswordResetEmail throws when email blank PASSED
+
+PasswordManagementServiceImpl > incrementSecurityVersion is silent when user missing PASSED
+
+PasswordManagementServiceImpl > initiatePasswordReset sends email when user found PASSED
+
+PasswordManagementServiceImpl > changePassword throws when password reused PASSED
+
+PasswordManagementServiceImpl > resetPasswordWithToken happy path updates password and clears token PASSED
+
+PasswordManagementServiceImpl > incrementSecurityVersion increments when user found PASSED
+
+PasswordManagementServiceImpl > resetLoginFailures noop when no failures PASSED
+
+PasswordManagementServiceImpl > isAccountLocked false when window expired PASSED
+
+PasswordManagementServiceImpl > recordLoginFailure increments without locking when below threshold PASSED
+
+PasswordManagementServiceImpl > initiatePasswordReset is silent when user not found PASSED
+
+PasswordManagementServiceImpl > isPasswordExpired true when older than expiry window PASSED
+
+PasswordManagementServiceImpl > resetPasswordWithToken throws on invalid token PASSED
+
+PasswordManagementServiceImpl > changePassword saves new hash, increments security version, saves history PASSED
+
+PasswordManagementServiceImpl > isPasswordExpired false when expiryDays<=0 PASSED
+
+SessionManagementServiceImpl > createSession parses tablet UA PASSED
+
+SessionManagementServiceImpl > createSession parses desktop UA when no mobile/tablet markers PASSED
+
+SessionManagementServiceImpl > createSession persists session, parses Mobile UA, truncates long UA PASSED
+
+SessionManagementServiceImpl > updateLastActive does nothing when session not found PASSED
+
+SessionManagementServiceImpl > revokeSession throws when no matching session PASSED
+
+SessionManagementServiceImpl > revokeSession revokes by id when matching pid found PASSED
+
+SessionManagementServiceImpl > createSession swallows DuplicateKeyException PASSED
+
+SessionManagementServiceImpl > cleanUpThrottleMap removes expired entries PASSED
+
+SessionManagementServiceImpl > isSessionValid returns true for non-revoked session PASSED
+
+SessionManagementServiceImpl > createSession parses Unknown when UA blank PASSED
+
+SessionManagementServiceImpl > isSessionValid returns false when missing or revoked PASSED
+
+SessionManagementServiceImpl > revokeAllSessions delegates to mapper PASSED
+
+SessionManagementServiceImpl > getActiveSessions delegates to mapper PASSED
+
+SessionManagementServiceImpl > updateLastActive updates DB once and throttles subsequent updates PASSED
+
+SessionManagementServiceImpl > revokeSessionByToken revokes the current bearer session PASSED
+
+SessionManagementServiceImpl > createSession parses Android non-tablet as Mobile PASSED
+
+TenantMemberCommandHandlerTest > execute_leaveMember_setsInactive() PASSED
+
+TenantMemberCommandHandlerTest > execute_rejectMember_withReason_callsServiceAndReturnsRejected() PASSED
+
+TenantMemberCommandHandlerTest > execute_missingMemberPid_throwsBusinessException() PASSED
+
+TenantMemberCommandHandlerTest > execute_suspendMember_withReason_returnsCorrectStatus() PASSED
+
+TenantMemberCommandHandlerTest > execute_restoreMember_callsApproveAndReturnsActive() PASSED
+
+TenantMemberCommandHandlerTest > execute_approveMember_callsServiceAndReturnsActive() PASSED
+
+TenantMemberCommandHandlerTest > execute_missingUserId_throwsBusinessException() PASSED
+
+TenantMemberCommandHandlerTest > execute_resetPassword_callsServiceAndReturnsTemporaryPassword() PASSED
+
+TenantMemberCommandHandlerTest > execute_memberPidFromPayload_whenTargetRecordIdBlank() PASSED
+
+TenantMemberCommandHandlerTest > execute_rejectMember_noReason_noReasonInResult() PASSED
+
+TenantMemberCommandHandlerTest > execute_deleteMember_callsRemoveAndSetsRemoved() PASSED
+
+TenantMemberCommandHandlerTest > getHandlerName_returnsTenantMemberCommandHandler() PASSED
+
+TenantMemberCommandHandlerTest > execute_unknownCommand_returnsHandlerExecutedFalse() PASSED
+
+TenantMemberCommandHandlerTest > execute_provisionMemberFromEmployee_opensEmployeeAccountAndReturnsTemporaryPassword() PASSED
+
+TenantMemberCommandHandlerTest > execute_serviceThrowsRuntimeException_wrappedAsBusinessException() PASSED
+
+OrgEmployeeServiceImpl > linkMember uses userName when nickName null PASSED
+
+OrgEmployeeServiceImpl > createWithUser handles String id and Number id and rejects unparseable PASSED
+
+OrgEmployeeServiceImpl > unlinkMember skips member-side update when no member PASSED
+
+OrgEmployeeServiceImpl > transfer fails when employee missing PASSED
+
+OrgEmployeeServiceImpl > unlinkMember clears both sides via SQL PASSED
+
+OrgEmployeeServiceImpl > createWithUser creates user, member, employee, and writes back link PASSED
+
+OrgEmployeeServiceImpl > linkMember fails when member missing / already linked / user missing PASSED
+
+OrgEmployeeServiceImpl > batchTransfer iterates pids PASSED
+
+OrgEmployeeServiceImpl > transfer without position pid still updates PASSED
+
+OrgEmployeeServiceImpl > linkMember succeeds and writes back PASSED
+
+OrgEmployeeServiceImpl > unlinkMember fails when employee missing PASSED
+
+OrgEmployeeServiceImpl > createWithUser handles minimal request without optional fields PASSED
+
+OrgEmployeeServiceImpl > openAccount reuses existing user and member without resetting password or roles PASSED
+
+OrgEmployeeServiceImpl > transfer updates dept and optional position PASSED
+
+OrgEmployeeServiceImpl > openAccount creates user and member, links both sides, and returns temporary password PASSED
+
+TenantMemberApplicationServiceImpl > downloadImportTemplate produces non-empty xlsx resource PASSED
+
+TenantMemberApplicationServiceImpl > batchRemoveMembers skips self / cross-tenant / missing PASSED
+
+TenantMemberApplicationServiceImpl > approveMember approve sets ACTIVE PASSED
+
+TenantMemberApplicationServiceImpl > getMemberTeams throws when member missing PASSED
+
+TenantMemberApplicationServiceImpl > getMemberById throws when not found PASSED
+
+TenantMemberApplicationServiceImpl > updateMemberStatus dispatches to activate/deactivate/suspend PASSED
+
+TenantMemberApplicationServiceImpl > approveMember invalid action throws PASSED
+
+TenantMemberApplicationServiceImpl > searchMembers paginates and converts to response PASSED
+
+TenantMemberApplicationServiceImpl > removeMember succeeds for another user PASSED
+
+TenantMemberApplicationServiceImpl > importMembers (rows) rejects empty input PASSED
+
+TenantMemberApplicationServiceImpl > approveMember reject persists rejection reason in extensions PASSED
+
+TenantMemberApplicationServiceImpl > getMemberById denies cross-tenant access PASSED
+
+TenantMemberApplicationServiceImpl > importMembers (MultipartFile) is unsupported PASSED
+
+TenantMemberApplicationServiceImpl > getMemberTeams returns teams for member's user PASSED
+
+TenantMemberApplicationServiceImpl > updateMemberStatus invalid status throws PASSED
+
+TenantMemberApplicationServiceImpl > resetMemberPasswordByAdmin retries until temporary password satisfies policy PASSED
+
+TenantMemberApplicationServiceImpl > sendPasswordResetEmail succeeds when user email present PASSED
+
+TenantMemberApplicationServiceImpl > removeMember refuses self-removal PASSED
+
+TenantMemberApplicationServiceImpl > searchMembers throws when no tenant context and no membership PASSED
+
+TenantMemberApplicationServiceImpl > getMemberById returns response when authorized PASSED
+
+TenantMemberApplicationServiceImpl > sendPasswordResetEmail throws when user has no email PASSED
+
+TenantMemberApplicationServiceImpl > leave member marks employee resigned by member pid when no employee id PASSED
+
+TenantMemberApplicationServiceImpl > batchRemoveMembers no-op for empty input PASSED
+
+TenantMemberApplicationServiceImpl > approveMember cross-tenant denied PASSED
+
+TenantMemberApplicationServiceImpl > sendPasswordResetEmail throws when target user missing PASSED
+
+AdminUserControllerPasswordResetTest > resetPassword_keepsPasswordAdminManaged() PASSED
+
+> Task :jacocoTestReport
+
+BUILD SUCCESSFUL in 6s
+13 actionable tasks: 4 executed, 9 up-to-date

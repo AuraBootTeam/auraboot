@@ -74,6 +74,21 @@ public class SessionManagementServiceImpl implements SessionManagementService {
 
     @Override
     @Transactional
+    public void revokeSessionByToken(String token) {
+        if (token == null || token.isBlank()) {
+            return;
+        }
+        UserSession session = userSessionMapper.findByTokenHash(hashToken(token));
+        if (session == null || Boolean.TRUE.equals(session.getRevoked())) {
+            return;
+        }
+        userSessionMapper.revokeSession(session.getId());
+        lastActiveThrottle.remove(hashToken(token));
+        log.info("Session {} revoked by current token", session.getPid());
+    }
+
+    @Override
+    @Transactional
     public void revokeAllSessions(Long userId) {
         int count = userSessionMapper.revokeAllSessions(userId);
         log.info("Revoked {} sessions for user {}", count, userId);

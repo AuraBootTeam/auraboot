@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { actionRegistry } from '~/framework/meta/runtime/actions/ActionRegistry';
+import { actionRegistry, promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
 
 describe('ActionRegistry record navigation', () => {
   it('prefers pid over id for edit routes', async () => {
@@ -119,6 +119,52 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
         }),
       }),
     );
+  });
+
+  it('maps paginated API records into input field select options', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({
+      code: '0',
+      data: {
+        records: [
+          { pid: 'emp-001', name: '张三' },
+          { pid: 'emp-002', name: '李四' },
+        ],
+      },
+    });
+    const submitted = new Promise<Record<string, any>>((resolve) => {
+      window.addEventListener(
+        'dialog:form',
+        (event) => {
+          const detail = (event as CustomEvent).detail;
+          expect(detail.fieldOptions.employeePid).toEqual([
+            { value: 'emp-001', label: '张三' },
+            { value: 'emp-002', label: '李四' },
+          ]);
+          detail.onSubmit({ employeePid: 'emp-001' });
+          resolve({ employeePid: 'emp-001' });
+        },
+        { once: true },
+      );
+    });
+
+    await expect(
+      promptInputForm(
+        [
+          {
+            field: 'employeePid',
+            type: 'select',
+            dataSource: {
+              type: 'api',
+              endpoint: '/api/org/employees?pageNum=1&pageSize=50',
+              valueField: 'pid',
+              labelField: 'name',
+            },
+          },
+        ],
+        '从人员开通账号',
+        fetchResult,
+      ),
+    ).resolves.toEqual(await submitted);
   });
 
   it('aborts (does not submit the command) when the user cancels the form', async () => {

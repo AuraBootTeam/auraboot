@@ -872,7 +872,13 @@ export async function executeCommandViaApi(
   }
   const resultData = (body as any)?.data?.data ?? {};
   const code = String(body?.code ?? '');
-  const recordId = resultData?.recordId ?? resultData?.pid ?? resultData?.id ?? '';
+  const recordId =
+    resultData?.recordId ??
+    resultData?.recordPid ??
+    resultData?.publicRecordId ??
+    resultData?.pid ??
+    resultData?.id ??
+    '';
   return {
     code: String(code),
     recordId: String(recordId),
@@ -891,7 +897,14 @@ export async function executeCommandViaApi(
  */
 export function extractRecordId(body: any): string {
   const resultData = body?.data?.data;
-  return String(resultData?.recordId ?? resultData?.pid ?? resultData?.id ?? '');
+  return String(
+    resultData?.recordId ??
+      resultData?.recordPid ??
+      resultData?.publicRecordId ??
+      resultData?.pid ??
+      resultData?.id ??
+      '',
+  );
 }
 
 // ---------------------------------------------------------------------------

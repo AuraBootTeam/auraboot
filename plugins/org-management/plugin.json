@@ -16,6 +16,7 @@
     "fields": "config/fields",
     "modelFieldBindings": "config/bindings",
     "commands": "config/commands",
+    "bindingRules": "config/bindingRules.json",
     "pages": "config/pages",
     "dicts": "config/dicts.json",
     "permissions": "config/permissions.json",

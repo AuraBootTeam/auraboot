@@ -216,6 +216,11 @@ public class PasswordManagementServiceImpl implements PasswordManagementService 
     @Override
     @Transactional
     public void resetPasswordByAdmin(String userPid, String newPassword) {
+        List<String> errors = passwordPolicyService.validate(newPassword);
+        if (!errors.isEmpty()) {
+            throw new RootUnCheckedException(ResponseCode.PasswordTooWeak, String.join("; ", errors));
+        }
+
         QueryWrapper<User> qw = new QueryWrapper<>();
         qw.eq("pid", userPid);
         User user = userMapper.selectOne(qw);

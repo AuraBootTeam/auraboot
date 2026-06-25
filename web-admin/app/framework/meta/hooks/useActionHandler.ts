@@ -67,6 +67,7 @@ import {
   resolvePromptUploadKey,
   resolvePromptUploadFilenameKey,
 } from '~/framework/meta/utils/promptUpload';
+import { promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
 import type { AsyncTask } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
 import { useAsyncTaskModalSink } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
 import {
@@ -568,11 +569,36 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
    * Show confirmation dialog and return user's choice
    */
   const showConfirmDialog = useCallback(
-    async (messageKey: string): Promise<boolean> => {
+    async (messageKey: string | Record<string, string>): Promise<boolean> => {
       const { title, content } = resolveConfirmDialog(messageKey, t);
       return confirmDialog({ title, content, variant: 'danger' });
     },
     [t],
+  );
+
+  const surfaceTemporaryPassword = useCallback(
+    (commandResult: unknown) => {
+      const data =
+        commandResult && typeof commandResult === 'object' && 'data' in commandResult
+          ? (commandResult as Record<string, unknown>).data
+          : commandResult;
+      if (!data || typeof data !== 'object') return;
+      const tempPassword = (data as Record<string, unknown>).tempPassword;
+      if (typeof tempPassword !== 'string' || tempPassword.length === 0) return;
+
+      void navigator.clipboard?.writeText(tempPassword).catch(() => undefined);
+      void confirmDialog({
+        title: '临时密码已生成',
+        content: `请立即保存并交付给用户，临时密码只显示一次：${tempPassword}`,
+        confirmText: '我已保存',
+        cancelText: '关闭',
+      });
+      notifyToast(
+        `临时密码已生成并尝试复制: ${tempPassword}`,
+        'success',
+      );
+    },
+    [notifyToast],
   );
 
   const handleAction = useCallback(
@@ -605,6 +631,27 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
                 runtimeContext,
               ),
             };
+            const inputFields = Array.isArray((actionDef as any).inputFields)
+              ? (actionDef as any).inputFields
+              : Array.isArray((normalizedButton as any).inputFields)
+                ? (normalizedButton as any).inputFields
+                : [];
+            if (inputFields.length > 0) {
+              let collectedInputs: Record<string, any>;
+              try {
+                collectedInputs = await promptInputForm(
+                  inputFields,
+                  (actionDef as any).inputFieldsTitle ?? (normalizedButton as any).inputFieldsTitle,
+                  fetchResult,
+                );
+              } catch {
+                return;
+              }
+              payload = {
+                ...payload,
+                ...collectedInputs,
+              };
+            }
             // `promptUpload`: collect a file from the user, upload it, and inject the
             // resulting file id into the payload before the command runs. Strictly
             // guarded by the flag, so non-upload buttons are unaffected.
@@ -675,6 +722,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               payload,
               operationType,
             );
+            surfaceTemporaryPassword(commandResult);
             if ((commandResult as any)?.__asyncFailed) {
               if (context.loadData) {
                 await context.loadData();

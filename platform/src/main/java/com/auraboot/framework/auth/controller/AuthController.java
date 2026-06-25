@@ -69,9 +69,11 @@ public class AuthController {
     @Operation(summary = "Register new user", description = "Register a new user account. Returns JWT token.")
     public ApiResponse<AuthenticationResponse> register(@jakarta.validation.Valid @RequestBody RegisterRequest request) {
 
-            // SINGLE mode: check if self-registration is allowed
-            if (systemModeService != null && systemModeService.isSingleTenant() && !systemModeService.isRegistrationAllowed()) {
-                return ApiResponse.error("Self-registration is disabled in single-tenant mode");
+            // Public self-registration is closed by default in SaaS deployments.
+            // Controlled member entry should go through admin provisioning,
+            // invitations, bulk import, or SSO sync.
+            if (systemModeService != null && !systemModeService.isRegistrationAllowed()) {
+                return ApiResponse.error(ResponseCode.FORBIDDEN, "Self-registration is disabled", null);
             }
 
             AuthenticationResponse response = authService.register(request);

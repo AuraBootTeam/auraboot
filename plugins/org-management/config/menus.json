@@ -1,13 +1,13 @@
 [
   {
     "code": "org_departments",
-    "name:zh-CN": "Departments",
+    "name:zh-CN": "组织架构",
     "name:en": "Departments",
     "path": "/p/org_department",
     "icon": "Building",
     "type": 1,
     "parentCode": "org_management",
-    "orderNo": 51,
+    "orderNo": 10,
     "permissionCode": "org.hr.read",
     "pageKey": "org_department_list",
     "visible": true,
@@ -19,26 +19,27 @@
   },
   {
     "code": "org_positions",
-    "name:zh-CN": "Positions",
+    "name:zh-CN": "职位",
     "name:en": "Positions",
     "path": "/p/org_position",
     "icon": "IdCard",
     "type": 1,
     "parentCode": "org_management",
-    "orderNo": 52,
+    "orderNo": 20,
     "permissionCode": "org.hr.read",
-    "pageKey": "org_position_list"
+    "pageKey": "org_position_list",
+    "visible": true
   },
   {
     "code": "org_employees",
-    "name:zh-CN": "Employees",
+    "name:zh-CN": "人员",
     "name:en": "Employees",
     "path": "/p/org_employee",
     "icon": "User",
     "type": 1,
     "parentCode": "org_management",
-    "orderNo": 53,
-    "visible": false,
+    "orderNo": 30,
+    "visible": true,
     "permissionCode": "org.hr.read",
     "pageKey": "org_employee_list"
   },
@@ -67,21 +68,21 @@
     "icon": "team",
     "type": 1,
     "permissionCode": "org_teams",
-    "orderNo": 10,
+    "orderNo": 40,
     "visible": true
   },
   {
     "code": "member_management",
     "parentCode": "org_management",
-    "name": "用户",
-    "name:zh-CN": "用户",
-    "name:en": "Users",
+    "name": "账号",
+    "name:zh-CN": "账号",
+    "name:en": "Accounts",
     "path": "/p/tenant_member",
     "component": null,
     "icon": "team",
     "type": 1,
     "permissionCode": "member_management",
-    "orderNo": 20,
+    "orderNo": 50,
     "visible": true
   },
   {
@@ -95,7 +96,7 @@
     "icon": "safety",
     "type": 1,
     "permissionCode": "permission_management",
-    "orderNo": 30,
+    "orderNo": 60,
     "visible": true,
     "extension": {
       "platforms": [
@@ -114,7 +115,7 @@
     "icon": "safety",
     "type": 1,
     "permissionCode": "permission_management",
-    "orderNo": 40,
+    "orderNo": 70,
     "visible": true,
     "extension": {
       "platforms": [

@@ -57,6 +57,24 @@
     "pageKey": "data_permission_list"
   },
   {
+    "code": "account_security_policy",
+    "parentCode": "system_management",
+    "name:zh-CN": "账号安全策略",
+    "name:en": "Account Security Policy",
+    "path": "/settings/account-security-policy",
+    "component": null,
+    "icon": "IconShieldCheck",
+    "type": 1,
+    "permissionCode": "system_management",
+    "orderNo": 30,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
     "code": "admin_webhook",
     "parentCode": "system_management",
     "name:zh-CN": "Webhook 订阅",
@@ -235,6 +253,25 @@
     "visible": true
   },
   {
+    "code": "llm_provider_settings",
+    "parentCode": "system_management",
+    "name": "模型服务",
+    "name:zh-CN": "模型服务",
+    "name:en": "LLM Providers",
+    "path": "/aurabot/providers",
+    "component": null,
+    "icon": "cloud",
+    "type": 1,
+    "permissionCode": "ai_center",
+    "orderNo": 90,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
     "code": "system_preferences",
     "parentCode": "system_management",
     "name": "系统偏好",
@@ -245,7 +282,7 @@
     "icon": "setting",
     "type": 1,
     "permissionCode": null,
-    "orderNo": 90,
+    "orderNo": 91,
     "visible": true
   },
   {
@@ -259,7 +296,7 @@
     "icon": "global",
     "type": 1,
     "permissionCode": null,
-    "orderNo": 91,
+    "orderNo": 92,
     "visible": true,
     "extension": {
       "platforms": [
@@ -278,7 +315,7 @@
     "icon": "translation",
     "type": 1,
     "permissionCode": null,
-    "orderNo": 92,
+    "orderNo": 93,
     "visible": true,
     "extension": {
       "platforms": [

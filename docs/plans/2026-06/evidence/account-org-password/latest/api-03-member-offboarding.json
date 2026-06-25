@@ -1,0 +1,62 @@
+{
+  "target": {
+    "id": "328329277533720576",
+    "member_pid": "01KVY2HT0K4MAAY9EV0TC8AYE6",
+    "user_id": "328329277516943360",
+    "tenant_id": "328329172772589568",
+    "status": "active",
+    "email": "e2e-operator@test.com",
+    "nick_name": "e2e-operator"
+  },
+  "requestShape": {
+    "targetRecordPid": "01KVY2HT0K4MAAY9EV0TC8AYE6",
+    "operationType": "update",
+    "payload": {
+      "pid": "01KVY2HT0K4MAAY9EV0TC8AYE6"
+    }
+  },
+  "seededEmployeePid": "EMPmqsrydei000000000000000",
+  "before": {
+    "member_pid": "01KVY2HT0K4MAAY9EV0TC8AYE6",
+    "member_status": "active",
+    "leave_date": null,
+    "email": "e2e-operator@test.com",
+    "employee_pid": "EMPmqsrydei000000000000000",
+    "org_emp_status": "active"
+  },
+  "leave": {
+    "status": 200,
+    "code": "0",
+    "message": "OK",
+    "data": {
+      "commandCode": "admin:leave_member",
+      "phaseReached": "completed",
+      "data": {
+        "action": "leave",
+        "tenant_member_updated": 1,
+        "recordPid": "01KVY2HT0K4MAAY9EV0TC8AYE6",
+        "newStatus": "inactive",
+        "handlerExecuted": true
+      },
+      "executionTimeMs": 35,
+      "idempotentReplay": false
+    },
+    "context": null
+  },
+  "after": {
+    "member_pid": "01KVY2HT0K4MAAY9EV0TC8AYE6",
+    "member_status": "inactive",
+    "leave_date": "2026-06-25",
+    "email": "e2e-operator@test.com",
+    "is_enabled": true,
+    "employee_pid": "EMPmqsrydei000000000000000",
+    "org_emp_status": "resigned",
+    "org_emp_user_id": "328329277516943360"
+  },
+  "assertions": {
+    "memberInactive": true,
+    "leaveDateSet": true,
+    "employeeResigned": true,
+    "globalUserStillEnabled": true
+  }
+}

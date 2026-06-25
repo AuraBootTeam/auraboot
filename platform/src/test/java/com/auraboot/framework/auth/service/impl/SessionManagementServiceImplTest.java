@@ -133,6 +133,20 @@ class SessionManagementServiceImplTest {
     }
 
     @Test
+    @DisplayName("revokeSessionByToken revokes the current bearer session")
+    void revokeSessionByTokenFound() {
+        UserSession s = new UserSession();
+        s.setId(99L);
+        s.setPid("p1");
+        s.setRevoked(false);
+        when(userSessionMapper.findByTokenHash(any())).thenReturn(s);
+
+        service.revokeSessionByToken("token");
+
+        verify(userSessionMapper).revokeSession(99L);
+    }
+
+    @Test
     @DisplayName("revokeAllSessions delegates to mapper")
     void revokeAllSessionsDelegates() {
         when(userSessionMapper.revokeAllSessions(1L)).thenReturn(3);

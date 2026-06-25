@@ -2,7 +2,7 @@
  * Auth Recovery & Signup Deep E2E
  *
  * Covers:
- * - Signup page rendering and validation
+ * - Signup disabled by default for admin-managed SaaS tenants
  * - Forgot/reset password routes show admin-managed password policy
  *
  * This suite runs in unauthenticated context and uses real UI interactions.
@@ -17,31 +17,17 @@ async function waitForAuthHydration(page: import('@playwright/test').Page): Prom
 test.describe('Auth Recovery & Signup Deep', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('ARS-001: signup page renders with required inputs', async ({ page }) => {
+  test('ARS-001: signup redirects to login when public registration is disabled', async ({ page }) => {
     await page.goto('/signup', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.locator('input#email')).toBeVisible();
-    await expect(page.locator('input#password')).toBeVisible();
-    await expect(page.locator('button[type="submit"]')).toBeVisible();
-
-    // Link back to login should be visible for navigation sanity
-    await expect(page.locator('a[href*="/login"]').first()).toBeVisible();
+    await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
+    await expect(page.locator('input#identifier, input#email').first()).toBeVisible();
   });
 
-  test('ARS-002: signup rejects invalid email format', async ({ page }) => {
-    await page.goto('/signup', { waitUntil: 'domcontentloaded' });
+  test('ARS-002: login page does not expose public signup link by default', async ({ page }) => {
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
 
-    await page.locator('input#email').click();
-    await page.locator('input#email').fill('invalid-email');
-    await page.locator('input#password').click();
-    await page.locator('input#password').fill('Test2026x');
-    await page.locator('button[type="submit"]').click();
-
-    // Should stay on signup and show validation message
-    await expect(page).toHaveURL(/\/signup/);
-    await expect(
-      page.locator('#email-error, [aria-describedby="email-error"]').first(),
-    ).toBeVisible();
+    await expect(page.locator('a[href*="signup"]').first()).toHaveCount(0);
   });
 
   test('ARS-003: forgot-password shows admin-managed password policy', async ({ page }) => {

@@ -3,6 +3,7 @@ package com.auraboot.framework.user.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.application.annotation.CurrentUserId;
 import com.auraboot.framework.auth.service.PasswordManagementService;
+import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
@@ -39,6 +40,7 @@ import java.util.Map;
 public class AdminUserController {
 
     private final PasswordManagementService passwordManagementService;
+    private final PasswordPolicyService passwordPolicyService;
     private final UserProvisioningService userProvisioningService;
     private final EmployeeAccountProvisioningService employeeAccountProvisioningService;
     private final EmployeeAccountWorkbookParser employeeAccountWorkbookParser;
@@ -169,8 +171,9 @@ public class AdminUserController {
 
     @PostMapping("/{userPid}/reset-password")
     @Operation(summary = "Admin reset user password")
+    @RequirePermission(MetaPermission.ROLE_MANAGE)
     public ApiResponse<Map<String, String>> resetPassword(@PathVariable String userPid) {
-        String tempPassword = generateRandomPassword(12);
+        String tempPassword = generatePolicyCompliantPassword(12);
         passwordManagementService.resetPasswordByAdmin(userPid, tempPassword);
 
         log.info("Admin reset password for user {}, mustChangePassword=false", userPid);
@@ -184,5 +187,15 @@ public class AdminUserController {
             sb.append(CHARS.charAt(RANDOM.nextInt(CHARS.length())));
         }
         return sb.toString();
+    }
+
+    private String generatePolicyCompliantPassword(int length) {
+        for (int i = 0; i < 20; i++) {
+            String candidate = generateRandomPassword(length);
+            if (passwordPolicyService.isValid(candidate)) {
+                return candidate;
+            }
+        }
+        throw new RootUnCheckedException(ResponseCode.PasswordTooWeak, "Unable to generate a policy-compliant temporary password");
     }
 }

@@ -1,6 +1,7 @@
 package com.auraboot.framework.user.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.service.RoleService;
@@ -39,6 +40,7 @@ public class UserProvisioningService {
     private final UserService userService;
     private final TenantMemberService tenantMemberService;
     private final RoleService roleService;
+    private final PasswordPolicyService passwordPolicyService;
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final String TEMP_PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$";
@@ -162,10 +164,16 @@ public class UserProvisioningService {
     }
 
     private String generateTemporaryPassword(int length) {
-        StringBuilder sb = new StringBuilder(length);
-        for (int i = 0; i < length; i++) {
-            sb.append(TEMP_PASSWORD_CHARS.charAt(RANDOM.nextInt(TEMP_PASSWORD_CHARS.length())));
+        for (int attempt = 0; attempt < 100; attempt++) {
+            StringBuilder sb = new StringBuilder(length);
+            for (int i = 0; i < length; i++) {
+                sb.append(TEMP_PASSWORD_CHARS.charAt(RANDOM.nextInt(TEMP_PASSWORD_CHARS.length())));
+            }
+            String candidate = sb.toString();
+            if (passwordPolicyService.validate(candidate).isEmpty()) {
+                return candidate;
+            }
         }
-        return sb.toString();
+        throw new BusinessException("Unable to generate a policy-compliant temporary password");
     }
 }

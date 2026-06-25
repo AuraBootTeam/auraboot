@@ -1,0 +1,36 @@
+{
+  "status": 200,
+  "body": {
+    "code": "0",
+    "message": "OK",
+    "data": {
+      "mode": "admin_managed",
+      "publicRegistrationEnabled": false,
+      "selfServicePasswordEnabled": false,
+      "adminManagedPasswordEnabled": true,
+      "mustChangePasswordAfterAdminReset": false,
+      "password": {
+        "minLength": 8,
+        "maxLength": 128,
+        "requireUppercase": false,
+        "requireLowercase": true,
+        "requireDigit": true,
+        "requireSpecial": false,
+        "historyCount": 5,
+        "expiryDays": 90,
+        "resetTokenExpiryMinutes": 30
+      },
+      "lockout": {
+        "maxAttempts": 5,
+        "durationMinutes": 30
+      },
+      "notes": [
+        "Password complexity, history, expiry, lockout, and reset-token lifetime are deployment-level rules.",
+        "Public registration is disabled by default. Member onboarding uses administrator-controlled paths.",
+        "Tenant-scoped behavior switches are not editable in this read-only delivery view."
+      ]
+    },
+    "context": null,
+    "timestamp": 1782353881646
+  }
+}

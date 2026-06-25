@@ -1,0 +1,231 @@
+
+Running 6 tests using 1 worker
+
+[1A[2K(node:61571) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:61571) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[1/6] [chromium] › tests/e2e/organization/team-management.spec.ts:62:3 › Team Management › TM-001: should display team list page @smoke
+[1A[2K  1) [chromium] › tests/e2e/organization/team-management.spec.ts:62:3 › Team Management › TM-001: should display team list page @smoke
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoContainText[2m([22m[32mexpected[39m[2m)[22m failed
+
+    Locator: locator('h1')
+    Expected pattern: [32m/Team Management|团队管理/i[39m
+    Error: strict mode violation: locator('h1') resolved to 2 elements:
+        1) <h1 class="mt-8 max-w-[580px] text-balance text-[34px] font-extrabold leading-[1.16] tracking-tight text-[#15131C] lg:text-[44px] xl:text-[50px] dark:text-white">…</h1> aka getByRole('heading', { name: '配置即应用,AI 即战力' })
+        2) <h1 class="text-[28px] font-extrabold tracking-tight text-[#15131C] lg:text-[30px] dark:text-white">欢迎登录</h1> aka getByRole('heading', { name: '欢迎登录' })
+
+    Call log:
+    [2m  - Expect "toContainText" with timeout 10000ms[22m
+    [2m  - waiting for locator('h1')[22m
+
+
+      63 |     await page.goto('/organization/teams');
+      64 |     await page.waitForLoadState('domcontentloaded');
+    > 65 |     await expect(page.locator('h1')).toContainText(/Team Management|团队管理/i, { timeout: 10000 });
+         |                                      ^
+      66 |     await expect(page.locator('[data-testid="create-team-btn"]')).toBeVisible();
+      67 |   });
+      68 |
+        at /Users/ghj/work/auraboot-core-account-org-settings/web-admin/tests/e2e/organization/team-management.spec.ts:65:38
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-5320a-isplay-team-list-page-smoke-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-5320a-isplay-team-list-page-smoke-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-5320a-isplay-team-list-page-smoke-chromium/error-context.md
+
+
+[1A[2K(node:61616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:61616) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[2/6] [chromium] › tests/e2e/organization/team-management.spec.ts:69:3 › Team Management › TM-002: should create a team via UI @smoke
+[1A[2K  2) [chromium] › tests/e2e/organization/team-management.spec.ts:69:3 › Team Management › TM-002: should create a team via UI @smoke
+
+    Error: [2mexpect([22m[31mlocator[39m[2m).[22mtoBeVisible[2m([22m[2m)[22m failed
+
+    Locator: locator('[data-testid="create-team-btn"]')
+    Expected: visible
+    Timeout: 10000ms
+    Error: element(s) not found
+
+    Call log:
+    [2m  - Expect "toBeVisible" with timeout 10000ms[22m
+    [2m  - waiting for locator('[data-testid="create-team-btn"]')[22m
+
+
+      76 |
+      77 |     // Wait for page to be ready
+    > 78 |     await expect(page.locator('[data-testid="create-team-btn"]')).toBeVisible({ timeout: 10000 });
+         |                                                                   ^
+      79 |
+      80 |     // Click create button
+      81 |     await page.locator('[data-testid="create-team-btn"]').click();
+        at /Users/ghj/work/auraboot-core-account-org-settings/web-admin/tests/e2e/organization/team-management.spec.ts:78:67
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-0f121--create-a-team-via-UI-smoke-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-0f121--create-a-team-via-UI-smoke-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-0f121--create-a-team-via-UI-smoke-chromium/error-context.md
+
+
+[1A[2K(node:61713) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:61713) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[3/6] [chromium] › tests/e2e/organization/team-management.spec.ts:126:3 › Team Management › TM-003: should edit a team via UI
+[1A[2K  3) [chromium] › tests/e2e/organization/team-management.spec.ts:126:3 › Team Management › TM-003: should edit a team via UI
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m"0"[39m
+    Received: [31m"20002"[39m
+
+      135 |     });
+      136 |     const createBody = await createResp.json();
+    > 137 |     expect(createBody.code).toBe(ErrorCodes.SUCCESS);
+          |                             ^
+      138 |
+      139 |     await page.goto('/organization/teams');
+      140 |     await page.waitForLoadState('domcontentloaded');
+        at /Users/ghj/work/auraboot-core-account-org-settings/web-admin/tests/e2e/organization/team-management.spec.ts:137:29
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-54c47-3-should-edit-a-team-via-UI-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-54c47-3-should-edit-a-team-via-UI-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-54c47-3-should-edit-a-team-via-UI-chromium/error-context.md
+
+
+[1A[2K(node:61739) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:61739) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[4/6] [chromium] › tests/e2e/organization/team-management.spec.ts:165:3 › Team Management › TM-004: should delete a team via UI
+[1A[2K  4) [chromium] › tests/e2e/organization/team-management.spec.ts:165:3 › Team Management › TM-004: should delete a team via UI
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m"0"[39m
+    Received: [31m"20002"[39m
+
+      173 |     });
+      174 |     const createBody = await createResp.json();
+    > 175 |     expect(createBody.code).toBe(ErrorCodes.SUCCESS);
+          |                             ^
+      176 |
+      177 |     await page.goto('/organization/teams');
+      178 |     await page.waitForLoadState('domcontentloaded');
+        at /Users/ghj/work/auraboot-core-account-org-settings/web-admin/tests/e2e/organization/team-management.spec.ts:175:29
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-cb14b-should-delete-a-team-via-UI-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-cb14b-should-delete-a-team-via-UI-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-cb14b-should-delete-a-team-via-UI-chromium/error-context.md
+
+
+[1A[2K(node:61744) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:61744) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[5/6] [chromium] › tests/e2e/organization/team-management.spec.ts:200:3 › Team Management › TM-005: should navigate to team detail and view members @smoke
+[1A[2K  5) [chromium] › tests/e2e/organization/team-management.spec.ts:200:3 › Team Management › TM-005: should navigate to team detail and view members @smoke
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m"0"[39m
+    Received: [31m"20002"[39m
+
+      209 |     });
+      210 |     const createBody = await createResp.json();
+    > 211 |     expect(createBody.code).toBe(ErrorCodes.SUCCESS);
+          |                             ^
+      212 |     const teamPid = createBody.data.pid;
+      213 |
+      214 |     await page.goto('/organization/teams');
+        at /Users/ghj/work/auraboot-core-account-org-settings/web-admin/tests/e2e/organization/team-management.spec.ts:211:29
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-fcc38-tail-and-view-members-smoke-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-fcc38-tail-and-view-members-smoke-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-fcc38-tail-and-view-members-smoke-chromium/error-context.md
+
+
+[1A[2K(node:61754) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:61754) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[6/6] [chromium] › tests/e2e/organization/team-management.spec.ts:227:3 › Team Management › TM-006: should add and remove team member via UI
+[1A[2K  6) [chromium] › tests/e2e/organization/team-management.spec.ts:227:3 › Team Management › TM-006: should add and remove team member via UI
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m"0"[39m
+    Received: [31m"20002"[39m
+
+      236 |     });
+      237 |     const createBody = await createResp.json();
+    > 238 |     expect(createBody.code).toBe(ErrorCodes.SUCCESS);
+          |                             ^
+      239 |     const teamPid = createBody.data.pid;
+      240 |
+      241 |     // Navigate to team detail
+        at /Users/ghj/work/auraboot-core-account-org-settings/web-admin/tests/e2e/organization/team-management.spec.ts:238:29
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-19df6-d-remove-team-member-via-UI-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-19df6-d-remove-team-member-via-UI-chromium/error-context.md
+
+    Error Context: ../docs/plans/2026-06/evidence/account-org-password/latest/pw-output-team/organization-team-manageme-19df6-d-remove-team-member-via-UI-chromium/error-context.md
+
+
+🧹 Running global teardown...
+✅ Global teardown complete
+[1A[2K  6 failed
+    [chromium] › tests/e2e/organization/team-management.spec.ts:62:3 › Team Management › TM-001: should display team list page @smoke
+    [chromium] › tests/e2e/organization/team-management.spec.ts:69:3 › Team Management › TM-002: should create a team via UI @smoke
+    [chromium] › tests/e2e/organization/team-management.spec.ts:126:3 › Team Management › TM-003: should edit a team via UI
+    [chromium] › tests/e2e/organization/team-management.spec.ts:165:3 › Team Management › TM-004: should delete a team via UI
+    [chromium] › tests/e2e/organization/team-management.spec.ts:200:3 › Team Management › TM-005: should navigate to team detail and view members @smoke
+    [chromium] › tests/e2e/organization/team-management.spec.ts:227:3 › Team Management › TM-006: should add and remove team member via UI

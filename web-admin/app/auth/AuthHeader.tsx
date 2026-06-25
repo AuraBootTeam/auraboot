@@ -6,6 +6,8 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useHydrated } from '~/hooks/useHydrated';
 import { useAuth } from '~/contexts/AuthContext';
 
+const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
+
 export default function AuthHeader() {
   const { theme, setTheme, isDark } = useTheme();
   const { t, locale, setLocale } = useI18n();
@@ -153,12 +155,14 @@ export default function AuthHeader() {
                 >
                   {t('auth.login') || '登录'}
                 </Link>
-                <Link
-                  to="/signup"
-                  className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-                >
-                  {t('auth.register') || '注册'}
-                </Link>
+                {PUBLIC_REGISTRATION_ENABLED && (
+                  <Link
+                    to="/signup"
+                    className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+                  >
+                    {t('auth.register') || '注册'}
+                  </Link>
+                )}
               </>
             )}
           </div>

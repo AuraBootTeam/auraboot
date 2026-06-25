@@ -293,9 +293,22 @@ const CONFIRM_DIALOG_FALLBACKS: Record<string, { title: string; content: string 
 };
 
 export function resolveConfirmDialog(
-  messageKey: string,
+  messageKey: string | Record<string, string | undefined>,
   t: TranslateFunction,
 ): { title: string; content: string } {
+  if (messageKey && typeof messageKey === 'object') {
+    return {
+      title: '确认',
+      content:
+        messageKey['zh-CN'] ??
+        messageKey.zh_CN ??
+        messageKey['en-US'] ??
+        messageKey.en_US ??
+        Object.values(messageKey)[0] ??
+        '',
+    };
+  }
+
   const titleKey = `message.${messageKey}.title`;
   const contentKey = `message.${messageKey}.content`;
 
