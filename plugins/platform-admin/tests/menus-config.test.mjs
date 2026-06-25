@@ -11,6 +11,18 @@ const commands = JSON.parse(readFileSync(join(__dirname, '../config/commands.jso
 const pages = JSON.parse(readFileSync(join(__dirname, '../config/pages.json'), 'utf8'));
 const bindingRules = JSON.parse(readFileSync(join(__dirname, '../config/bindingRules.json'), 'utf8'));
 
+test('platform-admin pages keep import-compatible top-level names', () => {
+  for (const page of pages) {
+    if (page.name !== undefined) {
+      assert.equal(
+        typeof page.name,
+        'string',
+        `${page.pageKey} top-level name must be a string for PageSchemaDTO import`,
+      );
+    }
+  }
+});
+
 test('platform-admin declares the LLM provider menu permission locally', () => {
   const permissionCodes = new Set(permissions.map((permission) => permission.code));
   const llmProviderMenu = menus.find((menu) => menu.code === 'llm_provider_settings');
