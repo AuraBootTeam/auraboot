@@ -98,6 +98,63 @@ describe('ControlledFieldRenderer', () => {
     expect(capturedPropsSpy.mock.calls[0]?.[0]?.props?.label).toBeUndefined();
   });
 
+  it('infers SmartSelect for enum fields declared only by page schema dataType', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid="component-loader">{componentName}</div>;
+      },
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'status',
+            label: { 'zh-CN': '状态', en: 'Status' },
+            component: 'input',
+            dataType: 'enum',
+            props: {
+              options: [
+                { label: { 'zh-CN': '启用', en: 'Active' }, value: 'active' },
+                { label: { 'zh-CN': '停用', en: 'Inactive' }, value: 'inactive' },
+              ],
+            },
+          } as any
+        }
+        value="active"
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader')).toHaveTextContent('SmartSelect');
+    });
+
+    expect(capturedPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        componentName: 'SmartSelect',
+        props: expect.objectContaining({
+          name: 'status',
+          options: [
+            { label: { 'zh-CN': '启用', en: 'Active' }, value: 'active' },
+            { label: { 'zh-CN': '停用', en: 'Inactive' }, value: 'inactive' },
+          ],
+        }),
+      }),
+    );
+  });
+
   it('disables dependent selects and suppresses their data source until the parent has a value', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({

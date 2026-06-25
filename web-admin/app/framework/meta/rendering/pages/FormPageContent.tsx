@@ -42,7 +42,10 @@ import { checkKindCompatibility } from '~/shared/utils/kindCapability';
 import type { ComputedFieldDef } from '~/framework/meta/runtime/computed/types';
 import { useFormDraft } from '~/framework/meta/rendering/pages/form/useFormDraft';
 import { RestoreDraftBanner } from '~/framework/meta/rendering/pages/form/RestoreDraftBanner';
-import { buildCommandTargetParams, getPublicRecordPid } from '~/framework/meta/utils/publicRecordId';
+import {
+  buildCommandTargetParams,
+  getPublicRecordPid,
+} from '~/framework/meta/utils/publicRecordId';
 
 /**
  * Map field dataType to Smart component name.
@@ -579,7 +582,10 @@ function replaceRecordEndpointPlaceholders(template: string, recordPid: string):
 
 export function resolveEditRecordEndpoint(
   schema:
-    | { recordSource?: { endpoint?: string }; extension?: { recordSource?: { endpoint?: string } } }
+    | {
+        recordSource?: { endpoint?: string };
+        extension?: { recordSource?: { endpoint?: string } };
+      }
     | null
     | undefined,
   tableName: string,
@@ -602,9 +608,18 @@ function isSingletonRecordSource(schema: any): boolean {
   return (
     schema?.recordSource?.mode === 'singleton' ||
     schema?.recordSource?.singleton === true ||
+    schema?.extension?.recordSource?.mode === 'singleton' ||
+    schema?.extension?.recordSource?.singleton === true ||
     schema?.extension?.recordMode === 'singleton' ||
     schema?.extension?.editMode === true
   );
+}
+
+export function shouldLoadMainRecordForForm(
+  recordPid: string | null | undefined,
+  schema: any,
+): boolean {
+  return Boolean(recordPid || isSingletonRecordSource(schema));
 }
 
 function replaceSubmitEndpointPlaceholders(
@@ -796,7 +811,10 @@ export function FormPageContent(props: PageContentProps) {
   const sourceRecordPid = searchParams.get('sourceRecordPid');
   const routeRecordPid = props.recordPid;
   const isEditMode = !!routeRecordPid || isSingletonRecordSource(schema);
-  const recordPid = useMemo(() => getPublicRecordPid({ pid: routeRecordPid }) || '', [routeRecordPid]);
+  const recordPid = useMemo(
+    () => getPublicRecordPid({ pid: routeRecordPid }) || '',
+    [routeRecordPid],
+  );
 
   // Flat field-name set from schema (form-section blocks).
   // Used for generic URL aliasing (e.g. ?modelCode=xxx → model_code) and for
@@ -987,7 +1005,7 @@ export function FormPageContent(props: PageContentProps) {
   const fieldDataTypesRef = useRef<Record<string, string>>({});
   const loadMainRecord = useCallback(
     async (options?: { preserveDirty?: boolean }) => {
-      if (!recordPid && !isSingletonRecordSource(schema)) return;
+      if (!shouldLoadMainRecordForForm(recordPid, schema)) return;
       const preserveDirty = options?.preserveDirty ?? true;
       dirtyFieldsRef.current.clear();
       setMainRecordLoaded(false);
@@ -1751,7 +1769,7 @@ export function FormPageContent(props: PageContentProps) {
 
   // Edit mode: fetch existing record data to populate form
   useEffect(() => {
-    if (!recordPid && !isSingletonRecordSource(schema)) return;
+    if (!shouldLoadMainRecordForForm(recordPid, schema)) return;
     void loadMainRecord({ preserveDirty: true });
   }, [recordPid, schema, loadMainRecord]);
 

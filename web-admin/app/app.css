@@ -2814,3 +2814,165 @@
     justify-content: flex-start;
   }
 }
+
+[data-testid='ab:detail:enterprise_info_detail:container'] {
+  max-width: 1040px;
+  margin-right: auto;
+  margin-left: auto;
+  padding: 20px 24px 32px;
+}
+
+[data-testid='ab:detail:enterprise_info_detail:container'] > .rounded-card {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-testid='ab:detail:enterprise_info_detail:container'] .print-hide.border-b {
+  background: var(--color-panel);
+  padding: 18px 24px;
+}
+
+[data-testid='ab:detail:enterprise_info_detail:container'] h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+[data-testid='ab:detail:enterprise_info_detail:container'] .space-y-6.p-6 {
+  display: grid;
+  gap: 16px;
+  padding: 20px 24px 24px;
+}
+
+[data-testid='ab:detail:enterprise_info_detail:container'] .form-section {
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-subtle);
+  padding: 16px;
+}
+
+[data-testid='ab:detail:enterprise_info_detail:container'] .form-section h3 {
+  margin-bottom: 14px;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-testid='ab:detail:enterprise_info_detail:container'] .form-section .grid {
+  gap: 12px 16px;
+}
+
+[data-testid='ab:detail:enterprise_info_detail:container'] [data-testid^='form-field-'] {
+  border-bottom: 0;
+  border-radius: 6px;
+  background: var(--color-panel);
+  padding: 12px;
+}
+
+[data-testid='ab:detail:enterprise_info_detail:container'] [data-testid^='form-field-'] > div {
+  margin-bottom: 0;
+}
+
+[data-testid='ab:detail:enterprise_info_detail:container'] label {
+  margin-bottom: 6px;
+  color: var(--color-text-2);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-testid='ab:form:enterprise_info_form:container'] {
+  max-width: 1040px;
+  margin-right: auto;
+  margin-left: auto;
+  padding: 20px 24px 32px;
+}
+
+[data-testid='ab:form:enterprise_info_form:container'] > .rounded-card {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-testid='ab:form:enterprise_info_form:container'] .border-b {
+  background: var(--color-panel);
+  padding: 18px 24px;
+}
+
+[data-testid='ab:form:enterprise_info_form:container'] h2 {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+[data-testid='ab:form:enterprise_info_form:container'] form.p-6 {
+  display: grid;
+  gap: 16px;
+  padding: 20px 24px 24px;
+}
+
+[data-testid='ab:form:enterprise_info_form:container'] .form-section {
+  margin: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-subtle);
+  padding: 16px;
+}
+
+[data-testid='ab:form:enterprise_info_form:container'] .form-section h3 {
+  margin-bottom: 14px;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-testid='ab:form:enterprise_info_form:container'] [data-testid^='form-field-'] {
+  border-bottom: 0;
+  border-radius: 6px;
+  background: var(--color-panel);
+  padding: 12px;
+}
+
+[data-testid='ab:form:enterprise_info_form:container'] label {
+  margin-bottom: 6px;
+  color: var(--color-text-2);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+[data-testid='ab:form:enterprise_info_form:container'] input,
+[data-testid='ab:form:enterprise_info_form:container'] textarea {
+  min-height: 38px;
+}
+
+[data-testid='ab:form:enterprise_info_form:container'] input:read-only,
+[data-testid='ab:form:enterprise_info_form:container'] textarea:read-only {
+  cursor: not-allowed;
+  background: var(--color-subtle);
+  color: var(--color-text-2);
+}
+
+@media (max-width: 768px) {
+  [data-testid='ab:detail:enterprise_info_detail:container'] {
+    padding: 12px;
+  }
+
+  [data-testid='ab:detail:enterprise_info_detail:container'] .space-y-6.p-6 {
+    padding: 16px;
+  }
+
+  [data-testid='ab:form:enterprise_info_form:container'] {
+    padding: 12px;
+  }
+
+  [data-testid='ab:form:enterprise_info_form:container'] form.p-6 {
+    padding: 16px;
+  }
+}

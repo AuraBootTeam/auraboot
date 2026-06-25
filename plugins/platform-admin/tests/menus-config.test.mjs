@@ -92,6 +92,61 @@ test('platform-admin exposes system preferences as a DSL form page', () => {
   assert.equal(timezoneField?.props?.['data-testid'], 'system-timezone-select');
 });
 
+test('platform-admin routes enterprise profile through DSL pages', () => {
+  const detailMenu = menus.find((item) => item.code === 'enterprise_info');
+  const editMenu = menus.find((item) => item.code === 'enterprise_info_edit');
+  const detailPage = pages.find((item) => item.pageKey === 'enterprise_info_detail');
+  const formPage = pages.find((item) => item.pageKey === 'enterprise_info_form');
+  const editButton = detailPage?.blocks
+    ?.find((block) => block.id === 'actions')
+    ?.buttons?.find((button) => button.code === 'edit');
+  const cancelButton = formPage?.blocks
+    ?.find((block) => block.id === 'buttons')
+    ?.buttons?.find((button) => button.code === 'cancel');
+  const submitButton = formPage?.blocks
+    ?.find((block) => block.id === 'buttons')
+    ?.buttons?.find((button) => button.code === 'submit');
+  const detailSections =
+    detailPage?.blocks?.filter((block) => block.blockType === 'form-section') ?? [];
+  const formBasicFields =
+    formPage?.blocks?.find((block) => block.id === 'basic')?.fields ?? [];
+  const tenantCodeField = formBasicFields.find((field) => field.field === 'name');
+  const displayNameField = formBasicFields.find((field) => field.field === 'displayName');
+  const statusField = formBasicFields.find((field) => field.field === 'status');
+
+  assert.ok(detailMenu, 'enterprise_info menu must exist');
+  assert.equal(detailMenu.path, '/p/c/enterprise_info_detail');
+  assert.equal(detailMenu.pageKey, 'enterprise_info_detail');
+  assert.ok(editMenu, 'enterprise_info_edit menu must exist');
+  assert.equal(editMenu.path, '/p/c/enterprise_info_form');
+  assert.equal(editMenu.pageKey, 'enterprise_info_form');
+  assert.ok(detailPage, 'enterprise_info_detail page must exist');
+  assert.equal(detailPage.kind, 'detail');
+  assert.equal(detailPage.layout?.type, 'grid');
+  assert.equal(editButton?.action?.to, '/p/c/enterprise_info_form');
+  assert.equal(detailSections.length, 3);
+  assert.deepEqual(
+    detailSections.map((block) => block.id),
+    ['basic', 'contact', 'description'],
+  );
+  assert.ok(formPage, 'enterprise_info_form page must exist');
+  assert.equal(formPage.extension?.afterSubmitRedirect, '/p/c/enterprise_info_detail');
+  assert.equal(formPage.extension?.recordSource?.endpoint, '/api/tenant/info');
+  assert.equal(formPage.extension?.recordSource?.mode, 'singleton');
+  assert.equal(formPage.extension?.submitEndpoint?.endpoint, '/api/tenant/{pid}');
+  assert.equal(tenantCodeField?.readOnly, true);
+  assert.equal(tenantCodeField?.props?.placeholder?.['zh-CN'], '系统生成，不可编辑');
+  assert.equal(displayNameField?.props?.placeholder?.['zh-CN'], '请输入企业名称');
+  assert.equal(statusField?.dataType, 'enum');
+  assert.equal(statusField?.props?.placeholder?.['zh-CN'], '请选择状态');
+  assert.deepEqual(
+    statusField?.props?.options?.map((option) => option.value),
+    ['active', 'inactive'],
+  );
+  assert.equal(submitButton?.action, 'save');
+  assert.equal(cancelButton?.action?.to, '/p/c/enterprise_info_detail');
+});
+
 test('platform-admin exposes account page provisioning from existing employees', () => {
   const command = commands.find((item) => item.code === 'admin:provision_member_from_employee');
   const page = pages.find((item) => item.pageKey === 'tenant_member_list');
