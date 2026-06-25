@@ -1788,6 +1788,50 @@
     },
     "blocks": [
       {
+        "id": "toolbar",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "provision_from_employee",
+            "variant": "primary",
+            "label": {
+              "zh-CN": "从人员开通账号",
+              "en-US": "Provision from Employee"
+            },
+            "action": {
+              "type": "command",
+              "command": "admin:provision_member_from_employee",
+              "operationType": "create",
+              "inputFieldsTitle": {
+                "zh-CN": "从人员开通账号",
+                "en-US": "Provision from employee"
+              },
+              "inputFields": [
+                {
+                  "field": "employeePid",
+                  "label": {
+                    "zh-CN": "人员",
+                    "en-US": "Employee"
+                  },
+                  "type": "select",
+                  "required": true,
+                  "placeholder": {
+                    "zh-CN": "选择未开通账号的人员",
+                    "en-US": "Select an employee without an account"
+                  },
+                  "dataSource": {
+                    "type": "api",
+                    "endpoint": "/api/org/employees?pageNum=1&pageSize=500",
+                    "valueField": "pid",
+                    "labelField": "name"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
         "id": "status-tabs",
         "blockType": "tabs",
         "tabs": [
@@ -1980,8 +2024,8 @@
               "en-US": "Reset Password"
             },
             "confirm": {
-              "zh-CN": "确认重置该成员密码并发送重置邮件？",
-              "en-US": "Reset this member's password and send a reset email?"
+              "zh-CN": "确认为该成员生成新的临时密码？临时密码只会显示一次。",
+              "en-US": "Generate a new temporary password for this member? It will be shown only once."
             },
             "action": {
               "type": "command",

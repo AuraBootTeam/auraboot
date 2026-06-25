@@ -1,5 +1,6 @@
 package com.auraboot.framework.auth.controller;
 
+import com.auraboot.framework.auth.dto.RegisterRequest;
 import com.auraboot.framework.auth.dto.ForgotPasswordRequest;
 import com.auraboot.framework.auth.dto.ResetPasswordRequest;
 import com.auraboot.framework.auth.service.AuthService;
@@ -9,6 +10,7 @@ import com.auraboot.framework.auth.service.UserInfoService;
 import com.auraboot.framework.auth.util.JwtUtil;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.user.service.UserService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +21,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -39,6 +42,8 @@ class AuthControllerSelfServicePasswordTest {
     private JwtUtil jwtUtil;
     @Mock
     private UserDetailsService userDetailsService;
+    @Mock
+    private SystemModeService systemModeService;
 
     @Test
     void forgotPassword_returnsForbiddenWhenSelfServiceDisabled() {
@@ -63,6 +68,23 @@ class AuthControllerSelfServicePasswordTest {
 
         assertThat(response.getCode()).isEqualTo(ResponseCode.FORBIDDEN.getCode());
         verify(passwordManagementService, never()).resetPasswordWithToken("token", "jjzz@1234");
+    }
+
+    @Test
+    void register_returnsErrorWhenPublicRegistrationDisabled() {
+        AuthController controller = controller(false);
+        ReflectionTestUtils.setField(controller, "systemModeService", systemModeService);
+        when(systemModeService.isRegistrationAllowed()).thenReturn(false);
+        RegisterRequest request = new RegisterRequest();
+        request.setEmail("new-user@example.com");
+        request.setPassword("StrongPass1!");
+        request.setDisplayName("New User");
+
+        ApiResponse<?> response = controller.register(request);
+
+        assertThat(response.getCode()).isEqualTo(ResponseCode.FORBIDDEN.getCode());
+        assertThat(response.getMessage()).contains("Self-registration is disabled");
+        verify(authService, never()).register(request);
     }
 
     private AuthController controller(boolean selfServiceEnabled) {

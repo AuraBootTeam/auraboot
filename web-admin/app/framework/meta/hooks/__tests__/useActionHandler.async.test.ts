@@ -90,6 +90,121 @@ describe('useActionHandler - handlerParams.async polling', () => {
     expect(result.current.activeTask).toBeNull();
   });
 
+  it('surfaces temporary passwords returned by administrator reset commands', async () => {
+    fetchResultMock.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        commandCode: 'admin:reset_member_password',
+        phaseReached: 'completed',
+        data: { action: 'reset_password', tempPassword: 'TempPass1!', adminManaged: true },
+      },
+    });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    const showToast = vi.fn();
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'tenant_member',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        showToast,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleAction(
+        {
+          code: 'reset-password',
+          label: 'Reset Password',
+          action: { type: 'command', command: 'admin:reset_member_password' },
+        } as unknown as ButtonConfig,
+        { pid: 'mbr-1' },
+      );
+    });
+
+    expect(writeText).toHaveBeenCalledWith('TempPass1!');
+    expect(showToast).toHaveBeenCalledWith(
+      expect.stringContaining('TempPass1!'),
+      'success',
+    );
+  });
+
+  it('collects command inputFields and merges them into the command payload', async () => {
+    fetchResultMock.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        commandCode: 'admin:provision_member_from_employee',
+        phaseReached: 'completed',
+        data: {
+          action: 'provision_member_from_employee',
+          employeePid: 'emp-001',
+          memberPid: 'member-001',
+          tempPassword: 'TempPass1!',
+        },
+      },
+    });
+
+    const formListener = vi.fn((event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      detail.onSubmit({ employeePid: 'emp-001' });
+    });
+    window.addEventListener('dialog:form', formListener);
+    const showToast = vi.fn();
+    const loadData = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'tenant_member',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        showToast,
+        context: { loadData } as any,
+      }),
+    );
+
+    await act(async () => {
+      await result.current.handleAction({
+        code: 'provision-from-employee',
+        label: '从人员开通账号',
+        action: {
+          type: 'command',
+          command: 'admin:provision_member_from_employee',
+          operationType: 'create',
+          inputFieldsTitle: { 'zh-CN': '从人员开通账号', 'en-US': 'Provision from employee' },
+          inputFields: [
+            {
+              field: 'employeePid',
+              label: { 'zh-CN': '人员 PID', 'en-US': 'Employee PID' },
+              type: 'text',
+              required: true,
+            },
+          ],
+        },
+      } as unknown as ButtonConfig);
+    });
+
+    window.removeEventListener('dialog:form', formListener);
+
+    expect(formListener).toHaveBeenCalled();
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/admin:provision_member_from_employee',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          operationType: 'CREATE',
+          payload: expect.objectContaining({
+            employeePid: 'emp-001',
+          }),
+        }),
+      }),
+    );
+    expect(loadData).toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('TempPass1!'), 'success');
+  });
+
   it('surfaces a failed async task in the modal instead of throwing to the page', async () => {
     fetchResultMock
       .mockResolvedValueOnce({ code: '0', data: { commandCode: 'c', phaseReached: 'completed', data: { async: true, taskCode: 'T2' } } })

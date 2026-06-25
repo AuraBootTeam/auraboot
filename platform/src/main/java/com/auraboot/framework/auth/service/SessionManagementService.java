@@ -25,6 +25,11 @@ public interface SessionManagementService {
     void revokeSession(Long userId, String sessionPid);
 
     /**
+     * Revoke the session represented by the bearer token.
+     */
+    void revokeSessionByToken(String token);
+
+    /**
      * Revoke all sessions for a user (logout everywhere).
      */
     void revokeAllSessions(Long userId);

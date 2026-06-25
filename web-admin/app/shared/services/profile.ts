@@ -65,7 +65,7 @@ export async function uploadAvatar(file: File, request?: Request): Promise<strin
   }
 
   try {
-    const response = await fetch('/api/user/avatar', {
+    const response = await fetch('/api/user/avatar/upload', {
       method: 'post',
       headers,
       body: formData,

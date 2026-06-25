@@ -15,6 +15,71 @@
 
 import { test, expect } from '../../fixtures';
 import { HeaderPage } from '../../pages';
+import { createCookieSessionStorage } from 'react-router';
+
+const ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL || 'admin@auraboot.com';
+const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD || 'Test2026x';
+const JWT_TOKEN_KEY = 'jwtToken';
+const authSessionStorage = createCookieSessionStorage({
+  cookie: {
+    name: '__session',
+    httpOnly: true,
+    path: '/',
+    sameSite: 'lax',
+    secrets: [process.env.SESSION_SECRET || 'dev-only-secret-do-not-use-in-production'],
+    secure: false,
+  },
+});
+
+async function createSessionCookieValue(jwt: string): Promise<string> {
+  const session = await authSessionStorage.getSession();
+  session.set(JWT_TOKEN_KEY, jwt);
+  const setCookie = await authSessionStorage.commitSession(session, {
+    maxAge: 60 * 60 * 24 * 7,
+  });
+  const match = setCookie.match(/__session=([^;]+)/);
+  if (!match?.[1]) {
+    throw new Error('Failed to create __session cookie');
+  }
+  return match[1];
+}
+
+async function ensureAuthenticated(page: import('@playwright/test').Page): Promise<HeaderPage> {
+  const header = new HeaderPage(page);
+  await page.goto(`/meta/models`, { waitUntil: 'domcontentloaded' });
+
+  if (await header.isAuthenticated()) {
+    return header;
+  }
+
+  const resp = await page.request.post('/api/auth/login', {
+    data: { email: ADMIN_EMAIL, password: ADMIN_PASSWORD },
+    headers: { 'Content-Type': 'application/json' },
+  });
+  expect(resp.ok()).toBe(true);
+  const body = await resp.json();
+  const jwt = body?.data?.jwt;
+  expect(typeof jwt).toBe('string');
+
+  const cookieValue = await createSessionCookieValue(jwt);
+  const baseURL = new URL(page.url() || 'http://127.0.0.1:5173').origin;
+  const cookieBase = {
+    name: '__session',
+    value: cookieValue,
+    httpOnly: true,
+    sameSite: 'Lax' as const,
+    expires: Math.floor(Date.now() / 1000) + 604800,
+  };
+  await page.context().addCookies([
+    { ...cookieBase, url: baseURL },
+    { ...cookieBase, domain: 'localhost', path: '/' },
+    { ...cookieBase, domain: '127.0.0.1', path: '/' },
+  ]);
+
+  await page.goto(`/meta/models`, { waitUntil: 'domcontentloaded' });
+  await expect(header.userAvatar).toBeVisible({ timeout: 10000 });
+  return header;
+}
 
 test.describe('Logout Functionality', () => {
   /**
@@ -22,15 +87,7 @@ test.describe('Logout Functionality', () => {
    * Verify that clicking logout link logs user out
    */
   test('LO-001: should logout via user menu @smoke', async ({ page }) => {
-    const header = new HeaderPage(page);
-
-    // Navigate to app
-    await page.goto(`/meta/models`, { waitUntil: 'commit', timeout: 10000 });
-    await page.waitForLoadState('domcontentloaded');
-
-    // Wait for avatar button to be interactive (indicates hydration complete)
-    const isAuthenticated = await header.isAuthenticated();
-    expect(isAuthenticated).toBe(true);
+    const header = await ensureAuthenticated(page);
 
     await header.logout();
 
@@ -44,15 +101,7 @@ test.describe('Logout Functionality', () => {
    * Verify that session/auth data is cleared after logout
    */
   test('LO-002: should clear session after logout', async ({ page }) => {
-    const header = new HeaderPage(page);
-
-    // Navigate to app
-    await page.goto(`/meta/models`);
-    await page.waitForLoadState('domcontentloaded');
-
-    // Check if authenticated
-    const isAuthenticated = await header.userAvatar.isVisible({ timeout: 5000 }).catch(() => false);
-    expect(isAuthenticated).toBe(true);
+    await ensureAuthenticated(page);
 
     // Navigate to logout confirmation and submit it.
     await page.goto(`/logout`, { waitUntil: 'commit', timeout: 10000 });
@@ -101,25 +150,12 @@ test.describe('Logout Functionality', () => {
    * Verify logout option is only visible for authenticated users
    */
   test('LO-004: logout button should be visible for authenticated users', async ({ page }) => {
-    const header = new HeaderPage(page);
+    const header = await ensureAuthenticated(page);
 
-    await page.goto(`/meta/models`);
-    await page.waitForLoadState('domcontentloaded');
+    // Open user menu and verify logout link is visible
+    await header.openUserMenu();
 
-    // Find user avatar button (indicates authenticated)
-    const isAuthenticated = await header.isAuthenticated();
-
-    if (isAuthenticated) {
-      // Open user menu and verify logout link is visible
-      await header.openUserMenu();
-
-      // Logout link should be visible (Link component renders as <a href="/logout">)
-      await expect(header.logoutLink).toBeVisible({ timeout: 3000 });
-    } else {
-      // Not authenticated - should see login/signup links instead
-      const loginLink = page.locator('a[href="/login"]');
-      const hasLoginLink = await loginLink.isVisible({ timeout: 3000 }).catch(() => false);
-      expect(hasLoginLink).toBe(true);
-    }
+    // Logout link should be visible (Link component renders as <a href="/logout">)
+    await expect(header.logoutLink).toBeVisible({ timeout: 3000 });
   });
 });

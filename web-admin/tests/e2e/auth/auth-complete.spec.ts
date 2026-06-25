@@ -232,6 +232,16 @@ async function sendEmailLoginCode(page: Page, email: string): Promise<void> {
 test.describe('Registration Flow', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
+  let selfRegistrationEnabled = false;
+
+  test.beforeAll(async ({ request }) => {
+    selfRegistrationEnabled = (await detectSelfRegistrationStatus(request)) === 'enabled';
+  });
+
+  test.beforeEach(() => {
+    test.skip(!selfRegistrationEnabled, 'Registration form validation requires self-registration enabled');
+  });
+
   test('REG-001: should display signup form with email, displayName, password fields', async ({
     page,
   }) => {
@@ -361,6 +371,19 @@ test.describe('Registration Policy — Self-registration disabled', () => {
     test.skip(!isSelfRegistrationDisabled(body), 'Self-registration is enabled in this environment');
     expect(JSON.stringify(body)).toMatch(/Self-registration is disabled|single-tenant/i);
   });
+
+  test('REG-DISABLED-002: login page hides signup link and direct /signup returns to login', async ({
+    page,
+  }) => {
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    const signupLink = page.locator('a[href*="signup"]').first();
+    const hasSignupLink = await signupLink.isVisible({ timeout: 2000 }).catch(() => false);
+    test.skip(hasSignupLink, 'Self-registration is enabled in this environment');
+    await expect(signupLink).toHaveCount(0);
+
+    await page.goto('/signup', { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(/\/login/, { timeout: 10000 });
+  });
 });
 
 // ===========================================================================
@@ -410,6 +433,10 @@ test.describe('Login — Email/Password', () => {
   });
 
   test('LN-006: should have signup link', async ({ page }) => {
+    test.skip(
+      (await detectSelfRegistrationStatus(page.request)) !== 'enabled',
+      'Signup link is hidden when public registration is disabled',
+    );
     await page.goto('/login');
     const signupLink = page.locator('a[href*="signup"]').first();
     await expect(signupLink).toBeVisible();

@@ -3,6 +3,8 @@ package com.auraboot.framework.meta.handler;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.service.CommandHandler;
 import com.auraboot.framework.meta.service.CommandHandlerContext;
+import com.auraboot.framework.organization.dto.EmployeeAccountProvisionResponse;
+import com.auraboot.framework.organization.service.OrgEmployeeService;
 import com.auraboot.framework.tenant.service.TenantMemberApplicationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,7 +27,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
  * - admin:restore_member  → restore a suspended member
  * - admin:leave_member    → mark a member as left (INACTIVE + set leave_date)
  * - admin:delete_member   → remove a member from the tenant
- * - admin:reset_member_password → send password reset email to the member
+ * - admin:reset_member_password → reset password and return a temporary password
  *
  * @author AuraBoot Team
  * @since 4.0.0
@@ -36,6 +38,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 public class TenantMemberCommandHandler implements CommandHandler {
 
     private final TenantMemberApplicationService tenantMemberApplicationService;
+    private final OrgEmployeeService orgEmployeeService;
 
     @Override
     public String getHandlerName() {
@@ -50,17 +53,17 @@ public class TenantMemberCommandHandler implements CommandHandler {
         Map<String, Object> result = new HashMap<>();
 
         try {
-            String memberPid = extractMemberPid(context);
             Long userId = extractUserId(context);
 
             switch (commandCode) {
-                case "admin:approve_member" -> handleApprove(memberPid, userId, result);
-                case "admin:reject_member" -> handleReject(memberPid, context.getPayload(), userId, result);
-                case "admin:suspend_member" -> handleSuspend(memberPid, context.getPayload(), userId, result);
-                case "admin:restore_member" -> handleRestore(memberPid, userId, result);
-                case "admin:leave_member" -> handleLeave(memberPid, userId, result);
-                case "admin:delete_member" -> handleDelete(memberPid, userId, result);
-                case "admin:reset_member_password" -> handleResetPassword(memberPid, userId, result);
+                case "admin:approve_member" -> handleApprove(extractMemberPid(context), userId, result);
+                case "admin:reject_member" -> handleReject(extractMemberPid(context), context.getPayload(), userId, result);
+                case "admin:suspend_member" -> handleSuspend(extractMemberPid(context), context.getPayload(), userId, result);
+                case "admin:restore_member" -> handleRestore(extractMemberPid(context), userId, result);
+                case "admin:leave_member" -> handleLeave(extractMemberPid(context), userId, result);
+                case "admin:delete_member" -> handleDelete(extractMemberPid(context), userId, result);
+                case "admin:reset_member_password" -> handleResetPassword(extractMemberPid(context), userId, result);
+                case "admin:provision_member_from_employee" -> handleProvisionMemberFromEmployee(context.getPayload(), result);
                 default -> {
                     log.warn("Unknown command code for TenantMemberCommandHandler: {}", commandCode);
                     result.put("handlerExecuted", false);
@@ -69,7 +72,7 @@ public class TenantMemberCommandHandler implements CommandHandler {
             }
 
             result.put("handlerExecuted", true);
-            log.info("TenantMemberCommandHandler completed: {} for member pid={}", commandCode, memberPid);
+            log.info("TenantMemberCommandHandler completed: {}", commandCode);
 
         } catch (BusinessException e) {
             throw e;
@@ -126,9 +129,36 @@ public class TenantMemberCommandHandler implements CommandHandler {
     }
 
     private void handleResetPassword(String memberPid, Long userId, Map<String, Object> result) {
-        tenantMemberApplicationService.sendPasswordResetEmail(memberPid, userId);
+        String tempPassword = tenantMemberApplicationService.resetMemberPasswordByAdmin(memberPid, userId);
         result.put("action", "reset_password");
-        result.put("emailSent", true);
+        result.put("tempPassword", tempPassword);
+        result.put("adminManaged", true);
+    }
+
+    private void handleProvisionMemberFromEmployee(Map<String, Object> payload, Map<String, Object> result) {
+        String employeePid = extractString(payload, "employeePid");
+        if (employeePid == null) {
+            employeePid = extractString(payload, "org_emp_pid");
+        }
+        if (employeePid == null) {
+            employeePid = extractString(payload, "pid");
+        }
+        if (employeePid == null) {
+            throw new BusinessException("employeePid is required for member provisioning");
+        }
+
+        EmployeeAccountProvisionResponse provisioned = orgEmployeeService.openAccount(employeePid);
+        result.put("action", "provision_member_from_employee");
+        result.put("employeePid", provisioned.getEmployeePid());
+        result.put("userPid", provisioned.getUserPid());
+        result.put("memberPid", provisioned.getMemberPid());
+        result.put("createdUser", provisioned.isCreatedUser());
+        result.put("createdMember", provisioned.isCreatedMember());
+        result.put("adminManaged", provisioned.isAdminManaged());
+        result.put("assignedRoles", provisioned.getAssignedRoles());
+        if (provisioned.getTemporaryPassword() != null) {
+            result.put("tempPassword", provisioned.getTemporaryPassword());
+        }
     }
 
     /**
@@ -172,5 +202,17 @@ public class TenantMemberCommandHandler implements CommandHandler {
         }
         Object reason = payload.get("reason");
         return reason != null ? reason.toString() : null;
+    }
+
+    private String extractString(Map<String, Object> payload, String key) {
+        if (payload == null) {
+            return null;
+        }
+        Object value = payload.get(key);
+        if (value == null) {
+            return null;
+        }
+        String text = value.toString().trim();
+        return text.isEmpty() ? null : text;
     }
 }

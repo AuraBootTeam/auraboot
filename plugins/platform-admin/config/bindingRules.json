@@ -47,5 +47,12 @@
     "handlerClass": "tenantMemberCommandHandler",
     "sequence": 10,
     "enabled": true
+  },
+  {
+    "commandCode": "admin:provision_member_from_employee",
+    "ruleType": "handler",
+    "handlerClass": "tenantMemberCommandHandler",
+    "sequence": 10,
+    "enabled": true
   }
 ]

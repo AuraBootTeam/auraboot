@@ -2,6 +2,8 @@ package com.auraboot.framework.meta.handler;
 
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.service.CommandHandlerContext;
+import com.auraboot.framework.organization.dto.EmployeeAccountProvisionResponse;
+import com.auraboot.framework.organization.service.OrgEmployeeService;
 import com.auraboot.framework.tenant.service.TenantMemberApplicationService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +24,9 @@ class TenantMemberCommandHandlerTest {
 
     @Mock
     private TenantMemberApplicationService tenantMemberApplicationService;
+
+    @Mock
+    private OrgEmployeeService orgEmployeeService;
 
     @InjectMocks
     private TenantMemberCommandHandler handler;
@@ -141,14 +146,45 @@ class TenantMemberCommandHandlerTest {
     }
 
     @Test
-    void execute_resetPassword_callsServiceAndMarksEmailSent() {
+    void execute_resetPassword_callsServiceAndReturnsTemporaryPassword() {
         CommandHandlerContext ctx = buildContext("admin:reset_member_password", "mbr-008", 100L, null);
+        when(tenantMemberApplicationService.resetMemberPasswordByAdmin("mbr-008", 100L))
+                .thenReturn("TempPass1!");
 
         Map<String, Object> result = handler.execute(ctx);
 
         assertThat(result.get("action")).isEqualTo("reset_password");
-        assertThat(result.get("emailSent")).isEqualTo(true);
-        verify(tenantMemberApplicationService).sendPasswordResetEmail("mbr-008", 100L);
+        assertThat(result.get("tempPassword")).isEqualTo("TempPass1!");
+        assertThat(result.get("adminManaged")).isEqualTo(true);
+        verify(tenantMemberApplicationService).resetMemberPasswordByAdmin("mbr-008", 100L);
+    }
+
+    @Test
+    void execute_provisionMemberFromEmployee_opensEmployeeAccountAndReturnsTemporaryPassword() {
+        CommandHandlerContext ctx = buildContext("admin:provision_member_from_employee", null, 100L,
+                Map.of("employeePid", "emp-001"));
+        when(orgEmployeeService.openAccount("emp-001")).thenReturn(EmployeeAccountProvisionResponse.builder()
+                .employeePid("emp-001")
+                .userPid("user-001")
+                .memberPid("member-001")
+                .createdUser(true)
+                .createdMember(true)
+                .adminManaged(true)
+                .temporaryPassword("TempPass1!")
+                .build());
+
+        Map<String, Object> result = handler.execute(ctx);
+
+        assertThat(result.get("handlerExecuted")).isEqualTo(true);
+        assertThat(result.get("action")).isEqualTo("provision_member_from_employee");
+        assertThat(result.get("employeePid")).isEqualTo("emp-001");
+        assertThat(result.get("memberPid")).isEqualTo("member-001");
+        assertThat(result.get("userPid")).isEqualTo("user-001");
+        assertThat(result.get("createdUser")).isEqualTo(true);
+        assertThat(result.get("createdMember")).isEqualTo(true);
+        assertThat(result.get("adminManaged")).isEqualTo(true);
+        assertThat(result.get("tempPassword")).isEqualTo("TempPass1!");
+        verify(orgEmployeeService).openAccount("emp-001");
     }
 
     // =========================================================

@@ -43,11 +43,7 @@ public class SystemModeServiceImpl implements SystemModeService {
 
     @Override
     public boolean isRegistrationAllowed() {
-        if (isSingleTenant()) {
-            return systemConfigService.getBoolean(
-                SystemConfigKeys.SYSTEM_ALLOW_SELF_REGISTRATION, false);
-        }
         return systemConfigService.getBoolean(
-            SystemConfigKeys.SYSTEM_ALLOW_SELF_REGISTRATION, true);
+            SystemConfigKeys.SYSTEM_ALLOW_SELF_REGISTRATION, false);
     }
 }

@@ -1,12 +1,16 @@
 package com.auraboot.framework.organization.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.organization.dto.CreateEmployeeRequest;
+import com.auraboot.framework.organization.dto.EmployeeAccountProvisionResponse;
 import com.auraboot.framework.organization.dto.LinkMemberRequest;
 import com.auraboot.framework.organization.dto.OrgEmployeeDTO;
 import com.auraboot.framework.organization.dto.TransferRequest;
+import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
@@ -41,6 +45,8 @@ class OrgEmployeeServiceImplTest {
     @Mock private UserService userService;
     @Mock private TenantMemberService tenantMemberService;
     @Mock private OrganizationServiceImpl organizationService;
+    @Mock private RoleService roleService;
+    @Mock private PasswordPolicyService passwordPolicyService;
     @Mock private JdbcTemplate jdbcTemplate;
 
     private OrgEmployeeServiceImpl service;
@@ -48,9 +54,90 @@ class OrgEmployeeServiceImplTest {
     @BeforeEach
     void setUp() throws Exception {
         service = new OrgEmployeeServiceImpl(
-            dynamicDataService, userService, tenantMemberService, organizationService);
+            dynamicDataService, userService, tenantMemberService, organizationService, roleService,
+            passwordPolicyService);
         injectField(service, "jdbcTemplate", jdbcTemplate);
         MetaContext.setContext(1L, 5L, "user-pid", "alice");
+    }
+
+    @Test
+    @DisplayName("openAccount creates user and member, links both sides, and returns temporary password")
+    void openAccountCreatesUserAndMember() {
+        Map<String, Object> employee = new HashMap<>();
+        employee.put("id", 200L);
+        employee.put("pid", "emp-1");
+        employee.put("org_emp_name", "Alice");
+        employee.put("org_emp_email", "alice@x");
+        when(dynamicDataService.getById("org_employee", "emp-1")).thenReturn(employee);
+        when(userService.findByEmail("alice@x")).thenReturn(null);
+        when(userService.findByUserName("emp_emp1")).thenReturn(null);
+        when(passwordPolicyService.validate(anyString())).thenReturn(List.of());
+
+        User user = new User();
+        user.setId(99L);
+        user.setPid("user-99");
+        user.setEmail("alice@x");
+        user.setUserName("emp_emp1");
+        when(userService.signUp(eq("alice@x"), anyString(), eq("Alice"), eq("emp_emp1"))).thenReturn(user);
+        when(tenantMemberService.findByTenantIdAndUserId(1L, 99L)).thenReturn(null);
+
+        TenantMember member = new TenantMember();
+        member.setId(50L);
+        member.setPid("mem-50");
+        when(tenantMemberService.addMember(99L, 1L, "active")).thenReturn(member);
+
+        Role defaultRole = new Role();
+        defaultRole.setId(8L);
+        defaultRole.setCode("member");
+        when(roleService.findDefaultRole(1L)).thenReturn(defaultRole);
+
+        EmployeeAccountProvisionResponse response = service.openAccount("emp-1");
+
+        assertTrue(response.isCreatedUser());
+        assertTrue(response.isCreatedMember());
+        assertNotNull(response.getTemporaryPassword());
+        assertEquals("user-99", response.getUserPid());
+        assertEquals("mem-50", response.getMemberPid());
+        assertEquals(200L, member.getEmployeeId());
+        assertEquals(List.of("member"), response.getAssignedRoles());
+        verify(tenantMemberService).updateMember(member);
+        verify(dynamicDataService).update(eq("org_employee"), eq("emp-1"), argThat(data ->
+            "user-99".equals(data.get("org_emp_user_id")) && "mem-50".equals(data.get("org_emp_member_id"))));
+        verify(roleService).assignRoleToMember(50L, 8L, 1L);
+    }
+
+    @Test
+    @DisplayName("openAccount reuses existing user and member without resetting password or roles")
+    void openAccountReusesExistingUserAndMember() {
+        Map<String, Object> employee = new HashMap<>();
+        employee.put("id", 201L);
+        employee.put("pid", "emp-2");
+        employee.put("org_emp_name", "Bob");
+        employee.put("org_emp_email", "bob@x");
+        when(dynamicDataService.getById("org_employee", "emp-2")).thenReturn(employee);
+
+        User user = new User();
+        user.setId(100L);
+        user.setPid("user-100");
+        user.setEmail("bob@x");
+        user.setUserName("bob");
+        when(userService.findByEmail("bob@x")).thenReturn(user);
+
+        TenantMember member = new TenantMember();
+        member.setId(51L);
+        member.setPid("mem-51");
+        when(tenantMemberService.findByTenantIdAndUserId(1L, 100L)).thenReturn(member);
+
+        EmployeeAccountProvisionResponse response = service.openAccount("emp-2");
+
+        assertFalse(response.isCreatedUser());
+        assertFalse(response.isCreatedMember());
+        assertNull(response.getTemporaryPassword());
+        assertEquals(List.of(), response.getAssignedRoles());
+        assertEquals(201L, member.getEmployeeId());
+        verify(userService, never()).signUp(any(), any(), any(), any());
+        verify(roleService, never()).assignRoleToMember(any(), any(), any());
+        verify(dynamicDataService).update(eq("org_employee"), eq("emp-2"), anyMap());
     }
 
     @AfterEach

@@ -1,6 +1,8 @@
 package com.auraboot.framework.tenant.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.auth.service.PasswordPolicyService;
+import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.constant.StatusConstants;
@@ -29,6 +31,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -73,6 +76,15 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
 
     @Autowired
     private PasswordManagementService passwordManagementService;
+
+    @Autowired(required = false)
+    private PasswordPolicyService passwordPolicyService;
+
+    @Autowired(required = false)
+    private SessionManagementService sessionManagementService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Autowired
     private TeamMemberService teamMemberService;
@@ -247,9 +259,11 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
                     break;
                 case StatusConstants.INACTIVE:
                     result = tenantMemberService.deactivateMember(member.getId());
+                    applyMemberOffboardingSideEffects(member);
                     break;
                 case StatusConstants.SUSPENDED:
                     result = tenantMemberService.suspendMember(member.getId(), reason);
+                    revokeUserSessions(member);
                     break;
                 default:
                     throw new BusinessException(ResponseCode.BadParam, "无效的状态: " + status);
@@ -334,6 +348,40 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
         } catch (Exception e) {
             log.error("发送成员重置密码邮件失败，memberPid: {}", memberPid, e);
             throw new BusinessException(ResponseCode.BUSINESS_ERROR, "发送重置密码邮件失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public String resetMemberPasswordByAdmin(String memberPid, Long userId) {
+        try {
+            TenantMember member = tenantMemberService.findByPid(memberPid);
+            if (member == null) {
+                throw new BusinessException(ResponseCode.NOT_FOUND, "成员不存在");
+            }
+
+            Long currentTenantId = MetaContext.getCurrentTenantId();
+            if (currentTenantId == null) {
+                currentTenantId = tenantMemberService.getTenantIdByUserId(userId);
+            }
+
+            if (!member.getTenantId().equals(currentTenantId)) {
+                throw new BusinessException(ResponseCode.FORBIDDEN, "无权限操作该成员");
+            }
+
+            User targetUser = userService.findByUserId(member.getUserId());
+            if (targetUser == null) {
+                throw new BusinessException(ResponseCode.NOT_FOUND, "成员关联用户不存在");
+            }
+
+            String tempPassword = generateTemporaryPassword(16);
+            passwordManagementService.resetPasswordByAdmin(targetUser.getPid(), tempPassword);
+            log.info("用户 {} 为成员 {} 重置了管理员托管临时密码", userId, memberPid);
+            return tempPassword;
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("管理员重置成员密码失败，memberPid: {}", memberPid, e);
+            throw new BusinessException(ResponseCode.BUSINESS_ERROR, "重置成员密码失败: " + e.getMessage(), e);
         }
     }
     
@@ -623,6 +671,35 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
         throw new BusinessException(ResponseCode.SystemError, "无法解析创建后的员工 ID");
     }
 
+    private void applyMemberOffboardingSideEffects(TenantMember member) {
+        markLinkedEmployeeResigned(member);
+        revokeUserSessions(member);
+    }
+
+    private void markLinkedEmployeeResigned(TenantMember member) {
+        if (member == null) {
+            return;
+        }
+        int updated;
+        if (member.getEmployeeId() != null) {
+            updated = jdbcTemplate.update(
+                    "UPDATE mt_org_employee SET org_emp_status = ?, updated_at = NOW() WHERE id = ?",
+                    "resigned", member.getEmployeeId());
+        } else {
+            updated = jdbcTemplate.update(
+                    "UPDATE mt_org_employee SET org_emp_status = ?, updated_at = NOW() WHERE org_emp_member_id = ?",
+                    "resigned", member.getPid());
+        }
+        log.info("Marked {} employee record(s) resigned for member {}", updated, member.getPid());
+    }
+
+    private void revokeUserSessions(TenantMember member) {
+        if (sessionManagementService == null || member == null || member.getUserId() == null) {
+            return;
+        }
+        sessionManagementService.revokeAllSessions(member.getUserId());
+    }
+
     private Map<Integer, String> resolveImportHeaders(Row headerRow) {
         if (headerRow == null) {
             throw new BusinessException(ResponseCode.BadParam, "导入模板缺少表头");
@@ -707,11 +784,17 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
     }
 
     private String generateTemporaryPassword(int length) {
-        StringBuilder sb = new StringBuilder(length);
-        for (int i = 0; i < length; i++) {
-            sb.append(TEMP_PASSWORD_CHARS.charAt(RANDOM.nextInt(TEMP_PASSWORD_CHARS.length())));
+        for (int attempt = 0; attempt < 100; attempt++) {
+            StringBuilder sb = new StringBuilder(length);
+            for (int i = 0; i < length; i++) {
+                sb.append(TEMP_PASSWORD_CHARS.charAt(RANDOM.nextInt(TEMP_PASSWORD_CHARS.length())));
+            }
+            String candidate = sb.toString();
+            if (passwordPolicyService == null || passwordPolicyService.validate(candidate).isEmpty()) {
+                return candidate;
+            }
         }
-        return sb.toString();
+        throw new BusinessException(ResponseCode.SystemError, "Unable to generate a policy-compliant temporary password");
     }
 
 }

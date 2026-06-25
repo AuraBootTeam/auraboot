@@ -86,6 +86,20 @@
     "resourceType": "menu"
   },
   {
+    "code": "ai_center",
+    "name": "AI 中心",
+    "name:zh-CN": "AI 中心",
+    "name:en": "AI Center",
+    "description": "访问 AI、模型服务和 LLM provider 配置",
+    "description:zh-CN": "访问 AI、模型服务和 LLM provider 配置",
+    "description:en": "Access AI, model service and LLM provider settings",
+    "type": "menu",
+    "module": "system",
+    "resource": "/aurabot/providers",
+    "action": "view",
+    "resourceType": "menu"
+  },
+  {
     "code": "login_channel_manage",
     "name": "登录渠道管理",
     "name:zh-CN": "登录渠道管理",

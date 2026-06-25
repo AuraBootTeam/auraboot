@@ -1,0 +1,13 @@
+{
+  "code": "org:open_employee_account",
+  "displayName:zh-CN": "开通账号",
+  "displayName:en": "Open Account",
+  "description": "Open or bind a login account for an existing employee",
+  "type": "custom",
+  "modelCode": "org_employee",
+  "permissions": ["ORG.hr.manage"],
+  "extension": {
+    "confirmMessage:zh-CN": "确认为该人员开通登录账号？如需新建用户，将生成一次性临时密码。",
+    "confirmMessage:en": "Open a login account for this employee? A one-time temporary password will be generated when a new user is created."
+  }
+}

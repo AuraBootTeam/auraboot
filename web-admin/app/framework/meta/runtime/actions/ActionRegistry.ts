@@ -639,7 +639,25 @@ export async function promptInputForm(
     if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
       try {
         const result = await fetchResult(field.dataSource.endpoint, { method: 'get' });
-        fieldOptions[field.field] = result.data || [];
+        const valueField = field.dataSource.valueField || 'value';
+        const labelField = field.dataSource.labelField || 'label';
+        const rawOptions = Array.isArray(result.data)
+          ? result.data
+          : Array.isArray(result.data?.records)
+            ? result.data.records
+            : [];
+        fieldOptions[field.field] = rawOptions
+          .map((option: any) => {
+            if (option && typeof option === 'object') {
+              const value = option[valueField] ?? option.value;
+              const label = option[labelField] ?? option.label ?? option.name ?? value;
+              if (value === undefined || value === null) return null;
+              return { value: String(value), label: String(label ?? value) };
+            }
+            if (option === undefined || option === null) return null;
+            return { value: String(option), label: String(option) };
+          })
+          .filter(Boolean) as Array<{ label: string; value: string }>;
       } catch (e) {
         console.error(`[promptInputForm] Failed to fetch options for ${field.field}:`, e);
         fieldOptions[field.field] = [];

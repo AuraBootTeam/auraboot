@@ -230,12 +230,16 @@ export class HeaderPage {
 
   /** The user menu button (contains the avatar) */
   get userMenuButton(): Locator {
-    return this.page.locator('[data-testid="user-menu"] > button').first();
+    return this.page
+      .locator(
+        '[data-testid="user-menu"] > button, header button:has(img[alt="User avatar"])',
+      )
+      .first();
   }
 
   /** The user avatar image */
   get userAvatar(): Locator {
-    return this.page.locator('header img[alt="User avatar"]');
+    return this.page.locator('header img[alt="User avatar"]').first();
   }
 
   /** The logout link inside the user dropdown */
@@ -270,7 +274,7 @@ export class HeaderPage {
         break;
       }
       await this.userMenuButton.click().catch(async () => {
-        await this.userAvatar.click();
+        await this.userAvatar.click({ force: true });
       });
       await this.userDropdown.waitFor({ state: 'visible', timeout: 1000 }).catch(() => null);
     }

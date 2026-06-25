@@ -21,7 +21,7 @@ vi.mock('~/shared/services/http-client', () => ({
 // profile.ts dynamically imports session only in uploadAvatar; no top-level session import
 // to mock for getUserProfile / updateUserProfile. We don't need to mock session here.
 
-import { getUserProfile, updateUserProfile } from '../profile';
+import { getUserProfile, updateUserProfile, uploadAvatar } from '../profile';
 
 function ok<T>(data: T) {
   return { code: '0', desc: '', data };
@@ -44,6 +44,13 @@ const PROFILE = {
 describe('profile service', () => {
   beforeEach(() => {
     fetchResultMock.mockReset();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue(ok('avatar-file-pid')),
+      }),
+    );
   });
 
   // ── getUserProfile ─────────────────────────────────────────────────────────────
@@ -111,6 +118,23 @@ describe('profile service', () => {
       fetchResultMock.mockResolvedValue({ code: '1', desc: '', data: null });
 
       await expect(updateUserProfile(FAKE_REQUEST, {})).rejects.toThrow('更新失败');
+    });
+  });
+
+  describe('uploadAvatar', () => {
+    it('POSTs multipart data to the backend avatar upload endpoint', async () => {
+      const file = new File(['avatar'], 'avatar.png', { type: 'image/png' });
+
+      const result = await uploadAvatar(file);
+
+      expect(result).toBe('avatar-file-pid');
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        '/api/user/avatar/upload',
+        expect.objectContaining({
+          method: 'post',
+          body: expect.any(FormData),
+        }),
+      );
     });
   });
 });

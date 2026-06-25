@@ -1,6 +1,7 @@
 package com.auraboot.framework.organization.service;
 
 import com.auraboot.framework.organization.dto.CreateEmployeeRequest;
+import com.auraboot.framework.organization.dto.EmployeeAccountProvisionResponse;
 import com.auraboot.framework.organization.dto.LinkMemberRequest;
 import com.auraboot.framework.organization.dto.OrgEmployeeDTO;
 import com.auraboot.framework.organization.dto.TransferRequest;
@@ -26,6 +27,14 @@ public interface OrgEmployeeService {
      * @return the created employee DTO
      */
     OrgEmployeeDTO createWithUser(CreateEmployeeRequest request);
+
+    /**
+     * Open or bind a login account for an existing employee record.
+     *
+     * @param employeePid employee PID
+     * @return account provisioning result with a one-time temporary password when a new user is created
+     */
+    EmployeeAccountProvisionResponse openAccount(String employeePid);
 
     /**
      * Link an existing tenant member to a new employee record.

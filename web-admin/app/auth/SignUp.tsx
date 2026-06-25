@@ -14,7 +14,12 @@ import { validateEmail } from '~/utils/utils';
 import { post } from '~/shared/services/http-client';
 import { ResultHelper, type User } from '~/utils/type';
 
+const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
+  if (!PUBLIC_REGISTRATION_ENABLED) {
+    return redirect('/login');
+  }
   const token = await getTokenFromRequest(request);
   if (token) {
     return redirect('/');
@@ -23,6 +28,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
+  if (!PUBLIC_REGISTRATION_ENABLED) {
+    return {
+      errors: { email: 'Self-registration is disabled', password: null, displayName: null },
+      status: 403,
+    };
+  }
+
   const formData = await request.formData();
   const email = formData.get('email');
   const password = formData.get('password');

@@ -212,8 +212,19 @@
     "type": "custom",
     "modelCode": "tenant_member",
     "extension": {
-      "confirmMessage:zh-CN": "确认重置该成员密码并发送重置邮件？",
-      "confirmMessage:en": "Reset this member's password and send a reset email?"
+      "confirmMessage:zh-CN": "确认为该成员生成新的临时密码？临时密码只会显示一次。",
+      "confirmMessage:en": "Generate a new temporary password for this member? It will be shown only once."
+    }
+  },
+  {
+    "code": "admin:provision_member_from_employee",
+    "displayName:zh-CN": "从人员开通账号",
+    "displayName:en": "Provision Member from Employee",
+    "type": "custom",
+    "modelCode": "tenant_member",
+    "extension": {
+      "confirmMessage:zh-CN": "确认从所选人员开通登录账号？如需新建用户，将生成一次性临时密码。",
+      "confirmMessage:en": "Provision an account from the selected employee? A one-time temporary password will be generated when a user is created."
     }
   },
 

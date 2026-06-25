@@ -1,0 +1,9 @@
+[
+  {
+    "commandCode": "org:open_employee_account",
+    "ruleType": "handler",
+    "handlerClass": "orgEmployeeCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  }
+]
