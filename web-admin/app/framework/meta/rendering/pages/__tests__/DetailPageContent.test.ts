@@ -415,6 +415,16 @@ describe('resolveDetailRecordEndpoint', () => {
       ),
     ).toEqual({ endpoint: '/api/billing/plans/abc%2Fdef', method: 'get' });
   });
+
+  it('allows singleton detail API endpoints without a route record pid', () => {
+    expect(
+      resolveDetailRecordEndpoint(
+        { extension: { dataSource: { type: 'api', endpoint: '/api/tenant/info' } } },
+        'tenant_profile',
+        '',
+      ),
+    ).toEqual({ endpoint: '/api/tenant/info', method: 'get' });
+  });
   it('appends /{recordPid} when the api endpoint has no placeholder, and honors post', () => {
     expect(
       resolveDetailRecordEndpoint(

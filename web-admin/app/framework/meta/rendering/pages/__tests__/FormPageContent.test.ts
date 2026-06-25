@@ -9,6 +9,7 @@ import {
   resolveAfterSubmitRedirect,
   resolveAsyncCommandDispatch,
   resolveEditRecordEndpoint,
+  resolveFormSubmitEndpoint,
   resolveSubmitCommandCode,
   shouldBypassFormSubmit,
   unwrapJsonLikeValue,
@@ -333,5 +334,40 @@ describe('resolveEditRecordEndpoint', () => {
   it('url-encodes the public record pid', () => {
     expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordPid}' } }, 'qr_code', 'a/b'))
       .toBe('/api/qr/a%2Fb');
+  });
+
+  it('allows singleton custom endpoints without a route record pid', () => {
+    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/tenant/info' } }, 'tenant_profile'))
+      .toBe('/api/tenant/info');
+  });
+});
+
+describe('resolveFormSubmitEndpoint', () => {
+  it('uses a configured API submit endpoint and resolves pid from loaded form data', () => {
+    expect(
+      resolveFormSubmitEndpoint(
+        {
+          extension: {
+            submitEndpoint: { type: 'api', method: 'put', endpoint: '/api/tenant/{pid}' },
+          },
+        },
+        null,
+        { pid: 'tenant-1' },
+      ),
+    ).toEqual({ endpoint: '/api/tenant/tenant-1', method: 'put' });
+  });
+
+  it('url-encodes route record pids for submit endpoints', () => {
+    expect(
+      resolveFormSubmitEndpoint(
+        {
+          extension: {
+            submitEndpoint: { type: 'api', method: 'patch', endpoint: '/api/custom/${recordPid}' },
+          },
+        },
+        'a/b',
+        {},
+      ),
+    ).toEqual({ endpoint: '/api/custom/a%2Fb', method: 'patch' });
   });
 });

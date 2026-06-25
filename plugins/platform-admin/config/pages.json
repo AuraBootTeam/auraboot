@@ -2477,6 +2477,339 @@
     ]
   },
   {
+    "pageKey": "enterprise_info_detail",
+    "name": {
+      "zh-CN": "企业信息",
+      "en-US": "Enterprise Info"
+    },
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "extension": {
+      "showBack": false,
+      "showShare": false,
+      "showReport": false,
+      "showPrint": false,
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/tenant/info"
+      }
+    },
+    "blocks": [
+      {
+        "id": "actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "edit",
+            "primary": true,
+            "label": {
+              "zh-CN": "编辑信息",
+              "en-US": "Edit Info"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "/enterprise/info/edit"
+            }
+          }
+        ]
+      },
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "name",
+            "label": {
+              "zh-CN": "企业编码",
+              "en-US": "Tenant Code"
+            },
+            "dataType": "string",
+            "colSpan": 6
+          },
+          {
+            "field": "displayName",
+            "label": {
+              "zh-CN": "企业名称",
+              "en-US": "Display Name"
+            },
+            "dataType": "string",
+            "colSpan": 6
+          },
+          {
+            "field": "industry",
+            "label": {
+              "zh-CN": "所属行业",
+              "en-US": "Industry"
+            },
+            "dataType": "string",
+            "colSpan": 6
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "状态",
+              "en-US": "Status"
+            },
+            "dataType": "string",
+            "colSpan": 6
+          }
+        ]
+      },
+      {
+        "id": "contact",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "联系信息",
+          "en-US": "Contact"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "contactEmail",
+            "label": {
+              "zh-CN": "联系邮箱",
+              "en-US": "Email"
+            },
+            "dataType": "string",
+            "colSpan": 6
+          },
+          {
+            "field": "contactPhone",
+            "label": {
+              "zh-CN": "联系电话",
+              "en-US": "Phone"
+            },
+            "dataType": "string",
+            "colSpan": 6
+          },
+          {
+            "field": "website",
+            "label": {
+              "zh-CN": "官网",
+              "en-US": "Website"
+            },
+            "dataType": "string",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "description",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "企业描述",
+          "en-US": "Description"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "description",
+            "label": {
+              "zh-CN": "描述",
+              "en-US": "Description"
+            },
+            "dataType": "text",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "audit",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "时间信息",
+          "en-US": "Audit"
+        },
+        "readOnly": true,
+        "fields": [
+          {
+            "field": "createdAt",
+            "label": {
+              "zh-CN": "创建时间",
+              "en-US": "Created At"
+            },
+            "dataType": "datetime",
+            "colSpan": 6
+          },
+          {
+            "field": "updatedAt",
+            "label": {
+              "zh-CN": "更新时间",
+              "en-US": "Updated At"
+            },
+            "dataType": "datetime",
+            "colSpan": 6
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "enterprise_info_form",
+    "name": {
+      "zh-CN": "编辑企业信息",
+      "en-US": "Edit Enterprise Info"
+    },
+    "kind": "form",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "recordSource": {
+      "mode": "singleton",
+      "method": "get",
+      "endpoint": "/api/tenant/info"
+    },
+    "extension": {
+      "editMode": true,
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "afterSubmitRedirect": "/enterprise/info",
+      "submitEndpoint": {
+        "type": "api",
+        "method": "put",
+        "endpoint": "/api/tenant/{pid}"
+      }
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "基本信息",
+          "en-US": "Basic Information"
+        },
+        "fields": [
+          {
+            "field": "name",
+            "label": {
+              "zh-CN": "企业编码",
+              "en-US": "Tenant Code"
+            },
+            "dataType": "string",
+            "required": true,
+            "colSpan": 6
+          },
+          {
+            "field": "displayName",
+            "label": {
+              "zh-CN": "企业名称",
+              "en-US": "Display Name"
+            },
+            "dataType": "string",
+            "required": true,
+            "colSpan": 6
+          },
+          {
+            "field": "logo",
+            "label": {
+              "zh-CN": "Logo 地址",
+              "en-US": "Logo URL"
+            },
+            "dataType": "string",
+            "colSpan": 12
+          },
+          {
+            "field": "industry",
+            "label": {
+              "zh-CN": "所属行业",
+              "en-US": "Industry"
+            },
+            "dataType": "string",
+            "colSpan": 6
+          },
+          {
+            "field": "status",
+            "label": {
+              "zh-CN": "状态",
+              "en-US": "Status"
+            },
+            "dataType": "string",
+            "colSpan": 6
+          },
+          {
+            "field": "contactEmail",
+            "label": {
+              "zh-CN": "联系邮箱",
+              "en-US": "Email"
+            },
+            "dataType": "string",
+            "colSpan": 6
+          },
+          {
+            "field": "contactPhone",
+            "label": {
+              "zh-CN": "联系电话",
+              "en-US": "Phone"
+            },
+            "dataType": "string",
+            "colSpan": 6
+          },
+          {
+            "field": "website",
+            "label": {
+              "zh-CN": "官网",
+              "en-US": "Website"
+            },
+            "dataType": "string",
+            "colSpan": 12
+          },
+          {
+            "field": "description",
+            "label": {
+              "zh-CN": "描述",
+              "en-US": "Description"
+            },
+            "dataType": "text",
+            "colSpan": 12
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "submit",
+            "primary": true,
+            "label": {
+              "zh-CN": "保存",
+              "en-US": "Save"
+            },
+            "action": {
+              "type": "command",
+              "command": "tenant:update_profile"
+            }
+          },
+          {
+            "code": "cancel",
+            "label": {
+              "zh-CN": "取消",
+              "en-US": "Cancel"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "/enterprise/info"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
     "pageKey": "template_center",
     "name": "$i18n:template.gallery.title",
     "kind": "detail",
