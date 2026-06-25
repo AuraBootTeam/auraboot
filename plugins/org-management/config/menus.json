@@ -69,7 +69,8 @@
     "type": 1,
     "permissionCode": "org_teams",
     "orderNo": 40,
-    "visible": true
+    "visible": true,
+    "pageKey": "ab_team_list"
   },
   {
     "code": "member_management",

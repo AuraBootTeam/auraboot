@@ -1,0 +1,14 @@
+{
+  "code": "code",
+  "displayName:zh-CN": "编码",
+  "displayName:en": "Code",
+  "dataType": "string",
+  "constraints": {
+    "required": true,
+    "maxLength": 100
+  },
+  "feature": {
+    "searchable": true,
+    "sortable": true
+  }
+}

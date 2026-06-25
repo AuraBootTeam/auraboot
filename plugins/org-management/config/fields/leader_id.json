@@ -1,0 +1,12 @@
+{
+  "code": "leader_id",
+  "displayName:zh-CN": "负责人",
+  "displayName:en": "Leader",
+  "dataType": "string",
+  "constraints": {
+    "maxLength": 26
+  },
+  "uiSchema": {
+    "component": "UserSelect"
+  }
+}

@@ -52,5 +52,26 @@
     "domain_category": "hr",
     "data_sensitivity": "confidential",
     "lifecycle_description": "ACTIVE → ON_LEAVE ↔ ACTIVE (reversible) / ACTIVE"
+  },
+  {
+    "code": "ab_team",
+    "displayName:zh-CN": "团队",
+    "displayName:en": "Team",
+    "description": "Platform team facade backed by ab_team",
+    "modelType": "ENTITY",
+    "modelCategory": "master",
+    "extension": {
+      "icon": "Users",
+      "category": "organization",
+      "titleField": "name",
+      "subtitleField": "code",
+      "tableName": "ab_team",
+      "softDelete": true,
+      "skipTableCreation": true
+    },
+    "semantic_description": "Organization team facade backed by the platform ab_team table. Teams group tenant members for collaboration, ownership, saved views, data scopes, and organization administration.",
+    "domain_category": "hr",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "active ↔ inactive"
   }
 ]

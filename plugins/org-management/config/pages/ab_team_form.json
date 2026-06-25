@@ -1,0 +1,97 @@
+{
+  "pageKey": "ab_team_form",
+  "name:zh-CN": "团队表单",
+  "name:en": "Team Form",
+  "modelCode": "ab_team",
+  "description": "DSL-driven team create/edit form backed by ab_team",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12,
+    "gap": 12
+  },
+  "extension": {
+    "afterSubmitRedirect": "/organization/teams"
+  },
+  "blocks": [
+    {
+      "id": "team_basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "基本信息",
+        "en": "Basic Information"
+      },
+      "columns": 2,
+      "fields": [
+        {
+          "field": "name",
+          "required": true,
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "code",
+          "required": true,
+          "readOnlyWhen": "record.pid != null",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "leader_id",
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "status",
+          "dictCode": "org_team_status",
+          "required": true,
+          "layout": {
+            "colSpan": 6
+          }
+        },
+        {
+          "field": "description",
+          "layout": {
+            "colSpan": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "team_actions",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "save",
+          "primary": true,
+          "label": {
+            "zh-CN": "保存",
+            "en": "Save"
+          },
+          "action": {
+            "type": "command"
+          }
+        },
+        {
+          "code": "cancel",
+          "label": {
+            "zh-CN": "取消",
+            "en": "Cancel"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "/organization/teams"
+          }
+        }
+      ]
+    }
+  ],
+  "title": {
+    "zh-CN": "团队表单",
+    "en": "Team Form"
+  }
+}

@@ -43,4 +43,9 @@ describe('runtime component loaders', () => {
     expect(getRuntimeComponentEntry('DecisionRuleBindingBlock')).toBeDefined();
     expect(getRuntimeComponentEntry('decision-rule-binding')).toBeDefined();
   });
+
+  it('registers the organization team members custom block', () => {
+    expect(getRuntimeComponentEntry('TeamMembersBlock')).toBeDefined();
+    expect(getRuntimeComponentEntry('team-members')).toBeDefined();
+  });
 });
