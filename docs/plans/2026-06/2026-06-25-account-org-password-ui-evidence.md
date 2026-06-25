@@ -1,5 +1,5 @@
 ---
-type: test-evidence
+type: plan-impl
 status: active
 created: 2026-06-25
 relates_to:

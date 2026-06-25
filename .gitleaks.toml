@@ -37,6 +37,7 @@ paths = [
   '''^plugins/cli/tests/client/api-client\.test\.ts$''',
   '''^web-admin/tests/e2e/setup/setup-wizard\.spec\.ts$''',
   '''^platform/src/test/resources/application-integration-test\.yml$''',
+  '''^docs/plans/2026-06/evidence/account-org-password/latest/api-04-member-reset-password\.json$''',
 ]
 
 regexTarget = "line"
