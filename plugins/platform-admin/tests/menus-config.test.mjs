@@ -62,6 +62,36 @@ test('platform-admin exposes account security policy under system management', (
   assert.equal(dataSource?.endpoint, '/api/admin/account-security-policy');
 });
 
+test('platform-admin exposes system preferences as a DSL form page', () => {
+  const menu = menus.find((item) => item.code === 'system_preferences');
+  const page = pages.find((item) => item.pageKey === 'system_preferences_form');
+  const recordSource = page?.recordSource ?? page?.extension?.recordSource;
+  const submitEndpoint = page?.extension?.submitEndpoint;
+  const preferenceSection = page?.blocks?.find((block) => block.id === 'system_preferences_display');
+  const datetimeField = preferenceSection?.fields?.find((field) => field.field === 'datetimeFormat');
+  const timezoneField = preferenceSection?.fields?.find((field) => field.field === 'timezone');
+
+  assert.ok(menu, 'system_preferences menu must exist');
+  assert.equal(menu.parentCode, 'system_management');
+  assert.equal(menu.path, '/p/c/system_preferences_form');
+  assert.equal(menu.pageKey, 'system_preferences_form');
+  assert.equal(menu.permissionCode, 'system_management');
+  assert.equal(menu.visible, true);
+  assert.ok(page, 'system_preferences_form page must exist');
+  assert.equal(page.kind, 'form');
+  assert.equal(recordSource?.mode, 'singleton');
+  assert.equal(recordSource?.method, 'get');
+  assert.equal(recordSource?.endpoint, '/api/admin/system-preferences');
+  assert.equal(page?.extension?.recordSource?.endpoint, '/api/admin/system-preferences');
+  assert.equal(submitEndpoint?.method, 'put');
+  assert.equal(submitEndpoint?.endpoint, '/api/admin/system-preferences');
+  assert.equal(preferenceSection?.extension?.displayVariant, 'settings-card');
+  assert.equal(datetimeField?.component, 'SmartInput');
+  assert.equal(datetimeField?.props?.['data-testid'], 'system-datetime-format-input');
+  assert.equal(timezoneField?.component, 'TimezoneSelect');
+  assert.equal(timezoneField?.props?.['data-testid'], 'system-timezone-select');
+});
+
 test('platform-admin exposes account page provisioning from existing employees', () => {
   const command = commands.find((item) => item.code === 'admin:provision_member_from_employee');
   const page = pages.find((item) => item.pageKey === 'tenant_member_list');

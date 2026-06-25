@@ -2992,6 +2992,112 @@
     ]
   },
   {
+    "pageKey": "system_preferences_form",
+    "name:zh-CN": "系统偏好",
+    "name:en": "System Preferences",
+    "kind": "form",
+    "schemaVersion": 4,
+    "layout": { "type": "stack" },
+    "title": {
+      "zh-CN": "系统偏好",
+      "en": "System Preferences"
+    },
+    "recordSource": {
+      "mode": "singleton",
+      "method": "get",
+      "endpoint": "/api/admin/system-preferences"
+    },
+    "extension": {
+      "editMode": true,
+      "skipFieldMeta": true,
+      "skipDynamicFieldMeta": true,
+      "recordSource": {
+        "mode": "singleton",
+        "method": "get",
+        "endpoint": "/api/admin/system-preferences"
+      },
+      "afterSubmitRedirect": "/p/c/system_preferences_form",
+      "submitEndpoint": {
+        "type": "api",
+        "method": "put",
+        "endpoint": "/api/admin/system-preferences"
+      }
+    },
+    "blocks": [
+      {
+        "id": "system_preferences_display",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "显示策略",
+          "en": "Display Policy"
+        },
+        "description": {
+          "zh-CN": "设置租户级日期时间格式和默认时区；用户个人偏好优先级更高。",
+          "en": "Configures tenant-level datetime format and default timezone; user preferences take priority."
+        },
+        "extension": {
+          "displayVariant": "settings-card"
+        },
+        "fields": [
+          {
+            "field": "datetimeFormat",
+            "label": { "zh-CN": "日期时间格式", "en": "Datetime Format" },
+            "dataType": "string",
+            "component": "SmartInput",
+            "required": true,
+            "layout": { "colSpan": 6 },
+            "props": {
+              "data-testid": "system-datetime-format-input",
+              "placeholder": "YYYY-MM-DD HH:mm:ss"
+            }
+          },
+          {
+            "field": "timezone",
+            "label": { "zh-CN": "默认时区", "en": "Default Timezone" },
+            "dataType": "string",
+            "component": "TimezoneSelect",
+            "required": true,
+            "layout": { "colSpan": 6 },
+            "props": {
+              "data-testid": "system-timezone-select"
+            }
+          },
+          {
+            "field": "timezoneStatusText",
+            "label": { "zh-CN": "配置状态", "en": "Configuration Status" },
+            "dataType": "string",
+            "component": "SmartInput",
+            "readOnly": true,
+            "layout": { "colSpan": 12 },
+            "props": {
+              "data-testid": "system-timezone-status"
+            }
+          }
+        ]
+      },
+      {
+        "id": "buttons",
+        "blockType": "form-buttons",
+        "buttons": [
+          {
+            "code": "save",
+            "primary": true,
+            "label": {
+              "zh-CN": "保存偏好",
+              "en": "Save Preferences"
+            },
+            "action": {
+              "type": "save"
+            },
+            "props": {
+              "data-testid": "system-preferences-save"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
     "pageKey": "template_center",
     "name": "$i18n:template.gallery.title",
     "kind": "detail",

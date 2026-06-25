@@ -15,6 +15,7 @@ import DatePicker from '~/ui/smart/datetime/DatePicker';
 import Select from '~/ui/smart/form/Select';
 import Switch from '~/ui/smart/form/Switch';
 import Textarea from '~/ui/smart/form/Textarea';
+import TimezoneSelect from '~/ui/TimezoneSelect';
 
 // LRU-style component cache with max size
 const MAX_CACHE_SIZE = 100;
@@ -50,6 +51,9 @@ const EAGER_CORE_COMPONENTS: Record<string, ComponentType<any>> = {
   smartswitch: Switch,
   Switch,
   SmartSwitch: Switch,
+  timezoneselect: TimezoneSelect,
+  timezone: TimezoneSelect,
+  TimezoneSelect,
 };
 
 function cacheSet(key: string, value: ComponentType<any>) {
@@ -74,6 +78,17 @@ export function sanitizeRuntimeComponentProps<T extends Record<string, any>>(pro
   return Object.fromEntries(
     Object.entries(props).filter(([key]) => !NON_RUNTIME_COMPONENT_PROP_NAMES.has(key)),
   ) as Partial<T>;
+}
+
+export function isCoreComponentRegisteredForTest(name: string): boolean {
+  const normalizedName = name.trim();
+  const compactName = normalizedName.replace(/[-_]/g, '');
+  return Boolean(
+    EAGER_CORE_COMPONENTS[normalizedName] ||
+      EAGER_CORE_COMPONENTS[normalizedName.toLowerCase()] ||
+      EAGER_CORE_COMPONENTS[compactName] ||
+      EAGER_CORE_COMPONENTS[compactName.toLowerCase()],
+  );
 }
 
 export interface ComponentLoaderProps {
