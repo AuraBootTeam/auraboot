@@ -105,15 +105,24 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // 构建组件 props
   // 如果有 dictCode 且未指定组件或组件为 SmartInput，自动使用 SmartSelect
   const componentName = useMemo(() => {
+    const component = String(field.component || '').toLowerCase();
     if (
       field.dictCode &&
       !isTreeComponent &&
-      (!field.component || field.component === 'SmartInput')
+      (!component || component === 'input' || component === 'smartinput')
+    ) {
+      return 'SmartSelect';
+    }
+    const dataType = String((field as any).dataType || field.type || '').toLowerCase();
+    if (
+      ['enum', 'reference'].includes(dataType) &&
+      !isTreeComponent &&
+      (!component || component === 'input' || component === 'smartinput')
     ) {
       return 'SmartSelect';
     }
     return field.component || 'SmartInput';
-  }, [field.dictCode, field.component, isTreeComponent]);
+  }, [field.dictCode, field.component, field.dataType, (field as any).type, isTreeComponent]);
 
   // Resolve field label from i18n keys with progressive fallback.
   let resolvedLabel = getLocalizedText(field.label, context.locale || 'zh-CN', t) || undefined;

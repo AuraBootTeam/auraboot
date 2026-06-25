@@ -2512,7 +2512,7 @@
             },
             "action": {
               "type": "navigate",
-              "to": "/enterprise/info/edit"
+              "to": "/p/c/enterprise_info_form"
             }
           }
         ]
@@ -2521,7 +2521,7 @@
         "id": "basic",
         "blockType": "form-section",
         "title": {
-          "zh-CN": "基本信息",
+          "zh-CN": "企业资料",
           "en-US": "Basic Information"
         },
         "readOnly": true,
@@ -2606,7 +2606,7 @@
         "id": "description",
         "blockType": "form-section",
         "title": {
-          "zh-CN": "企业描述",
+          "zh-CN": "备注",
           "en-US": "Description"
         },
         "readOnly": true,
@@ -2619,35 +2619,6 @@
             },
             "dataType": "text",
             "colSpan": 12
-          }
-        ]
-      },
-      {
-        "id": "audit",
-        "blockType": "form-section",
-        "title": {
-          "zh-CN": "时间信息",
-          "en-US": "Audit"
-        },
-        "readOnly": true,
-        "fields": [
-          {
-            "field": "createdAt",
-            "label": {
-              "zh-CN": "创建时间",
-              "en-US": "Created At"
-            },
-            "dataType": "datetime",
-            "colSpan": 6
-          },
-          {
-            "field": "updatedAt",
-            "label": {
-              "zh-CN": "更新时间",
-              "en-US": "Updated At"
-            },
-            "dataType": "datetime",
-            "colSpan": 6
           }
         ]
       }
@@ -2669,9 +2640,14 @@
     },
     "extension": {
       "editMode": true,
+      "recordSource": {
+        "mode": "singleton",
+        "method": "get",
+        "endpoint": "/api/tenant/info"
+      },
       "skipFieldMeta": true,
       "skipDynamicFieldMeta": true,
-      "afterSubmitRedirect": "/enterprise/info",
+      "afterSubmitRedirect": "/p/c/enterprise_info_detail",
       "submitEndpoint": {
         "type": "api",
         "method": "put",
@@ -2694,8 +2670,14 @@
               "en-US": "Tenant Code"
             },
             "dataType": "string",
-            "required": true,
-            "colSpan": 6
+            "readOnly": true,
+            "colSpan": 6,
+            "props": {
+              "placeholder": {
+                "zh-CN": "系统生成，不可编辑",
+                "en-US": "System generated, read-only"
+              }
+            }
           },
           {
             "field": "displayName",
@@ -2705,7 +2687,13 @@
             },
             "dataType": "string",
             "required": true,
-            "colSpan": 6
+            "colSpan": 6,
+            "props": {
+              "placeholder": {
+                "zh-CN": "请输入企业名称",
+                "en-US": "Enter enterprise name"
+              }
+            }
           },
           {
             "field": "logo",
@@ -2714,7 +2702,13 @@
               "en-US": "Logo URL"
             },
             "dataType": "string",
-            "colSpan": 12
+            "colSpan": 12,
+            "props": {
+              "placeholder": {
+                "zh-CN": "请输入 Logo 图片地址",
+                "en-US": "Enter logo image URL"
+              }
+            }
           },
           {
             "field": "industry",
@@ -2723,7 +2717,13 @@
               "en-US": "Industry"
             },
             "dataType": "string",
-            "colSpan": 6
+            "colSpan": 6,
+            "props": {
+              "placeholder": {
+                "zh-CN": "请输入所属行业",
+                "en-US": "Enter industry"
+              }
+            }
           },
           {
             "field": "status",
@@ -2731,8 +2731,30 @@
               "zh-CN": "状态",
               "en-US": "Status"
             },
-            "dataType": "string",
-            "colSpan": 6
+            "dataType": "enum",
+            "colSpan": 6,
+            "props": {
+              "placeholder": {
+                "zh-CN": "请选择状态",
+                "en-US": "Select status"
+              },
+              "options": [
+                {
+                  "label": {
+                    "zh-CN": "启用",
+                    "en-US": "Active"
+                  },
+                  "value": "active"
+                },
+                {
+                  "label": {
+                    "zh-CN": "停用",
+                    "en-US": "Inactive"
+                  },
+                  "value": "inactive"
+                }
+              ]
+            }
           },
           {
             "field": "contactEmail",
@@ -2741,7 +2763,13 @@
               "en-US": "Email"
             },
             "dataType": "string",
-            "colSpan": 6
+            "colSpan": 6,
+            "props": {
+              "placeholder": {
+                "zh-CN": "请输入联系邮箱",
+                "en-US": "Enter contact email"
+              }
+            }
           },
           {
             "field": "contactPhone",
@@ -2750,7 +2778,13 @@
               "en-US": "Phone"
             },
             "dataType": "string",
-            "colSpan": 6
+            "colSpan": 6,
+            "props": {
+              "placeholder": {
+                "zh-CN": "请输入联系电话",
+                "en-US": "Enter contact phone"
+              }
+            }
           },
           {
             "field": "website",
@@ -2759,7 +2793,13 @@
               "en-US": "Website"
             },
             "dataType": "string",
-            "colSpan": 12
+            "colSpan": 12,
+            "props": {
+              "placeholder": {
+                "zh-CN": "请输入官网地址",
+                "en-US": "Enter website URL"
+              }
+            }
           },
           {
             "field": "description",
@@ -2768,7 +2808,13 @@
               "en-US": "Description"
             },
             "dataType": "text",
-            "colSpan": 12
+            "colSpan": 12,
+            "props": {
+              "placeholder": {
+                "zh-CN": "请输入企业描述或备注",
+                "en-US": "Enter enterprise description or notes"
+              }
+            }
           }
         ]
       },
@@ -2783,10 +2829,7 @@
               "zh-CN": "保存",
               "en-US": "Save"
             },
-            "action": {
-              "type": "command",
-              "command": "tenant:update_profile"
-            }
+            "action": "save"
           },
           {
             "code": "cancel",
@@ -2796,7 +2839,7 @@
             },
             "action": {
               "type": "navigate",
-              "to": "/enterprise/info"
+              "to": "/p/c/enterprise_info_detail"
             }
           }
         ]

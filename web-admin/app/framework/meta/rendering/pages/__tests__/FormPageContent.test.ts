@@ -13,6 +13,7 @@ import {
   resolveFormSubmitEndpoint,
   resolveSubmitCommandCode,
   shouldBypassFormSubmit,
+  shouldLoadMainRecordForForm,
   unwrapJsonLikeValue,
 } from '../FormPageContent';
 
@@ -32,7 +33,9 @@ describe('resolveSubmitCommandCode (convention over configuration)', () => {
   });
 
   it('lets an explicit command override the convention map (create mode)', () => {
-    expect(resolveSubmitCommandCode('sc:register_showcase', crud, false)).toBe('sc:register_showcase');
+    expect(resolveSubmitCommandCode('sc:register_showcase', crud, false)).toBe(
+      'sc:register_showcase',
+    );
   });
 
   it('lets an explicit command override the convention map (edit mode)', () => {
@@ -46,6 +49,23 @@ describe('resolveSubmitCommandCode (convention over configuration)', () => {
 
   it('returns null when the map lacks the needed operation (update missing in edit mode)', () => {
     expect(resolveSubmitCommandCode(null, { create: 'sc:create_showcase' }, true)).toBeNull();
+  });
+});
+
+describe('shouldLoadMainRecordForForm', () => {
+  it('loads singleton edit forms even when the route has no record pid', () => {
+    expect(
+      shouldLoadMainRecordForForm('', {
+        recordSource: {
+          mode: 'singleton',
+          endpoint: '/api/tenant/info',
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('keeps create forms without a record pid unloaded', () => {
+    expect(shouldLoadMainRecordForForm('', {})).toBe(false);
   });
 });
 
@@ -85,7 +105,9 @@ describe('mergeLoadedRecordWithDirtyFields', () => {
 
 describe('getFormFieldValueWithAlias', () => {
   it('reads camelCase backend fields for snake_case DSL value fields', () => {
-    expect(getFormFieldValueWithAlias({ ruleBinding: { bindingKind: 'DECISION_REF' } }, 'rule_binding')).toEqual({
+    expect(
+      getFormFieldValueWithAlias({ ruleBinding: { bindingKind: 'DECISION_REF' } }, 'rule_binding'),
+    ).toEqual({
       bindingKind: 'DECISION_REF',
     });
   });
@@ -339,30 +361,65 @@ describe('resolveEditRecordEndpoint', () => {
   });
   it('uses the custom endpoint and interpolates public pid placeholders', () => {
     expect(
-      resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordPid}' } }, 'qr_code', 'abc'),
-    )
-      .toBe('/api/qr/abc');
+      resolveEditRecordEndpoint(
+        { recordSource: { endpoint: '/api/qr/{recordPid}' } },
+        'qr_code',
+        'abc',
+      ),
+    ).toBe('/api/qr/abc');
     expect(
-      resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/${recordPid}' } }, 'qr_code', 'abc'),
-    )
-      .toBe('/api/qr/abc');
-    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{pid}' } }, 'qr_code', 'abc'))
-      .toBe('/api/qr/abc');
+      resolveEditRecordEndpoint(
+        { recordSource: { endpoint: '/api/qr/${recordPid}' } },
+        'qr_code',
+        'abc',
+      ),
+    ).toBe('/api/qr/abc');
+    expect(
+      resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{pid}' } }, 'qr_code', 'abc'),
+    ).toBe('/api/qr/abc');
   });
   it('keeps legacy recordPid placeholder compatibility', () => {
-    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordPid}' } }, 'qr_code', 'abc'))
-      .toBe('/api/qr/abc');
-    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/${recordPid}' } }, 'qr_code', 'abc'))
-      .toBe('/api/qr/abc');
+    expect(
+      resolveEditRecordEndpoint(
+        { recordSource: { endpoint: '/api/qr/{recordPid}' } },
+        'qr_code',
+        'abc',
+      ),
+    ).toBe('/api/qr/abc');
+    expect(
+      resolveEditRecordEndpoint(
+        { recordSource: { endpoint: '/api/qr/${recordPid}' } },
+        'qr_code',
+        'abc',
+      ),
+    ).toBe('/api/qr/abc');
   });
   it('url-encodes the public record pid', () => {
-    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/qr/{recordPid}' } }, 'qr_code', 'a/b'))
-      .toBe('/api/qr/a%2Fb');
+    expect(
+      resolveEditRecordEndpoint(
+        { recordSource: { endpoint: '/api/qr/{recordPid}' } },
+        'qr_code',
+        'a/b',
+      ),
+    ).toBe('/api/qr/a%2Fb');
   });
 
   it('allows singleton custom endpoints without a route record pid', () => {
-    expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/tenant/info' } }, 'tenant_profile'))
-      .toBe('/api/tenant/info');
+    expect(
+      resolveEditRecordEndpoint(
+        { recordSource: { endpoint: '/api/tenant/info' } },
+        'tenant_profile',
+      ),
+    ).toBe('/api/tenant/info');
+  });
+
+  it('allows extension recordSource endpoints when the import DTO drops top-level fields', () => {
+    expect(
+      resolveEditRecordEndpoint(
+        { extension: { recordSource: { endpoint: '/api/tenant/info' } } },
+        'tenant_profile',
+      ),
+    ).toBe('/api/tenant/info');
   });
 
   it('supports recordSource stored under extension for imported singleton pages', () => {
