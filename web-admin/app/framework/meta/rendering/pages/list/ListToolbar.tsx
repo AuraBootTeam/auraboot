@@ -130,7 +130,7 @@ export function ListToolbar({
     <>
       {/* Main toolbar row */}
       <div
-        className="print-hide border-border flex flex-wrap items-center gap-2 border-b px-4 py-2 sm:px-6"
+        className="print-hide border-border bg-panel flex flex-wrap items-center gap-2 border-b px-4 py-3 sm:px-6"
         data-print="hide"
         data-testid="list-toolbar"
       >
@@ -142,11 +142,11 @@ export function ListToolbar({
             onChange={(e) => onKeywordChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t('common.search', undefined, 'Search') + '...'}
-            className="rounded-card border-border bg-subtle text-text-2 focus:bg-panel focus-visible:shadow-focus h-8 w-full border pr-3 pl-8 text-xs placeholder-gray-400 focus:outline-none sm:w-[240px]"
+            className="rounded-control border-border bg-subtle text-text-2 focus:bg-panel focus-visible:shadow-focus h-9 w-full border pr-3 pl-9 text-sm placeholder-gray-400 focus:outline-none sm:w-[280px]"
             data-testid="list-search-input"
           />
           <svg
-            className="text-text-3 absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2"
+            className="text-text-3 absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -172,7 +172,7 @@ export function ListToolbar({
           >
             <button
               type="button"
-              className={`rounded-card flex items-center gap-1 border px-3 py-1.5 text-xs font-medium transition-colors ${
+              className={`rounded-control flex h-9 items-center gap-1.5 border px-3 text-sm font-medium transition-colors ${
                 activeSorts.length > 0
                   ? 'bg-accent-weak text-accent border-accent/30 hover:bg-accent-weak'
                   : 'border-border text-text-2 hover:bg-hover hover:text-text-2'
@@ -202,7 +202,7 @@ export function ListToolbar({
           <button
             type="button"
             onClick={onColumnSettingsOpen}
-            className="rounded-card border-border text-text-2 hover:bg-hover hover:text-text-2 flex items-center gap-1 border px-3 py-1.5 text-xs font-medium transition-colors"
+            className="rounded-control border-border text-text-2 hover:bg-hover hover:text-text-2 flex h-9 items-center gap-1.5 border px-3 text-sm font-medium transition-colors"
             data-testid="column-settings-btn"
           >
             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -228,7 +228,7 @@ export function ListToolbar({
           <button
             type="button"
             onClick={onFilterFormToggle}
-            className={`rounded-card flex items-center gap-1 border px-3 py-1.5 text-xs font-medium transition-colors ${
+            className={`rounded-control flex h-9 items-center gap-1.5 border px-3 text-sm font-medium transition-colors ${
               filterFormVisible
                 ? 'bg-accent-weak text-accent border-accent/30 hover:bg-accent-weak'
                 : 'border-border text-text-2 hover:bg-hover hover:text-text-2'
@@ -279,7 +279,7 @@ export function ListToolbar({
                   data-testid={`quick-filter-${qf.key}`}
                   data-preset-active={active ? 'true' : 'false'}
                   aria-pressed={active}
-                  className={`rounded-pill inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium transition-colors ${
+                  className={`rounded-pill inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium transition-colors ${
                     active
                       ? 'bg-accent-weak text-accent ring-accent/30 ring-1'
                       : 'bg-subtle text-text-2 hover:bg-hover'

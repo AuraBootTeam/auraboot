@@ -21,7 +21,9 @@ export interface Team {
 
 export interface TeamMember {
   pid: string;
-  userId: number;
+  userId: string;
+  userPid?: string;
+  memberPid?: string;
   userName: string;
   userEmail: string;
   role: string;
@@ -43,7 +45,9 @@ export interface TeamUpdateRequest {
 }
 
 export interface TeamMemberAddRequest {
-  userId: number;
+  userId?: string;
+  userPid?: string;
+  memberPid?: string;
   role?: string;
 }
 

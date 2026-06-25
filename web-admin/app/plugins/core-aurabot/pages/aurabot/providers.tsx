@@ -30,9 +30,11 @@ import {
 } from '~/shared/admin/cloud-config-core';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
+import { useAuth } from '~/contexts/AuthContext';
 import { post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
+import { RouteAccessDenied } from '~/ui/PermissionGuard';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -183,6 +185,8 @@ export function meta() {
 
 export default function LlmProvidersPage() {
   const { t } = useI18n();
+  const { hasPermission } = useAuth();
+  const canManageProviders = hasPermission('ai_center') || hasPermission('system_management');
   const {
     configs,
     loading,
@@ -307,6 +311,12 @@ export default function LlmProvidersPage() {
       setLocalTestingPid(null);
     }
   };
+
+  if (!canManageProviders) {
+    return (
+      <RouteAccessDenied message="Access denied: LLM provider settings require permission ai_center" />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">

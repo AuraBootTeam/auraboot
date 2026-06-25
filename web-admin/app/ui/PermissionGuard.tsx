@@ -22,6 +22,30 @@ interface PermissionGuardProps {
   fallback?: React.ReactNode;
 }
 
+interface RouteAccessDeniedProps {
+  title?: string;
+  message?: string;
+}
+
+export function RouteAccessDenied({
+  title = 'Page Unavailable',
+  message = 'Access denied',
+}: RouteAccessDeniedProps) {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="mx-auto max-w-3xl px-6 py-16">
+        <div className="rounded-lg border border-red-100 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-600">
+            !
+          </div>
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+          <p className="mt-2 text-sm text-gray-600">{message}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Permission guard component.
  *

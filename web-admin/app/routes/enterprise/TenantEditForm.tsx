@@ -6,6 +6,7 @@ import { useTenantForm, type TenantInfo } from '~/hooks/useTenantForm';
 import { fetchResult } from '~/shared/services/http-client';
 import TenantFormFields from '~/ui/TenantFormFields';
 import { useAuth } from '~/contexts/AuthContext';
+import { RouteAccessDenied } from '~/ui/PermissionGuard';
 
 export default function TenantEditForm() {
   const navigate = useNavigate();
@@ -24,11 +25,12 @@ export default function TenantEditForm() {
     validateForm,
     setTenantFormData,
   } = useTenantForm();
-  const { token } = useAuth();
+  const { token, hasPermission } = useAuth();
+  const canUpdateTenant = hasPermission('org.tenant.update');
 
   // 获取当前租户信息
   const fetchTenantInfo = async () => {
-    if (!token) {
+    if (!token || !canUpdateTenant) {
       return;
     }
 
@@ -55,7 +57,7 @@ export default function TenantEditForm() {
 
   useEffect(() => {
     fetchTenantInfo();
-  }, [token]);
+  }, [token, canUpdateTenant]);
 
   // 提交表单
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,6 +109,12 @@ export default function TenantEditForm() {
   const handleCancel = () => {
     navigate('/enterprise/info');
   };
+
+  if (!canUpdateTenant) {
+    return (
+      <RouteAccessDenied message="Access denied: editing tenant information requires permission org.tenant.update" />
+    );
+  }
 
   if (loading) {
     return (

@@ -10,11 +10,12 @@ import {
   type Team,
   type TeamMember,
 } from '~/shared/services/teamService';
-import { get } from '~/shared/services/http-client';
+import { post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 
 interface TenantMemberOption {
-  userId: number;
+  memberPid: string;
+  userPid?: string;
   userName: string;
   userEmail: string;
 }
@@ -62,15 +63,15 @@ export default function TeamDetailPage() {
     }
   };
 
-  const handleAddMember = async (userId: number, role: string) => {
+  const handleAddMember = async (memberPid: string, role: string) => {
     if (!teamPid) return;
     try {
-      await addTeamMember(teamPid, { userId, role });
-      showSuccessToast('Member added');
+      await addTeamMember(teamPid, { memberPid, role });
+      showSuccessToast('成员已加入团队');
       setShowAddModal(false);
       loadData();
     } catch (e: any) {
-      showErrorToast(e.message || 'Failed to add member');
+      showErrorToast(e.message || '添加成员失败');
     }
   };
 
@@ -87,7 +88,7 @@ export default function TeamDetailPage() {
   }
 
   return (
-    <div className="p-6">
+      <div className="bg-subtle min-h-[calc(100vh-3.5rem)] px-4 py-5 sm:px-6 lg:px-8">
       {/* Header */}
       <div className="mb-6 flex items-center gap-4">
         <button
@@ -105,77 +106,77 @@ export default function TeamDetailPage() {
       </div>
 
       {/* Members section */}
-      <div className="rounded-lg bg-white shadow dark:bg-gray-800">
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4 dark:border-gray-700">
+      <div className="border-border bg-panel overflow-hidden rounded-card border shadow-sm">
+        <div className="border-border flex items-center justify-between border-b px-6 py-4">
           <div className="flex items-center gap-2">
             <UserGroupIcon className="h-5 w-5 text-gray-500" />
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Members ({members.length})
+            <h2 className="text-text text-lg font-semibold">
+              团队成员 ({members.length})
             </h2>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+            className="bg-accent hover:bg-accent-hover flex h-9 items-center gap-2 rounded-control px-3.5 text-sm font-medium text-white transition-colors"
             data-testid="add-member-btn"
           >
             <PlusIcon className="h-4 w-4" />
-            Add Member
+            添加成员
           </button>
         </div>
 
         {members.length === 0 ? (
-          <div className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-            No members yet. Add team members to get started.
+          <div className="text-text-3 px-6 py-12 text-center text-sm">
+            暂无团队成员
           </div>
         ) : (
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-900">
+          <table className="divide-border min-w-full divide-y">
+            <thead className="bg-subtle">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">
-                  User
+                <th className="text-text-3 px-6 py-3 text-left text-xs font-medium uppercase tracking-wide">
+                  用户
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">
-                  Email
+                <th className="text-text-3 px-6 py-3 text-left text-xs font-medium uppercase tracking-wide">
+                  邮箱
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">
-                  Role
+                <th className="text-text-3 px-6 py-3 text-left text-xs font-medium uppercase tracking-wide">
+                  角色
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase dark:text-gray-400">
-                  Joined
+                <th className="text-text-3 px-6 py-3 text-left text-xs font-medium uppercase tracking-wide">
+                  加入时间
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase dark:text-gray-400">
-                  Actions
+                <th className="text-text-3 px-6 py-3 text-right text-xs font-medium uppercase tracking-wide">
+                  操作
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="divide-border divide-y">
               {members.map((member) => (
-                <tr key={member.pid} className="dark:hover:bg-gray-750 hover:bg-gray-50">
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">
+                <tr key={member.pid} className="hover:bg-subtle/70">
+                  <td className="text-text px-6 py-4 text-sm font-medium">
                     {member.userName || `User #${member.userId}`}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                  <td className="text-text-2 px-6 py-4 text-sm">
                     {member.userEmail || '-'}
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
                         member.role === 'leader'
-                          ? 'bg-purple-100 text-purple-800'
-                          : 'bg-gray-100 text-gray-800'
+                          ? 'bg-accent-weak text-accent'
+                          : 'bg-hover text-text-2'
                       }`}
                     >
-                      {member.role}
+                      {member.role === 'leader' ? '负责人' : '成员'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                  <td className="text-text-2 px-6 py-4 text-sm">
                     {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : '-'}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button
                       onClick={() => handleRemoveMember(member)}
-                      className="rounded p-1.5 text-gray-400 hover:text-red-600"
-                      title="Remove member"
+                      className="text-text-3 hover:text-status-red rounded p-1.5 transition-colors"
+                      title="移除成员"
                       data-testid={`remove-member-${member.userId}`}
                     >
                       <TrashIcon className="h-4 w-4" />
@@ -192,7 +193,9 @@ export default function TeamDetailPage() {
         <AddMemberModal
           onClose={() => setShowAddModal(false)}
           onAdd={handleAddMember}
-          existingMemberUserIds={members.map((m) => m.userId)}
+          existingMemberUserIds={members.flatMap((m) =>
+            [m.userId, m.userPid, m.memberPid].filter((value): value is string => Boolean(value)),
+          )}
         />
       )}
     </div>
@@ -205,33 +208,48 @@ function AddMemberModal({
   existingMemberUserIds,
 }: {
   onClose: () => void;
-  onAdd: (userId: number, role: string) => void;
-  existingMemberUserIds: number[];
+  onAdd: (memberPid: string, role: string) => void;
+  existingMemberUserIds: string[];
 }) {
   const [tenantMembers, setTenantMembers] = useState<TenantMemberOption[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [selectedMemberPid, setSelectedMemberPid] = useState('');
   const [role, setRole] = useState('member');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadMembers = async () => {
       try {
-        const result = await get<any[]>('/api/tenant/members/search', {
-          status: 'active',
-          pageNum: '1',
-          pageSize: '100',
-        });
+        const result = await post<{ records?: any[]; content?: any[] } | any[]>(
+          '/api/tenant/members/search',
+          {
+            status: 'active',
+            pageNum: 1,
+            pageSize: 100,
+          },
+        );
         if (ResultHelper.isSuccess(result) && result.data) {
           const items = Array.isArray(result.data)
             ? result.data
-            : (result.data as any).content || [];
+            : result.data.records || result.data.content || [];
+          const existing = new Set(existingMemberUserIds.map(String));
           const options: TenantMemberOption[] = items
-            .filter((m: any) => !existingMemberUserIds.includes(m.userId || m.user?.id))
+            .filter((m: any) => {
+              const userId = m.userId ?? m.user?.id;
+              const userPid = m.userPid ?? m.user?.pid;
+              return !existing.has(String(userId)) && !existing.has(String(userPid));
+            })
             .map((m: any) => ({
-              userId: m.userId || m.user?.id,
-              userName: m.user?.realName || m.user?.username || `User #${m.userId}`,
-              userEmail: m.user?.email || '',
-            }));
+              memberPid: String(m.pid || ''),
+              userPid: m.user?.pid || m.userPid,
+              userName:
+                m.displayName ||
+                m.user?.realName ||
+                m.user?.username ||
+                m.user?.email ||
+                String(m.userId || m.user?.pid || ''),
+              userEmail: m.email || m.user?.email || '',
+            }))
+            .filter((m) => m.memberPid);
           setTenantMembers(options);
         }
       } catch {
@@ -245,37 +263,37 @@ function AddMemberModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedUserId != null) {
-      onAdd(selectedUserId, role);
+    if (selectedMemberPid) {
+      onAdd(selectedMemberPid, role);
     }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="mx-4 w-full max-w-md rounded-lg bg-white shadow-xl dark:bg-gray-800">
-        <div className="border-b border-gray-200 px-6 py-4 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Add Team Member</h3>
+      <div className="bg-panel border-border mx-4 w-full max-w-lg rounded-card border shadow-xl">
+        <div className="border-border border-b px-6 py-4">
+          <h3 className="text-text text-lg font-semibold">添加团队成员</h3>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 p-6">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Select User <span className="text-red-500">*</span>
+            <label className="text-text-2 mb-1 block text-sm font-medium">
+              选择用户 <span className="text-status-red">*</span>
             </label>
             {loading ? (
-              <p className="text-sm text-gray-500">Loading members...</p>
+              <p className="text-text-3 text-sm">正在加载成员...</p>
             ) : tenantMembers.length === 0 ? (
-              <p className="text-sm text-gray-500">No available members to add.</p>
+              <p className="text-text-3 text-sm">暂无可加入的成员。</p>
             ) : (
               <select
-                value={selectedUserId ?? ''}
-                onChange={(e) => setSelectedUserId(Number(e.target.value))}
+                value={selectedMemberPid}
+                onChange={(e) => setSelectedMemberPid(e.target.value)}
                 required
-                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                className="border-border-strong bg-panel text-text focus:border-accent focus-visible:shadow-focus w-full rounded-control border px-3 py-2 text-sm focus:outline-none"
                 data-testid="member-select"
               >
-                <option value="">-- Select a user --</option>
+                <option value="">请选择用户</option>
                 {tenantMembers.map((m) => (
-                  <option key={m.userId} value={m.userId}>
+                  <option key={m.memberPid} value={m.memberPid}>
                     {m.userName} ({m.userEmail})
                   </option>
                 ))}
@@ -283,34 +301,34 @@ function AddMemberModal({
             )}
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Role
+            <label className="text-text-2 mb-1 block text-sm font-medium">
+              团队角色
             </label>
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              className="border-border-strong bg-panel text-text focus:border-accent focus-visible:shadow-focus w-full rounded-control border px-3 py-2 text-sm focus:outline-none"
               data-testid="member-role-select"
             >
-              <option value="member">Member</option>
-              <option value="leader">Leader</option>
+              <option value="member">成员</option>
+              <option value="leader">负责人</option>
             </select>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg bg-gray-100 px-4 py-2 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              className="border-border-strong bg-panel text-text-2 hover:bg-subtle rounded-control border px-4 py-2 text-sm transition-colors"
             >
-              Cancel
+              取消
             </button>
             <button
               type="submit"
-              disabled={selectedUserId == null || tenantMembers.length === 0}
-              className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!selectedMemberPid || tenantMembers.length === 0}
+              className="bg-accent hover:bg-accent-hover rounded-control px-4 py-2 text-sm font-medium text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50"
               data-testid="add-member-confirm-btn"
             >
-              Add
+              添加
             </button>
           </div>
         </form>
