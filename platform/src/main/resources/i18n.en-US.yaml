@@ -599,6 +599,83 @@ ai:
   settings:
     title: AI Settings
     subtitle: Configure providers, tools, and governance for the AI center
+  providers:
+    title: LLM Providers
+    subtitle: Manage API keys, models, and endpoints for AI model providers
+    count:
+      configured: "{count} providers configured"
+    level:
+      platform: Platform
+      tenant: Tenant
+    status:
+      active: Active
+      unconfigured: No API Key
+      ready: Ready to Test
+      disabled: Disabled
+    action:
+      add: Add Provider
+      create: Create
+      saveChanges: Save Changes
+      edit: Edit
+      delete: Delete
+      testConnection: Test Connection
+      testing: Testing...
+    empty:
+      title: No LLM providers configured
+      description: Add an AI model provider to enable AuraBot chat, AI scoring, and other intelligent features.
+      addFirst: Add your first provider
+    picker:
+      title: Add Provider
+      subtitle: Choose a model provider to configure
+      added: Added
+    custom:
+      title: Custom (OpenAI-compatible)
+      description: Add a self-hosted or unlisted provider
+      providerName: Custom Provider
+    preset:
+      anthropic:
+        desc: Claude family — Opus, Sonnet, Haiku
+      openai:
+        desc: GPT-4o, GPT-4, o1 series
+      deepseek:
+        desc: DeepSeek Chat & Reasoner
+      minimaxi:
+        desc: MiniMax-Text-01
+      qianwen:
+        desc: Qwen-Plus, Qwen-Max
+      zhipu:
+        desc: GLM-4, GLM-3-Turbo
+      moonshot:
+        desc: Moonshot-v1-8k/32k/128k
+    panel:
+      configureTitle: "Configure {name}"
+      editTitle: "Edit {name}"
+      providerCode: Provider code
+    field:
+      apiKey: API Key
+      baseUrl: Base URL
+      defaultModel: Default Model
+      maxTokens: Max Tokens
+      displayName: Display Name
+      apiFormat: API Format
+      configLevel: Config Level
+      priority: Priority
+      enabled: Enable Provider
+    placeholder:
+      customDisplayName: e.g., My Local LLM
+    apiFormat:
+      messages: Messages API
+      chat_completions: Chat Completions
+    apiFormatHint:
+      openaiCompatible: OpenAI-compatible
+    card:
+      priority: "Priority {priority}"
+    hint:
+      priority: Higher = preferred
+    toast:
+      testPassed: Connection test passed
+      testPassedActivated: Connection test passed — provider activated
+      testFailed: Connection test failed
   retry: Retry
 
 # Workbench widgets
