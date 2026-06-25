@@ -19,6 +19,15 @@ export interface PluginResource extends Omit<NavigationResource, 'source'> {
    * the router should serve. Omit for menu-only entries.
    */
   file?: string
+
+  /**
+   * Optional DSL binding metadata for routes that are served by a small route
+   * wrapper but whose screen structure and actions are driven by page schema.
+   */
+  dsl?: {
+    modelCode: string
+    pageKey: string
+  }
 }
 
 /** Convenience: the `source: 'plugin'` injected by `toNavigationResources()`. */
@@ -29,7 +38,7 @@ export const PLUGIN_SOURCE = 'plugin' as const
  * Used by plugin index.ts files when calling `ctx.registerNavigationResources()`.
  */
 export function toNavigationResources(resources: readonly PluginResource[]): NavigationResource[] {
-  return resources.map(({ file: _file, ...rest }) => ({
+  return resources.map(({ file: _file, dsl: _dsl, ...rest }) => ({
     ...rest,
     source: PLUGIN_SOURCE,
   }))

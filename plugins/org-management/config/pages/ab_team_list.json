@@ -1,0 +1,199 @@
+{
+  "pageKey": "ab_team_list",
+  "name:zh-CN": "团队管理",
+  "name:en": "Team Management",
+  "modelCode": "ab_team",
+  "description": "DSL-driven team list backed by the platform ab_team table",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "team_status_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          },
+          "filter": null
+        },
+        {
+          "key": "active",
+          "label": {
+            "zh-CN": "启用",
+            "en": "Active"
+          },
+          "filter": {
+            "field": "status",
+            "operator": "EQ",
+            "value": "active"
+          }
+        },
+        {
+          "key": "inactive",
+          "label": {
+            "zh-CN": "停用",
+            "en": "Inactive"
+          },
+          "filter": {
+            "field": "status",
+            "operator": "EQ",
+            "value": "inactive"
+          }
+        }
+      ]
+    },
+    {
+      "id": "team_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "create",
+          "variant": "primary",
+          "icon": "Plus",
+          "label": {
+            "zh-CN": "新建团队",
+            "en": "Create Team"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "/organization/teams/new",
+            "command": "org:create_team"
+          }
+        }
+      ]
+    },
+    {
+      "id": "team_filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "name"
+        },
+        {
+          "field": "code"
+        },
+        {
+          "field": "status"
+        }
+      ]
+    },
+    {
+      "id": "team_table",
+      "blockType": "table",
+      "defaultSort": {
+        "field": "name",
+        "order": "asc"
+      },
+      "detailUrl": "/organization/teams/{pid}",
+      "columns": [
+        {
+          "field": "name",
+          "label": {
+            "zh-CN": "团队名称",
+            "en": "Team"
+          },
+          "width": 220,
+          "fixed": "left"
+        },
+        {
+          "field": "code",
+          "label": {
+            "zh-CN": "团队编码",
+            "en": "Code"
+          },
+          "width": 160
+        },
+        {
+          "field": "description",
+          "label": {
+            "zh-CN": "描述",
+            "en": "Description"
+          },
+          "width": 280
+        },
+        {
+          "field": "status",
+          "label": {
+            "zh-CN": "状态",
+            "en": "Status"
+          },
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "org_team_status"
+        },
+        {
+          "field": "updated_at",
+          "label": {
+            "zh-CN": "更新时间",
+            "en": "Updated"
+          },
+          "width": 180,
+          "format": "YYYY-MM-DD HH:mm"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": {
+            "zh-CN": "操作",
+            "en": "Actions"
+          },
+          "buttons": [
+            {
+              "code": "members",
+              "icon": "Users",
+              "label": {
+                "zh-CN": "成员",
+                "en": "Members"
+              },
+              "action": {
+                "type": "navigate",
+                "to": "/organization/teams/{pid}"
+              }
+            },
+            {
+              "code": "edit",
+              "icon": "Edit",
+              "label": {
+                "zh-CN": "编辑",
+                "en": "Edit"
+              },
+              "action": {
+                "type": "navigate",
+                "to": "/organization/teams/{pid}/edit",
+                "command": "org:update_team"
+              }
+            },
+            {
+              "code": "delete",
+              "icon": "Trash2",
+              "variant": "danger",
+              "danger": true,
+              "label": {
+                "zh-CN": "删除",
+                "en": "Delete"
+              },
+              "confirm": {
+                "zh-CN": "确认删除该团队？",
+                "en-US": "Delete this team?"
+              },
+              "action": {
+                "type": "command",
+                "command": "org:delete_team"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "title": {
+    "zh-CN": "团队管理",
+    "en": "Team Management"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "code": "org:update_team",
+  "displayName:zh-CN": "更新团队",
+  "displayName:en": "Update Team",
+  "type": "update",
+  "modelCode": "ab_team",
+  "inputFields": [
+    "name",
+    "description",
+    "leader_id",
+    "status"
+  ]
+}

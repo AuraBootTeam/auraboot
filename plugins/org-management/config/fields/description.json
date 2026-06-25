@@ -1,0 +1,9 @@
+{
+  "code": "description",
+  "displayName:zh-CN": "说明",
+  "displayName:en": "Description",
+  "dataType": "text",
+  "extension": {
+    "multiline": true
+  }
+}

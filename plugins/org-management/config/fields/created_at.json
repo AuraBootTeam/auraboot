@@ -1,0 +1,9 @@
+{
+  "code": "created_at",
+  "displayName:zh-CN": "创建时间",
+  "displayName:en": "Created At",
+  "dataType": "datetime",
+  "feature": {
+    "sortable": true
+  }
+}

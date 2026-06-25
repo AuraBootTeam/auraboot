@@ -1,0 +1,11 @@
+{
+  "code": "org:delete_team",
+  "displayName:zh-CN": "删除团队",
+  "displayName:en": "Delete Team",
+  "type": "delete",
+  "modelCode": "ab_team",
+  "extension": {
+    "confirmMessage:zh-CN": "确认删除该团队？删除后团队成员关系也将不可见。",
+    "confirmMessage:en": "Delete this team? Team memberships will no longer be visible."
+  }
+}

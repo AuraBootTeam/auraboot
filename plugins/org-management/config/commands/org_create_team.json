@@ -1,0 +1,19 @@
+{
+  "code": "org:create_team",
+  "displayName:zh-CN": "创建团队",
+  "displayName:en": "Create Team",
+  "type": "create",
+  "modelCode": "ab_team",
+  "inputFields": [
+    "code",
+    "name",
+    "description",
+    "leader_id"
+  ],
+  "autoSetFields": {
+    "status": {
+      "strategy": "fixed_value",
+      "value": "active"
+    }
+  }
+}
