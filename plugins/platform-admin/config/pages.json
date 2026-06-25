@@ -2478,10 +2478,7 @@
   },
   {
     "pageKey": "enterprise_info_detail",
-    "name": {
-      "zh-CN": "企业信息",
-      "en-US": "Enterprise Info"
-    },
+    "name": "企业信息",
     "kind": "detail",
     "schemaVersion": 4,
     "layout": {
@@ -2658,10 +2655,7 @@
   },
   {
     "pageKey": "enterprise_info_form",
-    "name": {
-      "zh-CN": "编辑企业信息",
-      "en-US": "Edit Enterprise Info"
-    },
+    "name": "编辑企业信息",
     "kind": "form",
     "schemaVersion": 4,
     "layout": {
