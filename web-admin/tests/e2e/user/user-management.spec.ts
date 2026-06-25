@@ -130,12 +130,16 @@ test.describe('User List', () => {
    * UM-002B: System datetime format settings page should be available
    */
   test('UM-002B: should save system datetime format', async ({ page }) => {
-    await page.goto('/settings/system-preferences');
+    await page.goto('/p/c/system_preferences_form');
     await page.waitForLoadState('domcontentloaded');
 
+    await expect(page.getByRole('heading', { name: '系统偏好' })).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('显示策略')).toBeVisible({ timeout: 8000 });
     const input = page.locator('[data-testid="system-datetime-format-input"]');
-    const saveBtn = page.locator('[data-testid="system-datetime-format-save"]');
+    const timezone = page.locator('[data-testid="system-timezone-select-trigger"]');
+    const saveBtn = page.locator('[data-testid="form-btn-save"]');
     await expect(input).toBeVisible({ timeout: 8000 });
+    await expect(timezone).toBeVisible({ timeout: 5000 });
     await expect(saveBtn).toBeVisible({ timeout: 5000 });
 
     await input.fill('YYYY-MM-DD HH:mm:ss');
