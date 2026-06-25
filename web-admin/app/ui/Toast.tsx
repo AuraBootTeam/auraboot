@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   XMarkIcon,
   ExclamationTriangleIcon,
@@ -14,41 +14,31 @@ interface ToastProps {
   duration?: number;
 }
 
-export default function Toast({ message, type, show, onClose, duration = 4000 }: ToastProps) {
+export default function Toast({ message, type, show, onClose, duration = 2500 }: ToastProps) {
   const [isVisible, setIsVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
-  const [progressStarted, setProgressStarted] = useState(false);
-  const progressTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
-  useEffect(() => {
-    if (show) {
-      setIsVisible(true);
-      setIsLeaving(false);
-      setProgressStarted(false);
-
-      // Delay progress start by one frame so CSS transition triggers (22.5 fix)
-      progressTimerRef.current = setTimeout(() => setProgressStarted(true), 20);
-
-      if (duration > 0) {
-        const timer = setTimeout(() => {
-          handleClose();
-        }, duration);
-        return () => {
-          clearTimeout(timer);
-          clearTimeout(progressTimerRef.current);
-        };
-      }
-      return () => clearTimeout(progressTimerRef.current);
-    }
-  }, [show, duration]);
-
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setIsLeaving(true);
     setTimeout(() => {
       setIsVisible(false);
       onClose();
     }, 300); // 等待退出动画完成
-  };
+  }, [onClose]);
+
+  useEffect(() => {
+    if (show) {
+      setIsVisible(true);
+      setIsLeaving(false);
+
+      if (duration > 0) {
+        const timer = setTimeout(() => {
+          handleClose();
+        }, duration);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [show, duration, handleClose]);
 
   const getIcon = () => {
     const iconClass = `h-5 w-5 ${getStyles().icon}`;
@@ -67,31 +57,17 @@ export default function Toast({ message, type, show, onClose, duration = 4000 }:
   const getStyles = () => {
     switch (type) {
       case 'success':
-        return {
-          icon: 'text-emerald-600',
-          progress: 'bg-emerald-500',
-        };
+        return { icon: 'text-emerald-600' };
       case 'error':
-        return {
-          icon: 'text-red-600',
-          progress: 'bg-red-500',
-        };
+        return { icon: 'text-red-600' };
       case 'warning':
-        return {
-          icon: 'text-amber-600',
-          progress: 'bg-amber-500',
-        };
+        return { icon: 'text-amber-600' };
       case 'info':
-        return {
-          icon: 'text-blue-600',
-          progress: 'bg-blue-500',
-        };
+        return { icon: 'text-blue-600' };
     }
   };
 
   if (!show && !isVisible) return null;
-
-  const styles = getStyles();
 
   return (
     <div
@@ -119,18 +95,6 @@ export default function Toast({ message, type, show, onClose, duration = 4000 }:
         </div>
       </div>
 
-      {/* 进度条 */}
-      {duration > 0 && (
-        <div className="bg-border/60 h-1 overflow-hidden">
-          <div
-            className={`${styles.progress} h-full transition-all ease-linear`}
-            style={{
-              width: progressStarted && !isLeaving ? '0%' : '100%',
-              transitionDuration: progressStarted && !isLeaving ? `${duration}ms` : '0ms',
-            }}
-          />
-        </div>
-      )}
     </div>
   );
 }
