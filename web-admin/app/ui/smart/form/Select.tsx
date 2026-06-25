@@ -37,6 +37,32 @@ const EMPTY_OPTIONS: SelectProps['options'] = [];
 
 export const CREATE_NEW_VALUE = '__aura_create_new__';
 
+function readContextPath(context: Record<string, any> | undefined, path: string): unknown {
+  if (!context || !path) return undefined;
+  return path.split('.').reduce<unknown>((current, segment) => {
+    if (current == null || typeof current !== 'object') return undefined;
+    return (current as Record<string, unknown>)[segment];
+  }, context);
+}
+
+function hasValue(value: unknown): boolean {
+  if (value === undefined || value === null || value === '') return false;
+  if (Array.isArray(value)) return value.length > 0;
+  return true;
+}
+
+function areDataSourceDependenciesMet(
+  dataSource: SelectProps['dataSource'],
+  context: SelectProps['context'],
+): boolean {
+  if (!dataSource || typeof dataSource === 'string') return true;
+  const dependencies = Array.isArray((dataSource as any).dependOn)
+    ? ((dataSource as any).dependOn as string[])
+    : [];
+  if (dependencies.length === 0) return true;
+  return dependencies.every((dependency) => hasValue(readContextPath(context as any, dependency)));
+}
+
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(
   (
     {
@@ -124,6 +150,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 
     // 批量翻译 options 的 label 字段
     const options = translateArray(rawOptions || [], ['label'], locale, t);
+    const dataSourceDependenciesMet = areDataSourceDependenciesMet(dataSource, context);
     const filteredOptions = useMemo(() => {
       const query = searchQuery.trim().toLowerCase();
       if (!query) return options;
@@ -172,6 +199,10 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 
     const handleRadixOpenChange = useCallback(
       (open: boolean) => {
+        if (open && !dataSourceDependenciesMet) {
+          setRadixOpen(false);
+          return;
+        }
         setRadixOpen(open);
         if (!open) {
           setSearchQuery('');
@@ -180,7 +211,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
           void refetch();
         }
       },
-      [dataSource, disabledValue, refetch],
+      [dataSource, dataSourceDependenciesMet, disabledValue, refetch],
     );
 
     // 处理清除
@@ -200,6 +231,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
     // Single-select mode: use Radix Select
     if (!multiple) {
       const currentValue = field.value != null ? String(field.value) : '';
+      const hasDropdownContent = dataSourceDependenciesMet && (options.length > 0 || canCreateNew);
       const actionSelectLabel = (() => {
         const key = 'action.select';
         const translated = t(key);
@@ -236,59 +268,61 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 }
               />
             </SelectTrigger>
-            <SelectContent>
-              <div className="border-border bg-panel sticky top-0 z-10 border-b p-2">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onKeyDown={(event) => event.stopPropagation()}
-                  onPointerDown={(event) => event.stopPropagation()}
-                  placeholder={
-                    t('common.search') !== 'common.search'
-                      ? t('common.search')
-                      : locale === 'zh-CN'
-                        ? '搜索'
-                        : 'Search'
-                  }
-                  data-testid={`select-search-${name}`}
-                  className="border-border-strong focus:border-accent focus-visible:shadow-focus bg-panel text-text placeholder:text-text-3 h-8 w-full rounded-md border px-2 text-sm focus:outline-none"
-                />
-              </div>
-              {filteredOptions.length === 0 && !loading && (
-                <div className="text-text-3 px-3 py-2 text-sm">
-                  {t('common.noResults') !== 'common.noResults'
-                    ? t('common.noResults')
-                    : locale === 'zh-CN'
-                      ? '无匹配结果'
-                      : 'No results'}
+            {hasDropdownContent && (
+              <SelectContent>
+                <div className="border-border bg-panel sticky top-0 z-10 border-b p-2">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onKeyDown={(event) => event.stopPropagation()}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    placeholder={
+                      t('common.search') !== 'common.search'
+                        ? t('common.search')
+                        : locale === 'zh-CN'
+                          ? '搜索'
+                          : 'Search'
+                    }
+                    data-testid={`select-search-${name}`}
+                    className="border-border-strong focus:border-accent focus-visible:shadow-focus bg-panel text-text placeholder:text-text-3 h-8 w-full rounded-md border px-2 text-sm focus:outline-none"
+                  />
                 </div>
-              )}
-              {filteredOptions?.map((option) => (
-                <SelectItem
-                  key={option.key || option.value}
-                  value={String(option.value)}
-                  disabled={option.disabled}
-                >
-                  {option.label}
-                </SelectItem>
-              ))}
-              {canCreateNew && (
-                <SelectItem
-                  key={CREATE_NEW_VALUE}
-                  value={CREATE_NEW_VALUE}
-                  data-testid={`select-create-new-${name}`}
-                  className="text-accent font-medium"
-                >
-                  {createNewLabel ??
-                    (t('action.createNew') !== 'action.createNew'
-                      ? t('action.createNew')
+                {filteredOptions.length === 0 && !loading && (
+                  <div className="text-text-3 px-3 py-2 text-sm">
+                    {t('common.noResults') !== 'common.noResults'
+                      ? t('common.noResults')
                       : locale === 'zh-CN'
-                        ? '+ 新建'
-                        : '+ New')}
-                </SelectItem>
-              )}
-            </SelectContent>
+                        ? '无匹配结果'
+                        : 'No results'}
+                  </div>
+                )}
+                {filteredOptions.map((option) => (
+                  <SelectItem
+                    key={option.key || option.value}
+                    value={String(option.value)}
+                    disabled={option.disabled}
+                  >
+                    {option.label}
+                  </SelectItem>
+                ))}
+                {canCreateNew && (
+                  <SelectItem
+                    key={CREATE_NEW_VALUE}
+                    value={CREATE_NEW_VALUE}
+                    data-testid={`select-create-new-${name}`}
+                    className="text-accent font-medium"
+                  >
+                    {createNewLabel ??
+                      (t('action.createNew') !== 'action.createNew'
+                        ? t('action.createNew')
+                        : locale === 'zh-CN'
+                          ? '+ 新建'
+                          : '+ New')}
+                  </SelectItem>
+                )}
+              </SelectContent>
+            )}
           </BaseSelect>
           {/* Clear button overlaid on trigger */}
           {clearable && currentValue && !disabledValue && !loading && (

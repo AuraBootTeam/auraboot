@@ -10,13 +10,25 @@ import {
 import { fetchResult } from '~/shared/services/http-client';
 import { useFormSubmit } from '~/hooks/useFormSubmit';
 import { getIndustryLabel, type TenantInfo as TenantInfoData } from '~/hooks/useTenantForm';
+import { useAuth } from '~/contexts/AuthContext';
+import { RouteAccessDenied } from '~/ui/PermissionGuard';
 
 export default function TenantInfo() {
   const [tenant, setTenant] = useState<TenantInfoData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
   const { handleSubmitResult } = useFormSubmit();
+  const { hasPermission } = useAuth();
+  const canReadTenant = hasPermission('org.tenant.read');
+  const canUpdateTenant = hasPermission('org.tenant.update');
 
   const fetchTenantInfo = async () => {
+    if (!canReadTenant) {
+      setAccessDenied(true);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await fetchResult<TenantInfoData>('/api/tenant/info', {
@@ -27,13 +39,16 @@ export default function TenantInfo() {
         showToast: false,
         onSuccess: (data: TenantInfoData) => {
           setTenant(data);
+          setAccessDenied(false);
         },
         onError: (error) => {
           console.error('获取租户信息失败:', error);
+          setAccessDenied(true);
         },
       });
     } catch (error) {
       console.error('获取租户信息失败:', error);
+      setAccessDenied(true);
     } finally {
       setLoading(false);
     }
@@ -41,7 +56,7 @@ export default function TenantInfo() {
 
   useEffect(() => {
     fetchTenantInfo();
-  }, []);
+  }, [canReadTenant]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -78,6 +93,12 @@ export default function TenantInfo() {
   }
 
   if (!tenant) {
+    if (accessDenied) {
+      return (
+        <RouteAccessDenied message="Access denied: tenant information requires permission org.tenant.read" />
+      );
+    }
+
     return (
       <div className="py-12 text-center">
         <p className="text-gray-500 dark:text-gray-400">未找到租户信息</p>
@@ -97,13 +118,15 @@ export default function TenantInfo() {
               <p className="text-gray-600 dark:text-gray-300">管理您的企业基本信息</p>
             </div>
           </div>
-          <Link
-            to={`/enterprise/info/edit`}
-            className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-gray-800"
-          >
-            <PencilIcon className="mr-2 h-4 w-4" />
-            编辑信息
-          </Link>
+          {canUpdateTenant && (
+            <Link
+              to={`/enterprise/info/edit`}
+              className="inline-flex items-center rounded-md border border-transparent bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none dark:bg-blue-500 dark:hover:bg-blue-600 dark:focus:ring-offset-gray-800"
+            >
+              <PencilIcon className="mr-2 h-4 w-4" />
+              编辑信息
+            </Link>
+          )}
         </div>
       </div>
 

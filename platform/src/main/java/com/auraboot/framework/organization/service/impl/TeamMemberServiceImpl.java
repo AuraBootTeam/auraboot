@@ -10,6 +10,8 @@ import com.auraboot.framework.organization.entity.TeamMember;
 import com.auraboot.framework.organization.mapper.TeamMapper;
 import com.auraboot.framework.organization.mapper.TeamMemberMapper;
 import com.auraboot.framework.organization.service.TeamMemberService;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -38,6 +40,9 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
     @Autowired
     private UserService userService;
 
+    @Autowired
+    private TenantMemberService tenantMemberService;
+
     @Override
     public List<TeamMemberResponse> listMembers(String teamPid) {
         Team team = teamMapper.findByPid(teamPid);
@@ -57,23 +62,25 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
             throw new BusinessException("Team not found: " + teamPid);
         }
 
+        Long userId = resolveUserId(request);
+
         // Check if already a member
-        TeamMember existing = teamMemberMapper.findByTeamIdAndUserId(team.getId(), request.getUserId());
+        TeamMember existing = teamMemberMapper.findByTeamIdAndUserId(team.getId(), userId);
         if (existing != null) {
             throw new BusinessException("User is already a member of this team");
         }
 
         // Verify user exists
-        User user = userService.findByUserId(request.getUserId());
+        User user = userService.findByUserId(userId);
         if (user == null) {
-            throw new BusinessException("User not found: " + request.getUserId());
+            throw new BusinessException("User not found: " + userId);
         }
 
         TeamMember member = new TeamMember();
         member.setPid(UniqueIdGenerator.generate());
         member.setTenantId(MetaContext.getCurrentTenantId());
         member.setTeamId(team.getId());
-        member.setUserId(request.getUserId());
+        member.setUserId(userId);
         member.setRole(request.getRole() != null ? request.getRole() : "member");
         member.setJoinedAt(Instant.now());
         member.setCreatedAt(Instant.now());
@@ -82,8 +89,43 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         member.setUpdatedBy(operatorId);
         save(member);
 
-        log.info("Member added to team: teamPid={}, userId={}, role={}", teamPid, request.getUserId(), member.getRole());
+        log.info("Member added to team: teamPid={}, userId={}, role={}", teamPid, userId, member.getRole());
         return toResponse(member);
+    }
+
+    private Long resolveUserId(TeamMemberAddRequest request) {
+        if (request.getUserId() != null) {
+            ensureTenantMember(request.getUserId());
+            return request.getUserId();
+        }
+        if (request.getUserPid() != null && !request.getUserPid().isBlank()) {
+            User user = userService.findByPid(request.getUserPid());
+            if (user == null) {
+                throw new BusinessException("User not found: " + request.getUserPid());
+            }
+            ensureTenantMember(user.getId());
+            return user.getId();
+        }
+        if (request.getMemberPid() != null && !request.getMemberPid().isBlank()) {
+            TenantMember member = tenantMemberService.findByPid(request.getMemberPid());
+            if (member == null) {
+                throw new BusinessException("Tenant member not found: " + request.getMemberPid());
+            }
+            Long tenantId = MetaContext.getCurrentTenantId();
+            if (!tenantId.equals(member.getTenantId())) {
+                throw new BusinessException("Tenant member not found: " + request.getMemberPid());
+            }
+            return member.getUserId();
+        }
+        throw new BusinessException("User ID, user pid or member pid is required");
+    }
+
+    private void ensureTenantMember(Long userId) {
+        TenantMember tenantMember = tenantMemberService.findByTenantIdAndUserId(
+                MetaContext.getCurrentTenantId(), userId);
+        if (tenantMember == null) {
+            throw new BusinessException("User is not a member of current tenant: " + userId);
+        }
     }
 
     @Override
@@ -156,8 +198,13 @@ public class TeamMemberServiceImpl extends ServiceImpl<TeamMemberMapper, TeamMem
         try {
             User user = userService.findByUserId(member.getUserId());
             if (user != null) {
+                resp.setUserPid(user.getPid());
                 resp.setUserName(user.getNickName() != null ? user.getNickName() : user.getUserName());
                 resp.setUserEmail(user.getEmail());
+            }
+            TenantMember tenantMember = tenantMemberService.findByTenantIdAndUserId(member.getTenantId(), member.getUserId());
+            if (tenantMember != null) {
+                resp.setMemberPid(tenantMember.getPid());
             }
         } catch (Exception e) {
             log.debug("Failed to resolve user info for userId={}", member.getUserId());

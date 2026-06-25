@@ -80,10 +80,10 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
   hideBuiltInPrint,
 }) => {
   return (
-    <div className="border-border border-b px-6 py-3">
+    <div className="border-border bg-panel border-b px-6 py-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <h2 className="text-text flex-shrink-0 whitespace-nowrap text-lg font-semibold">
+          <h2 className="text-text flex-shrink-0 whitespace-nowrap text-xl font-semibold tracking-tight">
             {title}
           </h2>
           {!hideSavedViews && (
@@ -110,7 +110,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               type="button"
               data-testid="invite-section"
               onClick={onInvite}
-              className="rounded-control inline-flex items-center gap-1.5 bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700"
+              className="rounded-control inline-flex h-9 items-center gap-1.5 bg-emerald-600 px-3.5 text-sm font-medium text-white shadow-sm transition-colors duration-150 hover:bg-emerald-700"
             >
               Invite
             </button>
@@ -120,7 +120,7 @@ export const ListPageHeader: React.FC<ListPageHeaderProps> = ({
               type="button"
               data-testid="member-import-entry"
               onClick={onImportMembers}
-              className="rounded-control bg-accent hover:bg-accent-hover inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white shadow-sm transition-colors duration-150"
+              className="rounded-control bg-accent hover:bg-accent-hover inline-flex h-9 items-center gap-1.5 px-3.5 text-sm font-medium text-white shadow-sm transition-colors duration-150"
             >
               Import Members
             </button>

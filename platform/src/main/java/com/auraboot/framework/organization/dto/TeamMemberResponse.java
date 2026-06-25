@@ -9,6 +9,8 @@ public class TeamMemberResponse {
 
     private String pid;
     private Long userId;
+    private String userPid;
+    private String memberPid;
     private String userName;
     private String userEmail;
     private String role;

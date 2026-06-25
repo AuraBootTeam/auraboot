@@ -212,11 +212,14 @@ export default function MemberDetailPage() {
   }
 
   const statusStyle = STATUS_STYLES[member.status] || STATUS_STYLES.INACTIVE;
-  const userName =
+  const displayName =
+    employee?.org_emp_name ||
     member.user?.realName ||
     member.user?.username ||
     member.user?.email ||
     `User #${member.userId}`;
+  const accountName = member.user?.username || `User #${member.userId}`;
+  const avatarText = (displayName || accountName).charAt(0).toUpperCase();
 
   const tabs = [
     { key: 'basic' as const, label: l('基本信息', 'Basic Info'), icon: UserIcon },
@@ -225,32 +228,34 @@ export default function MemberDetailPage() {
   ];
 
   return (
-    <div className="mx-auto w-full max-w-4xl p-6">
+    <div className="mx-auto w-full max-w-7xl px-6 py-8">
       {/* Header */}
-      <div className="mb-6 flex items-start gap-4">
+      <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-gray-900">
+        <div className="flex items-start gap-5">
         <button
           onClick={() => navigate('/p/tenant_member')}
-          className="mt-1 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-300"
+          className="mt-1 rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-800 dark:hover:text-gray-300"
           data-testid="back-btn"
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </button>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-4">
             {/* Avatar */}
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-lg font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
-              {userName.charAt(0).toUpperCase()}
+            <div className="flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xl font-bold text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+              {avatarText}
             </div>
-            <div>
+            <div className="min-w-0">
               <h1
-                className="text-2xl font-bold text-gray-900 dark:text-white"
+                className="max-w-4xl truncate text-3xl font-semibold tracking-tight text-gray-950 dark:text-white"
                 data-testid="member-name"
               >
-                {userName}
+                {displayName}
               </h1>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {member.user?.email}
-                {member.user?.phone && ` · ${member.user.phone}`}
+              <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
+                <span className="font-medium text-gray-700 dark:text-gray-300">{accountName}</span>
+                {member.user?.email && <span>{member.user.email}</span>}
+                {member.user?.phone && <span>{member.user.phone}</span>}
               </p>
             </div>
             <span
@@ -260,6 +265,7 @@ export default function MemberDetailPage() {
               {member.status}
             </span>
           </div>
+        </div>
         </div>
       </div>
 
@@ -326,8 +332,11 @@ export default function MemberDetailPage() {
       </div>
 
       {/* Tab Content */}
-      <div className="rounded-lg bg-white shadow dark:bg-gray-800" data-testid="tab-content">
-        {activeTab === 'basic' && <BasicInfoTab member={member} l={l} />}
+      <div
+        className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-900"
+        data-testid="tab-content"
+      >
+        {activeTab === 'basic' && <BasicInfoTab member={member} displayName={displayName} l={l} />}
         {activeTab === 'org' && <OrgInfoTab employee={employee} l={l} />}
         {activeTab === 'teams' && <TeamsTab teams={teams} l={l} navigate={navigate} />}
       </div>
@@ -339,12 +348,15 @@ export default function MemberDetailPage() {
 
 function BasicInfoTab({
   member,
+  displayName,
   l,
 }: {
   member: MemberData;
+  displayName: string;
   l: (zh: string, en: string) => string;
 }) {
   const fields = [
+    { label: l('姓名', 'Name'), value: displayName },
     { label: l('用户名', 'Username'), value: member.user?.username },
     { label: l('邮箱', 'Email'), value: member.user?.email },
     { label: l('手机', 'Phone'), value: member.user?.phone },

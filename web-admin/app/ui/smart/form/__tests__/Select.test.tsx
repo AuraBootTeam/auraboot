@@ -128,4 +128,69 @@ describe('Smart Select', () => {
     expect(screen.getByText('Beta Project')).toBeInTheDocument();
     expect(screen.getByTestId('select-create-new-bom_project_id')).toBeInTheDocument();
   });
+
+  it('does not render an empty dropdown panel when there are no options', () => {
+    render(
+      <Select
+        name="bom_project_id"
+        label="所属项目"
+        value=""
+        options={[]}
+        validationRules={[{ type: 'required', message: '此字段为必填项' }]}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('select-trigger-bom_project_id'));
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('does not render a loading-only dropdown panel before async options arrive', () => {
+    mockLoading = true;
+
+    render(
+      <Select
+        name="bom_project_id"
+        label="所属项目"
+        value=""
+        dataSource={{
+          type: 'api',
+          endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
+          method: 'get',
+          autoFetch: false,
+        } as any}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('select-trigger-bom_project_id'));
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('does not open or refetch a dependent select when the dependency value is empty', () => {
+    mockOptions = [{ label: '2', value: 'project-2' }];
+
+    render(
+      <Select
+        name="bom_project_id"
+        label="所属项目"
+        value=""
+        dataSource={
+          {
+            type: 'api',
+            endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
+            method: 'get',
+            autoFetch: false,
+            dependOn: ['form.bom_task_customer_id'],
+          } as any
+        }
+        context={{ form: { bom_task_customer_id: '' } } as any}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('select-trigger-bom_project_id'));
+
+    expect(mockRefetch).not.toHaveBeenCalled();
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
 });
