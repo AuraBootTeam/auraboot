@@ -160,5 +160,33 @@
         }
       }
     ]
+  },
+  {
+    "code": "org_team_status",
+    "name:zh-CN": "团队状态",
+    "name:en": "Team Status",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label:zh-CN": "启用",
+        "label:en": "Active",
+        "sortNo": 1,
+        "color": "#16a34a",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "inactive",
+        "label:zh-CN": "停用",
+        "label:en": "Inactive",
+        "sortNo": 2,
+        "color": "#6b7280",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
   }
 ]

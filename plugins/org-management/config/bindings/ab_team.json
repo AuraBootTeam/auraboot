@@ -1,0 +1,71 @@
+[
+  {
+    "modelCode": "ab_team",
+    "fieldCode": "code",
+    "sequence": 1,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "ab_team",
+    "fieldCode": "name",
+    "sequence": 2,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "ab_team",
+    "fieldCode": "description",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_team",
+    "fieldCode": "leader_id",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": true
+  },
+  {
+    "modelCode": "ab_team",
+    "fieldCode": "status",
+    "sequence": 5,
+    "required": true,
+    "visible": true,
+    "editable": true,
+    "dictOverrideCode": "org_team_status",
+    "displayConfig": {
+      "searchable": true,
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "ab_team",
+    "fieldCode": "created_at",
+    "sequence": 6,
+    "required": false,
+    "visible": true,
+    "editable": false
+  },
+  {
+    "modelCode": "ab_team",
+    "fieldCode": "updated_at",
+    "sequence": 7,
+    "required": false,
+    "visible": true,
+    "editable": false
+  }
+]

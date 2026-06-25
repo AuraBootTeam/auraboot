@@ -1,0 +1,94 @@
+{
+  "pageKey": "ab_team_detail",
+  "name:zh-CN": "团队详情",
+  "name:en": "Team Detail",
+  "modelCode": "ab_team",
+  "description": "DSL-driven team detail page backed by ab_team",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "grid",
+    "cols": 12
+  },
+  "blocks": [
+    {
+      "id": "team_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "back",
+          "label": {
+            "zh-CN": "返回",
+            "en": "Back"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "/organization/teams"
+          }
+        },
+        {
+          "code": "edit",
+          "variant": "primary",
+          "label": {
+            "zh-CN": "编辑",
+            "en": "Edit"
+          },
+          "action": {
+            "type": "navigate",
+            "to": "/organization/teams/{pid}/edit",
+            "command": "org:update_team"
+          }
+        }
+      ]
+    },
+    {
+      "id": "team_basic",
+      "blockType": "form-section",
+      "title": {
+        "zh-CN": "团队信息",
+        "en": "Team Information"
+      },
+      "readOnly": true,
+      "fields": [
+        {
+          "field": "name",
+          "colSpan": 6
+        },
+        {
+          "field": "code",
+          "colSpan": 6
+        },
+        {
+          "field": "status",
+          "dictCode": "org_team_status",
+          "colSpan": 6
+        },
+        {
+          "field": "description",
+          "colSpan": 12
+        },
+        {
+          "field": "created_at",
+          "colSpan": 6
+        },
+        {
+          "field": "updated_at",
+          "colSpan": 6
+        }
+      ]
+    },
+    {
+      "id": "team_members",
+      "blockType": "custom",
+      "component": "TeamMembersBlock",
+      "props": {
+        "teamPidField": "pid",
+        "title": "团队成员"
+      }
+    }
+  ],
+  "title": {
+    "zh-CN": "团队详情",
+    "en": "Team Detail"
+  }
+}

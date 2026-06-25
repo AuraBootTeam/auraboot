@@ -199,4 +199,7 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
       'process_fee_rule_matrix',
     ],
   }),
+  teammembersblock: runtime('organization', 'TeamMembersBlock', {
+    aliases: ['TeamMembersBlock', 'team-members', 'team_members', 'teammembersblock'],
+  }),
 };

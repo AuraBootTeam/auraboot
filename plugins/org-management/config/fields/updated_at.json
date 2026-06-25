@@ -1,0 +1,9 @@
+{
+  "code": "updated_at",
+  "displayName:zh-CN": "更新时间",
+  "displayName:en": "Updated At",
+  "dataType": "datetime",
+  "feature": {
+    "sortable": true
+  }
+}
