@@ -341,5 +341,43 @@
         "web"
       ]
     }
+  },
+  {
+    "code": "enterprise_info",
+    "parentCode": "system_management",
+    "name:zh-CN": "企业信息",
+    "name:en": "Enterprise Info",
+    "path": "/enterprise/info",
+    "pageKey": "enterprise_info_detail",
+    "component": null,
+    "icon": "building",
+    "type": 1,
+    "permissionCode": "org.tenant.read",
+    "orderNo": 12,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
+  },
+  {
+    "code": "enterprise_info_edit",
+    "parentCode": "enterprise_info",
+    "name:zh-CN": "编辑企业信息",
+    "name:en": "Edit Enterprise Info",
+    "path": "/enterprise/info/edit",
+    "pageKey": "enterprise_info_form",
+    "component": null,
+    "icon": "edit",
+    "type": 1,
+    "permissionCode": "org.tenant.update",
+    "orderNo": 1,
+    "visible": false,
+    "extension": {
+      "platforms": [
+        "web"
+      ]
+    }
   }
 ]

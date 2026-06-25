@@ -194,10 +194,12 @@ export function resolveDetailRecordEndpoint(
       `\\{recordPid\\}|\\$\\{recordPid\\}|\\{pid\\}|\\$\\{pid\\}|\\{id\\}|\\{${legacyRecordKey}\\}|\\$\\{${legacyRecordKey}\\}`,
       'g',
     );
-    if (publicRecordEndpointPlaceholder.test(endpoint)) {
+    if (recordPid && publicRecordEndpointPlaceholder.test(endpoint)) {
       endpoint = endpoint.replace(publicRecordEndpointPlaceholder, encodeURIComponent(recordPid));
-    } else {
+    } else if (recordPid) {
       endpoint = `${endpoint.replace(/\/+$/, '')}/${encodeURIComponent(recordPid)}`;
+    } else {
+      endpoint = endpoint.replace(/\/+$/, '');
     }
     return { endpoint, method };
   }
@@ -468,8 +470,14 @@ function DetailPageContentInner(props: PageContentProps) {
   const [recordLoading, setRecordLoading] = useState(true);
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
 
+  const hasApiSingletonRecordSource = Boolean(
+    (schema as any)?.extension?.dataSource?.type === 'api' &&
+      typeof (schema as any)?.extension?.dataSource?.endpoint === 'string' &&
+      (schema as any)?.extension?.dataSource?.endpoint,
+  );
+
   useEffect(() => {
-    if (!routeRecordPid || !recordModelCode) {
+    if ((!routeRecordPid && !hasApiSingletonRecordSource) || !recordModelCode) {
       setRecordLoading(false);
       return;
     }
@@ -510,14 +518,18 @@ function DetailPageContentInner(props: PageContentProps) {
         const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
         const unwrappedRecord = unwrapDetailRecord(result.data, recordPath);
         setRawData(result.data);
-        setRecordData(
-          await enrichDetailRecordDisplayFields(
-            currentModelCode,
-            currentRecordPid,
-            unwrappedRecord,
-            token || undefined,
-          ),
-        );
+        if (currentRecordPid && !shouldSkipDetailModelFieldMeta(schema)) {
+          setRecordData(
+            await enrichDetailRecordDisplayFields(
+              currentModelCode,
+              currentRecordPid,
+              unwrappedRecord,
+              token || undefined,
+            ),
+          );
+        } else {
+          setRecordData(unwrappedRecord);
+        }
       }
     }
 
@@ -533,11 +545,19 @@ function DetailPageContentInner(props: PageContentProps) {
     return () => {
       cancelled = true;
     };
-  }, [routeRecordPid, tableName, recordModelCode, schema, schema?.modelCode, token]);
+  }, [
+    routeRecordPid,
+    tableName,
+    recordModelCode,
+    schema,
+    schema?.modelCode,
+    token,
+    hasApiSingletonRecordSource,
+  ]);
 
   // Stable callback to reload the parent record (used after sub-table command execution)
   const reloadRecord = useCallback(() => {
-    if (!routeRecordPid || !recordModelCode) return;
+    if ((!routeRecordPid && !hasApiSingletonRecordSource) || !recordModelCode) return;
     const currentRecordPid = routeRecordPid;
     const currentModelCode = recordModelCode;
     const { endpoint, method } = resolveDetailRecordEndpoint(
@@ -551,16 +571,20 @@ function DetailPageContentInner(props: PageContentProps) {
           const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
           const unwrappedRecord = unwrapDetailRecord(result.data, recordPath);
           setRawData(result.data);
-          enrichDetailRecordDisplayFields(
-            currentModelCode,
-            currentRecordPid,
-            unwrappedRecord,
-            token || undefined,
-          ).then(setRecordData);
+          if (currentRecordPid && !shouldSkipDetailModelFieldMeta(schema)) {
+            enrichDetailRecordDisplayFields(
+              currentModelCode,
+              currentRecordPid,
+              unwrappedRecord,
+              token || undefined,
+            ).then(setRecordData);
+          } else {
+            setRecordData(unwrappedRecord);
+          }
         }
       })
       .catch(() => {});
-  }, [routeRecordPid, recordModelCode, token, schema]);
+  }, [routeRecordPid, recordModelCode, token, schema, hasApiSingletonRecordSource]);
 
   // Enrich a page-schema field with model field metadata (dictCode, component, dataType)
   const enrichField = useCallback(
@@ -846,16 +870,18 @@ function DetailPageContentInner(props: PageContentProps) {
         <div className="print-hide border-border border-b px-6 py-4" data-print="hide">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
-              <Link to={`/p/${tableName}`} className="text-text-3 hover:text-text-2">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 19l-7-7 7-7"
-                  />
-                </svg>
-              </Link>
+              {schema.extension?.showBack !== false && (
+                <Link to={`/p/${tableName}`} className="text-text-3 hover:text-text-2">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M15 19l-7-7 7-7"
+                    />
+                  </svg>
+                </Link>
+              )}
               <h2 className="text-text text-lg font-medium">
                 {getLocalizedText(schema.title, locale, t)}
               </h2>

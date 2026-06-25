@@ -554,13 +554,57 @@ function replaceRecordEndpointPlaceholders(template: string, recordPid: string):
 export function resolveEditRecordEndpoint(
   schema: { recordSource?: { endpoint?: string } } | null | undefined,
   tableName: string,
-  recordPid: string,
+  recordPid?: string,
 ): string {
   const custom = schema?.recordSource?.endpoint;
   if (custom && custom.trim()) {
-    return replaceRecordEndpointPlaceholders(custom, recordPid);
+    if (recordPid) {
+      return replaceRecordEndpointPlaceholders(custom, recordPid);
+    }
+    return custom.replace(/\/+$/, '');
+  }
+  if (!recordPid) {
+    return `/api/dynamic/${tableName}`;
   }
   return `/api/dynamic/${tableName}/${recordPid}`;
+}
+
+function isSingletonRecordSource(schema: any): boolean {
+  return (
+    schema?.recordSource?.mode === 'singleton' ||
+    schema?.recordSource?.singleton === true ||
+    schema?.extension?.recordMode === 'singleton' ||
+    schema?.extension?.editMode === true
+  );
+}
+
+function replaceSubmitEndpointPlaceholders(
+  template: string,
+  recordPid: string | null | undefined,
+  data: Record<string, any>,
+): string {
+  const pid = recordPid || data.pid || data.recordPid || data.id || '';
+  if (pid) {
+    return replaceRecordEndpointPlaceholders(template, String(pid));
+  }
+  return template.replace(/\/+$/, '');
+}
+
+export function resolveFormSubmitEndpoint(
+  schema: any,
+  recordPid: string | null | undefined,
+  data: Record<string, any>,
+): { endpoint: string; method: 'post' | 'put' | 'patch' } | null {
+  const config = schema?.extension?.submitEndpoint;
+  if (!config || config.type !== 'api' || typeof config.endpoint !== 'string') {
+    return null;
+  }
+  const rawMethod = String(config.method || (recordPid || data.pid ? 'put' : 'post')).toLowerCase();
+  const method = rawMethod === 'patch' ? 'patch' : rawMethod === 'put' ? 'put' : 'post';
+  return {
+    endpoint: replaceSubmitEndpointPlaceholders(config.endpoint, recordPid, data),
+    method,
+  };
 }
 
 function inferEditCommandCode(commandCode: string | null, isEditMode: boolean): string | null {
@@ -722,7 +766,7 @@ export function FormPageContent(props: PageContentProps) {
   const urlCommandCode = searchParams.get('commandCode');
   const sourceRecordPid = searchParams.get('sourceRecordPid');
   const routeRecordPid = props.recordPid;
-  const isEditMode = !!routeRecordPid;
+  const isEditMode = !!routeRecordPid || isSingletonRecordSource(schema);
   const recordPid = useMemo(() => getPublicRecordPid({ pid: routeRecordPid }) || '', [routeRecordPid]);
 
   // Flat field-name set from schema (form-section blocks).
@@ -914,12 +958,12 @@ export function FormPageContent(props: PageContentProps) {
   const fieldDataTypesRef = useRef<Record<string, string>>({});
   const loadMainRecord = useCallback(
     async (options?: { preserveDirty?: boolean }) => {
-      if (!recordPid) return;
+      if (!recordPid && !isSingletonRecordSource(schema)) return;
       const preserveDirty = options?.preserveDirty ?? true;
       dirtyFieldsRef.current.clear();
       setMainRecordLoaded(false);
       try {
-        const endpoint = resolveEditRecordEndpoint(schema, tableName, recordPid);
+        const endpoint = resolveEditRecordEndpoint(schema, tableName, recordPid || undefined);
         const resp = await fetchResult<any>(endpoint, {
           method: (schema?.recordSource?.method as any) || 'get',
           token: token || undefined,
@@ -1488,6 +1532,23 @@ export function FormPageContent(props: PageContentProps) {
 
       // Form command path: execute command directly with explicit operation context.
       // This avoids ambiguity from generic action routing branches (navigate/action registry).
+      const submitEndpoint = resolveFormSubmitEndpoint(schema, recordPid || null, actionRecord);
+      if (submitEndpoint && ['save', 'submit', 'create', 'update'].includes(effectiveActionType)) {
+        return fetchResult(submitEndpoint.endpoint, {
+          method: submitEndpoint.method,
+          params: commandPayload,
+          token: token || undefined,
+        }).then((result) => {
+          if (!ResultHelper.isSuccess(result)) {
+            throw new Error(result.desc || result.message || 'Failed to submit form');
+          }
+          showSuccessToast(t('common.saveSuccess') || 'Saved successfully');
+          dirtyFieldsRef.current.clear();
+          clearFormDraftRef.current();
+          navigate(resolveAfterSubmitRedirect(schema, tableName, result.data, recordPid));
+        });
+      }
+
       if (effectiveCommandCode) {
         const operationType =
           effectiveActionType === 'delete'
