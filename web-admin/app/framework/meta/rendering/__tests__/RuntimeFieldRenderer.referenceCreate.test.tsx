@@ -92,7 +92,7 @@ describe('RuntimeFieldRenderer reference inline-create', () => {
     expect(loaded.canCreateNew).toBeFalsy();
   });
 
-  it('does NOT enable create for reference-like fields backed by an explicit dataSource', () => {
+  it('enables create for reference fields backed by an explicit dataSource when refTarget is declared', () => {
     permits.add('customer:create');
     const { runtime } = makeRuntime();
     render(
@@ -108,7 +108,8 @@ describe('RuntimeFieldRenderer reference inline-create', () => {
         runtime={runtime}
       />,
     );
-    expect(loaded.canCreateNew).toBeFalsy();
+    expect(loaded.canCreateNew).toBe(true);
+    expect(dialogProps.targetModel).toBe('customer');
   });
 
   it('enables create and writes the new pid on creation when permitted', () => {

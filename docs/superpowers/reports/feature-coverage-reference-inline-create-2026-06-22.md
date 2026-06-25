@@ -19,6 +19,7 @@ Phase note: `createFields` remains a schema-reserved field per the implementatio
 | Requirement                            | User action or system behavior                                                                                                   | Evidence                                                                                        | Status |
 | -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------ |
 | SmartSelect single-select create entry | User opens a reference select and clicks `+ new`; the sentinel triggers `onCreateNew` and does not emit a normal value change.   | `Select.create.test.tsx`                                                                        | PASS   |
+| SmartSelect single-select search       | User types in the select search box; options filter by label/value while the create entry remains visible.                       | `Select.test.tsx`                                                                               | PASS   |
 | SmartSelect multi-select create button | User opens a multi reference select and clicks the create action button.                                                         | `Select.create.test.tsx`                                                                        | PASS   |
 | Keep newly created controlled value    | After a value is set from create, Radix empty value events do not clear the field.                                               | `Select.create.test.tsx`                                                                        | PASS   |
 | Quick-create dialog uses DSL form      | Dialog mounts `useDslForm` with the create page key.                                                                             | `ReferenceCreateDialog.test.tsx`                                                                | PASS   |
@@ -27,7 +28,7 @@ Phase note: `createFields` remains a schema-reserved field per the implementatio
 | Failed create path                     | Failed command keeps the dialog open and does not select anything.                                                               | `ReferenceCreateDialog.test.tsx`; Playwright `RIC-002`                                          | PASS   |
 | Runtime schema gate                    | `allowCreate`, `createCommand`, `createPermission`, and `createPageKey` wire create behavior only for eligible reference fields. | `RuntimeFieldRenderer.referenceCreate.test.tsx`; `ControlledFieldRenderer.test.tsx`             | PASS   |
 | Permission gate                        | User without customer create/manage permission can open order form but cannot see/open inline create.                            | `RuntimeFieldRenderer.referenceCreate.test.tsx`; Playwright `RIC-003`; DB role permission proof | PASS   |
-| Explicit data source exclusion         | Reference-like fields backed by explicit `dataSource` do not get inline create.                                                  | `RuntimeFieldRenderer.referenceCreate.test.tsx`                                                 | PASS   |
+| Explicit data source reference create  | Reference fields backed by explicit `dataSource` can still inline-create when `allowCreate` and a target model are declared.     | `RuntimeFieldRenderer.referenceCreate.test.tsx`; `ControlledFieldRenderer.test.tsx`             | PASS   |
 | Reference type detection               | `FieldConfig.type = reference` is recognized even without naming inference.                                                      | `RuntimeFieldRenderer.referenceCreate.test.tsx`                                                 | PASS   |
 | Single-value backfill                  | Created record pid is written back to the reference field.                                                                       | `RuntimeFieldRenderer.referenceCreate.test.tsx`; Playwright `RIC-001`                           | PASS   |
 | Multi-value append                     | Created pid appends to an existing array and does not duplicate an already selected pid.                                         | `RuntimeFieldRenderer.referenceCreate.test.tsx`                                                 | PASS   |
@@ -59,6 +60,12 @@ Slot: `reference-inline-create-75`.
   - BFF `/health` on `6175` → HTTP 200.
 - `npx vitest run app/ui/smart/form/__tests__/Select.create.test.tsx app/framework/meta/runtime/reference-create/__tests__/ReferenceCreateDialog.test.tsx app/framework/meta/rendering/__tests__/RuntimeFieldRenderer.referenceCreate.test.tsx app/framework/meta/rendering/__tests__/ControlledFieldRenderer.test.tsx app/framework/meta/hooks/__tests__/useFieldDataSource.test.tsx`
   - Result: 5 files, 32 tests passed.
+- `pnpm exec vitest run app/framework/meta/rendering/__tests__/RuntimeFieldRenderer.referenceCreate.test.tsx app/framework/meta/rendering/__tests__/ControlledFieldRenderer.test.tsx app/ui/smart/form/__tests__/Select.test.tsx app/ui/smart/form/__tests__/Select.create.test.tsx`
+  - Result: 4 files, 30 tests passed.
+- `pnpm exec eslint app/ui/smart/form/Select.tsx app/ui/smart/form/__tests__/Select.test.tsx app/framework/meta/rendering/RuntimeFieldRenderer.tsx app/framework/meta/rendering/ControlledFieldRenderer.tsx app/framework/meta/rendering/__tests__/RuntimeFieldRenderer.referenceCreate.test.tsx app/framework/meta/rendering/__tests__/ControlledFieldRenderer.test.tsx`
+  - Result: passed.
+- `pnpm exec tsc --noEmit --pretty false`
+  - Result: passed.
 - `npx tsc --noEmit -p tsconfig.json`
   - Result: passed.
 - `npx prettier --check <changed frontend/test files>`

@@ -103,15 +103,22 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
 
   // --- Reference inline-create wiring (hooks called unconditionally) ---
   const fieldKind = String((field as any).dataType || field.type || '').toLowerCase();
-  const isReferenceField = fieldKind === 'reference' && !field.dataSource;
+  const isReferenceField = fieldKind === 'reference';
   const refTargetCfg = {
     ...(((field as any).props?.refTarget || {}) as Record<string, any>),
     ...(((field as any).refTarget || {}) as Record<string, any>),
   };
   const refTargetModel: string =
-    refTargetCfg?.targetModel || refTargetCfg?.modelCode || refTargetCfg?.targetEntity || '';
+    refTargetCfg?.targetModel ||
+    refTargetCfg?.modelCode ||
+    refTargetCfg?.targetEntity ||
+    (typeof field.dataSource === 'object' ? (field.dataSource as any).modelCode : '') ||
+    '';
   const refDisplayField: string | undefined =
-    refTargetCfg?.displayField || refTargetCfg?.labelField || refTargetCfg?.targetField;
+    refTargetCfg?.displayField ||
+    refTargetCfg?.labelField ||
+    refTargetCfg?.targetField ||
+    (typeof field.dataSource === 'object' ? (field.dataSource as any).labelField : undefined);
   const createCommandCode =
     field.createCommand || (refTargetModel ? `${refTargetModel}:create` : '');
   const createPermissionCode = field.createPermission || createCommandCode;

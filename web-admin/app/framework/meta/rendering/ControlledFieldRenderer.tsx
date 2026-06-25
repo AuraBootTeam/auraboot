@@ -265,9 +265,13 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     refTarget?.targetModel ||
     refTarget?.modelCode ||
     refTarget?.targetEntity ||
-    (field as any).referenceModelCode;
+    (field as any).referenceModelCode ||
+    (typeof field.dataSource === 'object' ? (field.dataSource as any).modelCode : undefined);
   const refDisplayField =
-    refTarget?.displayField || refTarget?.labelField || refTarget?.targetField;
+    refTarget?.displayField ||
+    refTarget?.labelField ||
+    refTarget?.targetField ||
+    (typeof field.dataSource === 'object' ? (field.dataSource as any).labelField : undefined);
   const createCommandCode =
     field.createCommand || (refTargetModel ? `${refTargetModel}:create` : '');
   const createPermissionCode = field.createPermission || createCommandCode;
@@ -275,7 +279,6 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   const allowCreate =
     Boolean(field.allowCreate) &&
     fieldKind === 'reference' &&
-    !field.dataSource &&
     !!refTargetModel &&
     hasCreatePerm;
   const [createOpen, setCreateOpen] = useState(false);
