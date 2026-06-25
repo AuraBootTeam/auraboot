@@ -54,46 +54,75 @@ public class AccountSecurityPolicyController {
     @GetMapping
     @RequirePermission("system_management")
     public ApiResponse<AccountSecurityPolicyResponse> getPolicy() {
+        String mode = selfServiceEnabled ? "self_service" : "admin_managed";
+        String[] notes = new String[] {
+                "密码复杂度、历史密码、过期时间、登录锁定和重置令牌有效期由部署级配置统一控制。",
+                "默认关闭公开注册，成员开通使用管理员受控流程。",
+                "当前页面为只读交付视图，不提供租户级策略编辑。"
+        };
         return ApiResponse.success(AccountSecurityPolicyResponse.builder()
-                .mode(selfServiceEnabled ? "self_service" : "admin_managed")
+                .mode(mode)
+                .modeDisplay("self_service".equals(mode) ? "允许自助找回" : "管理员托管")
                 .publicRegistrationEnabled(false)
+                .publicRegistrationDisplay(enabledText(false))
                 .selfServicePasswordEnabled(selfServiceEnabled)
+                .selfServicePasswordDisplay(enabledText(selfServiceEnabled))
                 .adminManagedPasswordEnabled(true)
+                .adminManagedPasswordDisplay(enabledText(true))
                 .mustChangePasswordAfterAdminReset(false)
+                .mustChangePasswordAfterAdminResetDisplay(enabledText(false))
                 .password(PasswordPolicySummary.builder()
                         .minLength(minLength)
                         .maxLength(maxLength)
+                        .lengthDisplay(minLength + "-" + maxLength + " 个字符")
                         .requireUppercase(requireUppercase)
+                        .requireUppercaseDisplay(enabledText(requireUppercase))
                         .requireLowercase(requireLowercase)
+                        .requireLowercaseDisplay(enabledText(requireLowercase))
                         .requireDigit(requireDigit)
+                        .requireDigitDisplay(enabledText(requireDigit))
                         .requireSpecial(requireSpecial)
+                        .requireSpecialDisplay(enabledText(requireSpecial))
                         .historyCount(historyCount)
+                        .historyCountDisplay("最近 " + historyCount + " 次不可复用")
                         .expiryDays(expiryDays)
+                        .expiryDaysDisplay(expiryDays + " 天")
                         .resetTokenExpiryMinutes(resetTokenExpiryMinutes)
+                        .resetTokenExpiryDisplay(resetTokenExpiryMinutes + " 分钟")
+                        .recoveryModeDisplay(selfServiceEnabled ? "支持令牌重置" : "联系管理员")
                         .build())
                 .lockout(LockoutPolicySummary.builder()
                         .maxAttempts(lockoutMaxAttempts)
+                        .maxAttemptsDisplay(lockoutMaxAttempts + " 次失败")
                         .durationMinutes(lockoutDurationMinutes)
+                        .durationDisplay(lockoutDurationMinutes + " 分钟")
                         .build())
-                .notes(new String[] {
-                        "Password complexity, history, expiry, lockout, and reset-token lifetime are deployment-level rules.",
-                        "Public registration is disabled by default. Member onboarding uses administrator-controlled paths.",
-                        "Tenant-scoped behavior switches are not editable in this read-only delivery view."
-                })
+                .notes(notes)
+                .notesText(String.join("\n", notes))
                 .build());
+    }
+
+    private static String enabledText(boolean enabled) {
+        return enabled ? "已启用" : "已停用";
     }
 
     @Data
     @Builder
     public static class AccountSecurityPolicyResponse {
         private String mode;
+        private String modeDisplay;
         private boolean publicRegistrationEnabled;
+        private String publicRegistrationDisplay;
         private boolean selfServicePasswordEnabled;
+        private String selfServicePasswordDisplay;
         private boolean adminManagedPasswordEnabled;
+        private String adminManagedPasswordDisplay;
         private boolean mustChangePasswordAfterAdminReset;
+        private String mustChangePasswordAfterAdminResetDisplay;
         private PasswordPolicySummary password;
         private LockoutPolicySummary lockout;
         private String[] notes;
+        private String notesText;
     }
 
     @Data
@@ -101,19 +130,30 @@ public class AccountSecurityPolicyController {
     public static class PasswordPolicySummary {
         private int minLength;
         private int maxLength;
+        private String lengthDisplay;
         private boolean requireUppercase;
+        private String requireUppercaseDisplay;
         private boolean requireLowercase;
+        private String requireLowercaseDisplay;
         private boolean requireDigit;
+        private String requireDigitDisplay;
         private boolean requireSpecial;
+        private String requireSpecialDisplay;
         private int historyCount;
+        private String historyCountDisplay;
         private int expiryDays;
+        private String expiryDaysDisplay;
         private int resetTokenExpiryMinutes;
+        private String resetTokenExpiryDisplay;
+        private String recoveryModeDisplay;
     }
 
     @Data
     @Builder
     public static class LockoutPolicySummary {
         private int maxAttempts;
+        private String maxAttemptsDisplay;
         private int durationMinutes;
+        private String durationDisplay;
     }
 }

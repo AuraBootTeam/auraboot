@@ -2810,6 +2810,194 @@
     ]
   },
   {
+    "pageKey": "account_security_policy_detail",
+    "name:zh-CN": "账号安全策略",
+    "name:en": "Account Security Policy",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": { "type": "stack" },
+    "title": {
+      "zh-CN": "账号安全策略",
+      "en": "Account Security Policy"
+    },
+    "extension": {
+      "showShare": false,
+      "showReport": false,
+      "showEdit": false,
+      "showPrint": false,
+      "skipFieldMeta": true,
+      "dataSource": {
+        "type": "api",
+        "method": "get",
+        "endpoint": "/api/admin/account-security-policy"
+      }
+    },
+    "blocks": [
+      {
+        "id": "account_security_policy_behavior",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "账号行为",
+          "en": "Account Behavior"
+        },
+        "description": {
+          "zh-CN": "控制账号开通、注册入口与密码找回的总体策略。",
+          "en": "Controls account onboarding, public registration, and password recovery behavior."
+        },
+        "extension": {
+          "displayVariant": "settings-card",
+          "icon": "behavior"
+        },
+        "fields": [
+          {
+            "field": "modeDisplay",
+            "label": { "zh-CN": "托管模式", "en": "Mode" }
+          },
+          {
+            "field": "publicRegistrationDisplay",
+            "label": { "zh-CN": "公开注册", "en": "Public registration" }
+          },
+          {
+            "field": "selfServicePasswordDisplay",
+            "label": { "zh-CN": "自助密码", "en": "Self-service password" }
+          },
+          {
+            "field": "adminManagedPasswordDisplay",
+            "label": { "zh-CN": "管理员重置", "en": "Admin managed reset" }
+          },
+          {
+            "field": "mustChangePasswordAfterAdminResetDisplay",
+            "label": { "zh-CN": "重置后强制改密", "en": "Force change after reset" }
+          }
+        ]
+      },
+      {
+        "id": "account_security_policy_password_complexity",
+        "blockType": "detail-section",
+        "dataPath": "password",
+        "title": {
+          "zh-CN": "密码复杂度",
+          "en": "Password Complexity"
+        },
+        "description": {
+          "zh-CN": "定义用户密码必须满足的长度和字符组成要求。",
+          "en": "Defines password length and character composition requirements."
+        },
+        "extension": {
+          "displayVariant": "settings-card",
+          "icon": "password"
+        },
+        "fields": [
+          {
+            "field": "lengthDisplay",
+            "label": { "zh-CN": "长度", "en": "Length" }
+          },
+          {
+            "field": "requireLowercaseDisplay",
+            "label": { "zh-CN": "小写字母", "en": "Lowercase letter" }
+          },
+          {
+            "field": "requireDigitDisplay",
+            "label": { "zh-CN": "数字", "en": "Digit" }
+          },
+          {
+            "field": "requireUppercaseDisplay",
+            "label": { "zh-CN": "大写字母", "en": "Uppercase letter" }
+          },
+          {
+            "field": "requireSpecialDisplay",
+            "label": { "zh-CN": "特殊字符", "en": "Special character" }
+          }
+        ]
+      },
+      {
+        "id": "account_security_policy_reset_history",
+        "blockType": "detail-section",
+        "dataPath": "password",
+        "title": {
+          "zh-CN": "重置与历史",
+          "en": "Reset And History"
+        },
+        "description": {
+          "zh-CN": "限制历史密码复用，并控制密码与重置令牌的有效期。",
+          "en": "Limits password reuse and controls password and reset-token lifetime."
+        },
+        "extension": {
+          "displayVariant": "settings-card",
+          "icon": "reset"
+        },
+        "fields": [
+          {
+            "field": "historyCountDisplay",
+            "label": { "zh-CN": "历史密码复用限制", "en": "History reuse block" }
+          },
+          {
+            "field": "expiryDaysDisplay",
+            "label": { "zh-CN": "密码过期", "en": "Password expiry" }
+          },
+          {
+            "field": "resetTokenExpiryDisplay",
+            "label": { "zh-CN": "重置令牌有效期", "en": "Reset token lifetime" }
+          },
+          {
+            "field": "recoveryModeDisplay",
+            "label": { "zh-CN": "找回模式", "en": "Recovery mode" }
+          }
+        ]
+      },
+      {
+        "id": "account_security_policy_lockout",
+        "blockType": "detail-section",
+        "dataPath": "lockout",
+        "title": {
+          "zh-CN": "登录锁定",
+          "en": "Login Lockout"
+        },
+        "description": {
+          "zh-CN": "连续登录失败后自动锁定账号，降低暴力破解风险。",
+          "en": "Locks accounts after repeated failed sign-in attempts."
+        },
+        "extension": {
+          "displayVariant": "settings-card",
+          "icon": "lockout"
+        },
+        "fields": [
+          {
+            "field": "maxAttemptsDisplay",
+            "label": { "zh-CN": "失败次数", "en": "Failed attempts" }
+          },
+          {
+            "field": "durationDisplay",
+            "label": { "zh-CN": "锁定时长", "en": "Lock duration" }
+          }
+        ]
+      },
+      {
+        "id": "account_security_policy_delivery_notes",
+        "blockType": "detail-section",
+        "title": {
+          "zh-CN": "交付说明",
+          "en": "Delivery Notes"
+        },
+        "description": {
+          "zh-CN": "说明当前只读视图的策略来源和交付边界。",
+          "en": "Explains the policy source and delivery boundary of this read-only view."
+        },
+        "extension": {
+          "displayVariant": "settings-card",
+          "icon": "notes"
+        },
+        "fields": [
+          {
+            "field": "notesText",
+            "label": { "zh-CN": "说明", "en": "Notes" },
+            "layout": { "colSpan": 12 }
+          }
+        ]
+      }
+    ]
+  },
+  {
     "pageKey": "template_center",
     "name": "$i18n:template.gallery.title",
     "kind": "detail",
