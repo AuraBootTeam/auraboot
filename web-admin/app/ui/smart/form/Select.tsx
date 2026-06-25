@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useState } from 'react';
+import React, { forwardRef, useCallback, useMemo, useState } from 'react';
 import { useActionData } from 'react-router';
 import clsx from 'clsx';
 import type { SelectProps } from '~/plugins/core-designer/components/studio/domain/schema/smart-components';
@@ -120,9 +120,19 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       context,
     });
     const [radixOpen, setRadixOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
 
     // 批量翻译 options 的 label 字段
     const options = translateArray(rawOptions || [], ['label'], locale, t);
+    const filteredOptions = useMemo(() => {
+      const query = searchQuery.trim().toLowerCase();
+      if (!query) return options;
+      return options.filter((option) => {
+        const label = String(option.label ?? '').toLowerCase();
+        const value = String(option.value ?? '').toLowerCase();
+        return label.includes(query) || value.includes(query);
+      });
+    }, [options, searchQuery]);
 
     // 验证处理
     // 从 useActionData 获取错误信息
@@ -156,12 +166,16 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       if (newValue === '' && field.value != null && String(field.value) !== '') {
         return;
       }
+      setSearchQuery('');
       field.setValue(newValue);
     };
 
     const handleRadixOpenChange = useCallback(
       (open: boolean) => {
         setRadixOpen(open);
+        if (!open) {
+          setSearchQuery('');
+        }
         if (open && dataSource && !disabledValue) {
           void refetch();
         }
@@ -223,7 +237,34 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               />
             </SelectTrigger>
             <SelectContent>
-              {options?.map((option) => (
+              <div className="border-border bg-panel sticky top-0 z-10 border-b p-2">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  placeholder={
+                    t('common.search') !== 'common.search'
+                      ? t('common.search')
+                      : locale === 'zh-CN'
+                        ? '搜索'
+                        : 'Search'
+                  }
+                  data-testid={`select-search-${name}`}
+                  className="border-border-strong focus:border-accent focus-visible:shadow-focus bg-panel text-text placeholder:text-text-3 h-8 w-full rounded-md border px-2 text-sm focus:outline-none"
+                />
+              </div>
+              {filteredOptions.length === 0 && !loading && (
+                <div className="text-text-3 px-3 py-2 text-sm">
+                  {t('common.noResults') !== 'common.noResults'
+                    ? t('common.noResults')
+                    : locale === 'zh-CN'
+                      ? '无匹配结果'
+                      : 'No results'}
+                </div>
+              )}
+              {filteredOptions?.map((option) => (
                 <SelectItem
                   key={option.key || option.value}
                   value={String(option.value)}

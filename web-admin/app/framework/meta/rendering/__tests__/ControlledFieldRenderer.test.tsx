@@ -503,6 +503,90 @@ describe('ControlledFieldRenderer', () => {
     expect(manager.reload).toHaveBeenCalledWith(['ds_customer_options']);
   });
 
+  it('keeps reference inline-create available when the field uses an explicit option dataSource', async () => {
+    vi.resetModules();
+    const executeCommand = vi.fn();
+    const dialogProps: Record<string, any> = {};
+
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid="component-loader">{componentName}</div>;
+      },
+    }));
+    vi.doMock('~/contexts/AuthContext', () => ({
+      usePermission: (code: string) => code === 'bom.project.manage',
+    }));
+    vi.doMock('~/framework/meta/hooks/useActionHandler', () => ({
+      useActionHandler: () => ({ executeCommand }),
+    }));
+    vi.doMock('~/framework/meta/contexts/DataSourceContext', () => ({
+      useDataSourceManagerOptional: () => null,
+    }));
+    vi.doMock('~/framework/meta/runtime/reference-create/ReferenceCreateDialog', () => ({
+      ReferenceCreateDialog: (props: Record<string, any>) => {
+        Object.assign(dialogProps, props);
+        return null;
+      },
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'bom_task_project_id',
+            component: 'SmartSelect',
+            dataType: 'reference',
+            allowCreate: true,
+            createCommand: 'bom:create_project',
+            createPermission: 'bom.project.manage',
+            refTarget: {
+              modelCode: 'req_requirement_set_pcba_bom',
+              displayField: 'bom_project_name',
+            },
+            dataSource: {
+              type: 'api',
+              modelCode: 'req_requirement_set_pcba_bom',
+              endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
+              method: 'get',
+              adaptor: 'optionList',
+              valueField: 'pid',
+              labelField: 'bom_project_name',
+            },
+          } as any
+        }
+        value={undefined}
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader')).toHaveTextContent('SmartSelect');
+    });
+
+    const props = capturedPropsSpy.mock.calls[0]?.[0]?.props;
+    expect(props?.canCreateNew).toBe(true);
+    expect(props?.dataSource).toMatchObject({
+      modelCode: 'req_requirement_set_pcba_bom',
+      endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
+    });
+    expect(dialogProps).toMatchObject({
+      targetModel: 'req_requirement_set_pcba_bom',
+      createCommand: 'bom:create_project',
+      displayField: 'bom_project_name',
+      executeCommand,
+    });
+  });
+
   it('rehydrates stringified daterange values for edit mode', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({

@@ -100,4 +100,32 @@ describe('Smart Select', () => {
 
     expect(mockRefetch).toHaveBeenCalledTimes(1);
   });
+
+  it('filters single-select options with an in-dropdown search input while keeping create available', () => {
+    mockOptions = [
+      { label: 'Alpha Project', value: 'alpha' },
+      { label: 'Beta Project', value: 'beta' },
+    ];
+
+    render(
+      <Select
+        name="bom_project_id"
+        dataSource={{
+          type: 'api',
+          endpoint: '/api/dynamic/bom_project/list',
+          method: 'get',
+        } as any}
+        canCreateNew
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('select-trigger-bom_project_id'));
+    fireEvent.change(screen.getByTestId('select-search-bom_project_id'), {
+      target: { value: 'beta' },
+    });
+
+    expect(screen.queryByText('Alpha Project')).not.toBeInTheDocument();
+    expect(screen.getByText('Beta Project')).toBeInTheDocument();
+    expect(screen.getByTestId('select-create-new-bom_project_id')).toBeInTheDocument();
+  });
 });
