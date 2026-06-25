@@ -88,4 +88,51 @@ describe('RuntimeFieldRenderer bindState', () => {
     expect(updateState).not.toHaveBeenCalled();
     expect(notifyStateChanged).not.toHaveBeenCalled();
   });
+
+  it('disables dependent selects and withholds their data source while the parent field is blank', async () => {
+    let captured: any;
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: (p: any) => {
+        captured = p;
+        return <div data-testid="cl" />;
+      },
+    }));
+    const runtime = buildRuntime({
+      updateField: vi.fn(),
+      updateState: vi.fn(),
+      notifyStateChanged: vi.fn(),
+    });
+    const { RuntimeFieldRenderer } = await import('../RuntimeFieldRenderer');
+
+    render(
+      <RuntimeFieldRenderer
+        field={
+          {
+            field: 'bom_task_project_id',
+            component: 'SmartSelect',
+            dependsOn: 'bom_task_customer_id',
+            dataSource: {
+              type: 'api',
+              endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
+              method: 'get',
+              params: {
+                bom_project_customer_id: '${form.bom_task_customer_id}',
+              },
+              adaptor: 'optionList',
+              valueField: 'pid',
+              labelField: 'bom_project_name',
+              autoFetch: false,
+              dependOn: ['form.bom_task_customer_id'],
+            },
+          } as any
+        }
+        runtime={runtime}
+      />,
+    );
+    await waitFor(() => expect(captured).toBeTruthy());
+
+    expect(captured.props.disabled).toBe(true);
+    expect(captured.props.dataSource).toBeUndefined();
+  });
 });

@@ -28,6 +28,7 @@ import { usePermission } from '~/contexts/AuthContext';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useDataSourceManagerOptional } from '~/framework/meta/contexts/DataSourceContext';
 import { ReferenceCreateDialog } from '~/framework/meta/runtime/reference-create/ReferenceCreateDialog';
+import { hasMissingFieldDependency } from '~/framework/meta/rendering/fieldDependencies';
 
 export interface ControlledFieldRendererProps {
   field: FieldConfig;
@@ -76,11 +77,12 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // 计算条件属性
   const disableExpr = field.disableWhen || (field as any).disabledWhen;
   const enableExpr = field.enableWhen;
+  const dependencyMissing = hasMissingFieldDependency(field, context);
   const isDisabled = disableExpr
-    ? evaluateCondition(disableExpr, context)
+    ? dependencyMissing || evaluateCondition(disableExpr, context)
     : enableExpr
-      ? !evaluateCondition(enableExpr, context)
-      : false;
+      ? dependencyMissing || !evaluateCondition(enableExpr, context)
+      : dependencyMissing;
 
   const readOnlyExpr = field.readOnlyWhen || (field as any).readonlyWhen;
   const isRollUp = Boolean((field as any).feature?.rollUp);
@@ -375,7 +377,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       autoFetch: true,
     };
     componentProps.dataSource = dictDataSource;
-  } else if (fieldKind === 'reference' && !field.dataSource) {
+  } else if (!dependencyMissing && fieldKind === 'reference' && !field.dataSource) {
     const targetModelCode = refTargetModel;
     const labelField = refDisplayField;
     if (targetModelCode) {
@@ -419,7 +421,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
         componentProps.dataSource = referenceDataSource;
       }
     }
-  } else if (field.dataSource) {
+  } else if (!dependencyMissing && field.dataSource) {
     // 如果有 dataSource 配置，传递给组件
     componentProps.dataSource = field.dataSource;
   }

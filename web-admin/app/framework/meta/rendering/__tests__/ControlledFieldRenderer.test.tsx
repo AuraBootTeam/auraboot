@@ -98,6 +98,121 @@ describe('ControlledFieldRenderer', () => {
     expect(capturedPropsSpy.mock.calls[0]?.[0]?.props?.label).toBeUndefined();
   });
 
+  it('disables dependent selects and suppresses their data source until the parent has a value', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid="component-loader">{componentName}</div>;
+      },
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'bom_task_project_id',
+            component: 'SmartSelect',
+            dependsOn: 'bom_task_customer_id',
+            dataSource: {
+              type: 'api',
+              endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
+              method: 'get',
+              params: {
+                bom_project_customer_id: '${form.bom_task_customer_id}',
+              },
+              adaptor: 'optionList',
+              valueField: 'pid',
+              labelField: 'bom_project_name',
+              autoFetch: false,
+              dependOn: ['form.bom_task_customer_id'],
+            },
+          } as any
+        }
+        value={undefined}
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t: (key: string) => key, form: {} } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader')).toHaveTextContent('SmartSelect');
+    });
+
+    const props = capturedPropsSpy.mock.calls[0]?.[0]?.props;
+    expect(props?.disabled).toBe(true);
+    expect(props?.dataSource).toBeUndefined();
+  });
+
+  it('keeps dependent select data sources active after the parent has a value', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid="component-loader">{componentName}</div>;
+      },
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+    const dataSource = {
+      type: 'api',
+      endpoint: '/api/dynamic/req_requirement_set_pcba_bom/list',
+      method: 'get',
+      params: {
+        bom_project_customer_id: '${form.bom_task_customer_id}',
+      },
+      adaptor: 'optionList',
+      valueField: 'pid',
+      labelField: 'bom_project_name',
+      autoFetch: false,
+      dependOn: ['form.bom_task_customer_id'],
+    };
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'bom_task_project_id',
+            component: 'SmartSelect',
+            dependsOn: 'bom_task_customer_id',
+            dataSource,
+          } as any
+        }
+        value={undefined}
+        onChange={vi.fn()}
+        context={
+          {
+            locale: 'zh-CN',
+            t: (key: string) => key,
+            form: { bom_task_customer_id: 'customer-1' },
+          } as any
+        }
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader')).toHaveTextContent('SmartSelect');
+    });
+
+    const props = capturedPropsSpy.mock.calls[0]?.[0]?.props;
+    expect(props?.disabled).toBe(false);
+    expect(props?.dataSource).toBe(dataSource);
+  });
+
   it('routes sys_user reference fields to the system user search endpoint', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({

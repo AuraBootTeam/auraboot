@@ -21,6 +21,7 @@ import { ComponentLoader } from '~/framework/meta/rendering/components/Component
 import { usePermission } from '~/contexts/AuthContext';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { ReferenceCreateDialog } from '~/framework/meta/runtime/reference-create/ReferenceCreateDialog';
+import { hasMissingFieldDependency } from '~/framework/meta/rendering/fieldDependencies';
 
 export interface RuntimeFieldRendererProps {
   field: FieldConfig;
@@ -65,6 +66,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   const stateManager = runtime.getStateManager();
   const scopeId = runtime.getScopeId();
   const fieldMeta = stateManager.getFieldMeta(scopeId, field.field);
+  const dependencyMissing = hasMissingFieldDependency(field, context);
 
   // Visibility: fieldMeta.hidden takes priority over visibleWhen
   const visible = useMemo(() => {
@@ -178,7 +180,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   const disableExpr = field.disableWhen || (field as any).disabledWhen;
   const enableExpr = field.enableWhen;
   const isDisabled =
-    fieldMeta?.disabled === true
+    dependencyMissing || fieldMeta?.disabled === true
       ? true
       : disableExpr
         ? evaluateCondition(disableExpr, context)
@@ -296,7 +298,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
       autoFetch: true,
     };
     componentProps.dataSource = dictDataSource;
-  } else if (fieldKind === 'reference' && !field.dataSource) {
+  } else if (!dependencyMissing && fieldKind === 'reference' && !field.dataSource) {
     const refTarget = {
       ...(((field as any).props?.refTarget || {}) as Record<string, any>),
       ...(((field as any).refTarget || {}) as Record<string, any>),
@@ -351,7 +353,7 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
         componentProps.dataSource = referenceDataSource;
       }
     }
-  } else if (localizedFieldDataSource) {
+  } else if (!dependencyMissing && localizedFieldDataSource) {
     // 如果有 dataSource 配置，传递给组件
     componentProps.dataSource = localizedFieldDataSource;
   }
