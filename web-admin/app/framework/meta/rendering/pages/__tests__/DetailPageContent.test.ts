@@ -438,6 +438,23 @@ describe('resolveDetailRecordEndpoint', () => {
       ),
     ).toEqual({ endpoint: '/api/billing/plans/900202', method: 'post' });
   });
+  it('uses a custom api dataSource endpoint as-is for singleton detail pages without record pid', () => {
+    expect(
+      resolveDetailRecordEndpoint(
+        {
+          extension: {
+            dataSource: {
+              type: 'api',
+              method: 'get',
+              endpoint: '/api/admin/account-security-policy',
+            },
+          },
+        },
+        'account_security_policy_detail',
+        '',
+      ),
+    ).toEqual({ endpoint: '/api/admin/account-security-policy', method: 'get' });
+  });
   it('url-encodes the record id', () => {
     expect(
       resolveDetailRecordEndpoint(

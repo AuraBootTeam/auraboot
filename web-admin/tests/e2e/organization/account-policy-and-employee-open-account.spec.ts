@@ -57,18 +57,17 @@ async function createEmployeeForOpenAccount(page: import('@playwright/test').Pag
 
 test.describe('Account policy and employee account opening', () => {
   test('POLICY-001: admin can view read-only account security policy @smoke', async ({ page }) => {
-    await page.goto('/settings/account-security-policy', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/c/account_security_policy_detail', { waitUntil: 'domcontentloaded' });
 
-    await expect(page.getByTestId('account-security-policy-page')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByRole('heading', { name: 'Account Security Policy' })).toBeVisible();
-    await expect(page.getByTestId('account-security-policy-mode')).toContainText(
-      'Administrator managed',
-    );
-    await expect(page.getByText('Public registration', { exact: true })).toBeVisible();
-    await expect(page.getByText('Self-service password', { exact: true })).toBeVisible();
-    await expect(page.getByText('8-128 characters')).toBeVisible();
-    await expect(page.getByText('5 recent passwords')).toBeVisible();
-    await expect(page.getByText('5 attempts')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /^(Account Security Policy|账号安全策略)$/ }),
+    ).toBeVisible();
+    await expect(page.getByText('管理员托管')).toBeVisible();
+    await expect(page.getByText(/^(Public registration|公开注册)$/)).toBeVisible();
+    await expect(page.getByText(/^(Self-service password|自助密码)$/)).toBeVisible();
+    await expect(page.getByText('8-128 个字符')).toBeVisible();
+    await expect(page.getByText('最近 5 次不可复用')).toBeVisible();
+    await expect(page.getByText('5 次失败')).toBeVisible();
 
     await page.screenshot({
       path: join(evidenceDir, 'ui-14-account-security-policy.png'),
@@ -99,7 +98,10 @@ test.describe('Account policy and employee account opening', () => {
       path: join(evidenceDir, 'ui-15-employee-open-account-confirm.png'),
       fullPage: true,
     });
-    await page.getByRole('button', { name: /^确认$/ }).last().click({ force: true });
+    await page
+      .getByRole('button', { name: /^确认$/ })
+      .last()
+      .click({ force: true });
 
     const response = await openAccountResponse;
     expect(response.ok()).toBe(true);
@@ -144,7 +146,9 @@ test.describe('Account policy and employee account opening', () => {
 
     const provisionResponse = page.waitForResponse(
       (response) =>
-        response.url().includes('/api/meta/commands/execute/admin:provision_member_from_employee') &&
+        response
+          .url()
+          .includes('/api/meta/commands/execute/admin:provision_member_from_employee') &&
         response.request().method() === 'POST',
       { timeout: 15_000 },
     );

@@ -34,12 +34,20 @@ test('platform-admin exposes LLM provider settings under system management', () 
 
 test('platform-admin exposes account security policy under system management', () => {
   const menu = menus.find((item) => item.code === 'account_security_policy');
+  const page = pages.find((item) => item.pageKey === 'account_security_policy_detail');
+  const dataSource = page?.extension?.dataSource;
 
   assert.ok(menu, 'account_security_policy menu must exist');
   assert.equal(menu.parentCode, 'system_management');
-  assert.equal(menu.path, '/settings/account-security-policy');
+  assert.equal(menu.path, '/p/c/account_security_policy_detail');
+  assert.equal(menu.pageKey, 'account_security_policy_detail');
   assert.equal(menu.permissionCode, 'system_management');
   assert.equal(menu.visible, true);
+  assert.ok(page, 'account_security_policy_detail page must exist');
+  assert.equal(page.kind, 'detail');
+  assert.equal(dataSource?.type, 'api');
+  assert.equal(dataSource?.method, 'get');
+  assert.equal(dataSource?.endpoint, '/api/admin/account-security-policy');
 });
 
 test('platform-admin exposes account page provisioning from existing employees', () => {

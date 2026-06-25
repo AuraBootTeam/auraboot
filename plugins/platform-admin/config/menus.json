@@ -61,7 +61,7 @@
     "parentCode": "system_management",
     "name:zh-CN": "账号安全策略",
     "name:en": "Account Security Policy",
-    "path": "/settings/account-security-policy",
+    "path": "/p/c/account_security_policy_detail",
     "component": null,
     "icon": "IconShieldCheck",
     "type": 1,
@@ -72,7 +72,8 @@
       "platforms": [
         "web"
       ]
-    }
+    },
+    "pageKey": "account_security_policy_detail"
   },
   {
     "code": "admin_webhook",

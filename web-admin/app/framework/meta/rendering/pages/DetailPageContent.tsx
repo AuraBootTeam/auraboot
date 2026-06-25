@@ -17,6 +17,14 @@
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Link, useLocation, useNavigate as useRouterNavigate } from 'react-router';
+import {
+  FileText,
+  KeyRound,
+  LockKeyhole,
+  RotateCcwKey,
+  ShieldCheck,
+  type LucideIcon,
+} from 'lucide-react';
 import { PrintButton } from '~/framework/meta/rendering/components/PrintButton';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { RecordShareDialog } from '~/ui/shared/RecordShareDialog';
@@ -70,6 +78,33 @@ interface RecordData {
 
 interface DetailListResult {
   records?: RecordData[];
+}
+
+const DETAIL_SECTION_ICONS: Record<string, LucideIcon> = {
+  behavior: ShieldCheck,
+  password: KeyRound,
+  reset: RotateCcwKey,
+  lockout: LockKeyhole,
+  notes: FileText,
+};
+
+function resolveDetailSectionIcon(block: BlockConfig): LucideIcon {
+  const explicitIcon = String((block as any).extension?.icon || '').toLowerCase();
+  const blockId = String(block.id || '').toLowerCase();
+  const key =
+    explicitIcon || Object.keys(DETAIL_SECTION_ICONS).find((item) => blockId.includes(item));
+  return key && DETAIL_SECTION_ICONS[key] ? DETAIL_SECTION_ICONS[key] : FileText;
+}
+
+function getDetailValueTone(value: unknown): string {
+  const text = String(value ?? '').toLowerCase();
+  if (text.includes('已启用') || text.includes('enabled') || text.includes('管理员托管')) {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+  }
+  if (text.includes('已停用') || text.includes('disabled')) {
+    return 'border-slate-200 bg-slate-100 text-slate-600';
+  }
+  return 'border-blue-200 bg-blue-50 text-blue-700';
 }
 
 export function resolveDetailFieldComponent(meta?: {
@@ -156,6 +191,13 @@ export function shouldSkipDetailModelFieldMeta(
   return extension.skipFieldMeta === true || extension.skipDynamicFieldMeta === true;
 }
 
+export function hasDetailApiDataSource(
+  schema: { extension?: Record<string, any> } | null | undefined,
+): boolean {
+  const ds = schema?.extension?.dataSource as { type?: string; endpoint?: string } | undefined;
+  return ds?.type === 'api' && typeof ds.endpoint === 'string' && ds.endpoint.trim().length > 0;
+}
+
 /**
  * Read a nested value from an object by dot-path (e.g. "version", "a.b.c").
  * Returns the object itself when path is empty; undefined when any segment is missing.
@@ -174,9 +216,9 @@ export function getByDataPath(obj: any, path?: string): any {
  * This lets non-dynamic-model detail pages (billing, finance, any custom REST aggregate) render.
  *
  * Endpoint templating: public pid placeholders and compatibility aliases are replaced
- * with the public record pid. If none is present,
- * `/{recordPid}` is appended. Mirrors the list page's API datasource
- * handling in ListPageContent.
+ * with the public record pid. If none is present, `/{recordPid}` is appended for
+ * record-scoped detail pages. Singleton API detail pages without a record pid use the
+ * endpoint as-is.
  */
 export function resolveDetailRecordEndpoint(
   schema: { extension?: Record<string, any>; modelCode?: string } | null | undefined,
@@ -472,8 +514,8 @@ function DetailPageContentInner(props: PageContentProps) {
 
   const hasApiSingletonRecordSource = Boolean(
     (schema as any)?.extension?.dataSource?.type === 'api' &&
-      typeof (schema as any)?.extension?.dataSource?.endpoint === 'string' &&
-      (schema as any)?.extension?.dataSource?.endpoint,
+    typeof (schema as any)?.extension?.dataSource?.endpoint === 'string' &&
+    (schema as any)?.extension?.dataSource?.endpoint,
   );
 
   useEffect(() => {
@@ -1481,6 +1523,71 @@ function DetailBlockRenderer({
     const sectionRecord = sectionDataPath
       ? getByDataPath(rawData, sectionDataPath) || {}
       : recordData;
+    const displayVariant = String((block as any).extension?.displayVariant || '');
+    if (block.blockType === 'detail-section' && displayVariant === 'settings-card') {
+      const Icon = resolveDetailSectionIcon(block);
+      const title = block.title ? getLocalizedText(block.title, locale, t) : '';
+      const description = (block as any).description
+        ? getLocalizedText((block as any).description, locale, t)
+        : '';
+      return (
+        <section className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-start gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+              <Icon className="h-4 w-4" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+              {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
+            </div>
+          </div>
+          {block.fields && block.fields.length > 0 && (
+            <div className="grid grid-cols-1 gap-3 p-4 sm:p-5 md:grid-cols-2">
+              {block.fields.map((field: FieldConfig) => {
+                const colSpan = field.layout?.colSpan || (field.span === 2 ? 12 : 6);
+                const isFullWidth = colSpan >= 12 || field.span === 2;
+                const resolvedField: FieldConfig = field.label
+                  ? field
+                  : { ...field, label: resolveModelFieldLabel(field.field) };
+                const label = resolvedField.label
+                  ? getLocalizedText(resolvedField.label as any, locale, t)
+                  : field.field;
+                const rawValue = sectionRecord ? sectionRecord[field.field] : undefined;
+                const displayValue =
+                  sectionRecord && sectionRecord[`${field.field}_display`] !== undefined
+                    ? sectionRecord[`${field.field}_display`]
+                    : rawValue;
+                const valueText =
+                  displayValue === null || displayValue === undefined || displayValue === ''
+                    ? '—'
+                    : String(displayValue);
+                const isLongText = valueText.includes('\n') || valueText.length > 56;
+                return (
+                  <div
+                    key={field.field}
+                    data-testid={`form-field-${field.field}`}
+                    className={`${isFullWidth ? 'md:col-span-2' : ''} min-w-0 rounded-md border border-slate-100 bg-white px-4 py-3 ring-1 ring-slate-50`}
+                  >
+                    <div className="text-xs font-medium text-slate-500">{label}</div>
+                    {isLongText ? (
+                      <p className="mt-2 text-sm leading-6 whitespace-pre-line text-slate-700">
+                        {valueText}
+                      </p>
+                    ) : (
+                      <span
+                        className={`mt-2 inline-flex w-fit max-w-full items-center rounded-md border px-2.5 py-1 text-sm font-medium ${getDetailValueTone(valueText)}`}
+                      >
+                        {valueText}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      );
+    }
     return (
       <div className="form-section">
         {block.title && (
