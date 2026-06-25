@@ -52,6 +52,7 @@ const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
 const resultsJson = process.env.PW_RESULTS_JSON || './test-results/results.json';
 const deepSpecPattern = /.*-deep\.spec\.ts$/;
 const quoteOpsCurrentSpecNames = [
+  'enterprise-info-profile',
   'quote-bom-focused-menu-and-permissions',
   'bom-workbench-golden',
   'quote-minimal-create-regression',
