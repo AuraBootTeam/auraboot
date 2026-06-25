@@ -364,6 +364,32 @@ export function normalizeLoadedRecordForForm(
   );
 }
 
+function unwrapLoadedRecordResponse(raw: any): Record<string, any> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  if (
+    Object.prototype.hasOwnProperty.call(raw, 'data') &&
+    (Object.prototype.hasOwnProperty.call(raw, 'code') ||
+      Object.prototype.hasOwnProperty.call(raw, 'message') ||
+      Object.prototype.hasOwnProperty.call(raw, 'timestamp'))
+  ) {
+    return unwrapLoadedRecordResponse(raw.data);
+  }
+  if (Array.isArray(raw.records)) {
+    return raw.records[0] && typeof raw.records[0] === 'object' ? raw.records[0] : {};
+  }
+  if (raw.data && typeof raw.data === 'object' && !Array.isArray(raw.data)) {
+    return unwrapLoadedRecordResponse(raw.data);
+  }
+  return raw;
+}
+
+export function normalizeLoadedRecordResponseForForm(
+  raw: any,
+  fieldDataTypes: Record<string, string> = {},
+): Record<string, any> {
+  return normalizeLoadedRecordForForm(unwrapLoadedRecordResponse(raw), fieldDataTypes);
+}
+
 function resolveComponentByFieldMeta(
   dataType?: string,
   extension?: Record<string, any>,
@@ -552,11 +578,14 @@ function replaceRecordEndpointPlaceholders(template: string, recordPid: string):
 }
 
 export function resolveEditRecordEndpoint(
-  schema: { recordSource?: { endpoint?: string } } | null | undefined,
+  schema:
+    | { recordSource?: { endpoint?: string }; extension?: { recordSource?: { endpoint?: string } } }
+    | null
+    | undefined,
   tableName: string,
   recordPid?: string,
 ): string {
-  const custom = schema?.recordSource?.endpoint;
+  const custom = schema?.recordSource?.endpoint || schema?.extension?.recordSource?.endpoint;
   if (custom && custom.trim()) {
     if (recordPid) {
       return replaceRecordEndpointPlaceholders(custom, recordPid);
@@ -964,12 +993,13 @@ export function FormPageContent(props: PageContentProps) {
       setMainRecordLoaded(false);
       try {
         const endpoint = resolveEditRecordEndpoint(schema, tableName, recordPid || undefined);
+        const recordSource = schema?.recordSource || schema?.extension?.recordSource;
         const resp = await fetchResult<any>(endpoint, {
-          method: (schema?.recordSource?.method as any) || 'get',
+          method: (recordSource?.method as any) || 'get',
           token: token || undefined,
         });
         if (ResultHelper.isSuccess(resp) && resp.data) {
-          const normalizedRecord = normalizeLoadedRecordForForm(
+          const normalizedRecord = normalizeLoadedRecordResponseForForm(
             resp.data,
             fieldDataTypesRef.current,
           );
@@ -1721,9 +1751,9 @@ export function FormPageContent(props: PageContentProps) {
 
   // Edit mode: fetch existing record data to populate form
   useEffect(() => {
-    if (!recordPid) return;
+    if (!recordPid && !isSingletonRecordSource(schema)) return;
     void loadMainRecord({ preserveDirty: true });
-  }, [recordPid, loadMainRecord]);
+  }, [recordPid, schema, loadMainRecord]);
 
   // L1 SDK: merge external initialValues into form state (overlay on top of loaded data)
   useEffect(() => {
@@ -2141,19 +2171,58 @@ export function FormPageContent(props: PageContentProps) {
                           return null;
                         }
                       }
+                      const blockTitle = block.title ? getLocalizedText(block.title, locale, t) : '';
+                      const blockDescription = block.description
+                        ? getLocalizedText(block.description, locale, t)
+                        : '';
+                      const displayVariant = String(
+                        block.extension?.displayVariant || block.extension?.variant || '',
+                      );
+                      const isSettingsCard = displayVariant === 'settings-card';
 
                       return (
-                        <div key={block.id || `block-${blockIndex}`} className="form-section">
+                        <div
+                          key={block.id || `block-${blockIndex}`}
+                          data-testid={
+                            isSettingsCard && block.id ? `settings-card-${block.id}` : undefined
+                          }
+                          className={
+                            isSettingsCard
+                              ? 'form-section overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm'
+                              : 'form-section'
+                          }
+                        >
                           {/* Section Title */}
-                          {block.title && (
-                            <h3 className="border-border text-text mb-4 border-b pb-2 text-base font-semibold">
-                              {getLocalizedText(block.title, locale, t)}
-                            </h3>
+                          {blockTitle && (
+                            <div
+                              className={
+                                isSettingsCard
+                                  ? 'border-b border-slate-100 bg-slate-50 px-5 py-4'
+                                  : 'border-border mb-4 border-b pb-2'
+                              }
+                            >
+                              <h3
+                                className={
+                                  isSettingsCard
+                                    ? 'text-base font-semibold text-slate-900'
+                                    : 'text-text text-base font-semibold'
+                                }
+                              >
+                                {blockTitle}
+                              </h3>
+                              {isSettingsCard && blockDescription ? (
+                                <p className="mt-1 text-sm text-slate-500">{blockDescription}</p>
+                              ) : null}
+                            </div>
                           )}
 
                           {/* Section Fields */}
                           {block.fields && block.fields.length > 0 && (
-                            <div className="grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2">
+                            <div
+                              className={`grid grid-cols-1 gap-x-6 gap-y-4 md:grid-cols-2 ${
+                                isSettingsCard ? 'p-4 sm:p-5' : ''
+                              }`}
+                            >
                               {block.fields.map((rawField: any) => {
                                 // L1 SDK: skip hidden fields from external fieldPermissions
                                 const externalPerm = fieldPermissions?.[rawField.field];

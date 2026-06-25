@@ -4,6 +4,7 @@ import {
   getFormFieldValueWithAlias,
   mergeLoadedRecordWithDirtyFields,
   normalizeCommandPayloadValue,
+  normalizeLoadedRecordResponseForForm,
   normalizeLoadedFormValue,
   normalizeLoadedRecordForForm,
   resolveAfterSubmitRedirect,
@@ -306,6 +307,29 @@ describe('JSON-like form values', () => {
       retry_policy: '{\n  "maxRetries": 2\n}',
     });
   });
+
+  it('unwraps ApiResponse.data for singleton recordSource forms', () => {
+    const loadedRecord = normalizeLoadedRecordResponseForForm(
+      {
+        code: '0',
+        message: 'OK',
+        data: {
+          datetimeFormat: 'YYYY-MM-DD HH:mm:ss',
+          timezone: 'Asia/Shanghai',
+          timezoneStatusText: '尚未配置租户默认时区，保存后将作为租户默认值。',
+        },
+      },
+      {},
+    );
+
+    expect(loadedRecord).toMatchObject({
+      datetimeFormat: 'YYYY-MM-DD HH:mm:ss',
+      timezone: 'Asia/Shanghai',
+      timezoneStatusText: '尚未配置租户默认时区，保存后将作为租户默认值。',
+    });
+    expect(loadedRecord).not.toHaveProperty('code');
+    expect(loadedRecord).not.toHaveProperty('message');
+  });
 });
 
 describe('resolveEditRecordEndpoint', () => {
@@ -339,6 +363,15 @@ describe('resolveEditRecordEndpoint', () => {
   it('allows singleton custom endpoints without a route record pid', () => {
     expect(resolveEditRecordEndpoint({ recordSource: { endpoint: '/api/tenant/info' } }, 'tenant_profile'))
       .toBe('/api/tenant/info');
+  });
+
+  it('supports recordSource stored under extension for imported singleton pages', () => {
+    expect(
+      resolveEditRecordEndpoint(
+        { extension: { recordSource: { endpoint: '/api/admin/system-preferences' } } },
+        'system_preferences_form',
+      ),
+    ).toBe('/api/admin/system-preferences');
   });
 });
 
