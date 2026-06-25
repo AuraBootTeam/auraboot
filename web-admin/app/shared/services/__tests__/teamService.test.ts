@@ -54,7 +54,9 @@ const TEAM = {
 
 const MEMBER = {
   pid: 'm1',
-  userId: 42,
+  userId: '42',
+  userPid: 'u-pid-42',
+  memberPid: 'tm-pid-42',
   userName: 'Alice',
   userEmail: 'alice@example.com',
   role: 'member',
@@ -213,21 +215,21 @@ describe('teamService', () => {
     it('POSTs to /api/org/teams/:teamPid/members', async () => {
       postMock.mockResolvedValue(ok(MEMBER));
 
-      const result = await addTeamMember('t1', { userId: 42, role: 'member' });
+      const result = await addTeamMember('t1', { userId: '42', role: 'member' });
 
       expect(postMock).toHaveBeenCalledWith(
         '/api/org/teams/t1/members',
-        { userId: 42, role: 'member' },
+        { userId: '42', role: 'member' },
         undefined,
         undefined,
       );
-      expect(result.userId).toBe(42);
+      expect(result.userId).toBe('42');
     });
 
     it('throws on failure', async () => {
       postMock.mockResolvedValue(fail('Already member'));
 
-      await expect(addTeamMember('t1', { userId: 42 })).rejects.toThrow('Already member');
+      await expect(addTeamMember('t1', { userId: '42' })).rejects.toThrow('Already member');
     });
   });
 

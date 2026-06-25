@@ -3736,11 +3736,11 @@ function ListPageContentInner(props: PageContentProps) {
   return (
     <DataSourceProvider manager={dataSourceManager}>
       <div
-        className="mx-auto w-full px-2 py-3"
+        className="bg-subtle min-h-[calc(100vh-3.5rem)] w-full px-4 py-5 sm:px-6 lg:px-8"
         data-testid="dynamic-list"
         data-ab-testid={deriveTestId('list', modelCode, 'container')}
       >
-        <div className="rounded-card bg-panel relative shadow-sm">
+        <div className="rounded-card border-border bg-panel relative overflow-hidden border shadow-sm">
           {/* §3: quiet auto-save confirmation — appears briefly after a
               sort/filter/column/row-height change is persisted to the view. */}
           {viewSavedHintOn && (

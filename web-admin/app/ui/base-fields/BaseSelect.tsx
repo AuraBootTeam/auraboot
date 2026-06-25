@@ -47,6 +47,8 @@ export function BaseSelect({
   className,
   triggerClassName,
 }: BaseSelectProps) {
+  const hasOptions = options.length > 0;
+
   return (
     <FieldBase
       id={name}
@@ -71,13 +73,15 @@ export function BaseSelect({
         >
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent>
-          {options.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
-              {opt.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
+        {hasOptions && (
+          <SelectContent>
+            {options.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} disabled={opt.disabled}>
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        )}
       </Select>
     </FieldBase>
   );

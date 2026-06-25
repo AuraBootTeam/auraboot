@@ -3,6 +3,8 @@ import { useToastContext } from '~/contexts/ToastContext';
 import { tenantPreferenceService } from '~/shared/services/tenantPreferenceService';
 import TimezoneSelect from '~/ui/TimezoneSelect';
 import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
+import { useAuth } from '~/contexts/AuthContext';
+import { RouteAccessDenied } from '~/ui/PermissionGuard';
 
 type MetaArgs = Record<string, unknown>;
 
@@ -14,6 +16,8 @@ export function meta({}: MetaArgs) {
 }
 
 export default function SystemPreferencesPage() {
+  const { hasPermission } = useAuth();
+  const canManageSystemPreferences = hasPermission('system_management');
   const { showErrorToast, showSuccessToast } = useToastContext();
   const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [datetimeFormat, setDatetimeFormat] = useState('YYYY-MM-DD HH:mm:ss');
@@ -74,6 +78,12 @@ export default function SystemPreferencesPage() {
       <div className="flex min-h-screen items-center justify-center bg-gray-50">
         <div className="text-gray-500">Loading...</div>
       </div>
+    );
+  }
+
+  if (!canManageSystemPreferences) {
+    return (
+      <RouteAccessDenied message="Access denied: system preferences require permission system_management" />
     );
   }
 
