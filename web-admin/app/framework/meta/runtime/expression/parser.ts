@@ -731,7 +731,26 @@ export class ExpressionParser {
       );
     }
 
-    return object[property];
+    return this.resolveMemberObject(object, property)?.[property];
+  }
+
+  private resolveMemberObject(object: any, property: string | number): any {
+    if (typeof object !== 'string') {
+      return object;
+    }
+    if (property in Object(object)) {
+      return object;
+    }
+    const trimmed = object.trim();
+    if (!trimmed || (!trimmed.startsWith('{') && !trimmed.startsWith('['))) {
+      return object;
+    }
+    try {
+      const parsed = JSON.parse(trimmed);
+      return parsed !== null && typeof parsed === 'object' ? parsed : object;
+    } catch {
+      return object;
+    }
   }
 
   /**

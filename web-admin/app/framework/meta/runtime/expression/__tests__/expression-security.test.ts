@@ -313,6 +313,24 @@ describe('Expression Security', () => {
       const result = parser.evaluate('${JSON.parse(data)}');
       expect(result).toEqual({ key: 'value' });
     });
+
+    it('should read nested properties from JSON-like string fields', () => {
+      const context = createExpressionContext({
+        form: {
+          bom_task_status: 'completed',
+          bom_task_header_mapping: JSON.stringify({
+            llmDecision: { status: 'suggested' },
+          }),
+        },
+      });
+      const parser = new ExpressionParser(context);
+
+      expect(
+        parser.evaluate(
+          "${form.bom_task_status == 'completed' && form.bom_task_header_mapping.llmDecision.status == 'suggested'}",
+        ),
+      ).toBe(true);
+    });
   });
 
   describe('Safe String Operations', () => {

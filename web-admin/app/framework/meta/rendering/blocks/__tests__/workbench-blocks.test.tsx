@@ -422,6 +422,11 @@ describe('MetricStripBlockRenderer', () => {
 });
 
 describe('WorkbenchActionBarBlockRenderer', () => {
+  beforeEach(() => {
+    vi.mocked(fetchResult).mockReset();
+    vi.mocked(fetchResult).mockResolvedValue({ code: '0', data: {} } as any);
+  });
+
   it('renders configured actions and executes their lifecycle', async () => {
     const runtime = makeRuntime() as any;
     const block: BlockConfig = {
@@ -493,6 +498,328 @@ describe('WorkbenchActionBarBlockRenderer', () => {
 
     expect(screen.getByRole('heading', { name: 'Price Waterfall' })).toBeInTheDocument();
     expect(screen.getByTestId('workbench-action-run_sourcing')).toHaveTextContent('Run Sourcing');
+  });
+
+  it('supports JSON-like string fields in action visibility conditions', () => {
+    const context: Record<string, any> = {
+      locale: 'zh-CN',
+      t: (k: string) => k,
+      form: {
+        bom_task_status: 'completed',
+        bom_task_header_mapping: JSON.stringify({
+          llmDecision: { status: 'suggested' },
+        }),
+      },
+      global: {},
+      state: {},
+    };
+    const runtime = makeRuntime({
+      getContext: () => context,
+    }) as any;
+    const block: BlockConfig = {
+      id: 'actions',
+      blockType: 'workbench-action-bar',
+      actions: [
+        {
+          code: 'review_format_with_llm',
+          label: 'LLM 复核格式',
+          variant: 'primary',
+          visibleWhen:
+            "form.bom_task_status == 'completed' && form.bom_task_header_mapping.llmDecision.status == 'suggested'",
+        },
+      ],
+    };
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('workbench-action-review_format_with_llm')).toHaveTextContent(
+      'LLM 复核格式',
+    );
+  });
+
+  it('shows configured success feedback after a command action completes', async () => {
+    const showToast = vi.fn();
+    vi.mocked(fetchResult).mockResolvedValueOnce({
+      code: '0',
+      data: { success: true, applied: true },
+    } as any);
+    const runtime = makeRuntime({
+      getShowToast: () => showToast,
+    }) as any;
+    const block: BlockConfig = {
+      id: 'actions',
+      blockType: 'workbench-action-bar',
+      actions: [
+        {
+          code: 'review_format_with_llm',
+          label: 'LLM 复核格式',
+          onClick: {
+            action: 'command.execute',
+            args: {
+              command: 'bom:explore_format',
+              targetRecordId: 'TASK-1',
+              reload: ['taskSummary'],
+              feedback: {
+                loadingLabel: '复核中...',
+                successMessage: 'LLM 已复核格式，已重新解析 BOM',
+                rejectedMessage: 'LLM 未能给出可自动应用的格式建议',
+                errorMessage: 'LLM 复核失败，请稍后重试',
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+
+    fireEvent.click(screen.getByTestId('workbench-action-review_format_with_llm'));
+    expect(screen.getByTestId('workbench-action-review_format_with_llm')).toHaveTextContent(
+      '复核中...',
+    );
+
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('LLM 已复核格式，已重新解析 BOM', 'success');
+    });
+    expect(runtime.__reload).toHaveBeenCalledWith(['taskSummary']);
+  });
+
+  it('shows configured rejected feedback when a command returns business failure', async () => {
+    const showToast = vi.fn();
+    vi.mocked(fetchResult).mockResolvedValueOnce({
+      code: '0',
+      data: { success: false, applied: false, reason: 'low_confidence' },
+    } as any);
+    const runtime = makeRuntime({
+      getShowToast: () => showToast,
+    }) as any;
+    const block: BlockConfig = {
+      id: 'actions',
+      blockType: 'workbench-action-bar',
+      actions: [
+        {
+          code: 'review_format_with_llm',
+          label: 'LLM 复核格式',
+          onClick: {
+            action: 'command.execute',
+            args: {
+              command: 'bom:explore_format',
+              targetRecordId: 'TASK-1',
+              reload: ['taskSummary'],
+              feedback: {
+                rejectedMessage: 'LLM 未能给出可自动应用的格式建议',
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+
+    fireEvent.click(screen.getByTestId('workbench-action-review_format_with_llm'));
+
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('LLM 未能给出可自动应用的格式建议', 'warning');
+    });
+    expect(runtime.__reload).toHaveBeenCalledWith(['taskSummary']);
+  });
+
+  it('unwraps platform command envelopes before deciding command feedback', async () => {
+    const showToast = vi.fn();
+    vi.mocked(fetchResult).mockResolvedValueOnce({
+      code: '0',
+      message: 'OK',
+      data: {
+        commandCode: 'bom:explore_format',
+        phaseReached: 'completed',
+        data: {
+          success: false,
+          applied: false,
+          reason: 'empty_result',
+          taskId: 'TASK-1',
+        },
+        executionTimeMs: 606,
+      },
+    } as any);
+    const runtime = makeRuntime({
+      getShowToast: () => showToast,
+    }) as any;
+    const block: BlockConfig = {
+      id: 'actions',
+      blockType: 'workbench-action-bar',
+      actions: [
+        {
+          code: 'review_format_with_llm',
+          label: 'LLM 复核格式',
+          onClick: {
+            action: 'command.execute',
+            args: {
+              command: 'bom:explore_format',
+              targetRecordId: 'TASK-1',
+              feedback: {
+                successMessage: 'LLM 已复核格式，已重新解析 BOM',
+                rejectedMessage: 'LLM 未能给出可自动应用的格式建议',
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+
+    fireEvent.click(screen.getByTestId('workbench-action-review_format_with_llm'));
+
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('LLM 未能给出可自动应用的格式建议', 'warning');
+    });
+    expect(showToast).not.toHaveBeenCalledWith('LLM 已复核格式，已重新解析 BOM', 'success');
+  });
+
+  it('prefers business rejection message over generic configured rejected feedback', async () => {
+    const showToast = vi.fn();
+    vi.mocked(fetchResult).mockResolvedValueOnce({
+      code: '0',
+      message: 'OK',
+      data: {
+        commandCode: 'bom:explore_format',
+        phaseReached: 'completed',
+        data: {
+          success: false,
+          applied: false,
+          reason: 'llm_unavailable',
+          message: 'LLM 服务未配置,暂不能复核格式',
+          taskId: 'TASK-1',
+        },
+      },
+    } as any);
+    const runtime = makeRuntime({
+      getShowToast: () => showToast,
+    }) as any;
+    const block: BlockConfig = {
+      id: 'actions',
+      blockType: 'workbench-action-bar',
+      actions: [
+        {
+          code: 'review_format_with_llm',
+          label: 'LLM 复核格式',
+          onClick: {
+            action: 'command.execute',
+            args: {
+              command: 'bom:explore_format',
+              targetRecordId: 'TASK-1',
+              feedback: {
+                rejectedMessage: 'LLM 未能给出可自动应用的格式建议',
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+
+    fireEvent.click(screen.getByTestId('workbench-action-review_format_with_llm'));
+
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('LLM 服务未配置,暂不能复核格式', 'warning');
+    });
+    expect(showToast).not.toHaveBeenCalledWith('LLM 未能给出可自动应用的格式建议', 'warning');
+  });
+
+  it('falls back to global toast events when command feedback has no runtime toast bridge', async () => {
+    vi.mocked(fetchResult).mockResolvedValueOnce({
+      code: '0',
+      data: {
+        commandCode: 'bom:explore_format',
+        phaseReached: 'completed',
+        data: { success: false, applied: false, reason: 'empty_result' },
+      },
+    } as any);
+    const runtime = makeRuntime() as any;
+    const block: BlockConfig = {
+      id: 'actions',
+      blockType: 'workbench-action-bar',
+      actions: [
+        {
+          code: 'review_format_with_llm',
+          label: 'LLM 复核格式',
+          onClick: {
+            action: 'command.execute',
+            args: {
+              command: 'bom:explore_format',
+              targetRecordId: 'TASK-1',
+              feedback: {
+                rejectedMessage: 'LLM 未能给出可自动应用的格式建议',
+              },
+            },
+          },
+        },
+      ],
+    };
+    const toastEvents: CustomEvent[] = [];
+    const onToast = (event: Event) => toastEvents.push(event as CustomEvent);
+    window.addEventListener('aura:toast', onToast);
+
+    try {
+      render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+
+      fireEvent.click(screen.getByTestId('workbench-action-review_format_with_llm'));
+
+      await waitFor(() => {
+        expect(toastEvents.map((event) => event.detail)).toContainEqual(
+          expect.objectContaining({
+            message: 'LLM 未能给出可自动应用的格式建议',
+            variant: 'warning',
+          }),
+        );
+      });
+    } finally {
+      window.removeEventListener('aura:toast', onToast);
+    }
+  });
+
+  it('shows configured error feedback when a command action fails technically', async () => {
+    const showToast = vi.fn();
+    vi.mocked(fetchResult).mockResolvedValueOnce({
+      code: '500',
+      message: 'provider unavailable',
+    } as any);
+    const runtime = makeRuntime({
+      getShowToast: () => showToast,
+    }) as any;
+    const block: BlockConfig = {
+      id: 'actions',
+      blockType: 'workbench-action-bar',
+      actions: [
+        {
+          code: 'review_format_with_llm',
+          label: 'LLM 复核格式',
+          onClick: {
+            action: 'command.execute',
+            args: {
+              command: 'bom:explore_format',
+              targetRecordId: 'TASK-1',
+              feedback: {
+                errorMessage: 'LLM 复核失败，请稍后重试',
+              },
+            },
+          },
+        },
+      ],
+    };
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+
+    fireEvent.click(screen.getByTestId('workbench-action-review_format_with_llm'));
+
+    await waitFor(() => {
+      expect(showToast).toHaveBeenCalledWith('LLM 复核失败，请稍后重试', 'error');
+    });
+    expect(screen.getByTestId('workbench-action-review_format_with_llm')).toHaveTextContent(
+      'LLM 复核格式',
+    );
   });
 });
 
