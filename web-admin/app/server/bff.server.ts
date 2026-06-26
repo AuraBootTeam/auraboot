@@ -14,6 +14,7 @@ import { config } from '~/server/utils/config';
 import { parseDevAllowedPorts } from '~/server/utils/dev-cors-ports';
 import { requestLogger, errorLogger } from '~/server/middlewares/RequestLogger';
 import { register, proxyDurationHistogram } from './metrics.server';
+import { buildLoginFailureRedirect } from './login-failure';
 import { sessionStorage } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 
@@ -184,7 +185,7 @@ app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async
     if (intent === 'social-callback') {
       const token = String(req.body?.token || '');
       if (!token) {
-        return res.status(400).send('Missing token');
+        return res.redirect(303, buildLoginFailureRedirect(redirectTo, { error: 'missingToken' }));
       }
       await commitLoginSession(req, res, token, true);
       return res.redirect(302, redirectTo);
@@ -212,7 +213,13 @@ app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async
         code: String(req.body?.code || ''),
       };
     } else {
-      return res.status(400).send('Unsupported login method');
+      return res.redirect(
+        303,
+        buildLoginFailureRedirect(redirectTo, {
+          channelCode,
+          error: 'unsupportedLoginMethod',
+        }),
+      );
     }
 
     const loginResponse = await fetch(`${SPRING_BOOT_URL}${authPath}`, {
@@ -222,14 +229,26 @@ app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async
     });
 
     if (!loginResponse.ok) {
-      return res.status(400).send('Invalid credentials');
+      return res.redirect(
+        303,
+        buildLoginFailureRedirect(redirectTo, {
+          channelCode,
+          error: 'invalidCredentials',
+        }),
+      );
     }
 
     const loginPayload = await loginResponse.json();
     const loginData = loginPayload?.data;
     const token = loginData?.jwt;
     if (!token) {
-      return res.status(400).send('Invalid credentials');
+      return res.redirect(
+        303,
+        buildLoginFailureRedirect(redirectTo, {
+          channelCode,
+          error: 'invalidCredentials',
+        }),
+      );
     }
 
     await commitLoginSession(req, res, token, remember);
