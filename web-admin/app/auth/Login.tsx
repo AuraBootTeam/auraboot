@@ -16,6 +16,7 @@ import { post, fetchResult } from '~/shared/services/http-client';
 import { ResultHelper, type User } from '~/utils/type';
 import { getUserInfo } from '~/shared/services/userService';
 import { useI18n } from '~/contexts/I18nContext';
+import { getLoginFailureActionData } from './login-errors';
 
 const REMEMBER_KEY = 'auth.remember';
 const REMEMBER_EMAIL_KEY = 'auth.rememberedEmail';
@@ -279,6 +280,7 @@ export default function LoginPage() {
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
   const actionData = useActionData<typeof action>();
+  const visibleActionData = actionData ?? getLoginFailureActionData(searchParams);
   const loaderData = useLoaderData<typeof loader>();
   const rawChannels = Array.isArray((loaderData as any)?.channels)
     ? ((loaderData as any).channels as unknown[])
@@ -286,8 +288,8 @@ export default function LoginPage() {
   const channels: string[] = Array.from(
     new Set(rawChannels.map((channel) => String(channel || '').toLowerCase()).filter(Boolean)),
   );
-  const actionChannel = typeof (actionData as any)?.channelCode === 'string'
-    ? String((actionData as any).channelCode).toLowerCase()
+  const actionChannel = typeof (visibleActionData as any)?.channelCode === 'string'
+    ? String((visibleActionData as any).channelCode).toLowerCase()
     : null;
 
   const emailRef = useRef<HTMLInputElement>(null);
@@ -354,10 +356,10 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    const errors = actionData?.errors as Record<string, string> | undefined;
+    const errors = visibleActionData?.errors as Record<string, string> | undefined;
     if (errors?.email) emailRef.current?.focus();
     else if (errors?.password) passwordRef.current?.focus();
-  }, [actionData]);
+  }, [visibleActionData]);
 
   const tiles: CapabilityRow[] = [
     {
@@ -456,7 +458,7 @@ export default function LoginPage() {
         <EmailPasswordForm
           emailRef={emailRef}
           passwordRef={passwordRef}
-          actionData={actionData}
+          actionData={visibleActionData}
           redirectTo={redirectTo}
           email={email}
           setEmail={setEmail}
@@ -469,7 +471,7 @@ export default function LoginPage() {
       )}
       {activeTab === 'sms' && (
         <SmsLoginForm
-          actionData={actionData}
+          actionData={visibleActionData}
           redirectTo={redirectTo}
           remember={remember}
           setRemember={setRemember}
@@ -478,7 +480,7 @@ export default function LoginPage() {
       )}
       {activeTab === 'email_code' && (
         <EmailCodeLoginForm
-          actionData={actionData}
+          actionData={visibleActionData}
           redirectTo={redirectTo}
           email={email}
           setEmail={setEmail}
