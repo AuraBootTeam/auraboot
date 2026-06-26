@@ -122,7 +122,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       return 'SmartSelect';
     }
     return field.component || 'SmartInput';
-  }, [field.dictCode, field.component, field.dataType, (field as any).type, isTreeComponent]);
+  }, [field.dictCode, field.component, (field as any).dataType, (field as any).type, isTreeComponent]);
 
   // Resolve field label from i18n keys with progressive fallback.
   let resolvedLabel = getLocalizedText(field.label, context.locale || 'zh-CN', t) || undefined;

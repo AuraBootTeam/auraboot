@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { fetchResult } from '~/shared/services/http-client';
+import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 
 export function readDataSourceRows(runtime: SchemaRuntime, dataSource?: string): any[] {
   if (!dataSource) return [];
@@ -119,7 +120,16 @@ async function reloadDataSources(runtime: SchemaRuntime, ids: string | string[] 
 }
 
 function unwrapCommandData(result: any): any {
-  return result?.data?.data ?? result?.data ?? result ?? {};
+  const data = result?.data?.data ?? result?.data ?? result ?? {};
+  if (
+    data &&
+    typeof data === 'object' &&
+    'data' in data &&
+    ('commandCode' in data || 'phaseReached' in data || 'executionTimeMs' in data)
+  ) {
+    return data.data ?? {};
+  }
+  return data;
 }
 
 function isSuccessResult(result: any): boolean {
@@ -128,6 +138,57 @@ function isSuccessResult(result: any): boolean {
 
 function isAsyncDispatch(data: any): data is { async: true; taskCode: string } {
   return data?.async === true && typeof data.taskCode === 'string' && data.taskCode.trim() !== '';
+}
+
+function isBusinessRejected(data: any): boolean {
+  return data && typeof data === 'object' && (data.success === false || data.applied === false);
+}
+
+function resolveFeedback(args: any): any {
+  return args?.feedback ?? args?.resultFeedback ?? {};
+}
+
+function resolveFeedbackMessage(
+  runtime: SchemaRuntime,
+  feedback: any,
+  key: string,
+  fallback?: string,
+  preferFallback = false,
+): string | undefined {
+  const raw = preferFallback ? fallback ?? feedback?.[key] : feedback?.[key] ?? fallback;
+  if (raw === false || raw === undefined || raw === null) return undefined;
+  const context = runtime.getContext?.() || {};
+  const locale = context.locale || 'zh-CN';
+  const t = context.t || ((value: string) => value);
+  const message = getLocalizedText(raw, locale, t);
+  return message && message !== key ? message : undefined;
+}
+
+function showCommandFeedback(
+  runtime: SchemaRuntime,
+  feedback: any,
+  key: string,
+  level: 'success' | 'error' | 'warning' | 'info',
+  fallback?: string,
+  preferFallback = false,
+): void {
+  const message = resolveFeedbackMessage(runtime, feedback, key, fallback, preferFallback);
+  if (!message) return;
+  const showToast = runtime.getShowToast?.();
+  if (showToast) {
+    showToast(message, level);
+    return;
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('aura:toast', {
+        detail: {
+          message,
+          variant: level,
+        },
+      }),
+    );
+  }
 }
 
 type AsyncTaskStatus = {
@@ -298,6 +359,7 @@ export async function executeSimpleWorkbenchAction(
     if (!command) {
       throw new Error('[workbench] command.execute requires args.command');
     }
+    const feedback = resolveFeedback(args);
 
     // inputFields sugar: pop a FormDialog, collect fields, merge into the command payload.
     // Same capability as ActionRegistry's command.execute. workbench-action-bar buttons run
@@ -327,29 +389,54 @@ export async function executeSimpleWorkbenchAction(
       if (params[key] === undefined) delete params[key];
     });
 
-    let result = await fetchResult(`/api/meta/commands/execute/${command}`, {
-      method: 'post',
-      params,
-    });
-    if (!isSuccessResult(result)) {
-      throw new Error((result as any).message || (result as any).desc || `${command} failed`);
-    }
-
-    const reloadIds = resolveReloadIds(args.reload);
-    const dispatch = unwrapCommandData(result);
-    if (isAsyncDispatch(dispatch)) {
-      result = await pollWorkbenchAsyncTask(runtime, dispatch.taskCode, reloadIds, args);
-    }
-
-    await reloadDataSources(runtime, reloadIds);
-    const downloadUrl = resolveDownloadUrl(result, args.download);
-    if (downloadUrl) {
-      try {
-        await downloadWithAuth(downloadUrl);
-      } catch (error) {
-        console.error('[workbench] authenticated download failed, falling back to direct navigation:', error);
-        openDownloadUrl(downloadUrl);
+    try {
+      let result = await fetchResult(`/api/meta/commands/execute/${command}`, {
+        method: 'post',
+        params,
+      });
+      if (!isSuccessResult(result)) {
+        throw new Error((result as any).message || (result as any).desc || `${command} failed`);
       }
+
+      const reloadIds = resolveReloadIds(args.reload);
+      const dispatch = unwrapCommandData(result);
+      if (isAsyncDispatch(dispatch)) {
+        result = await pollWorkbenchAsyncTask(runtime, dispatch.taskCode, reloadIds, args);
+      }
+
+      await reloadDataSources(runtime, reloadIds);
+      const resultData = unwrapCommandData(result);
+      if (isBusinessRejected(resultData)) {
+        showCommandFeedback(
+          runtime,
+          feedback,
+          'rejectedMessage',
+          'warning',
+          resultData.message || resultData.reason,
+          Boolean(resultData.message),
+        );
+      } else {
+        showCommandFeedback(runtime, feedback, 'successMessage', 'success');
+      }
+
+      const downloadUrl = resolveDownloadUrl(result, args.download);
+      if (downloadUrl) {
+        try {
+          await downloadWithAuth(downloadUrl);
+        } catch (error) {
+          console.error('[workbench] authenticated download failed, falling back to direct navigation:', error);
+          openDownloadUrl(downloadUrl);
+        }
+      }
+    } catch (error) {
+      showCommandFeedback(
+        runtime,
+        feedback,
+        'errorMessage',
+        'error',
+        error instanceof Error ? error.message : `${command} failed`,
+      );
+      throw error;
     }
   }
 }
