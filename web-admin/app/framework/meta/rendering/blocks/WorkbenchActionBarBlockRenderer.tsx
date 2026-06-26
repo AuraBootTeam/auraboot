@@ -60,6 +60,12 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
   const actionButtons = visibleActions.map((actionConfig: any) => {
     const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
     const label = getLocalizedText(actionConfig.label || code, locale, t);
+    const feedback = actionConfig.onClick?.args?.feedback || actionConfig.onClick?.args?.resultFeedback || {};
+    const loadingLabel = getLocalizedText(
+      feedback.loadingLabel || t('common.loading') || 'Loading...',
+      locale,
+      t,
+    );
     const variant = actionConfig.variant || 'secondary';
     const active = actionConfig.activeWhen
       ? evaluator.evaluateCondition(actionConfig.activeWhen, context)
@@ -89,7 +95,7 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
           buttonSizeClass
         } disabled:cursor-not-allowed disabled:opacity-50`}
       >
-        {runningAction === code ? t('common.loading') : label}
+        {runningAction === code ? loadingLabel : label}
       </button>
     );
   });

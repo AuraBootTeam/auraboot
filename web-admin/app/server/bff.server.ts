@@ -195,9 +195,10 @@ app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async
     let authPath: string;
     let authPayload: Record<string, string>;
     if (channelCode === 'email_password') {
+      const identifier = String(req.body?.identifier || '').trim();
       authPath = '/api/auth/login';
       authPayload = {
-        email: String(req.body?.email || ''),
+        identifier,
         password: String(req.body?.password || ''),
       };
     } else if (channelCode === 'sms') {
