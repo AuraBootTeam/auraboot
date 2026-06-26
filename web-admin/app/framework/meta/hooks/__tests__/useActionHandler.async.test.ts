@@ -576,6 +576,81 @@ describe('useActionHandler - handlerParams.async polling', () => {
     );
   });
 
+  it('uses panel feedback for promptUpload async commands without duplicating process toasts', async () => {
+    fetchResultMock
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          commandCode: 'qo_offline_material_price_common:import_excel',
+          phaseReached: 'completed',
+          data: { async: true, taskCode: 'PRICE-IMPORT-1' },
+        },
+      })
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          status: 'completed',
+          progress: 100,
+          resultData: { importedRows: 42 },
+        },
+      });
+    vi.spyOn(promptUpload, 'pickFile').mockResolvedValueOnce(
+      new File(['mpn,price\nRC0603,0.01'], '采购价格分析表_20260616.xlsx'),
+    );
+    vi.spyOn(promptUpload, 'uploadCommandFile').mockResolvedValueOnce('FILE-PRICE-1');
+
+    const reload = vi.fn().mockResolvedValue(undefined);
+    const showToast = vi.fn();
+    const { result } = renderHook(() =>
+      useActionHandler({
+        runtime: makeRuntime(),
+        navigate: vi.fn() as any,
+        tableName: 'qo_offline_material_price_common',
+        locale: 'zh-CN',
+        t: ((k: string, _p?: any, fb?: string) => fb ?? k) as any,
+        dataSourceManager: { reload } as any,
+        context: {} as any,
+        showToast,
+      }),
+    );
+
+    const button = {
+      code: 'import_purchase_price_analysis',
+      label: { 'zh-CN': '导入采购价格分析表', en: 'Import Purchase Price Analysis' },
+      promptUpload: {
+        key: 'material_price_file_id',
+        accept: '.xlsx,.xls',
+        feedbackMode: 'panel',
+      },
+      action: {
+        type: 'command',
+        command: 'qo_offline_material_price_common:import_excel',
+        refresh: ['qo_offline_material_price_table'],
+      },
+    } as unknown as ButtonConfig;
+
+    await act(async () => {
+      await result.current.handleAction(button);
+    });
+
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/qo_offline_material_price_common:import_excel',
+      expect.objectContaining({
+        method: 'post',
+        params: expect.objectContaining({
+          payload: expect.objectContaining({
+            material_price_file_id: 'FILE-PRICE-1',
+            material_price_filename: '采购价格分析表_20260616.xlsx',
+          }),
+        }),
+      }),
+    );
+    expect(reload).toHaveBeenCalledWith(['qo_offline_material_price_table']);
+    expect(result.current.activeTask?.status).toBe('completed');
+    expect(result.current.activeTask?.resultData).toEqual({ importedRows: 42 });
+    expect(showToast).not.toHaveBeenCalled();
+  });
+
   it('uses the runtime toast bridge for promptUpload feedback when block renderers do not pass showToast', async () => {
     fetchResultMock.mockResolvedValueOnce({
       code: '0',
