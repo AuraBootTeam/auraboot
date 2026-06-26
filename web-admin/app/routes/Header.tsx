@@ -21,6 +21,8 @@ import { InboxHeaderWidget } from '~/ui/inbox/InboxDropdown';
 import { CommandPalette } from '~/ui/CommandPalette';
 import { useAuraBot } from '~/plugins/core-aurabot/components-shell/AuraBotProvider';
 
+const PUBLIC_REGISTRATION_ENABLED = import.meta.env.VITE_PUBLIC_REGISTRATION_ENABLED === 'true';
+
 interface HeaderProps {
   sidebarOpen?: boolean;
   setSidebarOpen?: (open: boolean) => void;
@@ -429,12 +431,14 @@ export default function Header({
               >
                 {t('auth.login')}
               </Link>
-              <Link
-                to="/signup"
-                className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
-              >
-                {t('auth.register')}
-              </Link>
+              {PUBLIC_REGISTRATION_ENABLED && (
+                <Link
+                  to="/signup"
+                  className="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
+                >
+                  {t('auth.register')}
+                </Link>
+              )}
             </div>
           )}
         </div>

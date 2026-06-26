@@ -1,6 +1,8 @@
 package com.auraboot.framework.tenant.dao.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -34,6 +36,7 @@ public class Tenant {
     
     private String status;              // Status: ACTIVE, INACTIVE, SUSPENDED
 
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String description;         // Description
 
     private String defaultCurrency;     // ISO 4217 currency code (e.g. USD, CNY, EUR)

@@ -239,8 +239,7 @@ public class OrgEmployeeServiceImpl implements OrgEmployeeService {
 
         String memberPid = (String) employee.get(EMP_MEMBER_ID);
 
-        // Clear employee side — only clear member link, keep user link
-        // (org_emp_user_id has NOT NULL constraint per plugin definition)
+        // Clear employee side — only clear member link, keep the optional user link.
         // Use direct SQL because DynamicDataService.update() ignores null values
         jdbcTemplate.update(
                 "UPDATE mt_org_employee SET org_emp_member_id = NULL, updated_at = NOW() WHERE pid = ?",

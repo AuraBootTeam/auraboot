@@ -157,6 +157,22 @@ class TenantApplicationServiceImplTest {
     }
 
     @Test
+    @DisplayName("updateTenant clears description when the request explicitly sets it to null")
+    void updateClearsExplicitNullDescription() {
+        Tenant t = tenant(1L, "n");
+        t.setDescription("old description");
+        when(tenantService.findByPid("p")).thenReturn(t);
+        when(tenantService.updateTenant(t)).thenReturn(t);
+        TenantRequest req = new TenantRequest();
+        req.setDescription(null);
+
+        TenantResponse resp = service.updateTenant("p", req, 7L);
+
+        assertNotNull(resp);
+        assertEquals(null, t.getDescription());
+    }
+
+    @Test
     @DisplayName("createTenantForUser rejects duplicate name")
     void createDuplicate() {
         when(tenantService.findByName("acme")).thenReturn(tenant(1L, "acme"));

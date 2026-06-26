@@ -41,7 +41,7 @@ export default function Screen() {
             <p className="text-gray-600 dark:text-gray-400">确定要退出当前账号吗？</p>
           </div>
 
-          <Form method="post" className="space-y-4">
+          <Form method="post" reloadDocument className="space-y-4">
             <button
               type="submit"
               className="w-full transform rounded-xl bg-gradient-to-r from-orange-500 to-red-500 px-6 py-3 text-lg font-semibold text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 hover:from-orange-600 hover:to-red-600 hover:shadow-xl focus:ring-4 focus:ring-red-300 focus:outline-none dark:focus:ring-red-800"

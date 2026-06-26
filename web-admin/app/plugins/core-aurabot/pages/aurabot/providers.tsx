@@ -186,7 +186,7 @@ export function meta() {
 export default function LlmProvidersPage() {
   const { t } = useI18n();
   const { hasPermission } = useAuth();
-  const canManageProviders = hasPermission('ai_center') || hasPermission('system_management');
+  const canManageProviders = hasPermission('system_management');
   const {
     configs,
     loading,
@@ -314,7 +314,7 @@ export default function LlmProvidersPage() {
 
   if (!canManageProviders) {
     return (
-      <RouteAccessDenied message="Access denied: LLM provider settings require permission ai_center" />
+      <RouteAccessDenied message="Access denied: LLM provider settings require permission system_management" />
     );
   }
 

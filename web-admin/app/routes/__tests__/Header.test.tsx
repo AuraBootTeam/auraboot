@@ -3,8 +3,12 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import Header from '../Header';
 
+const mockRootState = vi.hoisted(() => ({
+  user: { username: 'cat', tenantName: 'AcmeCo' } as Record<string, unknown> | null,
+}));
+
 vi.mock('~/root', () => ({
-  useRootLoaderData: () => ({ user: { username: 'cat', tenantName: 'AcmeCo' } }),
+  useRootLoaderData: () => ({ user: mockRootState.user }),
 }));
 vi.mock('~/contexts/ThemeContext', () => ({
   useTheme: () => ({ theme: 'light', setTheme: vi.fn(), isDark: false }),
@@ -33,6 +37,7 @@ vi.mock('~/plugins/core-aurabot/components-shell/AuraBotProvider', () => ({
 
 // Stub fetch to keep useEffect for spaces quiet
 beforeEach(() => {
+  mockRootState.user = { username: 'cat', tenantName: 'AcmeCo' };
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, json: () => Promise.resolve({}) }));
 });
 
@@ -69,5 +74,18 @@ describe('Header — polish', () => {
     );
     const chip = screen.getByTestId('header-env-chip');
     expect(chip.textContent?.trim().length).toBeGreaterThan(0);
+  });
+
+  it('does not expose the public registration link when registration is disabled', () => {
+    mockRootState.user = null;
+
+    render(
+      <MemoryRouter>
+        <Header />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('link', { name: 'auth.login' })).toHaveAttribute('href', '/login');
+    expect(screen.queryByRole('link', { name: 'auth.register' })).not.toBeInTheDocument();
   });
 });

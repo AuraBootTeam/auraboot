@@ -54,6 +54,26 @@ class SystemPreferencesControllerTest {
         assertThat(response.getData().getTimezoneStatusText()).contains("已设置");
     }
 
+    @Test
+    void updatePreferencesClearsStoredValuesWhenRequestValuesAreNull() {
+        MetaContext.setSystemTenantContext(42L);
+        tenantPreferenceService.setPreference(42L, "ui.datetime.format", TextNode.valueOf("YYYY/MM/DD HH:mm"));
+        tenantPreferenceService.setPreference(42L, "ui.timezone", TextNode.valueOf("Europe/London"));
+        var request = new SystemPreferencesController.SystemPreferencesRequest();
+        request.setDatetimeFormat(null);
+        request.setTimezone(null);
+
+        var response = controller.updateSystemPreferences(request);
+
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(tenantPreferenceService.getPreference(42L, "ui.datetime.format")).isNull();
+        assertThat(tenantPreferenceService.getPreference(42L, "ui.timezone")).isNull();
+        assertThat(response.getData().getDatetimeFormat()).isEqualTo("YYYY-MM-DD HH:mm:ss");
+        assertThat(response.getData().getTimezone()).isEqualTo("Asia/Shanghai");
+        assertThat(response.getData().isTimezoneConfigured()).isFalse();
+        assertThat(response.getData().getTimezoneStatusText()).contains("尚未配置");
+    }
+
     private static final class InMemoryTenantPreferenceService implements TenantPreferenceService {
         private final Map<Long, Map<String, JsonNode>> store = new HashMap<>();
 
@@ -65,6 +85,11 @@ class SystemPreferencesControllerTest {
         @Override
         public void setPreference(Long tenantId, String key, JsonNode value) {
             store.computeIfAbsent(tenantId, ignored -> new HashMap<>()).put(key, value);
+        }
+
+        @Override
+        public void deletePreference(Long tenantId, String key) {
+            store.getOrDefault(tenantId, Map.of()).remove(key);
         }
 
         @Override

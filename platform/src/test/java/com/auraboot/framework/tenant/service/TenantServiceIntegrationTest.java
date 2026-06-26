@@ -97,6 +97,25 @@ class TenantServiceIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Order(5)
+    @DisplayName("T1-05: updateTenant clears nullable description")
+    void updateTenant_clearsNullableDescription() {
+        assertThat(tenantId).as("tenantId must be set by T1-01").isNotNull();
+        Tenant existing = tenantService.getById(tenantId);
+        existing.setDescription("Temporary description " + runId);
+        tenantService.updateTenant(existing);
+
+        Tenant withDescription = tenantService.getById(tenantId);
+        assertThat(withDescription.getDescription()).isEqualTo("Temporary description " + runId);
+
+        withDescription.setDescription(null);
+        tenantService.updateTenant(withDescription);
+
+        Tenant restored = tenantService.getById(tenantId);
+        assertThat(restored.getDescription()).isNull();
+    }
+
+    @Test
+    @Order(6)
     @DisplayName("T1-05: getAllTenants includes the created tenant")
     void getAllTenants_includesCreatedTenant() {
         List<Tenant> all = tenantService.getAllTenants();

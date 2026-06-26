@@ -152,6 +152,9 @@ public class TenantMemberCommandHandler implements CommandHandler {
         result.put("employeePid", provisioned.getEmployeePid());
         result.put("userPid", provisioned.getUserPid());
         result.put("memberPid", provisioned.getMemberPid());
+        result.put("email", provisioned.getEmail());
+        result.put("userName", provisioned.getUserName());
+        result.put("displayName", provisioned.getDisplayName());
         result.put("createdUser", provisioned.isCreatedUser());
         result.put("createdMember", provisioned.isCreatedMember());
         result.put("adminManaged", provisioned.isAdminManaged());

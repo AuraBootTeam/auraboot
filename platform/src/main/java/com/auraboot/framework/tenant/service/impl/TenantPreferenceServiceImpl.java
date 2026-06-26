@@ -54,6 +54,16 @@ public class TenantPreferenceServiceImpl implements TenantPreferenceService {
     }
 
     @Override
+    @Transactional
+    public void deletePreference(Long tenantId, String key) {
+        preferenceMapper.delete(
+                new QueryWrapper<TenantPreference>()
+                        .eq("tenant_id", tenantId)
+                        .eq("preference_key", key)
+        );
+    }
+
+    @Override
     public Map<String, JsonNode> getPreferencesByPrefix(Long tenantId, String prefix) {
         List<TenantPreference> prefs = preferenceMapper.selectList(
                 new QueryWrapper<TenantPreference>()

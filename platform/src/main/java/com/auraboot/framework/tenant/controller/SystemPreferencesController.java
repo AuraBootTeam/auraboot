@@ -49,20 +49,34 @@ public class SystemPreferencesController {
         @RequestBody SystemPreferencesRequest request
     ) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        String datetimeFormat = StringUtils.hasText(request.getDatetimeFormat())
-            ? request.getDatetimeFormat().trim()
-            : DEFAULT_DATETIME_FORMAT;
-        String timezone = StringUtils.hasText(request.getTimezone())
-            ? request.getTimezone().trim()
-            : DEFAULT_TIMEZONE;
+        if (StringUtils.hasText(request.getDatetimeFormat())) {
+            tenantPreferenceService.setPreference(
+                tenantId,
+                DATETIME_FORMAT_KEY,
+                TextNode.valueOf(request.getDatetimeFormat().trim())
+            );
+        } else {
+            tenantPreferenceService.deletePreference(tenantId, DATETIME_FORMAT_KEY);
+        }
 
-        tenantPreferenceService.setPreference(
-            tenantId,
-            DATETIME_FORMAT_KEY,
-            TextNode.valueOf(datetimeFormat)
+        if (StringUtils.hasText(request.getTimezone())) {
+            tenantPreferenceService.setPreference(
+                tenantId,
+                TIMEZONE_KEY,
+                TextNode.valueOf(request.getTimezone().trim())
+            );
+        } else {
+            tenantPreferenceService.deletePreference(tenantId, TIMEZONE_KEY);
+        }
+
+        String datetimeFormat = textOrDefault(
+            tenantPreferenceService.getPreference(tenantId, DATETIME_FORMAT_KEY),
+            DEFAULT_DATETIME_FORMAT
         );
-        tenantPreferenceService.setPreference(tenantId, TIMEZONE_KEY, TextNode.valueOf(timezone));
-        return ApiResponse.success(toResponse(datetimeFormat, timezone, true));
+        JsonNode timezoneNode = tenantPreferenceService.getPreference(tenantId, TIMEZONE_KEY);
+        boolean timezoneConfigured = hasText(timezoneNode);
+        String timezone = timezoneConfigured ? timezoneNode.asText().trim() : DEFAULT_TIMEZONE;
+        return ApiResponse.success(toResponse(datetimeFormat, timezone, timezoneConfigured));
     }
 
     private static String textOrDefault(JsonNode node, String fallback) {

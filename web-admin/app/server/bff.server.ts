@@ -16,6 +16,7 @@ import { requestLogger, errorLogger } from '~/server/middlewares/RequestLogger';
 import { register, proxyDurationHistogram } from './metrics.server';
 import { sessionStorage } from '~/shared/services/session';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
+import { handleLogoutPost } from '~/server/logout.server';
 
 // ============================================================
 // CRITICAL: Bypass system proxy for ALL axios requests in BFF.
@@ -195,8 +196,10 @@ app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async
     let authPayload: Record<string, string>;
     if (channelCode === 'email_password') {
       authPath = '/api/auth/login';
+      const identifier = String(req.body?.identifier || req.body?.email || '');
       authPayload = {
-        email: String(req.body?.email || ''),
+        identifier,
+        email: identifier,
         password: String(req.body?.password || ''),
       };
     } else if (channelCode === 'sms') {
@@ -238,6 +241,8 @@ app.post('/login', express.urlencoded({ extended: true, limit: '100kb' }), async
     next(error);
   }
 });
+
+app.post('/logout', handleLogoutPost(SPRING_BOOT_URL));
 
 // Prometheus metrics endpoint
 app.get('/metrics', async (_req, res) => {

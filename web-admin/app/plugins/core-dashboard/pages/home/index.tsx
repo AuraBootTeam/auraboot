@@ -15,6 +15,7 @@ export default function WorkbenchPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [todayLabel, setTodayLabel] = useState('');
 
   const loadWorkbench = useCallback(async () => {
     setLoading(true);
@@ -34,7 +35,15 @@ export default function WorkbenchPage() {
     loadWorkbench();
   }, [loadWorkbench]);
 
-  const todayLabel = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  useEffect(() => {
+    setTodayLabel(
+      new Date().toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      }),
+    );
+  }, []);
 
   const headerBand = (
     <header className="flex items-end justify-between mb-6">
@@ -43,7 +52,8 @@ export default function WorkbenchPage() {
           {t('workbench.title', undefined, '工作台')}
         </h1>
         <div data-testid="workbench-subline" className="text-[13px] text-gray-500 mt-1">
-          {todayLabel} · {t('workbench.subline', undefined, '概览')}
+          {todayLabel ? `${todayLabel} · ` : ''}
+          {t('workbench.subline', undefined, '概览')}
         </div>
       </div>
       <div className="flex gap-2">

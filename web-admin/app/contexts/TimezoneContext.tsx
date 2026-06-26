@@ -12,6 +12,7 @@ interface TenantDisplayPrefs {
 }
 
 const EFFECTIVE_TIMEZONE_KEY = 'effective-timezone';
+const DEFAULT_TIMEZONE = 'Asia/Shanghai';
 
 interface TimezoneContextValue {
   timezone: string;
@@ -19,7 +20,7 @@ interface TimezoneContextValue {
 }
 
 const TimezoneContext = createContext<TimezoneContextValue>({
-  timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  timezone: DEFAULT_TIMEZONE,
   formats: DEFAULT_DATE_TIME_FORMATS,
 });
 
@@ -30,15 +31,11 @@ export function TimezoneProvider({
   children: ReactNode;
   initialTimezone?: string;
 }) {
-  const { preferences } = useAuth();
+  const { preferences, isAuthenticated } = useAuth();
 
   const [timezone, setTimezone] = useState<string>(() => {
     if (initialTimezone) return initialTimezone;
-    if (typeof window !== 'undefined') {
-      const cached = localStorage.getItem(EFFECTIVE_TIMEZONE_KEY);
-      if (cached) return cached;
-    }
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return DEFAULT_TIMEZONE;
   });
 
   const [formats, setFormats] = useState<DateTimeFormatPreferences>(DEFAULT_DATE_TIME_FORMATS);
@@ -48,6 +45,11 @@ export function TimezoneProvider({
   const [tenantPrefs, setTenantPrefs] = useState<TenantDisplayPrefs | null>(null);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setTenantPrefs({});
+      return;
+    }
+
     let cancelled = false;
     Promise.all([
       tenantPreferenceService.get<string>('ui.timezone'),
@@ -66,12 +68,17 @@ export function TimezoneProvider({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const browserTz = typeof window !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : DEFAULT_TIMEZONE;
+    const cachedTz = typeof window !== 'undefined'
+      ? localStorage.getItem(EFFECTIVE_TIMEZONE_KEY)
+      : null;
     // Resolution chain: user personal preference → tenant policy → browser.
-    const tz = preferences?.timezone || tenantPrefs?.timezone || browserTz;
+    const tz = preferences?.timezone || tenantPrefs?.timezone || cachedTz || browserTz || DEFAULT_TIMEZONE;
     setTimezone(tz);
     persistTimezone(tz);
 
@@ -95,6 +102,7 @@ export function useTimezone() {
 }
 
 function persistTimezone(tz: string) {
+  if (typeof window === 'undefined') return;
   localStorage.setItem(EFFECTIVE_TIMEZONE_KEY, tz);
   if (typeof document !== 'undefined') {
     document.cookie = `${EFFECTIVE_TIMEZONE_KEY}=${encodeURIComponent(tz)};path=/;max-age=${365 * 24 * 3600};SameSite=Lax`;

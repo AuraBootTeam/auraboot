@@ -98,6 +98,9 @@ class OrgEmployeeServiceImplTest {
         assertNotNull(response.getTemporaryPassword());
         assertEquals("user-99", response.getUserPid());
         assertEquals("mem-50", response.getMemberPid());
+        assertEquals("alice@x", response.getEmail());
+        assertEquals("emp_emp1", response.getUserName());
+        assertEquals("Alice", response.getDisplayName());
         assertEquals(200L, member.getEmployeeId());
         assertEquals(List.of("member"), response.getAssignedRoles());
         verify(tenantMemberService).updateMember(member);
@@ -134,6 +137,9 @@ class OrgEmployeeServiceImplTest {
         assertFalse(response.isCreatedMember());
         assertNull(response.getTemporaryPassword());
         assertEquals(List.of(), response.getAssignedRoles());
+        assertEquals("bob@x", response.getEmail());
+        assertEquals("bob", response.getUserName());
+        assertEquals("Bob", response.getDisplayName());
         assertEquals(201L, member.getEmployeeId());
         verify(userService, never()).signUp(any(), any(), any(), any());
         verify(roleService, never()).assignRoleToMember(any(), any(), any());

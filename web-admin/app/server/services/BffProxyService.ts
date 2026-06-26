@@ -52,6 +52,9 @@ const BROWSER_ONLY_PROXY_HEADERS = new Set([
   'access-control-request-headers',
   'access-control-request-method',
   'connection',
+  // Express parses JSON bodies and axios serializes them again. Forwarding the
+  // browser's original length can leave unread bytes on backend keep-alive sockets.
+  'content-length',
   'host',
   'origin',
   'referer',

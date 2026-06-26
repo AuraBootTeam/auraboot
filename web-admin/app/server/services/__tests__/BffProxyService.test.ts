@@ -61,6 +61,7 @@ describe('BffProxyService', () => {
       headers: {
         accept: '*/*',
         authorization: 'Bearer test-token',
+        'content-length': '999',
         'content-type': 'application/json',
         host: 'localhost:5237',
         origin: 'http://localhost:5237',
@@ -74,6 +75,7 @@ describe('BffProxyService', () => {
     expect(headers.authorization).toBe('Bearer test-token');
     expect(headers['content-type']).toBe('application/json');
     expect(headers.accept).toBe('application/json');
+    expect(headers['content-length']).toBeUndefined();
     expect(headers.origin).toBeUndefined();
     expect(headers.referer).toBeUndefined();
     expect(headers.host).toBeUndefined();

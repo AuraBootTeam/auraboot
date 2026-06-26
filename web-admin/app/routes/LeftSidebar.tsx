@@ -24,12 +24,11 @@ export default function LeftSidebar({ sidebarOpen, setSidebarOpen }: LeftSidebar
   const navRef = useRef<HTMLElement>(null);
   const revalidator = useRevalidator();
 
-  const [collapsed, setCollapsed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(COLLAPSED_KEY) === 'true';
-    }
-    return false;
-  });
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    setCollapsed(localStorage.getItem(COLLAPSED_KEY) === 'true');
+  }, []);
 
   const toggleCollapsed = useCallback(() => {
     setCollapsed((prev) => {

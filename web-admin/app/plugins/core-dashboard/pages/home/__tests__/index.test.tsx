@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
+import { renderToString } from 'react-dom/server';
 import WorkbenchPage from '../index';
 
 vi.mock('~/plugins/core-dashboard/services/dashboardService', () => ({
@@ -30,6 +31,17 @@ function renderPage() {
 }
 
 describe('WorkbenchPage header', () => {
+  it('keeps the server-rendered subline deterministic for hydration', () => {
+    const html = renderToString(
+      <MemoryRouter>
+        <WorkbenchPage />
+      </MemoryRouter>,
+    );
+
+    expect(html).toContain('data-testid="workbench-subline"');
+    expect(html).toContain('>workbench.subline</div>');
+  });
+
   it('renders a page title and dated subline', async () => {
     renderPage();
     expect(await screen.findByRole('heading', { name: 'workbench.title' })).toBeInTheDocument();

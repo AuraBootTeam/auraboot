@@ -1,14 +1,29 @@
 import React from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 
 import { I18nProvider } from '~/contexts/I18nContext';
 import LlmProvidersPage from '../pages/aurabot/providers';
 
+const mockAuthState = vi.hoisted(() => ({
+  permissionCodes: new Set<string>(['system_management']),
+}));
+
 vi.mock('~/contexts/ToastContext', () => ({
   useToastContext: () => ({
     showSuccessToast: vi.fn(),
     showErrorToast: vi.fn(),
+  }),
+}));
+
+vi.mock('~/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    hasPermission: (permissionCode: string) => mockAuthState.permissionCodes.has(permissionCode),
+    hasRole: vi.fn(() => false),
+    hasAnyPermission: (permissionCodes: string[]) =>
+      permissionCodes.some((permissionCode) => mockAuthState.permissionCodes.has(permissionCode)),
+    hasAllPermissions: (permissionCodes: string[]) =>
+      permissionCodes.every((permissionCode) => mockAuthState.permissionCodes.has(permissionCode)),
   }),
 }));
 
@@ -27,6 +42,10 @@ vi.mock('~/shared/admin/cloud-config-core', async (importOriginal) => {
       handleSave: vi.fn(),
     }),
   };
+});
+
+beforeEach(() => {
+  mockAuthState.permissionCodes = new Set<string>(['system_management']);
 });
 
 afterEach(() => {
@@ -66,5 +85,21 @@ describe('LlmProvidersPage i18n', () => {
     expect(screen.getByText('已配置 0 个提供商')).toBeInTheDocument();
     expect(screen.getByText('暂无已配置的模型提供商')).toBeInTheDocument();
     expect(screen.getByText('添加第一个提供商')).toBeInTheDocument();
+  });
+
+  it('denies provider management when the user only has ai_center permission', () => {
+    mockAuthState.permissionCodes = new Set<string>(['ai_center']);
+
+    render(
+      <I18nProvider initialLocale="zh-CN" initialData={{}}>
+        <LlmProvidersPage />
+      </I18nProvider>,
+    );
+
+    expect(screen.getByText('Page Unavailable')).toBeInTheDocument();
+    expect(
+      screen.getByText('Access denied: LLM provider settings require permission system_management'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '添加提供商' })).not.toBeInTheDocument();
   });
 });

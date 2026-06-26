@@ -3,8 +3,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 
 let mockPreferences: Record<string, unknown> | null = null;
+let mockIsAuthenticated = true;
 vi.mock('~/contexts/AuthContext', () => ({
-  useAuth: () => ({ preferences: mockPreferences }),
+  useAuth: () => ({ preferences: mockPreferences, isAuthenticated: mockIsAuthenticated }),
 }));
 
 const tenantGet = vi.fn();
@@ -38,7 +39,20 @@ function renderProbe() {
 describe('TimezoneContext resolution chain', () => {
   beforeEach(() => {
     mockPreferences = null;
+    mockIsAuthenticated = true;
     tenantGet.mockReset();
+    window.localStorage.clear();
+  });
+
+  it('does not fetch tenant preferences before authentication', async () => {
+    mockIsAuthenticated = false;
+    mockPreferences = null;
+    tenantGet.mockResolvedValue('America/New_York');
+
+    renderProbe();
+
+    await waitFor(() => expect(screen.getByTestId('tz').textContent).toBeTruthy());
+    expect(tenantGet).not.toHaveBeenCalled();
   });
 
   it('falls back to the tenant ui.timezone preference when the user has none', async () => {

@@ -2848,6 +2848,7 @@
   },
   {
     "pageKey": "account_security_policy_detail",
+    "name": "账号安全策略",
     "name:zh-CN": "账号安全策略",
     "name:en": "Account Security Policy",
     "kind": "detail",
@@ -3036,6 +3037,7 @@
   },
   {
     "pageKey": "system_preferences_form",
+    "name": "系统偏好",
     "name:zh-CN": "系统偏好",
     "name:en": "System Preferences",
     "kind": "form",

@@ -28,6 +28,10 @@ public class TenantPreferenceController {
     public ApiResponse<Void> setPreference(@PathVariable String key, @RequestBody Map<String, JsonNode> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
         JsonNode value = body.get("value");
+        if (value == null || value.isNull()) {
+            tenantPreferenceService.deletePreference(tenantId, key);
+            return ApiResponse.success(null);
+        }
         tenantPreferenceService.setPreference(tenantId, key, value);
         return ApiResponse.success(null);
     }

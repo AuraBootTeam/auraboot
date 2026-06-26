@@ -149,6 +149,7 @@ test('platform-admin routes enterprise profile through DSL pages', () => {
 
 test('platform-admin exposes account page provisioning from existing employees', () => {
   const command = commands.find((item) => item.code === 'admin:provision_member_from_employee');
+  const resetCommand = commands.find((item) => item.code === 'admin:reset_member_password');
   const page = pages.find((item) => item.pageKey === 'tenant_member_list');
   const toolbar = page?.blocks?.find((block) => block.id === 'toolbar');
   const button = toolbar?.buttons?.find((item) => item.code === 'provision_from_employee');
@@ -159,6 +160,8 @@ test('platform-admin exposes account page provisioning from existing employees',
 
   assert.ok(command, 'admin:provision_member_from_employee command must exist');
   assert.equal(command.modelCode, 'tenant_member');
+  assert.deepEqual(command.permissions, ['admin_tenant_member']);
+  assert.deepEqual(resetCommand?.permissions, ['admin_tenant_member']);
   assert.equal(
     command.inputFields,
     undefined,

@@ -1,5 +1,6 @@
 package com.auraboot.framework.tenant.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -40,4 +41,12 @@ public class TenantRequest {
     
     @Size(max = 500, message = "描述长度不能超过500个字符")
     private String description; // 描述
+
+    @JsonIgnore
+    private boolean descriptionSet;
+
+    public void setDescription(String description) {
+        this.description = description;
+        this.descriptionSet = true;
+    }
 }

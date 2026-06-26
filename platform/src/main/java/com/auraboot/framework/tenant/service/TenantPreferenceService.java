@@ -10,5 +10,7 @@ public interface TenantPreferenceService {
 
     void setPreference(Long tenantId, String key, JsonNode value);
 
+    void deletePreference(Long tenantId, String key);
+
     Map<String, JsonNode> getPreferencesByPrefix(Long tenantId, String prefix);
 }

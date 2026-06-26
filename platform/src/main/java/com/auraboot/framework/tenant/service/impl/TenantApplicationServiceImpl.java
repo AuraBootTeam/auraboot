@@ -155,7 +155,7 @@ public class TenantApplicationServiceImpl implements TenantApplicationService {
         if (request.getContactPhone() != null) {
             tenant.setContactPhone(request.getContactPhone());
         }
-        if (request.getDescription() != null) {
+        if (request.isDescriptionSet()) {
             tenant.setDescription(request.getDescription());
         }
         
