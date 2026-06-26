@@ -58,6 +58,7 @@ export interface PermissionMatrixActionDTO {
   mergeStrategy?: string;   // 'MAX' | 'MIN' | null
   policySchema?: string;    // JSON string of policy schema definition, null if no policy
   policyValues?: Record<string, any>; // current policy values for this role
+  extension?: Record<string, any>; // display metadata such as displayGroup/displayOrder
 }
 
 export interface PermissionMatrixResourceDTO {

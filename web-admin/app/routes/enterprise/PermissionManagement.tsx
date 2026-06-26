@@ -201,9 +201,9 @@ export default function PermissionManagement() {
   // -------------------------------------------------------------------------
 
   const renderRolesTab = () => (
-    <div className="flex flex-1 overflow-hidden">
+    <div className="flex min-w-0 flex-1 overflow-hidden">
       {/* Left — Role table */}
-      <div className="flex w-80 flex-shrink-0 flex-col border-r border-gray-200 dark:border-gray-700">
+      <div className="flex w-80 min-w-0 flex-shrink-0 flex-col border-r border-gray-200 dark:border-gray-700">
         <div className="border-b border-gray-200 p-3 dark:border-gray-700">
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
@@ -237,7 +237,7 @@ export default function PermissionManagement() {
               {t(
                 'admin.permission.role.recommendedHint',
                 undefined,
-                '建议岗位: 管理员 tenant_admin；销售 qo_sales；采购 qo_procurement；工程 bom_engineering',
+                '建议岗位: 管理员 tenant_admin；销售/采购 bom_operator + qo_quoter；工程 bom_operator',
               )}
             </div>
           )}
@@ -252,7 +252,7 @@ export default function PermissionManagement() {
                 : t('admin.permission.empty.roles') || 'No roles yet'}
             </div>
           ) : (
-            <table data-testid="role-table" className="min-w-full table-fixed">
+            <table data-testid="role-table" className="w-full table-fixed">
               <thead className="sr-only">
                 <tr>
                   <th>Role</th>
@@ -275,7 +275,7 @@ export default function PermissionManagement() {
                           : 'hover:bg-gray-50 dark:hover:bg-gray-800'
                       }`}
                     >
-                      <td data-testid={`role-row-${role.code}`} className="px-3 py-2">
+                      <td data-testid={`role-row-${role.code}`} className="max-w-0 px-3 py-2">
                         <div className="flex items-center gap-2">
                           {role.type === 'SYSTEM' && (
                             <span
@@ -307,7 +307,7 @@ export default function PermissionManagement() {
                           </div>
                         )}
                       </td>
-                      <td className="px-2 py-2 text-right whitespace-nowrap">
+                      <td className="w-20 px-2 py-2 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
                           <button
                             data-testid={`role-action-edit-${role.code}`}

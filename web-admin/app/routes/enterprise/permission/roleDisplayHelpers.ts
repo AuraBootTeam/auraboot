@@ -1,14 +1,13 @@
 import type { Role } from './types';
 
-const RECOMMENDED_BOM_ROLE_ORDER = ['tenant_admin', 'qo_sales', 'qo_procurement', 'bom_engineering'];
+const RECOMMENDED_BOM_ROLE_ORDER = ['tenant_admin', 'bom_operator', 'qo_quoter'];
 const RECOMMENDED_BOM_ROLE_RANK = new Map(
   RECOMMENDED_BOM_ROLE_ORDER.map((code, index) => [code, index]),
 );
 const RECOMMENDED_BOM_ROLE_LABEL: Record<string, string> = {
   tenant_admin: '管理员',
-  qo_sales: '销售',
-  qo_procurement: '采购',
-  bom_engineering: '工程',
+  bom_operator: 'BOM 操作员',
+  qo_quoter: '报价员',
 };
 
 export function isRecommendedBomRole(roleCode: string): boolean {

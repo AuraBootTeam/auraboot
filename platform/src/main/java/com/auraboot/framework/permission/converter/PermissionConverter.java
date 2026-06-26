@@ -11,6 +11,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
+import org.postgresql.util.PGobject;
 
 import java.util.List;
 import java.util.Map;
@@ -98,6 +99,17 @@ public interface PermissionConverter {
             }
             try {
                 return JsonUtil.parse(str, new TypeReference<>() {});
+            } catch (Exception e) {
+                return null;
+            }
+        }
+        if (obj instanceof PGobject pgObject) {
+            String value = pgObject.getValue();
+            if (value == null || value.trim().isEmpty() || "{}".equals(value.trim())) {
+                return null;
+            }
+            try {
+                return JsonUtil.parse(value, new TypeReference<>() {});
             } catch (Exception e) {
                 return null;
             }

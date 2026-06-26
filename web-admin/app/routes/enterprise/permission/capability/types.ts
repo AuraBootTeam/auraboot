@@ -9,6 +9,8 @@ export interface Capability {
   sensitive: boolean;
   /** Preset tier (viewer/editor/admin); null for convention-derived capabilities. */
   tier?: string | null;
+  displayGroupOrder?: number | null;
+  displayOrder?: number | null;
   includes: string[];
   granted: boolean;
   conventionDerived: boolean;
