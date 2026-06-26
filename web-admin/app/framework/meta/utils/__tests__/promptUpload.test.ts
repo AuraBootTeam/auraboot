@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   resolvePromptUploadAccept,
+  resolvePromptUploadFeedbackMode,
   resolvePromptUploadFilenameKey,
   resolvePromptUploadKey,
   uploadCommandFile,
@@ -53,6 +54,29 @@ describe('resolvePromptUploadAccept', () => {
   it('falls back to spreadsheet uploads for legacy promptUpload values', () => {
     expect(resolvePromptUploadAccept('corrected_bom_file_id')).toBe('.xlsx,.xls,.csv');
     expect(resolvePromptUploadAccept(true)).toBe('.xlsx,.xls,.csv');
+  });
+});
+
+describe('resolvePromptUploadFeedbackMode', () => {
+  it('defaults legacy promptUpload values to toast feedback', () => {
+    expect(resolvePromptUploadFeedbackMode(true)).toBe('toast');
+    expect(resolvePromptUploadFeedbackMode('source_file_id')).toBe('toast');
+  });
+
+  it('uses panel feedback when configured on promptUpload metadata', () => {
+    expect(
+      resolvePromptUploadFeedbackMode({
+        key: 'material_price_file_id',
+        accept: '.xlsx,.xls',
+        feedbackMode: 'panel',
+      }),
+    ).toBe('panel');
+  });
+
+  it('falls back to toast for unknown feedback modes', () => {
+    expect(resolvePromptUploadFeedbackMode({ key: 'source_file_id', feedbackMode: 'quiet' })).toBe(
+      'toast',
+    );
   });
 });
 

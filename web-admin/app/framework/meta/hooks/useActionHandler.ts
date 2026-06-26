@@ -64,6 +64,7 @@ import {
   pickFile,
   uploadCommandFile,
   resolvePromptUploadAccept,
+  resolvePromptUploadFeedbackMode,
   resolvePromptUploadKey,
   resolvePromptUploadFilenameKey,
 } from '~/framework/meta/utils/promptUpload';
@@ -214,6 +215,9 @@ function buildPromptUploadCompletedMessage(
 }
 
 type ActionToastType = 'success' | 'error' | 'warning' | 'info';
+interface ExecuteCommandOptions {
+  suppressAsyncSubmitToast?: boolean;
+}
 
 function notifyActionToast(
   showToast: ((message: string, type: ActionToastType) => void) | undefined,
@@ -335,6 +339,7 @@ export interface UseActionHandlerResult {
     targetRecordPid?: string,
     payload?: Record<string, any>,
     operationType?: string,
+    options?: ExecuteCommandOptions,
   ) => Promise<any>;
 }
 
@@ -432,6 +437,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       targetRecordPid?: string,
       payload?: Record<string, any>,
       operationType?: string,
+      commandOptions: ExecuteCommandOptions = {},
     ) => {
       const normalizedOp = operationType?.toUpperCase();
       if ((normalizedOp === 'update' || normalizedOp === 'delete') && !targetRecordPid) {
@@ -472,7 +478,9 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       const dispatch =
         envelope?.data && typeof envelope.data === 'object' ? envelope.data : envelope;
       if (dispatch && dispatch.async === true && dispatch.taskCode) {
-        notifyToast('已提交,后台处理中…', 'info');
+        if (!commandOptions.suppressAsyncSubmitToast) {
+          notifyToast('已提交,后台处理中…', 'info');
+        }
         // Open the progress modal immediately in a running state; pollAsyncTask
         // then refreshes it each tick until terminal.
         setActiveTask({ status: 'running', progress: 0 });
@@ -656,6 +664,8 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             // resulting file id into the payload before the command runs. Strictly
             // guarded by the flag, so non-upload buttons are unaffected.
             const promptUpload = (normalizedButton as any).promptUpload;
+            const promptUploadUsesPanelFeedback =
+              resolvePromptUploadFeedbackMode(promptUpload) === 'panel';
             if (promptUpload) {
               // Don't keep the button disabled while the OS file picker is open:
               // some browsers don't fire a 'cancel' event, so awaiting pickFile()
@@ -664,15 +674,19 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               const file = await pickFile(resolvePromptUploadAccept(promptUpload));
               if (!file) return; // user dismissed the picker — nothing to do
               setLoading(true);
-              notifyToast(
-                formatMessage({ filename: file.name }, uploadMessageFallback(locale, 'selected')),
-                'info',
-              );
+              if (!promptUploadUsesPanelFeedback) {
+                notifyToast(
+                  formatMessage({ filename: file.name }, uploadMessageFallback(locale, 'selected')),
+                  'info',
+                );
+              }
               const fileId = await uploadCommandFile(file, token);
-              notifyToast(
-                formatMessage({ filename: file.name }, uploadMessageFallback(locale, 'uploaded')),
-                'info',
-              );
+              if (!promptUploadUsesPanelFeedback) {
+                notifyToast(
+                  formatMessage({ filename: file.name }, uploadMessageFallback(locale, 'uploaded')),
+                  'info',
+                );
+              }
               payload = {
                 ...payload,
                 [resolvePromptUploadKey(promptUpload)]: fileId,
@@ -721,6 +735,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               targetRecordPid,
               payload,
               operationType,
+              { suppressAsyncSubmitToast: promptUploadUsesPanelFeedback },
             );
             surfaceTemporaryPassword(commandResult);
             if ((commandResult as any)?.__asyncFailed) {
@@ -741,7 +756,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
             if (!context.loadData && !(refreshIds && dataSourceManager?.reload)) {
               navigate(`/p/${tableName}`);
             }
-            if (promptUpload) {
+            if (promptUpload && !promptUploadUsesPanelFeedback) {
               const fileName = toNonBlankString(
                 payload[resolvePromptUploadFilenameKey(promptUpload)],
               );
