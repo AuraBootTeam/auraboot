@@ -13,6 +13,8 @@
 const MAX_COMMAND_UPLOAD_SIZE_MB = 50;
 const MAX_COMMAND_UPLOAD_SIZE_BYTES = MAX_COMMAND_UPLOAD_SIZE_MB * 1024 * 1024;
 
+export type PromptUploadFeedbackMode = 'toast' | 'panel';
+
 /**
  * Programmatically open the OS file picker and resolve with the chosen File, or
  * null if the user cancels. Kept side-effect-light so it can be invoked from a
@@ -150,6 +152,18 @@ export function resolvePromptUploadAccept(promptUpload: unknown): string {
     }
   }
   return '.xlsx,.xls,.csv';
+}
+
+export function resolvePromptUploadFeedbackMode(
+  promptUpload: unknown,
+): PromptUploadFeedbackMode {
+  if (promptUpload && typeof promptUpload === 'object' && !Array.isArray(promptUpload)) {
+    const mode = (promptUpload as Record<string, unknown>).feedbackMode;
+    if (mode === 'panel') {
+      return 'panel';
+    }
+  }
+  return 'toast';
 }
 
 /**
