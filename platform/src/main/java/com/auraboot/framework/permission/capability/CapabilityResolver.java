@@ -41,10 +41,19 @@ public class CapabilityResolver {
                                          List<String> allPermissionCodes,
                                          Set<String> grantedCodes,
                                          Map<String, String> permissionNames) {
+        return resolve(declarations, allPermissionCodes, grantedCodes, permissionNames, Map.of());
+    }
+
+    public List<CapabilityGroup> resolve(List<CapabilityDefinitionDTO> declarations,
+                                         List<String> allPermissionCodes,
+                                         Set<String> grantedCodes,
+                                         Map<String, String> permissionNames,
+                                         Map<String, Map<String, Object>> permissionExtensions) {
         List<CapabilityDefinitionDTO> decls = declarations == null ? List.of() : declarations;
         List<String> allCodes = allPermissionCodes == null ? List.of() : allPermissionCodes;
         Set<String> granted = grantedCodes == null ? Set.of() : grantedCodes;
         Map<String, String> names = permissionNames == null ? Map.of() : permissionNames;
+        Map<String, Map<String, Object>> extensions = permissionExtensions == null ? Map.of() : permissionExtensions;
 
         // group name -> capabilities (preserve first-seen order: declared groups before derived)
         LinkedHashMap<String, List<Capability>> byGroup = new LinkedHashMap<>();
@@ -53,20 +62,26 @@ public class CapabilityResolver {
         // 1. Declared capabilities, lowest order first.
         decls.stream()
                 .filter(CapabilityDefinitionDTO::isValid)
-                .sorted(Comparator.comparingInt(d -> d.getOrder() == null ? 100 : d.getOrder()))
+                .sorted(Comparator
+                        .comparingInt((CapabilityDefinitionDTO d) -> displayGroupOrder(d.getIncludes(), extensions))
+                        .thenComparingInt(d -> displayOrder(d.getIncludes(), extensions, d.getOrder()))
+                        .thenComparing(CapabilityDefinitionDTO::getCode, Comparator.nullsLast(String::compareTo)))
                 .forEach(d -> {
                     coveredCodes.addAll(d.getIncludes());
+                    DisplayMeta displayMeta = displayMeta(d.getIncludes(), extensions, d.getGroup(), d.getOrder());
                     Capability cap = Capability.builder()
                             .code(d.getCode())
-                            .group(d.getGroup())
+                            .group(displayMeta.group())
                             .label(label(d))
-                            .sensitive(Boolean.TRUE.equals(d.getSensitive()))
+                            .sensitive(Boolean.TRUE.equals(d.getSensitive()) || displayMeta.sensitive())
                             .tier(d.getTier())
+                            .displayGroupOrder(displayMeta.groupOrder())
+                            .displayOrder(displayMeta.order())
                             .includes(d.getIncludes())
                             .granted(granted.containsAll(d.getIncludes()))
                             .conventionDerived(false)
                             .build();
-                    byGroup.computeIfAbsent(d.getGroup(), g -> new ArrayList<>()).add(cap);
+                    byGroup.computeIfAbsent(displayMeta.group(), g -> new ArrayList<>()).add(cap);
                 });
 
         // 2. Convention-derive any uncovered code, grouped by module -> resource.
@@ -86,16 +101,19 @@ public class CapabilityResolver {
         byModuleResource.forEach((moduleResource, includes) -> {
             String module = moduleResource.substring(0, moduleResource.indexOf('.'));
             String resource = moduleResource.substring(moduleResource.indexOf('.') + 1);
+            DisplayMeta displayMeta = displayMeta(includes, extensions, module, null);
             Capability cap = Capability.builder()
                     .code(moduleResource)
-                    .group(module)
+                    .group(displayMeta.group())
                     .label(conventionLabel(includes, names, resource))
-                    .sensitive(false)
+                    .sensitive(displayMeta.sensitive())
+                    .displayGroupOrder(displayMeta.groupOrder())
+                    .displayOrder(displayMeta.order())
                     .includes(includes)
                     .granted(granted.containsAll(includes))
                     .conventionDerived(true)
                     .build();
-            byGroup.computeIfAbsent(module, g -> new ArrayList<>()).add(cap);
+            byGroup.computeIfAbsent(displayMeta.group(), g -> new ArrayList<>()).add(cap);
         });
 
         List<CapabilityGroup> result = new ArrayList<>();
@@ -203,5 +221,77 @@ public class CapabilityResolver {
             return d.getNameEn();
         }
         return d.getCode();
+    }
+
+    private record DisplayMeta(String group, Integer groupOrder, Integer order, boolean sensitive) {}
+
+    private DisplayMeta displayMeta(List<String> includes,
+                                    Map<String, Map<String, Object>> extensions,
+                                    String fallbackGroup,
+                                    Integer fallbackOrder) {
+        String group = null;
+        Integer groupOrder = null;
+        Integer order = null;
+        boolean sensitive = false;
+
+        for (String code : includes == null ? List.<String>of() : includes) {
+            Map<String, Object> extension = extensions.get(code);
+            if (extension == null || extension.isEmpty()) {
+                continue;
+            }
+            group = firstNonBlank(group, stringValue(extension.get("displayGroup")));
+            groupOrder = min(groupOrder, intValue(extension.get("displayGroupOrder")));
+            order = min(order, intValue(extension.get("displayOrder")));
+            sensitive = sensitive || Boolean.TRUE.equals(extension.get("sensitive"));
+        }
+
+        if (order == null) {
+            order = fallbackOrder;
+        }
+        return new DisplayMeta(
+                firstNonBlank(group, fallbackGroup),
+                groupOrder == null ? 10000 : groupOrder,
+                order == null ? 100 : order,
+                sensitive);
+    }
+
+    private int displayGroupOrder(List<String> includes, Map<String, Map<String, Object>> extensions) {
+        return displayMeta(includes, extensions, "", null).groupOrder();
+    }
+
+    private int displayOrder(List<String> includes, Map<String, Map<String, Object>> extensions, Integer fallbackOrder) {
+        return displayMeta(includes, extensions, "", fallbackOrder).order();
+    }
+
+    private Integer min(Integer current, Integer next) {
+        if (next == null) {
+            return current;
+        }
+        return current == null ? next : Math.min(current, next);
+    }
+
+    private String firstNonBlank(String current, String next) {
+        if (current != null && !current.isBlank()) {
+            return current;
+        }
+        return next != null && !next.isBlank() ? next : current;
+    }
+
+    private String stringValue(Object value) {
+        return value instanceof String str && !str.isBlank() ? str : null;
+    }
+
+    private Integer intValue(Object value) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value instanceof String str && !str.isBlank()) {
+            try {
+                return Integer.parseInt(str);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 }

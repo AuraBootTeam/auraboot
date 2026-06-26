@@ -38,6 +38,7 @@ const ADVANCED_GROUPS = new Set([
 ]);
 
 const FOCUSED_PRIMARY_GROUPS = new Set([
+  '报价管理',
   '报价单',
   '项目管理',
   '来料处理',
@@ -86,13 +87,47 @@ export function splitCapabilityGroupsForPrimaryView(
   }
 
   return {
-    primaryGroups,
-    advancedGroups,
+    primaryGroups: sortCapabilityGroups(primaryGroups),
+    advancedGroups: sortCapabilityGroups(advancedGroups),
     primaryGranted: countGranted(primaryGroups),
     primaryTotal: allCapabilities(primaryGroups).length,
     advancedGranted: countGranted(advancedGroups),
     advancedTotal: allCapabilities(advancedGroups).length,
   };
+}
+
+function sortCapabilityGroups(groups: CapabilityGroup[]): CapabilityGroup[] {
+  return groups
+    .map((group, index) => ({
+      group: {
+        ...group,
+        capabilities: [...group.capabilities].sort(compareCapabilities),
+      },
+      index,
+    }))
+    .sort((a, b) => {
+      const groupOrderA = firstDisplayGroupOrder(a.group);
+      const groupOrderB = firstDisplayGroupOrder(b.group);
+      if (groupOrderA !== groupOrderB) return groupOrderA - groupOrderB;
+      return a.index - b.index;
+    })
+    .map(({ group }) => group);
+}
+
+function firstDisplayGroupOrder(group: CapabilityGroup): number {
+  return Math.min(...group.capabilities.map((capability) => numberOrMax(capability.displayGroupOrder)));
+}
+
+function compareCapabilities(a: Capability, b: Capability): number {
+  const groupOrderDelta = numberOrMax(a.displayGroupOrder) - numberOrMax(b.displayGroupOrder);
+  if (groupOrderDelta !== 0) return groupOrderDelta;
+  const orderDelta = numberOrMax(a.displayOrder) - numberOrMax(b.displayOrder);
+  if (orderDelta !== 0) return orderDelta;
+  return a.code.localeCompare(b.code);
+}
+
+function numberOrMax(value: number | null | undefined): number {
+  return typeof value === 'number' ? value : Number.MAX_SAFE_INTEGER;
 }
 
 /** Initial selection = codes of capabilities the role currently has fully granted. */
