@@ -205,6 +205,27 @@ export function makeQuoteRoleUser(
   };
 }
 
+async function fetchOnlineJwt(email: string, password: string): Promise<string> {
+  if (process.env.PW_ONLINE_TARGET !== '1') {
+    return '';
+  }
+  const baseURL = process.env.PLAYWRIGHT_BASE_URL || '';
+  if (!baseURL) {
+    return '';
+  }
+  const resp = await fetch(`${baseURL.replace(/\/$/, '')}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!resp.ok) {
+    return '';
+  }
+  const body = (await resp.json().catch(() => ({}))) as Record<string, any>;
+  const jwt = body?.data?.jwt;
+  return typeof jwt === 'string' ? jwt : '';
+}
+
 export async function ensureQuoteRoleUser(page: Page, user: QuoteRoleUser): Promise<void> {
   const resp = await page.request.post('/api/admin/users', {
     data: {
@@ -237,7 +258,11 @@ export async function openQuoteRolePage(
   browser: Browser,
   user: QuoteRoleUser,
 ): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const jwt = await fetchOnlineJwt(user.email, user.password);
+  const context = await browser.newContext({
+    storageState: { cookies: [], origins: [] },
+    ...(jwt ? { extraHTTPHeaders: { Authorization: `Bearer ${jwt}` } } : {}),
+  });
   const page = await context.newPage();
   await loginViaUI(page, user.email, user.password);
   return { context, page };
@@ -451,8 +476,30 @@ export async function dynamicCreate(
   data: Record<string, unknown>,
   rows: CreatedRows['rows'],
 ): Promise<string> {
+  const modelResp = await page.request.get(`/api/meta/models/code/${encodeURIComponent(model)}`, {
+    timeout: 15_000,
+  });
+  const modelBody = await modelResp.json().catch(() => ({}));
+  const modelPid = String((modelBody as any).data?.pid ?? '');
+  let createData = data;
+  if (modelResp.ok() && modelPid) {
+    const fieldsResp = await page.request.get(`/api/meta/models/${encodeURIComponent(modelPid)}/fields`, {
+      timeout: 15_000,
+    });
+    const fieldsBody = await fieldsResp.json().catch(() => ({}));
+    const fields = extractRecords(fieldsBody);
+    const fieldCodes = new Set(
+      fields.map((field) => String(field.code ?? field.fieldCode ?? '')).filter(Boolean),
+    );
+    if (fieldCodes.size > 0) {
+      createData = Object.fromEntries(
+        Object.entries(data).filter(([fieldCode]) => fieldCodes.has(fieldCode)),
+      );
+    }
+  }
+
   const resp = await page.request.post(`/api/dynamic/${model}/create`, {
-    data,
+    data: createData,
     timeout: 15_000,
   });
   const body = await resp.json().catch(() => ({}));
@@ -556,6 +603,22 @@ export async function cleanupRows(page: Page, created: CreatedRows): Promise<voi
   }
 }
 
+async function resolveAccountIdByName(
+  page: Page,
+  accountResult: Record<string, unknown>,
+  accountName: string,
+): Promise<string> {
+  let accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
+  if (accountId) {
+    return accountId;
+  }
+  const records = await queryDynamicRecords(page, 'crm_account_common', [
+    { fieldName: 'crm_acc_name', operator: 'eq', value: accountName },
+  ]);
+  accountId = String(records[0]?.pid ?? records[0]?.id ?? '');
+  return accountId;
+}
+
 async function fetchTenantAdminRole(page: Page): Promise<Record<string, unknown>> {
   const resp = await page.request.get('/api/roles?keyword=tenant_admin&pageNum=1&pageSize=50', {
     timeout: 15_000,
@@ -570,7 +633,7 @@ async function fetchTenantAdminRole(page: Page): Promise<Record<string, unknown>
 
 async function fetchModelPermissionPids(page: Page, modelCodes: string[]): Promise<string[]> {
   const permissions: Array<Record<string, unknown>> = [];
-  for (const resourceType of ['model', 'MODEL']) {
+  for (const resourceType of ['MODEL', 'model']) {
     const permissionsResp = await page.request.get(
       `/api/permissions/resource-type/${resourceType}`,
       { timeout: 15_000 },
@@ -594,6 +657,16 @@ async function fetchModelPermissionPids(page: Page, modelCodes: string[]): Promi
   );
 
   const out = new Set<string>();
+  const lookupPermissionPid = async (code: string): Promise<string> => {
+    const resp = await page.request.get(
+      `/api/permissions?search=${encodeURIComponent(code)}&pageNum=1&pageSize=50`,
+      { timeout: 15_000 },
+    );
+    const body = await resp.json().catch(() => ({}));
+    const records = extractRecords(body);
+    const match = records.find((permission) => String(permission.code ?? '') === code);
+    return String(match?.pid ?? '');
+  };
   for (const modelCode of modelCodes) {
     for (const action of MODEL_FIXTURE_ACTIONS) {
       const code = `model.${modelCode}.${action}`;
@@ -613,11 +686,14 @@ async function fetchModelPermissionPids(page: Page, modelCodes: string[]): Promi
           timeout: 15_000,
         });
         const createBody = await createResp.json().catch(() => ({}));
+        if (!createResp.ok() && /already exists/i.test(JSON.stringify(createBody))) {
+          pid = await lookupPermissionPid(code);
+        }
         expect(
-          createResp.ok(),
+          createResp.ok() || Boolean(pid),
           `${code} permission create HTTP ${createResp.status()}: ${JSON.stringify(createBody).slice(0, 500)}`,
         ).toBe(true);
-        pid = String((createBody as any).data?.pid ?? '');
+        pid ||= String((createBody as any).data?.pid ?? '');
         expect(pid, `${code} created permission should expose pid`).toBeTruthy();
         byCode.set(code, pid);
       }
@@ -701,18 +777,19 @@ async function seedQuoteScaffold(
   const created: CreatedRows = { quoteId: '', quoteCode, rows: [] };
 
   try {
+    const accountName = `E2E ${marker} Customer ${suffix}`;
     const accountResult = await executeCommand(
       page,
       'crm:create_account',
       {
-        crm_acc_name: `E2E ${marker} Customer ${suffix}`,
+        crm_acc_name: accountName,
         crm_acc_industry: 'electronics',
         crm_acc_rating: 'A',
       },
       undefined,
       'create',
     );
-    const accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
+    const accountId = await resolveAccountIdByName(page, accountResult, accountName);
     expect(accountId, 'crm:create_account should return account id').toBeTruthy();
     created.rows.push({ model: 'crm_account_common', pid: accountId });
 
@@ -883,18 +960,19 @@ export async function seedBomWorkbench(page: Page): Promise<BomWorkbenchSeed> {
   } as BomWorkbenchSeed;
 
   try {
+    const accountName = `${marker} customer`;
     const accountResult = await executeCommand(
       page,
       'crm:create_account',
       {
-        crm_acc_name: `${marker} customer`,
+        crm_acc_name: accountName,
         crm_acc_industry: 'electronics',
         crm_acc_rating: 'A',
       },
       undefined,
       'create',
     );
-    const accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
+    const accountId = await resolveAccountIdByName(page, accountResult, accountName);
     expect(accountId, 'crm:create_account should return account id').toBeTruthy();
     created.rows.push({ model: 'crm_account_common', pid: accountId });
 

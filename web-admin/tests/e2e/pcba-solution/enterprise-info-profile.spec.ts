@@ -5,12 +5,20 @@ import { ensureSidebarExpanded } from '../helpers';
 const DETAIL_PATH = '/p/c/enterprise_info_detail';
 const FORM_PATH = '/p/c/enterprise_info_form';
 
-test.use({ storageState: { cookies: [], origins: [] } });
+test.use({
+  storageState:
+    process.env.PW_ONLINE_TARGET === '1'
+      ? process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json'
+      : { cookies: [], origins: [] },
+});
 
 function testAccount(): { email: string; password: string } {
   return {
-    email: process.env.ENTERPRISE_INFO_E2E_EMAIL ?? DEFAULT_TEST_ACCOUNT.email,
-    password: process.env.ENTERPRISE_INFO_E2E_PASSWORD ?? DEFAULT_TEST_ACCOUNT.password,
+    email: process.env.ENTERPRISE_INFO_E2E_EMAIL ?? process.env.PW_ADMIN_EMAIL ?? DEFAULT_TEST_ACCOUNT.email,
+    password:
+      process.env.ENTERPRISE_INFO_E2E_PASSWORD ??
+      process.env.PW_ADMIN_PASSWORD ??
+      DEFAULT_TEST_ACCOUNT.password,
   };
 }
 

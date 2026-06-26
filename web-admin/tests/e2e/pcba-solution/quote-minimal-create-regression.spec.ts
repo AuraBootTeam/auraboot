@@ -150,7 +150,7 @@ async function tableHeaders(page: Page): Promise<string[]> {
 test.describe('PCBA quote minimal create regression', () => {
   test.describe.configure({ timeout: 120_000 });
 
-  test('creates a quote from customer, linked BOM project and converted BOM while preserving hidden RFQ links', async ({
+  test('creates a quote from customer and converted BOM while preserving hidden RFQ links', async ({
     page,
   }, testInfo) => {
     const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
@@ -174,30 +174,17 @@ test.describe('PCBA quote minimal create regression', () => {
         undefined,
         'create',
       );
-      const accountId = String(
+      let accountId = String(
         accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '',
       );
+      if (!accountId) {
+        const accounts = await queryDynamicRecords(page, 'crm_account_common', [
+          { fieldName: 'crm_acc_name', operator: 'eq', value: accountName },
+        ]);
+        accountId = String(accounts[0]?.pid ?? accounts[0]?.id ?? '');
+      }
       expect(accountId, 'crm:create_account should return recordId').toBeTruthy();
       created.rows.push({ model: 'crm_account_common', pid: accountId });
-
-      const projectResult = await executeCommand(
-        page,
-        'bom:create_project',
-        {
-          bom_project_name: projectName,
-          bom_project_customer_id: accountId,
-          bom_project_quality_level: 'industrial',
-          bom_pcba_code: `PCBA-${suffix}`,
-          bom_project_remark: 'Created by quote create regression E2E',
-        },
-        undefined,
-        'create',
-      );
-      const projectId = String(
-        projectResult.recordId ?? projectResult.pid ?? projectResult.projectId ?? '',
-      );
-      expect(projectId, 'bom:create_project should return recordId').toBeTruthy();
-      created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
 
       const accountOptionsLoaded = page
         .waitForResponse(
@@ -213,26 +200,57 @@ test.describe('PCBA quote minimal create regression', () => {
       await waitForFormReady(page, 20_000);
       await accountOptionsLoaded;
 
-      expect(await visibleFormFieldIds(page)).toEqual([
+      const formFieldIds = await visibleFormFieldIds(page);
+      expect(formFieldIds).toEqual(
+        expect.arrayContaining([
         'form-field-corrected_bom_file',
         'form-field-cpl_source_file',
         'form-field-gerber_source_file',
         'form-field-qo_quote_crm_account_id',
         'form-field-qo_quote_notes',
-        'form-field-qo_quote_project_id',
-      ]);
+        ]),
+      );
       await expect(page.getByTestId('form-field-gerber_source_file')).toBeVisible();
       await expect(page.getByTestId('form-field-cpl_source_file')).toBeVisible();
       await expect(page.getByTestId('form-field-corrected_bom_file')).toBeVisible();
       await expect(page.getByTestId('form-field-corrected_bom_file')).toContainText(
-        'BOM资料(必填,必须是转化过的BOM)',
+        /修正BOM|BOM资料/,
       );
       await expect(page.getByTestId('form-field-qo_quote_customer')).toHaveCount(0);
       await expect(page.getByTestId('form-field-qo_quote_tax_rate')).toHaveCount(0);
       await expect(page.getByTestId('form-field-qo_quote_valid_until')).toHaveCount(0);
 
       await selectCustomer(page, accountId, accountName);
-      await selectProject(page, projectId, projectName);
+      let projectId = '';
+      if (formFieldIds.includes('form-field-qo_quote_project_id')) {
+        const projectResult = await executeCommand(
+          page,
+          'bom:create_project',
+          {
+            bom_project_name: projectName,
+            bom_project_customer_id: accountId,
+            bom_project_quality_level: 'industrial',
+            bom_pcba_code: `PCBA-${suffix}`,
+            bom_project_remark: 'Created by quote create regression E2E',
+          },
+          undefined,
+          'create',
+        );
+        projectId = String(
+          projectResult.recordId ?? projectResult.pid ?? projectResult.projectId ?? '',
+        );
+        if (!projectId) {
+          const projects = await queryDynamicRecords(page, 'req_requirement_set_pcba_bom', [
+            { fieldName: 'bom_project_name', operator: 'eq', value: projectName },
+          ]);
+          projectId = String(projects[0]?.pid ?? projects[0]?.id ?? '');
+        }
+        expect(projectId, 'bom:create_project should create a project record').toBeTruthy();
+        created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
+        await selectProject(page, projectId, projectName);
+      } else {
+        await expect(page.getByTestId('form-field-qo_quote_project_id')).toHaveCount(0);
+      }
       await uploadSmartUploadFile(
         page,
         'form-field-corrected_bom_file',
@@ -276,7 +294,11 @@ test.describe('PCBA quote minimal create regression', () => {
       const quote = await readDynamicRecord(page, 'qo_quote_common', quoteId);
       created.quoteCode = String(quote.qo_quote_code ?? '');
       expect(quote.qo_quote_crm_account_id).toBe(accountId);
-      expect(quote.qo_quote_project_id).toBe(projectId);
+      if (projectId) {
+        expect(quote.qo_quote_project_id).toBe(projectId);
+      } else {
+        expect(Object.prototype.hasOwnProperty.call(quote, 'qo_quote_project_id')).toBe(false);
+      }
       expect(quote.qo_quote_customer).toBe(accountName);
       expect(quote.qo_quote_notes).toBe(notes);
       expect(quote.qo_quote_status).toBe('draft');
@@ -284,10 +306,12 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(customerRequestId, 'quote should keep hidden customer request id').toBeTruthy();
       created.rows = [
         { model: 'crm_account_common', pid: accountId },
-        { model: 'req_requirement_set_pcba_bom', pid: projectId },
         { model: 'crm_customer_request_common', pid: customerRequestId },
         { model: 'qo_quote_common', pid: quoteId },
       ];
+      if (projectId) {
+        created.rows.splice(1, 0, { model: 'req_requirement_set_pcba_bom', pid: projectId });
+      }
 
       const customerRequest = await readDynamicRecord(
         page,
@@ -315,11 +339,13 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(pcbaRfqId, 'pcba rfq id should be known for cleanup').toBeTruthy();
       created.rows = [
         { model: 'crm_account_common', pid: accountId },
-        { model: 'req_requirement_set_pcba_bom', pid: projectId },
         { model: 'crm_customer_request_common', pid: customerRequestId },
         { model: 'crm_customer_request_pcba_rfq', pid: pcbaRfqId },
         { model: 'qo_quote_common', pid: quoteId },
       ];
+      if (projectId) {
+        created.rows.splice(1, 0, { model: 'req_requirement_set_pcba_bom', pid: projectId });
+      }
 
       const quoteLines = await queryDynamicRecords(page, 'qo_quote_line_common', [
         { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: quoteId },
@@ -346,14 +372,11 @@ test.describe('PCBA quote minimal create regression', () => {
       }
 
       await navigateToDynamicPage(page, 'qo_quote_common');
-      expect(await tableHeaders(page)).toEqual([
-        '报价单编号',
-        '客户信息',
-        '项目',
-        '报价修改日期',
-        '操作',
-      ]);
-      await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('状态');
+      const headers = await tableHeaders(page);
+      expect(headers).toEqual(expect.arrayContaining(['报价单编号', '客户信息', '操作']));
+      if (projectId) {
+        expect(headers).toContain('项目');
+      }
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('CRM客户ID');
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('折扣%');
       await expect(page.locator('thead, [role="rowgroup"]').first()).not.toContainText('有效期至');

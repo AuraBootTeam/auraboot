@@ -50,6 +50,7 @@ const viewerStorageState = storageStatePath(
 const artifactDir = process.env.PW_ARTIFACT_DIR || './test-results/artifacts';
 const reportDir = process.env.PW_REPORT_DIR || './test-results/html-report';
 const resultsJson = process.env.PW_RESULTS_JSON || './test-results/results.json';
+const authHeader = process.env.PW_AUTH_HEADER;
 const deepSpecPattern = /.*-deep\.spec\.ts$/;
 const quoteOpsCurrentSpecNames = [
   'enterprise-info-profile',
@@ -191,6 +192,7 @@ export default defineConfig({
     launchOptions: {
       args: ['--no-proxy-server'],
     },
+    ...(authHeader ? { extraHTTPHeaders: { Authorization: authHeader } } : {}),
   },
 
   // Browser projects

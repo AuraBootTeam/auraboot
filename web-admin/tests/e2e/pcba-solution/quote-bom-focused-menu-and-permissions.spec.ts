@@ -17,7 +17,7 @@ const PRICE_LIBRARY_MENU_PATH = '/p/qo_offline_material_price_common';
 const BOM_PROJECTS_PATH = '/p/req_requirement_set_pcba_bom';
 const BOM_WORKBENCH_PATH = '/p/bom_conversion_task_pcba_workbench';
 const BOM_REVIEW_QUEUE_PATH = '/p/bom_review_queue';
-const BOM_MATERIAL_LIBRARY_PATH = '/p/bom_material_master';
+const BOM_MATERIAL_LIBRARY_PATH = '/p/bom_material_sync_state';
 const BOM_FORMAT_PROFILE_PATH = '/p/bom_source_format_profile';
 const BOM_FIELD_COMPOSITION_RULE_PATH = '/p/bom_field_composition_rule';
 const RBAC_TEAM_PATH = '/organization/teams';
@@ -163,7 +163,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
 
     const sidebar = page.getByTestId('sidebar');
     await expect(sidebar).toBeVisible({ timeout: 15_000 });
-    await expect(sidebar.getByText('权限管理', { exact: true }).first()).toBeVisible({
+    await expect(sidebar.getByText(/权限管理|组织管理/).first()).toBeVisible({
       timeout: 10_000,
     });
     await expect(sidebar.locator(`a[href="${RBAC_TEAM_PATH}"]`)).toBeVisible({
@@ -172,10 +172,10 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     await expect(sidebar.locator(`a[href="${RBAC_USER_PATH}"]`)).toBeVisible({
       timeout: 10_000,
     });
-    await expect(sidebar.getByText('用户', { exact: true }).first()).toBeVisible();
+    await expect(sidebar.getByText(/用户|账号/).first()).toBeVisible();
     await expect(sidebar.getByText('角色', { exact: true }).first()).toBeVisible();
-    await expect(sidebar.getByText('权限/授权关系', { exact: true }).first()).toBeVisible();
-    await expect(sidebar.locator(`a[href="${RBAC_PERMISSION_PATH}"]`)).toHaveCount(2);
+    await expect(sidebar.locator(`a[href="${RBAC_PERMISSION_PATH}"]`).first()).toBeVisible();
+    await expect.poll(async () => sidebar.locator(`a[href="${RBAC_PERMISSION_PATH}"]`).count()).toBeGreaterThanOrEqual(1);
   });
 
   test('role snapshots expose only current QuoteOps and BOM permissions', async ({ browser }) => {

@@ -87,8 +87,8 @@ interface TestUser {
 
 const TEST_USERS: TestUser[] = [
   {
-    email: DEFAULT_TEST_ACCOUNT.email,
-    password: DEFAULT_TEST_ACCOUNT.password,
+    email: process.env.PW_ADMIN_EMAIL || DEFAULT_TEST_ACCOUNT.email,
+    password: process.env.PW_ADMIN_PASSWORD || DEFAULT_TEST_ACCOUNT.password,
     storageFile: 'admin.json',
     role: 'admin',
   },
@@ -416,8 +416,11 @@ setup('authenticate as admin', async ({ page, baseURL: configURL }) => {
     return;
   }
 
-  let ok = await loginViaApi(page, baseURL, user);
-  if (!ok) {
+  let ok =
+    process.env.PW_ONLINE_TARGET === '1' && !process.env.SESSION_SECRET
+      ? await loginViaUI(page, baseURL, user)
+      : await loginViaApi(page, baseURL, user);
+  if (!ok && process.env.PW_ONLINE_TARGET !== '1') {
     ok = await loginViaUI(page, baseURL, user);
   }
 

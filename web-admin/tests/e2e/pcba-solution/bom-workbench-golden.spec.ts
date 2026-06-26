@@ -186,7 +186,13 @@ test.describe('BOM standardization workbench golden', () => {
       });
       await expect(page.locator('tbody')).not.toContainText('MCU direct copy');
 
-      await page.getByTestId('metric-strip-item-reason_clear_filter').click();
+      const reasonFilters = page.getByTestId('metric-strip-bom_workbench_reason_filters');
+      const clearFilter = page.getByTestId('metric-strip-item-reason_clear_filter');
+      if ((await clearFilter.count()) > 0) {
+        await clearFilter.click();
+      } else {
+        await reasonFilters.getByRole('button', { name: /^全部(?:\s+\d+)?$/ }).click();
+      }
       await expect(page.locator('tbody')).toContainText('MCU direct copy', { timeout: 20_000 });
 
       await page.locator('tbody tr').filter({ hasText: '10K resistor canonical' }).first().click();
@@ -290,6 +296,9 @@ test.describe('BOM standardization workbench golden', () => {
           decisions: ['manual_confirm', 'undo'],
         });
 
+      await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/i }).click();
+      await expect(page.getByTestId('review-drawer-minimized')).toBeVisible({ timeout: 10_000 });
+
       const regenerateResponsePromise = page.waitForResponse(
         (response) =>
           response.url().includes('/api/meta/commands/execute/bom:regenerate_export') &&
@@ -336,8 +345,6 @@ test.describe('BOM standardization workbench golden', () => {
           revisionCount: 2,
         });
 
-      await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/i }).click();
-      await expect(page.getByTestId('review-drawer-minimized')).toBeVisible({ timeout: 10_000 });
       await page.getByRole('tab', { name: /导出版本|Export Revisions/i }).click();
       await expect(page.getByTestId('artifact-timeline')).toBeVisible({ timeout: 20_000 });
       await expect(page.getByTestId('artifact-timeline')).toContainText('Rev 2');
