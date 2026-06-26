@@ -43,9 +43,8 @@ class EmployeeAccountProvisioningServiceTest {
     void provision_mapsEmployeeTypesAndGeneratesCustomerPasswords() {
         when(roleService.findByTenantId(7L)).thenReturn(List.of(
                 role(1L, "tenant_admin"),
-                role(2L, "bom_engineering"),
-                role(3L, "qo_procurement"),
-                role(4L, "qo_sales")
+                role(2L, "bom_operator"),
+                role(3L, "qo_quoter")
         ));
         when(userProvisioningService.provision(any(), eq(7L), eq(100L)))
                 .thenAnswer(invocation -> response(invocation.getArgument(0)));
@@ -74,19 +73,19 @@ class EmployeeAccountProvisioningServiceTest {
                 .extracting(UserProvisionRequest::getRoleCodes)
                 .containsExactly(
                         List.of("tenant_admin"),
-                        List.of("qo_sales"),
-                        List.of("qo_procurement"),
-                        List.of("bom_engineering")
+                        List.of("bom_operator", "qo_quoter"),
+                        List.of("bom_operator", "qo_quoter"),
+                        List.of("bom_operator")
                 );
     }
 
     @Test
     void provision_missingMappedRoleFailsBeforeCreatingUsers() {
-        when(roleService.findByTenantId(7L)).thenReturn(List.of(role(1L, "bom_engineering")));
+        when(roleService.findByTenantId(7L)).thenReturn(List.of(role(1L, "qo_quoter")));
 
         assertThatThrownBy(() -> service.provision(request(List.of(row("袁称磊", "销售"))), 7L, 100L))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("qo_sales");
+                .hasMessageContaining("bom_operator");
         verify(userProvisioningService, never()).provision(any(), any(), any());
     }
 

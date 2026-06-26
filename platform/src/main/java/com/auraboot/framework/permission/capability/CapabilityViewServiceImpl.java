@@ -34,9 +34,12 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
         Map<String, String> names = allActive.stream()
                 .filter(p -> p.getCode() != null && p.getName() != null && !p.getName().isBlank())
                 .collect(Collectors.toMap(PermissionDTO::getCode, PermissionDTO::getName, (a, b) -> a));
+        Map<String, Map<String, Object>> extensions = allActive.stream()
+                .filter(p -> p.getCode() != null && p.getExtension() != null && !p.getExtension().isEmpty())
+                .collect(Collectors.toMap(PermissionDTO::getCode, PermissionDTO::getExtension, (a, b) -> a));
         Set<String> granted = roleCodes(roleId);
         List<CapabilityDefinitionDTO> declarations = capabilityRegistryService.listDeclarations(tenantId);
-        return capabilityResolver.resolve(declarations, allCodes, granted, names);
+        return capabilityResolver.resolve(declarations, allCodes, granted, names, extensions);
     }
 
     @Override

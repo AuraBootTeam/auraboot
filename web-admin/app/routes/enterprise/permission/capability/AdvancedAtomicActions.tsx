@@ -18,6 +18,9 @@ interface AdvancedAtomicActionsProps {
 interface FlatRow {
   resourceCode: string;
   resourceName: string;
+  displayGroup: string;
+  displayGroupOrder: number;
+  displayOrder: number;
   permissionId: number;
   permissionPid: string;
   code: string;
@@ -65,9 +68,13 @@ export default function AdvancedAtomicActions({
       for (const res of mod.resources) {
         for (const act of res.actions) {
           if (!act.supported) continue;
+          const extension = act.extension ?? {};
           out.push({
             resourceCode: res.resourceCode,
             resourceName: res.resourceName,
+            displayGroup: stringValue(extension.displayGroup) ?? res.resourceName,
+            displayGroupOrder: numberValue(extension.displayGroupOrder),
+            displayOrder: numberValue(extension.displayOrder),
             permissionId: act.permissionId,
             permissionPid: act.permissionPid,
             code: act.code,
@@ -80,7 +87,7 @@ export default function AdvancedAtomicActions({
         }
       }
     }
-    return out;
+    return out.sort(compareRows);
   }, [matrix]);
 
   const totalCodes = rows.length;
@@ -96,12 +103,13 @@ export default function AdvancedAtomicActions({
     });
   }, [rows, query, onlyGranted, onlyUncovered, sources]);
 
-  // Group filtered rows by resource, preserving first-seen order.
+  // Group filtered rows by explicit display group, preserving sorted first-seen order.
   const grouped = useMemo(() => {
-    const map = new Map<string, { resourceName: string; rows: FlatRow[] }>();
+    const map = new Map<string, { groupName: string; rows: FlatRow[] }>();
     for (const r of filtered) {
-      if (!map.has(r.resourceCode)) map.set(r.resourceCode, { resourceName: r.resourceName, rows: [] });
-      map.get(r.resourceCode)!.rows.push(r);
+      const key = r.displayGroup || r.resourceCode;
+      if (!map.has(key)) map.set(key, { groupName: r.displayGroup || r.resourceName, rows: [] });
+      map.get(key)!.rows.push(r);
     }
     return [...map.entries()];
   }, [filtered]);
@@ -191,10 +199,10 @@ export default function AdvancedAtomicActions({
                 {t('admin.permission.advanced.empty', undefined, 'No matching permission codes')}
               </div>
             ) : (
-              grouped.map(([resourceCode, { resourceName, rows: resRows }]) => (
-                <div key={resourceCode} data-testid={`atomic-resource-${resourceCode}`}>
+              grouped.map(([groupKey, { groupName, rows: resRows }]) => (
+                <div key={groupKey} data-testid={`atomic-resource-${groupKey}`}>
                   <div className="border-b border-gray-100 bg-gray-50/60 px-3 py-1.5 text-[11px] text-gray-500 dark:border-gray-800 dark:bg-gray-800/40">
-                    {resourceName} <span className="ml-1 font-mono text-gray-400">{resourceCode}</span>
+                    {groupName}
                   </div>
                   {resRows.map((r) => {
                     const src = sourceFor(sources, r.code);
@@ -303,4 +311,25 @@ export default function AdvancedAtomicActions({
       )}
     </section>
   );
+}
+
+function compareRows(a: FlatRow, b: FlatRow): number {
+  const groupOrderDelta = a.displayGroupOrder - b.displayGroupOrder;
+  if (groupOrderDelta !== 0) return groupOrderDelta;
+  const orderDelta = a.displayOrder - b.displayOrder;
+  if (orderDelta !== 0) return orderDelta;
+  return a.code.localeCompare(b.code);
+}
+
+function numberValue(value: unknown): number {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : Number.MAX_SAFE_INTEGER;
+  }
+  return Number.MAX_SAFE_INTEGER;
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value : null;
 }

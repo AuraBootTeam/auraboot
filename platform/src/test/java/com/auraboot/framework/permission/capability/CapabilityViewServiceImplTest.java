@@ -42,6 +42,12 @@ class CapabilityViewServiceImplTest {
         return d;
     }
 
+    private PermissionDTO perm(Long id, String pid, String code, java.util.Map<String, Object> extension) {
+        PermissionDTO d = perm(id, pid, code);
+        d.setExtension(extension);
+        return d;
+    }
+
     private CapabilityDefinitionDTO decl(String code, String group, String... includes) {
         return CapabilityDefinitionDTO.builder().code(code).group(group).includes(List.of(includes)).build();
     }
@@ -65,6 +71,29 @@ class CapabilityViewServiceImplTest {
         assertThat(cap.getCode()).isEqualTo("crm.cap.account");
         assertThat(cap.getLabel()).isEqualTo("维护客户资料");
         assertThat(cap.isGranted()).isFalse(); // crm.account.manage not granted
+    }
+
+    @Test
+    void resolvesDisplayMetadataFromPermissionExtensions() {
+        when(permissionService.findAllActive())
+                .thenReturn(List.of(perm(1L, "p1", "qo.quote.read", java.util.Map.of(
+                        "displayGroup", "报价管理",
+                        "displayGroupOrder", 10,
+                        "displayOrder", 10
+                ))));
+        when(permissionService.findRolePermissions(5L)).thenReturn(List.of());
+        when(registry.listDeclarations(any())).thenReturn(List.of(
+                CapabilityDefinitionDTO.builder().code("qo.cap.quote_view").group("报价单").nameZhCN("查看报价")
+                        .includes(List.of("qo.quote.read")).build()));
+
+        MetaContext.setContext(1L, 1L, "p", "u");
+        List<CapabilityGroup> groups = service.resolveForRole(5L);
+
+        CapabilityGroup group = groups.get(0);
+        Capability cap = group.getCapabilities().get(0);
+        assertThat(group.getGroup()).isEqualTo("报价管理");
+        assertThat(cap.getDisplayGroupOrder()).isEqualTo(10);
+        assertThat(cap.getDisplayOrder()).isEqualTo(10);
     }
 
     @Test

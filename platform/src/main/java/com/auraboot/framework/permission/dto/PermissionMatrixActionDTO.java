@@ -18,5 +18,6 @@ public record PermissionMatrixActionDTO(
     String scopeType,       // current scope for this role+action (null if not configured)
     String mergeStrategy,   // MAX or MIN (null if not configured)
     String policySchema,    // JSON string of policy_schema, null if no schema defined
-    Map<String, Object> policyValues  // current policy values for this role+permission
+    Map<String, Object> policyValues, // current policy values for this role+permission
+    Map<String, Object> extension     // display metadata such as displayGroup/displayOrder
 ) {}

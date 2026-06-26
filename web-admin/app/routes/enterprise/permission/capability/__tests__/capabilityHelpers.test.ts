@@ -99,4 +99,30 @@ describe('capabilityHelpers', () => {
     expect(split.advancedGranted).toBe(3);
     expect(split.advancedTotal).toBe(4);
   });
+
+  it('sorts primary capability groups and capabilities by display metadata', () => {
+    const mixed: CapabilityGroup[] = [
+      {
+        group: '规则配置',
+        capabilities: [
+          { code: 'bom.rule.manage', group: '规则配置', label: '编辑 BOM 规则', sensitive: false, includes: [], granted: false, conventionDerived: false, displayGroupOrder: 80, displayOrder: 20 },
+        ],
+      },
+      {
+        group: '报价管理',
+        capabilities: [
+          { code: 'qo.cap.quote_edit', group: '报价管理', label: '编辑报价', sensitive: false, includes: [], granted: false, conventionDerived: false, displayGroupOrder: 10, displayOrder: 30 },
+          { code: 'qo.cap.quote_view', group: '报价管理', label: '查看报价', sensitive: false, includes: [], granted: true, conventionDerived: false, displayGroupOrder: 10, displayOrder: 10 },
+        ],
+      },
+    ];
+
+    const split = splitCapabilityGroupsForPrimaryView(mixed);
+
+    expect(split.primaryGroups.map((group) => group.group)).toEqual(['报价管理', '规则配置']);
+    expect(split.primaryGroups[0].capabilities.map((capability) => capability.code)).toEqual([
+      'qo.cap.quote_view',
+      'qo.cap.quote_edit',
+    ]);
+  });
 });

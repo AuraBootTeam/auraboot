@@ -23,6 +23,8 @@ public class Capability {
     private boolean sensitive;
     /** Preset tier this capability belongs to (viewer/editor/admin); null for convention-derived. */
     private String tier;
+    private Integer displayGroupOrder;
+    private Integer displayOrder;
     private List<String> includes;
     /** True when every code in {@link #includes} is currently granted to the subject. */
     private boolean granted;

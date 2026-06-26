@@ -179,6 +179,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             .collect(Collectors.groupingBy(PermissionDTO::getParentId, LinkedHashMap::new, Collectors.toList()));
 
         List<PermissionMatrixModuleDTO> moduleDTOs = new ArrayList<>();
+        Set<Long> attachedActionIds = new HashSet<>();
 
         for (PermissionDTO module : modules) {
             List<PermissionDTO> moduleResources = resourcesByModule.getOrDefault(module.getId(), Collections.emptyList());
@@ -186,6 +187,10 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             List<PermissionMatrixResourceDTO> resourceDTOs = new ArrayList<>();
             for (PermissionDTO resource : moduleResources) {
                 List<PermissionDTO> resourceActions = actionsByResource.getOrDefault(resource.getId(), Collections.emptyList());
+                resourceActions.stream()
+                    .map(PermissionDTO::getId)
+                    .filter(Objects::nonNull)
+                    .forEach(attachedActionIds::add);
                 List<PermissionMatrixActionDTO> actionDTOs = buildActionDTOs(resourceActions, grantedIds, scopeMap, policyMap);
                 resourceDTOs.add(new PermissionMatrixResourceDTO(
                     resource.getResourceCode() != null ? resource.getResourceCode() : resource.getCode(),
@@ -205,6 +210,12 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             }
         }
 
+        List<PermissionDTO> orphanActions = actions.stream()
+            .filter(action -> action.getId() == null || !attachedActionIds.contains(action.getId()))
+            .filter(action -> action.getResourceCode() != null || action.getAction() != null)
+            .toList();
+        moduleDTOs.addAll(buildFlatModules(orphanActions, grantedIds, scopeMap, policyMap));
+
         return new PermissionMatrixDTO(moduleDTOs);
     }
 
@@ -212,6 +223,17 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
                                                  Set<Long> grantedIds,
                                                  Map<String, RoleDataScope> scopeMap,
                                                  Map<Long, Map<String, Object>> policyMap) {
+        return new PermissionMatrixDTO(buildFlatModules(allPermissions, grantedIds, scopeMap, policyMap));
+    }
+
+    private List<PermissionMatrixModuleDTO> buildFlatModules(List<PermissionDTO> allPermissions,
+                                                             Set<Long> grantedIds,
+                                                             Map<String, RoleDataScope> scopeMap,
+                                                             Map<Long, Map<String, Object>> policyMap) {
+        if (allPermissions.isEmpty()) {
+            return List.of();
+        }
+
         // Group by resourceType as module, then by resourceCode as resource
         Map<String, Map<String, List<PermissionDTO>>> grouped = new LinkedHashMap<>();
 
@@ -246,7 +268,7 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
             ));
         }
 
-        return new PermissionMatrixDTO(moduleDTOs);
+        return moduleDTOs;
     }
 
     private List<PermissionMatrixActionDTO> buildActionDTOs(
@@ -292,7 +314,8 @@ public class PermissionMatrixServiceImpl implements PermissionMatrixService {
                     scope != null ? scope.getScopeType() : null,
                     scope != null ? scope.getMergeStrategy() : null,
                     policySchemaJson,
-                    policyValues
+                    policyValues,
+                    p.getExtension()
                 );
             })
             .toList();

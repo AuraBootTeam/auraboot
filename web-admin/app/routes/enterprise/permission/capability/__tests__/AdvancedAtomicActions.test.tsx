@@ -28,6 +28,8 @@ const matrix: PermissionMatrixDTO = {
           actions: [
             { permissionId: 1, permissionPid: 'p1', code: 'crm.account.read', action: 'read', label: '查看客户', granted: true, supported: true, scopeType: 'dept' },
             { permissionId: 2, permissionPid: 'p2', code: 'crm.account.export', action: 'export', label: '导出客户', granted: true, supported: true },
+            { permissionId: 3, permissionPid: 'p3', code: 'crm.account.manage', action: 'manage', label: '维护客户', granted: false, supported: true, extension: { displayGroup: '客户管理', displayGroupOrder: 20, displayOrder: 20 } },
+            { permissionId: 4, permissionPid: 'p4', code: 'crm.account.audit', action: 'audit', label: '审计客户', granted: false, supported: true, extension: { displayGroup: '审计', displayGroupOrder: 80, displayOrder: 10 } },
           ],
         },
       ],
@@ -104,5 +106,14 @@ describe('AdvancedAtomicActions', () => {
     fireEvent.click(screen.getByTestId('advanced-filter-uncovered'));
     expect(screen.queryByTestId('atomic-row-crm.account.export')).toBeTruthy();
     expect(screen.queryByTestId('atomic-row-crm.account.read')).toBeNull();
+  });
+
+  it('groups and sorts rows by permission display metadata when present', () => {
+    renderAdvanced();
+    fireEvent.click(screen.getByTestId('advanced-atomic-toggle'));
+
+    const bodyText = screen.getByTestId('advanced-atomic-body').textContent ?? '';
+    expect(bodyText.indexOf('客户管理')).toBeLessThan(bodyText.indexOf('审计'));
+    expect(bodyText.indexOf('crm.account.manage')).toBeLessThan(bodyText.indexOf('crm.account.audit'));
   });
 });

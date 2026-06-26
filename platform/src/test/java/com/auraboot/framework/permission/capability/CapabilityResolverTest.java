@@ -146,6 +146,33 @@ class CapabilityResolverTest {
     }
 
     @Test
+    void declaredCapabilityInheritsDisplayMetadataFromIncludedPermission() {
+        CapabilityDefinitionDTO quoteView = CapabilityDefinitionDTO.builder()
+                .code("qo.cap.quote_view").group("报价单").nameZhCN("查看报价")
+                .includes(List.of("qo.quote.read")).order(99).build();
+        CapabilityDefinitionDTO ruleManage = CapabilityDefinitionDTO.builder()
+                .code("bom.cap.rule_manage").group("规则").nameZhCN("编辑规则")
+                .includes(List.of("bom.rule.manage")).order(1).build();
+
+        List<CapabilityGroup> groups = resolver.resolve(
+                List.of(ruleManage, quoteView),
+                List.of("qo.quote.read", "bom.rule.manage"),
+                Set.of(),
+                Map.of(),
+                Map.of(
+                        "qo.quote.read", Map.of("displayGroup", "报价管理", "displayGroupOrder", 10, "displayOrder", 10),
+                        "bom.rule.manage", Map.of("displayGroup", "规则配置", "displayGroupOrder", 80, "displayOrder", 20, "sensitive", true)
+                ));
+
+        assertThat(groups).extracting(CapabilityGroup::getGroup).containsExactly("报价管理", "规则配置");
+        Capability quote = cap(group(groups, "报价管理"), "qo.cap.quote_view");
+        assertThat(quote.getDisplayGroupOrder()).isEqualTo(10);
+        assertThat(quote.getDisplayOrder()).isEqualTo(10);
+        Capability rule = cap(group(groups, "规则配置"), "bom.cap.rule_manage");
+        assertThat(rule.isSensitive()).isTrue();
+    }
+
+    @Test
     void expandToPermissionCodesUnionsSelectedIncludes() {
         CapabilityDefinitionDTO account = CapabilityDefinitionDTO.builder()
                 .code("crm.cap.account").includes(List.of("crm.account.read", "crm.account.manage")).build();

@@ -84,6 +84,30 @@ class PermissionMatrixServiceImplTest {
     }
 
     @Test
+    void getMatrixPreservesFlatActionsWhenHierarchyExists() {
+        PermissionDTO module = permission(1L, "model", 1, null, "MODEL", null, null);
+        PermissionDTO resource = permission(2L, "model.user", 2, 1L, "MODEL", "model.user", null);
+        PermissionDTO action = permission(3L, "model.user.read", 3, 2L, "MODEL", "model.user", "read");
+        PermissionDTO flatAction = permission(4L, "qo.quote.read", null, null, "quote", "qo_quote_common", "read");
+        flatAction.setExtension(Map.of(
+            "displayGroup", "报价管理",
+            "displayGroupOrder", 10,
+            "displayOrder", 10,
+            "focusedRolePermission", true
+        ));
+        when(permissionService.findAllActive()).thenReturn(List.of(module, resource, action, flatAction));
+
+        PermissionMatrixDTO matrix = service.getMatrix(100L);
+
+        assertThat(matrix.modules()).hasSize(2);
+        assertThat(matrix.modules().get(1).moduleCode()).isEqualTo("quote");
+        assertThat(matrix.modules().get(1).resources().get(0).resourceCode()).isEqualTo("qo_quote_common");
+        assertThat(matrix.modules().get(1).resources().get(0).actions().get(0).extension())
+            .containsEntry("displayGroup", "报价管理")
+            .containsEntry("focusedRolePermission", true);
+    }
+
+    @Test
     void getMatrixFallsBackToFlatGrouping() {
         // No level=1 or level=2 — falls back to grouping by resourceType + resourceCode
         PermissionDTO p1 = permission(10L, "model.user.read", null, null, "MODEL", "model.user", "read");
