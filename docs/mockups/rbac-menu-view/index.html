@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RBAC 权限页 — 菜单视角 mockup</title>
+<style>
+  :root{
+    --accent:#2563eb; --accent-weak:#dbeafe; --line:#e5e7eb; --ink:#1f2937;
+    --muted:#6b7280; --faint:#9ca3af; --bg:#f9fafb; --card:#fff;
+    --green:#16a34a; --amber:#d97706;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--bg);font-size:14px;}
+  .wrap{display:flex;height:100vh;}
+  /* role list */
+  .roles{width:260px;border-right:1px solid var(--line);background:var(--card);padding:16px;overflow:auto;}
+  .roles h2{font-size:18px;margin-bottom:4px;}
+  .roles .sub{color:var(--muted);font-size:12px;margin-bottom:12px;}
+  .search{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;font-size:13px;}
+  .role{padding:10px;border-radius:8px;cursor:pointer;margin-bottom:4px;}
+  .role.active{background:var(--accent-weak);}
+  .role .nm{font-weight:600;}
+  .role .tag{font-size:11px;color:var(--accent);background:#eff6ff;padding:1px 6px;border-radius:10px;margin-left:6px;}
+  .role .d{font-size:12px;color:var(--faint);margin-top:2px;}
+  /* editor */
+  .editor{flex:1;overflow:auto;padding:24px 28px;}
+  .ttl{font-size:20px;font-weight:700;}
+  .ttl .desc{font-size:13px;color:var(--muted);font-weight:400;margin-top:2px;}
+  .tabs{display:flex;gap:20px;border-bottom:1px solid var(--line);margin:14px 0 18px;}
+  .tab{padding:8px 2px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
+  .tab.active{color:var(--accent);border-color:var(--accent);font-weight:600;}
+  /* data scope bar */
+  .scope{display:flex;align-items:center;gap:10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:14px;}
+  .scope .ic{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;}
+  .scope b{color:var(--accent);}
+  .scope .hint{color:var(--muted);font-size:12px;margin-left:auto;}
+  .scope .edit{color:var(--accent);font-size:13px;cursor:pointer;}
+  /* presets */
+  .presets{display:flex;align-items:center;gap:8px;margin-bottom:16px;}
+  .presets .lbl{color:var(--muted);font-size:12px;}
+  .preset{padding:5px 14px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;font-size:13px;}
+  .preset:hover{border-color:var(--accent);color:var(--accent);}
+  /* MENU-VIEW: tree of menus */
+  .note{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;font-size:12.5px;color:#92400e;margin-bottom:16px;line-height:1.6;}
+  .menugrp{border:1px solid var(--line);border-radius:10px;margin-bottom:12px;overflow:hidden;}
+  .menugrp>.hd{display:flex;align-items:center;gap:8px;padding:11px 14px;background:#f8fafc;cursor:pointer;font-weight:600;}
+  .menugrp>.hd .ico{width:18px;text-align:center;color:var(--muted);}
+  .menugrp>.hd .count{font-size:12px;color:var(--faint);font-weight:400;}
+  .menugrp>.hd .chev{margin-left:auto;color:var(--faint);}
+  .menurow{display:flex;align-items:flex-start;gap:10px;padding:10px 14px 10px 40px;border-top:1px solid #f3f4f6;}
+  .menurow.lead{padding-left:14px;} /* top-level leaf menu (no parent) */
+  .menurow .mname{min-width:150px;display:flex;align-items:center;gap:7px;padding-top:2px;}
+  .menurow .mname .mi{color:var(--muted);width:16px;text-align:center;}
+  .menurow .mname .sub{font-size:11px;color:var(--faint);}
+  .ops{display:flex;flex-wrap:wrap;gap:8px;flex:1;}
+  .op{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:13px;cursor:pointer;background:#fff;user-select:none;}
+  .op input{accent-color:var(--accent);}
+  .op.on{border-color:var(--accent);background:var(--accent-weak);}
+  .op.read{color:#374151;}
+  .op.manage{}
+  .op .lock{font-size:11px;}
+  .opnote{flex-basis:100%;font-size:11px;color:var(--faint);padding-left:2px;}
+  /* advanced */
+  .adv{border:1px dashed var(--line);border-radius:10px;margin-top:18px;}
+  .adv .hd{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;color:var(--muted);}
+  .adv .hd .count{margin-left:auto;font-size:12px;color:var(--faint);}
+  .adv .body{padding:0 14px 14px 14px;color:var(--faint);font-size:12.5px;display:none;}
+  .adv.open .body{display:block;}
+  .footer{display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:14px;border-top:1px solid var(--line);}
+  .footer .sum{color:var(--muted);font-size:12px;}
+  .save{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:8px 22px;font-size:14px;cursor:pointer;}
+  .legend{display:flex;gap:16px;font-size:12px;color:var(--muted);margin-bottom:14px;}
+  .legend .k{display:inline-flex;align-items:center;gap:5px;}
+  .sw{width:12px;height:12px;border-radius:3px;display:inline-block;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <!-- role list (unchanged from current) -->
+  <aside class="roles">
+    <h2>权限管理</h2>
+    <div class="sub">管理系统权限、角色和用户权限分配</div>
+    <input class="search" placeholder="搜索角色...">
+    <div class="role active"><span class="nm">管理员</span><span class="tag">管理员</span><div class="d">Focused runtime admi…</div></div>
+    <div class="role"><span class="nm">BOM 操作员</span><span class="tag">BOM 操作员</span><div class="d">工程岗</div></div>
+    <div class="role"><span class="nm">报价员</span><span class="tag">报价员</span><div class="d">销售/采购</div></div>
+  </aside>
+
+  <!-- editor: MENU-VIEW -->
+  <main class="editor">
+    <div class="ttl">管理员 <div class="desc">Focused runtime administrator with tenant management access.</div></div>
+    <div class="tabs"><div class="tab active">能力</div><div class="tab">成员管理</div></div>
+
+    <div class="note">
+      <b>菜单视角(本 mockup 的改动)</b>:权限按<strong>左侧导航菜单的真实结构</strong>组织 —— 每个菜单一行,后面是该菜单上的操作(查看 / 编辑 / 管理)。
+      授权 = “让这个角色能进哪些菜单、在里面能做什么”。与旧的抽象业务组(报价管理 / 来料处理 / 寻源与定价…)相比,管理员看到的就是用户实际会用的功能树,有限、稳定、一眼对得上。
+    </div>
+
+    <!-- data scope (unchanged) -->
+    <div class="scope">
+      <span class="ic">◉</span><span>管理范围(数据范围):<b>全部数据</b></span>
+      <span class="hint">决定能管哪些记录,与“能做什么”分开</span>
+      <span class="edit">修改范围 →</span>
+    </div>
+
+    <!-- presets (unchanged) -->
+    <div class="presets">
+      <span class="lbl">预设</span>
+      <span class="preset">查看者</span><span class="preset">编辑者</span><span class="preset">管理员</span>
+    </div>
+
+    <div class="legend">
+      <span class="k"><span class="sw" style="background:var(--accent-weak);border:1px solid var(--accent)"></span>已授予</span>
+      <span class="k">查看 = 能进菜单/看列表</span>
+      <span class="k">编辑/管理 = 能增改删</span>
+      <span class="k">🔒 = 敏感(默认不给)</span>
+    </div>
+
+    <!-- ============ MENU TREE ============ -->
+
+    <!-- top-level leaf: 客户 -->
+    <div class="menugrp">
+      <div class="menurow lead">
+        <div class="mname"><span class="mi">▤</span>客户</div>
+        <div class="ops">
+          <label class="op on read"><input type="checkbox" checked>查看客户</label>
+          <label class="op manage"><input type="checkbox">管理客户</label>
+          <div class="opnote">查看 = 解析客户名 + 进客户菜单(crm.account.read + model.crm_account_common.read);管理 = 增改删(crm.account.manage)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- top-level leaf: 项目 -->
+    <div class="menugrp">
+      <div class="menurow lead">
+        <div class="mname"><span class="mi">▦</span>项目</div>
+        <div class="ops">
+          <label class="op on read"><input type="checkbox" checked>查看项目</label>
+          <label class="op on manage"><input type="checkbox" checked>维护项目</label>
+        </div>
+      </div>
+    </div>
+
+    <!-- group: BOM转化工具 -->
+    <div class="menugrp">
+      <div class="hd"><span class="ico">▤</span>BOM 转化工具<span class="count">4 个菜单</span><span class="chev">▾</span></div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">▥</span>BOM 工作台</div>
+        <div class="ops"><label class="op on read"><input type="checkbox" checked>查看</label><label class="op on manage"><input type="checkbox" checked>执行转换与导出</label></div>
+      </div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">⟳</span>同步金蝶物料库</div>
+        <div class="ops"><label class="op on read"><input type="checkbox" checked>查看物料库</label><label class="op on manage"><input type="checkbox" checked>管理 / 同步</label></div>
+      </div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">⚙</span>格式 Profile<div class="sub">来源格式规则 · 字段组合规则</div></div>
+        <div class="ops"><label class="op on read"><input type="checkbox" checked>查看规则</label><label class="op on manage"><input type="checkbox" checked>编辑规则</label></div>
+      </div>
+    </div>
+
+    <!-- group: 报价工具 -->
+    <div class="menugrp">
+      <div class="hd"><span class="ico">▣</span>报价工具<span class="count">2 个菜单</span><span class="chev">▾</span></div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">▤</span>报价单</div>
+        <div class="ops">
+          <label class="op on read"><input type="checkbox" checked>查看报价</label>
+          <label class="op on manage"><input type="checkbox" checked>新建草稿</label>
+          <label class="op on manage"><input type="checkbox" checked>编辑报价</label>
+          <label class="op on manage"><input type="checkbox" checked>生成报价单</label>
+          <label class="op manage"><input type="checkbox">查看成本 <span class="lock">🔒</span></label>
+        </div>
+      </div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">▤</span>采购价格库</div>
+        <div class="ops"><label class="op on read"><input type="checkbox" checked>查看</label><label class="op on manage"><input type="checkbox" checked>寻源 / 采纳价 / 工艺费</label></div>
+      </div>
+    </div>
+
+    <!-- group: 组织管理 (was the buried 组织与权限管理) -->
+    <div class="menugrp">
+      <div class="hd"><span class="ico">▦</span>组织管理<span class="count">6 个菜单</span><span class="chev">▾</span></div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">▦</span>组织架构 / 职位 / 人员</div>
+        <div class="ops"><label class="op on read"><input type="checkbox" checked>查看</label><label class="op on manage"><input type="checkbox" checked>维护组织</label></div>
+      </div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">⊞</span>团队</div>
+        <div class="ops"><label class="op on read"><input type="checkbox" checked>查看</label><label class="op on manage"><input type="checkbox" checked>维护团队</label></div>
+      </div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">☺</span>账号</div>
+        <div class="ops"><label class="op on read"><input type="checkbox" checked>查看成员</label><label class="op on manage"><input type="checkbox" checked>管理成员(审批/停用/重置)</label></div>
+      </div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">⛉</span>角色</div>
+        <div class="ops"><label class="op on read"><input type="checkbox" checked>查看角色</label><label class="op on manage"><input type="checkbox" checked>管理角色与授权</label><label class="op on manage"><input type="checkbox" checked>管理权限与菜单</label></div>
+      </div>
+    </div>
+
+    <!-- group: 系统管理 -->
+    <div class="menugrp">
+      <div class="hd"><span class="ico">⚙</span>系统管理<span class="count">4 个菜单</span><span class="chev">▾</span></div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">▦</span>企业信息</div>
+        <div class="ops"><label class="op on read"><input type="checkbox" checked>查看</label><label class="op on manage"><input type="checkbox" checked>维护企业信息</label></div>
+      </div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">🛡</span>账号安全策略</div>
+        <div class="ops"><label class="op on manage"><input type="checkbox">管理 <span class="lock">🔒</span></label></div>
+      </div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">☁</span>模型服务</div>
+        <div class="ops"><label class="op on manage"><input type="checkbox">管理 AI/模型配置</label></div>
+      </div>
+      <div class="menurow">
+        <div class="mname"><span class="mi">⚙</span>系统偏好</div>
+        <div class="ops"><label class="op on manage"><input type="checkbox">管理</label></div>
+      </div>
+    </div>
+
+    <!-- advanced escape hatch (model noise + non-menu codes) -->
+    <div class="adv" id="adv">
+      <div class="hd" onclick="document.getElementById('adv').classList.toggle('open')">
+        <span>▸ 高级 · 原子权限(逃生舱)</span>
+        <span class="count">288 个底层权限码 · 默认折叠</span>
+      </div>
+      <div class="body">
+        所有未归入上面菜单的底层 <code>model.*</code> / 系统权限码(约 288 个)在这里按 资源 × 动作 列出,供审计 / 破例授权 ~5% 高级用户使用。普通管理员不需要展开。
+      </div>
+    </div>
+
+    <div class="footer">
+      <span class="sum">有效菜单 18 项 · 已授予操作 30 · 数据范围: 全部数据</span>
+      <button class="save">保存</button>
+    </div>
+  </main>
+</div>
+</body>
+</html>
