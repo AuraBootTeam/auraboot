@@ -2,6 +2,7 @@
   {
     "code": "org.cap.hr",
     "group": "组织与权限管理",
+    "displayGroupOrder": 90,
     "name:zh-CN": "维护组织架构",
     "name:en": "Manage Organization",
     "description": "查看与维护组织架构、职位、人员",
@@ -15,6 +16,7 @@
   {
     "code": "org.cap.hr_view",
     "group": "组织与权限管理",
+    "displayGroupOrder": 90,
     "name:zh-CN": "查看组织架构",
     "name:en": "View Organization",
     "description": "只读查看组织架构、职位、人员",
@@ -27,6 +29,7 @@
   {
     "code": "org.cap.team",
     "group": "组织与权限管理",
+    "displayGroupOrder": 90,
     "name:zh-CN": "维护团队",
     "name:en": "Manage Teams",
     "description": "查看与维护团队",
@@ -40,6 +43,7 @@
   {
     "code": "org.cap.member",
     "group": "组织与权限管理",
+    "displayGroupOrder": 90,
     "name:zh-CN": "管理账号成员",
     "name:en": "Manage Members",
     "description": "查看、审批、停用、重置租户成员账号",
@@ -58,6 +62,7 @@
   {
     "code": "org.cap.member_view",
     "group": "组织与权限管理",
+    "displayGroupOrder": 90,
     "name:zh-CN": "查看账号成员",
     "name:en": "View Members",
     "description": "只读查看租户成员账号",
@@ -70,6 +75,7 @@
   {
     "code": "org.cap.role",
     "group": "组织与权限管理",
+    "displayGroupOrder": 90,
     "name:zh-CN": "管理角色与授权",
     "name:en": "Manage Roles & Grants",
     "description": "查看与维护角色、给成员分配角色",
@@ -85,6 +91,7 @@
   {
     "code": "org.cap.role_view",
     "group": "组织与权限管理",
+    "displayGroupOrder": 90,
     "name:zh-CN": "查看角色",
     "name:en": "View Roles",
     "description": "只读查看角色与授权关系",
@@ -98,6 +105,7 @@
   {
     "code": "org.cap.permission",
     "group": "组织与权限管理",
+    "displayGroupOrder": 90,
     "name:zh-CN": "管理权限与菜单",
     "name:en": "Manage Permissions & Menus",
     "description": "查看与维护权限项、授权关系、菜单可见性",
@@ -114,6 +122,7 @@
   {
     "code": "org.cap.tenant",
     "group": "组织与权限管理",
+    "displayGroupOrder": 90,
     "name:zh-CN": "维护企业信息",
     "name:en": "Manage Enterprise Profile",
     "description": "查看与维护企业信息、邀请成员",

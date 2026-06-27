@@ -21,6 +21,15 @@ class CapabilityResolverTest {
         return g.getCapabilities().stream().filter(c -> code.equals(c.getCode())).findFirst().orElseThrow();
     }
 
+    private int indexOfGroup(List<CapabilityGroup> groups, String name) {
+        for (int i = 0; i < groups.size(); i++) {
+            if (name.equals(groups.get(i).getGroup())) {
+                return i;
+            }
+        }
+        throw new AssertionError("group not found: " + name);
+    }
+
     @Test
     void declaredCapabilityIsGrantedWhenAllIncludesHeld() {
         CapabilityDefinitionDTO decl = CapabilityDefinitionDTO.builder()
@@ -36,6 +45,29 @@ class CapabilityResolverTest {
         assertThat(c.getTier()).isEqualTo("editor");
         assertThat(c.isGranted()).isTrue();
         assertThat(c.isConventionDerived()).isFalse();
+    }
+
+    @Test
+    void declarationDisplayGroupOrderControlsGroupSorting() {
+        // R5-fix: a declared capability whose includes carry NO permission-extension group order
+        // (e.g. org/admin codes) can still control where its group sorts via the declaration's own
+        // displayGroupOrder, instead of falling to the 10000 floor and sinking below everything.
+        CapabilityDefinitionDTO org = CapabilityDefinitionDTO.builder()
+                .code("org.cap.role").group("组织与权限管理").displayGroupOrder(90)
+                .includes(List.of("org.role.read")).build();
+        CapabilityDefinitionDTO noOrder = CapabilityDefinitionDTO.builder()
+                .code("x.cap.misc").group("其它")
+                .includes(List.of("x.misc.read")).build();
+
+        List<CapabilityGroup> groups = resolver.resolve(List.of(noOrder, org),
+                List.of("org.role.read", "x.misc.read"), Set.of());
+
+        Capability orgCap = cap(group(groups, "组织与权限管理"), "org.cap.role");
+        assertThat(orgCap.getDisplayGroupOrder()).isEqualTo(90);
+        // 90 sorts before the 10000-floor "其它" group.
+        int orgIdx = indexOfGroup(groups, "组织与权限管理");
+        int miscIdx = indexOfGroup(groups, "其它");
+        assertThat(orgIdx).isLessThan(miscIdx);
     }
 
     @Test

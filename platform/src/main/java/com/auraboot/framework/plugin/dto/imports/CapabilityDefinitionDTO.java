@@ -52,6 +52,14 @@ public class CapabilityDefinitionDTO {
     @Builder.Default
     private Integer order = 100;
 
+    /**
+     * Group display order in the v2 permission page. Lets a declared capability control where its
+     * group sorts without relying on an underlying permission's {@code displayGroupOrder} extension
+     * (which scattered admin/org codes don't carry). Permission-extension group order still wins when
+     * present (keeps business plugins unchanged); otherwise this value is used; otherwise 10000.
+     */
+    private Integer displayGroupOrder;
+
     public boolean isValid() {
         return code != null && !code.isBlank() && includes != null && !includes.isEmpty();
     }
