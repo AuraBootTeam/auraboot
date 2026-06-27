@@ -122,9 +122,15 @@ public class DictController {
         return ApiResponse.success(result);
     }
 
+    // Render-time dictionary reads (by-code, by-code/data, data/batch) are
+    // baseline-readable for any authenticated user: enum/dict values are
+    // application structure (same class as model/field/page render schema),
+    // not tenant data. Gating them per-role breaks every dict-backed form
+    // dropdown with "Access forbidden" mid-form. Dictionary *management*
+    // (create/update/delete = DICT_MANAGE) and governance lookups (by-pid /
+    // paged query = DICT_READ) stay gated; tenant isolation still applies.
     @GetMapping("/by-code/{code}")
     @Operation(summary = "根据编码获取字典", description = "根据字典编码获取当前版本的字典")
-    @RequirePermission(MetaPermission.DICT_READ)
     public ApiResponse<DictDTO> getDictByCode(
             @Parameter(description = "字典编码") @PathVariable @NotBlank String code) {
         log.info("根据编码获取字典: code={}", logSafe(code));
@@ -138,7 +144,6 @@ public class DictController {
 
     @GetMapping("/by-code/{code}/data")
     @Operation(summary = "根据编码加载字典数据", description = "根据字典编码加载字典数据（用于表单下拉框）")
-    @RequirePermission(MetaPermission.DICT_READ)
     public ApiResponse<DictDataResult> loadDictDataByCode(
             @Parameter(description = "字典编码") @PathVariable @NotBlank String code,
             @Parameter(description = "版本策略") @RequestParam(defaultValue = "latest") String versionStrategy,
@@ -218,9 +223,10 @@ public class DictController {
     }
 
 
+    // Render-time batch dict load (forms with multiple dict fields) — baseline,
+    // see getDictByCode note above.
     @PostMapping("/data/batch")
     @Operation(summary = "批量加载字典数据", description = "批量根据版本策略加载字典数据")
-    @RequirePermission(MetaPermission.DICT_READ)
     public ApiResponse<List<DictDataResult>> batchLoadDictData(
             @Valid @RequestBody List<DictLoadRequest> requests) {
         log.info("批量加载字典数据: count={}", requests.size());
@@ -281,9 +287,10 @@ public class DictController {
 
     // ==================== 级联字典 ====================
 
+    // Cascade dict reads (children / tree / query) drive cascading form
+    // dropdowns at render time — baseline, same rationale as getDictByCode.
     @GetMapping("/{pid}/cascade/children")
     @Operation(summary = "获取级联字典子项", description = "获取级联字典的子项列表")
-    @RequirePermission(MetaPermission.DICT_READ)
     public ApiResponse<List<DictItemData>> getCascadeChildren(
             @Parameter(description = "字典PID") @PathVariable @NotBlank String pid,
             @Parameter(description = "父级值") @RequestParam(required = false) String parentValue) {
@@ -295,7 +302,6 @@ public class DictController {
 
     @GetMapping("/{pid}/cascade/tree")
     @Operation(summary = "构建级联字典树", description = "构建完整的级联字典树结构")
-    @RequirePermission(MetaPermission.DICT_READ)
     public ApiResponse<DictTreeNode> buildCascadeTree(
             @Parameter(description = "字典PID") @PathVariable @NotBlank String pid) {
         log.info("构建级联字典树: pid={}", logSafe(pid));
@@ -306,7 +312,6 @@ public class DictController {
 
     @PostMapping("/cascade/query")
     @Operation(summary = "查询级联字典", description = "根据条件查询级联字典数据")
-    @RequirePermission(MetaPermission.DICT_READ)
     public ApiResponse<CascadeDictResult> queryCascadeDict(
             @Valid @RequestBody CascadeDictRequest request) {
         log.info("查询级联字典: dictCode={}", logSafe(request.getDictCode()));
