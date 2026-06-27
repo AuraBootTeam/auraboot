@@ -4336,6 +4336,7 @@ CREATE TABLE IF NOT EXISTS ab_permission_capability (
     sensitive           BOOLEAN NOT NULL DEFAULT FALSE,
     unmasks_fields      TEXT,                           -- comma-separated model.field
     order_no            INTEGER NOT NULL DEFAULT 100,
+    display_group_order INTEGER,                         -- v2 page group order (declaration-level; null -> 10000 floor)
     created_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_permission_capability UNIQUE (tenant_id, code)
