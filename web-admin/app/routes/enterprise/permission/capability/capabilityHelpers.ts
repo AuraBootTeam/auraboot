@@ -49,6 +49,7 @@ const FOCUSED_PRIMARY_GROUPS = new Set([
   '规则配置',
   '权限管理',
   '团队与用户',
+  '组织与权限管理',
 ]);
 
 function isAdvancedCapability(capability: Capability): boolean {
