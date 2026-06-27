@@ -51,6 +51,9 @@ public class CapabilityRecord {
     @TableField("order_no")
     private Integer orderNo;
 
+    @TableField("display_group_order")
+    private Integer displayGroupOrder;
+
     @TableField(value = "created_at", fill = FieldFill.INSERT)
     private Instant createdAt;
 

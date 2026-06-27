@@ -48,6 +48,7 @@ public class CapabilityRegistryServiceImpl implements CapabilityRegistryService 
         r.setSensitive(Boolean.TRUE.equals(dto.getSensitive()));
         r.setUnmasksFields(joinCsv(dto.getUnmasksFields()));
         r.setOrderNo(dto.getOrder() == null ? 100 : dto.getOrder());
+        r.setDisplayGroupOrder(dto.getDisplayGroupOrder());
         return r;
     }
 
@@ -63,6 +64,7 @@ public class CapabilityRegistryServiceImpl implements CapabilityRegistryService 
                 .sensitive(Boolean.TRUE.equals(r.getSensitive()))
                 .unmasksFields(splitCsv(r.getUnmasksFields()))
                 .order(r.getOrderNo())
+                .displayGroupOrder(r.getDisplayGroupOrder())
                 .build();
     }
 
