@@ -217,6 +217,46 @@ describe('ToolbarBlockRenderer', () => {
     expect(passedRecord).toBeUndefined();
   });
 
+  it('disables the button while its action is in flight and ignores re-entrant double-clicks', async () => {
+    const runtime = makeRuntime();
+    let resolveAction: () => void = () => {};
+    handleActionSpy.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveAction = resolve;
+        }),
+    );
+    const block = {
+      type: 'toolbar',
+      buttons: [
+        {
+          code: 'sync',
+          label: 'Sync',
+          action: { type: 'command', command: 'bom:sync_material_reconcile_now' },
+        },
+      ],
+    };
+
+    const { getByTestId } = render(<ToolbarBlockRenderer block={block as any} runtime={runtime} />);
+    const btn = getByTestId('toolbar-btn-sync') as HTMLButtonElement;
+
+    // First click starts the action; the button must disable while it is in flight.
+    fireEvent.click(btn);
+    await waitFor(() => expect(btn.disabled).toBe(true));
+
+    // Rapid extra clicks while in flight must NOT fire the command again — this is
+    // the front-line guard against double-triggering a sync into a duplicate insert.
+    fireEvent.click(btn);
+    fireEvent.click(btn);
+    expect(handleActionSpy).toHaveBeenCalledTimes(1);
+
+    // Once the action settles the button re-enables and can fire again.
+    resolveAction();
+    await waitFor(() => expect(btn.disabled).toBe(false));
+    fireEvent.click(btn);
+    expect(handleActionSpy).toHaveBeenCalledTimes(2);
+  });
+
   it('dispatches legacy bare button.handler through useActionHandler (normalized to events.onClick.handler)', () => {
     const runtime = makeRuntime();
     const block = {
