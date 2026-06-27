@@ -158,6 +158,30 @@ class CapabilityViewServiceImplTest {
     }
 
     @Test
+    void readOnlyCapabilityGrantsReadCodesButNeverManage() {
+        // R3: a viewer-tier capability (crm.cap.account_view = read + model-read, NO manage)
+        // coexists with the editor-tier crm.cap.account (read + manage + model-read). Selecting
+        // ONLY the read-only capability must grant the read codes but NEVER the manage code, so a
+        // role (e.g. engineering / bom_operator) can resolve customer names without being able to
+        // create/edit/delete customers. This is the positive+negative contract behind crm.cap.account_view.
+        when(registry.listDeclarations(any())).thenReturn(List.of(
+                decl("crm.cap.account_view", "客户管理", "crm.account.read", "model.crm_account_common.read"),
+                decl("crm.cap.account", "客户管理", "crm.account.read", "crm.account.manage", "model.crm_account_common.read")));
+        when(permissionService.findAllActive()).thenReturn(List.of(
+                perm(1L, "p1", "crm.account.read"),
+                perm(2L, "p2", "crm.account.manage"),
+                perm(3L, "p3", "model.crm_account_common.read")));
+        when(permissionService.findRolePermissions(5L)).thenReturn(List.of()); // fresh role
+
+        MetaContext.setContext(1L, 1L, "p", "u");
+        service.applyCapabilitySelection(5L, Set.of("crm.cap.account_view")); // read-only only
+
+        // positive: read (1) + model-read (3) granted; negative: manage (2) is NEVER granted
+        verify(rolePermissionService).assignPermissionsToRole(eq(5L),
+                argThat(ids -> ids.size() == 2 && ids.contains(1L) && ids.contains(3L) && !ids.contains(2L)));
+    }
+
+    @Test
     void partiallyGrantedResourceIsNotStrippedBySave() {
         // role holds only billing.license.read (e.g. granted earlier via the advanced matrix). The
         // convention-derived "billing.license" capability is NOT fully held, so it stays out of the
