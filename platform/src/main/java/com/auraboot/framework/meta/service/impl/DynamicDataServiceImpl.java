@@ -472,49 +472,84 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     /**
-     * Enrich REFERENCE fields with display values from target models (GAP-124 Lookup Field).
-     * For each REFERENCE field with a configured refTarget in extraProps, batch-fetches
-     * referenced records and populates a synthetic "{fieldCode}_display" column.
-     * <p>
-     * Reference config is stored in {@code FieldDefinition.extraProps} under key "refTarget"
-     * as a Map with keys: targetEntity (model code), displayField (field code to show).
+     * Resolve a reference field's target as canonical {@code [targetModelCode, displayField]}, or null.
+     * Import normalizes every writing style to {@code refTarget.targetEntity} (C1), so this reads only
+     * the canonical key — from the typed refTarget, else extraProps.refTarget, else
+     * extraProps.extension.refTarget (the two storage locations the canonical may land in). No
+     * compatibility with the legacy modelCode/targetModel writing styles (collapsed at import).
      */
     @SuppressWarnings("unchecked")
+    private String[] resolveCanonicalRefTarget(FieldDefinition field) {
+        if (field == null) return null;
+        if (field.getRefTarget() != null && field.getRefTarget().getTargetEntity() != null
+                && !field.getRefTarget().getTargetEntity().isBlank()) {
+            return new String[] { field.getRefTarget().getTargetEntity(), field.getRefTarget().getDisplayField() };
+        }
+        Map<String, Object> extra = field.getExtraProps();
+        if (extra == null) return null;
+        Object rt = extra.get("refTarget");
+        if (!(rt instanceof Map) && extra.get("extension") instanceof Map<?, ?> ext) {
+            rt = ((Map<String, Object>) ext).get("refTarget");
+        }
+        if (!(rt instanceof Map)) return null;
+        Map<String, Object> m = (Map<String, Object>) rt;
+        String target = m.get("targetEntity") instanceof String s && !s.isBlank() ? s : null;
+        if (target == null) return null;
+        String display = m.get("displayField") instanceof String d && !d.isBlank() ? d : null;
+        return new String[] { target, display };
+    }
+
+    /** True when {@code displayField} on {@code targetModelCode} is masked for this user (sensitive). */
+    private boolean isDisplayFieldMasked(Long tenantId, Long userId, String targetModelCode, String displayField) {
+        if (tenantId == null || userId == null) return false;
+        try {
+            List<FieldMaskRule> rules = dataPermissionEngine.getFieldMaskRules(tenantId, targetModelCode, userId);
+            if (rules != null) {
+                for (FieldMaskRule rule : rules) {
+                    if (displayField.equals(rule.getFieldCode())) return true;
+                }
+            }
+        } catch (Exception e) {
+            // Fail-safe: if we cannot determine sensitivity, suppress the system-resolved name.
+            log.warn("Reference display mask check failed for {}.{}; suppressing enrich",
+                    logSafe(targetModelCode), logSafe(displayField));
+            return true;
+        }
+        return false;
+    }
+
     private void enrichReferenceDisplayFields(String modelCode, List<Map<String, Object>> records) {
         Optional<ModelDefinition> modelOpt = metadataService.getModelDefinition(modelCode);
         if (modelOpt.isEmpty()) return;
 
         ModelDefinition model = modelOpt.get();
-        // Reference config: prefer FieldDefinition.refTarget, fallback to extraProps.refTarget
         List<FieldDefinition> refFields = model.getFields().stream()
                 .filter(f -> "reference".equals(f.getDataType()))
-                .filter(f -> {
-                    if (f.getRefTarget() != null && f.getRefTarget().getTargetEntity() != null) return true;
-                    return f.getExtraProps() != null && f.getExtraProps().get("refTarget") instanceof Map;
-                })
+                .filter(f -> resolveCanonicalRefTarget(f) != null)
                 .toList();
 
         if (refFields.isEmpty()) return;
+
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
 
         for (FieldDefinition refField : refFields) {
             String fieldCode = refField.getCode();
             String columnName = refField.getColumnName() != null ? refField.getColumnName() : fieldCode;
 
-            String targetModelCode;
-            String displayField;
-            if (refField.getRefTarget() != null && refField.getRefTarget().getTargetEntity() != null) {
-                targetModelCode = refField.getRefTarget().getTargetEntity();
-                displayField = refField.getRefTarget().getDisplayField();
-            } else {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> refTargetMap = (Map<String, Object>) refField.getExtraProps().get("refTarget");
-                targetModelCode = refTargetMap.get("targetEntity") instanceof String s ? s : null;
-                if (targetModelCode == null) {
-                    targetModelCode = refTargetMap.get("targetModel") instanceof String s2 ? s2 : null;
-                }
-                displayField = refTargetMap.get("displayField") instanceof String s3 ? s3 : null;
-            }
+            String[] canonical = resolveCanonicalRefTarget(refField);
+            if (canonical == null) continue;
+            String targetModelCode = canonical[0];
+            String displayField = canonical[1];
             if (targetModelCode == null || targetModelCode.isBlank()) continue;
+
+            // Sensitive reference: if the display field is masked for THIS user on the target model,
+            // do NOT system-resolve a name — leave it to the normal per-user path so masking/field
+            // permission is honored (敏感引用不出名/仍按权限). Names (the usual displayField) are not
+            // masked, so this only suppresses genuinely sensitive display fields.
+            if (displayField != null && isDisplayFieldMasked(tenantId, userId, targetModelCode, displayField)) {
+                continue;
+            }
 
             // Collect unique reference IDs
             Set<String> refIds = new java.util.LinkedHashSet<>();
@@ -883,6 +918,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // Apply field-level permission filtering — remove hidden fields
             record = applyFieldPermissionFilterSingle(modelCode, record);
         }
+
+        // Resolve reference display names (same as list) so the detail page shows names, not pids.
+        List<Map<String, Object>> single = new java.util.ArrayList<>(1);
+        single.add(record);
+        enrichReferenceDisplayFields(modelCode, single);
+        record = single.get(0);
 
         return record;
     }
@@ -2160,6 +2201,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             } catch (Exception e) {
                 log.warn("Failed to apply export masking for model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
             }
+
+            // Resolve reference display names so the export shows names, not pids (same as list/detail).
+            enrichReferenceDisplayFields(modelCode, data);
 
             // Determine export fields
             List<String> exportFields = exportRequest.getFields();

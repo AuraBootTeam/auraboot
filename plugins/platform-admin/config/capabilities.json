@@ -1,0 +1,134 @@
+[
+  {
+    "code": "sys.cap.console",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "系统配置与安全策略",
+    "name:en": "System Config & Security Policy",
+    "description": "进入系统管理,维护账号安全策略、系统偏好、基础设施状态",
+    "includes": [
+      "system_management"
+    ],
+    "tier": "admin",
+    "order": 10
+  },
+  {
+    "code": "sys.cap.model_service",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "模型服务配置",
+    "name:en": "Model / LLM Provider Config",
+    "description": "查看与配置 LLM/DeepSeek 模型服务(AI 中心)",
+    "includes": [
+      "ai_center"
+    ],
+    "tier": "admin",
+    "order": 20
+  },
+  {
+    "code": "sys.cap.login_channel",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "登录渠道管理",
+    "name:en": "Login Channel Management",
+    "description": "管理登录渠道与认证方式",
+    "includes": [
+      "login_channel_manage"
+    ],
+    "tier": "admin",
+    "order": 30
+  },
+  {
+    "code": "sys.cap.cloud_config",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "云服务配置",
+    "name:en": "Cloud Service Config",
+    "description": "管理对象存储、消息等云服务配置",
+    "includes": [
+      "cloud_config_manage"
+    ],
+    "tier": "admin",
+    "order": 40
+  },
+  {
+    "code": "sys.cap.notification_rule",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "通知规则管理",
+    "name:en": "Notification Rule Management",
+    "description": "管理系统通知规则与订阅",
+    "includes": [
+      "notification_rule_manage"
+    ],
+    "tier": "admin",
+    "order": 50
+  },
+  {
+    "code": "sys.cap.automation",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "自动化查看",
+    "name:en": "Automation View",
+    "description": "查看自动化规则与执行",
+    "includes": [
+      "automation.automation.read"
+    ],
+    "tier": "viewer",
+    "order": 60
+  },
+  {
+    "code": "sys.cap.data_permission",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "数据权限策略",
+    "name:en": "Data Permission Policy",
+    "description": "管理行级/字段级数据权限策略",
+    "includes": [
+      "admin_data_permission"
+    ],
+    "tier": "admin",
+    "order": 70
+  },
+  {
+    "code": "sys.cap.integration",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "集成与连接器",
+    "name:en": "Integrations & Connectors",
+    "description": "管理 Webhook 订阅与 API 连接器",
+    "includes": [
+      "admin_webhook",
+      "admin_api_connector"
+    ],
+    "tier": "admin",
+    "order": 80
+  },
+  {
+    "code": "sys.cap.plugin",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "插件与应用模板",
+    "name:en": "Plugins & App Templates",
+    "description": "管理插件安装与应用模板市场",
+    "includes": [
+      "plugin_management",
+      "plugin.plugin.manage"
+    ],
+    "tier": "admin",
+    "order": 90
+  },
+  {
+    "code": "sys.cap.scheduled_task",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "定时任务管理",
+    "name:en": "Scheduled Task Management",
+    "description": "管理系统定时任务",
+    "includes": [
+      "admin_scheduled_task"
+    ],
+    "tier": "admin",
+    "order": 100
+  }
+]

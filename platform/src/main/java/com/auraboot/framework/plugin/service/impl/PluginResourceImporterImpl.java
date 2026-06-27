@@ -656,46 +656,66 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         return feature.isEmpty() ? null : feature;
     }
 
+    /**
+     * Normalize a reference field's target config to ONE canonical shape, collapsing the four
+     * historical writing styles (top-level {@code referenceModelCode}, {@code refTarget.modelCode},
+     * {@code refTarget.targetModel}, {@code refTarget.targetEntity}) into the canonical
+     * {@code refTarget.targetEntity}. The persisted {@code ref_target} therefore always uses
+     * {@code targetEntity}; the alias keys ({@code modelCode}/{@code targetModel}) are dropped so the
+     * runtime has a single shape to read. Other refTarget keys (valueField, relationship, filter, …)
+     * are preserved. C1: import is the single normalization point; runtime reads canonical only.
+     */
+    @SuppressWarnings("unchecked")
     private Map<String, Object> resolveFieldRefTarget(FieldDefinitionDTO dto) {
+        // Source refTarget may be declared top-level (dto.refTarget) OR nested under extension.refTarget
+        // (the shape many plugin field JSON files use). Prefer the explicit top-level one.
+        Map<String, Object> source = new LinkedHashMap<>();
         if (dto.getRefTarget() != null && !dto.getRefTarget().isEmpty()) {
-            return dto.getRefTarget();
-        }
-        if (!"reference".equalsIgnoreCase(dto.getDataType())) {
-            return null;
-        }
-
-        // Determine the effective reference model code.
-        // Priority: explicit referenceModelCode > extension.referenceModelCode > extension.refModelCode
-        String modelCode = dto.getReferenceModelCode();
-        if ((modelCode == null || modelCode.isBlank()) && dto.getExtension() != null) {
-            Object extRefModelCode = dto.getExtension().get("referenceModelCode");
-            if (extRefModelCode == null) {
-                extRefModelCode = dto.getExtension().get("refModelCode");
-            }
-            if (extRefModelCode instanceof String s && !s.isBlank()) {
-                modelCode = s;
-            }
+            source.putAll(dto.getRefTarget());
+        } else if (dto.getExtension() != null && dto.getExtension().get("refTarget") instanceof Map<?, ?> nested) {
+            source.putAll((Map<String, Object>) nested);
         }
 
-        if (modelCode == null || modelCode.isBlank()) {
-            return null;
+        // Resolve the target model code from any alias, in priority order.
+        String target = firstNonBlank(
+                stringOf(source.get("targetEntity")),
+                stringOf(source.get("targetModel")),
+                stringOf(source.get("modelCode")),
+                dto.getReferenceModelCode(),
+                dto.getExtension() != null ? stringOf(dto.getExtension().get("referenceModelCode")) : null,
+                dto.getExtension() != null ? stringOf(dto.getExtension().get("refModelCode")) : null);
+
+        // Not a resolvable reference: only normalize reference-type fields with a target.
+        if (target == null) {
+            return (!"reference".equalsIgnoreCase(dto.getDataType()) || source.isEmpty()) ? null : source;
         }
 
-        Map<String, Object> refTarget = new LinkedHashMap<>();
-        refTarget.put("refType", "entity");
-        refTarget.put("targetEntity", modelCode);
-        refTarget.put("modelCode", modelCode);
+        Map<String, Object> canonical = new LinkedHashMap<>(source);
+        // Drop alias keys — canonical keeps only targetEntity.
+        canonical.remove("targetModel");
+        canonical.remove("modelCode");
+        canonical.put("targetEntity", target);
+        canonical.putIfAbsent("refType", "entity");
 
-        // Resolve display field from extension.refDisplayField
-        // Must use "displayField" key to match DynamicDataServiceImpl.enrichReferenceDisplayFields()
-        if (dto.getExtension() != null) {
-            Object refDisplayField = dto.getExtension().get("refDisplayField");
-            if (refDisplayField instanceof String s && !s.isBlank()) {
-                refTarget.put("displayField", s);
+        // Display field: prefer explicit refTarget.displayField, else extension.refDisplayField.
+        if (stringOf(canonical.get("displayField")) == null && dto.getExtension() != null) {
+            String refDisplayField = stringOf(dto.getExtension().get("refDisplayField"));
+            if (refDisplayField != null) {
+                canonical.put("displayField", refDisplayField);
             }
         }
+        return canonical;
+    }
 
-        return refTarget;
+    private static String stringOf(Object v) {
+        return (v instanceof String s && !s.isBlank()) ? s : null;
+    }
+
+    private static String firstNonBlank(String... vals) {
+        for (String v : vals) {
+            if (v != null && !v.isBlank()) return v;
+        }
+        return null;
     }
 
     /**
