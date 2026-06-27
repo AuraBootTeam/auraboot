@@ -125,4 +125,20 @@ describe('capabilityHelpers', () => {
       'qo.cap.quote_edit',
     ]);
   });
+
+  it('keeps the 组织与权限管理 (org/role/permission) group in the primary view (R5)', () => {
+    const groups: CapabilityGroup[] = [
+      {
+        group: '组织与权限管理',
+        capabilities: [
+          { code: 'org.cap.role', group: '组织与权限管理', label: '管理角色与授权', sensitive: false, includes: ['org.role.read'], granted: false, conventionDerived: false, displayGroupOrder: 90, displayOrder: 40 },
+        ],
+      },
+    ];
+
+    const split = splitCapabilityGroupsForPrimaryView(groups);
+
+    expect(split.primaryGroups.map((group) => group.group)).toEqual(['组织与权限管理']);
+    expect(split.advancedGroups).toEqual([]);
+  });
 });
