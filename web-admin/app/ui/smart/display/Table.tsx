@@ -120,7 +120,7 @@ interface TableProps {
   context?: any;
   className?: string;
   visible?: boolean | string;
-  onAction?: (action: TableActionConfig, record: any, index: number) => void;
+  onAction?: (action: TableActionConfig, record: any, index: number) => void | Promise<void>;
   onSelectionChange?: (keys: (string | number)[], rows: any[]) => void;
   onExpand?: (expanded: boolean, record: any) => void;
   onSort?: (config: SortConfig) => void;
@@ -194,6 +194,13 @@ export const Table: React.FC<TableProps> = ({
   const [selectedKeys, setSelectedKeys] = useState<(string | number)[]>(selectedRowKeys);
   const [expandedKeys, setExpandedKeys] = useState<(string | number)[]>(expandedRowKeys);
   const [filterVisible, setFilterVisible] = useState<Record<string, boolean>>({});
+  // In-flight row action: disables the row's action buttons and shows a spinner on
+  // the one that was clicked while its (async) handler runs, so a rapid
+  // double-click can't fire the same command twice (e.g. "refresh material from
+  // source" → racing into a duplicate-pid insert). Harmless when onAction is
+  // synchronous (the await resolves immediately). Backend lock is the correctness
+  // backstop; this removes the common double-click trigger.
+  const [runningActionKey, setRunningActionKey] = useState<string | null>(null);
 
   // 异步数据加载
   useEffect(() => {
@@ -537,14 +544,36 @@ export const Table: React.FC<TableProps> = ({
             ? ExpressionParser.evaluate(action.disabled, actionContext)
             : false;
 
+          const actionRunKey = `${index}__${action.key}`;
+          const actionRunning = runningActionKey === actionRunKey;
+          const actionBusy = runningActionKey !== null;
+          const runAction = async () => {
+            if (actionBusy) {
+              return; // ignore re-entrant clicks while a row action is in flight
+            }
+            setRunningActionKey(actionRunKey);
+            try {
+              // await: when onAction returns a promise (command actions) the button
+              // stays disabled until it settles; when it returns void this resolves
+              // immediately and is a no-op.
+              await onAction?.(action, record, index);
+            } finally {
+              setRunningActionKey(null);
+            }
+          };
+
           return (
             <Button
               key={action.key}
               name={`${name}_action_${action.key}`}
               size="small"
               variant={action.type === 'danger' ? 'danger' : 'default'}
-              disabled={isActionDisabled}
+              disabled={isActionDisabled || actionBusy}
+              loading={actionRunning}
               onClick={async () => {
+                if (actionBusy) {
+                  return;
+                }
                 if (action.confirm) {
                   const confirmTitle =
                     typeof action.confirm === 'object' ? action.confirm.title : '确认操作';
@@ -556,10 +585,10 @@ export const Table: React.FC<TableProps> = ({
                     variant: action.type === 'danger' ? 'danger' : 'default',
                   });
                   if (confirmed) {
-                    onAction?.(action, record, index);
+                    await runAction();
                   }
                 } else {
-                  onAction?.(action, record, index);
+                  await runAction();
                 }
               }}
               className={clsx(
