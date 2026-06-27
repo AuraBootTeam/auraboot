@@ -43,15 +43,17 @@ const GROUP_TO_MENU_SECTION: Record<string, string> = {
   组织与权限管理: '组织管理',
   权限管理: '组织管理',
   团队与用户: '组织管理',
+  系统管理: '系统管理',
 };
 
-/** Section render order = sidebar menu tree order (客户 → 项目 → BOM → 报价 → 组织). */
+/** Section render order = sidebar menu tree order (客户 → 项目 → BOM → 报价 → 组织 → 系统). */
 const MENU_SECTION_ORDER: Record<string, number> = {
   客户: 10,
   项目: 20,
   'BOM 转化工具': 30,
   报价工具: 40,
   组织管理: 50,
+  系统管理: 60,
 };
 
 /** The top-level menu section a capability belongs to, or null if it has no focused menu. */
