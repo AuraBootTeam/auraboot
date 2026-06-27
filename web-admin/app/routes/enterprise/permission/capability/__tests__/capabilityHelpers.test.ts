@@ -92,12 +92,14 @@ describe('capabilityHelpers', () => {
 
     const split = splitCapabilityGroupsForPrimaryView(mixed);
 
-    expect(split.primaryGroups.map((group) => group.group)).toEqual(['报价单']);
-    expect(split.primaryGranted).toBe(1);
-    expect(split.primaryTotal).toBe(1);
-    expect(split.advancedGroups.map((group) => group.group)).toEqual(['model', '客户管理', 'meta']);
-    expect(split.advancedGranted).toBe(3);
-    expect(split.advancedTotal).toBe(4);
+    // Menu-view: business groups regroup into menu sections (报价单→报价工具, 客户管理→客户);
+    // generated model/meta capabilities fold into advanced.
+    expect(split.primaryGroups.map((group) => group.group)).toEqual(['客户', '报价工具']);
+    expect(split.primaryGranted).toBe(2); // quote_view + crm.cap.account both granted
+    expect(split.primaryTotal).toBe(2);
+    expect(split.advancedGroups.map((group) => group.group)).toEqual(['model', 'meta']);
+    expect(split.advancedGranted).toBe(2);
+    expect(split.advancedTotal).toBe(3);
   });
 
   it('sorts primary capability groups and capabilities by display metadata', () => {
@@ -119,14 +121,16 @@ describe('capabilityHelpers', () => {
 
     const split = splitCapabilityGroupsForPrimaryView(mixed);
 
-    expect(split.primaryGroups.map((group) => group.group)).toEqual(['报价管理', '规则配置']);
-    expect(split.primaryGroups[0].capabilities.map((capability) => capability.code)).toEqual([
+    // 规则配置→BOM 转化工具, 报价管理→报价工具; sections ordered by menu tree (BOM 30 < 报价 40);
+    // capabilities within a section sorted by display metadata.
+    expect(split.primaryGroups.map((group) => group.group)).toEqual(['BOM 转化工具', '报价工具']);
+    expect(split.primaryGroups[1].capabilities.map((capability) => capability.code)).toEqual([
       'qo.cap.quote_view',
       'qo.cap.quote_edit',
     ]);
   });
 
-  it('keeps the 组织与权限管理 (org/role/permission) group in the primary view (R5)', () => {
+  it('menu-view: 组织与权限管理 capabilities land in the 组织管理 section (R5/menu-view)', () => {
     const groups: CapabilityGroup[] = [
       {
         group: '组织与权限管理',
@@ -138,7 +142,23 @@ describe('capabilityHelpers', () => {
 
     const split = splitCapabilityGroupsForPrimaryView(groups);
 
-    expect(split.primaryGroups.map((group) => group.group)).toEqual(['组织与权限管理']);
+    expect(split.primaryGroups.map((group) => group.group)).toEqual(['组织管理']);
     expect(split.advancedGroups).toEqual([]);
+  });
+
+  it('menu-view: a CRM group with no focused menu (线索与商机) folds into advanced', () => {
+    const groups: CapabilityGroup[] = [
+      {
+        group: '线索与商机',
+        capabilities: [
+          { code: 'crm.cap.lead', group: '线索与商机', label: '维护线索', sensitive: false, includes: ['crm.lead.read'], granted: false, conventionDerived: false },
+        ],
+      },
+    ];
+
+    const split = splitCapabilityGroupsForPrimaryView(groups);
+
+    expect(split.primaryGroups).toEqual([]);
+    expect(split.advancedGroups.map((g) => g.group)).toEqual(['线索与商机']);
   });
 });
