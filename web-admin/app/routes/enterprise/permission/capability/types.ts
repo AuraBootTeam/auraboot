@@ -14,6 +14,8 @@ export interface Capability {
   includes: string[];
   granted: boolean;
   conventionDerived: boolean;
+  /** Menus this capability unlocks (derived server-side from menu.permissionCode ∈ includes). */
+  unlockedMenus?: string[] | null;
 }
 
 export interface CapabilityGroup {

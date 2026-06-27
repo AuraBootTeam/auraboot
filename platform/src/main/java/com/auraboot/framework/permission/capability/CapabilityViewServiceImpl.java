@@ -1,6 +1,8 @@
 package com.auraboot.framework.permission.capability;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.menu.entity.Menu;
+import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.RolePermissionService;
@@ -8,6 +10,8 @@ import com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -22,6 +26,7 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
     private final CapabilityRegistryService capabilityRegistryService;
     private final CapabilityResolver capabilityResolver;
     private final RolePermissionService rolePermissionService;
+    private final MenuMapper menuMapper;
 
     @Override
     public List<CapabilityGroup> resolveForRole(Long roleId) {
@@ -39,7 +44,47 @@ public class CapabilityViewServiceImpl implements CapabilityViewService {
                 .collect(Collectors.toMap(PermissionDTO::getCode, PermissionDTO::getExtension, (a, b) -> a));
         Set<String> granted = roleCodes(roleId);
         List<CapabilityDefinitionDTO> declarations = capabilityRegistryService.listDeclarations(tenantId);
-        return capabilityResolver.resolve(declarations, allCodes, granted, names, extensions);
+        List<CapabilityGroup> groups = capabilityResolver.resolve(declarations, allCodes, granted, names, extensions);
+        annotateUnlockedMenus(groups);
+        return groups;
+    }
+
+    /**
+     * Derive (not grant) the menus each capability unlocks: a menu is unlocked by a capability when
+     * the menu's permissionCode is one of the capability's included codes. Pure read-side decoration
+     * so the v2 page can render "解锁菜单: …"; never affects authorization.
+     */
+    private void annotateUnlockedMenus(List<CapabilityGroup> groups) {
+        Map<String, List<String>> menusByPermission = new LinkedHashMap<>();
+        for (Menu menu : menuMapper.findAllActiveMenus()) {
+            String code = menu.getPermissionCode();
+            String name = menu.getName();
+            if (code == null || code.isBlank() || name == null || name.isBlank()) {
+                continue;
+            }
+            menusByPermission.computeIfAbsent(code, k -> new ArrayList<>()).add(name);
+        }
+        if (menusByPermission.isEmpty()) {
+            return;
+        }
+        for (CapabilityGroup group : groups) {
+            for (Capability cap : group.getCapabilities()) {
+                if (cap.getIncludes() == null) {
+                    continue;
+                }
+                List<String> unlocked = new ArrayList<>();
+                for (String includedCode : cap.getIncludes()) {
+                    for (String menuName : menusByPermission.getOrDefault(includedCode, List.of())) {
+                        if (!unlocked.contains(menuName)) {
+                            unlocked.add(menuName);
+                        }
+                    }
+                }
+                if (!unlocked.isEmpty()) {
+                    cap.setUnlockedMenus(unlocked);
+                }
+            }
+        }
     }
 
     @Override
