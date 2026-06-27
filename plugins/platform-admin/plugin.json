@@ -21,6 +21,7 @@
     "permissions": "config/permissions.json",
     "menus": "config/menus.json",
     "pages": "config/pages.json",
+    "capabilities": "config/capabilities.json",
     "i18n": "config/i18n.json"
   },
   "importOptions": {
