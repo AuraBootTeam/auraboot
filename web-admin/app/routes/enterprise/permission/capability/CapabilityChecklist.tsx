@@ -44,24 +44,45 @@ export default function CapabilityChecklist({ groups, selected, onToggle }: Capa
                 <label
                   key={cap.code}
                   data-testid={`capability-${cap.code}`}
-                  className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer"
+                  className="flex items-start gap-2 text-sm text-gray-700 cursor-pointer"
                 >
                   <input
                     type="checkbox"
+                    className="mt-1"
                     data-testid={`capability-checkbox-${cap.code}`}
                     checked={selectedSet.has(cap.code)}
                     onChange={() => onToggle(cap.code)}
                   />
-                  <span>{cap.label}</span>
-                  {cap.sensitive && (
-                    <span
-                      data-testid={`capability-sensitive-${cap.code}`}
-                      title={t('permission.capability.sensitive', undefined, '敏感')}
-                      aria-label={t('permission.capability.sensitive', undefined, '敏感')}
-                    >
-                      🔒
+                  <span className="flex flex-col gap-1">
+                    <span className="flex items-center gap-2">
+                      <span>{cap.label}</span>
+                      {cap.sensitive && (
+                        <span
+                          data-testid={`capability-sensitive-${cap.code}`}
+                          title={t('permission.capability.sensitive', undefined, '敏感')}
+                          aria-label={t('permission.capability.sensitive', undefined, '敏感')}
+                        >
+                          🔒
+                        </span>
+                      )}
                     </span>
-                  )}
+                    {cap.unlockedMenus && cap.unlockedMenus.length > 0 && (
+                      <span
+                        data-testid={`capability-menus-${cap.code}`}
+                        className="flex flex-wrap items-center gap-1 text-xs text-gray-400"
+                      >
+                        <span>{t('permission.capability.unlocksMenus', undefined, '解锁菜单')}:</span>
+                        {cap.unlockedMenus.map((m) => (
+                          <span
+                            key={m}
+                            className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-500"
+                          >
+                            {m}
+                          </span>
+                        ))}
+                      </span>
+                    )}
+                  </span>
                 </label>
               ))}
             </div>

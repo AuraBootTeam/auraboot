@@ -1,6 +1,8 @@
 package com.auraboot.framework.permission.capability;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.menu.entity.Menu;
+import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.RolePermissionService;
@@ -25,9 +27,17 @@ class CapabilityViewServiceImplTest {
     private final PermissionService permissionService = mock(PermissionService.class);
     private final CapabilityRegistryService registry = mock(CapabilityRegistryService.class);
     private final RolePermissionService rolePermissionService = mock(RolePermissionService.class);
+    private final MenuMapper menuMapper = mock(MenuMapper.class);
     private final CapabilityResolver resolver = new CapabilityResolver();
     private final CapabilityViewServiceImpl service =
-            new CapabilityViewServiceImpl(permissionService, registry, resolver, rolePermissionService);
+            new CapabilityViewServiceImpl(permissionService, registry, resolver, rolePermissionService, menuMapper);
+
+    private static Menu menu(String name, String permissionCode) {
+        Menu m = new Menu();
+        m.setName(name);
+        m.setPermissionCode(permissionCode);
+        return m;
+    }
 
     @AfterEach
     void clearContext() {
@@ -61,6 +71,7 @@ class CapabilityViewServiceImplTest {
         when(registry.listDeclarations(any())).thenReturn(List.of(
                 CapabilityDefinitionDTO.builder().code("crm.cap.account").group("客户管理").nameZhCN("维护客户资料")
                         .includes(List.of("crm.account.read", "crm.account.manage")).build()));
+        when(menuMapper.findAllActiveMenus()).thenReturn(List.of());
 
         MetaContext.setContext(1L, 1L, "p", "u");
         List<CapabilityGroup> groups = service.resolveForRole(5L);
@@ -71,6 +82,28 @@ class CapabilityViewServiceImplTest {
         assertThat(cap.getCode()).isEqualTo("crm.cap.account");
         assertThat(cap.getLabel()).isEqualTo("维护客户资料");
         assertThat(cap.isGranted()).isFalse(); // crm.account.manage not granted
+    }
+
+    @Test
+    void annotatesUnlockedMenusDerivedFromIncludedCodes() {
+        // R6: a capability is decorated with the menus it unlocks (menu.permissionCode ∈ includes),
+        // so the v2 page can show "解锁菜单: …". Pure read-side derivation, no grant effect.
+        when(permissionService.findAllActive())
+                .thenReturn(List.of(perm(1L, "p1", "crm.account.read"), perm(2L, "p2", "model.crm_account_common.read")));
+        when(permissionService.findRolePermissions(5L)).thenReturn(List.of());
+        when(registry.listDeclarations(any())).thenReturn(List.of(
+                CapabilityDefinitionDTO.builder().code("crm.cap.account_view").group("客户管理").nameZhCN("查看客户")
+                        .includes(List.of("crm.account.read", "model.crm_account_common.read")).build()));
+        when(menuMapper.findAllActiveMenus()).thenReturn(List.of(
+                menu("客户", "crm.account.read"),          // unlocked by the capability
+                menu("项目", "bom.project.read")));        // unrelated, must NOT appear
+
+        MetaContext.setContext(1L, 1L, "p", "u");
+        Capability cap = service.resolveForRole(5L).stream()
+                .filter(g -> "客户管理".equals(g.getGroup())).findFirst().orElseThrow()
+                .getCapabilities().get(0);
+
+        assertThat(cap.getUnlockedMenus()).containsExactly("客户");
     }
 
     @Test
@@ -85,6 +118,7 @@ class CapabilityViewServiceImplTest {
         when(registry.listDeclarations(any())).thenReturn(List.of(
                 CapabilityDefinitionDTO.builder().code("qo.cap.quote_view").group("报价单").nameZhCN("查看报价")
                         .includes(List.of("qo.quote.read")).build()));
+        when(menuMapper.findAllActiveMenus()).thenReturn(List.of());
 
         MetaContext.setContext(1L, 1L, "p", "u");
         List<CapabilityGroup> groups = service.resolveForRole(5L);
