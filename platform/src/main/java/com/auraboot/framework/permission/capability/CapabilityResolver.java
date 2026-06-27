@@ -63,12 +63,12 @@ public class CapabilityResolver {
         decls.stream()
                 .filter(CapabilityDefinitionDTO::isValid)
                 .sorted(Comparator
-                        .comparingInt((CapabilityDefinitionDTO d) -> displayGroupOrder(d.getIncludes(), extensions))
+                        .comparingInt((CapabilityDefinitionDTO d) -> displayGroupOrder(d.getIncludes(), extensions, d.getDisplayGroupOrder()))
                         .thenComparingInt(d -> displayOrder(d.getIncludes(), extensions, d.getOrder()))
                         .thenComparing(CapabilityDefinitionDTO::getCode, Comparator.nullsLast(String::compareTo)))
                 .forEach(d -> {
                     coveredCodes.addAll(d.getIncludes());
-                    DisplayMeta displayMeta = displayMeta(d.getIncludes(), extensions, d.getGroup(), d.getOrder());
+                    DisplayMeta displayMeta = displayMeta(d.getIncludes(), extensions, d.getGroup(), d.getOrder(), d.getDisplayGroupOrder());
                     Capability cap = Capability.builder()
                             .code(d.getCode())
                             .group(displayMeta.group())
@@ -101,7 +101,7 @@ public class CapabilityResolver {
         byModuleResource.forEach((moduleResource, includes) -> {
             String module = moduleResource.substring(0, moduleResource.indexOf('.'));
             String resource = moduleResource.substring(moduleResource.indexOf('.') + 1);
-            DisplayMeta displayMeta = displayMeta(includes, extensions, module, null);
+            DisplayMeta displayMeta = displayMeta(includes, extensions, module, null, null);
             Capability cap = Capability.builder()
                     .code(moduleResource)
                     .group(displayMeta.group())
@@ -228,7 +228,8 @@ public class CapabilityResolver {
     private DisplayMeta displayMeta(List<String> includes,
                                     Map<String, Map<String, Object>> extensions,
                                     String fallbackGroup,
-                                    Integer fallbackOrder) {
+                                    Integer fallbackOrder,
+                                    Integer fallbackGroupOrder) {
         String group = null;
         Integer groupOrder = null;
         Integer order = null;
@@ -248,6 +249,11 @@ public class CapabilityResolver {
         if (order == null) {
             order = fallbackOrder;
         }
+        // Permission-extension group order wins (unchanged for business plugins); otherwise the
+        // declaration's own displayGroupOrder; otherwise the 10000 floor.
+        if (groupOrder == null) {
+            groupOrder = fallbackGroupOrder;
+        }
         return new DisplayMeta(
                 firstNonBlank(group, fallbackGroup),
                 groupOrder == null ? 10000 : groupOrder,
@@ -255,12 +261,13 @@ public class CapabilityResolver {
                 sensitive);
     }
 
-    private int displayGroupOrder(List<String> includes, Map<String, Map<String, Object>> extensions) {
-        return displayMeta(includes, extensions, "", null).groupOrder();
+    private int displayGroupOrder(List<String> includes, Map<String, Map<String, Object>> extensions,
+                                  Integer fallbackGroupOrder) {
+        return displayMeta(includes, extensions, "", null, fallbackGroupOrder).groupOrder();
     }
 
     private int displayOrder(List<String> includes, Map<String, Map<String, Object>> extensions, Integer fallbackOrder) {
-        return displayMeta(includes, extensions, "", fallbackOrder).order();
+        return displayMeta(includes, extensions, "", fallbackOrder, null).order();
     }
 
     private Integer min(Integer current, Integer next) {
