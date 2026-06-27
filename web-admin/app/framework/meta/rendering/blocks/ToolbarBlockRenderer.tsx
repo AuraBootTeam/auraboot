@@ -59,7 +59,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
     [showSuccessToast, showErrorToast, showWarningToast, showInfoToast],
   );
 
-  const { handleAction } = useActionHandler({
+  const { handleAction, loading } = useActionHandler({
     runtime,
     navigate,
     tableName,
@@ -71,9 +71,22 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
     showToast,
   });
 
+  // In-flight guard: while an action runs, disable every toolbar button and show a
+  // loading state on the one that was clicked. This makes rapid double-clicks
+  // idempotent at the UI layer — a second click is ignored and the button is
+  // disabled — which is the front-line defence against firing a command twice
+  // (e.g. triggering Kingdee material sync twice and racing into a duplicate-pid
+  // insert; the backend lock is the correctness backstop). Mirrors
+  // WorkbenchActionBarBlockRenderer's in-flight behaviour.
+  const [runningCode, setRunningCode] = React.useState<string | null>(null);
+  const busy = loading || runningCode !== null;
+
   // 处理按钮点击 - 委托给 useActionHandler
   // Toolbar 通常无 record（列表页工具栏），传 undefined 是合法的
-  const handleButtonClick = (button: ButtonConfig) => {
+  const handleButtonClick = async (button: ButtonConfig) => {
+    if (busy) {
+      return; // ignore re-entrant clicks while an action is in flight
+    }
     // Legacy compatibility: bare `button.handler` (not wrapped in events.onClick)
     // is not recognized by normalizeAction — normalize it here to preserve
     // original behavior where `button.handler` on a toolbar button was fire-able.
@@ -92,7 +105,12 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
     ) {
       return;
     }
-    handleAction(normalized, undefined);
+    setRunningCode(button.code);
+    try {
+      await handleAction(normalized, undefined);
+    } finally {
+      setRunningCode(null);
+    }
   };
 
   return (
@@ -105,23 +123,27 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
         }
 
         const label = getLocalizedText(button.label || button.content || button.code, locale, t);
+        const isRunning = runningCode === button.code;
+        const isDisabled = Boolean(button.disabled) || busy;
+        const loadingLabel = t('common.loading') || '加载中...';
 
         return (
           <button
             key={button.code}
             data-testid={`toolbar-btn-${button.code}`}
             onClick={() => handleButtonClick(button)}
-            disabled={button.disabled}
+            disabled={isDisabled}
+            aria-busy={isRunning}
             className={`rounded-control inline-flex items-center px-4 py-2 text-sm font-medium ${
               button.variant === 'primary'
                 ? 'bg-accent hover:bg-accent-hover text-white'
                 : button.variant === 'danger'
                   ? 'bg-red-600 text-white hover:bg-red-700'
                   : 'border-border-strong bg-panel text-text-2 hover:bg-hover border'
-            } ${button.disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+            } ${isDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
           >
-            {renderIcon(button.icon)}
-            {label}
+            {!isRunning && renderIcon(button.icon)}
+            {isRunning ? loadingLabel : label}
           </button>
         );
       })}
