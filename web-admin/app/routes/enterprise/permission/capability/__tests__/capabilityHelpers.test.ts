@@ -146,6 +146,22 @@ describe('capabilityHelpers', () => {
     expect(split.advancedGroups).toEqual([]);
   });
 
+  it('menu-view: 系统管理 capabilities land in the 系统管理 section (R5b)', () => {
+    const groups: CapabilityGroup[] = [
+      {
+        group: '系统管理',
+        capabilities: [
+          { code: 'sys.cap.model_service', group: '系统管理', label: '模型服务配置', sensitive: false, includes: ['ai_center'], granted: false, conventionDerived: false, displayGroupOrder: 95, displayOrder: 20 },
+        ],
+      },
+    ];
+
+    const split = splitCapabilityGroupsForPrimaryView(groups);
+
+    expect(split.primaryGroups.map((group) => group.group)).toEqual(['系统管理']);
+    expect(split.advancedGroups).toEqual([]);
+  });
+
   it('menu-view: a CRM group with no focused menu (线索与商机) folds into advanced', () => {
     const groups: CapabilityGroup[] = [
       {
