@@ -30,4 +30,10 @@ public class Capability {
     private boolean granted;
     /** True when this capability was auto-derived from code convention rather than declared. */
     private boolean conventionDerived;
+    /**
+     * Display names of the menus this capability unlocks — derived (NOT a grant primitive) by
+     * matching each menu's permissionCode against {@link #includes}. Lets the v2 permission page
+     * show "解锁菜单: …" so an admin sees the cause/effect of granting a capability.
+     */
+    private List<String> unlockedMenus;
 }

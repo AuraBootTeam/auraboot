@@ -35,4 +35,20 @@ describe('CapabilityChecklist', () => {
     fireEvent.click(screen.getByTestId('capability-checkbox-crm.cap.account'));
     expect(onToggle).toHaveBeenCalledWith('crm.cap.account');
   });
+
+  it('shows the unlocked menus for a capability (R6) and omits the row when there are none', () => {
+    const withMenus: CapabilityGroup[] = [
+      {
+        group: '客户管理',
+        capabilities: [
+          { ...cap('crm.cap.account_view', false), unlockedMenus: ['客户'] },
+          { ...cap('crm.cap.account', true), unlockedMenus: [] },
+        ],
+      },
+    ];
+    render(<CapabilityChecklist groups={withMenus} selected={[]} onToggle={() => {}} />);
+    const menus = screen.getByTestId('capability-menus-crm.cap.account_view');
+    expect(menus.textContent).toContain('客户');
+    expect(screen.queryByTestId('capability-menus-crm.cap.account')).toBeNull();
+  });
 });
