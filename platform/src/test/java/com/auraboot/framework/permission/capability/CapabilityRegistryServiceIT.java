@@ -61,13 +61,15 @@ class CapabilityRegistryServiceIT {
         capabilityRegistryService.saveDefinition(CapabilityDefinitionDTO.builder()
                 .code("crm.cap.account").group("客户管理").nameZhCN("维护客户资料")
                 .includes(List.of("crm.account.read", "crm.account.manage"))
-                .tier("editor").sensitive(false).order(10).build());
+                .tier("editor").sensitive(false).order(10).displayGroupOrder(90).build());
 
         CapabilityDefinitionDTO read = find(capabilityRegistryService.listDeclarations(TENANT_ID), "crm.cap.account");
         assertThat(read.getGroup()).isEqualTo("客户管理");
         assertThat(read.getNameZhCN()).isEqualTo("维护客户资料");
         assertThat(read.getIncludes()).containsExactly("crm.account.read", "crm.account.manage");
         assertThat(read.getTier()).isEqualTo("editor");
+        // R5-fix: displayGroupOrder must survive the DB round-trip (was dropped by toRecord/toDto).
+        assertThat(read.getDisplayGroupOrder()).isEqualTo(90);
     }
 
     @Test
