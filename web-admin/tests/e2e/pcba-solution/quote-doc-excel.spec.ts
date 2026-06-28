@@ -62,7 +62,7 @@ test.describe('Quote pricing + document excel (QO-04 / QO-07 / XLS-Q) @smoke', (
       const proj = await post(page, 'bom:create_project', { bom_project_name: `QOD ${uid}`, bom_pcba_code: `QOD-${uid}` });
       const projId = pid(proj.body);
       expect(projId, 'project created').toBeTruthy();
-      const buf = fs.readFileSync(SAMPLE_BOM);
+      const buf = fs.readFileSync(SAMPLE_BOM!);
       const up = await page.request.post('/api/file/upload', {
         multipart: { file: { name: 'bom.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: buf } },
       });
