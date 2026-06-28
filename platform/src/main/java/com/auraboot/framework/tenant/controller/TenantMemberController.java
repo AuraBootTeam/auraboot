@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.auraboot.framework.application.annotation.CurrentUserId;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.meta.dto.PaginationResult;
+import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.tenant.controller.request.ApproveRequest;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
@@ -62,6 +63,7 @@ public class TenantMemberController {
     }
 
     @PostMapping("/{memberPid}/approve")
+    @RequirePermission("member_management")
     @ResponseBody
     public ApiResponse<Boolean> approveMember(
             @PathVariable String memberPid,
@@ -73,6 +75,7 @@ public class TenantMemberController {
     }
 
     @PutMapping("/{memberPid}/status")
+    @RequirePermission("member_management")
     @ResponseBody
     public ApiResponse<Boolean> updateMemberStatus(
             @PathVariable String memberPid,
@@ -84,6 +87,7 @@ public class TenantMemberController {
     }
 
     @DeleteMapping("/{memberPid}")
+    @RequirePermission("member_management")
     @ResponseBody
     public ApiResponse<Boolean> removeMember(
             @PathVariable String memberPid,
@@ -110,6 +114,7 @@ public class TenantMemberController {
     }
 
     @PostMapping("/import")
+    @RequirePermission("member_management")
     @ResponseBody
     public ApiResponse<TenantMemberImportResult> importMembers(
             @RequestParam("file") MultipartFile file,
@@ -118,6 +123,7 @@ public class TenantMemberController {
     }
 
     @PostMapping("/import-rows")
+    @RequirePermission("member_management")
     @ResponseBody
     public ApiResponse<TenantMemberImportResult> importMembersFromRows(
             @RequestBody List<TenantMemberImportRow> rows,
@@ -126,6 +132,7 @@ public class TenantMemberController {
     }
 
     @PostMapping("/batch-delete")
+    @RequirePermission("member_management")
     @ResponseBody
     public ApiResponse<Boolean> batchRemoveMembers(
             @RequestBody List<String> memberPids,
