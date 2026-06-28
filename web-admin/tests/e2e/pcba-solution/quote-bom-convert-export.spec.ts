@@ -40,8 +40,10 @@ function findSampleBom(): string | undefined {
 }
 const SAMPLE_BOM = findSampleBom();
 
-async function post(page: Page, code: string, payload: any, op = 'create') {
-  const r = await page.request.post(`/api/meta/commands/execute/${code}`, { data: { payload, operationType: op } });
+async function post(page: Page, code: string, payload: any, op = 'create', target?: string) {
+  const data: any = { payload, operationType: op };
+  if (target) data.targetRecordPid = target;
+  const r = await page.request.post(`/api/meta/commands/execute/${code}`, { data });
   return { status: r.status(), body: await r.json().catch(() => ({})) };
 }
 
@@ -109,7 +111,7 @@ test.describe('BOM convert + export deep (BOM-03/05/08 + XLS-B) @smoke', () => {
       expect(mainText.length, 'BOM-05: workbench renders content').toBeGreaterThan(0);
 
       // 4) BOM-08 / XLS-B: regenerate export → download → parse xlsx columns
-      const exp = await post(page, 'bom:regenerate_export', { sourceRecordId: taskId }, 'update');
+      const exp = await post(page, 'bom:regenerate_export', { sourceRecordId: taskId }, 'update', taskId);
       // export fileId may surface under various keys
       const eb = exp.body?.data || {};
       const exportFileId = eb.exportFileId || eb.fileId || eb.bom_task_export_file_id || eb.export_file_id
