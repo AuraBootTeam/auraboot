@@ -4,6 +4,8 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.constant.Status;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
+import com.auraboot.framework.meta.dto.SchemaOperationResult;
+import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.Model;
 import com.auraboot.framework.meta.entity.ModelFieldBinding;
@@ -50,6 +52,8 @@ class SchemaManagementServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private MetaModelService metaModelService;
+    @Autowired
+    private SchemaManagementService schemaManagementService;
 
     @Autowired
     private MetaModelMapper metaModelMapper;
@@ -181,6 +185,93 @@ class SchemaManagementServiceIntegrationTest extends BaseIntegrationTest {
         log.info("Verified all columns exist");
     }
 
+    @Test
+    @Order(2)
+    @DisplayName("Transient field is physicalized nullable even when binding is required (#1107)")
+    void transientFieldColumnIsNullableEvenWhenRequired() throws Exception {
+        testSuffix = "_t" + System.currentTimeMillis();
+        modelCode = "schema_transient" + testSuffix;
+        tableName = "mt_" + modelCode.toLowerCase();
+
+        model = buildMetaModel(modelCode, Status.DRAFT);
+        metaModelMapper.insert(model);
+        modelPid = model.getPid();
+
+        // Reproduce the quote-core corrected_bom_file shape: virtualType=transient (so it is
+        // excluded from INSERT) + the binding marks it required (form-required UX). feature.required
+        // stays false (GAP-259: required is per-binding), matching the real import.
+        String transientCode = "uploadslot" + testSuffix;
+        String normalCode = "name" + testSuffix;
+        nameField = buildField(transientCode, "string", false, false);
+        nameField.getFeature().setVirtualType("transient");
+        statusField = buildField(normalCode, "string", false, false);
+        metaFieldMapper.insert(nameField);
+        metaFieldMapper.insert(statusField);
+
+        ModelFieldBinding transientBinding = buildBinding(model.getId(), nameField.getId(), 1);
+        transientBinding.setRequired(true);   // form-required, but column must stay nullable
+        ModelFieldBinding normalBinding = buildBinding(model.getId(), statusField.getId(), 2);
+        normalBinding.setRequired(true);      // control: a normal required field stays NOT NULL
+        fieldBindingMapper.insert(transientBinding);
+        fieldBindingMapper.insert(normalBinding);
+
+        metaModelService.publish(modelPid, "Publish transient-field test");
+        assertTrue(tableExists(tableName), "Table should exist");
+
+        Boolean transientNullable = columnIsNullable(tableName, transientCode);
+        Boolean normalNullable = columnIsNullable(tableName, normalCode);
+        log.info("transient column {} nullable={}, normal column {} nullable={}",
+                transientCode, transientNullable, normalCode, normalNullable);
+
+        assertEquals(Boolean.TRUE, transientNullable,
+                "transient field column must be NULLABLE (it is excluded from INSERT) even when the "
+                + "binding is required — otherwise create fails with a not-null violation (#1107)");
+        assertEquals(Boolean.FALSE, normalNullable,
+                "a normal required field column must stay NOT NULL (control)");
+    }
+
+    @Test
+    @Order(3)
+    @DisplayName("Transient field added via updateTableByModel sync path stays nullable (#1107)")
+    void transientFieldViaSyncPathIsNullable() throws Exception {
+        testSuffix = "_s" + System.currentTimeMillis();
+        modelCode = "schema_sync" + testSuffix;
+        tableName = "mt_" + modelCode.toLowerCase();
+
+        // Publish a model with one normal field → table created.
+        model = buildMetaModel(modelCode, Status.DRAFT);
+        metaModelMapper.insert(model);
+        modelPid = model.getPid();
+        String normalCode = "name" + testSuffix;
+        statusField = buildField(normalCode, "string", false, false);
+        metaFieldMapper.insert(statusField);
+        ModelFieldBinding b1 = buildBinding(model.getId(), statusField.getId(), 1);
+        b1.setRequired(false);
+        fieldBindingMapper.insert(b1);
+        metaModelService.publish(modelPid, "publish sync-path base");
+        assertTrue(tableExists(tableName), "Table should exist after publish");
+
+        // Now add a transient+required(binding) field and run the import sync path
+        // (updateTableByModel → syncModelToTable → buildSyncDdls ADD COLUMN) — the path the real
+        // plugin reimport uses (PluginResourceImporterImpl.syncPublishedModelsForUpdatedField).
+        String transientCode = "uploadslot" + testSuffix;
+        nameField = buildField(transientCode, "string", false, false);
+        nameField.getFeature().setVirtualType("transient");
+        metaFieldMapper.insert(nameField);
+        ModelFieldBinding b2 = buildBinding(model.getId(), nameField.getId(), 2);
+        b2.setRequired(true);
+        fieldBindingMapper.insert(b2);
+
+        SchemaOperationResult sync = schemaManagementService.updateTableByModel(modelCode);
+        log.info("sync result success={} ddl={}", sync.isSuccess(), sync.getExecutedDDL());
+        assertTrue(sync.isSuccess(), "updateTableByModel should succeed: " + sync.getErrorMessage());
+
+        Boolean transientNullable = columnIsNullable(tableName, transientCode);
+        log.info("sync-path transient column {} nullable={}", transientCode, transientNullable);
+        assertEquals(Boolean.TRUE, transientNullable,
+                "transient field column added via the import sync path must be NULLABLE (#1107)");
+    }
+
     private boolean tableExists(String name) throws Exception {
         try (Connection connection = dataSource.getConnection()) {
             DatabaseMetaData metaData = connection.getMetaData();
@@ -200,6 +291,22 @@ class SchemaManagementServiceIntegrationTest extends BaseIntegrationTest {
                 }
             }
             return false;
+        }
+    }
+
+    /** Returns true if the column is nullable (is_nullable='YES'), false if NOT NULL, null if absent. */
+    private Boolean columnIsNullable(String table, String column) throws Exception {
+        try (Connection connection = dataSource.getConnection()) {
+            DatabaseMetaData metaData = connection.getMetaData();
+            for (String schema : new String[]{connection.getSchema(), "public"}) {
+                try (ResultSet columns = metaData.getColumns(
+                        connection.getCatalog(), schema, table.toLowerCase(), column.toLowerCase())) {
+                    if (columns.next()) {
+                        return "YES".equalsIgnoreCase(columns.getString("IS_NULLABLE"));
+                    }
+                }
+            }
+            return null;
         }
     }
 
