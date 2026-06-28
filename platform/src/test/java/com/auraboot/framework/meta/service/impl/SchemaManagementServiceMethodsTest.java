@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -317,6 +318,32 @@ class SchemaManagementServiceMethodsTest {
         assertFalse(result.getSuccess());
         assertNotNull(result.getErrorMessage());
         assertTrue(result.getErrorMessage().contains("Cannot remove primary key"));
+    }
+
+    // ==================== generateColumnDefinition transient NOT NULL 测试 ====================
+
+    @Test
+    @DisplayName("generateColumnDefinition - transient required 字段保持可空(不加 NOT NULL)")
+    void testGenerateColumnDefinition_TransientRequiredFieldStaysNullable() {
+        when(ddlDialect.mapDataType(any())).thenReturn("VARCHAR(255)");
+
+        // transient + required:true (e.g. corrected_bom_file) — excluded from INSERT, so the
+        // column must stay nullable even though the binding is required.
+        FieldDefinition transientRequired = FieldDefinition.builder()
+                .code("corrected_bom_file").columnName("corrected_bom_file")
+                .dataType("string").required(true).virtualType("transient").build();
+        String ddl = ReflectionTestUtils.invokeMethod(
+                schemaManagementService, "generateColumnDefinition", transientRequired);
+        assertFalse(ddl.contains("NOT NULL"),
+                "transient required field must not be NOT NULL: " + ddl);
+
+        // a normal required field is still NOT NULL
+        FieldDefinition normalRequired = FieldDefinition.builder()
+                .code("name").columnName("name").dataType("string").required(true).build();
+        String ddl2 = ReflectionTestUtils.invokeMethod(
+                schemaManagementService, "generateColumnDefinition", normalRequired);
+        assertTrue(ddl2.contains("NOT NULL"),
+                "normal required field must be NOT NULL: " + ddl2);
     }
 
     // ==================== updateModelField 测试 ====================
