@@ -1,7 +1,7 @@
 ---
 title: 平台审计 — 租户级 mutation 端点缺角色门禁(越权)
 type: backlog
-status: open
+status: active
 created: 2026-06-28
 ---
 
@@ -26,6 +26,34 @@ created: 2026-06-28
 | `RecordShareController` POST `/api/record-share` / DELETE `/{shareId}` | `RecordShareServiceImpl.shareRecord(tenantId,...)` 只按 tenantId 插 share 记录,**不校验调用者是否拥有/有权分享该记录** → 非 admin 能把任意记录授权给任意 subject = **访问控制绕过 / 数据越权暴露** | **高** | 校验调用者对该记录有 share/manage 权限(owner 或显式权限),而非仅 tenant 隔离 |
 | `NotificationRuleController` POST / PUT `/{id}` / DELETE / PUT `/{id}/toggle` | 租户级通知规则(`list` 注释 "for the current tenant"),无门禁 → 非 admin 篡改全租户通知配置(关告警 / 改触发) | 中 | `@RequirePermission`(通知/自动化管理权限) |
 | `AnnouncementController` POST / PUT `/{id}` / DELETE | 租户级公告,无门禁 → 非 admin 发 / 改 / 删全租户公告(冒充官方 / 删真公告) | 中 | `@RequirePermission`(公告/系统管理权限) |
+
+## 解决(2026-06-28)
+
+上表 3 项已全部修复(本 PR):
+
+- **`RecordShareController`(高)**:share / unshare 不再仅靠 tenant 隔离。控制器现要求调用者
+  **是目标记录的 owner**(记录 `created_by` == `MetaContext.getCurrentUserId()`)**或**持有新权限
+  `data.record_share.manage`(管理员逃生通道);删除额外允许该 share 的创建者。否则抛
+  `AccessDeniedException`(403)。这关闭了"同租户任意成员把自己看不到的记录授权给自己"的越权。
+  授权放在控制器层(请求边界),避免与数据范围 evaluator 形成循环依赖;share 创建时回填
+  `created_by` 以支持"创建者可撤销"。
+- **`NotificationRuleController`(中)**:create / update / delete / toggle 加
+  `@RequirePermission(MetaPermission.NOTIFICATION_RULE_MANAGE)`(`notification.rule.manage`);
+  list / get / test 仍对租户成员开放。
+- **`AnnouncementController`(中)**:create / update / delete 加
+  `@RequirePermission(MetaPermission.ANNOUNCEMENT_MANAGE)`(`dashboard.announcement.manage`);
+  list 仍开放。
+
+3 个新权限码注册进 `default-bootstrap.json`,`tenant_admin` 经 `*` 绑定自动获得。
+验证:`validate-permission-codes.mjs` 0 drift;`*AuthzTest`(reflection 注解守卫 + RecordShare
+行为单测)15 用例全绿;`check-controller-authz.mjs` 已从 baseline 移除两个被注解守卫的控制器。
+
+### 残留(交平台线续审,非本 PR)
+
+`check-controller-authz.mjs` 当前仍标出 3 个 baseline 外的未守卫写控制器,需按下述方法 triage
+(可能是合法 self-service / 公开遥测 / 测试端点,也可能是同类越权):
+`BehaviorCollectController`、`BehaviorQuarantineController`、`TestImBroadcastController`。
+"完整候选清单"中其余 self-service 候选同样未逐个 triage。
 
 ## 审计方法(可复用)
 

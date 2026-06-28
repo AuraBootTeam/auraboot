@@ -3,8 +3,11 @@ package com.auraboot.framework.permission.controller;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.exception.RootUnCheckedException;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.entity.RecordShare;
 import com.auraboot.framework.permission.service.RecordShareService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -13,12 +16,14 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.util.StringUtils;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 
@@ -44,6 +49,8 @@ import static com.auraboot.framework.common.constant.ResponseCode.BadParam;
 public class RecordShareController {
 
     private final RecordShareService recordShareService;
+    private final DynamicDataService dynamicDataService;
+    private final UserPermissionService userPermissionService;
 
     /**
      * List all active shares for a record.
@@ -86,6 +93,7 @@ public class RecordShareController {
         if (request.getSubjectId() == null && !StringUtils.hasText(request.getSubjectPid())) {
             throw new RootUnCheckedException(BadParam, "subjectId or subjectPid is required");
         }
+        assertCanManageRecordShares(request.getResourceCode(), request.getRecordPid());
         recordShareService.shareRecordByPid(
                 tenantId,
                 request.getResourceCode(),
@@ -111,8 +119,97 @@ public class RecordShareController {
         Long tenantId = MetaContext.getCurrentTenantId();
         log.info("Removing share: shareId={}, tenantId={}", shareId, tenantId);
 
+        RecordShare share = recordShareService.getByIdInTenant(tenantId, shareId);
+        if (share == null) {
+            throw new AccessDeniedException("Record share not found or not accessible");
+        }
+        authorizeShareRemoval(share);
         recordShareService.removeById(tenantId, shareId);
         return ApiResponse.success();
+    }
+
+    // -----------------------------------------------------------------------
+    // Authorization (audit 2026-06-28: record sharing must not be tenant-wide open)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Authorize creation of a share on a record. The caller must either hold the
+     * {@code data.record_share.manage} administration permission, or be the owner
+     * (creator) of the target record. Otherwise {@link AccessDeniedException} (HTTP 403)
+     * is thrown. Closes the within-tenant escalation hole where any member could grant
+     * themselves access to records they cannot see.
+     */
+    private void assertCanManageRecordShares(String resourceCode, String recordPid) {
+        Long callerId = MetaContext.getCurrentUserId();
+        if (callerId == null) {
+            throw new AccessDeniedException("Authenticated user required to manage record shares");
+        }
+        if (userPermissionService.hasPermission(callerId, MetaPermission.RECORD_SHARE_MANAGE)) {
+            return; // administrative escape hatch
+        }
+        if (isRecordOwner(resourceCode, recordPid, callerId)) {
+            return; // a record owner may share their own record
+        }
+        log.warn("Denied record-share mutation: caller={} is neither owner nor admin for {}/{}",
+                callerId, resourceCode, recordPid);
+        throw new AccessDeniedException(
+                "Only the record owner or an authorized administrator can manage shares for this record");
+    }
+
+    /**
+     * Authorize removal of an existing share. Allowed for the administrator, the original
+     * creator of the share, or the owner of the underlying record.
+     */
+    private void authorizeShareRemoval(RecordShare share) {
+        Long callerId = MetaContext.getCurrentUserId();
+        if (callerId == null) {
+            throw new AccessDeniedException("Authenticated user required to manage record shares");
+        }
+        if (userPermissionService.hasPermission(callerId, MetaPermission.RECORD_SHARE_MANAGE)) {
+            return;
+        }
+        if (callerId.equals(share.getCreatedBy())) {
+            return; // the member who created the share may revoke it
+        }
+        if (isRecordOwner(share.getResourceCode(), share.getRecordPid(), callerId)) {
+            return;
+        }
+        log.warn("Denied record-share removal: caller={} for shareId={} ({}/{})",
+                callerId, share.getId(), share.getResourceCode(), share.getRecordPid());
+        throw new AccessDeniedException(
+                "Only the record owner, the share creator, or an authorized administrator can remove this share");
+    }
+
+    /**
+     * Returns true if {@code callerId} created the target record (its {@code created_by}).
+     * If the record cannot be resolved (missing / not accessible) this returns false so
+     * that sharing fails closed.
+     */
+    private boolean isRecordOwner(String resourceCode, String recordPid, Long callerId) {
+        if (!StringUtils.hasText(resourceCode) || !StringUtils.hasText(recordPid)) {
+            return false;
+        }
+        Map<String, Object> record = dynamicDataService.getById(resourceCode, recordPid);
+        if (record == null || record.isEmpty()) {
+            return false;
+        }
+        Long ownerId = toLong(record.get("created_by"));
+        return ownerId != null && ownerId.equals(callerId);
+    }
+
+    private static Long toLong(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            return Long.parseLong(value.toString().trim());
+        } catch (NumberFormatException ex) {
+            // Non-numeric created_by → treat as no resolvable owner (fail closed).
+            return null;
+        }
     }
 
     // -----------------------------------------------------------------------

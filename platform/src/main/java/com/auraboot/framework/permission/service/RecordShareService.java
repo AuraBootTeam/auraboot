@@ -113,4 +113,13 @@ public interface RecordShareService {
      * @param shareId  share record ID
      */
     void removeById(Long tenantId, Long shareId);
+
+    /**
+     * Look up a share by its ID, scoped to the tenant.
+     *
+     * @param tenantId tenant ID (for isolation)
+     * @param shareId  share record ID
+     * @return the share, or {@code null} if not found or belonging to another tenant
+     */
+    com.auraboot.framework.permission.entity.RecordShare getByIdInTenant(Long tenantId, Long shareId);
 }

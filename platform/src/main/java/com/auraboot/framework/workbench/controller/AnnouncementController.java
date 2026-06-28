@@ -1,6 +1,8 @@
 package com.auraboot.framework.workbench.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.workbench.dto.AnnouncementDTO;
 import com.auraboot.framework.workbench.dto.AnnouncementRequest;
 import com.auraboot.framework.workbench.service.AnnouncementService;
@@ -39,6 +41,7 @@ public class AnnouncementController {
      * POST /api/announcements
      */
     @PostMapping
+    @RequirePermission(MetaPermission.ANNOUNCEMENT_MANAGE)
     public ApiResponse<AnnouncementDTO> create(@Valid @RequestBody AnnouncementRequest request) {
         return ApiResponse.success(announcementService.create(request));
     }
@@ -48,6 +51,7 @@ public class AnnouncementController {
      * PUT /api/announcements/{id}
      */
     @PutMapping("/{id}")
+    @RequirePermission(MetaPermission.ANNOUNCEMENT_MANAGE)
     public ApiResponse<AnnouncementDTO> update(
             @PathVariable Long id,
             @Valid @RequestBody AnnouncementRequest request) {
@@ -59,6 +63,7 @@ public class AnnouncementController {
      * DELETE /api/announcements/{id}
      */
     @DeleteMapping("/{id}")
+    @RequirePermission(MetaPermission.ANNOUNCEMENT_MANAGE)
     public ApiResponse<Void> delete(@PathVariable Long id) {
         announcementService.delete(id);
         return ApiResponse.success();
