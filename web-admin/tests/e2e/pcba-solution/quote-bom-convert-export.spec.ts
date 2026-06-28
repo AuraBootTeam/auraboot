@@ -68,7 +68,7 @@ test.describe('BOM convert + export deep (BOM-03/05/08 + XLS-B) @smoke', () => {
       const projId = proj.body?.data?.data?.recordPid || proj.body?.data?.recordPid || proj.body?.data?.recordId;
       expect(projId, `project created (resp=${JSON.stringify(proj.body?.data).slice(0, 200)})`).toBeTruthy();
 
-      const buf = fs.readFileSync(SAMPLE_BOM);
+      const buf = fs.readFileSync(SAMPLE_BOM!);
       const up = await page.request.post('/api/file/upload', {
         multipart: { file: { name: 'bom.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: buf } },
       });

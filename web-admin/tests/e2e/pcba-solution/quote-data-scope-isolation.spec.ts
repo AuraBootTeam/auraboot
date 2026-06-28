@@ -69,7 +69,7 @@ async function provisionQuote(page: Page, code: string): Promise<void> {
   const projId = projBody?.data?.recordPid || projBody?.data?.data?.recordPid || projBody?.data?.recordId;
   expect(projId, `project created for ${code}`).toBeTruthy();
 
-  const buf = fs.readFileSync(SAMPLE_BOM);
+  const buf = fs.readFileSync(SAMPLE_BOM!);
   const up = await page.request.post('/api/file/upload', {
     multipart: { file: { name: 'bom.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: buf } },
   });
