@@ -266,10 +266,13 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
         columnDef.append(" ").append(dataType);
         
         // NOT NULL约束
-        if (field.isRequired() || field.isPrimaryKey()) {
+        // Transient fields are excluded from INSERT (DynamicDataMapper never writes them), so a
+        // NOT NULL column for a transient field can never be satisfied — it must stay nullable
+        // even when the binding is required (required is a form-level constraint, not a column one).
+        if ((field.isRequired() || field.isPrimaryKey()) && !field.isTransientField()) {
             columnDef.append(" NOT NULL");
         }
-        
+
         // 唯一约束
         if (field.isUnique() && !field.isPrimaryKey()) {
             columnDef.append(" UNIQUE");
@@ -650,11 +653,14 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
                         tableName, columnName, dataType));
                 
                 // 修改NOT NULL约束
-                if (field.isRequired() || field.isPrimaryKey()) {
-                    ddls.add(String.format("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL", 
+                // Transient fields are never INSERTed, so they must stay nullable — this also
+                // heals existing NOT NULL columns left behind when a field became transient
+                // (DROP NOT NULL on the next schema sync).
+                if ((field.isRequired() || field.isPrimaryKey()) && !field.isTransientField()) {
+                    ddls.add(String.format("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL",
                             tableName, columnName));
                 } else {
-                    ddls.add(String.format("ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL", 
+                    ddls.add(String.format("ALTER TABLE %s ALTER COLUMN %s DROP NOT NULL",
                             tableName, columnName));
                 }
                 
