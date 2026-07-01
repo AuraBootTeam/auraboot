@@ -50,28 +50,34 @@ function unique(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean)));
 }
 
-function resolveEnterprisePluginRoot(): string {
+// Returns null (rather than throwing) when the enterprise pcba-solution plugin
+// is not present. This spec depends on enterprise demo data; in OSS-only
+// checkouts (e.g. CI) the plugin is absent. Throwing here would run at module
+// import time and crash Playwright's collection phase for the WHOLE run — even
+// suites that don't include this spec — so resolution must fail soft and the
+// suite self-skips (see beforeAll) when no root is found.
+function resolveEnterprisePluginRoot(): string | null {
   const candidates = unique([
     process.env.AURA_ENTERPRISE_PLUGIN_ROOT || '',
     process.env.AURA_ENTERPRISE_PROJECT_ROOT ? path.join(process.env.AURA_ENTERPRISE_PROJECT_ROOT, 'plugins') : '',
     process.env.AURABOOT_ENTERPRISE_ROOT ? path.join(process.env.AURABOOT_ENTERPRISE_ROOT, 'plugins') : '',
     path.resolve(process.cwd(), '../../plugins'),
     path.resolve(process.cwd(), '../../../plugins'),
-    '/Users/ghj/work/auraboot/plugins',
-    '/Users/ghj/work/auraboot/auraboot-enterprise/plugins',
   ]);
-  const selected = candidates.find((candidate) =>
-    existsSync(path.join(candidate, 'pcba-solution/config/demo-data/pcba-demo-20260426.json')),
+  return (
+    candidates.find((candidate) =>
+      existsSync(path.join(candidate, 'pcba-solution/config/demo-data/pcba-demo-20260426.json')),
+    ) ?? null
   );
-  if (!selected) {
-    throw new Error(`Cannot resolve PCBA demo plugin root. Checked: ${candidates.join(', ')}`);
-  }
-  return selected;
 }
 
 const ENTERPRISE_PLUGIN_ROOT = resolveEnterprisePluginRoot();
-const SEED_FILE = path.join(ENTERPRISE_PLUGIN_ROOT, 'pcba-solution/config/demo-data/pcba-demo-20260426.json');
-const MENU_FILE = path.join(ENTERPRISE_PLUGIN_ROOT, 'pcba-solution/config/menus.json');
+const SEED_FILE = ENTERPRISE_PLUGIN_ROOT
+  ? path.join(ENTERPRISE_PLUGIN_ROOT, 'pcba-solution/config/demo-data/pcba-demo-20260426.json')
+  : '';
+const MENU_FILE = ENTERPRISE_PLUGIN_ROOT
+  ? path.join(ENTERPRISE_PLUGIN_ROOT, 'pcba-solution/config/menus.json')
+  : '';
 
 const REQUIRED_PLUGINS = [
   'product-catalog',
@@ -101,6 +107,12 @@ function readJson<T>(filePath: string): T {
 }
 
 function demoEntries(): DemoEntry[] {
+  // Called at describe (collection) scope; must not read files when the
+  // enterprise plugin root is absent, or collection would crash. The suite is
+  // skipped in that case (see beforeAll).
+  if (!ENTERPRISE_PLUGIN_ROOT) {
+    return [];
+  }
   const seed = readJson<{ demoMenus: SeedMenu[] }>(SEED_FILE);
   const menus = readJson<PcbaMenu[]>(MENU_FILE);
   const menusByCode = new Map(menus.map((menu) => [menu.code, menu]));
@@ -231,6 +243,10 @@ test.describe('PCBA-009B - Fixed demo seed menu smoke @critical', () => {
   const entries = demoEntries();
 
   test.beforeAll(async ({ request }, testInfo) => {
+    test.skip(
+      !ENTERPRISE_PLUGIN_ROOT,
+      'PCBA demo data ships in the enterprise pcba-solution plugin, which is not present in this checkout (e.g. OSS CI).',
+    );
     testInfo.setTimeout(300_000);
     for (const pluginName of REQUIRED_PLUGINS) {
       await importPluginDirectory(request, pluginName);

@@ -74,6 +74,17 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-auraboot}-backend
     profiles:
       - isolated
+    # Wait for both datastores to be healthy before starting, mirroring
+    # docker-compose.prod.yml. The base file gates `redis` behind the `cache`
+    # profile; without this explicit dependency `docker compose up -d backend
+    # isolated-frontend` never pulls redis in (profile activation alone does not
+    # start an un-referenced service), so the backend cannot resolve host
+    # `redis` and `dataSyncRedisListenerContainer` fails app startup.
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     build:
       dockerfile: ${ISOLATED_BACKEND_DOCKERFILE:-Dockerfile}
     # Per-container resource cap so concurrent isolated stacks don't fight
