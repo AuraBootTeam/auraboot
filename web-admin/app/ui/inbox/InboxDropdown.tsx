@@ -111,7 +111,7 @@ export function InboxHeaderWidget() {
       navigate(`/inbox?task=${item.sourceId}`);
     } else if (item.sourceModel ?? item.modelCode) {
       const modelCode = item.sourceModel ?? item.modelCode;
-      const recordPid = item.sourceRecordPid ?? item.sourceRecordPid ?? (item.recordPid != null ? String(item.recordPid) : undefined);
+      const recordPid = item.sourceRecordPid ?? (item.recordPid != null ? String(item.recordPid) : undefined);
       if (recordPid) {
         navigate(`/p/${modelCode}/view/${recordPid}`);
         return;
