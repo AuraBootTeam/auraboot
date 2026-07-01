@@ -1395,6 +1395,36 @@
       "resourceType": "function"
     },
     {
+      "code": "notification.rule.manage",
+      "name": "Manage notification rules",
+      "description": "Notification — create / update / delete / toggle tenant notification rules",
+      "type": "function",
+      "module": "notification",
+      "resource": "notification:rule",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "dashboard.announcement.manage",
+      "name": "Manage announcements",
+      "description": "Workbench — create / update / delete tenant announcements",
+      "type": "function",
+      "module": "dashboard",
+      "resource": "dashboard:announcement",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
+      "code": "data.record_share.manage",
+      "name": "Administer record shares",
+      "description": "Data — administer per-record shares on records the caller does not own (owner sharing needs no permission)",
+      "type": "function",
+      "module": "data",
+      "resource": "data:record_share",
+      "action": "manage",
+      "resourceType": "function"
+    },
+    {
       "code": "org.role.read",
       "name": "Organization role read",
       "description": "Organization role — read",
