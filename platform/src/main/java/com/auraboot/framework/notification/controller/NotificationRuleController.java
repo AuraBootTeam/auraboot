@@ -2,6 +2,8 @@ package com.auraboot.framework.notification.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 // BusinessException is handled by the global exception handler
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.notification.dto.NotificationRuleDTO;
 import com.auraboot.framework.notification.dto.NotificationRuleRequest;
 import com.auraboot.framework.notification.dto.NotificationRuleTestResult;
@@ -61,6 +63,7 @@ public class NotificationRuleController {
      * POST /api/notification-rules
      */
     @PostMapping
+    @RequirePermission(MetaPermission.NOTIFICATION_RULE_MANAGE)
     public ApiResponse<NotificationRuleDTO> create(@Valid @RequestBody NotificationRuleRequest request) {
         return ApiResponse.success(ruleService.createRule(request));
     }
@@ -70,6 +73,7 @@ public class NotificationRuleController {
      * PUT /api/notification-rules/{id}
      */
     @PutMapping("/{id}")
+    @RequirePermission(MetaPermission.NOTIFICATION_RULE_MANAGE)
     public ApiResponse<NotificationRuleDTO> update(@PathVariable Long id,
                                                     @Valid @RequestBody NotificationRuleRequest request) {
         return ApiResponse.success(ruleService.updateRule(id, request));
@@ -80,6 +84,7 @@ public class NotificationRuleController {
      * DELETE /api/notification-rules/{id}
      */
     @DeleteMapping("/{id}")
+    @RequirePermission(MetaPermission.NOTIFICATION_RULE_MANAGE)
     public ApiResponse<Void> delete(@PathVariable Long id) {
         ruleService.deleteRule(id);
         return ApiResponse.success();
@@ -91,6 +96,7 @@ public class NotificationRuleController {
      * Body: { "enabled": true/false }
      */
     @PutMapping("/{id}/toggle")
+    @RequirePermission(MetaPermission.NOTIFICATION_RULE_MANAGE)
     public ApiResponse<NotificationRuleDTO> toggle(@PathVariable Long id,
                                                     @RequestBody Map<String, Boolean> body) {
         boolean enabled = Boolean.TRUE.equals(body.get("enabled"));

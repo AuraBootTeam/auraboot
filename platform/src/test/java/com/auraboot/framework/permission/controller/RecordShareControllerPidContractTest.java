@@ -2,8 +2,11 @@ package com.auraboot.framework.permission.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.entity.RecordShare;
 import com.auraboot.framework.permission.service.RecordShareService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,6 +27,8 @@ import static org.mockito.Mockito.when;
 class RecordShareControllerPidContractTest {
 
     @Mock private RecordShareService recordShareService;
+    @Mock private DynamicDataService dynamicDataService;
+    @Mock private UserPermissionService userPermissionService;
 
     @AfterEach
     void tearDown() {
@@ -38,7 +43,8 @@ class RecordShareControllerPidContractTest {
         when(recordShareService.listByRecordPid(7L, "crm_lead", "01KSHAREPID"))
                 .thenReturn(List.of(share));
 
-        RecordShareController controller = new RecordShareController(recordShareService);
+        RecordShareController controller =
+                new RecordShareController(recordShareService, dynamicDataService, userPermissionService);
         ApiResponse<List<RecordShare>> response = controller.listShares("crm_lead", "01KSHAREPID");
 
         assertThat(response.isSuccess()).isTrue();
@@ -50,7 +56,10 @@ class RecordShareControllerPidContractTest {
 
     @Test
     void shareRecordUsesRecordPidOnly() {
-        MetaContext.setCurrentTenantId(7L);
+        // Authenticated caller with the record-share admin permission, so the share
+        // passes the owner/admin gate and we can assert the PID-only delegation contract.
+        MetaContext.setContext(7L, 5L, "caller-pid", "caller");
+        when(userPermissionService.hasPermission(5L, MetaPermission.RECORD_SHARE_MANAGE)).thenReturn(true);
         RecordShareController.RecordShareRequest request = new RecordShareController.RecordShareRequest();
         request.setResourceCode("crm_lead");
         request.setRecordPid("01KSHAREPID");
@@ -59,7 +68,8 @@ class RecordShareControllerPidContractTest {
         request.setPermissionMask("read");
         request.setExpiresAt(Instant.parse("2026-07-01T00:00:00Z"));
 
-        RecordShareController controller = new RecordShareController(recordShareService);
+        RecordShareController controller =
+                new RecordShareController(recordShareService, dynamicDataService, userPermissionService);
         ApiResponse<Void> response = controller.shareRecord(request);
 
         assertThat(response.isSuccess()).isTrue();

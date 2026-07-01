@@ -891,6 +891,35 @@ public final class MetaPermission {
      */
     public static final String AI_SCORING_RUN = "ai.scoring.run";
 
+    // ==================== NOTIFICATION permissions ====================
+
+    /**
+     * Notification rule management permission for {@code NotificationRuleController}
+     * create / update / delete / toggle. Rules are tenant-wide automation config
+     * (alerting triggers); without this gate any tenant member could disable or
+     * rewrite alerting. Reads (list/get) stay open to tenant members.
+     */
+    public static final String NOTIFICATION_RULE_MANAGE = "notification.rule.manage";
+
+    // ==================== WORKBENCH permissions ====================
+
+    /**
+     * Announcement management permission for {@code AnnouncementController}
+     * create / update / delete. Announcements are tenant-wide official notices;
+     * without this gate any tenant member could post / edit / delete them.
+     * Reads (list) stay open to tenant members.
+     */
+    public static final String ANNOUNCEMENT_MANAGE = "dashboard.announcement.manage";
+
+    /**
+     * Record-share administration permission. The {@code RecordShareController}
+     * share / unshare endpoints are owner-based (a record owner may share their own
+     * records); this permission is the administrative escape hatch that lets an
+     * authorized administrator manage shares on records they do not own. Without
+     * either ownership or this permission, share mutations are denied (403).
+     */
+    public static final String RECORD_SHARE_MANAGE = "data.record_share.manage";
+
     // ==================== Private Constructor ====================
 
     /**

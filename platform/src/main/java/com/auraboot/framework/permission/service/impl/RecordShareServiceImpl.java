@@ -1,5 +1,6 @@
 package com.auraboot.framework.permission.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.entity.RecordShare;
@@ -44,6 +45,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         share.setPermissionMask(permissionMask);
         share.setExpiresAt(expiresAt);
         share.setCreatedAt(Instant.now());
+        share.setCreatedBy(MetaContext.getCurrentUserId());
 
         recordShareMapper.insert(share);
         log.info("Shared record {}/{} with {}:{} (mask={}, expires={})",
@@ -72,6 +74,7 @@ public class RecordShareServiceImpl implements RecordShareService {
         share.setPermissionMask(permissionMask);
         share.setExpiresAt(expiresAt);
         share.setCreatedAt(Instant.now());
+        share.setCreatedBy(MetaContext.getCurrentUserId());
 
         recordShareMapper.insert(share);
         log.info("Shared record {}/{} with {}:{} (mask={}, expires={})",
@@ -180,6 +183,18 @@ public class RecordShareServiceImpl implements RecordShareService {
         }
         recordShareMapper.deleteById(shareId);
         log.info("Removed share id={} for resource={} record={}", shareId, share.getResourceCode(), share.getRecordId());
+    }
+
+    @Override
+    public RecordShare getByIdInTenant(Long tenantId, Long shareId) {
+        if (tenantId == null || shareId == null) {
+            return null;
+        }
+        RecordShare share = recordShareMapper.selectById(shareId);
+        if (share == null || !tenantId.equals(share.getTenantId())) {
+            return null;
+        }
+        return share;
     }
 
     private String normalizePid(String pid) {
