@@ -8,6 +8,8 @@ import com.auraboot.framework.plugin.dto.packages.PackageParseResult;
 import com.auraboot.framework.plugin.dto.packages.PackageStatusDTO;
 import com.auraboot.framework.plugin.dto.packages.PackageUninstallOptions;
 import com.auraboot.framework.plugin.dto.packages.PackageUninstallResult;
+import com.auraboot.framework.plugin.dto.imports.ImportRequest;
+import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.auraboot.framework.plugin.dto.uninstall.UninstallPreviewResult;
 import com.auraboot.framework.plugin.entity.PluginPackageHistory;
 import com.auraboot.framework.plugin.entity.PluginRecord;
@@ -341,5 +343,29 @@ class PluginPackageServiceImplBranchTest {
 
         assertThat(result).hasSize(2);
         assertThat(result).extracting(PackageHistoryDTO::getPid).containsExactly("a", "b");
+    }
+
+    @Test
+    @DisplayName("resolveConflictStrategy honours manifest skip/overwrite (regression: case-mismatch downgraded to ERROR)")
+    void resolveConflictStrategyHonoursManifestStrategy() {
+        // Regression for AGENTS §9: switch value was manifestStrategy.toUpperCase() but the case labels
+        // were lowercase ("skip"/"overwrite"), so a manifest declaring skip/overwrite was silently
+        // downgraded to ERROR (import fails on conflict instead of skipping/overwriting).
+        assertThat(invokeResolveConflictStrategy("skip")).isEqualTo(ImportRequest.ConflictStrategy.SKIP);
+        assertThat(invokeResolveConflictStrategy("overwrite")).isEqualTo(ImportRequest.ConflictStrategy.OVERWRITE);
+        // case-insensitive (switch normalises to upper)
+        assertThat(invokeResolveConflictStrategy("SKIP")).isEqualTo(ImportRequest.ConflictStrategy.SKIP);
+        assertThat(invokeResolveConflictStrategy("Overwrite")).isEqualTo(ImportRequest.ConflictStrategy.OVERWRITE);
+        // unknown strategy still falls to ERROR
+        assertThat(invokeResolveConflictStrategy("bogus")).isEqualTo(ImportRequest.ConflictStrategy.ERROR);
+    }
+
+    private ImportRequest.ConflictStrategy invokeResolveConflictStrategy(String manifestStrategy) {
+        PluginManifestExtended manifest = new PluginManifestExtended();
+        PluginManifestExtended.ImportOptions opts = new PluginManifestExtended.ImportOptions();
+        opts.setConflictStrategy(manifestStrategy);
+        manifest.setImportOptions(opts);
+        return (ImportRequest.ConflictStrategy) ReflectionTestUtils.invokeMethod(
+                service, "resolveConflictStrategy", manifest, new PackageInstallOptions());
     }
 }

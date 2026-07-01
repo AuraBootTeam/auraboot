@@ -1160,8 +1160,8 @@ public class PluginPackageServiceImpl implements PluginPackageService {
             String manifestStrategy = manifest.getImportOptions().getConflictStrategy();
             if (manifestStrategy != null && !manifestStrategy.isBlank()) {
                 return switch (manifestStrategy.toUpperCase()) {
-                    case "skip" -> ImportRequest.ConflictStrategy.SKIP;
-                    case "overwrite" -> ImportRequest.ConflictStrategy.OVERWRITE;
+                    case "SKIP" -> ImportRequest.ConflictStrategy.SKIP;
+                    case "OVERWRITE" -> ImportRequest.ConflictStrategy.OVERWRITE;
                     default -> ImportRequest.ConflictStrategy.ERROR;
                 };
             }
