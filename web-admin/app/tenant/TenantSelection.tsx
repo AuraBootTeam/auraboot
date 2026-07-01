@@ -18,6 +18,7 @@ import {
   CogIcon,
 } from '@heroicons/react/24/outline';
 import { ResultHelper } from '~/utils/type';
+import { useI18n } from '~/contexts/I18nContext';
 
 interface UserSpace {
   tenantId: number;
@@ -151,6 +152,7 @@ export default function TenantSelection() {
   const actionData = useActionData<typeof action>();
   const { spaces } = useLoaderData<typeof loader>() ?? { spaces: [] };
   const navigate = useNavigate();
+  const { t } = useI18n();
   const { formData, errors, handleInputChange } = useTenantForm();
   const hasExistingSpaces = spaces && spaces.length > 0;
 
@@ -180,13 +182,15 @@ export default function TenantSelection() {
               <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-full bg-yellow-100 dark:bg-yellow-900/20">
                 <ClockIcon className="h-8 w-8 text-yellow-600 dark:text-yellow-400" />
               </div>
-              <h2 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">申请已提交</h2>
+              <h2 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">
+                {t('tenant.select.pending.title', undefined, '申请已提交')}
+              </h2>
               <p className="mb-8 text-gray-600 dark:text-gray-400">{actionData.message}</p>
               <button
                 className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
                 onClick={() => navigate('/login')}
               >
-                返回登录
+                {t('tenant.select.pending.backToLogin', undefined, '返回登录')}
               </button>
             </div>
           </div>
@@ -288,13 +292,17 @@ export default function TenantSelection() {
                       <BuildingOfficeIcon className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                     </div>
                     <h2 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">
-                      创建新租户
+                      {t('tenant.select.create.title', undefined, '创建新租户')}
                     </h2>
                     <p className="mb-6 text-gray-600 dark:text-gray-400">
-                      创建一个新的组织空间，您将成为该组织的管理员
+                      {t(
+                        'tenant.select.create.desc',
+                        undefined,
+                        '创建一个新的组织空间，您将成为该组织的管理员',
+                      )}
                     </p>
                     <div className="inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors group-hover:bg-blue-700">
-                      开始创建
+                      {t('tenant.select.create.cta', undefined, '开始创建')}
                     </div>
                   </div>
                 </div>
@@ -309,13 +317,17 @@ export default function TenantSelection() {
                       <UserGroupIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
                     </div>
                     <h2 className="mb-4 text-2xl font-bold text-gray-900 dark:text-white">
-                      加入现有租户
+                      {t('tenant.select.join.title', undefined, '加入现有租户')}
                     </h2>
                     <p className="mb-6 text-gray-600 dark:text-gray-400">
-                      使用邀请码加入已有的组织，需要管理员审批
+                      {t(
+                        'tenant.select.join.desc',
+                        undefined,
+                        '使用邀请码加入已有的组织，需要管理员审批',
+                      )}
                     </p>
                     <div className="inline-flex items-center rounded-lg bg-green-600 px-4 py-2 font-medium text-white transition-colors group-hover:bg-green-700">
-                      立即加入
+                      {t('tenant.select.join.cta', undefined, '立即加入')}
                     </div>
                   </div>
                 </div>
@@ -328,7 +340,7 @@ export default function TenantSelection() {
                     onClick={() => handleSwitchAction(null)}
                   >
                     <ArrowLeftIcon className="mr-2 h-5 w-5" />
-                    返回选择
+                    {t('tenant.select.back', undefined, '返回选择')}
                   </button>
                 </div>
 
@@ -338,9 +350,11 @@ export default function TenantSelection() {
 
                     <div className="mb-8">
                       <h2 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">
-                        创建新租户
+                        {t('tenant.select.create.title', undefined, '创建新租户')}
                       </h2>
-                      <p className="text-gray-600 dark:text-gray-400">填写以下信息来创建您的组织</p>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        {t('tenant.select.create.formHint', undefined, '填写以下信息来创建您的组织')}
+                      </p>
                     </div>
 
                     <TenantFormFields
@@ -362,7 +376,7 @@ export default function TenantSelection() {
                       type="submit"
                       className="w-full rounded-lg bg-blue-600 px-4 py-3 font-medium text-white transition-colors hover:bg-blue-700"
                     >
-                      创建租户
+                      {t('tenant.select.create.submit', undefined, '创建租户')}
                     </button>
                   </Form>
                 )}
@@ -373,14 +387,16 @@ export default function TenantSelection() {
 
                     <div className="mb-8">
                       <h2 className="mb-2 text-3xl font-bold text-gray-900 dark:text-white">
-                        加入现有租户
+                        {t('tenant.select.join.title', undefined, '加入现有租户')}
                       </h2>
-                      <p className="text-gray-600 dark:text-gray-400">输入管理员提供的邀请码</p>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        {t('tenant.select.join.formHint', undefined, '输入管理员提供的邀请码')}
+                      </p>
                     </div>
 
                     <div className="space-y-2">
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                        邀请码 *
+                        {t('tenant.select.join.inviteCodeLabel', undefined, '邀请码')} *
                       </label>
                       <input
                         ref={inviteCodeRef}
@@ -388,10 +404,10 @@ export default function TenantSelection() {
                         type="text"
                         required
                         className="w-full rounded-lg border border-gray-300 bg-white px-4 py-3 text-gray-900 placeholder-gray-500 focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400"
-                        placeholder="输入邀请码"
+                        placeholder={t('tenant.select.join.inviteCodePlaceholder', undefined, '输入邀请码')}
                       />
                       <p className="text-sm text-gray-500 dark:text-gray-400">
-                        请输入租户管理员提供的邀请码
+                        {t('tenant.select.join.inviteCodeHint', undefined, '请输入租户管理员提供的邀请码')}
                       </p>
                     </div>
 
@@ -405,7 +421,7 @@ export default function TenantSelection() {
                       type="submit"
                       className="w-full rounded-lg bg-green-600 px-4 py-3 font-medium text-white transition-colors hover:bg-green-700"
                     >
-                      提交申请
+                      {t('tenant.select.join.submit', undefined, '提交申请')}
                     </button>
                   </Form>
                 )}

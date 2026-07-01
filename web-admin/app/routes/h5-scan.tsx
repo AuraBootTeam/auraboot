@@ -13,6 +13,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { useToast } from '~/contexts/ToastContext';
 import { useAuth } from '~/contexts/AuthContext';
+import { useI18n } from '~/contexts/I18nContext';
 import { fetchResult } from '~/shared/services/http-client';
 import jsQR from 'jsqr';
 
@@ -62,6 +63,7 @@ export default function H5ScanPage() {
   const navigate = useNavigate();
   const { showErrorToast, showSuccessToast } = useToast();
   const { user, token } = useAuth();
+  const { t } = useI18n();
 
   const [isScanning, setIsScanning] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -169,37 +171,41 @@ export default function H5ScanPage() {
         (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError')
       ) {
         setPermissionDenied(true);
-        setCameraError('摄像头权限被拒绝，请允许访问摄像头后重试');
-        showErrorToast('需要摄像头权限才能扫描二维码');
+        setCameraError(
+          t('h5.scan.error.permissionDenied', undefined, '摄像头权限被拒绝，请允许访问摄像头后重试'),
+        );
+        showErrorToast(t('h5.scan.toast.permissionNeeded', undefined, '需要摄像头权限才能扫描二维码'));
       } else if (
         error &&
         typeof error === 'object' &&
         'name' in error &&
         error.name === 'NotFoundError'
       ) {
-        setCameraError('未找到摄像头设备，请检查设备连接');
-        showErrorToast('未找到摄像头设备');
+        setCameraError(t('h5.scan.error.notFound', undefined, '未找到摄像头设备，请检查设备连接'));
+        showErrorToast(t('h5.scan.toast.notFound', undefined, '未找到摄像头设备'));
       } else if (
         error &&
         typeof error === 'object' &&
         'name' in error &&
         error.name === 'NotReadableError'
       ) {
-        setCameraError('摄像头被其他应用占用，请关闭其他应用后重试');
-        showErrorToast('摄像头被占用');
+        setCameraError(t('h5.scan.error.inUse', undefined, '摄像头被其他应用占用，请关闭其他应用后重试'));
+        showErrorToast(t('h5.scan.toast.inUse', undefined, '摄像头被占用'));
       } else {
-        setCameraError('无法访问摄像头，请检查权限设置或尝试刷新页面');
-        showErrorToast('摄像头访问失败');
+        setCameraError(t('h5.scan.error.accessFailed', undefined, '无法访问摄像头，请检查权限设置或尝试刷新页面'));
+        showErrorToast(t('h5.scan.toast.accessFailed', undefined, '摄像头访问失败'));
       }
     }
-  }, [showErrorToast]);
+  }, [showErrorToast, t]);
 
   const handleStartScan = async () => {
     try {
       const permissionState = await checkCameraPermission();
       if (permissionState === 'denied') {
         setPermissionDenied(true);
-        setCameraError('摄像头权限被拒绝，请在浏览器设置中允许访问摄像头');
+        setCameraError(
+          t('h5.scan.error.permissionDeniedSettings', undefined, '摄像头权限被拒绝，请在浏览器设置中允许访问摄像头'),
+        );
         return;
       }
 
@@ -209,7 +215,7 @@ export default function H5ScanPage() {
         startCamera();
       }
     } catch {
-      showErrorToast('启动扫描失败');
+      showErrorToast(t('h5.scan.toast.startFailed', undefined, '启动扫描失败'));
     }
   };
 
@@ -328,16 +334,18 @@ export default function H5ScanPage() {
       const deviceData = parseQrCodeData(qrText);
       if (deviceData) {
         setScanResult(deviceData);
-        showSuccessToast('二维码识别成功！');
+        showSuccessToast(t('h5.scan.toast.recognized', undefined, '二维码识别成功！'));
         // 二维码解析成功后重置 isProcessing，只有在用户点击确认绑定时才设置为 true
         setIsProcessing(false);
       } else {
-        setError('无效的设备二维码，请扫描TV设备上显示的登录二维码');
-        showErrorToast('无效的二维码');
+        setError(
+          t('h5.scan.error.invalidQr', undefined, '无效的设备二维码，请扫描TV设备上显示的登录二维码'),
+        );
+        showErrorToast(t('h5.scan.toast.invalidQr', undefined, '无效的二维码'));
         setIsProcessing(false);
       }
     },
-    [isProcessing, stopCamera, showErrorToast, showSuccessToast],
+    [isProcessing, stopCamera, showErrorToast, showSuccessToast, t],
   );
 
   const handleConfirmBinding = async () => {
@@ -366,17 +374,21 @@ export default function H5ScanPage() {
       });
 
       if (response && response.data) {
-        showSuccessToast('设备绑定成功！');
+        showSuccessToast(t('h5.scan.toast.bindSuccess', undefined, '设备绑定成功！'));
         setBindingSuccess(true);
         setIsProcessing(false);
       } else {
-        throw new Error('设备绑定失败');
+        throw new Error(t('h5.scan.error.bindFailed', undefined, '设备绑定失败'));
       }
     } catch (error) {
       console.error('设备绑定失败:', error);
       console.error(`设备绑定失败: ${error}`);
-      setError(error instanceof Error ? error.message : '设备绑定失败');
-      showErrorToast('设备绑定失败');
+      setError(
+        error instanceof Error
+          ? error.message
+          : t('h5.scan.error.bindFailed', undefined, '设备绑定失败'),
+      );
+      showErrorToast(t('h5.scan.toast.bindFailed', undefined, '设备绑定失败'));
       setIsProcessing(false);
     }
   };
@@ -408,9 +420,11 @@ export default function H5ScanPage() {
           className="flex items-center text-gray-600 hover:text-gray-900"
         >
           <ArrowLeftIcon className="mr-1 h-5 w-5" />
-          返回
+          {t('h5.scan.back', undefined, '返回')}
         </button>
-        <h1 className="text-lg font-semibold text-gray-900">扫描设备二维码</h1>
+        <h1 className="text-lg font-semibold text-gray-900">
+          {t('h5.scan.title', undefined, '扫描设备二维码')}
+        </h1>
         <div className="w-16"></div>
       </div>
 
@@ -453,8 +467,12 @@ export default function H5ScanPage() {
 
                 {/* Instructions */}
                 <div className="mt-6 text-center">
-                  <p className="mb-2 text-lg font-medium text-white">将二维码放入框内</p>
-                  <p className="text-sm text-gray-300">请对准TV设备上显示的登录二维码</p>
+                  <p className="mb-2 text-lg font-medium text-white">
+                    {t('h5.scan.frameHint', undefined, '将二维码放入框内')}
+                  </p>
+                  <p className="text-sm text-gray-300">
+                    {t('h5.scan.aimHint', undefined, '请对准TV设备上显示的登录二维码')}
+                  </p>
                 </div>
               </div>
             </div>
@@ -478,8 +496,12 @@ export default function H5ScanPage() {
               <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600">
                 <QrCodeIcon className="h-10 w-10 text-white" />
               </div>
-              <h2 className="mb-2 text-xl font-bold text-white">准备扫描</h2>
-              <p className="text-sm text-gray-300">点击下方按钮开始扫描TV设备二维码</p>
+              <h2 className="mb-2 text-xl font-bold text-white">
+                {t('h5.scan.ready', undefined, '准备扫描')}
+              </h2>
+              <p className="text-sm text-gray-300">
+                {t('h5.scan.readyHint', undefined, '点击下方按钮开始扫描TV设备二维码')}
+              </p>
             </div>
 
             <button
@@ -489,7 +511,7 @@ export default function H5ScanPage() {
               className="flex items-center rounded-xl bg-indigo-600 px-8 py-4 text-lg font-medium text-white transition-colors hover:bg-indigo-700"
             >
               <CameraIcon className="mr-2 h-6 w-6" />
-              开始扫描
+              {t('h5.scan.start', undefined, '开始扫描')}
             </button>
           </div>
         )}
@@ -500,7 +522,9 @@ export default function H5ScanPage() {
             <div className="mb-8 text-center">
               <ExclamationTriangleIcon className="mx-auto mb-4 h-16 w-16 text-red-500" />
               <h2 className="mb-2 text-xl font-bold text-white">
-                {permissionDenied ? '需要摄像头权限' : '摄像头访问失败'}
+                {permissionDenied
+                  ? t('h5.scan.perm.title', undefined, '需要摄像头权限')
+                  : t('h5.scan.error.accessFailedTitle', undefined, '摄像头访问失败')}
               </h2>
               <p className="mb-4 text-sm text-gray-300">{cameraError}</p>
 
@@ -508,17 +532,20 @@ export default function H5ScanPage() {
                 <div className="mb-6 rounded-lg border border-yellow-600 bg-yellow-900/50 p-4 text-left">
                   <h3 className="mb-2 flex items-center font-medium text-yellow-400">
                     <InformationCircleIcon className="mr-2 h-5 w-5" />
-                    如何开启摄像头权限？
+                    {t('h5.scan.perm.howTitle', undefined, '如何开启摄像头权限？')}
                   </h3>
                   <div className="space-y-2 text-sm text-yellow-200">
                     <p>
-                      • <strong>Chrome/Edge:</strong> 点击地址栏左侧的摄像头图标，选择"允许"
+                      • <strong>Chrome/Edge:</strong>{' '}
+                      {t('h5.scan.perm.chrome', undefined, '点击地址栏左侧的摄像头图标，选择"允许"')}
                     </p>
                     <p>
-                      • <strong>Safari:</strong> 在地址栏点击"网站设置"，允许摄像头访问
+                      • <strong>Safari:</strong>{' '}
+                      {t('h5.scan.perm.safari', undefined, '在地址栏点击"网站设置"，允许摄像头访问')}
                     </p>
                     <p>
-                      • <strong>Firefox:</strong> 点击地址栏左侧的盾牌图标，允许摄像头权限
+                      • <strong>Firefox:</strong>{' '}
+                      {t('h5.scan.perm.firefox', undefined, '点击地址栏左侧的盾牌图标，允许摄像头权限')}
                     </p>
                   </div>
                 </div>
@@ -530,14 +557,14 @@ export default function H5ScanPage() {
                 onClick={handleRetry}
                 className="rounded-xl bg-indigo-600 px-6 py-3 font-medium text-white transition-colors hover:bg-indigo-700"
               >
-                重试
+                {t('h5.scan.retry', undefined, '重试')}
               </button>
               {permissionDenied && (
                 <button
                   onClick={() => window.location.reload()}
                   className="rounded-xl bg-gray-600 px-6 py-3 font-medium text-white transition-colors hover:bg-gray-700"
                 >
-                  刷新页面
+                  {t('h5.scan.refresh', undefined, '刷新页面')}
                 </button>
               )}
             </div>
@@ -550,25 +577,35 @@ export default function H5ScanPage() {
             <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-lg">
               <div className="mb-6 text-center">
                 <CheckCircleIcon className="mx-auto mb-3 h-12 w-12 text-green-500" />
-                <h2 className="mb-2 text-xl font-bold text-gray-900">识别成功</h2>
-                <p className="text-sm text-gray-600">确认绑定以下设备？</p>
+                <h2 className="mb-2 text-xl font-bold text-gray-900">
+                  {t('h5.scan.result.title', undefined, '识别成功')}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {t('h5.scan.result.confirm', undefined, '确认绑定以下设备？')}
+                </p>
               </div>
 
               {/* Device Info */}
               <div className="mb-6 rounded-xl bg-gray-50 p-4">
                 <h3 className="mb-2 font-medium text-gray-900">{scanResult.deviceName}</h3>
-                <p className="mb-1 text-sm text-gray-600">设备编码: {scanResult.deviceCode}</p>
+                <p className="mb-1 text-sm text-gray-600">
+                  {t('h5.scan.deviceCode', undefined, '设备编码')}: {scanResult.deviceCode}
+                </p>
                 {scanResult.deviceType && (
-                  <p className="mb-1 text-sm text-gray-600">设备类型: {scanResult.deviceType}</p>
+                  <p className="mb-1 text-sm text-gray-600">
+                    {t('h5.scan.deviceType', undefined, '设备类型')}: {scanResult.deviceType}
+                  </p>
                 )}
                 <p className="text-xs text-gray-500">
-                  扫描时间: {formatTimestamp(scanResult.timestamp)}
+                  {t('h5.scan.scanTime', undefined, '扫描时间')}: {formatTimestamp(scanResult.timestamp)}
                 </p>
               </div>
 
               {/* User Info */}
               <div className="mb-6 rounded-xl bg-blue-50 p-4">
-                <h4 className="mb-2 text-sm font-medium text-blue-900">登录账户</h4>
+                <h4 className="mb-2 text-sm font-medium text-blue-900">
+                  {t('h5.scan.loginAccount', undefined, '登录账户')}
+                </h4>
                 <div className="flex items-center">
                   {user?.avatar && (
                     <img
@@ -593,14 +630,16 @@ export default function H5ScanPage() {
                   disabled={isProcessing}
                   className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
                 >
-                  取消
+                  {t('h5.scan.cancel', undefined, '取消')}
                 </button>
                 <button
                   onClick={handleConfirmBinding}
                   disabled={isProcessing}
                   className="flex-1 rounded-xl border border-transparent bg-indigo-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
                 >
-                  {isProcessing ? '绑定中...' : '确认绑定'}
+                  {isProcessing
+                    ? t('h5.scan.binding', undefined, '绑定中...')
+                    : t('h5.scan.confirmBind', undefined, '确认绑定')}
                 </button>
               </div>
             </div>
@@ -615,29 +654,41 @@ export default function H5ScanPage() {
                 <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
                   <CheckCircleIcon className="h-10 w-10 text-green-600" />
                 </div>
-                <h2 className="mb-2 text-2xl font-bold text-gray-900">绑定成功！</h2>
-                <p className="text-sm text-gray-600">设备已成功绑定到您的账户</p>
+                <h2 className="mb-2 text-2xl font-bold text-gray-900">
+                  {t('h5.scan.success.title', undefined, '绑定成功！')}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {t('h5.scan.success.desc', undefined, '设备已成功绑定到您的账户')}
+                </p>
               </div>
 
               {/* Success Device Info */}
               <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-4">
                 <div className="mb-3 flex items-center">
                   <CheckCircleIcon className="mr-2 h-5 w-5 text-green-600" />
-                  <h3 className="font-medium text-green-900">已绑定设备</h3>
+                  <h3 className="font-medium text-green-900">
+                    {t('h5.scan.success.boundDevice', undefined, '已绑定设备')}
+                  </h3>
                 </div>
                 <h4 className="mb-2 font-medium text-gray-900">{scanResult.deviceName}</h4>
-                <p className="mb-1 text-sm text-gray-600">设备编码: {scanResult.deviceCode}</p>
+                <p className="mb-1 text-sm text-gray-600">
+                  {t('h5.scan.deviceCode', undefined, '设备编码')}: {scanResult.deviceCode}
+                </p>
                 {scanResult.deviceType && (
-                  <p className="mb-1 text-sm text-gray-600">设备类型: {scanResult.deviceType}</p>
+                  <p className="mb-1 text-sm text-gray-600">
+                    {t('h5.scan.deviceType', undefined, '设备类型')}: {scanResult.deviceType}
+                  </p>
                 )}
                 <p className="text-xs text-gray-500">
-                  绑定时间: {dayjs().format('YYYY-MM-DD HH:mm:ss')}
+                  {t('h5.scan.bindTime', undefined, '绑定时间')}: {dayjs().format('YYYY-MM-DD HH:mm:ss')}
                 </p>
               </div>
 
               {/* User Info */}
               <div className="mb-6 rounded-xl bg-blue-50 p-4">
-                <h4 className="mb-2 text-sm font-medium text-blue-900">绑定账户</h4>
+                <h4 className="mb-2 text-sm font-medium text-blue-900">
+                {t('h5.scan.bindAccount', undefined, '绑定账户')}
+              </h4>
                 <div className="flex items-center">
                   {user?.avatar && (
                     <img
@@ -665,13 +716,13 @@ export default function H5ScanPage() {
                   }}
                   className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
                 >
-                  继续扫描
+                  {t('h5.scan.continueScan', undefined, '继续扫描')}
                 </button>
                 <button
                   onClick={() => navigate('/devices')}
                   className="flex-1 rounded-xl border border-transparent bg-green-600 px-4 py-3 text-sm font-medium text-white transition-colors hover:bg-green-700"
                 >
-                  查看设备
+                  {t('h5.scan.viewDevices', undefined, '查看设备')}
                 </button>
               </div>
             </div>
@@ -684,7 +735,7 @@ export default function H5ScanPage() {
             <div className="rounded-xl bg-red-600 p-4 text-white">
               <p className="text-sm">{error}</p>
               <button onClick={handleRetry} className="mt-2 text-sm underline">
-                重新扫描
+                {t('h5.scan.rescan', undefined, '重新扫描')}
               </button>
             </div>
           </div>
@@ -699,9 +750,15 @@ export default function H5ScanPage() {
               <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-600">
                 <ShieldCheckIcon className="h-8 w-8 text-white" />
               </div>
-              <h3 className="mb-2 text-xl font-bold text-white">需要摄像头权限</h3>
+              <h3 className="mb-2 text-xl font-bold text-white">
+                {t('h5.scan.perm.title', undefined, '需要摄像头权限')}
+              </h3>
               <p className="text-sm leading-relaxed text-gray-300">
-                为了扫描TV设备上的二维码，我们需要访问您的摄像头。您的隐私和数据安全是我们的首要关注。
+                {t(
+                  'h5.scan.perm.modalDesc',
+                  undefined,
+                  '为了扫描TV设备上的二维码，我们需要访问您的摄像头。您的隐私和数据安全是我们的首要关注。',
+                )}
               </p>
             </div>
 
@@ -709,10 +766,12 @@ export default function H5ScanPage() {
               <div className="flex items-start">
                 <InformationCircleIcon className="mt-0.5 mr-3 h-5 w-5 flex-shrink-0 text-blue-400" />
                 <div className="text-sm text-blue-200">
-                  <p className="mb-1 font-medium">权限用途说明：</p>
+                  <p className="mb-1 font-medium">
+                    {t('h5.scan.perm.usageTitle', undefined, '权限用途说明：')}
+                  </p>
                   <ul className="space-y-1 text-xs">
-                    <li>• 仅用于扫描设备二维码</li>
-                    <li>• 不会录制或存储视频</li>
+                    <li>• {t('h5.scan.perm.usage1', undefined, '仅用于扫描设备二维码')}</li>
+                    <li>• {t('h5.scan.perm.usage2', undefined, '不会录制或存储视频')}</li>
                   </ul>
                 </div>
               </div>
@@ -723,13 +782,13 @@ export default function H5ScanPage() {
                 onClick={handlePermissionCancel}
                 className="flex-1 rounded-xl bg-gray-600 py-3 font-medium text-white transition-colors hover:bg-gray-700"
               >
-                取消
+                {t('h5.scan.cancel', undefined, '取消')}
               </button>
               <button
                 onClick={handlePermissionConfirm}
                 className="flex-1 rounded-xl bg-blue-600 py-3 font-medium text-white transition-colors hover:bg-blue-700"
               >
-                允许访问
+                {t('h5.scan.perm.allow', undefined, '允许访问')}
               </button>
             </div>
           </div>
