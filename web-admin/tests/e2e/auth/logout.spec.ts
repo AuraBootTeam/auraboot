@@ -44,6 +44,36 @@ async function createSessionCookieValue(jwt: string): Promise<string> {
   return match[1];
 }
 
+/**
+ * Login through the real /login form. The crafted-cookie path below only
+ * half-authenticates in the docker CI stack (its SESSION_SECRET differs from
+ * the dev fallback, so the BFF cannot extract a token from the session:
+ * the SSR shell renders but every client fetch is unauthorized and the
+ * header never becomes fully interactive). Tests that need a WORKING header
+ * (LO-001's user-menu logout) must hold a real session.
+ */
+async function loginViaForm(page: import('@playwright/test').Page): Promise<HeaderPage> {
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
+    timeout: 10000,
+  });
+  const emailInput = page.locator('input#identifier, input#email').first();
+  await emailInput.fill(ADMIN_EMAIL);
+  await expect(emailInput).toHaveValue(ADMIN_EMAIL, { timeout: 3000 });
+  const pwd = page.locator('input#password');
+  await pwd.fill(ADMIN_PASSWORD);
+  await expect(pwd).toHaveValue(ADMIN_PASSWORD, { timeout: 3000 });
+  await page
+    .locator('form button[type="submit"], form button:has-text("立即登录"), form button:has-text("Login")')
+    .first()
+    .click();
+  await page.waitForURL((url) => !url.toString().includes('/login'), { timeout: 20000 });
+
+  const header = new HeaderPage(page);
+  await expect(header.userAvatar).toBeVisible({ timeout: 15000 });
+  return header;
+}
+
 async function ensureAuthenticated(page: import('@playwright/test').Page): Promise<HeaderPage> {
   const header = new HeaderPage(page);
   await page.goto(`/meta/models`, { waitUntil: 'domcontentloaded' });
@@ -82,12 +112,22 @@ async function ensureAuthenticated(page: import('@playwright/test').Page): Promi
 }
 
 test.describe('Logout Functionality', () => {
+  // Fresh-login flows (API login + hydration-aware menu interaction) do not fit
+  // the fast profile's 15s default budget on CI containers (LO-001 died at
+  // 15.1s: "Target page ... has been closed" = timeout cleanup mid-click).
+  test.setTimeout(45_000);
+  // Fresh session: every test here logs out server-side. Consuming the shared
+  // admin storageState would invalidate that session for later specs in the
+  // same run (space-selection etc.), so start empty — ensureAuthenticated
+  // performs a disposable API login per test.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   /**
    * LO-001: Logout via user menu
    * Verify that clicking logout link logs user out
    */
   test('LO-001: should logout via user menu @smoke', async ({ page }) => {
-    const header = await ensureAuthenticated(page);
+    const header = await loginViaForm(page);
 
     await header.logout();
 
@@ -113,7 +153,11 @@ test.describe('Logout Functionality', () => {
     const authToken = await page.evaluate(() => localStorage.getItem('token'));
     expect(authToken === null || authToken === '').toBe(true);
 
-    await page.goto(`/meta/models`, { waitUntil: 'domcontentloaded' });
+    // Post-logout, navigating to a protected page redirects to /login; the
+    // redirect can abort the original navigation (net::ERR_ABORTED) — what
+    // matters is where we land, not whether the first request completed.
+    await page.goto(`/meta/models`, { waitUntil: 'domcontentloaded' }).catch(() => null);
+    await page.waitForURL(/\/login/, { timeout: 10000 });
     await expect(page.locator('input#identifier, input#email').first()).toBeVisible({
       timeout: 10000,
     });

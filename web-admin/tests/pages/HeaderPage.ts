@@ -263,23 +263,29 @@ export class HeaderPage {
 
   /**
    * Open the user dropdown menu.
-   * Polls for the dropdown so the first click swallowed during hydration
-   * doesn't make auth/logout flows flaky.
+   * The SSR header renders the avatar long before React attaches its click
+   * handlers, so first wait for the header's data-hydrated marker (slow CI
+   * containers lose this race for many seconds), then poll-click so a click
+   * swallowed mid-hydration doesn't make auth/logout flows flaky.
    */
   async openUserMenu(): Promise<void> {
     await expect(this.userMenuButton).toBeVisible({ timeout: 8000 });
+    await this.page
+      .locator('header[data-hydrated="true"]')
+      .waitFor({ state: 'attached', timeout: 15000 })
+      .catch(() => null); // marker may not exist on older builds — poll below still covers it
 
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    for (let attempt = 0; attempt < 6; attempt += 1) {
       if (await this.userDropdown.isVisible({ timeout: 250 }).catch(() => false)) {
         break;
       }
       await this.userMenuButton.click().catch(async () => {
         await this.userAvatar.click({ force: true });
       });
-      await this.userDropdown.waitFor({ state: 'visible', timeout: 1000 }).catch(() => null);
+      await this.userDropdown.waitFor({ state: 'visible', timeout: 1500 }).catch(() => null);
     }
 
-    await expect(this.userDropdown).toBeVisible({ timeout: 3000 });
+    await expect(this.userDropdown).toBeVisible({ timeout: 5000 });
 
     await expect(this.logoutLink).toBeVisible({ timeout: 5000 });
   }

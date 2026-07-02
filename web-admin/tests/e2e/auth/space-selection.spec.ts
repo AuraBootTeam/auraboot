@@ -160,9 +160,15 @@ test.describe('Tenant Switch in Avatar Menu', () => {
   test('avatar menu shows tenant list and platform console', async ({ page }) => {
     await page.goto('/', { waitUntil: 'load' });
 
-    // Wait for React hydration — avatar button must be interactive
+    // Wait for React hydration — avatar button must be interactive, and the
+    // header marks data-hydrated once its click handlers are attached (slow CI
+    // containers render the SSR avatar many seconds before hydration finishes).
     const avatarButton = page.locator('[data-testid="user-menu"] button').first();
     await expect(avatarButton).toBeVisible({ timeout: 15_000 });
+    await page
+      .locator('header[data-hydrated="true"]')
+      .waitFor({ state: 'attached', timeout: 15_000 })
+      .catch(() => null);
 
     const dropdown = page.locator('[data-testid="user-dropdown"]');
     await expect
