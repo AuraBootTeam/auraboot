@@ -44,6 +44,36 @@ async function createSessionCookieValue(jwt: string): Promise<string> {
   return match[1];
 }
 
+/**
+ * Login through the real /login form. The crafted-cookie path below only
+ * half-authenticates in the docker CI stack (its SESSION_SECRET differs from
+ * the dev fallback, so the BFF cannot extract a token from the session:
+ * the SSR shell renders but every client fetch is unauthorized and the
+ * header never becomes fully interactive). Tests that need a WORKING header
+ * (LO-001's user-menu logout) must hold a real session.
+ */
+async function loginViaForm(page: import('@playwright/test').Page): Promise<HeaderPage> {
+  await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('login-page-root')).toHaveAttribute('data-hydrated', 'true', {
+    timeout: 10000,
+  });
+  const emailInput = page.locator('input#identifier, input#email').first();
+  await emailInput.fill(ADMIN_EMAIL);
+  await expect(emailInput).toHaveValue(ADMIN_EMAIL, { timeout: 3000 });
+  const pwd = page.locator('input#password');
+  await pwd.fill(ADMIN_PASSWORD);
+  await expect(pwd).toHaveValue(ADMIN_PASSWORD, { timeout: 3000 });
+  await page
+    .locator('form button[type="submit"], form button:has-text("立即登录"), form button:has-text("Login")')
+    .first()
+    .click();
+  await page.waitForURL((url) => !url.toString().includes('/login'), { timeout: 20000 });
+
+  const header = new HeaderPage(page);
+  await expect(header.userAvatar).toBeVisible({ timeout: 15000 });
+  return header;
+}
+
 async function ensureAuthenticated(page: import('@playwright/test').Page): Promise<HeaderPage> {
   const header = new HeaderPage(page);
   await page.goto(`/meta/models`, { waitUntil: 'domcontentloaded' });
@@ -97,7 +127,7 @@ test.describe('Logout Functionality', () => {
    * Verify that clicking logout link logs user out
    */
   test('LO-001: should logout via user menu @smoke', async ({ page }) => {
-    const header = await ensureAuthenticated(page);
+    const header = await loginViaForm(page);
 
     await header.logout();
 
