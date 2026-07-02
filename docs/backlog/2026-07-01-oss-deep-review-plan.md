@@ -98,6 +98,7 @@ perm-004 存量 controller 分类、capability 系统、tenant/permission contro
 |---|---|---|---|---|---|
 | DR-20260701-W1-sec-001 | **P1** | `agent/service/InterruptDispatcher.java` cancelRun | 跨租户 agent-run 取消 IDOR:raw JdbcTemplate `UPDATE ab_agent_run WHERE pid=?` **无 tenant_id**(该表不在 ignoreTable,raw JdbcTemplate 绕拦截器)→ 任一登录用户可取消他租户在飞 run(跨租户写/DoS);姊妹 INSERT_SUBTASK 路径有 tenantId+ACL | plumb tenantId + `AND tenant_id=?`(UPDATE+SELECT) | `InterruptDispatcherTenantScopeTest` PASS |
 | DR-20260701-W1-sec-002 | **P1** | `meta/.../DynamicDataServiceImpl.java` applyFieldPermissionFilter{,Single} | field-permission 评估失败 catch→log.warn→**返回未脱敏记录**(隐藏字段泄漏);同 class 的 row-ACL/policy-mask/config-mask 全 fail-closed(23 处 throw),唯这 2 处 fail-open | 2 catch 改 fail-closed throw MetaServiceException | `DynamicDataServiceImplGetByIdFailSecureTest` +1(共 7)PASS |
+| DR-20260701-W1-sec-003 | P2 | `meta/.../DataPermissionEngineImpl.java` dataScopeConditionToSql | config-boundary SQLi 防御纵深:SELF/DEPT 的 `ownerField`/`deptField` 标识符拼接 SQL **未过 `SqlSafetyUtils.isValidIdentifier`**(姊妹 row-policy builder 过了);值侧安全(Long owner id / 引号转义 dept pids),仅字段标识符是注入面 | 两处加 `isValidIdentifier` guard,非法→`log.warn`+`return "1 = 0"`(对齐姊妹 fail-secure) | `DataPermissionEngineImplDataScopeTest` +3(共 6)PASS(注入 field→1=0 / 合法→正常 SQL) |
 
 ### 延后(evidenced backlog,已价值分层——非闷头清)
 
@@ -108,7 +109,7 @@ perm-004 存量 controller 分类、capability 系统、tenant/permission contro
 | DR-20260701-W2-perf-003 | P2 | 未读汇总 N+1(`getUnreadSummary` 1+2N,badge 轮询放大) | 单 join 重写 + 真 DB IT(3-4h) |
 | DR-20260701-W2-perf-cand | P2/P3 | 5 candidate:OrgController N+1 / RollUp 全表扫 / ExportAsyncTaskExecutor 无界物化(potential OOM)/ CapabilitySync N+1 / CascadeDelete loop | 多为 admin/maintenance 低频路径或需确认上游 cap;各 2-6h |
 | DR-20260701-W3-xrepo-001 | P2 | `e2et_*` 全局 model code 在 OSS/EE test-fixtures 分歧定义(双 SoT,仅靠 reset-init 名字特判防撞) | **test-only**(`AURA_ENV=test` 才导入),当前 guard 有效未撞;修复跨 OSS+EE 双仓;low blast radius |
-| DR-20260701-W1-sec-cand | P2/P3 | 3 admin-gated SSRF(Embedding/LLM/SaaS `baseUrl` 无 SsrfValidator)+ config-boundary SQLi(`DataPermissionEngineImpl` ownerField/deptField 未过 validateIdentifier,姊妹 policy 路径过了)+ 1 不可达 SQLi | SSRF 各 ~0.5d 且 **admin-gated 非请求输入**;config SQLi 需 config-time 授权写才可利用。防御性硬化,非紧急 |
+| DR-20260701-W1-sec-cand | P2/P3 | 3 admin-gated SSRF(Embedding/LLM/SaaS `baseUrl` 无 SsrfValidator)+ 1 不可达 SQLi(`QueryBuilderServiceImpl` 无 controller wire) | SSRF 各 ~0.5d 且 **admin-gated 非请求输入**;不可达 SQLi 现网无请求路径。防御性硬化,非紧急。(config-boundary SQLi 已修,见 W1-sec-003)|
 
 ### Candidate 门禁硬化(可选)
 - `validate-permission-codes.mjs` 不扫 EE 侧 Java `@RequirePermission` 字面量(当前 0 drift)——未来 EE inline 权限码无注册会漏过 CI。扩展 validator 引用扫描面。
