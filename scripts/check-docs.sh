@@ -125,5 +125,13 @@ else
 fi
 echo ""
 
+# ---------- 5. OSS internal-docs guard ----------
+
+echo "--- OSS internal-docs guard ---"
+if ! ./scripts/check-oss-no-internal-docs.sh; then
+    EXIT_CODE=1
+fi
+echo ""
+
 echo "=== Done (exit code: $EXIT_CODE) ==="
 exit $EXIT_CODE
