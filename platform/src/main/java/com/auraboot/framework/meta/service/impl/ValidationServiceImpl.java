@@ -427,11 +427,75 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
 
         try {
             Pattern pattern = Pattern.compile(format);
-            if (!pattern.matcher(stringValue).matches()) {
+            if (!matchesWithTimeout(pattern, stringValue)) {
                 errors.add("Field '" + fieldDefinition.getName() + "' does not match required format");
             }
+        } catch (RegexTimeoutException e) {
+            // A runaway match (likely ReDoS: an admin-configured catastrophic-backtracking
+            // regex + crafted input) is bounded and treated as a validation failure instead
+            // of hanging the request thread.
+            log.warn("Regex match timed out for field {} (possible ReDoS), pattern={}",
+                    fieldDefinition.getCode(), format);
+            errors.add("Field '" + fieldDefinition.getName()
+                    + "' could not be validated (format pattern is too complex)");
         } catch (Exception e) {
             log.warn("Invalid regex pattern for field {}: {}", fieldDefinition.getCode(), format);
+        }
+    }
+
+    /** Max wall-clock a single field-format regex match may run before being aborted. */
+    private static final long REGEX_MATCH_TIMEOUT_MS = 200L;
+
+    /**
+     * Match {@code input} against {@code pattern} with a hard time bound to defend against
+     * ReDoS (catastrophic backtracking). The input is wrapped in a {@link TimeoutCharSequence}
+     * whose {@code charAt} throws once the deadline passes; regex backtracking reads chars
+     * repeatedly, so a runaway match is interrupted within the bound. Package-private for
+     * direct unit testing of the boundary.
+     */
+    static boolean matchesWithTimeout(Pattern pattern, String input) {
+        long deadlineNanos = System.nanoTime() + REGEX_MATCH_TIMEOUT_MS * 1_000_000L;
+        return pattern.matcher(new TimeoutCharSequence(input, deadlineNanos)).matches();
+    }
+
+    /** Signals that a regex match exceeded {@link #REGEX_MATCH_TIMEOUT_MS}. */
+    static final class RegexTimeoutException extends RuntimeException {
+        RegexTimeoutException() {
+            super("regex match timed out");
+        }
+    }
+
+    /** CharSequence that aborts (via {@link RegexTimeoutException}) once a deadline passes. */
+    private static final class TimeoutCharSequence implements CharSequence {
+        private final CharSequence inner;
+        private final long deadlineNanos;
+
+        TimeoutCharSequence(CharSequence inner, long deadlineNanos) {
+            this.inner = inner;
+            this.deadlineNanos = deadlineNanos;
+        }
+
+        @Override
+        public char charAt(int index) {
+            if (System.nanoTime() > deadlineNanos) {
+                throw new RegexTimeoutException();
+            }
+            return inner.charAt(index);
+        }
+
+        @Override
+        public int length() {
+            return inner.length();
+        }
+
+        @Override
+        public CharSequence subSequence(int start, int end) {
+            return new TimeoutCharSequence(inner.subSequence(start, end), deadlineNanos);
+        }
+
+        @Override
+        public String toString() {
+            return inner.toString();
         }
     }
 
