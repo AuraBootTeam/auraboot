@@ -144,13 +144,13 @@ public class QueryOperator {
         }
         
         switch (dataType.toUpperCase()) {
-            case "string":
+            case "STRING":
                 return "string".equals(valueType) || "any".equals(valueType) || isStringOperator();
-            case "number":
+            case "NUMBER":
                 return "number".equals(valueType) || "any".equals(valueType) || isComparisonOperator();
-            case "date":
+            case "DATE":
                 return "number".equals(valueType) || "any".equals(valueType) || isComparisonOperator() || isRangeOperator();
-            case "boolean":
+            case "BOOLEAN":
                 return "any".equals(valueType) || isComparisonOperator();
             default:
                 return "any".equals(valueType);

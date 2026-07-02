@@ -1,6 +1,8 @@
 package com.auraboot.framework.im.mapper;
 
+import com.auraboot.framework.im.dto.ConversationMemberCountRow;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
+import com.auraboot.framework.im.dto.ConversationUnreadRow;
 import com.auraboot.framework.im.dto.ReadReceiptInfo;
 import com.auraboot.framework.im.model.ImConversationMember;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
@@ -22,6 +24,28 @@ public interface ImConversationMemberMapper extends BaseMapper<ImConversationMem
                                             @Param("memberType") String memberType,
                                             @Param("memberId") Long memberId);
 
+    /**
+     * Join member ⋈ conversation for one member so unread counts can be computed in a single
+     * query instead of an N+1 loop (per-conversation selectById + findMember). The INNER JOIN
+     * naturally drops memberships whose conversation no longer exists (equivalent to the old
+     * {@code if (conv == null) continue}). max_seq / last_read_seq map to camelCase via
+     * map-underscore-to-camel-case.
+     */
+    @Select("""
+        SELECT m.conversation_id AS conversationId,
+               c.max_seq         AS maxSeq,
+               m.last_read_seq   AS lastReadSeq
+        FROM ab_im_conversation_member m
+        JOIN ab_im_conversation c
+          ON c.id = m.conversation_id AND c.tenant_id = m.tenant_id
+        WHERE m.tenant_id = #{tenantId}
+          AND m.member_type = #{memberType}
+          AND m.member_id = #{memberId}
+        """)
+    List<ConversationUnreadRow> findUnreadRowsByMember(@Param("tenantId") Long tenantId,
+                                                       @Param("memberType") String memberType,
+                                                       @Param("memberId") Long memberId);
+
     @Select("""
         SELECT member_id FROM ab_im_conversation_member
         WHERE conversation_id = #{conversationId} AND tenant_id = #{tenantId}
@@ -29,6 +53,45 @@ public interface ImConversationMemberMapper extends BaseMapper<ImConversationMem
         """)
     List<Long> findHumanMemberIds(@Param("conversationId") Long conversationId,
                                    @Param("tenantId") Long tenantId);
+
+    /**
+     * Batch variant of {@link #findMember} for the conversation-list endpoint: one query returns the
+     * member's membership row for every conversation in the set (bucketed by conversation_id in the
+     * service), replacing the per-conversation findMember N+1.
+     */
+    @Select("""
+        <script>
+        SELECT * FROM ab_im_conversation_member
+        WHERE tenant_id = #{tenantId}
+          AND member_type = #{memberType}
+          AND member_id = #{memberId}
+          AND conversation_id IN
+          <foreach item='id' collection='conversationIds' open='(' separator=',' close=')'>#{id}</foreach>
+        </script>
+        """)
+    List<ImConversationMember> findMembersByConversationIds(@Param("tenantId") Long tenantId,
+                                                            @Param("memberType") String memberType,
+                                                            @Param("memberId") Long memberId,
+                                                            @Param("conversationIds") List<Long> conversationIds);
+
+    /**
+     * Batch variant of {@link #findHumanMemberIds} for the conversation-list endpoint: one grouped
+     * query returns the human-member count per conversation, replacing the per-conversation
+     * findHumanMemberIds N+1.
+     */
+    @Select("""
+        <script>
+        SELECT conversation_id AS conversationId, COUNT(*) AS memberCount
+        FROM ab_im_conversation_member
+        WHERE tenant_id = #{tenantId}
+          AND member_type = 'human'
+          AND conversation_id IN
+          <foreach item='id' collection='conversationIds' open='(' separator=',' close=')'>#{id}</foreach>
+        GROUP BY conversation_id
+        </script>
+        """)
+    List<ConversationMemberCountRow> countHumanMembersByConversationIds(@Param("tenantId") Long tenantId,
+                                                                        @Param("conversationIds") List<Long> conversationIds);
 
     @Update("""
         UPDATE ab_im_conversation_member

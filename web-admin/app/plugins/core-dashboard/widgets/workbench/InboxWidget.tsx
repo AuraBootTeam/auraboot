@@ -98,7 +98,6 @@ export function InboxWidget({
       const modelCode = item.sourceModel ?? item.modelCode;
       const recordPid =
         item.sourceRecordPid ??
-        item.sourceRecordPid ??
         (item.recordPid != null ? String(item.recordPid) : undefined);
       if (recordPid) {
         window.location.href = `/p/${modelCode}/view/${recordPid}`;
