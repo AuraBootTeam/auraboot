@@ -830,11 +830,18 @@ test.describe('Security Settings — Sessions', () => {
 
 test.describe('Logout Flow', () => {
   test.setTimeout(30000);
+  // Fresh session: this suite LOGS OUT server-side. Running it on the shared
+  // admin storageState kills that session for every later spec in the run
+  // (space-selection etc. get bounced to /login). Log in disposably instead.
+  test.use({ storageState: { cookies: [], origins: [] } });
 
   test('LO-001: should logout and redirect to login @smoke', async ({ page }) => {
     test.setTimeout(45000);
 
-    // Start authenticated — wait for full page load
+    await loginViaUI(page, ADMIN.email, ADMIN.password);
+    await expectLoggedIn(page);
+
+    // Wait for full page load
     await page.goto('/dashboards', { waitUntil: 'load' });
     const header = new HeaderPage(page);
     await header.userMenuButton.waitFor({ state: 'visible', timeout: 20000 });

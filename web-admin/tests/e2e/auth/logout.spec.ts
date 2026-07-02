@@ -82,6 +82,12 @@ async function ensureAuthenticated(page: import('@playwright/test').Page): Promi
 }
 
 test.describe('Logout Functionality', () => {
+  // Fresh session: every test here logs out server-side. Consuming the shared
+  // admin storageState would invalidate that session for later specs in the
+  // same run (space-selection etc.), so start empty — ensureAuthenticated
+  // performs a disposable API login per test.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   /**
    * LO-001: Logout via user menu
    * Verify that clicking logout link logs user out
