@@ -229,9 +229,12 @@ export function AsyncTaskProgressModal({
 
       {/* Failed state: error message */}
       {task.status === 'failed' && (
-        <div className="space-y-2">
+        <div className="space-y-2" data-testid="async-task-modal-failed">
           <div className="text-base font-semibold text-red-700">导入失败 / Failed</div>
-          <div className="rounded-control bg-status-red-bg border border-red-200 p-3 text-sm text-red-800">
+          <div
+            className="rounded-control bg-status-red-bg border border-red-200 p-3 text-sm text-red-800"
+            data-testid="async-task-modal-error"
+          >
             {task.errorMessage || '未知错误 / Unknown error'}
           </div>
         </div>
