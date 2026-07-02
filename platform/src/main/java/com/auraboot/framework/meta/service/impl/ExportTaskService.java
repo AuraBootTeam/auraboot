@@ -96,7 +96,7 @@ public class ExportTaskService {
      */
     public ExportTaskDTO getTaskStatus(String taskPid) {
         ExportTask task = exportTaskMapper.findByPid(taskPid);
-        if (task == null) {
+        if (task == null || !belongsToCurrentTenant(task)) {
             throw new MetaServiceException("Export task not found: " + taskPid);
         }
         return toDTO(task);
@@ -107,7 +107,20 @@ public class ExportTaskService {
      */
     public String getFileKey(String taskPid) {
         ExportTask task = exportTaskMapper.findByPid(taskPid);
-        return task != null ? task.getFileKey() : null;
+        if (task == null || !belongsToCurrentTenant(task)) {
+            return null;
+        }
+        return task.getFileKey();
+    }
+
+    /**
+     * {@code ab_export_task} is excluded from the tenant line interceptor and resolved by a
+     * global {@code pid}, so re-assert tenant ownership here — a tenant must not read another
+     * tenant's export status / file / queryCode via its (ULID) taskPid.
+     */
+    private boolean belongsToCurrentTenant(ExportTask task) {
+        Long current = com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId();
+        return current != null && current.equals(task.getTenantId());
     }
 
     /**
