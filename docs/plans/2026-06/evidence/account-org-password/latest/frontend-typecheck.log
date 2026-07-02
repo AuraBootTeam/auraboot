@@ -1,6 +1,0 @@
-
-> auraboot-app@ typecheck /Users/ghj/work/auraboot-core-account-org-settings/web-admin
-> react-router typegen && tsc
-
-The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
-The plugin "vite-tsconfig-paths" is detected. Vite now supports tsconfig paths resolution natively via the resolve.tsconfigPaths option. You can remove the plugin and set resolve.tsconfigPaths: true in your Vite config instead.
