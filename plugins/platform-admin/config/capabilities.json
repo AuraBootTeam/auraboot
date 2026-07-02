@@ -142,7 +142,9 @@
       "dashboard.read",
       "dashboard.saved_view.read",
       "meta.model.read",
-      "data.datasource.read"
+      "data.datasource.read",
+      "page.page.read",
+      "bpm.process.read"
     ],
     "tier": "viewer",
     "order": 110
