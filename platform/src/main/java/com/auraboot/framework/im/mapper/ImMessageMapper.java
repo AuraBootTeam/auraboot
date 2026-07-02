@@ -1,5 +1,6 @@
 package com.auraboot.framework.im.mapper;
 
+import com.auraboot.framework.im.dto.ConversationLastMessageRow;
 import com.auraboot.framework.im.dto.MessageSearchResult;
 import com.auraboot.framework.im.model.ImMessage;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
@@ -38,6 +39,30 @@ public interface ImMessageMapper extends BaseMapper<ImMessage> {
                                    @Param("tenantId") Long tenantId,
                                    @Param("beforeSeq") Long beforeSeq,
                                    @Param("limit") int limit);
+
+    /**
+     * Batch variant of {@code findBeforeSeq(convId, tenant, MAX, 1)} for the conversation-list
+     * endpoint: one {@code DISTINCT ON (conversation_id)} query returns the latest (max-seq) message
+     * per conversation, replacing the per-conversation findBeforeSeq N+1. Same semantics as the loop
+     * it replaces (latest by seq, no recalled/type filter). Only the fields the list needs are
+     * projected (content / message_type / created_at), avoiding the JSONB columns.
+     */
+    @Select("""
+        <script>
+        SELECT DISTINCT ON (conversation_id)
+               conversation_id AS conversationId,
+               content,
+               message_type AS messageType,
+               created_at AS createdAt
+        FROM ab_im_message
+        WHERE tenant_id = #{tenantId}
+          AND conversation_id IN
+          <foreach item='id' collection='conversationIds' open='(' separator=',' close=')'>#{id}</foreach>
+        ORDER BY conversation_id, seq DESC
+        </script>
+        """)
+    List<ConversationLastMessageRow> findLastMessagesByConversationIds(@Param("tenantId") Long tenantId,
+                                                                       @Param("conversationIds") List<Long> conversationIds);
 
     @Select("""
         SELECT * FROM ab_im_message

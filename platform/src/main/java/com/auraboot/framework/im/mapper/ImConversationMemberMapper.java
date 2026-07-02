@@ -1,5 +1,6 @@
 package com.auraboot.framework.im.mapper;
 
+import com.auraboot.framework.im.dto.ConversationMemberCountRow;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
 import com.auraboot.framework.im.dto.ConversationUnreadRow;
 import com.auraboot.framework.im.dto.ReadReceiptInfo;
@@ -52,6 +53,45 @@ public interface ImConversationMemberMapper extends BaseMapper<ImConversationMem
         """)
     List<Long> findHumanMemberIds(@Param("conversationId") Long conversationId,
                                    @Param("tenantId") Long tenantId);
+
+    /**
+     * Batch variant of {@link #findMember} for the conversation-list endpoint: one query returns the
+     * member's membership row for every conversation in the set (bucketed by conversation_id in the
+     * service), replacing the per-conversation findMember N+1.
+     */
+    @Select("""
+        <script>
+        SELECT * FROM ab_im_conversation_member
+        WHERE tenant_id = #{tenantId}
+          AND member_type = #{memberType}
+          AND member_id = #{memberId}
+          AND conversation_id IN
+          <foreach item='id' collection='conversationIds' open='(' separator=',' close=')'>#{id}</foreach>
+        </script>
+        """)
+    List<ImConversationMember> findMembersByConversationIds(@Param("tenantId") Long tenantId,
+                                                            @Param("memberType") String memberType,
+                                                            @Param("memberId") Long memberId,
+                                                            @Param("conversationIds") List<Long> conversationIds);
+
+    /**
+     * Batch variant of {@link #findHumanMemberIds} for the conversation-list endpoint: one grouped
+     * query returns the human-member count per conversation, replacing the per-conversation
+     * findHumanMemberIds N+1.
+     */
+    @Select("""
+        <script>
+        SELECT conversation_id AS conversationId, COUNT(*) AS memberCount
+        FROM ab_im_conversation_member
+        WHERE tenant_id = #{tenantId}
+          AND member_type = 'human'
+          AND conversation_id IN
+          <foreach item='id' collection='conversationIds' open='(' separator=',' close=')'>#{id}</foreach>
+        GROUP BY conversation_id
+        </script>
+        """)
+    List<ConversationMemberCountRow> countHumanMembersByConversationIds(@Param("tenantId") Long tenantId,
+                                                                        @Param("conversationIds") List<Long> conversationIds);
 
     @Update("""
         UPDATE ab_im_conversation_member

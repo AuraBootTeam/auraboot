@@ -4,8 +4,11 @@ import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
+import com.auraboot.framework.im.dto.ConversationLastMessageRow;
 import com.auraboot.framework.im.dto.ConversationListItem;
+import com.auraboot.framework.im.dto.ConversationMemberCountRow;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
+import com.auraboot.framework.im.dto.ConversationUnreadRow;
 import com.auraboot.framework.im.dto.ConversationUpdateRequest;
 import com.auraboot.framework.im.dto.UnreadSummary;
 import com.auraboot.framework.im.mapper.ImConversationMapper;
@@ -203,31 +206,27 @@ class ImConversationServiceImplTest {
         c1.setMaxSeq(5L);
         ImConversation c2 = conv(2L, ImConstants.TYPE_PRIVATE, USER_ID);
         c2.setMaxSeq(2L);
-        when(conversationMapper.selectById(1L)).thenReturn(c1);
-        when(conversationMapper.selectById(2L)).thenReturn(c2);
+        when(conversationMapper.selectBatchIds(List.of(1L, 2L))).thenReturn(List.of(c1, c2));
 
         ImConversationMember mem1 = new ImConversationMember();
+        mem1.setConversationId(1L);
         mem1.setLastReadSeq(3L);
         mem1.setMuted(false);
         mem1.setPinned(true);
-        when(memberMapper.findMember(1L, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
-                .thenReturn(mem1);
-        when(memberMapper.findMember(2L, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
-                .thenReturn(null);
+        when(memberMapper.findMembersByConversationIds(
+                TENANT_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, List.of(1L, 2L)))
+                .thenReturn(List.of(mem1)); // conv 2 has no membership row
 
-        ImMessage m1 = new ImMessage();
-        m1.setContent("a");
-        m1.setMessageType("text");
-        m1.setCreatedAt(Instant.now().minusSeconds(10));
-        ImMessage m2 = new ImMessage();
-        m2.setContent("b");
-        m2.setMessageType("text");
-        m2.setCreatedAt(Instant.now());
-        when(messageMapper.findBeforeSeq(eq(1L), eq(TENANT_ID), eq(Long.MAX_VALUE), eq(1)))
-                .thenReturn(List.of(m1));
-        when(messageMapper.findBeforeSeq(eq(2L), eq(TENANT_ID), eq(Long.MAX_VALUE), eq(1)))
-                .thenReturn(List.of(m2));
-        when(memberMapper.findHumanMemberIds(anyLong(), eq(TENANT_ID))).thenReturn(List.of(USER_ID));
+        when(messageMapper.findLastMessagesByConversationIds(TENANT_ID, List.of(1L, 2L)))
+                .thenReturn(List.of(
+                        ConversationLastMessageRow.builder().conversationId(1L).content("a").messageType("text")
+                                .createdAt(Instant.now().minusSeconds(10)).build(),
+                        ConversationLastMessageRow.builder().conversationId(2L).content("b").messageType("text")
+                                .createdAt(Instant.now()).build()));
+        when(memberMapper.countHumanMembersByConversationIds(TENANT_ID, List.of(1L, 2L)))
+                .thenReturn(List.of(
+                        ConversationMemberCountRow.builder().conversationId(1L).memberCount(1L).build(),
+                        ConversationMemberCountRow.builder().conversationId(2L).memberCount(1L).build()));
 
         List<ConversationListItem> items = service.listByUser(USER_ID, TENANT_ID);
 
@@ -243,7 +242,7 @@ class ImConversationServiceImplTest {
     void listByUser_skipsNullConv() {
         when(memberMapper.findVisibleConversationIdsByMember(TENANT_ID,
                 ImConstants.MEMBER_TYPE_HUMAN, USER_ID)).thenReturn(List.of(1L));
-        when(conversationMapper.selectById(1L)).thenReturn(null);
+        when(conversationMapper.selectBatchIds(List.of(1L))).thenReturn(List.of()); // conversation not found
         assertThat(service.listByUser(USER_ID, TENANT_ID)).isEmpty();
     }
 
@@ -252,10 +251,8 @@ class ImConversationServiceImplTest {
         when(memberMapper.findVisibleConversationIdsByMember(TENANT_ID,
                 ImConstants.MEMBER_TYPE_HUMAN, USER_ID)).thenReturn(List.of(1L));
         ImConversation c1 = conv(1L, ImConstants.TYPE_GROUP, USER_ID);
-        when(conversationMapper.selectById(1L)).thenReturn(c1);
-        when(memberMapper.findMember(anyLong(), anyString(), anyLong(), anyLong())).thenReturn(null);
-        when(messageMapper.findBeforeSeq(anyLong(), anyLong(), anyLong(), anyInt())).thenReturn(List.of());
-        when(memberMapper.findHumanMemberIds(anyLong(), anyLong())).thenReturn(List.of());
+        when(conversationMapper.selectBatchIds(List.of(1L))).thenReturn(List.of(c1));
+        // membership / last-message / member-count batched lookups default to empty
 
         assertThat(service.listByUser(USER_ID, TENANT_ID, ImConstants.TYPE_PRIVATE)).isEmpty();
         assertThat(service.listByUser(USER_ID, TENANT_ID, ImConstants.TYPE_GROUP)).hasSize(1);
@@ -361,24 +358,11 @@ class ImConversationServiceImplTest {
 
     @Test
     void getUnreadSummary_aggregatesAcrossConvs() {
-        when(memberMapper.findConversationIdsByMember(TENANT_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID))
-                .thenReturn(List.of(1L, 2L, 3L));
-        ImConversation c1 = conv(1L, ImConstants.TYPE_GROUP, USER_ID);
-        c1.setMaxSeq(5L);
-        ImConversation c2 = conv(2L, ImConstants.TYPE_GROUP, USER_ID);
-        c2.setMaxSeq(10L);
-        when(conversationMapper.selectById(1L)).thenReturn(c1);
-        when(conversationMapper.selectById(2L)).thenReturn(c2);
-        when(conversationMapper.selectById(3L)).thenReturn(null); // skipped
-
-        ImConversationMember m1 = new ImConversationMember();
-        m1.setLastReadSeq(3L);
-        ImConversationMember m2 = new ImConversationMember();
-        m2.setLastReadSeq(10L); // 0 unread
-        when(memberMapper.findMember(1L, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
-                .thenReturn(m1);
-        when(memberMapper.findMember(2L, ImConstants.MEMBER_TYPE_HUMAN, USER_ID, TENANT_ID))
-                .thenReturn(m2);
+        when(memberMapper.findUnreadRowsByMember(TENANT_ID, ImConstants.MEMBER_TYPE_HUMAN, USER_ID))
+                .thenReturn(List.of(
+                        ConversationUnreadRow.builder().conversationId(1L).maxSeq(5L).lastReadSeq(3L).build(),    // 2 unread
+                        ConversationUnreadRow.builder().conversationId(2L).maxSeq(10L).lastReadSeq(10L).build())); // 0 unread
+        // conv 3 (deleted conversation) is naturally excluded by the INNER JOIN in findUnreadRowsByMember.
 
         UnreadSummary s = service.getUnreadSummary(USER_ID, TENANT_ID);
         assertThat(s.getTotalUnread()).isEqualTo(2L);
