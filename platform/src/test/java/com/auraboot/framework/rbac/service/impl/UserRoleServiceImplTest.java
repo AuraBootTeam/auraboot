@@ -44,6 +44,7 @@ class UserRoleServiceImplTest {
     @Mock private UserRoleMapper userRoleMapper;
     @Mock private RoleMapper roleMapper;
     @Mock private TenantMemberMapper tenantMemberMapper;
+    @Mock private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     private UserRoleServiceImpl service;
     private UserRoleServiceImpl spyService;
@@ -55,6 +56,7 @@ class UserRoleServiceImplTest {
         injectField(service, "userRoleMapper", userRoleMapper);
         injectField(service, "roleMapper", roleMapper);
         injectField(service, "tenantMemberMapper", tenantMemberMapper);
+        injectField(service, "eventPublisher", eventPublisher);
         spyService = spy(service);
     }
 

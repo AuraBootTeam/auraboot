@@ -6,7 +6,6 @@ import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.entity.RoleDataScope;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.DataScopeService;
-import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
@@ -50,7 +49,7 @@ class RolePermissionServiceImplTest {
     private PermissionMapper permissionMapper;
 
     @Mock
-    private UserPermissionService userPermissionService;
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Mock
     private RoleMapper roleMapper;
@@ -81,7 +80,7 @@ class RolePermissionServiceImplTest {
         assertThat(captor.getValue()).hasSize(2);
         assertThat(captor.getValue().get(0).getRoleId()).isEqualTo(7L);
         assertThat(captor.getValue().get(0).getDeletedFlag()).isFalse();
-        verify(userPermissionService).evictRoleUsers(7L);
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.isA(com.auraboot.framework.permission.event.RolePermissionChangedEvent.class));
     }
 
     @Test
@@ -151,7 +150,7 @@ class RolePermissionServiceImplTest {
         assertThat(ok).isTrue();
         verify(dataScopeService).setScope(100L, 7L, "crm.account", "read", "self", "MAX");
         verify(rolePermissionMapper, never()).batchInsert(anyList());
-        verify(userPermissionService).evictRoleUsers(7L);
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.isA(com.auraboot.framework.permission.event.RolePermissionChangedEvent.class));
     }
 
     private Permission perm(Long id, String resourceCode, String action) {
@@ -168,7 +167,7 @@ class RolePermissionServiceImplTest {
 
         assertThat(ok).isTrue();
         verify(rolePermissionMapper, never()).batchInsert(anyList());
-        verify(userPermissionService).evictRoleUsers(7L);
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.isA(com.auraboot.framework.permission.event.RolePermissionChangedEvent.class));
     }
 
     @Test
@@ -184,7 +183,7 @@ class RolePermissionServiceImplTest {
         when(rolePermissionMapper.deleteByRoleAndPermission(7L, 50L, 100L)).thenReturn(1);
 
         assertThat(service.removePermission(7L, 50L)).isTrue();
-        verify(userPermissionService).evictRoleUsers(7L);
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.isA(com.auraboot.framework.permission.event.RolePermissionChangedEvent.class));
     }
 
     @Test
@@ -208,7 +207,7 @@ class RolePermissionServiceImplTest {
         when(rolePermissionMapper.deleteByRoleId(7L, 100L)).thenReturn(3);
 
         assertThat(service.removeAllPermissionsByRoleId(7L)).isTrue();
-        verify(userPermissionService).evictRoleUsers(7L);
+        verify(eventPublisher).publishEvent(org.mockito.ArgumentMatchers.isA(com.auraboot.framework.permission.event.RolePermissionChangedEvent.class));
     }
 
     @Test
