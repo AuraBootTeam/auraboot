@@ -15,14 +15,12 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.expression.MapAccessor;
+import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.EvaluationException;
 import org.springframework.expression.ExpressionParser;
-import org.springframework.expression.TypeLocator;
-import org.springframework.expression.spel.SpelEvaluationException;
-import org.springframework.expression.spel.SpelMessage;
 import org.springframework.expression.spel.SpelParserConfiguration;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -106,17 +104,6 @@ public class BpmNodeHookService {
      */
     private final ExpressionParser spelParser = new SpelExpressionParser(
             new SpelParserConfiguration(false, false));
-
-    /**
-     * TypeLocator that always refuses {@code T(...)} references. Any attempt to
-     * resolve a {@link Class} (e.g. {@code T(java.lang.Runtime)}) throws
-     * {@link SpelEvaluationException}, blocking the most common SpEL RCE vectors
-     * in hook scripts (GAP-257).
-     */
-    private static final TypeLocator DENY_TYPE_LOCATOR = typeName -> {
-        throw new SpelEvaluationException(SpelMessage.TYPE_NOT_FOUND,
-                "Type references are not allowed in hook scripts: " + typeName);
-    };
 
     public BpmNodeHookService(BpmNodeHookMapper hookMapper,
                               DroolsEngineService droolsEngineService,
@@ -311,10 +298,11 @@ public class BpmNodeHookService {
      * <h3>Why that is acceptable here</h3>
      * <ul>
      *   <li>SpEL has no {@code while}/{@code for} grammar; looping requires
-     *       {@code T(...)} type refs (blocked by {@link #DENY_TYPE_LOCATOR}),
-     *       bean refs (no {@code BeanResolver} registered), or constructor
-     *       calls (no {@code ConstructorResolver} registered). A script that
-     *       passes hook hardening cannot build a spin loop inside SpEL.</li>
+     *       {@code T(...)} type refs, method calls, bean refs, or constructor
+     *       calls — all structurally unavailable under the hardened
+     *       {@link SimpleEvaluationContext} built by
+     *       {@link #buildScriptEvaluationContext(Map)}. A script that passes
+     *       hook hardening cannot build a spin loop inside SpEL.</li>
      *   <li>Drools {@code validateDrl} blocks {@code Thread}/{@code Runtime}/
      *       {@code ProcessBuilder} imports, so rules cannot call
      *       {@code Thread.sleep} directly.</li>
@@ -434,33 +422,32 @@ public class BpmNodeHookService {
     /**
      * Execute a SpEL "script" hook against the given process variables map.
      *
-     * <p>Until GAP-257 this used {@code SimpleEvaluationContext}, which is
-     * read-only — any {@code #vars['x'] = 'y'} or {@code #setVar(...)} from a
-     * hook script silently had no effect, so downstream nodes (gateway
-     * conditions, userTask assignees) could not observe hook-produced values.</p>
-     *
-     * <p>The implementation now uses {@link StandardEvaluationContext}, but with
-     * a hardened surface to keep hook scripts far away from generic SpEL RCE
-     * vectors:</p>
+     * <p>Hook scripts run inside a hardened {@link SimpleEvaluationContext}
+     * (see {@link #buildScriptEvaluationContext(Map)}). Unlike
+     * {@code StandardEvaluationContext}, it registers <em>no</em> method
+     * resolver, type locator, constructor resolver, or bean resolver, so every
+     * generic SpEL RCE primitive is structurally unavailable rather than being
+     * caught by a denylist:</p>
      * <ul>
-     *   <li>{@code T(...)} type references are rejected by
-     *       {@link #DENY_TYPE_LOCATOR} — {@code T(java.lang.Runtime).exec(...)}
-     *       cannot resolve a class and throws {@link SpelEvaluationException}.</li>
-     *   <li>No {@code ConstructorResolver} is registered, so {@code new Foo()}
-     *       constructor calls cannot be resolved.</li>
-     *   <li>No {@code BeanResolver} is registered, so {@code @someBean.xxx}
-     *       cannot reach Spring beans.</li>
+     *   <li>Method invocation on any object is unresolvable — the reflective
+     *       escape {@code ''.getClass().forName('java.lang.Runtime')...} throws
+     *       {@link EvaluationException} instead of executing.</li>
+     *   <li>{@code T(...)} type references cannot resolve a class.</li>
+     *   <li>{@code new Foo()} constructor calls cannot be resolved.</li>
+     *   <li>{@code @someBean.xxx} cannot reach Spring beans.</li>
      *   <li>{@link SpelParserConfiguration} is built with {@code autoGrow=false}
      *       and {@code compilerMode=false} to keep behaviour predictable.</li>
      * </ul>
      *
-     * <p>Scripts can now write variables via either route — both land in the
-     * same mutable {@code variables} map that the caller handed in (which in
-     * runtime is {@code executionContext.getRequest()}), so SmartEngine sees
+     * <p>The context is built via {@code forPropertyAccessors(new MapAccessor())}
+     * so it stays writable (a read-only data-binding context would silently drop
+     * hook mutations). Scripts can write variables via either route — both land
+     * in the same mutable {@code variables} map that the caller handed in (which
+     * in runtime is {@code executionContext.getRequest()}), so SmartEngine sees
      * the updates on the next node:</p>
      * <ul>
-     *   <li>{@code #setVar(#vars, 'approverRole', 'manager')} — registered SpEL
-     *       function, thin facade over {@link Map#put}.</li>
+     *   <li>{@code #setVar(#vars, 'approverRole', 'manager')} — SpEL function
+     *       (bound as a variable), thin facade over {@link Map#put}.</li>
      *   <li>{@code #vars['approverRole'] = 'manager'} — SpEL indexer mutation
      *       on the {@code #vars} variable, which is the same map instance.</li>
      * </ul>
@@ -473,34 +460,7 @@ public class BpmNodeHookService {
         }
 
         try {
-            StandardEvaluationContext evalContext = new StandardEvaluationContext();
-            // Allow map-key property access (#vars.someKey) without exposing a
-            // rootObject — rootObject would let scripts navigate arbitrary
-            // getters/setters on whatever we set.
-            evalContext.addPropertyAccessor(new MapAccessor());
-            // Harden: block T(...) type references and explicit bean resolution.
-            evalContext.setTypeLocator(DENY_TYPE_LOCATOR);
-            evalContext.setBeanResolver(null);
-
-            // Make the full variable map available as #vars (same instance as
-            // the caller's map — mutations via #vars['x'] = 'y' propagate back
-            // to the SmartEngine ExecutionContext request map).
-            evalContext.setVariable("vars", variables);
-            if (variables != null) {
-                for (Map.Entry<String, Object> entry : variables.entrySet()) {
-                    evalContext.setVariable(entry.getKey(), entry.getValue());
-                }
-            }
-
-            // Register #setVar(#vars, 'name', value) as an explicit writer —
-            // thin facade over Map.put, so scripts can call
-            //   #setVar(#vars, 'approverRole', 'manager')
-            // and the write lands on the caller's live map (which is the same
-            // instance as SmartEngine's ExecutionContext request map).
-            evalContext.registerFunction("setVar",
-                    BpmNodeHookService.class.getDeclaredMethod(
-                            "setVar", Map.class, String.class, Object.class));
-
+            EvaluationContext evalContext = buildScriptEvaluationContext(variables);
             Object result = spelParser.parseExpression(script).getValue(evalContext);
             if (result == null) {
                 return false;
@@ -519,14 +479,57 @@ public class BpmNodeHookService {
             throw new IllegalStateException(
                     "BpmNodeHookService SpEL function registration failed", e);
         } catch (EvaluationException e) {
-            // Security guard tripped (e.g. T(...) rejected, constructor call
-            // rejected) or script is invalid. Propagate so failStrategy
-            // handling in executePreChecks / executePostActions can act on it
-            // (block → "Pre-check error: …", warn/skip → swallow).
+            // Security containment tripped (method call / T(...) / constructor /
+            // bean ref unresolvable) or script is invalid. Propagate so
+            // failStrategy handling in executePreChecks / executePostActions can
+            // act on it (block → "Pre-check error: …", warn/skip → swallow).
             log.error("Script hook execution failed (SpEL): script={}, reason={}",
                     script, e.getMessage());
             throw e;
         }
+    }
+
+    /**
+     * Build the hardened SpEL evaluation context for a script hook.
+     *
+     * <p>Uses {@link SimpleEvaluationContext#forPropertyAccessors(org.springframework.expression.PropertyAccessor...)}
+     * with only a {@link MapAccessor}. This is the primary security boundary: a
+     * {@code SimpleEvaluationContext} exposes no method resolver, type locator,
+     * constructor resolver, or bean resolver, so method invocation (including
+     * the {@code getClass().forName(...)} reflection chain), {@code T(...)},
+     * {@code new}, and {@code @bean} references are all structurally rejected —
+     * no denylist to keep in sync. It is built via {@code forPropertyAccessors}
+     * (not {@code forReadOnlyDataBinding}) so hook scripts can still mutate the
+     * variables map (GAP-257).
+     *
+     * <p>Package-private for direct unit testing of the sandbox boundary.
+     */
+    static EvaluationContext buildScriptEvaluationContext(Map<String, Object> variables)
+            throws NoSuchMethodException {
+        SimpleEvaluationContext evalContext = SimpleEvaluationContext
+                .forPropertyAccessors(new MapAccessor())
+                .build();
+
+        // Make the full variable map available as #vars (same instance as the
+        // caller's map — mutations via #vars['x'] = 'y' propagate back to the
+        // SmartEngine ExecutionContext request map).
+        evalContext.setVariable("vars", variables);
+        if (variables != null) {
+            for (Map.Entry<String, Object> entry : variables.entrySet()) {
+                evalContext.setVariable(entry.getKey(), entry.getValue());
+            }
+        }
+
+        // Bind #setVar(#vars, 'name', value) as a SpEL function — a thin facade
+        // over Map.put, so scripts can call
+        //   #setVar(#vars, 'approverRole', 'manager')
+        // and the write lands on the caller's live map. Function references are
+        // resolved via lookupVariable, independent of any method resolver, so
+        // this works under SimpleEvaluationContext.
+        evalContext.setVariable("setVar",
+                BpmNodeHookService.class.getDeclaredMethod(
+                        "setVar", Map.class, String.class, Object.class));
+        return evalContext;
     }
 
     /**
