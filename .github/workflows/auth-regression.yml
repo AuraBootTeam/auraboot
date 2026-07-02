@@ -92,6 +92,15 @@ jobs:
             up --build -d backend isolated-frontend
 
       - name: Run auth regression suite
+        # PLAYWRIGHT_RUNNER_COMMAND must be in the runner's (host) env, not just a
+        # container `-e`: the playwright-runner service command interpolates
+        # ${PLAYWRIGHT_RUNNER_COMMAND:-<default>} at compose parse time from the
+        # host env. A `-e` value only exists inside the container at runtime and is
+        # never seen by that interpolation, so the override was silently ignored and
+        # the job ran the default full noweb suite (all specs, incl. 02-test-pages)
+        # instead of the scoped auth runner.
+        env:
+          PLAYWRIGHT_RUNNER_COMMAND: pnpm test:auth-regression
         run: |
           set -euo pipefail
           docker compose \
@@ -102,7 +111,6 @@ jobs:
             --profile cache \
             --profile playwright-runner \
             run --rm \
-            -e PLAYWRIGHT_RUNNER_COMMAND="pnpm test:auth-regression" \
             -e PW_E2E_RUN_ID="$PW_E2E_RUN_ID" \
             -e PW_PROFILE=fast \
             -e PW_ROLE_PROJECTS=1 \
