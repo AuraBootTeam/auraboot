@@ -3,7 +3,9 @@ package com.auraboot.framework.permission.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -40,6 +42,9 @@ class UserPermissionServiceImplTest {
 
     @Mock
     private UserRoleMapper userRoleMapper;
+
+    @Mock
+    private RoleMapper roleMapper;
 
     @Mock
     private CacheManager cacheManager;
@@ -107,6 +112,40 @@ class UserPermissionServiceImplTest {
     }
 
     @Test
+    void getUserPermissionIdsIncludesBaselineRolePermissions() {
+        // Member has business role 7 (perm 50) AND the tenant implicitly grants the tenant_member
+        // baseline role (role 99 -> perm 60). Effective set is the union — including the baseline
+        // perm the member never had an ab_user_role row for.
+        UserRole ur = new UserRole();
+        ur.setRoleId(7L);
+        when(userRoleMapper.findByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of(ur));
+        when(rolePermissionMapper.findPermissionIdsByRoles(List.of(7L))).thenReturn(Set.of(50L));
+        Role baseline = new Role();
+        baseline.setId(99L);
+        when(roleMapper.findByTenantIdAndCode(100L, "tenant_member")).thenReturn(baseline);
+        when(rolePermissionMapper.findPermissionIdsByRoles(List.of(99L))).thenReturn(Set.of(60L));
+
+        Set<Long> ids = service.getUserPermissionIds(1L);
+
+        assertThat(ids).containsExactlyInAnyOrder(50L, 60L);
+    }
+
+    @Test
+    void getUserPermissionIdsReturnsBaselineForMemberWithNoBusinessRoles() {
+        // No ab_user_role rows, but the tenant_member baseline still applies (the original incident:
+        // a member provisioned without the baseline could not render pages).
+        when(userRoleMapper.findByMemberIdAndTenantId(5L, 100L)).thenReturn(List.of());
+        Role baseline = new Role();
+        baseline.setId(99L);
+        when(roleMapper.findByTenantIdAndCode(100L, "tenant_member")).thenReturn(baseline);
+        when(rolePermissionMapper.findPermissionIdsByRoles(List.of(99L))).thenReturn(Set.of(60L));
+
+        Set<Long> ids = service.getUserPermissionIds(1L);
+
+        assertThat(ids).containsExactly(60L);
+    }
+
+    @Test
     void evictUserPermissionsClearsCacheEntry() {
         when(cacheManager.getCache("user-permissions")).thenReturn(cache);
 
@@ -133,12 +172,16 @@ class UserPermissionServiceImplTest {
     }
 
     @Test
-    void evictRoleUsersSkipsWhenRoleHasNoMembers() {
+    void evictRoleUsersClearsEvenWhenRoleHasNoMembers() {
+        // REG L1 (DDR-2026-06-30): the tenant_member baseline role is applied implicitly (no
+        // ab_user_role rows), so a baseline grant change reports zero direct members yet must still
+        // clear every member's cached permissions — evictRoleUsers must NOT early-return on empty.
         when(userRoleMapper.findMemberIdsByRoleId(7L)).thenReturn(List.of());
+        when(cacheManager.getCache("user-permissions")).thenReturn(cache);
 
         service.evictRoleUsers(7L);
 
-        verify(cacheManager, never()).getCache(anyString());
+        verify(cache).clear();
     }
 
     @Test
