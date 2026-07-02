@@ -26,16 +26,21 @@ import java.math.BigDecimal;
 public interface QuotaBucketMapper extends BaseMapper<QuotaBucket> {
 
     /**
-     * CAS reserve: {@code reserved_amount += delta}, only when {@code version = versionBefore}.
-     * Increments version on success.
+     * CAS reserve: {@code reserved_amount += delta}, only when {@code version = versionBefore}
+     * AND the bucket still has enough headroom ({@code total - used - reserved >= delta}).
+     * Increments version on success. The balance predicate makes the hard-limit invariant
+     * atomic at the DB, so concurrent authorize calls cannot over-reserve past the total even
+     * when both pass the service-layer pre-check (TOCTOU).
      *
-     * @return 1 if updated, 0 if version mismatch (concurrent update — retry)
+     * @return 1 if updated, 0 if version mismatch OR insufficient headroom (caller
+     *         re-reads to distinguish retry-vs-insufficient)
      */
     @Update("UPDATE ab_billing_quota_bucket " +
             "SET reserved_amount = reserved_amount + #{delta}, " +
             "    version = version + 1, " +
             "    updated_at = NOW() " +
-            "WHERE id = #{id} AND version = #{versionBefore}")
+            "WHERE id = #{id} AND version = #{versionBefore} " +
+            "  AND (total_amount - used_amount - reserved_amount) >= #{delta}")
     int casAddReserved(@Param("id") Long id,
                        @Param("delta") BigDecimal delta,
                        @Param("versionBefore") Long versionBefore);
