@@ -1,5 +1,6 @@
 package com.auraboot.framework.rbac.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.permission.entity.Permission;
@@ -128,11 +129,25 @@ class RoleServiceImplTest {
     }
 
     @Test
-    @DisplayName("findByPid delegates to mapper")
+    @DisplayName("findByPid delegates to mapper (no tenant context → unscoped fallback)")
     void findByPidDelegates() {
+        MetaContext.clear(); // system/background caller: no tenant context → unscoped lookup
         Role r = role(1L, "x");
         when(roleMapper.findByPid("p1")).thenReturn(r);
         assertEquals(r, service.findByPid("p1"));
+    }
+
+    @Test
+    @DisplayName("findByPid is tenant-scoped when a tenant context is present (REG-7)")
+    void findByPidTenantScopedWhenContextPresent() {
+        try {
+            MetaContext.setContext(7L, 1L, "up", "u");
+            Role r = role(1L, "x");
+            when(roleMapper.findByTenantIdAndPid(7L, "p1")).thenReturn(r);
+            assertEquals(r, service.findByPid("p1"));
+        } finally {
+            MetaContext.clear();
+        }
     }
 
     @Test
