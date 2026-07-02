@@ -8,9 +8,11 @@ import com.auraboot.framework.tenant.service.TenantBootstrapService.BootstrapRes
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -30,7 +32,40 @@ class TenantBootstrapIntegrationTest extends BaseIntegrationTest {
     
     @Autowired
     private PermissionMapper permissionMapper;
-    
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Test
+    @DisplayName("bootstrap seeds tenant_member baseline role with the L1 render-support codes (做法 B)")
+    void bootstrapSeedsTenantMemberBaseline() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = testUser.getId();
+
+        BootstrapResult result = tenantBootstrapService.bootstrapTenant(tenantId, userId);
+        assertTrue(result.isSuccess(), "Bootstrap should succeed");
+
+        List<Long> ids = jdbc.queryForList(
+                "SELECT id FROM ab_role WHERE tenant_id = ? AND code = 'tenant_member' "
+                        + "AND (deleted_flag = false OR deleted_flag IS NULL)",
+                Long.class, tenantId);
+        assertThat(ids).as("tenant_member baseline role must be seeded by bootstrap").isNotEmpty();
+        Long baselineRoleId = ids.get(0);
+
+        Boolean isDefault = jdbc.queryForObject(
+                "SELECT is_default FROM ab_role WHERE id = ?", Boolean.class, baselineRoleId);
+        assertFalse(Boolean.TRUE.equals(isDefault),
+                "tenant_member must NOT be the default role (做法 B implicit baseline)");
+
+        List<String> boundCodes = jdbc.queryForList(
+                "SELECT p.code FROM ab_role_permission rp JOIN ab_permission p ON rp.permission_id = p.id "
+                        + "WHERE rp.role_id = ? AND (rp.deleted_flag = false OR rp.deleted_flag IS NULL)",
+                String.class, baselineRoleId);
+        assertThat(boundCodes).as("tenant_member must carry the L1 render-support read codes")
+                .contains("meta.model.read", "page.page.read", "dashboard.saved_view.read",
+                        "bpm.process.read", "notification.view");
+    }
+
     @Test
     @DisplayName("租户初始化成功 - 验证所有系统级Permission被创建")
     void testBootstrapTenant_Success() {
