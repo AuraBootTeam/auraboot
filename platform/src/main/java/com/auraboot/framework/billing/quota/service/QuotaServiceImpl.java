@@ -457,9 +457,17 @@ public class QuotaServiceImpl implements QuotaService {
      * Manual CAS: {@code bucket.reserved += amount}.
      * Uses SQL {@code WHERE id=? AND version=?} so concurrent updates are serialized.
      */
-    private void applyReserveWithRetry(QuotaBucket bucket, BigDecimal amount) {
+    void applyReserveWithRetry(QuotaBucket bucket, BigDecimal amount) {
         for (int attempt = 0; attempt < MAX_RETRY; attempt++) {
             QuotaBucket fresh = attempt == 0 ? bucket : requireBucket(bucket.getId());
+            // Fail fast on a genuine shortfall: a concurrent reserver consumed the headroom,
+            // so casAddReserved's balance predicate would keep returning 0 and burn every
+            // retry. Throwing rolls back any buckets already reserved in this @Transactional
+            // authorize, keeping reserved + used <= total (the hard-limit invariant).
+            if (fresh.availableAmount().compareTo(amount) < 0) {
+                throw new IllegalStateException(
+                        "Insufficient quota headroom under concurrency on bucket " + bucket.getId());
+            }
             int updated = quotaBucketMapper.casAddReserved(fresh.getId(), amount, fresh.getVersion());
             if (updated == 1) return;
             log.debug("[quota] reserve CAS retry {}/{} bucketId={}", attempt + 1, MAX_RETRY, bucket.getId());
