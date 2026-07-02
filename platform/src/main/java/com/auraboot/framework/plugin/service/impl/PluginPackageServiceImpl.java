@@ -913,21 +913,61 @@ public class PluginPackageServiceImpl implements PluginPackageService {
         return tempPath;
     }
 
+    // Decompression-bomb guards: a small package can inflate to fill the shared host disk.
+    // Kept in line with PluginImportServiceImpl.parseZip's limits.
+    private static final long MAX_EXTRACT_ENTRY_SIZE = 50L * 1024 * 1024;    // 50 MB per entry
+    private static final int MAX_EXTRACT_ENTRIES = 5000;
+    private static final long MAX_EXTRACT_TOTAL_SIZE = 500L * 1024 * 1024;   // 500 MB total uncompressed
+
     private void extractZip(InputStream inputStream, Path targetPath) throws IOException {
         try (ZipInputStream zis = new ZipInputStream(inputStream)) {
             ZipEntry entry;
+            int entryCount = 0;
+            long totalSize = 0;
             while ((entry = zis.getNextEntry()) != null) {
                 Path entryPath = PathSafetyUtils.requireSafeChild(targetPath, entry.getName(), "zip entry");
 
                 if (entry.isDirectory()) {
                     Files.createDirectories(entryPath);
                 } else {
+                    if (++entryCount > MAX_EXTRACT_ENTRIES) {
+                        throw new IOException("Package exceeds maximum entry count: " + MAX_EXTRACT_ENTRIES);
+                    }
                     Files.createDirectories(entryPath.getParent());
-                    Files.copy(zis, entryPath, StandardCopyOption.REPLACE_EXISTING);
+                    // Bounded copy: stream at most MAX+1 bytes so a zip bomb cannot fill the disk.
+                    long written = copyBounded(zis, entryPath, MAX_EXTRACT_ENTRY_SIZE);
+                    if (written > MAX_EXTRACT_ENTRY_SIZE) {
+                        Files.deleteIfExists(entryPath);
+                        throw new IOException("Package entry exceeds maximum size ("
+                                + (MAX_EXTRACT_ENTRY_SIZE / (1024 * 1024)) + " MB): " + entry.getName());
+                    }
+                    totalSize += written;
+                    if (totalSize > MAX_EXTRACT_TOTAL_SIZE) {
+                        throw new IOException("Package uncompressed size exceeds maximum ("
+                                + (MAX_EXTRACT_TOTAL_SIZE / (1024 * 1024)) + " MB)");
+                    }
                 }
                 zis.closeEntry();
             }
         }
+    }
+
+    /**
+     * Copy up to {@code maxBytes + 1} bytes from {@code in} to {@code target}; the +1 lets the
+     * caller detect (and reject) an entry that exceeds the per-entry limit. Returns bytes written.
+     */
+    static long copyBounded(InputStream in, Path target, long maxBytes) throws IOException {
+        long total = 0;
+        byte[] buf = new byte[8192];
+        try (java.io.OutputStream out = Files.newOutputStream(target, StandardOpenOption.CREATE,
+                StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.WRITE)) {
+            int n;
+            while (total <= maxBytes && (n = in.read(buf)) != -1) {
+                out.write(buf, 0, n);
+                total += n;
+            }
+        }
+        return total;
     }
 
     private List<String> validateManifest(PackageManifest manifest) {
