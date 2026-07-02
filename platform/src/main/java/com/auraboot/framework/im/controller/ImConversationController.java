@@ -83,6 +83,11 @@ public class ImConversationController {
     @GetMapping("/{id}/members")
     public ApiResponse<List<ConversationMemberInfo>> getMembers(@PathVariable Long id) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        // Object-level authorization: only members may view a conversation's roster.
+        if (!conversationService.isMember(id, userId, tenantId)) {
+            return ApiResponse.error("Not a member of this conversation");
+        }
         return ApiResponse.success(conversationService.getMembers(id, tenantId));
     }
 
@@ -91,6 +96,13 @@ public class ImConversationController {
         Long userId = MetaContext.getCurrentUserId();
         String userName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
+        // Object-level authorization: the caller must already be a member of the
+        // conversation. Without this, any authenticated tenant user could add
+        // themselves to an arbitrary (enumerable) conversation id and then read
+        // its private messages (getMessages gates on isMember).
+        if (!conversationService.isMember(id, userId, tenantId)) {
+            return ApiResponse.error("Not a member of this conversation");
+        }
         List<Long> memberIds = readIdList(body, "memberIds", body.isArray());
         List<Long> agentIds = readIdList(body, "agentIds", false);
         conversationService.addMembers(id, memberIds, tenantId);
@@ -136,6 +148,12 @@ public class ImConversationController {
         Long actorUserId = MetaContext.getCurrentUserId();
         String actorUserName = MetaContext.getCurrentUsername();
         Long tenantId = MetaContext.getCurrentTenantId();
+
+        // Object-level authorization: only a member may remove members from a
+        // conversation (closes non-member eviction of arbitrary members).
+        if (!conversationService.isMember(id, actorUserId, tenantId)) {
+            return ApiResponse.error("Not a member of this conversation");
+        }
 
         // Capture removed member's name BEFORE deletion (humans only — agent removals skip sys msg)
         String removedName = null;

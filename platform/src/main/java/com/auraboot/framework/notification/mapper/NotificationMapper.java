@@ -50,9 +50,9 @@ public interface NotificationMapper extends BaseMapper<Notification> {
 
     @Update("""
         UPDATE ab_notification SET is_read = TRUE, read_at = now()
-        WHERE tenant_id = #{tenantId} AND id = #{id}
+        WHERE tenant_id = #{tenantId} AND id = #{id} AND user_id = #{userId}
         """)
-    int markAsRead(@Param("tenantId") Long tenantId, @Param("id") Long id);
+    int markAsRead(@Param("tenantId") Long tenantId, @Param("id") Long id, @Param("userId") Long userId);
 
     @Update("""
         UPDATE ab_notification SET is_read = TRUE, read_at = now()

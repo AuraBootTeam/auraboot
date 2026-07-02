@@ -128,25 +128,30 @@ class NotificationQueryServiceImplTest {
     }
 
     @Test
-    @DisplayName("markAsRead pushes unread count via SSE when user found")
+    @DisplayName("markAsRead scopes the UPDATE by the caller's userId and pushes SSE when owned")
     void markAsRead() {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
-        when(notificationMapper.findUserIdById(99L, 100L)).thenReturn(7L);
+        metaContextMock.when(MetaContext::getCurrentUserId).thenReturn(7L);
+        // caller (userId=7) owns the notification → 1 row updated
+        when(notificationMapper.markAsRead(99L, 100L, 7L)).thenReturn(1);
         when(notificationMapper.countUnread(99L, 7L)).thenReturn(3);
 
         service.markAsRead(100L);
-        verify(notificationMapper).markAsRead(99L, 100L);
+        // security: UPDATE is scoped by the caller's own userId (not an untrusted id)
+        verify(notificationMapper).markAsRead(99L, 100L, 7L);
         verify(notificationSseService).pushUnreadCount(7L, 3);
     }
 
     @Test
-    @DisplayName("markAsRead skips SSE push when notification owner unknown")
+    @DisplayName("markAsRead on a notification the caller does not own updates nothing and pushes no SSE")
     void markAsReadNoOwner() {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
-        when(notificationMapper.findUserIdById(99L, 100L)).thenReturn(null);
+        metaContextMock.when(MetaContext::getCurrentUserId).thenReturn(7L);
+        // notification 100 does not belong to caller 7 → 0 rows updated
+        when(notificationMapper.markAsRead(99L, 100L, 7L)).thenReturn(0);
 
         service.markAsRead(100L);
-        verify(notificationMapper).markAsRead(99L, 100L);
+        verify(notificationMapper).markAsRead(99L, 100L, 7L);
         verify(notificationSseService, never()).pushUnreadCount(org.mockito.ArgumentMatchers.anyLong(), anyInt());
     }
 
