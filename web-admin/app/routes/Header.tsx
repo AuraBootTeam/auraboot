@@ -51,6 +51,11 @@ export default function Header({
   const [showThemeDropdown, setShowThemeDropdown] = useState(false);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
   const [spaces, setSpaces] = useState<Array<{ tenantId: string; tenantName: string; tenantDisplayName: string; spaceType: string }>>([]);
+  // Hydration marker (same pattern as Login.tsx): the SSR header renders the
+  // avatar long before React attaches its click handlers, so E2E must be able
+  // to wait for interactivity instead of clicking a dead button.
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
 
   const userDropdownRef = useRef<HTMLDivElement>(null);
   const themeDropdownRef = useRef<HTMLDivElement>(null);
@@ -162,6 +167,7 @@ export default function Header({
     <header
       className="print-hide fixed top-0 right-0 left-0 z-50 border-b border-gray-200 bg-white/95 shadow-lg backdrop-blur-sm dark:border-gray-700 dark:bg-gray-800/95"
       data-print="hide"
+      data-hydrated={hydrated ? 'true' : 'false'}
     >
       <div className="flex h-14 items-center justify-between bg-gradient-to-r from-white/50 to-gray-50/50 px-4 sm:px-6 lg:px-8 dark:from-gray-800/50 dark:to-gray-900/50">
         {/* Left: logo and menu button */}

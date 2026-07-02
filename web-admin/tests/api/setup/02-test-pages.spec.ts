@@ -145,7 +145,7 @@ const SYSTEM_OVERVIEW = {
         color: '#2563EB',
         dataSource: {
           type: 'aggregate',
-          modelCode: 'page_schema',
+          modelCode: 'ab_page_schema',
           metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
         },
       },
@@ -164,7 +164,7 @@ const SYSTEM_OVERVIEW = {
         color: '#10B981',
         dataSource: {
           type: 'aggregate',
-          modelCode: 'bpm_domain_config',
+          modelCode: 'ab_bpm_domain_config',
           metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
         },
       },
@@ -183,7 +183,7 @@ const SYSTEM_OVERVIEW = {
         color: '#F59E0B',
         dataSource: {
           type: 'aggregate',
-          modelCode: 'tenant_member',
+          modelCode: 'ab_tenant_member',
           metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
         },
       },
@@ -202,7 +202,7 @@ const SYSTEM_OVERVIEW = {
         color: '#8B5CF6',
         dataSource: {
           type: 'aggregate',
-          modelCode: 'sla_config',
+          modelCode: 'ab_sla_config',
           metrics: [{ field: 'id', aggregation: 'count', alias: 'count' }],
         },
       },
