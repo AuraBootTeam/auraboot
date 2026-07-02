@@ -112,3 +112,14 @@ plugins/cli/coverage/
 # Per-worktree isolated docker stack state (slug-keyed env files written by
 # scripts/dev/start-isolated.sh; transient and worktree-local).
 .aura-stack/
+
+# Internal-process docs never belong in the public repo — authored in
+# auraboot-website (private) / auraboot-enterprise. Enforced by
+# scripts/check-oss-no-internal-docs.sh (wired into the required docs gate).
+docs/backlog/
+docs/handover/
+docs/plans/
+docs/retro/
+docs/superpowers/
+docs/mockups/
+docs/standards/

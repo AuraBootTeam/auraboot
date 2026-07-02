@@ -1,8 +1,8 @@
 # Architecture
 
-This document is the entry point for understanding how AuraBoot is structured. It is intentionally short — each section links to the canonical reference in [`docs/core-concepts/`](docs/core-concepts/) or [the documentation site](https://docs.auraboot.com).
+This document is the entry point for understanding how AuraBoot is structured. It is intentionally short — each section links to the canonical reference on [the documentation site](https://docs.auraboot.com).
 
-Read [POSITIONING](docs/getting-started/positioning.md) first if you have not — the rest of this document assumes you understand what AuraBoot is optimized for.
+Read the [positioning overview](https://docs.auraboot.com) first if you have not — the rest of this document assumes you understand what AuraBoot is optimized for.
 
 ---
 
@@ -54,34 +54,34 @@ AuraBoot has exactly six first-class concepts. If a feature does not fit one of 
 ### Model
 Models are how AuraBoot understands your data. A model declaration produces the database table, REST endpoints, list/detail/form pages, and the type information that powers everything downstream.
 
-→ [`docs/core-concepts/models-and-fields.md`](docs/core-concepts/models-and-fields.md)
+→ [Models & Fields](https://docs.auraboot.com)
 
 ### Page
 Pages are DSL documents that compose blocks (list, form, detail, custom). There is no path where business CRUD is written as ad-hoc TSX — the renderer is contract-driven, and unrecognized block types fail fast rather than silently fall back.
 
-→ [`docs/core-concepts/pages-and-layouts.md`](docs/core-concepts/pages-and-layouts.md)
+→ [Pages & Layouts](https://docs.auraboot.com)
 
 ### Command
 A command is the only sanctioned write path. Every command — whether triggered by a button, an automation rule, a workflow task, or an AI agent — flows through the same multi-stage pipeline: resolve, authenticate, authorize, validate against entitlement and SoD, check preconditions, guard state transitions, execute, audit, dispatch events, and trigger side effects.
 
 This contract is what makes the rest of the platform possible. Without it, audit and AI-safe execution would be aspirations, not guarantees.
 
-→ [`docs/core-concepts/commands.md`](docs/core-concepts/commands.md)
+→ [Commands](https://docs.auraboot.com)
 
 ### Permission
 Permission in AuraBoot is layered, not stacked. Five evaluation layers — role-based (RBAC), relation-based (ReBAC), organizational data scope, attribute-based (ABAC), and field-level visibility — are applied in a defined order against a tenant-scoped principal. This is what lets enterprises grant precise authority *"see all opportunities owned by my org, edit only those above $50k that I created, hide the discount field from non-finance roles"* without writing code per scenario.
 
-→ [`docs/core-concepts/permissions.md`](docs/core-concepts/permissions.md)
+→ [Permissions](https://docs.auraboot.com)
 
 ### Process
 Processes are long-running orchestration. AuraBoot uses BPMN 2.0 (via SmartEngine) and lets each task resolve to a Command. The flow does not escape the governance contract just because it crosses a wait-state or a human approval.
 
-→ [Process designer guide](docs/guides/bpm-workflows.md)
+→ [Process designer guide](https://docs.auraboot.com)
 
 ### Plugin
 A plugin is the unit of delivery. It declares — through a typed manifest — the models, fields, commands, permissions, menus, pages, processes, and named queries it contributes. The plugin substrate isolates resources, resolves dependencies, and supports three plugin types: configuration-only, hybrid (configuration + Java extensions), and solution packages (industry verticals that bundle other plugins).
 
-→ [`docs/core-concepts/plugin-manifest.md`](docs/core-concepts/plugin-manifest.md)
+→ [Plugin manifest](https://docs.auraboot.com)
 
 ---
 
@@ -99,7 +99,7 @@ Three design pressures push AuraBoot toward this architecture:
 
 ## What this architecture is not
 
-For the things AuraBoot deliberately does not optimize for, see [POSITIONING](docs/getting-started/positioning.md):
+For the things AuraBoot deliberately does not optimize for, see the [positioning overview](https://docs.auraboot.com):
 
 - Not a drop-in replacement for a country-specific accounting suite
 - Not a quickest-time-to-screen data-app builder
@@ -124,10 +124,6 @@ These are extensions of the same contracts described above, not parallel runtime
 
 ## Where to go next
 
-- New to the platform → [Getting started](docs/getting-started/)
-- Adding a model → [`docs/core-concepts/models-and-fields.md`](docs/core-concepts/models-and-fields.md)
-- Designing a page → [`docs/core-concepts/pages-and-layouts.md`](docs/core-concepts/pages-and-layouts.md)
-- Writing a command → [`docs/core-concepts/commands.md`](docs/core-concepts/commands.md)
-- Building a plugin → [`docs/plugin-development/`](docs/plugin-development/)
-- Calling AuraBoot from an AI agent → [`docs/core-concepts/agent-readiness.md`](docs/core-concepts/agent-readiness.md)
-- Full doc site → [docs.auraboot.com](https://docs.auraboot.com)
+The documentation site is the canonical reference for getting started, models,
+pages, commands, permissions, plugin development, and agent-readiness:
+**[docs.auraboot.com](https://docs.auraboot.com)**.

@@ -174,7 +174,7 @@ npx @auraboot/plugin-cli create my-plugin
 npx @auraboot/plugin-cli import ./my-plugin
 ```
 
-See the [Plugin Development Guide](docs/system-reference/plugins/02-插件开发指南.md) for details.
+See the [plugin development guide](https://docs.auraboot.com) for details.
 
 ---
 
@@ -208,13 +208,11 @@ For organizations, a Corporate CLA may be required if your employer holds rights
 
 ## Architecture & deep references
 
-- [Architecture overview](docs/architecture/overview.md) — system layering, request flow
-- [Data model](docs/architecture/data-model.md) — schema conventions
-- [Tech stack](docs/architecture/tech-stack.md) — Java / TypeScript / DB choices
-- [Plugin development](docs/plugin-development/) — building your own plugins
+- [Architecture overview](ARCHITECTURE.md) — system layering and request flow (in this repo)
+- [docs.auraboot.com](https://docs.auraboot.com) — data model, tech stack, plugin development, and the full guides
 
 ## Documentation contributions
 
-Docs PRs are especially welcome and have a faster review lane (we aim to first-respond within 24h on docs PRs during beta). The docs source of truth lives in `auraboot/docs/`; the public site at docs.auraboot.com is auto-synced via `scripts/sync-docs-to-website.sh`. If you're adding screenshots, see [docs/community/readme-screenshots-spec.md](docs/community/readme-screenshots-spec.md) for visual conventions.
+User-facing documentation is maintained separately from this code repository and published at [docs.auraboot.com](https://docs.auraboot.com). This repository intentionally keeps no `docs/` tree (beyond code-coupled test fixtures). To propose documentation changes, open a [GitHub issue](https://github.com/AuraBootTeam/auraboot/issues) or use the [website feedback form](https://www.auraboot.com/contact?interest=feedback), and the docs team will fold it into the site.
 
 Thank you for helping make AuraBoot better!
