@@ -9,11 +9,12 @@ import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.permission.service.DataScopeService;
+import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
 import com.auraboot.framework.permission.service.RolePermissionService;
-import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,7 +61,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
     
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
-    private final UserPermissionService userPermissionService;
+    private final ApplicationEventPublisher eventPublisher;
     private final RoleMapper roleMapper;
     private final DataScopeService dataScopeService;
     
@@ -101,7 +102,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             }
 
             // 清除用户Permission缓存
-            userPermissionService.evictRoleUsers(roleId);
+            eventPublisher.publishEvent(new RolePermissionChangedEvent(this, roleId, null, "UPDATE"));
 
             return true;
             
@@ -121,7 +122,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
         try {
             Long tenantId = MetaContext.getCurrentTenantId();
             inheritDefaultDataScope(tenantId, roleId, permissionIds);
-            userPermissionService.evictRoleUsers(roleId);
+            eventPublisher.publishEvent(new RolePermissionChangedEvent(this, roleId, null, "UPDATE"));
             return true;
         } catch (Exception e) {
             log.error("继承角色默认数据范围失败: roleId={}", roleId, e);
@@ -175,7 +176,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
                 roleId, permissionId, deletedCount);
             
             // 清除用户Permission缓存
-            userPermissionService.evictRoleUsers(roleId);
+            eventPublisher.publishEvent(new RolePermissionChangedEvent(this, roleId, null, "UPDATE"));
             
             return deletedCount > 0;
             
@@ -200,7 +201,7 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             log.info("成功移除角色的所有Permission: roleId={}, deletedCount={}", roleId, deletedCount);
             
             // 清除用户Permission缓存
-            userPermissionService.evictRoleUsers(roleId);
+            eventPublisher.publishEvent(new RolePermissionChangedEvent(this, roleId, null, "UPDATE"));
             
             return true;
             
