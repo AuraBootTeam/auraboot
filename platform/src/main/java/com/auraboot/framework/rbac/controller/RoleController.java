@@ -75,10 +75,30 @@ public class RoleController {
     /**
      * 根据PID获取角色详情
      */
+    /**
+     * Resolve a role by its (non-enumerable) pid, scoped to the current tenant.
+     * {@code ab_role} is excluded from the tenant line interceptor, so resolving a
+     * role by a global pid must re-assert tenant ownership here. Returns null for a
+     * role owned by a different tenant (treated as not-found → 404) so a tenant admin
+     * cannot read/mutate another tenant's role. System roles (tenantId == null)
+     * remain accessible.
+     */
+    private Role resolveRoleForCurrentTenant(String pid) {
+        Role role = roleService.findByPid(pid);
+        if (role == null) {
+            return null;
+        }
+        Long currentTenant = MetaContext.getCurrentTenantId();
+        if (role.getTenantId() != null && !role.getTenantId().equals(currentTenant)) {
+            return null; // cross-tenant access → not found
+        }
+        return role;
+    }
+
     @GetMapping("/{pid}")
     @RequirePermission(MetaPermission.ROLE_READ)
     public ApiResponse<RoleResponse> getRole(@PathVariable String pid) {
-        Role role = roleService.findByPid(pid);
+        Role role = resolveRoleForCurrentTenant(pid);
         if (role == null) {
             throw new RootUnCheckedException(BadParam,"Not found by the param :"+pid);
         }
@@ -112,7 +132,7 @@ public class RoleController {
             @RequestBody Role role,
             @CurrentUserId Long userId) {
         
-        Role existingRole = roleService.findByPid(pid);
+        Role existingRole = resolveRoleForCurrentTenant(pid);
         if (existingRole == null) {
             throw new RootUnCheckedException(BadParam,"Not found by the param :"+pid);
         }
@@ -129,7 +149,7 @@ public class RoleController {
     @DeleteMapping("/{pid}")
     @RequirePermission(MetaPermission.ROLE_MANAGE)
     public ApiResponse<Boolean> deleteRole(@PathVariable String pid) {
-        Role role = roleService.findByPid(pid);
+        Role role = resolveRoleForCurrentTenant(pid);
         if (role == null) {
             throw new RootUnCheckedException(BadParam,"Not found by the param :"+pid);
         }
@@ -144,7 +164,7 @@ public class RoleController {
     @PutMapping("/{pid}/enable")
     @RequirePermission(MetaPermission.ROLE_MANAGE)
     public ApiResponse<Boolean> enableRole(@PathVariable String pid) {
-        Role role = roleService.findByPid(pid);
+        Role role = resolveRoleForCurrentTenant(pid);
         if (role == null) {
             throw new RootUnCheckedException(BadParam,"Not found by the param :"+pid);
         }
@@ -158,7 +178,7 @@ public class RoleController {
     @PutMapping("/{pid}/disable")
     @RequirePermission(MetaPermission.ROLE_MANAGE)
     public ApiResponse<Boolean> disableRole(@PathVariable String pid) {
-        Role role = roleService.findByPid(pid);
+        Role role = resolveRoleForCurrentTenant(pid);
         if (role == null) {
             throw new RootUnCheckedException(BadParam,"Not found by the param :"+pid);
         }
@@ -172,7 +192,7 @@ public class RoleController {
     @GetMapping("/{pid}/permissions")
     @RequirePermission(MetaPermission.ROLE_READ)
     public ApiResponse<List<String>> getRolePermissions(@PathVariable String pid) {
-        Role role = roleService.findByPid(pid);
+        Role role = resolveRoleForCurrentTenant(pid);
         if (role == null) {
             throw new RootUnCheckedException(BadParam, "Not found by the param: " + pid);
         }
@@ -189,7 +209,7 @@ public class RoleController {
             @PathVariable String pid,
             @RequestBody List<String> permissionPids) {
 
-        Role role = roleService.findByPid(pid);
+        Role role = resolveRoleForCurrentTenant(pid);
         if (role == null) {
             throw new RootUnCheckedException(BadParam, "Not found by the param: " + pid);
         }
@@ -206,7 +226,7 @@ public class RoleController {
             @PathVariable String pid,
             @RequestBody List<String> permissionPids) {
 
-        Role role = roleService.findByPid(pid);
+        Role role = resolveRoleForCurrentTenant(pid);
         if (role == null) {
             throw new RootUnCheckedException(BadParam, "Not found by the param: " + pid);
         }
@@ -220,7 +240,7 @@ public class RoleController {
     @GetMapping("/{pid}/statistics")
     @RequirePermission(MetaPermission.ROLE_READ)
     public ApiResponse<Map<String, Object>> getRoleStatistics(@PathVariable String pid) {
-        Role role = roleService.findByPid(pid);
+        Role role = resolveRoleForCurrentTenant(pid);
         if (role == null) {
             throw new RootUnCheckedException(BadParam,"Not found by the param :"+pid);
         }
@@ -237,7 +257,7 @@ public class RoleController {
             @PathVariable String pid,
             @RequestBody @jakarta.validation.Valid CopyPermissionsRequest request) {
 
-        Role role = roleService.findByPid(pid);
+        Role role = resolveRoleForCurrentTenant(pid);
         if (role == null) {
             throw new RootUnCheckedException(BadParam, "Not found by the param: " + pid);
         }
