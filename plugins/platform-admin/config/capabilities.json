@@ -130,5 +130,23 @@
     ],
     "tier": "admin",
     "order": 100
+  },
+  {
+    "code": "sys.cap.member_base",
+    "group": "系统管理",
+    "displayGroupOrder": 95,
+    "name:zh-CN": "成员基础访问",
+    "name:en": "Member Base Access",
+    "description": "业务成员在平台 UI 的基础读能力:首页仪表盘、列表保存视图、模型元数据、数据源查询。所有非管理员业务角色都应持有,否则每个动态页面都会产生 403(dashboard.saved_view.read / meta.model.read 等)",
+    "includes": [
+      "dashboard.read",
+      "dashboard.saved_view.read",
+      "meta.model.read",
+      "data.datasource.read",
+      "page.page.read",
+      "bpm.process.read"
+    ],
+    "tier": "viewer",
+    "order": 110
   }
 ]

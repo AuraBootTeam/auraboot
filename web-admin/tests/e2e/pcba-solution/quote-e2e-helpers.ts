@@ -426,7 +426,11 @@ export async function executeCommand(
   operationType?: string,
 ): Promise<Record<string, unknown>> {
   const data: Record<string, unknown> = { payload };
-  if (targetRecordId) data.targetRecordId = targetRecordId;
+  if (targetRecordId) {
+    // deployed builds resolve the target via targetRecordPid; keep both for compatibility
+    data.targetRecordId = targetRecordId;
+    data.targetRecordPid = targetRecordId;
+  }
   if (operationType) data.operationType = operationType;
   const resp = await page.request.post(`/api/meta/commands/execute/${commandCode}`, {
     data,
@@ -441,6 +445,10 @@ export async function executeCommand(
   const commandData = ((body as any).data?.data ?? {}) as Record<string, unknown>;
   if (commandData.async === true && typeof commandData.taskCode === 'string') {
     return pollAsyncTaskResult(page, commandData.taskCode);
+  }
+  // some handlers return recordPid instead of recordId — normalize so callers can rely on recordId
+  if (commandData.recordId === undefined && commandData.recordPid !== undefined) {
+    commandData.recordId = commandData.recordPid;
   }
   return commandData;
 }
@@ -583,6 +591,27 @@ async function fetchModelPermissionPids(page: Page, modelCodes: string[]): Promi
     if (Array.isArray((permissionsBody as any).data)) {
       permissions.push(...((permissionsBody as any).data as Array<Record<string, unknown>>));
     }
+  }
+  // Plugin-imported model.<m>.<action> permissions can carry a blank resource_type
+  // (permissions.json "type":"API" since plugins R2), so the resource-type scan misses them
+  // and a blind create would 422 "already exists". Merge the full permission tree by code.
+  const treeResp = await page.request.get('/api/permissions/tree', { timeout: 15_000 });
+  const treeBody = await treeResp.json().catch(() => ({}));
+  if (treeResp.ok()) {
+    const flatten = (node: unknown): void => {
+      if (Array.isArray(node)) {
+        node.forEach(flatten);
+        return;
+      }
+      if (node && typeof node === 'object') {
+        const record = node as Record<string, unknown>;
+        if (record.code && record.pid) permissions.push(record);
+        Object.values(record).forEach((value) => {
+          if (value && typeof value === 'object') flatten(value);
+        });
+      }
+    };
+    flatten((treeBody as any).data);
   }
   const byCode = new Map(
     permissions
@@ -774,6 +803,9 @@ async function seedQuoteScaffold(
         qo_quote_tax_rate: 0.13,
         qo_quote_factory_class: factoryClass,
         qo_quote_industry: 'pcba',
+        // required since the corrected-BOM-at-create contract (#1107); dynamic insert runs
+        // no import side effect, so a fixture file id (same pattern as the rsa rows) is enough
+        corrected_bom_file: `e2e-corrected-bom-${suffix}`,
       },
       created.rows,
     );
