@@ -371,8 +371,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 hidden.forEach(record::remove);
             }
         } catch (Exception e) {
+            // Fail closed for security (matches the sibling row-ACL / field-mask paths in this class):
+            // if field-permission evaluation fails we must NOT return records with their hidden fields
+            // still present, or hidden field values leak to callers who should not see them.
             // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-            log.warn("Failed to apply field permission filter for model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
+            log.error("Failed to apply field permission filter for model {} — failing closed for security", logSafe(modelCode), e);
+            throw new MetaServiceException("Field permission evaluation failed for model: " + modelCode, e);
         }
         return records;
     }
@@ -392,7 +396,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
             fieldPerms.hiddenFields().forEach(record::remove);
         } catch (Exception e) {
-            log.warn("Failed to apply field permission filter for model {}: {}", logSafe(modelCode), logSafe(e.getMessage()), e);
+            // Fail closed for security (matches the sibling row-ACL / field-mask paths in this class).
+            // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
+            log.error("Failed to apply field permission filter for model {} — failing closed for security", logSafe(modelCode), e);
+            throw new MetaServiceException("Field permission evaluation failed for model: " + modelCode, e);
         }
         return record;
     }

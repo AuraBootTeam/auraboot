@@ -226,6 +226,35 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
     }
 
     // =====================================================================
+    // Test (b2): field-permission filter lookup throws → must fail closed
+    // (deep-review DR-20260701 W1-F2 — the two applyFieldPermissionFilter
+    //  helpers used to log.warn + return the UNMASKED record)
+    // =====================================================================
+
+    @Test
+    @DisplayName("getFieldPermissions throws → getById throws MetaServiceException (fail-secure, field-permission gate)")
+    void getById_fieldPermissionLookupThrows_throwsMetaServiceException() {
+        wireHappyPathDbStubs();
+
+        // ACL + policy/configurable masking all pass, so control reaches the field-permission filter
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
+                .thenReturn(true);
+        when(dataPermissionEngine.getFieldMaskRules(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID)))
+                .thenReturn(List.of());
+        when(fieldMaskService.applyMaskingForDetail(eq(MODEL_CODE), anyMap(), eq(USER_ID)))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+
+        // Field-permission evaluation blows up (e.g. role lookup DB error / missing member context)
+        when(fieldPermissionService.getFieldPermissions(any(), eq(MODEL_CODE)))
+                .thenThrow(new RuntimeException("field permission role lookup error"));
+
+        // Must NOT return the record with its hidden fields still present
+        assertThatThrownBy(() -> service.getById(MODEL_CODE, RECORD_ID))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("Field permission evaluation failed");
+    }
+
+    // =====================================================================
     // Test (c): configurable detail masking (fieldMaskService) throws
     // =====================================================================
 
