@@ -180,16 +180,32 @@ function attachForbiddenCollector(page: Page): { hits: ForbiddenHit[]; setMenu: 
   return { hits, setMenu: (m: string) => { currentMenu = m; } };
 }
 
-function leafMenus(snapshot: RoleSnapshot): Array<{ code: string; path: string; name: string }> {
+type LeafMenu = { code: string; path: string; name: string };
+
+/** Fetch /api/menu/user and keep only leaf nodes (group headers also carry paths). */
+async function fetchLeafMenus(page: Page): Promise<LeafMenu[]> {
+  const resp = await page.request.get('/api/menu/user', { timeout: 15_000 });
+  const body = await resp.json().catch(() => ({} as Record<string, unknown>));
+  expect(resp.ok(), `/api/menu/user HTTP ${resp.status()}`).toBe(true);
+  const root = Array.isArray((body as any).data) ? (body as any).data : [];
+  const leaves: LeafMenu[] = [];
   const seen = new Set<string>();
-  return snapshot.menus
-    .filter((m) => m.path && m.path.startsWith('/'))
-    .filter((m) => {
-      if (seen.has(m.path)) return false;
-      seen.add(m.path);
-      return true;
-    })
-    .map((m) => ({ code: m.code, path: m.path, name: m.name }));
+  const visit = (items: unknown[]) => {
+    for (const item of items) {
+      const menu = item as Record<string, unknown>;
+      const children = (menu.children ?? menu.submenu) as unknown[] | undefined;
+      if (Array.isArray(children) && children.length > 0) {
+        visit(children);
+        continue;
+      }
+      const path = String(menu.path ?? '');
+      if (!path.startsWith('/') || seen.has(path)) continue;
+      seen.add(path);
+      leaves.push({ code: String(menu.code ?? ''), path, name: String(menu.name ?? '') });
+    }
+  };
+  visit(root);
+  return leaves;
 }
 
 async function settle(page: Page): Promise<void> {
@@ -203,15 +219,17 @@ async function settle(page: Page): Promise<void> {
  */
 async function traverseMenus(
   page: Page,
-  menus: Array<{ code: string; path: string; name: string }>,
+  menus: LeafMenu[],
   setMenu: (m: string) => void,
 ): Promise<string[]> {
   const problems: string[] = [];
+  // land once and let the SPA hydrate before driving sidebar clicks
+  await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+  await settle(page);
+  await ensureSidebarExpanded(page);
   for (const menu of menus) {
     const label = `${menu.code || '?'} ${menu.path}`;
     setMenu(label);
-    await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
-    await ensureSidebarExpanded(page);
     const sidebar = page.getByTestId('sidebar');
     await expect(sidebar).toBeVisible({ timeout: 15_000 });
     const link = sidebar.locator(`a[href="${menu.path}"]`).first();
@@ -219,20 +237,40 @@ async function traverseMenus(
       problems.push(`${label}: menu link not found in sidebar (API says visible)`);
       continue;
     }
+    const targetPath = menu.path.split('?')[0];
+    const reachedTarget = () =>
+      page
+        .waitForURL((url) => url.pathname.startsWith(targetPath), { timeout: 15_000 })
+        .then(() => true)
+        .catch(() => false);
+    await link.scrollIntoViewIfNeeded().catch(() => {});
     await link.click();
-    const reached = await page
-      .waitForURL((url) => url.pathname.startsWith(menu.path.split('?')[0]), { timeout: 20_000 })
-      .then(() => true)
-      .catch(() => false);
+    let reached = await reachedTarget();
+    if (!reached) {
+      // one retry: SPA may still have been hydrating on the first click
+      await link.click().catch(() => {});
+      reached = await reachedTarget();
+    }
     if (!reached) {
       problems.push(`${label}: navigation did not reach ${menu.path} (still at ${page.url()})`);
       continue;
     }
     await settle(page);
-    const main = page.locator('main').first();
-    const mainVisible = await main.isVisible().catch(() => false);
-    const scope = mainVisible ? main : page.locator('body');
-    const text = (await scope.innerText().catch(() => '')).trim();
+    // custom pages (/p/c/...) hydrate content after networkidle — poll instead of instant read
+    let text = '';
+    await expect
+      .poll(
+        async () => {
+          const main = page.locator('main').first();
+          const mainVisible = await main.isVisible().catch(() => false);
+          const scope = mainVisible ? main : page.locator('body');
+          text = (await scope.innerText().catch(() => '')).trim();
+          return text.length;
+        },
+        { timeout: 15_000 },
+      )
+      .toBeGreaterThan(0)
+      .catch(() => {});
     if (text.length === 0) {
       problems.push(`${label}: content area rendered empty`);
       continue;
@@ -297,7 +335,6 @@ async function expectUnavailableByDirectUrl(page: Page, path: string): Promise<v
 }
 
 test.describe('Quote/BOM per-role menu smoke @smoke', () => {
-  test.describe.configure({ mode: 'serial' });
   test.setTimeout(300_000);
 
   let adminSnapshot: RoleSnapshot;
@@ -336,12 +373,17 @@ test.describe('Quote/BOM per-role menu smoke @smoke', () => {
         }
 
         // 3. walk EVERY visible menu via the sidebar; assert page renders, no forbidden text
-        const problems = await traverseMenus(page, leafMenus(snapshot), collector.setMenu);
-        expect(problems, `${contract.user.key} traversal problems:\n${problems.join('\n')}`).toEqual([]);
+        // (soft: keep going so a single run reports the FULL gap inventory)
+        const problems = await traverseMenus(page, await fetchLeafMenus(page), collector.setMenu);
+        expect
+          .soft(problems, `${contract.user.key} traversal problems:\n${problems.join('\n')}`)
+          .toEqual([]);
 
         // 4. zero forbidden API responses across the whole session
         const hits = collector.hits.map((h) => `[${h.menu}] ${h.status} ${h.url}`);
-        expect(hits, `${contract.user.key} forbidden API hits:\n${hits.join('\n')}`).toEqual([]);
+        expect
+          .soft(hits, `${contract.user.key} forbidden API hits:\n${hits.join('\n')}`)
+          .toEqual([]);
 
         // 5. admin-tier surfaces stay denied by direct URL
         for (const path of contract.deniedDirectPaths) {
@@ -356,15 +398,10 @@ test.describe('Quote/BOM per-role menu smoke @smoke', () => {
   test('admin: delivery whitelist menus all reachable (MENU-P0-01/09)', async ({ browser }) => {
     await withAdminPage(browser, async (page) => {
       const collector = attachForbiddenCollector(page);
-      const snapshot = await fetchRoleSnapshot(page);
-      const byCode = new Map(leafMenus(snapshot).map((m) => [m.code, m]));
+      const byCode = new Map((await fetchLeafMenus(page)).map((m) => [m.code, m]));
       const missing = ADMIN_SWEEP_CODES.filter((code) => !byCode.has(code));
       expect(missing, `admin missing delivery menus: ${missing.join(', ')}`).toEqual([]);
-      const targets = ADMIN_SWEEP_CODES.map((code) => byCode.get(code)!) as Array<{
-        code: string;
-        path: string;
-        name: string;
-      }>;
+      const targets = ADMIN_SWEEP_CODES.map((code) => byCode.get(code)!) as LeafMenu[];
       const problems = await traverseMenus(page, targets, collector.setMenu);
       expect(problems, `admin traversal problems:\n${problems.join('\n')}`).toEqual([]);
       const hits = collector.hits.map((h) => `[${h.menu}] ${h.status} ${h.url}`);
