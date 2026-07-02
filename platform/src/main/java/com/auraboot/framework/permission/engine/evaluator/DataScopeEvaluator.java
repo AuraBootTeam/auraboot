@@ -100,26 +100,42 @@ public class DataScopeEvaluator {
     // ========================================================================
 
     private EvaluationStep evaluateSelf(DataScopeCondition condition, Map<String, Object> record) {
-        Object createdBy = record.get(condition.ownerField());
-        if (createdBy == null) {
+        Object recordOwner = record.get(condition.ownerField());
+        if (recordOwner == null) {
             return new EvaluationStep(NAME, EvaluationVerdict.DENY,
                     "Record has no " + condition.ownerField() + " field");
         }
 
-        long createdById;
-        if (createdBy instanceof Number) {
-            createdById = ((Number) createdBy).longValue();
-        } else {
-            createdById = Long.parseLong(String.valueOf(createdBy));
-        }
-
-        if (createdById == condition.ownerValue()) {
+        if (isOwnedByCurrentUser(condition.ownerValue(), recordOwner)) {
             return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
                     "Scope: self — record owned by current user");
         }
 
         return new EvaluationStep(NAME, EvaluationVerdict.DENY,
                 "Scope: self — record not owned by current user");
+    }
+
+    /**
+     * Compare by the owner value's type: a Long userId against numeric owner columns, a String
+     * userPid against varchar/ULID owner columns. Type mismatches (e.g. a ULID record value
+     * against a numeric owner id) can never match — deny, don't throw.
+     */
+    private boolean isOwnedByCurrentUser(Object ownerValue, Object recordOwner) {
+        if (ownerValue == null) {
+            return false;
+        }
+        if (ownerValue instanceof Number expected) {
+            if (recordOwner instanceof Number actual) {
+                return actual.longValue() == expected.longValue();
+            }
+            // CATCH: a non-numeric record value can never equal a numeric owner id — not-owned, not an error
+            try {
+                return Long.parseLong(String.valueOf(recordOwner)) == expected.longValue();
+            } catch (NumberFormatException e) {
+                return false;
+            }
+        }
+        return String.valueOf(recordOwner).equals(String.valueOf(ownerValue));
     }
 
     private EvaluationStep evaluateDept(DataScopeCondition condition, Map<String, Object> record) {

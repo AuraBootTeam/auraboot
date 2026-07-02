@@ -1,6 +1,7 @@
 package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.dto.DataTypeMapping;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -247,6 +248,78 @@ class DataScopeServiceImplTest {
 
         assertThat(c.scopeType()).isEqualTo("dept_and_sub");
         assertThat(c.deptPids()).containsExactlyInAnyOrder("dept-1", "dept-1.1");
+    }
+
+    // ---- SELF owner value must match the owner COLUMN type (2026-06-28 Quote/BOM incident) ----
+    // A varchar/ULID ownerField (e.g. crm_acc_owner) compared against the numeric userId produced
+    // "operator does not exist: character varying = bigint" -> self-scoped list 500. The self value
+    // must be chosen by the owner column's declared type: numeric -> userId, string -> userPid.
+
+    private void stubSelfScope(String resourceCode, String ownerField) {
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("self");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        when(metaModelService.getModelDefinition(resourceCode)).thenReturn(Optional.of(ModelDefinition.builder().build()));
+        MetaModelDTO modelDto = MetaModelDTO.builder()
+                .extension(Map.of("dataScope", Map.of("ownerField", ownerField)))
+                .build();
+        when(metaModelService.findByCode(resourceCode)).thenReturn(modelDto);
+    }
+
+    @Test
+    void selfScopeUsesUserPidForStringOwnerColumn() {
+        stubSelfScope("crm_account_common", "crm_acc_owner");
+        when(metaModelService.getFieldDataType("crm_account_common", "crm_acc_owner"))
+                .thenReturn(DataTypeMapping.builder().javaType("String").build());
+
+        DataScopeCondition c = service.resolveScope(5L, "crm_account_common", "read");
+
+        assertThat(c.scopeType()).isEqualTo("self");
+        assertThat(c.ownerField()).isEqualTo("crm_acc_owner");
+        assertThat(c.ownerValue()).isEqualTo("u-pid"); // current userPid, not the numeric userId
+    }
+
+    @Test
+    void selfScopeKeepsUserIdForNumericOwnerColumn() {
+        stubSelfScope("crm_account_common", "crm_acc_owner_id");
+        when(metaModelService.getFieldDataType("crm_account_common", "crm_acc_owner_id"))
+                .thenReturn(DataTypeMapping.builder().javaType("Long").build());
+
+        DataScopeCondition c = service.resolveScope(5L, "crm_account_common", "read");
+
+        assertThat(c.ownerValue()).isEqualTo(1L);
+    }
+
+    @Test
+    void selfScopeFallsBackToUserIdWhenOwnerColumnTypeUnknown() {
+        // created_by default: a system column, not a declared meta field -> lookup throws.
+        // Fall back to the numeric userId (created_by stores userId on platform tables).
+        when(userRoleMapper.findRoleIdsByMemberId(5L)).thenReturn(List.of(7L));
+        RoleDataScope scope = new RoleDataScope();
+        scope.setScopeType("self");
+        when(roleDataScopeMapper.findByRoleIdsAndResource(any(), anyString(), anyString())).thenReturn(List.of(scope));
+        when(metaModelService.getModelDefinition("model.user")).thenReturn(Optional.empty());
+        when(metaModelService.getFieldDataType("model.user", "created_by"))
+                .thenThrow(new RuntimeException("Field not found: created_by"));
+
+        DataScopeCondition c = service.resolveScope(5L, "model.user", "read");
+
+        assertThat(c.ownerValue()).isEqualTo(1L);
+    }
+
+    @Test
+    void selfScopeFailsSecureWhenStringOwnerColumnButNoUserPid() {
+        MetaContext.clear();
+        MetaContext.setContext(100L, 1L, null, "tester");
+        stubSelfScope("crm_account_common", "crm_acc_owner");
+        when(metaModelService.getFieldDataType("crm_account_common", "crm_acc_owner"))
+                .thenReturn(DataTypeMapping.builder().javaType("String").build());
+
+        DataScopeCondition c = service.resolveScope(5L, "crm_account_common", "read");
+
+        // No pid to compare against a string owner column: deny rather than emit broken SQL
+        assertThat(c.scopeType()).isEqualTo("none");
     }
 
     @Test

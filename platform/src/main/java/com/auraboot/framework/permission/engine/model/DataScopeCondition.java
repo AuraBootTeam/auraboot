@@ -8,7 +8,10 @@ import java.util.List;
  *
  * @param scopeType       scope type (e.g. "all", "none", "self", "dept", "dept_and_sub")
  * @param ownerField      field name for owner filtering (e.g. "created_by")
- * @param ownerValue      owner user/member ID
+ * @param ownerValue      owner comparison value, typed to match the owner COLUMN: a Long userId
+ *                        for numeric columns (created_by), or a String userPid for varchar/ULID
+ *                        owner columns (e.g. crm_acc_owner) — comparing a numeric id against a
+ *                        varchar column is a SQL type error
  * @param deptField       field name for department filtering on target model
  * @param deptPids        list of department PIDs within scope (string-based, from dynamic tables)
  * @param sharedRecordIds record IDs explicitly shared via ReBAC
@@ -16,7 +19,7 @@ import java.util.List;
 public record DataScopeCondition(
         String scopeType,
         String ownerField,
-        Long ownerValue,
+        Object ownerValue,
         String deptField,
         List<String> deptPids,
         List<Long> sharedRecordIds

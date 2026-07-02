@@ -128,4 +128,39 @@ class DataScopeEvaluatorTest {
         when(dataScopeService.resolveScope(1L, "M", "view")).thenReturn(self);
         assertSame(self, evaluator.getCondition(1L, "M", "view"));
     }
+
+    // ---- SELF owner value typing (2026-06-28 Quote/BOM varchar/ULID owner incident) ----
+
+    @Test
+    void selfScopeStringOwnerAllowsMatchingPid() {
+        when(dataScopeService.resolveScope(1L, "M", "view"))
+                .thenReturn(new DataScopeCondition("self", "owner_id", "01KWEYE0JG", null, List.of(), List.of()));
+        EvaluationStep s = evaluator.evaluate(1L, "M", "view", Map.of("owner_id", "01KWEYE0JG"));
+        assertEquals(EvaluationVerdict.ALLOW, s.verdict());
+    }
+
+    @Test
+    void selfScopeStringOwnerDeniesDifferentPid() {
+        when(dataScopeService.resolveScope(1L, "M", "view"))
+                .thenReturn(new DataScopeCondition("self", "owner_id", "01KWEYE0JG", null, List.of(), List.of()));
+        EvaluationStep s = evaluator.evaluate(1L, "M", "view", Map.of("owner_id", "01KWOTHER"));
+        assertEquals(EvaluationVerdict.DENY, s.verdict());
+    }
+
+    @Test
+    void selfScopeNumericOwnerDeniesNonNumericRecordValueWithoutCrashing() {
+        // ULID string in the record, numeric owner value: must DENY, not throw NumberFormatException
+        when(dataScopeService.resolveScope(1L, "M", "view"))
+                .thenReturn(new DataScopeCondition("self", "owner_id", 1L, null, List.of(), List.of()));
+        EvaluationStep s = evaluator.evaluate(1L, "M", "view", Map.of("owner_id", "01KWEYE0JG"));
+        assertEquals(EvaluationVerdict.DENY, s.verdict());
+    }
+
+    @Test
+    void selfScopeNullOwnerValueDenies() {
+        when(dataScopeService.resolveScope(1L, "M", "view"))
+                .thenReturn(new DataScopeCondition("self", "owner_id", null, null, List.of(), List.of()));
+        EvaluationStep s = evaluator.evaluate(1L, "M", "view", Map.of("owner_id", 1L));
+        assertEquals(EvaluationVerdict.DENY, s.verdict());
+    }
 }

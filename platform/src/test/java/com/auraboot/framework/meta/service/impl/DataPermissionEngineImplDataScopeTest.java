@@ -135,4 +135,44 @@ class DataPermissionEngineImplDataScopeTest {
         assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", dept))
                 .isEqualTo("org_emp_dept_id IN ('p1','p2')");
     }
+
+    // ---- SELF owner value typing (2026-06-28 Quote/BOM varchar/ULID owner incident) ----
+    // A string owner value (userPid against a varchar/ULID owner column) must be quoted;
+    // unquoted it is either broken SQL or an injection surface.
+
+    @Test
+    @DisplayName("dataScopeConditionToSql quotes string owner values (ULID/pid owner columns)")
+    void dataScopeSql_quotesStringOwnerValue() {
+        DataScopeCondition self = new DataScopeCondition(
+                "self", "crm_acc_owner", "01KWEYE0JGW6364G1VMP5MZK7X", null, List.of(), List.of());
+        assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", self))
+                .isEqualTo("crm_acc_owner = '01KWEYE0JGW6364G1VMP5MZK7X'");
+    }
+
+    @Test
+    @DisplayName("dataScopeConditionToSql escapes quotes inside string owner values")
+    void dataScopeSql_escapesQuotesInStringOwnerValue() {
+        DataScopeCondition self = new DataScopeCondition(
+                "self", "crm_acc_owner", "a'b", null, List.of(), List.of());
+        assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", self))
+                .isEqualTo("crm_acc_owner = 'a''b'");
+    }
+
+    @Test
+    @DisplayName("dataScopeConditionToSql keeps numeric owner values unquoted")
+    void dataScopeSql_numericOwnerValueUnquoted() {
+        DataScopeCondition self = new DataScopeCondition(
+                "self", "created_by", USER_ID, null, List.of(), List.of());
+        assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", self))
+                .isEqualTo("created_by = " + USER_ID);
+    }
+
+    @Test
+    @DisplayName("dataScopeConditionToSql fails secure (1 = 0) on a null owner value")
+    void dataScopeSql_nullOwnerValueFailsSecure() {
+        DataScopeCondition self = new DataScopeCondition(
+                "self", "created_by", null, null, List.of(), List.of());
+        assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", self))
+                .isEqualTo("1 = 0");
+    }
 }
