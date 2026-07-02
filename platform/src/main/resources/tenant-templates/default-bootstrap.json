@@ -1816,6 +1816,8 @@
     {
       "roleCode": "tenant_member",
       "permissionCodes": [
+        "meta.model.read",
+        "page.page.read",
         "dashboard.saved_view.read",
         "bpm.process.read",
         "notification.view"
