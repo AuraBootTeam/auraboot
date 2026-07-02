@@ -94,6 +94,14 @@ jobs:
             up --build -d backend isolated-frontend
 
       - name: Run auth regression suite
+        # PLAYWRIGHT_RUNNER_COMMAND must be HOST env, not `docker compose run -e`:
+        # the runner service's `command:` consumes it via compose ${...} interpolation,
+        # which resolves at compose parse time from the host environment. Passing it
+        # with -e sets only the container env, the interpolation falls back to the
+        # full-suite default, and the targeted auth runner never executes (the gate
+        # then runs ~4k tests on 1 worker and dies on the job timeout).
+        env:
+          PLAYWRIGHT_RUNNER_COMMAND: pnpm test:auth-regression
         run: |
           set -euo pipefail
           docker compose \
@@ -104,7 +112,6 @@ jobs:
             --profile cache \
             --profile playwright-runner \
             run --rm \
-            -e PLAYWRIGHT_RUNNER_COMMAND="pnpm test:auth-regression" \
             -e PW_E2E_RUN_ID="$PW_E2E_RUN_ID" \
             -e PW_PROFILE=fast \
             -e PW_ROLE_PROJECTS=1 \

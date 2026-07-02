@@ -327,6 +327,11 @@ services:
         condition: service_healthy
       isolated-frontend:
         condition: service_healthy
+    # PLAYWRIGHT_RUNNER_COMMAND below is compose PARSE-TIME interpolation (unlike the
+    # $$-escaped runtime vars): it must be set in the HOST environment of the
+    # `docker compose` invocation (export it, or a CI step `env:`). Passing it with
+    # `docker compose run -e PLAYWRIGHT_RUNNER_COMMAND=...` sets only the container
+    # env, which ${...} never sees — the full-suite default runs instead.
     command: >-
       sh -c "
       set -e;
