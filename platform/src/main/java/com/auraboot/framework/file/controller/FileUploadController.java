@@ -25,6 +25,7 @@ import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
+import com.auraboot.framework.application.tenant.MetaContext;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -129,6 +130,21 @@ public class FileUploadController {
         fileEntity.setCreatedBy(userPid);
         fileEntity.setDeletedFlag(false);
         
+        // Object-level tenant isolation: file_name is the storage key that object-read
+        // sinks (FileAccessorImpl / FileImageBridge) download by. Reject registering a
+        // key that already belongs to a different tenant — otherwise a client could
+        // claim another tenant's object key via this metadata-only endpoint and then
+        // read its content cross-tenant (single shared bucket, keys carry no tenant prefix).
+        String storageKey = fileEntity.getFileName();
+        if (StringUtils.hasText(storageKey)) {
+            Long tenantId = MetaContext.getCurrentTenantId();
+            if (tenantId != null
+                    && fileMapper.countByFileNameInOtherTenants(storageKey, tenantId) > 0) {
+                throw new IllegalArgumentException(
+                        "Storage key is already registered by another tenant");
+            }
+        }
+
         // 保存到数据库
         fileMapper.insert(fileEntity);
         
