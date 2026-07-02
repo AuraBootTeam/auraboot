@@ -82,6 +82,10 @@ async function ensureAuthenticated(page: import('@playwright/test').Page): Promi
 }
 
 test.describe('Logout Functionality', () => {
+  // Fresh-login flows (API login + hydration-aware menu interaction) do not fit
+  // the fast profile's 15s default budget on CI containers (LO-001 died at
+  // 15.1s: "Target page ... has been closed" = timeout cleanup mid-click).
+  test.setTimeout(45_000);
   // Fresh session: every test here logs out server-side. Consuming the shared
   // admin storageState would invalidate that session for later specs in the
   // same run (space-selection etc.), so start empty — ensureAuthenticated
