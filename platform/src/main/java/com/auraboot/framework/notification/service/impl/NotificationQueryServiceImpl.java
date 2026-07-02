@@ -64,12 +64,14 @@ public class NotificationQueryServiceImpl implements NotificationQueryService {
     @Transactional
     public void markAsRead(Long notificationId) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        // Get the userId before marking as read
-        Long userId = notificationMapper.findUserIdById(tenantId, notificationId);
-        notificationMapper.markAsRead(tenantId, notificationId);
+        // Object-level authorization: only the notification's own recipient may
+        // mark it read. Scope the UPDATE by the caller's userId so a user cannot
+        // mark another (same-tenant) user's notification read via an enumerable id.
+        Long userId = MetaContext.getCurrentUserId();
+        int updated = notificationMapper.markAsRead(tenantId, notificationId, userId);
 
-        // Push updated unread count via SSE
-        if (userId != null) {
+        // Push updated unread count via SSE only when the caller actually owned it.
+        if (updated > 0) {
             pushUnreadCountUpdate(userId);
         }
     }
