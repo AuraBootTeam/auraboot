@@ -803,6 +803,9 @@ async function seedQuoteScaffold(
         qo_quote_tax_rate: 0.13,
         qo_quote_factory_class: factoryClass,
         qo_quote_industry: 'pcba',
+        // required since the corrected-BOM-at-create contract (#1107); dynamic insert runs
+        // no import side effect, so a fixture file id (same pattern as the rsa rows) is enough
+        corrected_bom_file: `e2e-corrected-bom-${suffix}`,
       },
       created.rows,
     );
