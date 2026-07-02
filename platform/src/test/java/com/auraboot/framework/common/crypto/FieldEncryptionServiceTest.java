@@ -239,4 +239,41 @@ class FieldEncryptionServiceTest {
         String encrypted = service.encrypt(unicode);
         assertEquals(unicode, service.decrypt(encrypted));
     }
+
+    // ========== Fail-closed passthrough in non-dev profiles (security) ==========
+
+    private void setProfile(FieldEncryptionService service, String profile) throws Exception {
+        Field f = FieldEncryptionService.class.getDeclaredField("activeProfile");
+        f.setAccessible(true);
+        f.set(service, profile);
+    }
+
+    @Test
+    @DisplayName("No key + non-dev profile — encrypt refuses to store plaintext (fails closed)")
+    void testNoKeyNonDevProfileRefused() throws Exception {
+        FieldEncryptionService service = createService("");
+        setProfile(service, "prod");
+
+        assertThrows(IllegalStateException.class, () -> service.encrypt("sensitive-secret"));
+    }
+
+    @Test
+    @DisplayName("No key + dev/local/test profile — encrypt still passes through")
+    void testNoKeyDevProfilePassthrough() throws Exception {
+        FieldEncryptionService service = createService("");
+        for (String profile : new String[] {"dev", "local", "test", ""}) {
+            setProfile(service, profile);
+            assertEquals("sensitive-secret", service.encrypt("sensitive-secret"),
+                    "profile '" + profile + "' should still passthrough in dev-ish mode");
+        }
+    }
+
+    @Test
+    @DisplayName("Decrypt of legacy plaintext still works in a non-dev profile (read path unaffected)")
+    void testDecryptLegacyPlaintextNonDev() throws Exception {
+        FieldEncryptionService service = createService("");
+        setProfile(service, "prod");
+        // The fail-closed guard is on write (encrypt) only; reads of existing plaintext must still work.
+        assertEquals("legacy-plain", service.decrypt("legacy-plain"));
+    }
 }
