@@ -207,4 +207,26 @@ class CloudConfigConnectionTesterTest {
         assertThat(result.get("status")).isEqualTo("error");
         assertThat((String) result.get("message")).contains("clientId");
     }
+
+    // -----------------------------------------------------------------
+    // Security: WeChat appSecret must never leak into the error message.
+    // The cgi-bin/token contract puts the secret in the URL query, and a
+    // URI-illegal appSecret makes URI.create throw an exception whose message
+    // contains the full URL — which must NOT be echoed back to the caller.
+    // -----------------------------------------------------------------
+
+    @Test
+    void testConnection_wechatOAuth_malformedUrl_doesNotLeakSecret() {
+        String secret = "s3cr3t with space <leak>";
+        when(cloudConfigService.getByPidDecrypted("pid-1"))
+                .thenReturn(config("oauth", "wechat_web",
+                        "{\"appId\":\"wx-app-id\",\"appSecret\":\"" + secret + "\"}"));
+
+        Map<String, Object> result = tester.testConnection("pid-1");
+
+        assertThat(result.get("status")).isEqualTo("error");
+        assertThat((String) result.get("message"))
+                .doesNotContain(secret)
+                .doesNotContain("s3cr3t");
+    }
 }
