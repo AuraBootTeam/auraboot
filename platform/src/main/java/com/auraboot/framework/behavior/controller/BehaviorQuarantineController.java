@@ -8,6 +8,7 @@ import com.auraboot.framework.behavior.service.BehaviorQuarantineService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.common.util.PaginationSafetyUtils;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,10 +19,17 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Tenant-scoped operator API for inspecting and replaying the behavior ingest quarantine sink.
+ *
+ * <p>Authorization: login-required, no RBAC role distinction (owner decision
+ * 2026-07-02: operator/viewer split is not needed here). All operations are
+ * tenant-scoped via {@link MetaContext#getCurrentTenantId()}, so a logged-in
+ * tenant user only ever sees / replays their own tenant's quarantine sink.
  */
 @RestController
 @RequestMapping("/api/analytics/behavior/quarantine")
 @RequiredArgsConstructor
+@AuthenticatedAccess("tenant-scoped behavior-quarantine inspect/replay; owner decision 2026-07-02: "
+        + "login-required, no operator/viewer role distinction. Tenant-isolated via MetaContext.")
 public class BehaviorQuarantineController {
 
     private final BehaviorQuarantineService service;
