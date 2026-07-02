@@ -122,14 +122,37 @@ public class EmployeeAccountWorkbookParser {
         return readSheet(sheet, sharedStrings);
     }
 
-    private Map<String, byte[]> readZipEntries(InputStream inputStream) throws Exception {
+    // Decompression-bomb guards: an xlsx is a zip; a small upload can inflate to GBs.
+    private static final long MAX_ZIP_ENTRY_SIZE = 10L * 1024 * 1024;    // 10 MB per entry
+    private static final int MAX_ZIP_ENTRIES = 1000;
+    private static final long MAX_ZIP_TOTAL_SIZE = 100L * 1024 * 1024;   // 100 MB total uncompressed
+
+    Map<String, byte[]> readZipEntries(InputStream inputStream) throws Exception {
         Map<String, byte[]> entries = new HashMap<>();
         try (ZipInputStream zip = new ZipInputStream(inputStream)) {
             ZipEntry entry;
+            int entryCount = 0;
+            long totalSize = 0;
             while ((entry = zip.getNextEntry()) != null) {
-                if (!entry.isDirectory()) {
-                    entries.put(entry.getName(), zip.readAllBytes());
+                if (entry.isDirectory()) {
+                    continue;
                 }
+                if (++entryCount > MAX_ZIP_ENTRIES) {
+                    throw new IllegalArgumentException(
+                            "Workbook exceeds maximum entry count: " + MAX_ZIP_ENTRIES);
+                }
+                // readNBytes(MAX+1) bounds heap use; length > MAX means an oversized entry.
+                byte[] content = zip.readNBytes((int) MAX_ZIP_ENTRY_SIZE + 1);
+                if (content.length > MAX_ZIP_ENTRY_SIZE) {
+                    throw new IllegalArgumentException("Workbook entry exceeds maximum size ("
+                            + (MAX_ZIP_ENTRY_SIZE / (1024 * 1024)) + " MB): " + entry.getName());
+                }
+                totalSize += content.length;
+                if (totalSize > MAX_ZIP_TOTAL_SIZE) {
+                    throw new IllegalArgumentException("Workbook uncompressed size exceeds maximum ("
+                            + (MAX_ZIP_TOTAL_SIZE / (1024 * 1024)) + " MB)");
+                }
+                entries.put(entry.getName(), content);
             }
         }
         return entries;
