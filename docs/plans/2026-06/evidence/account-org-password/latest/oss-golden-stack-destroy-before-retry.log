@@ -1,3 +1,0 @@
-[36m[golden-stack][0m stopped 'account-org-settings' processes (runtime/DB kept; 'destroy' to remove)
-[36m[golden-stack][0m infra cleanup + runtime destroy 'account-org-settings'
-[36m[golden-stack][0m destroyed 'account-org-settings' ✓
