@@ -173,6 +173,32 @@ class BpmNodeHookSpELWritableIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("SPEL-07: reflective getClass().forName() RCE chain rejected, no side effects")
+    void spel07_reflectionEscapeRejected() {
+        String processKey = "proc-spel-rce-reflect-" + System.nanoTime();
+        String nodeId = "node-spel-07";
+        // The vector that defeated the old T()-only guard: reflection reaches
+        // Runtime via method calls, none of which use T(...). Under the hardened
+        // SimpleEvaluationContext no method resolver is registered, so this is
+        // structurally unresolvable and throws — BLOCK strategy must fail closed
+        // with no side effects on the variables map.
+        hookService.createHook(buildScriptHook(processKey, nodeId, "pre_check",
+                "''.getClass().forName('java.lang.Runtime').getMethod('getRuntime').invoke(null)",
+                "block"));
+
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("before", "untouched");
+        HookExecutionResult result = hookService.executePreChecks(processKey, nodeId, vars);
+
+        assertFalse(result.passed(), "reflective RCE chain must not be allowed to pass pre-check");
+        assertNotNull(result.message(), "security rejection must carry a message");
+        assertEquals("untouched", vars.get("before"), "no side effects expected on the variables map");
+
+        log.info("SPEL-07 PASSED: reflective getClass().forName() chain rejected, message={}",
+                result.message());
+    }
+
+    @Test
     @DisplayName("SPEL-06: post-action hook mutation propagates to caller's map")
     void spel06_postActionWritesBack() {
         String processKey = "proc-spel-postwrite-" + System.nanoTime();
