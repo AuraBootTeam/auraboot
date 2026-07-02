@@ -104,9 +104,9 @@ perm-004 存量 controller 分类、capability 系统、tenant/permission contro
 
 | ID | sev | 内容 | 为何延后 |
 |---|---|---|---|
-| DR-20260701-W2-perf-001 | P1 | OEE fleet 大屏 N+1(`OeeFleetService` 1+3N,50 机 =151 查/次) | perf 非 correctness bug;需新建 port batch fetch + adapter grouped query + **真 DB IT** 验查询数下降+输出一致(6-8h) |
-| DR-20260701-W2-perf-002 | P1 | IM 会话列表 N+1(`ImConversationServiceImpl.listByUser` 1+4N) | 触 chat 路径(L1 chokepoint 邻域,需谨慎);4 batched mapper+XML+真 DB IT(6-8h) |
-| DR-20260701-W2-perf-003 | P2 | 未读汇总 N+1(`getUnreadSummary` 1+2N,badge 轮询放大) | 单 join 重写 + 真 DB IT(3-4h) |
+| DR-20260701-W2-perf-003 | P2 | 未读汇总 N+1(`getUnreadSummary` 1+2N,badge 轮询放大) | **✅ 已修 + 真栈验证**(单 join 重写;Mockito 单测证无 N+1 + 真 Postgres IT 证 SQL 正确)。见提交 `perf(im): batch getUnreadSummary` |
+| DR-20260701-W2-perf-001 | P1 | OEE fleet 大屏 N+1(`OeeFleetService` 1+3N,50 机 =151 查/次) | **env-blocked**:真 DB 验证需 PCBA manufacturing 插件表(`mt_mfg_*`/`mt_pe_*`),aura_boot 只有 `mt_pe_equipment` 缺 downtime 等表→adapter `activeSchema()` 返 null。按红线不 ship 未真栈验证的 grouped SQL。需先导入 PCBA 插件栈(更重 bringup)再做 batch fetch + grouped query + 真 DB IT |
+| DR-20260701-W2-perf-002 | P1 | IM 会话列表 N+1(`ImConversationServiceImpl.listByUser` 1+4N) | 3 个中**最大**:需 4 batched 查询(selectBatchIds 会话 + IN 我的 membership + GROUP BY human 成员数 + **`DISTINCT ON(conversation_id)` per-group 最后消息**)+ 保留精确输出(排序/unread/pinned/muted)+ 真 DB IT;chat 域需谨慎。ab_im_* 表在 aura_boot 存在→可真栈验证,但改动面大,未在本轮尾部盲做 |
 | DR-20260701-W2-perf-cand | P2/P3 | 5 candidate:OrgController N+1 / RollUp 全表扫 / ExportAsyncTaskExecutor 无界物化(potential OOM)/ CapabilitySync N+1 / CascadeDelete loop | 多为 admin/maintenance 低频路径或需确认上游 cap;各 2-6h |
 | DR-20260701-W3-xrepo-001 | P2 | `e2et_*` 全局 model code 在 OSS/EE test-fixtures 分歧定义(双 SoT,仅靠 reset-init 名字特判防撞) | **test-only**(`AURA_ENV=test` 才导入),当前 guard 有效未撞;修复跨 OSS+EE 双仓;low blast radius |
 | DR-20260701-W1-sec-cand | P2/P3 | 3 admin-gated SSRF(Embedding/LLM/SaaS `baseUrl` 无 SsrfValidator)+ 1 不可达 SQLi(`QueryBuilderServiceImpl` 无 controller wire) | SSRF 各 ~0.5d 且 **admin-gated 非请求输入**;不可达 SQLi 现网无请求路径。防御性硬化,非紧急。(config-boundary SQLi 已修,见 W1-sec-003)|
@@ -123,10 +123,11 @@ perm-004 存量 controller 分类、capability 系统、tenant/permission contro
 |---|---|
 | reviewer | 5(wave1:R1 后端红线 / R2 链路 / R3 变更面 / R4 前端 / R5 测试+插件配置)+ 3(wave2:W1 安全 / W2 性能 / W3 跨仓) |
 | raw findings | wave1 ~15 + 4 测试 gap;wave2 2 P1 安全 confirmed + 3 perf N+1 + 1 跨仓 + 若干 candidate |
-| accepted & 已修 | **9 finding 组 = 13 处修复**(wave1:3 §9 + 1 loader 诊断 + 4 测试 gap + 1 inbox + 2 i18n;wave2:2 P1 安全),**20 测试新增/扩展** |
+| accepted & 已修 | **11 finding 组 = 15 处修复**(wave1:3 §9 + 1 loader 诊断 + 4 测试 gap + 1 inbox + 2 i18n;wave2:2 P1 安全 + 1 config-SQLi 硬化 + **1 perf N+1〔unread,真栈验证〕**),**24 测试新增/扩展** |
 | 重分类/驳回 | 2(F1 fail-loud→仅诊断;R5 注入 candidate 驳回);wave2 W1 亦驳回多处(SQLi sink 逐片段过 SqlSafetyUtils、path-traversal 有 startsWith 守卫、无原生反序列化) |
-| 延后(owner/重验/低频,已分层非 completionism) | wave1:2(bootstrap-002 §4.1 / flyway-001 baseline);wave2:3 perf N+1(需真 DB IT)+ 1 跨仓 test-only + SSRF/config-SQLi candidate |
+| 延后(owner/重验/低频/env-blocked,已分层非 completionism) | wave1:2(bootstrap-002 §4.1 / flyway-001 baseline);wave2:OEE perf(env-blocked 缺 PCBA 表)+ IM perf(最大,4 batched 含 DISTINCT ON)+ 1 跨仓 test-only + SSRF candidate |
 | 本地门禁 | oss-boundary / reset-init / jsonb / public-record-id / version-sync 全 ✅ |
 | 前端 typecheck | react-router typegen && tsc ✅ |
+| host-first 真栈 | unread perf N+1 已用真 Postgres IT(aura_boot,@Transactional 回滚不扰并发)验证 SQL 正确 |
 
-status: 两轮 review(5+3 维)完成。全部**可安全修复且不与并发会话冲突**的 verified finding 已闭环 + 真栈/typecheck 验证(13 处修复 / 20 测试,含 wave2 两个 P1 安全 bug);延后项(bootstrap-002 / flyway-001 / 3 perf N+1 / 跨仓 test-only / SSRF candidate)均**显式价值分层**——需 owner 决策、真 DB IT 重验、或低频/admin-gated,非闷头清的待办 backlog。交付于 PR #1126。
+status: 两轮 review(5+3 维)完成。全部**可安全修复且不与并发会话冲突**的 verified finding 已闭环 + 真栈/typecheck 验证(**15 处修复 / 24 测试**,含 wave2 两个 P1 安全 bug + config-SQLi 硬化 + 一个真栈验证的 perf N+1)。剩余延后项均**显式价值分层**:OEE perf **env-blocked**(缺 PCBA 插件表,需先导入才能真栈验证)、IM perf 最大(4 batched 含 Postgres DISTINCT ON,chat 域)、bootstrap-002/flyway-001 需 owner 决策、跨仓 test-only、SSRF admin-gated——非闷头清的待办 backlog。交付于 PR #1126。
