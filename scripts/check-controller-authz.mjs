@@ -35,6 +35,9 @@ const WRITE_MAPPING = /@(Post|Put|Delete|Patch)Mapping/;
 // explicit acknowledged authenticated-only marker (@AuthenticatedAccess). Both drop it out of the
 // undecided baseline.
 const GUARD = /@RequirePermission|@AuthenticatedAccess/;
+// Controllers annotated @Profile("test") are only wired into the test profile and
+// are never registered in a production context, so they carry no fail-open risk.
+const TEST_PROFILE = /@Profile\(\s*\{?\s*['"]test['"]/;
 const ADMIN_PATH = /["(]\s*"?\/api\/admin\//;
 
 function walk(dir, out = []) {
@@ -55,6 +58,7 @@ for (const file of walk(SRC)) {
   if (!WRITE_MAPPING.test(text)) continue;       // no write surface
   if (GUARD.test(text)) continue;                 // has a @RequirePermission somewhere
   if (ADMIN_PATH.test(text)) continue;            // AdminRoleInterceptor covers /api/admin/**
+  if (TEST_PROFILE.test(text)) continue;          // @Profile("test") controller — never wired in prod
   unguarded.push(path.relative(REPO, file));
 }
 unguarded.sort();
