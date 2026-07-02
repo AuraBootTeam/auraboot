@@ -7,6 +7,7 @@ import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.common.util.JsonUtil;
 import com.auraboot.framework.datasource.dao.mapper.DynamicQueryMapper;
+import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -118,9 +119,17 @@ public class DashboardDataServiceImpl implements DashboardDataService {
                     String sql = String.valueOf(ds.get("query"));
                     if (sql != null && !sql.isBlank()) {
                         try {
+                            // Security: the widget query is authored config stored in
+                            // ab_page_schema and executed via SqlRunner, which bypasses
+                            // the tenant line interceptor. Enforce the same SELECT-only
+                            // guard every other raw-SQL path uses (DynamicSqlProvider,
+                            // NamedQueryServiceImpl, ReportTemplateServiceImpl) — blocks
+                            // writes/DDL, stacked statements, UNION-based exfiltration,
+                            // comments, and file operations before the query runs.
+                            SqlSafetyUtils.validateSelectOnlySql(sql);
                             return dynamicQueryMapper.queryData(sql);
                         } catch (Exception e) {
-                            log.warn("Widget SQL query failed: {}", e.getMessage());
+                            log.warn("Widget SQL query rejected or failed: {}", e.getMessage());
                             return Map.of("error", e.getMessage());
                         }
                     }
