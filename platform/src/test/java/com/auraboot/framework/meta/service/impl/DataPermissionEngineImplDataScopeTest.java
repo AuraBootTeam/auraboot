@@ -3,9 +3,11 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.mapper.DataPermissionPolicyMapper;
 import com.auraboot.framework.permission.engine.evaluator.DataScopeEvaluator;
+import com.auraboot.framework.permission.engine.model.DataScopeCondition;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -95,5 +97,42 @@ class DataPermissionEngineImplDataScopeTest {
                 List.of(own, other));
 
         assertThat(filtered).containsExactly(own);
+    }
+
+    // ---- data-scope SQL identifier validation (deep-review DR-20260701 W1-C-1) ----
+    // ownerField / deptField are model-config identifiers concatenated into SQL; the sibling
+    // row-policy builder validates them, this SQL-gen path previously did not. Values (Long owner id,
+    // quote-escaped dept pids) are already safe; only the field identifiers are the injection surface.
+
+    @Test
+    @DisplayName("dataScopeConditionToSql fails secure (1 = 0) on an injected SELF owner field")
+    void dataScopeSql_rejectsInjectedOwnerField() {
+        DataScopeCondition malicious = new DataScopeCondition(
+                "self", "created_by = 1 OR 1=1 --", USER_ID, null, List.of(), List.of());
+        String sql = (String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", malicious);
+        assertThat(sql).isEqualTo("1 = 0");
+    }
+
+    @Test
+    @DisplayName("dataScopeConditionToSql fails secure (1 = 0) on an injected DEPT field")
+    void dataScopeSql_rejectsInjectedDeptField() {
+        DataScopeCondition malicious = new DataScopeCondition(
+                "dept", null, null, "dept_id); DROP TABLE x --", List.of("p1"), List.of());
+        String sql = (String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", malicious);
+        assertThat(sql).isEqualTo("1 = 0");
+    }
+
+    @Test
+    @DisplayName("dataScopeConditionToSql builds normal SQL for valid identifiers")
+    void dataScopeSql_buildsNormalSqlForValidFields() {
+        DataScopeCondition self = new DataScopeCondition(
+                "self", "created_by", USER_ID, null, List.of(), List.of());
+        assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", self))
+                .isEqualTo("created_by = " + USER_ID);
+
+        DataScopeCondition dept = new DataScopeCondition(
+                "dept", null, null, "org_emp_dept_id", List.of("p1", "p2"), List.of());
+        assertThat((String) ReflectionTestUtils.invokeMethod(engine, "dataScopeConditionToSql", dept))
+                .isEqualTo("org_emp_dept_id IN ('p1','p2')");
     }
 }

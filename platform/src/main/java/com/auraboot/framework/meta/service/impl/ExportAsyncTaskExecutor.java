@@ -90,10 +90,10 @@ public class ExportAsyncTaskExecutor implements AsyncTaskExecutor {
             Path filePath;
 
             switch (format.toUpperCase()) {
-                case "csv":
+                case "CSV":
                     filePath = writeCsv(data, fileName);
                     break;
-                case "json":
+                case "JSON":
                     filePath = writeJson(data, fileName);
                     break;
                 default:

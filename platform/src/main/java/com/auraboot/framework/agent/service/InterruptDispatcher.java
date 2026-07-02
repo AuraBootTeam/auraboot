@@ -95,7 +95,7 @@ public class InterruptDispatcher {
         switch (classification.getSubPolicy()) {
             case InterruptClassifier.REPLACE_INTENT -> {
                 if (activeRunId != null) {
-                    cancelRun(activeRunId);
+                    cancelRun(activeRunId, tenantId);
                     action = CANCELLED_RUN_ACTION;
                 } else {
                     action = NOOP_ACTION;
@@ -163,12 +163,16 @@ public class InterruptDispatcher {
      * rows persist as L1 until the hourly orphan cron rescues them — which
      * grows the {@code OrphanBacklogGrowing} metric and creates alert noise.
      */
-    private void cancelRun(String runPid) {
+    private void cancelRun(String runPid, Long tenantId) {
+        // Tenant-scoped: ab_agent_run is NOT in the MyBatis TenantLineInnerInterceptor ignoreTable and
+        // this raw JdbcTemplate update bypasses the interceptor, so the caller's tenant_id MUST be in the
+        // WHERE clause — otherwise any authenticated user could cancel another tenant's running agent run
+        // by submitting its run pid (cross-tenant write / DoS).
         int updated = jdbcTemplate.update(
                 "UPDATE ab_agent_run SET run_status = 'cancelled', " +
                         "    completed_at = NOW(), updated_at = NOW(), " +
                         "    error_message = COALESCE(error_message || E'\\n','') || 'cancelled by user interrupt' " +
-                        "WHERE pid = ? AND run_status = 'running'", runPid);
+                        "WHERE pid = ? AND tenant_id = ? AND run_status = 'running'", runPid, tenantId);
         if (updated != 1) {
             log.debug("cancelRun: run {} no longer running (race with completion)", runPid);
             return;
@@ -178,7 +182,7 @@ public class InterruptDispatcher {
         // (updated == 1) — a race-losing call returns above, so the winner
         // is the exclusive publisher.
         List<Map<String, Object>> rows = jdbcTemplate.queryForList(
-                "SELECT tenant_id, agent_id FROM ab_agent_run WHERE pid = ?", runPid);
+                "SELECT tenant_id, agent_id FROM ab_agent_run WHERE pid = ? AND tenant_id = ?", runPid, tenantId);
         if (rows.isEmpty()) {
             // Row vanished between UPDATE and SELECT — should not happen for
             // a run we just flipped, but refuse to invent placeholder values.
@@ -186,11 +190,11 @@ public class InterruptDispatcher {
             return;
         }
         Map<String, Object> row = rows.get(0);
-        Long tenantId = row.get("tenant_id") == null ? null : ((Number) row.get("tenant_id")).longValue();
+        // tenant_id is the caller's tenantId (the UPDATE + SELECT above are tenant-scoped to it).
         String agentCode = (String) row.get("agent_id");
-        if (tenantId == null || agentCode == null || agentCode.isBlank()) {
-            log.warn("cancelRun: run {} missing tenant/agent ({}/{}), skipping SessionEndedEvent",
-                    runPid, tenantId, agentCode);
+        if (agentCode == null || agentCode.isBlank()) {
+            log.warn("cancelRun: run {} missing agent ({}), skipping SessionEndedEvent",
+                    runPid, agentCode);
             return;
         }
 

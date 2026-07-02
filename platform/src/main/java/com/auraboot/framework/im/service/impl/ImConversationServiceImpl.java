@@ -6,7 +6,10 @@ import com.auraboot.framework.im.dto.Announcement;
 import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
 import com.auraboot.framework.im.dto.ConversationListItem;
+import com.auraboot.framework.im.dto.ConversationLastMessageRow;
+import com.auraboot.framework.im.dto.ConversationMemberCountRow;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
+import com.auraboot.framework.im.dto.ConversationUnreadRow;
 import com.auraboot.framework.im.dto.ConversationUpdateRequest;
 import com.auraboot.framework.im.dto.UnreadSummary;
 import com.auraboot.framework.im.mapper.ImConversationMapper;
@@ -28,6 +31,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 public class ImConversationServiceImpl implements ImConversationService {
@@ -127,29 +132,38 @@ public class ImConversationServiceImpl implements ImConversationService {
             return List.of();
         }
 
+        // Batch-load everything the list needs (was 1 + 4N: per-conversation selectById + findMember
+        // + findBeforeSeq + findHumanMemberIds). Values are identical to the old per-conversation
+        // lookups; only the fetch is batched.
+        Map<Long, ImConversation> convById = conversationMapper.selectBatchIds(conversationIds).stream()
+                .collect(Collectors.toMap(ImConversation::getId, c -> c, (a, b) -> a));
+        Map<Long, ImConversationMember> membershipByConv = memberMapper
+                .findMembersByConversationIds(tenantId, ImConstants.MEMBER_TYPE_HUMAN, userId, conversationIds)
+                .stream().collect(Collectors.toMap(ImConversationMember::getConversationId, m -> m, (a, b) -> a));
+        Map<Long, ConversationListItem.LastMessage> lastMsgByConv = messageMapper
+                .findLastMessagesByConversationIds(tenantId, conversationIds).stream()
+                .collect(Collectors.toMap(ConversationLastMessageRow::getConversationId,
+                        r -> ConversationListItem.LastMessage.builder()
+                                .content(r.getContent())
+                                .messageType(r.getMessageType())
+                                .createdAt(r.getCreatedAt())
+                                .build(),
+                        (a, b) -> a));
+        Map<Long, Long> memberCountByConv = memberMapper
+                .countHumanMembersByConversationIds(tenantId, conversationIds).stream()
+                .collect(Collectors.toMap(ConversationMemberCountRow::getConversationId,
+                        ConversationMemberCountRow::getMemberCount, (a, b) -> a));
+
         List<ConversationListItem> items = new ArrayList<>();
         for (Long convId : conversationIds) {
-            ImConversation conv = conversationMapper.selectById(convId);
+            ImConversation conv = convById.get(convId);
             if (conv == null) continue;
 
-            ImConversationMember membership = memberMapper.findMember(
-                    convId, ImConstants.MEMBER_TYPE_HUMAN, userId, tenantId);
+            ImConversationMember membership = membershipByConv.get(convId);
             long unread = conv.getMaxSeq() - (membership != null ? membership.getLastReadSeq() : 0);
 
-            // Get last message
-            ConversationListItem.LastMessage lastMsg = null;
-            List<ImMessage> lastMessages = messageMapper.findBeforeSeq(convId, tenantId, Long.MAX_VALUE, 1);
-            if (!lastMessages.isEmpty()) {
-                ImMessage msg = lastMessages.get(0);
-                lastMsg = ConversationListItem.LastMessage.builder()
-                        .content(msg.getContent())
-                        .messageType(msg.getMessageType())
-                        .createdAt(msg.getCreatedAt())
-                        .build();
-            }
-
-            // Count human members
-            List<Long> members = memberMapper.findHumanMemberIds(convId, tenantId);
+            ConversationListItem.LastMessage lastMsg = lastMsgByConv.get(convId);
+            int memberCount = memberCountByConv.getOrDefault(convId, 0L).intValue();
 
             items.add(ConversationListItem.builder()
                     .conversationId(conv.getId())
@@ -165,7 +179,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                     .unreadCount(Math.max(0, unread))
                     .pinned(membership != null ? membership.getPinned() : false)
                     .muted(membership != null ? membership.getMuted() : false)
-                    .memberCount(members.size())
+                    .memberCount(memberCount)
                     .announcement(parseAnnouncement(conv.getMetadata()))
                     .build());
         }
@@ -292,22 +306,22 @@ public class ImConversationServiceImpl implements ImConversationService {
 
     @Override
     public UnreadSummary getUnreadSummary(Long userId, Long tenantId) {
-        List<Long> conversationIds = memberMapper.findConversationIdsByMember(
+        // Single join query (member ⋈ conversation) instead of an N+1 loop of
+        // per-conversation selectById + findMember. The INNER JOIN drops memberships whose
+        // conversation no longer exists, matching the old "if (conv == null) continue".
+        List<ConversationUnreadRow> rows = memberMapper.findUnreadRowsByMember(
                 tenantId, ImConstants.MEMBER_TYPE_HUMAN, userId);
         long totalUnread = 0;
         List<UnreadSummary.ConversationUnread> convUnreads = new ArrayList<>();
 
-        for (Long convId : conversationIds) {
-            ImConversation conv = conversationMapper.selectById(convId);
-            ImConversationMember membership = memberMapper.findMember(
-                    convId, ImConstants.MEMBER_TYPE_HUMAN, userId, tenantId);
-            if (conv == null || membership == null) continue;
-
-            long unread = Math.max(0, conv.getMaxSeq() - membership.getLastReadSeq());
+        for (ConversationUnreadRow row : rows) {
+            long maxSeq = row.getMaxSeq() == null ? 0L : row.getMaxSeq();
+            long lastReadSeq = row.getLastReadSeq() == null ? 0L : row.getLastReadSeq();
+            long unread = Math.max(0, maxSeq - lastReadSeq);
             if (unread > 0) {
                 totalUnread += unread;
                 convUnreads.add(UnreadSummary.ConversationUnread.builder()
-                        .conversationId(convId)
+                        .conversationId(row.getConversationId())
                         .unread(unread)
                         .build());
             }

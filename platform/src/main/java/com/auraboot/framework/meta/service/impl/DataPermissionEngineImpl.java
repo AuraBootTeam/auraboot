@@ -361,10 +361,20 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
             return "1 = 0";
         }
         if ("self".equals(condition.scopeType())) {
+            // Validate the field identifier (values are Long, safe; the field name is the injection
+            // surface) — mirror the fail-secure "1 = 0" guard the row-policy builder already applies.
+            if (!SqlSafetyUtils.isValidIdentifier(condition.ownerField())) {
+                log.warn("Invalid owner field in SELF data scope: {}", condition.ownerField());
+                return "1 = 0";
+            }
             return condition.ownerField() + " = " + condition.ownerValue();
         }
         if ("dept".equals(condition.scopeType()) || "dept_and_sub".equals(condition.scopeType())) {
             if (condition.deptPids() == null || condition.deptPids().isEmpty()) {
+                return "1 = 0";
+            }
+            if (!SqlSafetyUtils.isValidIdentifier(condition.deptField())) {
+                log.warn("Invalid dept field in DEPT data scope: {}", condition.deptField());
                 return "1 = 0";
             }
             // Department PIDs are strings, need quoting for SQL

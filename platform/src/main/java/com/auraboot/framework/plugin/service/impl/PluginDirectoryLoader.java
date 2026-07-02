@@ -471,7 +471,13 @@ public class PluginDirectoryLoader {
             }
             return List.of(objectMapper.convertValue(node, clazz));
         } catch (Exception e) {
-            log.warn("Failed to load resource from {}: {}", file, e.getMessage());
+            // Directory layout intentionally keeps per-file resilience (a malformed auxiliary file skips
+            // itself rather than failing the whole plugin — see PluginDirectoryLoaderTest
+            // #shouldSkipInvalidJsonAndLoadValidOnes). Log at ERROR (not WARN) so a dropped resource file
+            // is visible and diagnosable instead of vanishing quietly into a later "Command not found".
+            // (The single-file loadResourceList path stays fail-loud; that was the actual incident source.)
+            log.error("Failed to parse plugin resource file {} as List<{}> — skipping this file: {}",
+                    file, clazz.getSimpleName(), e.getMessage());
             return List.of();
         }
     }
@@ -495,7 +501,9 @@ public class PluginDirectoryLoader {
                             new TypeReference<List<ModelFieldBindingDTO>>() {});
                     allBindings.addAll(bindings);
                 } catch (IOException e) {
-                    log.warn("Failed to load bindings from {}: {}", file, e.getMessage());
+                    // Per-file resilience (see parseResourceFile): skip a malformed bindings file rather
+                    // than failing the whole plugin, but log at ERROR so the drop is visible/diagnosable.
+                    log.error("Failed to load bindings from {} — skipping this file: {}", file, e.getMessage());
                 }
             }
         }
@@ -693,7 +701,10 @@ public class PluginDirectoryLoader {
                     result.add(objectMapper.convertValue(node, clazz));
                 }
             } catch (Exception e) {
-                log.warn("Failed to load resource from source {}/{}: {}", source.getSourceId(), filePath, e.getMessage());
+                // Per-file resilience (see parseResourceFile): skip a malformed file rather than failing
+                // the whole plugin, but log at ERROR so the drop is visible/diagnosable.
+                log.error("Failed to load resource from source {}/{} — skipping this file: {}",
+                        source.getSourceId(), filePath, e.getMessage());
             }
         }
         return result;
