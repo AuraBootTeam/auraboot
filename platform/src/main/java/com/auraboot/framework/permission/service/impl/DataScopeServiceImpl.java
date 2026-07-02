@@ -180,21 +180,54 @@ public class DataScopeServiceImpl implements DataScopeService {
     }
 
     /**
-     * SELF scope: filter by ownerField = current userId.
+     * SELF scope: filter by ownerField = current user.
      * Reads ownerField from model extension.dataScope config; defaults to "created_by".
      * Note: created_by stores userId, not memberId.
      */
     private DataScopeCondition buildSelfCondition(String resourceCode) {
-        Long userId = MetaContext.getCurrentUserId();
         String ownerField = getDataScopeOwnerField(resourceCode);
+        Object ownerValue = resolveOwnerValue(resourceCode, ownerField);
+        if (ownerValue == null) {
+            // String owner column but no userPid in context: deny rather than emit broken SQL
+            log.warn("SELF data scope on {}.{} has no usable owner value; denying", resourceCode, ownerField);
+            return DataScopeCondition.none();
+        }
         return new DataScopeCondition(
                 DataScopeType.SELF.code(),
                 ownerField,
-                userId,
+                ownerValue,
                 null,
                 Collections.emptyList(),
                 Collections.emptyList()
         );
+    }
+
+    /**
+     * Choose the SELF comparison value by the owner COLUMN type: numeric columns store the
+     * numeric userId; string columns (reference/ULID owner fields like crm_acc_owner) store
+     * the user pid. Undeclared fields (e.g. the created_by system column) have no meta field
+     * definition — fall back to the numeric userId, which is what created_by stores.
+     * Comparing the numeric userId against a varchar/ULID owner column is a SQL type error
+     * ("operator does not exist: character varying = bigint").
+     */
+    private Object resolveOwnerValue(String resourceCode, String ownerField) {
+        if (isStringOwnerColumn(resourceCode, ownerField)) {
+            String pid = MetaContext.getCurrentUserPid();
+            return pid == null || pid.isBlank() ? null : pid;
+        }
+        return MetaContext.getCurrentUserId();
+    }
+
+    private boolean isStringOwnerColumn(String resourceCode, String ownerField) {
+        // CATCH: type lookup is best-effort — system columns (created_by) are not declared meta
+        // fields and throw "Field not found"; unknown type keeps the numeric-userId behaviour.
+        try {
+            var mapping = metaModelService.getFieldDataType(resourceCode, ownerField);
+            return mapping != null && "String".equals(mapping.getJavaType());
+        } catch (Exception e) {
+            log.debug("Owner column type unknown for {}.{}: {}", resourceCode, ownerField, e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -243,7 +276,7 @@ public class DataScopeServiceImpl implements DataScopeService {
         return new DataScopeCondition(
                 scopeTypeCode,
                 ownerField,
-                MetaContext.getCurrentUserId(),
+                resolveOwnerValue(resourceCode, ownerField),
                 deptField,
                 deptPids,
                 Collections.emptyList()
