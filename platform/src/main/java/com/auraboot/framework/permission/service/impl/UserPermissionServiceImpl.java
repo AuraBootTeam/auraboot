@@ -94,7 +94,8 @@ public class UserPermissionServiceImpl implements UserPermissionService {
      * @return Set of permission IDs
      */
     @Override
-    @Cacheable(value = CACHE_NAME, key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #userId")
+    @Cacheable(value = CACHE_NAME, key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #userId",
+        unless = "#result.isEmpty()")
     public Set<Long> getUserPermissionIds(Long userId) {
         log.debug("Loading user permissions from database: userId={}", userId);
 

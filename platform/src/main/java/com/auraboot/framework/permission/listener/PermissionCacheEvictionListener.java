@@ -7,7 +7,8 @@ import com.auraboot.framework.permission.service.SubjectPermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.event.EventListener;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.stereotype.Component;
 
 /**
@@ -60,7 +61,7 @@ public class PermissionCacheEvictionListener {
      *
      * @param event Role-Permission changed event
      */
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onRolePermissionChanged(RolePermissionChangedEvent event) {
         Long roleId = event.getRoleId();
         String operation = event.getOperation();
@@ -88,7 +89,7 @@ public class PermissionCacheEvictionListener {
      *
      * @param event User-Role changed event
      */
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onUserRoleChanged(UserRoleChangedEvent event) {
         Long userId = event.getUserId();
         String operation = event.getOperation();
@@ -117,7 +118,7 @@ public class PermissionCacheEvictionListener {
      *
      * @param event Subject-Permission changed event
      */
-    @EventListener
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onSubjectPermissionChanged(SubjectPermissionChangedEvent event) {
         String subjectType = event.getSubjectType();
         Long subjectId = event.getSubjectId();

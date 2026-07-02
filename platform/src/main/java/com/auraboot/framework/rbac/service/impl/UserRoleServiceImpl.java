@@ -8,6 +8,7 @@ import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
+import com.auraboot.framework.permission.event.UserRoleChangedEvent;
 import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.dao.mapper.TenantMemberMapper;
@@ -16,6 +17,7 @@ import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import jakarta.annotation.Resource;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -42,6 +44,9 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
     @Resource
     private TenantMemberMapper tenantMemberMapper;
 
+    @Resource
+    private ApplicationEventPublisher eventPublisher;
+
     @Override
     @Transactional
     public boolean assignRolesToMember(Long memberId, List<Long> roleIds, Long tenantId, Long operatorId) {
@@ -66,7 +71,14 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             }
         }
 
-        return CollectionUtils.isEmpty(userRoles) || saveBatch(userRoles);
+        if (CollectionUtils.isEmpty(userRoles)) {
+            return true;
+        }
+        boolean saved = saveBatch(userRoles);
+        if (saved) {
+            publishMemberRoleChange(memberId, null, "CREATE");
+        }
+        return saved;
     }
 
     @Override
@@ -141,7 +153,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             wrapper.eq("tenant_id", tenantId);
         }
 
-        return remove(wrapper);
+        boolean removed = remove(wrapper);
+        if (removed) {
+            publishMemberRoleChange(memberId, null, "DELETE");
+        }
+        return removed;
     }
 
     @Override
@@ -157,7 +173,9 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
     @Override
     @Transactional
     public boolean removeAllRolesFromMemberInTenant(Long memberId, Long tenantId) {
-        return userRoleMapper.deleteByMemberIdAndTenantId(memberId, tenantId) >= 0;
+        boolean removed = userRoleMapper.deleteByMemberIdAndTenantId(memberId, tenantId) >= 0;
+        publishMemberRoleChange(memberId, null, "DELETE");
+        return removed;
     }
 
     @Override
@@ -529,7 +547,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
                 .set("status", StatusConstants.ACTIVE)
                 .set("updated_at", Instant.now());
 
-        return update(wrapper) ? userRoleIds.size() : 0;
+        if (!update(wrapper)) {
+            return 0;
+        }
+        publishUserRoleRowsChange(userRoleIds, "UPDATE");
+        return userRoleIds.size();
     }
 
     @Override
@@ -544,7 +566,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
                 .set("status", StatusConstants.INACTIVE)
                 .set("updated_at", Instant.now());
 
-        return update(wrapper) ? userRoleIds.size() : 0;
+        if (!update(wrapper)) {
+            return 0;
+        }
+        publishUserRoleRowsChange(userRoleIds, "UPDATE");
+        return userRoleIds.size();
     }
 
     @Override
@@ -553,7 +579,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         wrapper.eq("member_id", memberId)
                 .eq("role_id", roleId)
                 .eq("tenant_id", tenantId);
-        return remove(wrapper);
+        boolean removed = remove(wrapper);
+        if (removed) {
+            publishMemberRoleChange(memberId, roleId, "DELETE");
+        }
+        return removed;
     }
 
     private Long resolveMemberId(String memberPid, Long legacyMemberId, Long tenantId) {
@@ -611,5 +641,31 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             return null;
         }
         return roleMapper.findByTenantIdAndId(tenantId, userRole.getRoleId());
+    }
+
+    /**
+     * Member-role bindings changed — publish so PermissionCacheEvictionListener can evict the
+     * member's user-permissions cache AFTER COMMIT. Without this, granted roles take up to the
+     * cache TTL (30min) to appear and — worse — revoked roles keep working for up to 30min.
+     */
+    private void publishMemberRoleChange(Long memberId, Long roleId, String operation) {
+        if (memberId == null) {
+            return;
+        }
+        TenantMember member = tenantMemberMapper.selectById(memberId);
+        Long userId = member == null ? null : member.getUserId();
+        if (userId == null) {
+            return;
+        }
+        eventPublisher.publishEvent(new UserRoleChangedEvent(this, userId, roleId, operation));
+    }
+
+    private void publishUserRoleRowsChange(List<Long> userRoleIds, String operation) {
+        if (CollectionUtils.isEmpty(userRoleIds)) {
+            return;
+        }
+        for (UserRole userRole : listByIds(userRoleIds)) {
+            publishMemberRoleChange(userRole.getMemberId(), userRole.getRoleId(), operation);
+        }
     }
 }
