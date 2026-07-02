@@ -5,6 +5,7 @@ import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.rbac.constant.RoleConstants;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.service.RoleService;
 import com.auraboot.framework.rbac.service.UserRoleService;
@@ -119,6 +120,23 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
 
     @Override
     public Role findByPid(String pid) {
+        // REG-7 (DDR-2026-06-30): roles are per-tenant, and ab_role is exempt from the
+        // MyBatis-Plus tenant-line interceptor, so the raw findByPid has no tenant predicate.
+        // A tenant-A admin holding the ordinary ROLE_MANAGE/PERMISSION_MANAGE permission could
+        // therefore read/mutate a tenant-B role by learning its PID (RoleController /
+        // PermissionMatrixController / CapabilityController / RoleMemberController all resolve
+        // roles this way). When a tenant context is present (every request-scoped caller),
+        // scope the lookup to it; system/background callers without a context keep the
+        // unscoped behaviour. Same-tenant resolution is unchanged; only cross-tenant PID
+        // resolution now returns null (the fix).
+        // NOTE: MetaContext.getCurrentTenantId() throws IllegalStateException when no context
+        // is initialized (system/background threads), so gate on exists() first.
+        if (MetaContext.exists()) {
+            Long tenantId = MetaContext.getCurrentTenantId();
+            if (tenantId != null) {
+                return roleMapper.findByTenantIdAndPid(tenantId, pid);
+            }
+        }
         return roleMapper.findByPid(pid);
     }
 
