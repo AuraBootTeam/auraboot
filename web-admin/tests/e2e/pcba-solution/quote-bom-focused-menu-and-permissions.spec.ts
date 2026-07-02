@@ -12,6 +12,19 @@ import {
   type RoleSnapshot,
 } from './quote-e2e-helpers';
 
+/**
+ * Focused-runtime menu + permission matrix against the CURRENT owner role model
+ * (business-roles.json, owner-confirmed 2026-06-28, applied to source in #199):
+ *
+ *   | role            | BOM 转化 (view rules/library) | 报价全套 | 物料/规则写 + 金蝶同步 |
+ *   | qo_sales        | ✓                             | ✓        | ✗ (admin-tier)        |
+ *   | qo_procurement  | ✓ (= sales)                   | ✓        | ✗                     |
+ *   | bom_engineering | ✓ (+ intake upload)           | ✗        | ✗                     |
+ *   | viewer (平台)    | ✗                             | ✗        | ✗                     |
+ *
+ * The retired 5-role model (qo_quoter / bom_operator / bom_admin) no longer exists on
+ * delivery stacks — creating users against those codes silently yields assignedRoles=[].
+ */
 const QUOTE_MENU_PATH = '/p/qo_quote_common';
 const PRICE_LIBRARY_MENU_PATH = '/p/qo_offline_material_price_common';
 const BOM_PROJECTS_PATH = '/p/req_requirement_set_pcba_bom';
@@ -20,12 +33,15 @@ const BOM_REVIEW_QUEUE_PATH = '/p/bom_review_queue';
 const BOM_MATERIAL_LIBRARY_PATH = '/p/bom_material_master';
 const BOM_FORMAT_PROFILE_PATH = '/p/bom_source_format_profile';
 const BOM_FIELD_COMPOSITION_RULE_PATH = '/p/bom_field_composition_rule';
-const RBAC_TEAM_PATH = '/organization/teams';
-const RBAC_USER_PATH = '/p/tenant_member';
-const RBAC_PERMISSION_PATH = '/enterprise/permissions';
+const ORG_TEAMS_PATH = '/organization/teams';
+const MEMBER_MANAGEMENT_PATH = '/p/tenant_member';
+const PERMISSION_ROLES_PATH = '/enterprise/permissions';
 const BOM_MATERIAL_SYNC_COMMAND = 'bom:sync_material_incremental_now';
 const BOM_MATERIAL_SYNC_DRY_RUN = { dryRun: true };
 
+const COMMAND_EXECUTE_PERMISSION = 'meta.command.execute';
+
+// full quote-business permission set (all granted to sales/procurement via qo.cap.*)
 const QUOTE_PERMISSIONS = [
   'qo.quote.read',
   'qo.quote.create',
@@ -37,19 +53,27 @@ const QUOTE_PERMISSIONS = [
   'qo.document.generate',
 ];
 
-const BOM_PERMISSIONS = [
+// BOM read/execute surface every business role holds (bom.cap.project/convert/*_view)
+const BOM_BUSINESS_PERMISSIONS = [
   'bom.project.read',
   'bom.project.manage',
   'bom.convert.execute',
   'bom.library.read',
-  'bom.library.manage',
   'bom.rule.read',
-  'bom.rule.manage',
 ];
 
-const COMMAND_EXECUTE_PERMISSION = 'meta.command.execute';
+// admin-tier writes no business role may hold
+const BOM_ADMIN_PERMISSIONS = ['bom.library.manage', 'bom.rule.manage'];
 
-type RoleKey = 'qoSales' | 'qoQuoter' | 'bomOperator' | 'bomAdmin' | 'platformViewer';
+const BUSINESS_MENU_PATHS = [
+  BOM_PROJECTS_PATH,
+  BOM_WORKBENCH_PATH,
+  BOM_FORMAT_PROFILE_PATH,
+  BOM_FIELD_COMPOSITION_RULE_PATH,
+];
+const QUOTE_MENU_PATHS = [QUOTE_MENU_PATH, PRICE_LIBRARY_MENU_PATH];
+
+type RoleKey = 'qoSales' | 'qoProcurement' | 'bomEngineering' | 'platformViewer';
 
 function expectIncludes(actual: string[], expected: string[], label: string): void {
   for (const value of expected) {
@@ -130,16 +154,15 @@ function bomProjectPayload(seed: string): Record<string, unknown> {
 
 test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => {
   test.describe.configure({ mode: 'serial' });
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
 
   const uid = uniqueId('qobom_role').replace(/_/g, '-');
   const users = {} as Record<RoleKey, QuoteRoleUser>;
 
   test.beforeAll(async ({ browser }) => {
     users.qoSales = makeQuoteRoleUser('qo_sales', uid, ['qo_sales']);
-    users.qoQuoter = makeQuoteRoleUser('qo_quoter', uid, ['qo_quoter']);
-    users.bomOperator = makeQuoteRoleUser('bom_operator', uid, ['bom_operator']);
-    users.bomAdmin = makeQuoteRoleUser('bom_admin', uid, ['bom_admin']);
+    users.qoProcurement = makeQuoteRoleUser('qo_procurement', uid, ['qo_procurement']);
+    users.bomEngineering = makeQuoteRoleUser('bom_engineering', uid, ['bom_engineering']);
     users.platformViewer = makeQuoteRoleUser('platform_viewer', uid, ['viewer']);
 
     const context = await browser.newContext({
@@ -155,7 +178,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
     }
   });
 
-  test('admin sidebar restores minimal permission management menu in focused runtime', async ({
+  test('admin sidebar exposes the delivery org-management group in the focused runtime', async ({
     page,
   }) => {
     await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
@@ -163,124 +186,79 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
 
     const sidebar = page.getByTestId('sidebar');
     await expect(sidebar).toBeVisible({ timeout: 15_000 });
-    await expect(sidebar.getByText('权限管理', { exact: true }).first()).toBeVisible({
+    await expect(sidebar.getByText('组织管理', { exact: true }).first()).toBeVisible({
       timeout: 10_000,
     });
-    await expect(sidebar.locator(`a[href="${RBAC_TEAM_PATH}"]`)).toBeVisible({
+    await expect(sidebar.locator(`a[href="${ORG_TEAMS_PATH}"]`)).toBeVisible({ timeout: 10_000 });
+    await expect(sidebar.locator(`a[href="${MEMBER_MANAGEMENT_PATH}"]`)).toBeVisible({
       timeout: 10_000,
     });
-    await expect(sidebar.locator(`a[href="${RBAC_USER_PATH}"]`)).toBeVisible({
+    await expect(sidebar.locator(`a[href="${PERMISSION_ROLES_PATH}"]`).first()).toBeVisible({
       timeout: 10_000,
     });
-    await expect(sidebar.getByText('用户', { exact: true }).first()).toBeVisible();
+    await expect(sidebar.getByText('账号', { exact: true }).first()).toBeVisible();
     await expect(sidebar.getByText('角色', { exact: true }).first()).toBeVisible();
-    await expect(sidebar.getByText('权限/授权关系', { exact: true }).first()).toBeVisible();
-    await expect(sidebar.locator(`a[href="${RBAC_PERMISSION_PATH}"]`)).toHaveCount(2);
   });
 
   test('role snapshots expose only current QuoteOps and BOM permissions', async ({ browser }) => {
-    await withRolePage(browser, users.qoSales, async (page) => {
-      const snapshot = await fetchRoleSnapshot(page);
-      expectIncludes(snapshot.roleCodes, ['qo_sales'], 'qo_sales roles');
-      expectIncludes(
-        snapshot.permissionCodes,
-        [COMMAND_EXECUTE_PERMISSION, 'qo.quote.read', 'qo.quote.create', 'qo.rfq.upload'],
-        'qo_sales permissions',
-      );
-      expectExcludes(
-        snapshot.permissionCodes,
-        [
-          'qo.quote.manage',
-          'qo.bom.import',
-          'qo.price.manage',
-          'qo.process_fee.manage',
-          'qo.document.generate',
-          ...BOM_PERMISSIONS,
-        ],
-        'qo_sales permissions',
-      );
-      expectIncludes(snapshot.menuPaths, [QUOTE_MENU_PATH], 'qo_sales menu paths');
-      expectExcludes(snapshot.menuPaths, [PRICE_LIBRARY_MENU_PATH], 'qo_sales menu paths');
-      expectNoBomMenus(snapshot, 'qo_sales');
-    });
+    for (const [label, user] of [
+      ['qo_sales', users.qoSales],
+      ['qo_procurement', users.qoProcurement],
+    ] as const) {
+      await withRolePage(browser, user, async (page) => {
+        const snapshot = await fetchRoleSnapshot(page);
+        expectIncludes(snapshot.roleCodes, [user.roleCodes[0]], `${label} roles`);
+        expectIncludes(
+          snapshot.permissionCodes,
+          [COMMAND_EXECUTE_PERMISSION, ...QUOTE_PERMISSIONS, ...BOM_BUSINESS_PERMISSIONS],
+          `${label} permissions`,
+        );
+        expectExcludes(snapshot.permissionCodes, BOM_ADMIN_PERMISSIONS, `${label} permissions`);
+        expectIncludes(
+          snapshot.menuPaths,
+          [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS],
+          `${label} menu paths`,
+        );
+        expectExcludes(
+          snapshot.menuPaths,
+          [BOM_REVIEW_QUEUE_PATH, BOM_MATERIAL_LIBRARY_PATH],
+          `${label} menu paths`,
+        );
+      });
+    }
 
-    await withRolePage(browser, users.qoQuoter, async (page) => {
+    await withRolePage(browser, users.bomEngineering, async (page) => {
       const snapshot = await fetchRoleSnapshot(page);
-      expectIncludes(snapshot.roleCodes, ['qo_quoter'], 'qo_quoter roles');
-      expectIncludes(
-        snapshot.permissionCodes,
-        [COMMAND_EXECUTE_PERMISSION, ...QUOTE_PERMISSIONS],
-        'qo_quoter permissions',
-      );
-      expectExcludes(snapshot.permissionCodes, BOM_PERMISSIONS, 'qo_quoter permissions');
-      expectIncludes(
-        snapshot.menuPaths,
-        [QUOTE_MENU_PATH, PRICE_LIBRARY_MENU_PATH],
-        'qo_quoter menu paths',
-      );
-      expectNoBomMenus(snapshot, 'qo_quoter');
-    });
-
-    await withRolePage(browser, users.bomOperator, async (page) => {
-      const snapshot = await fetchRoleSnapshot(page);
-      expectIncludes(snapshot.roleCodes, ['bom_operator'], 'bom_operator roles');
+      expectIncludes(snapshot.roleCodes, ['bom_engineering'], 'bom_engineering roles');
       expectIncludes(
         snapshot.permissionCodes,
         [
           COMMAND_EXECUTE_PERMISSION,
-          'bom.project.read',
-          'bom.project.manage',
-          'bom.convert.execute',
-          'bom.library.read',
-          'bom.rule.read',
+          ...BOM_BUSINESS_PERMISSIONS,
+          'qo.rfq.upload',
+          'qo.bom.import',
         ],
-        'bom_operator permissions',
+        'bom_engineering permissions',
       );
       expectExcludes(
         snapshot.permissionCodes,
-        ['bom.library.manage', 'bom.rule.manage', ...QUOTE_PERMISSIONS],
-        'bom_operator permissions',
-      );
-      expectIncludes(
-        snapshot.menuPaths,
         [
-          BOM_PROJECTS_PATH,
-          BOM_WORKBENCH_PATH,
-          BOM_FORMAT_PROFILE_PATH,
-          BOM_FIELD_COMPOSITION_RULE_PATH,
+          ...BOM_ADMIN_PERMISSIONS,
+          'qo.quote.read',
+          'qo.quote.create',
+          'qo.quote.manage',
+          'qo.price.manage',
+          'qo.process_fee.manage',
+          'qo.document.generate',
         ],
-        'bom_operator menu paths',
+        'bom_engineering permissions',
       );
+      expectIncludes(snapshot.menuPaths, BUSINESS_MENU_PATHS, 'bom_engineering menu paths');
       expectExcludes(
         snapshot.menuPaths,
-        [BOM_REVIEW_QUEUE_PATH, BOM_MATERIAL_LIBRARY_PATH],
-        'bom_operator menu paths',
+        [...QUOTE_MENU_PATHS, BOM_REVIEW_QUEUE_PATH, BOM_MATERIAL_LIBRARY_PATH],
+        'bom_engineering menu paths',
       );
-      expectNoQuoteMenus(snapshot, 'bom_operator');
-    });
-
-    await withRolePage(browser, users.bomAdmin, async (page) => {
-      const snapshot = await fetchRoleSnapshot(page);
-      expectIncludes(snapshot.roleCodes, ['bom_admin'], 'bom_admin roles');
-      expectIncludes(
-        snapshot.permissionCodes,
-        [COMMAND_EXECUTE_PERMISSION, ...BOM_PERMISSIONS],
-        'bom_admin permissions',
-      );
-      expectExcludes(snapshot.permissionCodes, QUOTE_PERMISSIONS, 'bom_admin permissions');
-      expectIncludes(
-        snapshot.menuPaths,
-        [
-          BOM_PROJECTS_PATH,
-          BOM_WORKBENCH_PATH,
-          BOM_MATERIAL_LIBRARY_PATH,
-          BOM_FORMAT_PROFILE_PATH,
-          BOM_FIELD_COMPOSITION_RULE_PATH,
-        ],
-        'bom_admin menu paths',
-      );
-      expectExcludes(snapshot.menuPaths, [BOM_REVIEW_QUEUE_PATH], 'bom_admin menu paths');
-      expectNoQuoteMenus(snapshot, 'bom_admin');
     });
 
     await withRolePage(browser, users.platformViewer, async (page) => {
@@ -288,7 +266,7 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
       expectIncludes(snapshot.roleCodes, ['viewer'], 'platform_viewer roles');
       expectExcludes(
         snapshot.permissionCodes,
-        [COMMAND_EXECUTE_PERMISSION, ...QUOTE_PERMISSIONS, ...BOM_PERMISSIONS],
+        [COMMAND_EXECUTE_PERMISSION, ...QUOTE_PERMISSIONS, ...BOM_ADMIN_PERMISSIONS],
         'platform_viewer permissions',
       );
       expectNoQuoteMenus(snapshot, 'platform_viewer');
@@ -297,63 +275,32 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
   });
 
   test('sidebar shows only the pages permitted for each role', async ({ browser }) => {
-    await withRolePage(browser, users.qoSales, async (page) => {
-      await assertSidebarLinks(
-        page,
-        [QUOTE_MENU_PATH],
-        [PRICE_LIBRARY_MENU_PATH, BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH],
-      );
-      await expectUnavailableByDirectUrl(page, PRICE_LIBRARY_MENU_PATH);
-    });
+    for (const user of [users.qoSales, users.qoProcurement]) {
+      await withRolePage(browser, user, async (page) => {
+        await assertSidebarLinks(
+          page,
+          [...QUOTE_MENU_PATHS, ...BUSINESS_MENU_PATHS],
+          [BOM_REVIEW_QUEUE_PATH, BOM_MATERIAL_LIBRARY_PATH],
+        );
+        await expectUnavailableByDirectUrl(page, BOM_MATERIAL_LIBRARY_PATH);
+      });
+    }
 
-    await withRolePage(browser, users.qoQuoter, async (page) => {
-      await assertSidebarLinks(
-        page,
-        [QUOTE_MENU_PATH, PRICE_LIBRARY_MENU_PATH],
-        [BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH],
-      );
-      await expectUnavailableByDirectUrl(page, BOM_WORKBENCH_PATH);
-    });
-
-    await withRolePage(browser, users.bomOperator, async (page) => {
-      await assertSidebarLinks(
-        page,
-        [
-          BOM_PROJECTS_PATH,
-          BOM_WORKBENCH_PATH,
-          BOM_FORMAT_PROFILE_PATH,
-          BOM_FIELD_COMPOSITION_RULE_PATH,
-        ],
-        [
-          QUOTE_MENU_PATH,
-          PRICE_LIBRARY_MENU_PATH,
-          BOM_REVIEW_QUEUE_PATH,
-          BOM_MATERIAL_LIBRARY_PATH,
-        ],
-      );
+    await withRolePage(browser, users.bomEngineering, async (page) => {
+      await assertSidebarLinks(page, BUSINESS_MENU_PATHS, [
+        ...QUOTE_MENU_PATHS,
+        BOM_REVIEW_QUEUE_PATH,
+        BOM_MATERIAL_LIBRARY_PATH,
+      ]);
       await expectUnavailableByDirectUrl(page, QUOTE_MENU_PATH);
-    });
-
-    await withRolePage(browser, users.bomAdmin, async (page) => {
-      await assertSidebarLinks(
-        page,
-        [
-          BOM_PROJECTS_PATH,
-          BOM_WORKBENCH_PATH,
-          BOM_MATERIAL_LIBRARY_PATH,
-          BOM_FORMAT_PROFILE_PATH,
-          BOM_FIELD_COMPOSITION_RULE_PATH,
-        ],
-        [QUOTE_MENU_PATH, PRICE_LIBRARY_MENU_PATH, BOM_REVIEW_QUEUE_PATH],
-      );
-      await expectUnavailableByDirectUrl(page, QUOTE_MENU_PATH);
+      await expectUnavailableByDirectUrl(page, BOM_MATERIAL_LIBRARY_PATH);
     });
 
     await withRolePage(browser, users.platformViewer, async (page) => {
       await assertSidebarLinks(
         page,
         [],
-        [QUOTE_MENU_PATH, PRICE_LIBRARY_MENU_PATH, BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH],
+        [...QUOTE_MENU_PATHS, BOM_PROJECTS_PATH, BOM_WORKBENCH_PATH],
       );
       await expectUnavailableByDirectUrl(page, QUOTE_MENU_PATH);
       await expectUnavailableByDirectUrl(page, BOM_WORKBENCH_PATH);
@@ -363,33 +310,30 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
   test('backend command permissions reject cross-role operations without 500', async ({
     browser,
   }) => {
-    await withRolePage(browser, users.qoSales, async (page) => {
-      await expectCommandNotDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
-      await expectCommandDenied(page, 'qo_quote_common:import_corrected_bom', {}, 'quote-id', 'update');
+    for (const [label, user] of [
+      ['sales', users.qoSales],
+      ['procurement', users.qoProcurement],
+    ] as const) {
+      await withRolePage(browser, user, async (page) => {
+        await expectCommandNotDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
+        await expectCommandNotDenied(page, 'qo_quote_common:batch_source_prices', {}, 'quote-id', 'update');
+        await expectCommandNotDenied(page, 'qo_quote_common:compute_process_fee', {}, 'quote-id', 'update');
+        await expectCommandNotDenied(page, 'qo_quote_common:generate_document', {}, 'quote-id', 'update');
+        await expectCommandNotDenied(page, 'qo_offline_material_price_common:import_excel', {});
+        await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-${label}`));
+        await expectCommandDenied(page, BOM_MATERIAL_SYNC_COMMAND, BOM_MATERIAL_SYNC_DRY_RUN);
+        await expectCommandDenied(page, 'bom:create_material', { bom_mm_material_code: `X-${uid}` });
+      });
+    }
+
+    await withRolePage(browser, users.bomEngineering, async (page) => {
+      await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-eng`));
+      await expectCommandNotDenied(page, 'qo_quote_common:import_corrected_bom', {}, 'quote-id', 'update');
+      await expectCommandDenied(page, BOM_MATERIAL_SYNC_COMMAND, BOM_MATERIAL_SYNC_DRY_RUN);
+      await expectCommandDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
       await expectCommandDenied(page, 'qo_quote_common:batch_source_prices', {}, 'quote-id', 'update');
-      await expectCommandDenied(page, 'qo_quote_common:compute_process_fee', {}, 'quote-id', 'update');
       await expectCommandDenied(page, 'qo_quote_common:generate_document', {}, 'quote-id', 'update');
       await expectCommandDenied(page, 'qo_offline_material_price_common:import_excel', {});
-      await expectCommandDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-sales`));
-    });
-
-    await withRolePage(browser, users.qoQuoter, async (page) => {
-      await expectCommandNotDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
-      await expectCommandNotDenied(page, 'qo_offline_material_price_common:import_excel', {});
-      await expectCommandDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-quoter`));
-      await expectCommandDenied(page, BOM_MATERIAL_SYNC_COMMAND, BOM_MATERIAL_SYNC_DRY_RUN);
-    });
-
-    await withRolePage(browser, users.bomOperator, async (page) => {
-      await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-operator`));
-      await expectCommandDenied(page, BOM_MATERIAL_SYNC_COMMAND, BOM_MATERIAL_SYNC_DRY_RUN);
-      await expectCommandDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
-    });
-
-    await withRolePage(browser, users.bomAdmin, async (page) => {
-      await expectCommandNotDenied(page, 'bom:create_project', bomProjectPayload(`${uid}-admin`));
-      await expectCommandNotDenied(page, BOM_MATERIAL_SYNC_COMMAND, BOM_MATERIAL_SYNC_DRY_RUN);
-      await expectCommandDenied(page, 'qo_quote_common:create', {}, undefined, 'create');
     });
 
     await withRolePage(browser, users.platformViewer, async (page) => {
