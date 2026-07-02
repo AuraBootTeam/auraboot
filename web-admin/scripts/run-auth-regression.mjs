@@ -41,11 +41,21 @@ for (const dir of [
   mkdirSync(dir, { recursive: true });
 }
 
+// The `setup` project matches every NN-*.spec.ts (see playwright.config.ts), so
+// this invocation also pulls in 02-test-pages. That spec's system_overview
+// dashboard fixture aggregates over the `page_schema` model, which the
+// page-manager plugin provides. Auth regression is a minimal profile that only
+// imports core-announcement (see 04-import-oss-plugins.spec.ts), so page_schema
+// is never published and the aggregate query 400s ("not published for aggregate
+// query"), failing the whole setup dependency. Exclude it here — auth regression
+// tests login/register/logout/space-selection and needs no page/dashboard
+// fixtures. Mirrors the rbac-setup project's intentional 02-test-pages exclusion.
 runPlaywright([
   'test',
   'tests/api/setup/00-bootstrap.spec.ts',
   'tests/api/setup/01-multi-role-users.spec.ts',
   '--project=setup',
+  '--grep-invert=02-test-pages',
 ]);
 runPlaywright(['test', 'tests/auth.setup.ts', '--project=auth', '--no-deps']);
 runPlaywright(['test', ...targetSpecs, '--project=chromium', '--no-deps']);
