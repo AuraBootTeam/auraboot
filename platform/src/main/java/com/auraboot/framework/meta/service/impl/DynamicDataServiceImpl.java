@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.LogSanitizer;
+import com.auraboot.framework.meta.security.CsvSafetyUtils;
 import com.auraboot.framework.meta.service.DataDomainService;
 import com.auraboot.framework.meta.service.FieldMaskService;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -2696,24 +2697,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // Write header with display labels
             if (!Boolean.FALSE.equals(includeHeader)) {
                 List<String> headerLabels = fields.stream()
-                        .map(f -> fieldLabelMap != null
-                                ? fieldLabelMap.getOrDefault(f, f) : f)
+                        .map(f -> CsvSafetyUtils.escapeCsvCell(fieldLabelMap != null
+                                ? fieldLabelMap.getOrDefault(f, f) : f))
                         .collect(Collectors.toList());
                 writer.write(String.join(",", headerLabels));
                 writer.newLine();
             }
-            // Write data
+            // Write data — escape every cell (formula-injection neutralization + RFC-4180)
             for (Map<String, Object> row : data) {
                 List<String> values = fields.stream()
-                        .map(field -> {
-                            Object val = row.get(field);
-                            if (val == null) return "";
-                            String str = val.toString();
-                            if (str.contains(",") || str.contains("\"") || str.contains("\n")) {
-                                return "\"" + str.replace("\"", "\"\"") + "\"";
-                            }
-                            return str;
-                        })
+                        .map(field -> CsvSafetyUtils.escapeCsvCell(row.get(field)))
                         .collect(Collectors.toList());
                 writer.write(String.join(",", values));
                 writer.newLine();

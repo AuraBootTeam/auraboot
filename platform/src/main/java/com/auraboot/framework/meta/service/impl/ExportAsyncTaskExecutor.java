@@ -148,20 +148,8 @@ public class ExportAsyncTaskExecutor implements AsyncTaskExecutor {
      *    which Excel/Sheets may execute as formulas.
      */
     private static String escapeCsvCell(Object val) {
-        if (val == null) return "";
-        String str = val.toString();
-        // Neutralize formula injection: prefix with single-quote (tab-separated safe)
-        if (!str.isEmpty()) {
-            char first = str.charAt(0);
-            if (first == '=' || first == '+' || first == '-' || first == '@'
-                    || first == '\t' || first == '\r') {
-                str = "'" + str;
-            }
-        }
-        if (str.contains(",") || str.contains("\"") || str.contains("\n") || str.contains("'")) {
-            return "\"" + str.replace("\"", "\"\"") + "\"";
-        }
-        return str;
+        // Delegate to the shared util so every CSV export path escapes identically.
+        return com.auraboot.framework.meta.security.CsvSafetyUtils.escapeCsvCell(val);
     }
 
     private Path writeJson(List<Map<String, Object>> data, String fileName) throws Exception {
