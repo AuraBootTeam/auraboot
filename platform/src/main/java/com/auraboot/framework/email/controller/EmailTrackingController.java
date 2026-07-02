@@ -134,9 +134,50 @@ public class EmailTrackingController {
             return;
         }
 
+        // Open-redirect / header-injection guard: this endpoint is public (no auth),
+        // and `url` is fully attacker-controlled, so only redirect to a well-formed
+        // absolute http(s) URL. Blocks javascript:/data:/file: schemes, protocol-
+        // relative //host tricks, and CR/LF response-header injection. (Fully closing
+        // same-scheme http→http phishing redirects would require signing the tracking
+        // links; tracked as a follow-up.)
+        if (!isSafeRedirectUrl(url)) {
+            log.warn("Click tracking rejected unsafe redirect url: trackingId={}", trackingId);
+            response.sendError(HttpStatus.BAD_REQUEST.value(), "Invalid redirect url");
+            return;
+        }
+
         // 302 redirect to original URL
         response.setStatus(HttpStatus.FOUND.value());
         response.setHeader(HttpHeaders.LOCATION, url);
+    }
+
+    /**
+     * Validates that a click-tracking redirect target is a well-formed absolute
+     * http/https URL. Rejects other schemes (javascript:, data:, file:, mailto:),
+     * protocol-relative {@code //host} URLs, and any control/CR/LF characters
+     * (response-header injection). Package-private for direct unit testing.
+     */
+    static boolean isSafeRedirectUrl(String url) {
+        if (url == null || url.isBlank()) {
+            return false;
+        }
+        // Reject control chars including CR/LF (response-header injection).
+        for (int i = 0; i < url.length(); i++) {
+            char c = url.charAt(i);
+            if (c < 0x20 || c == 0x7f) {
+                return false;
+            }
+        }
+        try {
+            java.net.URI uri = java.net.URI.create(url.trim());
+            if (!uri.isAbsolute() || uri.getHost() == null) {
+                return false;
+            }
+            String scheme = uri.getScheme();
+            return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     // ──────────────────────────────────────────────────────────────────────────
