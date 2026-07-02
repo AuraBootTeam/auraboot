@@ -8,13 +8,16 @@ import com.auraboot.framework.notification.controller.NotificationTemplateContro
 import com.auraboot.framework.tenant.controller.TenantInviteController;
 import com.auraboot.framework.agent.nlmodeling.controller.NlModelingController;
 import com.auraboot.framework.application.tenant.MetaContext;
+import java.util.Set;
 import com.auraboot.framework.organization.controller.OrgController;
 import com.auraboot.framework.organization.controller.TeamController;
 import com.auraboot.framework.versioning.controller.VersionHistoryController;
 import com.auraboot.framework.view.controller.ViewShareController;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.permission.enums.RoleCodes;
 import com.auraboot.framework.permission.controller.SubjectPermissionController;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.plugin.controller.PluginPackageController;
@@ -42,6 +45,8 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
@@ -67,6 +72,8 @@ class DeepReviewControllerGuardTest {
     @Mock
     private MenuMapper menuMapper;
     @Mock
+    private AdminRoleChecker adminRoleChecker;
+    @Mock
     private HttpServletRequest request;
     @Mock
     private HttpServletResponse response;
@@ -75,7 +82,7 @@ class DeepReviewControllerGuardTest {
 
     @BeforeEach
     void setUp() {
-        interceptor = new PermissionInterceptor(userPermissionService, menuMapper);
+        interceptor = new PermissionInterceptor(userPermissionService, menuMapper, adminRoleChecker);
     }
 
     @AfterEach
@@ -87,6 +94,14 @@ class DeepReviewControllerGuardTest {
     private void assertGuard(Class<?> controller, String methodName, String expectedCode) throws Exception {
         HandlerMethod hm = handlerFor(controller, methodName);
         authenticate(7L);
+
+        // REG-5/6: role/permission ASSIGNMENT codes additionally require tenant_admin. Set up that
+        // context so this helper still exercises the "holds the code -> allowed" path for them.
+        if (Set.of(MetaPermission.USER_ROLE_MANAGE, MetaPermission.ROLE_MANAGE, MetaPermission.PERMISSION_MANAGE)
+                .contains(expectedCode)) {
+            MetaContext.setContext(1L, 7L, "pid", "guard-test");
+            when(adminRoleChecker.hasRole(anyLong(), eq(7L), eq(RoleCodes.TENANT_ADMIN))).thenReturn(true);
+        }
 
         // Denied when the user lacks the code.
         when(userPermissionService.hasPermission(7L, expectedCode)).thenReturn(false);

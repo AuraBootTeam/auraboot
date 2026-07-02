@@ -5,7 +5,9 @@ import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.permission.enums.RoleCodes;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -63,6 +65,18 @@ public class PermissionInterceptor implements HandlerInterceptor {
     
     private final UserPermissionService userPermissionService;
     private final MenuMapper menuMapper;
+    private final AdminRoleChecker adminRoleChecker;
+
+    /**
+     * REG-5/6 (DDR-2026-06-30): role/permission ASSIGNMENT is restricted to tenant_admin.
+     * These coarse *_MANAGE codes gate the assignment endpoints; holding one is necessary but NOT
+     * sufficient — the caller must also be tenant_admin. This closes privilege escalation where a
+     * delegated non-admin holding a *_MANAGE code could grant itself (or others) tenant_admin.
+     */
+    private static final Set<String> ASSIGNMENT_ADMIN_ONLY_CODES = Set.of(
+            MetaPermission.USER_ROLE_MANAGE,   // org.user_role.update
+            MetaPermission.ROLE_MANAGE,        // org.role.update
+            MetaPermission.PERMISSION_MANAGE); // meta.permission.update
 
     /**
      * Authorization behavior for handlers that have NEITHER {@link RequirePermission} NOR
@@ -125,6 +139,21 @@ public class PermissionInterceptor implements HandlerInterceptor {
         log.debug("Extracted user ID: userId={}, endpoint={}", 
             userId, request.getRequestURI());
         
+        // 2.5 REG-5/6: role/permission ASSIGNMENT requires tenant_admin (in addition to the *_MANAGE
+        // code). A delegated non-admin holding a *_MANAGE code must NOT be able to assign roles /
+        // permissions (would allow self-escalation to tenant_admin). Bootstrap/system flows call the
+        // services directly and bypass this request-scoped interceptor, so they are unaffected.
+        if (ASSIGNMENT_ADMIN_ONLY_CODES.contains(permissionCode)) {
+            Long assignTenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+            if (assignTenantId == null
+                    || !adminRoleChecker.hasRole(assignTenantId, userId, RoleCodes.TENANT_ADMIN)) {
+                log.error("Assignment denied — tenant_admin required: userId={}, permission={}, endpoint={}",
+                        userId, permissionCode, request.getRequestURI());
+                throw new AccessDeniedException(
+                        "tenant_admin required for role/permission assignment,permissionCode: " + permissionCode);
+            }
+        }
+
         // 3. Check user permission
         boolean hasPermission = userPermissionService.hasPermission(userId, permissionCode);
 
