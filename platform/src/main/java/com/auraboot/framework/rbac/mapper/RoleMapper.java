@@ -99,9 +99,14 @@ public interface RoleMapper extends BaseMapper<Role> {
 //    Role findDefaultByTenantId(@Param("tenantId") Long tenantId);
 
     /**
-     * 查询默认角色
+     * 查询默认角色（按租户）。
+     *
+     * <p>REG-TENANT-5 (DDR-2026-06-30): the {@code tenantId} param was previously declared
+     * but NOT used in the WHERE clause, so in a multi-tenant DB this returned an arbitrary
+     * tenant's default role (a cross-tenant correctness bug feeding member provisioning and
+     * default-scope resolution). Now scoped to the requested tenant.
      */
-    @Select("SELECT * FROM ab_role WHERE is_default = true AND deleted_flag = false LIMIT 1")
+    @Select("SELECT * FROM ab_role WHERE is_default = true AND tenant_id = #{tenantId} AND deleted_flag = false LIMIT 1")
     Role findDefaultRole(@Param("tenantId") Long tenantId);
 
 //    /**
