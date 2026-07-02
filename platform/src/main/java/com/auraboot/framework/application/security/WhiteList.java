@@ -65,9 +65,10 @@ public class WhiteList {
             "/actuator/prometheus",
             "/actuator/info",
 
-            // A2A Agent Card discovery (RFC 8615 — public metadata, no auth required)
-            "/.well-known/agent.json",
-            "/.well-known/agent/**",
+            // REG-3 (DDR-2026-06-30): anonymous A2A discovery (/.well-known/agent*) removed from the
+            // whitelist — it exposed every tenant's agent metadata (name/description/skills) to
+            // unauthenticated callers. The endpoints now require authentication and are tenant-scoped
+            // in AgentCardService.
     };
 
     /** Swagger paths — only whitelisted when dev/test profile is active */

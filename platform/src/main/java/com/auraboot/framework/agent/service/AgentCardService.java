@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,8 +54,9 @@ public class AgentCardService {
                 "WHERE agent_code = ? " +
                 "  AND status = 'active' " +
                 "  AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
+                "  AND tenant_id = ? " + // REG-3: tenant-scoped — no cross-tenant agent leak
                 "LIMIT 1",
-                agentCode);
+                agentCode, currentTenantId());
 
         if (rows.isEmpty()) {
             log.debug("AgentCardService.generateAgentCard: agent not found or inactive: {}", agentCode);
@@ -80,7 +82,9 @@ public class AgentCardService {
                 "FROM ab_agent_definition " +
                 "WHERE status = 'active' " +
                 "  AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
-                "ORDER BY name");
+                "  AND tenant_id = ? " + // REG-3: tenant-scoped — discovery lists only the caller's tenant
+                "ORDER BY name",
+                currentTenantId());
 
         List<Map<String, Object>> agentEntries = new ArrayList<>();
         for (Map<String, Object> row : agents) {
@@ -105,6 +109,15 @@ public class AgentCardService {
     // ──────────────────────────────────────────────────────────────────────────
     // Private helpers
     // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * The caller's tenant (REG-3). Discovery endpoints now require authentication (removed from the
+     * WhiteList), so a request context is present here; a null tenant (no context) matches no rows,
+     * which is the safe / fail-closed default.
+     */
+    private Long currentTenantId() {
+        return MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+    }
 
     /**
      * Load active skills for a given agent code.

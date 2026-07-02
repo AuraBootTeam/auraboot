@@ -1,6 +1,7 @@
 package com.auraboot.framework.permission.interceptor;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -37,6 +38,7 @@ class PermissionInterceptorUnannotatedModeTest {
 
     @Mock private UserPermissionService userPermissionService;
     @Mock private MenuMapper menuMapper;
+    @Mock private AdminRoleChecker adminRoleChecker;
     @Mock private HttpServletRequest request;
     @Mock private HttpServletResponse response;
 
@@ -44,7 +46,7 @@ class PermissionInterceptorUnannotatedModeTest {
 
     @BeforeEach
     void setUp() {
-        interceptor = new PermissionInterceptor(userPermissionService, menuMapper);
+        interceptor = new PermissionInterceptor(userPermissionService, menuMapper, adminRoleChecker);
     }
 
     @AfterEach
