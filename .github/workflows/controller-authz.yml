@@ -1,0 +1,50 @@
+name: Controller Authz Fail-Open Gate
+
+# REG-COVER Phase 1 (DDR-2026-06-30 deny-flip campaign): the PermissionInterceptor fail-opens for
+# handlers with no @RequirePermission (unannotated-mode=shadow). check-controller-authz.mjs pins the
+# current set of unguarded WRITE controllers (POST/PUT/DELETE/PATCH, no guard, not under /api/admin)
+# as a baseline and FAILS when a NEW one appears — so the fail-open surface cannot silently grow
+# while the campaign annotates the existing baseline down toward zero (then the runtime default can
+# be flipped shadow -> deny). Regenerate intentionally-accepted additions with --write-baseline.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'platform/src/main/java/**/*Controller.java'
+      - 'scripts/check-controller-authz.mjs'
+      - 'scripts/controller-authz-baseline.json'
+      - '.github/workflows/controller-authz.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'platform/src/main/java/**/*Controller.java'
+      - 'scripts/check-controller-authz.mjs'
+      - 'scripts/controller-authz-baseline.json'
+      - '.github/workflows/controller-authz.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: controller-authz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Controller authz fail-open ratchet
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Check for new unguarded write controllers (fail-open drift)
+        run: node scripts/check-controller-authz.mjs
