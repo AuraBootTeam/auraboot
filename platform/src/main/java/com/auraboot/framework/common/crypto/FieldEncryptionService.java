@@ -44,7 +44,19 @@ public class FieldEncryptionService {
     @Value("${security.field-encryption.key:}")
     private String base64Key;
 
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
+
     private SecretKeySpec secretKey;
+
+    /** Dev-ish profiles (dev/local/test or unset) tolerate passthrough (plaintext) mode. */
+    private boolean isDevProfile() {
+        if (activeProfile == null || activeProfile.isBlank()) {
+            return true;
+        }
+        String p = activeProfile.toLowerCase();
+        return p.contains("dev") || p.contains("local") || p.contains("test");
+    }
 
     @PostConstruct
     public void init() {
@@ -81,7 +93,15 @@ public class FieldEncryptionService {
             return plaintext;
         }
         if (secretKey == null) {
-            return plaintext; // passthrough
+            // Fail closed in non-dev: refuse to store a sensitive value in plaintext
+            // when no encryption key is configured. Dev/local/test tolerate passthrough.
+            if (isDevProfile()) {
+                return plaintext; // passthrough in dev/local/test
+            }
+            throw new IllegalStateException(
+                    "Field encryption key is not configured (security.field-encryption.key) — "
+                    + "refusing to store a sensitive value in plaintext in a non-dev profile. "
+                    + "Set the FIELD_ENCRYPTION_KEY environment variable.");
         }
         if (isEncrypted(plaintext)) {
             return plaintext; // already encrypted

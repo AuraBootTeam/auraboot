@@ -38,11 +38,44 @@ public class BpmSignatureService {
     @Value("${bpm.signature.secret-key:" + DEFAULT_KEY_MARKER + "}")
     private String secretKey;
 
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
+
     @PostConstruct
     void validateSecretKey() {
-        if (DEFAULT_KEY_MARKER.equals(secretKey) || secretKey == null || secretKey.length() < 32) {
+        if (!isSecureKey()) {
             log.warn("BPM signature secret key is not configured or too short (min 32 chars). "
-                    + "Set 'bpm.signature.secret-key' in application properties for production use.");
+                    + "Set 'bpm.signature.secret-key' in application properties for production use. "
+                    + "In non-dev profiles, signing/verification will be refused until a real key is set.");
+        }
+    }
+
+    /** True when a real (non-default, >=32 char) signing key is configured. */
+    private boolean isSecureKey() {
+        return secretKey != null && !DEFAULT_KEY_MARKER.equals(secretKey) && secretKey.length() >= 32;
+    }
+
+    /** Dev-ish profiles (dev/local/test or unset) tolerate the insecure default key. */
+    private boolean isDevProfile() {
+        if (activeProfile == null || activeProfile.isBlank()) {
+            return true;
+        }
+        String p = activeProfile.toLowerCase();
+        return p.contains("dev") || p.contains("local") || p.contains("test");
+    }
+
+    /**
+     * Fail closed: in a non-dev profile, refuse to compute an HMAC with the
+     * source-visible built-in default key — such a signature is forgeable, so
+     * producing or verifying one gives false tamper-evidence. Package-private
+     * for direct unit testing of the boundary.
+     */
+    void requireUsableSigningKey() {
+        if (!isSecureKey() && !isDevProfile()) {
+            throw new BusinessException(
+                    "BPM signature secret key is not configured (the insecure built-in default is in use). "
+                    + "Set 'bpm.signature.secret-key' (>= 32 chars) for non-dev profiles — refusing to "
+                    + "produce or verify a forgeable signature.");
         }
     }
 
@@ -149,6 +182,7 @@ public class BpmSignatureService {
     }
 
     private String computeHmac(String payload) {
+        requireUsableSigningKey();
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(secretKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
