@@ -112,15 +112,15 @@ test.describe('PCBA quote BOM price manual adoption', () => {
 
       const priceTable = priceRow.locator('xpath=ancestor::table[1]');
       const headers = await tableHeaders(priceTable);
+      // Multi-source columns (立创商城/云汉芯城/华强电子网/供应商 RFQ) were moved out of the
+      // compact waterfall table into the evidence review drawer in aura-quote PR #123 (939d414);
+      // the main table now shows only the adopted-price summary. Detail-per-source is asserted
+      // via the drawer candidates below.
       expect(headers).toEqual([
         '物料',
         'BOM用量',
         PURCHASE_ANALYSIS_RECENT_PRICE_LABEL,
-        '立创商城',
-        '云汉芯城',
-        '华强电子网',
-        'DeepSeek建议',
-        '供应商 RFQ',
+        'DeepSeek建议价',
         '采用价格',
         '采用来源',
         '当前状态',
@@ -147,7 +147,9 @@ test.describe('PCBA quote BOM price manual adoption', () => {
       expect(String(beforeWaterfall.adopted_source ?? '')).toBe('');
       expect(String(beforeWaterfall.adopted_source_label ?? '')).toBe('');
       expect(String(beforeWaterfall.current_price_status ?? '')).toBe('AI建议待确认');
-      expect(String(beforeWaterfall.deepseek_suggested_price ?? '')).toContain('1.1111');
+      // Waterfall query now renders the suggested price as "<currency> <2dp>" (939d414);
+      // raw precision is retained in qo_pe_unit_price, the cell is display-formatted.
+      expect(String(beforeWaterfall.deepseek_suggested_price ?? '')).toContain('CNY 1.11');
 
       await priceRow.click();
       const reviewDrawer = page.getByTestId('review-drawer');
@@ -212,7 +214,9 @@ test.describe('PCBA quote BOM price manual adoption', () => {
       );
 
       const requestBody = response.request().postDataJSON() as Record<string, any>;
-      expect(requestBody.targetRecordId).toBe(created.lineId);
+      // Commands now carry the target via targetRecordPid (public-record dual-id contract);
+      // the legacy targetRecordId key is no longer emitted by the UI action pipeline.
+      expect(requestBody.targetRecordPid ?? requestBody.targetRecordId).toBe(created.lineId);
       expect(requestBody.operationType).toBe('UPDATE');
       expect(requestBody.payload).toMatchObject({
         source: 'manual',

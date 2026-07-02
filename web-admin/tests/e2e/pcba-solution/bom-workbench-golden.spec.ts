@@ -186,7 +186,9 @@ test.describe('BOM standardization workbench golden', () => {
       });
       await expect(page.locator('tbody')).not.toContainText('MCU direct copy');
 
-      await page.getByTestId('metric-strip-item-reason_clear_filter').click();
+      // The reason metric-strip's "show all / clear" chip is keyed reason_all
+      // (sets reasonFilterCodes=[]); the legacy reason_clear_filter key no longer exists.
+      await page.getByTestId('metric-strip-item-reason_all').click();
       await expect(page.locator('tbody')).toContainText('MCU direct copy', { timeout: 20_000 });
 
       await page.locator('tbody tr').filter({ hasText: '10K resistor canonical' }).first().click();
@@ -290,6 +292,15 @@ test.describe('BOM standardization workbench golden', () => {
           decisions: ['manual_confirm', 'undo'],
         });
 
+      // Minimize the review drawer before exercising the toolbar-level regenerate action: the
+      // floating drawer (fixed z-50) overlays the workbench toolbar and would intercept the
+      // click on workbench-action-download_new_bom. Close collapses it to the minimized bar
+      // (bottom-right), which does not occlude the toolbar.
+      await page
+        .getByRole('button', { name: /关闭复核浮层|Close review drawer/i })
+        .click();
+      await expect(page.getByTestId('review-drawer-minimized')).toBeVisible({ timeout: 10_000 });
+
       const regenerateResponsePromise = page.waitForResponse(
         (response) =>
           response.url().includes('/api/meta/commands/execute/bom:regenerate_export') &&
@@ -336,7 +347,8 @@ test.describe('BOM standardization workbench golden', () => {
           revisionCount: 2,
         });
 
-      await page.getByRole('button', { name: /关闭复核浮层|Close review drawer/i }).click();
+      // Drawer was already minimized before the toolbar regenerate action above; assert it
+      // stays minimized (the export-revisions timeline lives in the workbench body, not the drawer).
       await expect(page.getByTestId('review-drawer-minimized')).toBeVisible({ timeout: 10_000 });
       await page.getByRole('tab', { name: /导出版本|Export Revisions/i }).click();
       await expect(page.getByTestId('artifact-timeline')).toBeVisible({ timeout: 20_000 });
