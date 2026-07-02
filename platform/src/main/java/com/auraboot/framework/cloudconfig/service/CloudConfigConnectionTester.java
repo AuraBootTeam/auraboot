@@ -260,7 +260,14 @@ public class CloudConfigConnectionTester {
             return Map.of("status", "ok",
                     "message", "WeChat API reachable (errcode=" + errcode + ")");
         } catch (Exception e) {
-            return Map.of("status", "error", "message", "WeChat OAuth test failed: " + e.getMessage());
+            // Do NOT echo e.getMessage() to the caller: the request URL carries
+            // the appSecret in the query string (WeChat's cgi-bin/token contract),
+            // and exceptions such as URI.create's IllegalArgumentException include
+            // the full URL — echoing it would leak the secret. Log the exception
+            // type server-side only.
+            log.warn("WeChat OAuth connection test failed for appId={}: {}",
+                    appId, e.getClass().getSimpleName());
+            return Map.of("status", "error", "message", "WeChat OAuth test failed");
         }
     }
 
