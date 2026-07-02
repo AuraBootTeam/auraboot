@@ -7,7 +7,6 @@
   "platform/src/main/java/com/auraboot/framework/auth/controller/AuthController.java",
   "platform/src/main/java/com/auraboot/framework/auth/controller/VerifyCodeController.java",
   "platform/src/main/java/com/auraboot/framework/automation/controller/AutomationWebhookController.java",
-  "platform/src/main/java/com/auraboot/framework/behavior/controller/BehaviorQuarantineController.java",
   "platform/src/main/java/com/auraboot/framework/behavior/keyed/KeyedCollectController.java",
   "platform/src/main/java/com/auraboot/framework/bi/controller/PivotQueryController.java",
   "platform/src/main/java/com/auraboot/framework/bpm/controller/BpmAiController.java",
