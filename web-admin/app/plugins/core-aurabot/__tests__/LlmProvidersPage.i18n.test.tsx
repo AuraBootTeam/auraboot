@@ -12,6 +12,27 @@ vi.mock('~/contexts/ToastContext', () => ({
   }),
 }));
 
+// #1084 gated the page behind hasPermission('ai_center'); without an
+// authenticated context the component renders RouteAccessDenied instead of
+// the provider management copy this test asserts on.
+vi.mock('~/contexts/AuthContext', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('~/contexts/AuthContext')>();
+  return {
+    ...actual,
+    useAuth: () => ({
+      user: null,
+      permissions: null,
+      preferences: null,
+      token: null,
+      isAuthenticated: true,
+      hasPermission: () => true,
+      hasRole: () => true,
+      hasAnyPermission: () => true,
+      hasAllPermissions: () => true,
+    }),
+  };
+});
+
 vi.mock('~/shared/admin/cloud-config-core', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/shared/admin/cloud-config-core')>();
   return {
