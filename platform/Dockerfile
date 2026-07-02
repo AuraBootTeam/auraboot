@@ -67,6 +67,14 @@ EXPOSE 6443
 
 ENV JAVA_OPTS="-Xms512m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
 
+# Secure-by-default Spring profile. application.yml bakes in `dev,local,test` for
+# local development, which enables the anonymous test-seed endpoints
+# (TestSeedController: create tenant + mint JWT) and the dev actuator surface.
+# Baking a safe default here ensures a bare `docker run` of this image never falls
+# through to that unsafe default. Deployments override it (compose `environment:` /
+# `docker run -e SPRING_PROFILES_ACTIVE=...`); local gradle bootRun is unaffected.
+ENV SPRING_PROFILES_ACTIVE="community"
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD wget --no-verbose --tries=1 --spider http://localhost:6443/actuator/health || exit 1
 
