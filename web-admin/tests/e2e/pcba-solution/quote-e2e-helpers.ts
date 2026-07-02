@@ -30,6 +30,14 @@ export type BomPriceManualReviewSeed = CreatedRows & {
   failedEvidenceId: string;
 };
 
+export type BomPriceYunhanSeed = CreatedRows & {
+  lineId: string;
+  mpn: string;
+  capturedEvidenceId: string;
+  unitPrice: number;
+  sku: string;
+};
+
 export type BomWorkbenchSeed = CreatedRows & {
   projectId: string;
   taskId: string;
@@ -1313,6 +1321,83 @@ export async function seedBomPriceManualReviewQuote(page: Page): Promise<BomPric
           source: 'kingdee_purchase_history',
           failureCode: 'price_not_found',
           queryPartNo: mpn,
+        },
+      },
+      created.rows,
+    );
+
+    return created;
+  } catch (error) {
+    await cleanupRows(page, created);
+    throw error;
+  }
+}
+
+/**
+ * Seed a quote line plus a captured `yunhan` (云汉芯城 / ickey.cn) price-evidence row. The snapshot
+ * mirrors the shape the live YunhanPriceConnector produces (ladder prices, stock, footprint,
+ * matchedBy, detailUrl) so the review drawer + adoption path can be verified deterministically
+ * without calling the live ickey sandbox. Live sourcing is covered by YunhanLiveSmokeTest.
+ */
+export async function seedBomPriceYunhanQuote(page: Page): Promise<BomPriceYunhanSeed> {
+  const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
+  const mpn = '1N4148W';
+  const sku = `1003001429481881`;
+  const unitPrice = 0.0264;
+  const created = (await seedQuoteScaffold(page, 'YUNHAN', [
+    {
+      sourceRef: `BOM-YUNHAN-${suffix}`,
+      sourceRowNo: 1,
+      description: '二极管 SOD-123 100V',
+      refdes: 'D1',
+      mpn,
+      packageName: 'SOD-123',
+      qty: 100,
+      unitCost: 0,
+      lineCost: 0,
+      linePrice: 0,
+      smtPoints: 1,
+      thtPoints: 0,
+    },
+  ])) as BomPriceYunhanSeed;
+
+  try {
+    const lineId = created.rows.find((row) => row.model === 'qo_quote_line_common')?.pid ?? '';
+    expect(lineId, 'yunhan price seed should create one quote line').toBeTruthy();
+    created.lineId = lineId;
+    created.mpn = mpn;
+    created.unitPrice = unitPrice;
+    created.sku = sku;
+
+    created.capturedEvidenceId = await dynamicCreate(
+      page,
+      'qo_price_evidence_common',
+      {
+        qo_pe_quote_line_id: lineId,
+        qo_pe_part_no: mpn,
+        qo_pe_source: 'yunhan',
+        qo_pe_source_ref: `yunhan:${sku}`,
+        qo_pe_supplier_name: 'YANGJIE/扬州扬杰电子',
+        qo_pe_unit_price: unitPrice,
+        qo_pe_currency: 'CNY',
+        qo_pe_moq: 1,
+        qo_pe_mpq: 3000,
+        qo_pe_confidence: 0.9,
+        qo_pe_valid_until: '2030-12-31',
+        qo_pe_status: 'captured',
+        qo_pe_snapshot: {
+          source: 'yunhan',
+          matchedBy: 'mpn',
+          keyword: mpn,
+          proName: mpn,
+          manufacturer: 'YANGJIE/扬州扬杰电子',
+          stock: 20448,
+          spq: 1,
+          leadTime: '1-3工作日',
+          footprint: 'SOD-123',
+          ladderNums: [1],
+          ladderPrices: [unitPrice],
+          detailUrl: `https://www.ickey.cn/detail/${sku}/1N4148W.html`,
         },
       },
       created.rows,
