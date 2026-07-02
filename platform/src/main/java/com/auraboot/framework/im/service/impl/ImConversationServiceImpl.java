@@ -7,6 +7,7 @@ import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
 import com.auraboot.framework.im.dto.ConversationListItem;
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
+import com.auraboot.framework.im.dto.ConversationUnreadRow;
 import com.auraboot.framework.im.dto.ConversationUpdateRequest;
 import com.auraboot.framework.im.dto.UnreadSummary;
 import com.auraboot.framework.im.mapper.ImConversationMapper;
@@ -292,22 +293,22 @@ public class ImConversationServiceImpl implements ImConversationService {
 
     @Override
     public UnreadSummary getUnreadSummary(Long userId, Long tenantId) {
-        List<Long> conversationIds = memberMapper.findConversationIdsByMember(
+        // Single join query (member ⋈ conversation) instead of an N+1 loop of
+        // per-conversation selectById + findMember. The INNER JOIN drops memberships whose
+        // conversation no longer exists, matching the old "if (conv == null) continue".
+        List<ConversationUnreadRow> rows = memberMapper.findUnreadRowsByMember(
                 tenantId, ImConstants.MEMBER_TYPE_HUMAN, userId);
         long totalUnread = 0;
         List<UnreadSummary.ConversationUnread> convUnreads = new ArrayList<>();
 
-        for (Long convId : conversationIds) {
-            ImConversation conv = conversationMapper.selectById(convId);
-            ImConversationMember membership = memberMapper.findMember(
-                    convId, ImConstants.MEMBER_TYPE_HUMAN, userId, tenantId);
-            if (conv == null || membership == null) continue;
-
-            long unread = Math.max(0, conv.getMaxSeq() - membership.getLastReadSeq());
+        for (ConversationUnreadRow row : rows) {
+            long maxSeq = row.getMaxSeq() == null ? 0L : row.getMaxSeq();
+            long lastReadSeq = row.getLastReadSeq() == null ? 0L : row.getLastReadSeq();
+            long unread = Math.max(0, maxSeq - lastReadSeq);
             if (unread > 0) {
                 totalUnread += unread;
                 convUnreads.add(UnreadSummary.ConversationUnread.builder()
-                        .conversationId(convId)
+                        .conversationId(row.getConversationId())
                         .unread(unread)
                         .build());
             }

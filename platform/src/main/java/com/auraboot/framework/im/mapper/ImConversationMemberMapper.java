@@ -1,6 +1,7 @@
 package com.auraboot.framework.im.mapper;
 
 import com.auraboot.framework.im.dto.ConversationMemberInfo;
+import com.auraboot.framework.im.dto.ConversationUnreadRow;
 import com.auraboot.framework.im.dto.ReadReceiptInfo;
 import com.auraboot.framework.im.model.ImConversationMember;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
@@ -21,6 +22,28 @@ public interface ImConversationMemberMapper extends BaseMapper<ImConversationMem
     List<Long> findConversationIdsByMember(@Param("tenantId") Long tenantId,
                                             @Param("memberType") String memberType,
                                             @Param("memberId") Long memberId);
+
+    /**
+     * Join member ⋈ conversation for one member so unread counts can be computed in a single
+     * query instead of an N+1 loop (per-conversation selectById + findMember). The INNER JOIN
+     * naturally drops memberships whose conversation no longer exists (equivalent to the old
+     * {@code if (conv == null) continue}). max_seq / last_read_seq map to camelCase via
+     * map-underscore-to-camel-case.
+     */
+    @Select("""
+        SELECT m.conversation_id AS conversationId,
+               c.max_seq         AS maxSeq,
+               m.last_read_seq   AS lastReadSeq
+        FROM ab_im_conversation_member m
+        JOIN ab_im_conversation c
+          ON c.id = m.conversation_id AND c.tenant_id = m.tenant_id
+        WHERE m.tenant_id = #{tenantId}
+          AND m.member_type = #{memberType}
+          AND m.member_id = #{memberId}
+        """)
+    List<ConversationUnreadRow> findUnreadRowsByMember(@Param("tenantId") Long tenantId,
+                                                       @Param("memberType") String memberType,
+                                                       @Param("memberId") Long memberId);
 
     @Select("""
         SELECT member_id FROM ab_im_conversation_member
