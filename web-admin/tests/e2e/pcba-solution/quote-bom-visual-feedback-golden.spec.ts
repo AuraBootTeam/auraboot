@@ -134,10 +134,21 @@ test.describe('QuoteOps visual feedback golden', () => {
       const task = await waitForAsyncTaskTerminal(page, taskCode!);
       expect(task.status).toBe('failed');
 
-      const failureBanner = page.getByTestId('status-banner-qo_quote_material_processing_status');
-      await expect(failureBanner).toBeVisible({ timeout: 20_000 });
-      await expect(failureBanner).toContainText(/后台处理失败|Background processing failed/i);
-      await expect(failureBanner).toContainText(/Corrected BOM|header|MPN|QTY/i);
+      // The corrected-BOM upload uses panel feedback (promptUpload.feedbackMode='panel'):
+      // failure surfaces in the import-result modal (AsyncTaskProgressModal), NOT the inline
+      // status-banner. Assert the visible failure the user actually sees — the modal shows the
+      // failed state and the real backend error, so a bad file is never a silent success.
+      // Prefer the stable testid (present post-merge); fall back to the modal's visible failed
+      // text so this also passes on already-deployed builds without the testid.
+      const failurePanelById = page.getByTestId('async-task-modal-failed');
+      const failurePanel = (await failurePanelById.count())
+        ? failurePanelById
+        : page.getByText(/导入失败\s*\/\s*Failed/i).locator('xpath=ancestor::*[self::div][1]');
+      await expect(failurePanel.first()).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByText(/导入失败\s*\/\s*Failed/i).first()).toBeVisible();
+      await expect(page.getByText(/Corrected BOM missing required header row/i).first()).toBeVisible({
+        timeout: 20_000,
+      });
 
       const imports = await queryDynamicRecords(page, 'qo_bom_import_common', [
         { fieldName: 'qo_bi_quote_id', operator: 'EQ', value: created.quoteId },
