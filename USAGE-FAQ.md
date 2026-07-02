@@ -42,7 +42,7 @@ Not in the community edition. AuraBoot relies on `pgvector` for the RAG knowledg
 
 In your PostgreSQL database. The platform metadata (model definitions, page configs, command pipelines) lives in `meta_*` tables; business data lives in tables created when plugins are installed (e.g. `tcrm_lead` from crm-quick-start).
 
-Drop AuraBoot tomorrow and your tables remain queryable — there's no proprietary file format. Schema is documented in [docs/architecture/data-model.md](docs/architecture/data-model.md).
+Drop AuraBoot tomorrow and your tables remain queryable — there's no proprietary file format. Schema is documented on [the documentation site](https://docs.auraboot.com).
 
 ### Q. Will my schema change between minor versions?
 
@@ -68,7 +68,7 @@ If you have a substantial migration (>10K records, complex relationships), use h
 
 ### Q. How do I write a custom plugin?
 
-See [docs/plugin-development/](docs/plugin-development/). The short version: a plugin is a directory with `plugin.json` + a `config/` tree of declarative resources (models, fields, commands, pages). Drop it into `plugins/` and restart.
+See the [plugin development guide](https://docs.auraboot.com). The short version: a plugin is a directory with `plugin.json` + a `config/` tree of declarative resources (models, fields, commands, pages). Drop it into `plugins/` and restart.
 
 A plugin scaffolding CLI exists (`pnpm aura plugin init <name>`) for the basic boilerplate.
 
@@ -131,7 +131,7 @@ Standard Postgres backup applies. `pg_dump` on the AuraBoot database covers ever
 
 ### Q. How do I monitor the platform?
 
-OpenTelemetry is built in. Configure `MANAGEMENT_TRACING_*` and point at your collector (Tempo, Grafana Cloud, Honeycomb, …). Sentry SDK is also wired — set `SENTRY_DSN`. See [docs/operations/](docs/operations/).
+OpenTelemetry is built in. Configure `MANAGEMENT_TRACING_*` and point at your collector (Tempo, Grafana Cloud, Honeycomb, …). Sentry SDK is also wired — set `SENTRY_DSN`. See the [operations guide](https://docs.auraboot.com).
 
 ### Q. The audit log is huge. Can I prune it?
 
