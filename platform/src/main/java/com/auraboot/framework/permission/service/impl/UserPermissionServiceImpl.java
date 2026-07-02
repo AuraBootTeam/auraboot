@@ -4,7 +4,9 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.cache.MetaCacheKeyGenerator;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.UserRole;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import io.micrometer.observation.annotation.Observed;
@@ -50,10 +52,18 @@ public class UserPermissionServiceImpl implements UserPermissionService {
     
     private final RolePermissionMapper rolePermissionMapper;
     private final UserRoleMapper userRoleMapper;
+    private final RoleMapper roleMapper;
     private final CacheManager cacheManager;
     private final com.auraboot.framework.permission.mapper.PermissionMapper permissionMapper;
-    
+
     private static final String CACHE_NAME = "user-permissions";
+
+    /**
+     * L1 baseline role code (DDR-2026-06-30). Every tenant member implicitly inherits this role's
+     * permissions during resolution — with NO {@code ab_user_role} row — so render-support reads are
+     * guaranteed for all members and cannot be dropped by any provisioning path.
+     */
+    private static final String BASELINE_ROLE_CODE = "tenant_member";
 
     /**
      * Local cache for permissionCode → permissionId mapping.
@@ -101,7 +111,7 @@ public class UserPermissionServiceImpl implements UserPermissionService {
             return Collections.emptySet();
         }
 
-        // 1. Query roles assigned to the member in current tenant
+        // 1. Permissions from the member's explicitly-assigned roles in this tenant.
         List<UserRole> userRoles = userRoleMapper.findByMemberIdAndTenantId(memberId, tenantId);
         List<Long> roleIds = userRoles.stream()
             .map(UserRole::getRoleId)
@@ -109,19 +119,26 @@ public class UserPermissionServiceImpl implements UserPermissionService {
             .distinct()
             .collect(Collectors.toList());
 
-        if (roleIds.isEmpty()) {
-            log.debug("Member has no roles: memberId={}, userId={}", memberId, userId);
-            return Collections.emptySet();
+        Set<Long> permissionIds = new HashSet<>();
+        if (!roleIds.isEmpty()) {
+            permissionIds.addAll(rolePermissionMapper.findPermissionIdsByRoles(roleIds));
         }
 
-        log.debug("Member has {} roles: memberId={}, userId={}, roleIds={}",
-            roleIds.size(), memberId, userId, roleIds);
+        // 2. L1 implicit baseline (DDR-2026-06-30): every tenant member additionally inherits the
+        // tenant_member baseline role's permissions — WITHOUT an ab_user_role row — so render-support
+        // reads are guaranteed for every member and cannot be dropped by any provisioning path (the
+        // original incident: a member provisioned WITH business roles but WITHOUT the baseline could
+        // not render pages). The baseline role is resolved by (tenant, code); if it is not yet seeded
+        // for this tenant it simply contributes nothing (safe degradation). NOTE: because the baseline
+        // is applied here (no member rows), a change to its grants must clear the whole cache — see
+        // evictRoleUsers, which no longer early-returns on an empty member set.
+        Role baseline = roleMapper.findByTenantIdAndCode(tenantId, BASELINE_ROLE_CODE);
+        if (baseline != null && baseline.getId() != null) {
+            permissionIds.addAll(rolePermissionMapper.findPermissionIdsByRoles(List.of(baseline.getId())));
+        }
 
-        // 2. Query all permissions bound to those roles
-        Set<Long> permissionIds = rolePermissionMapper.findPermissionIdsByRoles(roleIds);
-
-        log.debug("Member has {} permissions: memberId={}, userId={}, count={}",
-            memberId, userId, permissionIds.size());
+        log.debug("Resolved {} permissions for memberId={}, userId={} ({} own-role ids, baseline={})",
+            permissionIds.size(), memberId, userId, roleIds.size(), baseline != null);
 
         return permissionIds;
     }
@@ -187,18 +204,16 @@ public class UserPermissionServiceImpl implements UserPermissionService {
     public void evictRoleUsers(Long roleId) {
         log.info("Evicting permissions cache for all users of role: roleId={}", roleId);
         
-        // 1. Query all members assigned to the role
+        // 1. Query members assigned to the role (informational only).
         List<Long> memberIds = userRoleMapper.findMemberIdsByRoleId(roleId);
 
-        if (memberIds.isEmpty()) {
-            log.debug("Role has no members: roleId={}", roleId);
-            return;
-        }
+        // Do NOT early-return when memberIds is empty: the L1 tenant_member baseline role is applied
+        // implicitly during resolution (no ab_user_role rows), so a baseline grant change has zero
+        // member rows yet affects every member's cached permissions — we must still clear.
+        log.info("Evicting permission caches for role change: roleId={}, directMemberRows={}",
+            roleId, memberIds.size());
 
-        log.info("Role has {} members, evicting their caches: roleId={}, memberCount={}",
-            memberIds.size(), roleId, memberIds.size());
-
-        // 2. Evict each member's permission cache
+        // 2. Evict the permission cache
         // Note: cache key still uses userId for backward compatibility with hasPermission(userId, ...)
         // The cache eviction here is best-effort; a full cache clear may be needed
         Cache cache = cacheManager.getCache(CACHE_NAME);

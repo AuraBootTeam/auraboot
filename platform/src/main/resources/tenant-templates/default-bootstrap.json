@@ -1745,6 +1745,16 @@
       "priority": 20,
       "isDefault": false,
       "isDeletable": true
+    },
+    {
+      "code": "tenant_member",
+      "name": "租户成员基线",
+      "description": "系统托管基线角色：每个租户成员在权限解析时隐式获得其渲染支持读（无需显式分配 ab_user_role 行）。见 07 §4.6 / DDR-2026-06-30。仅放对所有成员无害的读。",
+      "type": "tenant",
+      "scopeType": "tenant",
+      "priority": 15,
+      "isDefault": false,
+      "isDeletable": false
     }
   ],
   "menus": [],
@@ -1801,6 +1811,16 @@
         "notification.view",
         "meta.changelog.read",
         "meta.chatbi.use"
+      ]
+    },
+    {
+      "roleCode": "tenant_member",
+      "permissionCodes": [
+        "meta.model.read",
+        "page.page.read",
+        "dashboard.saved_view.read",
+        "bpm.process.read",
+        "notification.view"
       ]
     }
   ]
