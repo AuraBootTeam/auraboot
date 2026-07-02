@@ -2,6 +2,7 @@ package com.auraboot.framework.behavior.controller;
 
 import com.auraboot.framework.behavior.dto.CollectRequest;
 import com.auraboot.framework.behavior.service.BehaviorCollectService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -17,6 +18,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/collect")
 @RequiredArgsConstructor
+@AuthenticatedAccess("authenticated self-scope behavior ingestion; tenant/user derived "
+        + "from the auth context. The anonymous site-key variant is /api/collect/keyed.")
 public class BehaviorCollectController {
 
     private final BehaviorCollectService behaviorCollectService;
