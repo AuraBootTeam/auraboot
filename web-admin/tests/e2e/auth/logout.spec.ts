@@ -153,7 +153,11 @@ test.describe('Logout Functionality', () => {
     const authToken = await page.evaluate(() => localStorage.getItem('token'));
     expect(authToken === null || authToken === '').toBe(true);
 
-    await page.goto(`/meta/models`, { waitUntil: 'domcontentloaded' });
+    // Post-logout, navigating to a protected page redirects to /login; the
+    // redirect can abort the original navigation (net::ERR_ABORTED) — what
+    // matters is where we land, not whether the first request completed.
+    await page.goto(`/meta/models`, { waitUntil: 'domcontentloaded' }).catch(() => null);
+    await page.waitForURL(/\/login/, { timeout: 10000 });
     await expect(page.locator('input#identifier, input#email').first()).toBeVisible({
       timeout: 10000,
     });
