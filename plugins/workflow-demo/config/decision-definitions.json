@@ -1,0 +1,166 @@
+[
+  {
+    "decisionCode": "complaint_sla_deadline",
+    "decisionName": "请假审批 SLA 截止时间",
+    "description": "Workflow demo SLA deadline policy. The same rule-center decision is bound by the manager and HR approval SLA configs.",
+    "scopeType": "SLA",
+    "scopeRef": "wd_leave_approval",
+    "ownerModule": "workflow-demo",
+    "enabled": true,
+    "versionTag": "workflow-demo-v1",
+    "kind": "DECISION_TABLE",
+    "runtimeAdapter": "PLATFORM_DECISION_TABLE",
+    "publish": true,
+    "contentJson": {
+      "hitPolicy": "FIRST",
+      "inputs": [
+        {
+          "id": "targetKey",
+          "label": "SLA target node",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.targetKey",
+            "dataType": "string"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "id": "deadlineMinutes",
+          "label": "Deadline minutes",
+          "dataType": "integer"
+        },
+        {
+          "id": "warningBeforeMinutes",
+          "label": "Warning before minutes",
+          "dataType": "integer"
+        },
+        {
+          "id": "escalationLevel",
+          "label": "Escalation level",
+          "dataType": "string"
+        }
+      ],
+      "rules": [
+        {
+          "ruleId": "manager-approval-deadline",
+          "priority": 10,
+          "when": {
+            "targetKey": {
+              "operator": "EQ",
+              "value": "task_manager_approve"
+            }
+          },
+          "then": {
+            "deadlineMinutes": 30,
+            "warningBeforeMinutes": 10,
+            "escalationLevel": "manager-parent"
+          }
+        },
+        {
+          "ruleId": "hr-approval-deadline",
+          "priority": 20,
+          "when": {
+            "targetKey": {
+              "operator": "EQ",
+              "value": "task_hr_approve"
+            }
+          },
+          "then": {
+            "deadlineMinutes": 45,
+            "warningBeforeMinutes": 15,
+            "escalationLevel": "hr-parent"
+          }
+        }
+      ],
+      "defaultOutput": {
+        "deadlineMinutes": 1440,
+        "warningBeforeMinutes": 60,
+        "escalationLevel": "default"
+      }
+    }
+  },
+  {
+    "decisionCode": "approval_routing",
+    "decisionName": "请假审批分派",
+    "description": "Workflow demo assignment policy. BPM user tasks consume it through aura.ruleBinding and keep static assignees as fallback.",
+    "scopeType": "BPM",
+    "scopeRef": "wd_leave_approval",
+    "ownerModule": "workflow-demo",
+    "enabled": true,
+    "versionTag": "workflow-demo-v1",
+    "kind": "DECISION_TABLE",
+    "runtimeAdapter": "PLATFORM_DECISION_TABLE",
+    "publish": true,
+    "contentJson": {
+      "hitPolicy": "FIRST",
+      "inputs": [
+        {
+          "id": "nodeId",
+          "label": "BPM node",
+          "expr": {
+            "type": "path",
+            "scope": "process",
+            "path": "nodeId",
+            "dataType": "string"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "id": "reviewUsers",
+          "label": "Review users",
+          "dataType": "collection"
+        },
+        {
+          "id": "reviewGroups",
+          "label": "Review groups",
+          "dataType": "collection"
+        },
+        {
+          "id": "primaryAssignee",
+          "label": "Primary assignee",
+          "dataType": "user"
+        }
+      ],
+      "rules": [
+        {
+          "ruleId": "manager-task-assignment",
+          "priority": 10,
+          "when": {
+            "nodeId": {
+              "operator": "EQ",
+              "value": "task_manager_approve"
+            }
+          },
+          "then": {
+            "reviewUsers": [],
+            "reviewGroups": ["wd_manager"],
+            "primaryAssignee": ""
+          }
+        },
+        {
+          "ruleId": "hr-task-assignment",
+          "priority": 20,
+          "when": {
+            "nodeId": {
+              "operator": "EQ",
+              "value": "task_hr_approve"
+            }
+          },
+          "then": {
+            "reviewUsers": [],
+            "reviewGroups": ["wd_hr"],
+            "primaryAssignee": ""
+          }
+        }
+      ],
+      "defaultOutput": {
+        "reviewUsers": [],
+        "reviewGroups": ["wd_manager"],
+        "primaryAssignee": ""
+      }
+    }
+  }
+]

@@ -1,10 +1,17 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import com.auraboot.framework.decision.adapter.DecisionTableAdapter;
+import com.auraboot.framework.decision.model.DecisionKind;
+import com.auraboot.framework.decision.model.RuntimeAdapter;
+import com.auraboot.framework.decision.model.VersionStatus;
+import com.auraboot.framework.decision.runtime.ResolvedDecision;
 import com.auraboot.framework.plugin.dto.imports.BpmRuleDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.AgentDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.DecisionDefinitionSeedDTO;
 import com.auraboot.framework.plugin.dto.imports.FieldMaskDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
+import com.auraboot.framework.plugin.dto.imports.ProcessDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.SlaConfigDefinitionDTO;
 import com.auraboot.framework.plugin.exception.PluginException;
 import org.junit.jupiter.api.DisplayName;
@@ -14,6 +21,8 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -118,6 +127,56 @@ class PluginDirectoryLoaderRulesSlaTest {
         SlaConfigDefinitionDTO sla = manifest.getSlaConfigs().get(0);
         assertThat(sla.getName()).isEqualTo("wd_manager_approval_sla");
         assertThat(sla.getDeadlineValue()).isEqualTo("PT30S");
+    }
+
+    @Test
+    @DisplayName("Loader reads decisionDefinitions.json into DRT seed definitions")
+    void loadsDecisionDefinitions(@TempDir Path pluginDir) throws IOException {
+        Files.writeString(pluginDir.resolve("decisionDefinitions.json"), """
+                [
+                  {
+                    "decisionCode": "complaint_sla_deadline",
+                    "decisionName": "投诉 SLA 截止时间",
+                    "scopeType": "SLA",
+                    "ownerModule": "bpm",
+                    "kind": "SIMPLE_CONDITION",
+                    "runtimeAdapter": "AST_EVALUATOR",
+                    "versionTag": "seed-v1",
+                    "publish": true,
+                    "contentJson": {
+                      "condition": {
+                        "type": "group",
+                        "op": "AND",
+                        "children": [
+                          {
+                            "type": "compare",
+                            "left": { "type": "path", "scope": "process", "path": "taskKey", "dataType": "string" },
+                            "operator": "IS_NOT_NULL"
+                          }
+                        ]
+                      },
+                      "outputs": { "deadlineMinutes": 30 }
+                    }
+                  }
+                ]
+                """);
+        writeManifest(pluginDir, """
+                { "pluginId": "com.demo",
+                  "namespace": "demo",
+                  "version": "1.0.0",
+                  "resourceDirs": { "decisionDefinitions": "decisionDefinitions.json" } }
+                """);
+
+        PluginManifestExtended manifest = loader.loadFromDirectory(pluginDir);
+
+        assertThat(manifest.getDecisionDefinitions()).hasSize(1);
+        DecisionDefinitionSeedDTO decision = manifest.getDecisionDefinitions().get(0);
+        assertThat(decision.getDecisionCode()).isEqualTo("complaint_sla_deadline");
+        assertThat(decision.getKind()).isEqualTo("SIMPLE_CONDITION");
+        assertThat(decision.getRuntimeAdapter()).isEqualTo("AST_EVALUATOR");
+        assertThat(decision.getContentJson().at("/outputs/deadlineMinutes").asInt()).isEqualTo(30);
+        assertThat(decision.isPublish()).isTrue();
+        assertThat(decision.isValid()).isTrue();
     }
 
     @Test
@@ -236,7 +295,103 @@ class PluginDirectoryLoaderRulesSlaTest {
                 .hasMessageContaining("not found");
     }
 
+    @Test
+    @DisplayName("workflow-demo wires rule-center seeds into BPM assignment and SLA deadline consumers")
+    void workflowDemoDeclaresDecisionSeedsAndRuleBindings() {
+        PluginManifestExtended manifest = loader.loadFromDirectory(workflowDemoDir());
+
+        assertThat(manifest.getDecisionDefinitions())
+                .extracting(DecisionDefinitionSeedDTO::getDecisionCode)
+                .contains("complaint_sla_deadline", "approval_routing");
+        DecisionDefinitionSeedDTO slaDecision = manifest.getDecisionDefinitions().stream()
+                .filter(d -> "complaint_sla_deadline".equals(d.getDecisionCode()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(slaDecision.getKind()).isEqualTo("DECISION_TABLE");
+        assertThat(slaDecision.getRuntimeAdapter()).isEqualTo("PLATFORM_DECISION_TABLE");
+        assertThat(slaDecision.getContentJson().path("outputs").findValuesAsText("id"))
+                .contains("deadlineMinutes");
+        DecisionTableAdapter decisionTableAdapter = new DecisionTableAdapter();
+        for (DecisionDefinitionSeedDTO decision : manifest.getDecisionDefinitions()) {
+            assertThat(decisionTableAdapter.validate(new ResolvedDecision(
+                    decision.getDecisionCode(),
+                    1,
+                    decision.getVersionTag(),
+                    VersionStatus.PUBLISHED,
+                    DecisionKind.valueOf(decision.getKind()),
+                    RuntimeAdapter.valueOf(decision.getRuntimeAdapter()),
+                    decision.getContentJson())).valid())
+                    .as("decision seed must validate: %s", decision.getDecisionCode())
+                    .isTrue();
+        }
+
+        SlaConfigDefinitionDTO managerSla = manifest.getSlaConfigs().stream()
+                .filter(s -> "wd_manager_approve_sla".equals(s.getUnknownFields().get("slaKey")))
+                .findFirst()
+                .orElseThrow();
+        assertThat(managerSla.getRuleBinding()).isNotNull();
+        assertThat(managerSla.getRuleBinding().decisionBinding().decisionCode())
+                .isEqualTo("complaint_sla_deadline");
+        assertThat(managerSla.getRuleBinding().decisionBinding().outputMappings())
+                .anySatisfy(mapping -> {
+                    assertThat(mapping.output()).isEqualTo("deadlineMinutes");
+                    assertThat(mapping.target().kind().name()).isEqualTo("SLA_FIELD");
+                    assertThat(mapping.target().path()).isEqualTo("deadlineMinutes");
+                });
+
+        ProcessDefinitionDTO process = manifest.getProcesses().stream()
+                .filter(p -> "wd_leave_approval".equals(p.getKey()))
+                .findFirst()
+                .orElseThrow();
+        assertAssignmentBinding(process, "task_manager_approve");
+        assertAssignmentBinding(process, "task_hr_approve");
+    }
+
     private void writeManifest(Path pluginDir, String json) throws IOException {
         Files.writeString(pluginDir.resolve("plugin.json"), json);
+    }
+
+    private Path workflowDemoDir() {
+        Path userDir = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        List<Path> candidates = List.of(
+                userDir.resolve("plugins/workflow-demo"),
+                userDir.resolve("../plugins/workflow-demo").normalize(),
+                userDir.resolve("../../plugins/workflow-demo").normalize());
+        return candidates.stream()
+                .filter(path -> Files.exists(path.resolve("plugin.json")))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertAssignmentBinding(ProcessDefinitionDTO process, String nodeId) {
+        List<Map<String, Object>> nodes = (List<Map<String, Object>>) process.getDesignerJson().get("nodes");
+        Map<String, Object> node = nodes.stream()
+                .filter(candidate -> nodeId.equals(candidate.get("id")))
+                .findFirst()
+                .orElseThrow();
+        Map<String, Object> data = (Map<String, Object>) node.get("data");
+        Map<String, Object> config = (Map<String, Object>) data.get("config");
+        Map<String, Object> ruleBinding = (Map<String, Object>) config.get("assignmentRuleBinding");
+        assertThat(ruleBinding).isNotNull();
+        assertThat(ruleBinding.get("consumerType")).isEqualTo("BPM");
+        assertThat(ruleBinding.get("consumerNodeId")).isEqualTo(nodeId);
+        Map<String, Object> decisionBinding = (Map<String, Object>) ruleBinding.get("decisionBinding");
+        assertThat(decisionBinding.get("decisionCode")).isEqualTo("approval_routing");
+        List<Map<String, Object>> outputMappings =
+                (List<Map<String, Object>>) decisionBinding.get("outputMappings");
+        assertThat(outputMappings)
+                .anySatisfy(mapping -> {
+                    assertThat(mapping.get("output")).isEqualTo("reviewGroups");
+                    Map<String, Object> target = (Map<String, Object>) mapping.get("target");
+                    assertThat(target.get("kind")).isEqualTo("ACTION_PARAM");
+                    assertThat(target.get("path")).isEqualTo("candidateGroups");
+                })
+                .anySatisfy(mapping -> {
+                    assertThat(mapping.get("output")).isEqualTo("primaryAssignee");
+                    Map<String, Object> target = (Map<String, Object>) mapping.get("target");
+                    assertThat(target.get("kind")).isEqualTo("PROCESS_VARIABLE");
+                    assertThat(target.get("path")).isEqualTo("assigneeUserId");
+                });
     }
 }

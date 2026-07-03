@@ -104,6 +104,55 @@
                   "wd_manager"
                 ]
               },
+              "assignmentRuleBinding": {
+                "consumerType": "BPM",
+                "consumerCode": "wd_leave_approval",
+                "consumerNodeId": "task_manager_approve",
+                "bindingKind": "DECISION_REF",
+                "decisionBinding": {
+                  "decisionCode": "approval_routing",
+                  "versionPolicy": "LATEST_PUBLISHED",
+                  "inputMappings": [
+                    {
+                      "input": "nodeId",
+                      "source": {
+                        "kind": "FIELD",
+                        "scope": "process",
+                        "path": "nodeId"
+                      }
+                    }
+                  ],
+                  "outputMappings": [
+                    {
+                      "output": "reviewUsers",
+                      "target": {
+                        "kind": "ACTION_PARAM",
+                        "path": "candidateUsers"
+                      }
+                    },
+                    {
+                      "output": "reviewGroups",
+                      "target": {
+                        "kind": "ACTION_PARAM",
+                        "path": "candidateGroups"
+                      }
+                    },
+                    {
+                      "output": "primaryAssignee",
+                      "target": {
+                        "kind": "PROCESS_VARIABLE",
+                        "path": "assigneeUserId"
+                      }
+                    }
+                  ],
+                  "fallbackPolicy": {
+                    "mode": "FAIL_OPEN"
+                  },
+                  "traceMode": "ALWAYS",
+                  "enabled": true
+                },
+                "enabled": true
+              },
               "formBinding": {
                 "formRef": "wd_leave_request_detail",
                 "formType": "PAGE",
@@ -166,6 +215,55 @@
                 "roleIds": [
                   "wd_hr"
                 ]
+              },
+              "assignmentRuleBinding": {
+                "consumerType": "BPM",
+                "consumerCode": "wd_leave_approval",
+                "consumerNodeId": "task_hr_approve",
+                "bindingKind": "DECISION_REF",
+                "decisionBinding": {
+                  "decisionCode": "approval_routing",
+                  "versionPolicy": "LATEST_PUBLISHED",
+                  "inputMappings": [
+                    {
+                      "input": "nodeId",
+                      "source": {
+                        "kind": "FIELD",
+                        "scope": "process",
+                        "path": "nodeId"
+                      }
+                    }
+                  ],
+                  "outputMappings": [
+                    {
+                      "output": "reviewUsers",
+                      "target": {
+                        "kind": "ACTION_PARAM",
+                        "path": "candidateUsers"
+                      }
+                    },
+                    {
+                      "output": "reviewGroups",
+                      "target": {
+                        "kind": "ACTION_PARAM",
+                        "path": "candidateGroups"
+                      }
+                    },
+                    {
+                      "output": "primaryAssignee",
+                      "target": {
+                        "kind": "PROCESS_VARIABLE",
+                        "path": "assigneeUserId"
+                      }
+                    }
+                  ],
+                  "fallbackPolicy": {
+                    "mode": "FAIL_OPEN"
+                  },
+                  "traceMode": "ALWAYS",
+                  "enabled": true
+                },
+                "enabled": true
               },
               "formBinding": {
                 "formRef": "wd_leave_request_detail",
