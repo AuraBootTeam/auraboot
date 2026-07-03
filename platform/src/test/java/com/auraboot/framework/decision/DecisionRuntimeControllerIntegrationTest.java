@@ -565,10 +565,185 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         assertTrue(foundMetaField);
     }
 
+    @Test
+    void httpConditionFragments_createEvaluateAndReportImpactRefs() throws Exception {
+        String code = "it_fragment_" + System.nanoTime();
+        JsonNode conditionSpec = json.readTree("""
+            { "root": {
+                "type": "group",
+                "op": "AND",
+                "children": [
+                  { "type": "compare",
+                    "left": { "type": "path", "scope": "record", "path": "data.amount", "dataType": "decimal" },
+                    "operator": "GT",
+                    "right": { "type": "literal", "value": 10000, "dataType": "decimal" } },
+                  { "type": "not",
+                    "child": { "type": "compare",
+                      "left": { "type": "path", "scope": "actor", "path": "roles", "dataType": "string" },
+                      "operator": "CONTAINS_ELEMENT",
+                      "right": { "type": "literal", "value": "internal_auditor", "dataType": "string" } } }
+                ] },
+              "decisionBindings": [] }
+            """);
+
+        String body = mockMvc.perform(post("/api/decision/condition-fragments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "fragmentCode", code,
+                                "fragmentName", "High value non-auditor",
+                                "description", "Reusable approval condition",
+                                "scopeType", "MODEL",
+                                "scopeRef", "expense_claim",
+                                "conditionSpec", conditionSpec))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.fragmentCode").value(code))
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andExpect(jsonPath("$.data.fieldRefs[0]").value("record.data.amount"))
+                .andExpect(jsonPath("$.data.fieldRefs[1]").value("actor.roles"))
+                .andReturn().getResponse().getContentAsString();
+        String fragmentPid = json.readTree(body).path("data").path("pid").asText();
+
+        mockMvc.perform(get("/api/decision/condition-fragments/" + code))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pid").value(fragmentPid))
+                .andExpect(jsonPath("$.data.conditionSpec.root.type").value("group"));
+
+        mockMvc.perform(post("/api/decision/condition-fragments/" + code + "/evaluate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "context", Map.of(
+                                        "record", Map.of("data", Map.of("amount", 20000)),
+                                        "actor", Map.of("roles", List.of("manager")))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.matched").value(true))
+                .andExpect(jsonPath("$.data.result").value("TRUE"));
+
+        mockMvc.perform(post("/api/decision/condition-fragments/" + code + "/evaluate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "context", Map.of(
+                                        "record", Map.of("data", Map.of("amount", 20000)),
+                                        "actor", Map.of("roles", List.of("internal_auditor")))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.matched").value(false))
+                .andExpect(jsonPath("$.data.result").value("FALSE"));
+
+        DecisionUsageRefEntity ref = new DecisionUsageRefEntity();
+        ref.setPid(UniqueIdGenerator.generate());
+        ref.setTenantId(getTestTenant().getId());
+        ref.setSourceType("SLA_RULE");
+        ref.setSourceCode("it_sla_" + code);
+        ref.setSourcePid(UniqueIdGenerator.generate());
+        ref.setTargetType("CONDITION_FRAGMENT");
+        ref.setTargetCode(code);
+        ref.setBinding("condition");
+        ref.setCreatedAt(Instant.now());
+        ref.setUpdatedAt(Instant.now());
+        usageRefMapper.insert(ref);
+
+        mockMvc.perform(get("/api/decision/condition-fragments/" + code + "/impact"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.incomingCount").value(1))
+                .andExpect(jsonPath("$.data.incoming[0].sourceType").value("SLA_RULE"))
+                .andExpect(jsonPath("$.data.incoming[0].targetType").value("CONDITION_FRAGMENT"));
+    }
+
+    @Test
+    void httpConditionFragments_versionLifecycleDoesNotServeDrafts() throws Exception {
+        String code = "it_fragment_version_" + System.nanoTime();
+
+        String v1Body = mockMvc.perform(post("/api/decision/condition-fragments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "fragmentCode", code,
+                                "fragmentName", "High value approval",
+                                "scopeType", "MODEL",
+                                "scopeRef", "expense_claim",
+                                "conditionSpec", conditionSpecGreaterThan(10000)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andReturn().getResponse().getContentAsString();
+        String v1Pid = json.readTree(v1Body).path("data").path("pid").asText();
+
+        mockMvc.perform(post("/api/decision/condition-fragment-versions/" + v1Pid + "/validate"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("VALIDATED"));
+
+        mockMvc.perform(post("/api/decision/condition-fragment-versions/" + v1Pid + "/publish"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.data.version").value(1));
+
+        String v2Body = mockMvc.perform(post("/api/decision/condition-fragments/" + code + "/versions")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "fragmentName", "High value approval v2",
+                                "description", "Lowered threshold after policy review",
+                                "conditionSpec", conditionSpecGreaterThan(1000)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(2))
+                .andExpect(jsonPath("$.data.status").value("DRAFT"))
+                .andReturn().getResponse().getContentAsString();
+        String v2Pid = json.readTree(v2Body).path("data").path("pid").asText();
+
+        mockMvc.perform(get("/api/decision/condition-fragments/" + code + "/versions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].version").value(2))
+                .andExpect(jsonPath("$.data[0].status").value("DRAFT"))
+                .andExpect(jsonPath("$.data[1].version").value(1))
+                .andExpect(jsonPath("$.data[1].status").value("PUBLISHED"));
+
+        // v2 is still draft, so runtime evaluation must stay pinned to the latest bindable version (v1).
+        mockMvc.perform(post("/api/decision/condition-fragments/" + code + "/evaluate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "context", Map.of("record", Map.of("data", Map.of("amount", 5000)))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(1))
+                .andExpect(jsonPath("$.data.matched").value(false));
+
+        mockMvc.perform(post("/api/decision/condition-fragment-versions/" + v2Pid + "/validate"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("VALIDATED"));
+
+        mockMvc.perform(post("/api/decision/condition-fragment-versions/" + v2Pid + "/publish"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.data.version").value(2));
+
+        mockMvc.perform(get("/api/decision/condition-fragments/" + code + "/versions"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].version").value(2))
+                .andExpect(jsonPath("$.data[0].status").value("PUBLISHED"))
+                .andExpect(jsonPath("$.data[1].version").value(1))
+                .andExpect(jsonPath("$.data[1].status").value("DEPRECATED"));
+
+        mockMvc.perform(post("/api/decision/condition-fragments/" + code + "/evaluate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "context", Map.of("record", Map.of("data", Map.of("amount", 5000)))))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.version").value(2))
+                .andExpect(jsonPath("$.data.matched").value(true));
+    }
+
     private ExtensionBean extension(String key, String value) {
         ExtensionBean extension = new ExtensionBean();
         extension.setExtension(Map.of(key, value));
         return extension;
+    }
+
+    private JsonNode conditionSpecGreaterThan(int threshold) throws Exception {
+        return json.readTree("""
+            { "root": {
+                "type": "compare",
+                "left": { "type": "path", "scope": "record", "path": "data.amount", "dataType": "decimal" },
+                "operator": "GT",
+                "right": { "type": "literal", "value": %d, "dataType": "decimal" } },
+              "decisionBindings": [] }
+            """.formatted(threshold));
     }
 
     @Test

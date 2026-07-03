@@ -2,6 +2,12 @@ package com.auraboot.framework.decision.controller;
 
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.common.dto.PageResult;
+import com.auraboot.framework.decision.dto.ConditionFragmentCreateRequest;
+import com.auraboot.framework.decision.dto.ConditionFragmentDTO;
+import com.auraboot.framework.decision.dto.ConditionFragmentEvaluateRequest;
+import com.auraboot.framework.decision.dto.ConditionFragmentEvaluationDTO;
+import com.auraboot.framework.decision.dto.ConditionFragmentImpactDTO;
+import com.auraboot.framework.decision.dto.ConditionFragmentVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DecisionDashboardDTO;
 import com.auraboot.framework.decision.dto.DecisionFieldImpactDTO;
 import com.auraboot.framework.decision.dto.DecisionFieldPreflightDTO;
@@ -30,6 +36,7 @@ import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionDTO;
 import com.auraboot.framework.decision.model.DecisionResult;
 import com.auraboot.framework.decision.model.DecisionValidateResult;
+import com.auraboot.framework.decision.service.ConditionFragmentService;
 import com.auraboot.framework.decision.service.DecisionDashboardService;
 import com.auraboot.framework.decision.service.DecisionImpactService;
 import com.auraboot.framework.decision.service.DecisionModelFieldService;
@@ -83,6 +90,7 @@ public class DecisionRuntimeController {
     private final DecisionUsageIndexService usageIndexService;
     private final DecisionTableAnalysisService tableAnalysisService;
     private final DecisionTableDmnXmlService tableDmnXmlService;
+    private final ConditionFragmentService conditionFragmentService;
 
     // ==================== Stateless validation + evaluation ====================
 
@@ -350,6 +358,92 @@ public class DecisionRuntimeController {
             @RequestParam @NotBlank String targetCode) {
         log.info("Getting integration impact: targetType={}, targetCode={}", targetType, targetCode);
         return ApiResponse.success(impactService.getIntegrationImpact(targetType, targetCode));
+    }
+
+    @PostMapping("/condition-fragments")
+    @Operation(summary = "Create reusable condition fragment",
+            description = "Persists a tenant-scoped ConditionSpec fragment that SLA, BPM, Automation, Permission and EventPolicy can reuse.")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_MANAGE)
+    public ApiResponse<ConditionFragmentDTO> createConditionFragment(
+            @Valid @RequestBody ConditionFragmentCreateRequest request) {
+        log.info("Creating condition fragment: code={}", request.getFragmentCode());
+        return ApiResponse.success("Condition fragment created", conditionFragmentService.create(request));
+    }
+
+    @PostMapping("/condition-fragments/{code}/versions")
+    @Operation(summary = "Create next condition-fragment draft version",
+            description = "Creates a new DRAFT version from an immutable published/deprecated/retired fragment.")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_MANAGE)
+    public ApiResponse<ConditionFragmentDTO> createConditionFragmentVersion(
+            @Parameter(description = "Condition fragment code") @PathVariable @NotBlank String code,
+            @Valid @RequestBody ConditionFragmentVersionCreateRequest request) {
+        return ApiResponse.success("Condition fragment draft version created",
+                conditionFragmentService.createVersion(code, request));
+    }
+
+    @GetMapping("/condition-fragments")
+    @Operation(summary = "List reusable condition fragments")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_READ)
+    public ApiResponse<PageResult<ConditionFragmentDTO>> listConditionFragments(
+            @Parameter(description = "Search keyword") @RequestParam(required = false) String keyword,
+            @Parameter(description = "Scope type filter") @RequestParam(required = false) String scopeType,
+            @Parameter(description = "Scope ref filter") @RequestParam(required = false) String scopeRef,
+            @Parameter(description = "Page number") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Page size") @RequestParam(defaultValue = "20") int size) {
+        return ApiResponse.success(conditionFragmentService.list(keyword, scopeType, scopeRef, page, size));
+    }
+
+    @GetMapping("/condition-fragments/{code}")
+    @Operation(summary = "Get reusable condition fragment by code")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_READ)
+    public ApiResponse<ConditionFragmentDTO> getConditionFragment(
+            @Parameter(description = "Condition fragment code") @PathVariable @NotBlank String code) {
+        return ApiResponse.success(conditionFragmentService.findByCode(code));
+    }
+
+    @GetMapping("/condition-fragments/{code}/versions")
+    @Operation(summary = "List condition-fragment versions")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_READ)
+    public ApiResponse<List<ConditionFragmentDTO>> listConditionFragmentVersions(
+            @Parameter(description = "Condition fragment code") @PathVariable @NotBlank String code) {
+        return ApiResponse.success(conditionFragmentService.listVersions(code));
+    }
+
+    @PostMapping("/condition-fragments/{code}/evaluate")
+    @Operation(summary = "Evaluate reusable condition fragment",
+            description = "Runs a persisted condition fragment with the same Condition AST evaluator used by Decision Runtime.")
+    @RequirePermission(MetaPermission.DRT_RUNTIME_EVALUATE)
+    public ApiResponse<ConditionFragmentEvaluationDTO> evaluateConditionFragment(
+            @Parameter(description = "Condition fragment code") @PathVariable @NotBlank String code,
+            @RequestBody(required = false) ConditionFragmentEvaluateRequest request) {
+        return ApiResponse.success(conditionFragmentService.evaluate(code, request));
+    }
+
+    @GetMapping("/condition-fragments/{code}/impact")
+    @Operation(summary = "Get condition fragment impact graph",
+            description = "Returns consumers that reuse the condition fragment.")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_READ)
+    public ApiResponse<ConditionFragmentImpactDTO> getConditionFragmentImpact(
+            @Parameter(description = "Condition fragment code") @PathVariable @NotBlank String code) {
+        return ApiResponse.success(conditionFragmentService.impact(code));
+    }
+
+    @PostMapping("/condition-fragment-versions/{pid}/validate")
+    @Operation(summary = "Validate a condition-fragment draft version")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_MANAGE)
+    public ApiResponse<ConditionFragmentDTO> validateConditionFragmentVersion(
+            @Parameter(description = "Condition fragment version PID") @PathVariable @NotBlank String pid) {
+        return ApiResponse.success(conditionFragmentService.validate(pid));
+    }
+
+    @PostMapping("/condition-fragment-versions/{pid}/publish")
+    @Operation(summary = "Publish a validated condition-fragment version")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_PUBLISH)
+    public ApiResponse<ConditionFragmentDTO> publishConditionFragmentVersion(
+            @Parameter(description = "Condition fragment version PID") @PathVariable @NotBlank String pid,
+            @RequestBody(required = false) DecisionVersionTransitionRequest request) {
+        return ApiResponse.success("Condition fragment version published",
+                conditionFragmentService.publish(pid, impactAcknowledged(request)));
     }
 
     @PostMapping("/usage-index/rebuild")
