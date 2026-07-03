@@ -41,7 +41,7 @@ public class UserProvisionRequest {
     private String initialPassword;
 
     /**
-     * Role codes to assign (e.g. ["operator", "viewer"]).
+     * Role codes to assign (e.g. ["tenant_admin"]).
      * If empty, the tenant's default role is assigned.
      */
     private List<String> roleCodes;

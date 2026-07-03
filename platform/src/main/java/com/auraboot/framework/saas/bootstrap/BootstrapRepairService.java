@@ -383,7 +383,9 @@ public class BootstrapRepairService {
             Set<String> roleCodes = roles.stream()
                     .map(Role::getCode)
                     .collect(java.util.stream.Collectors.toSet());
-            Set<String> requiredRoleCodes = Set.of("tenant_admin", "operator", "viewer");
+            // Platform-baseline template roles (operator/viewer retired 2026-07-03, OSS #1167 —
+            // default-bootstrap.json now seeds tenant_admin + the tenant_member L1 baseline).
+            Set<String> requiredRoleCodes = Set.of("tenant_admin", "tenant_member");
 
             if (roleCodes.containsAll(requiredRoleCodes)) {
                 return RepairStepResult.present(STEP_BUSINESS_TENANT_BOOTSTRAP,
