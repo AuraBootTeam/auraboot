@@ -64,6 +64,14 @@ const quoteOpsCurrentSpecNames = [
   'quote-process-fee-review',
   'quote-gerber-runtime',
   'quote-excel-download',
+  // Per-role suites (DDR-2026-06-29 §8). These were listed on the gate script's
+  // command line but the `quoteops` project testMatch dropped them silently, so the
+  // gate went green WITHOUT running them — they must be in this list to actually run.
+  'role-capability-closed-loop',
+  'quote-bom-role-menu-smoke',
+  'bom-workbench-role-eng-golden',
+  'quote-role-sales-golden',
+  'quote-role-proc-golden',
 ];
 const quoteOpsCurrentGatePattern = new RegExp(
   String.raw`.*\/pcba-solution\/(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$`,
