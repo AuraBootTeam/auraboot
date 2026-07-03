@@ -59,6 +59,40 @@ public final class RbacAccessMatrix {
         return stringList(root.path("specialRules").path(rule).path("codes"));
     }
 
+    /** A named cross-cutting special rule (e.g. {@code "REG-3-anon-discovery"}). */
+    public SpecialRule specialRule(String rule) {
+        JsonNode node = root.path("specialRules").path(rule);
+        if (node.isMissingNode()) {
+            throw new IllegalArgumentException("no special rule '" + rule + "' in matrix");
+        }
+        return new SpecialRule(rule, node);
+    }
+
+    /** A cross-cutting RBAC special rule (REG-2 / REG-3 / REG-5-6 / cross-tenant). */
+    public static final class SpecialRule {
+        private final String name;
+        private final JsonNode node;
+
+        private SpecialRule(String name, JsonNode node) {
+            this.name = name;
+            this.node = node;
+        }
+
+        public String name() {
+            return name;
+        }
+
+        /** Endpoint pattern the rule guards (e.g. {@code /.well-known/agent.json}); empty if not endpoint-shaped. */
+        public String endpoint() {
+            return node.path("endpoint").asText();
+        }
+
+        /** HTTP status an anonymous caller must receive; 0 if the rule declares no anonymous expectation. */
+        public int anonymousStatus() {
+            return node.path("anonymous").asInt();
+        }
+    }
+
     /** One role's intended access. */
     public static final class RoleEntry {
         private final String code;
