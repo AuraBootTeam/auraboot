@@ -80,8 +80,8 @@ class TenantBootstrapServiceTest extends BaseIntegrationTest {
         // (Functional menu permissions migrated to plugins; bootstrap retains function-type perms.)
         assertThat(template.getPermissions()).hasSizeGreaterThan(0);
 
-        // 验证角色
-        assertThat(template.getRoles()).hasSize(3);
+        // 验证角色（tenant_admin + tenant_member;operator/viewer 已下线 2026-07-03）
+        assertThat(template.getRoles()).hasSize(2);
         assertThat(template.getRoles().get(0).getCode()).isEqualTo("tenant_admin");
         assertThat(template.getRoles().get(0).getPriority()).isEqualTo(1);
         assertThat(template.getRoles().get(0).getIsDeletable()).isFalse();
@@ -91,7 +91,7 @@ class TenantBootstrapServiceTest extends BaseIntegrationTest {
         assertThat(template.getMenus()).isNotNull();
 
         // 验证角色-权限绑定
-        assertThat(template.getRolePermissionBindings()).hasSize(3);
+        assertThat(template.getRolePermissionBindings()).hasSize(2);
         assertThat(template.getRolePermissionBindings().get(0).getRoleCode())
             .isEqualTo("tenant_admin");
         assertThat(template.getRolePermissionBindings().get(0).getPermissionCodes())
@@ -114,10 +114,10 @@ class TenantBootstrapServiceTest extends BaseIntegrationTest {
             .orElseThrow();
         assertThat(tenantAdminBinding.getPermissionCodes()).contains("*");
 
-        RolePermissionBinding operatorBinding = template.getRolePermissionBindings().stream()
-            .filter(binding -> "operator".equals(binding.getRoleCode()))
+        RolePermissionBinding tenantMemberBinding = template.getRolePermissionBindings().stream()
+            .filter(binding -> "tenant_member".equals(binding.getRoleCode()))
             .findFirst()
             .orElseThrow();
-        assertThat(operatorBinding.getPermissionCodes()).contains("org.tenant.invite.manage");
+        assertThat(tenantMemberBinding.getPermissionCodes()).contains("notification.view");
     }
 }
