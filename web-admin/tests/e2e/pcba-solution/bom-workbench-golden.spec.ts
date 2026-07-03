@@ -53,14 +53,19 @@ function validateStandardBomWorkbook(filePath: string, created: BomWorkbenchSeed
     '备注',
   ]);
 
-  const resistorRow = bomRows.find((row) => cell(row, 3) === '10K resistor canonical');
-  expect(resistorRow, 'standard BOM should include unresolved resistor row').toBeTruthy();
+  // Source-truth semantics (plugins #144): the spec flow is confirm → undo, and undo
+  // restores the SOURCE values (name/spec/brand/mpn/package) from the raw line onto the
+  // standard row. Locate the row by its stable refdes; the seeded standard-line identity
+  // ('10K resistor canonical' / brand 'Yageo') must NOT survive the undo — the export
+  // presents the customer's raw values for unconfirmed rows.
+  const resistorRow = bomRows.find((row) => cell(row, 7) === 'R1,R2');
+  expect(resistorRow, 'standard BOM should include unresolved resistor row (refdes R1,R2)').toBeTruthy();
+  expect(cell(resistorRow, 3), 'undo restores the raw-source material name').toBe('10K resistor raw');
   expect(cell(resistorRow, 2), 'unconfirmed multi-candidate material code stays blank').toBe('');
   expect(cell(resistorRow, 4)).toBe('10K 1% 0603');
   expect(cell(resistorRow, 5)).toBe('PCS');
   expect(Number(resistorRow?.[6])).toBe(2);
-  expect(cell(resistorRow, 7)).toBe('R1,R2');
-  expect(cell(resistorRow, 9)).toBe('Yageo');
+  expect(cell(resistorRow, 9), 'brand reverts to the raw source (which has none), not the seeded Yageo').toBe('');
   expect(cell(resistorRow, 10)).toBe('RC0603FR-0710KL');
 
   const mcuRow = bomRows.find((row) => cell(row, 3) === 'MCU direct copy');
