@@ -47,6 +47,7 @@ export interface ProcessMetadataProps {
   withdrawPolicy?: WithdrawPolicy;
   ccPolicy?: CcPolicy;
   onNameChange: (value: string) => void;
+  onProcessKeyChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onCategoryChange: (value: string) => void;
   onWithdrawPolicyChange: (value: WithdrawPolicy | undefined) => void;

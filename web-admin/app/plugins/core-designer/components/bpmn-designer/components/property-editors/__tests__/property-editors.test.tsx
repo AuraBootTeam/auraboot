@@ -15,6 +15,35 @@ import { StartEventEditor, EndEventEditor } from '../EventEditor';
 import { ExclusiveGatewayEditor } from '../ExclusiveGatewayEditor';
 import { ParallelGatewayEditor } from '../ParallelGatewayEditor';
 import { ReceiveTaskEditor } from '../ReceiveTaskEditor';
+import { ProcessMetadataPanel } from '../ProcessMetadataPanel';
+
+function processMetadata(overrides: Record<string, unknown> = {}) {
+  return {
+    name: 'P',
+    processKey: 'p',
+    description: '',
+    category: '',
+    isExisting: false,
+    onNameChange: vi.fn(),
+    onProcessKeyChange: vi.fn(),
+    onDescriptionChange: vi.fn(),
+    onCategoryChange: vi.fn(),
+    onWithdrawPolicyChange: vi.fn(),
+    onCcPolicyChange: vi.fn(),
+    ...overrides,
+  };
+}
+
+describe('ProcessMetadataPanel — process binding', () => {
+  it('binds process key for new processes from the property panel', () => {
+    const onProcessKeyChange = vi.fn();
+    render(<ProcessMetadataPanel metadata={processMetadata({ onProcessKeyChange }) as any} />);
+
+    fireEvent.change(screen.getByTestId('prop-panel-key'), { target: { value: 'approval_flow' } });
+
+    expect(onProcessKeyChange).toHaveBeenCalledWith('approval_flow');
+  });
+});
 
 describe('ServiceTaskEditor — property binding', () => {
   it('changing serviceType emits onChange with the new type', () => {

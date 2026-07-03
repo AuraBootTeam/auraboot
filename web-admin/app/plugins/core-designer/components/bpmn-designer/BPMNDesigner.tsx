@@ -472,7 +472,10 @@ export function BPMNDesigner() {
           setDirty(true);
         }}
         onProcessKeyChange={(v) => {
-          if (!processDefinition?.id) setProcessKey(v);
+          if (!processDefinition?.id) {
+            setProcessKey(v);
+            setDirty(true);
+          }
         }}
         onSave={handleSave}
         onValidate={handleValidate}
@@ -622,6 +625,12 @@ export function BPMNDesigner() {
             onNameChange: (v) => {
               setProcessName(v);
               setDirty(true);
+            },
+            onProcessKeyChange: (v) => {
+              if (!processDefinition?.id) {
+                setProcessKey(v);
+                setDirty(true);
+              }
             },
             onDescriptionChange: (v) => {
               setProcessDescription(v);

@@ -34,6 +34,7 @@ export function ProcessMetadataPanel({ metadata }: { metadata: ProcessMetadataPr
         <input
           type="text"
           value={metadata.processKey}
+          onChange={(e) => metadata.onProcessKeyChange(e.target.value)}
           readOnly={metadata.isExisting}
           className={`w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm ${
             metadata.isExisting ? 'cursor-not-allowed bg-gray-50 text-gray-500' : ''
