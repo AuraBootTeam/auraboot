@@ -22,6 +22,52 @@
         "notifyTargets": ["assignee"]
       }
     ],
+    "ruleBinding": {
+      "consumerType": "SLA",
+      "consumerCode": "wd_manager_approve_sla",
+      "consumerNodeId": "task_manager_approve",
+      "bindingKind": "DECISION_REF",
+      "decisionBinding": {
+        "decisionCode": "complaint_sla_deadline",
+        "versionPolicy": "LATEST_PUBLISHED",
+        "inputMappings": [
+          {
+            "input": "targetKey",
+            "source": {
+              "kind": "FIELD",
+              "scope": "record",
+              "path": "data.targetKey"
+            }
+          }
+        ],
+        "outputMappings": [
+          {
+            "output": "deadlineMinutes",
+            "target": {
+              "kind": "SLA_FIELD",
+              "path": "deadlineMinutes"
+            }
+          },
+          {
+            "output": "warningBeforeMinutes",
+            "target": {
+              "kind": "SLA_FIELD",
+              "path": "warningBeforeMinutes"
+            }
+          }
+        ],
+        "fallbackPolicy": {
+          "mode": "DEFAULT_VALUE",
+          "defaultOutputs": {
+            "deadlineMinutes": 30,
+            "warningBeforeMinutes": 10
+          }
+        },
+        "traceMode": "ALWAYS",
+        "enabled": true
+      },
+      "enabled": true
+    },
     "suspendPolicy": "pause",
     "escalationTargetType": "role_parent",
     "escalationTargetValue": "wd_manager",
@@ -51,6 +97,52 @@
         "notifyTargets": ["assignee"]
       }
     ],
+    "ruleBinding": {
+      "consumerType": "SLA",
+      "consumerCode": "wd_hr_approve_sla",
+      "consumerNodeId": "task_hr_approve",
+      "bindingKind": "DECISION_REF",
+      "decisionBinding": {
+        "decisionCode": "complaint_sla_deadline",
+        "versionPolicy": "LATEST_PUBLISHED",
+        "inputMappings": [
+          {
+            "input": "targetKey",
+            "source": {
+              "kind": "FIELD",
+              "scope": "record",
+              "path": "data.targetKey"
+            }
+          }
+        ],
+        "outputMappings": [
+          {
+            "output": "deadlineMinutes",
+            "target": {
+              "kind": "SLA_FIELD",
+              "path": "deadlineMinutes"
+            }
+          },
+          {
+            "output": "warningBeforeMinutes",
+            "target": {
+              "kind": "SLA_FIELD",
+              "path": "warningBeforeMinutes"
+            }
+          }
+        ],
+        "fallbackPolicy": {
+          "mode": "DEFAULT_VALUE",
+          "defaultOutputs": {
+            "deadlineMinutes": 45,
+            "warningBeforeMinutes": 15
+          }
+        },
+        "traceMode": "ALWAYS",
+        "enabled": true
+      },
+      "enabled": true
+    },
     "suspendPolicy": "pause",
     "escalationTargetType": "role_parent",
     "escalationTargetValue": "wd_hr",

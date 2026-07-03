@@ -165,6 +165,11 @@ public class PluginManifestExtended extends PluginManifest {
      */
     private List<SlaConfigDefinitionDTO> slaConfigs;
 
+    /**
+     * Decision Runtime definitions to seed through DRT lifecycle services.
+     */
+    private List<DecisionDefinitionSeedDTO> decisionDefinitions;
+
     // ==================== Directory-based Configuration ====================
 
     /**
@@ -342,6 +347,15 @@ public class PluginManifestExtended extends PluginManifest {
         if (notificationTemplates != null) {
             for (NotificationTemplateDefinitionDTO template : notificationTemplates) {
                 if (!template.isValid()) {
+                    return false;
+                }
+            }
+        }
+
+        // Validate decision definitions
+        if (decisionDefinitions != null) {
+            for (DecisionDefinitionSeedDTO decision : decisionDefinitions) {
+                if (!decision.isValid()) {
                     return false;
                 }
             }
@@ -537,6 +551,8 @@ public class PluginManifestExtended extends PluginManifest {
                 SavedViewDefinitionDTO::getUnknownFields, SavedViewDefinitionDTO::getUniqueKey);
         collectUnknownFieldWarnings(warnings, "notificationTemplates", notificationTemplates,
                 NotificationTemplateDefinitionDTO::getUnknownFields, NotificationTemplateDefinitionDTO::getUniqueKey);
+        collectUnknownFieldWarnings(warnings, "decisionDefinitions", decisionDefinitions,
+                DecisionDefinitionSeedDTO::getUnknownFields, DecisionDefinitionSeedDTO::getDecisionCode);
 
         return warnings;
     }
@@ -594,7 +610,8 @@ public class PluginManifestExtended extends PluginManifest {
                 || (notificationTemplates != null && !notificationTemplates.isEmpty())
                 || (dashboards != null && !dashboards.isEmpty())
                 || (rules != null && !rules.isEmpty())
-                || (slaConfigs != null && !slaConfigs.isEmpty());
+                || (slaConfigs != null && !slaConfigs.isEmpty())
+                || (decisionDefinitions != null && !decisionDefinitions.isEmpty());
     }
 
     /**
@@ -621,7 +638,8 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("notificationTemplates", notificationTemplates != null ? notificationTemplates.size() : 0),
                 Map.entry("dashboards", dashboards != null ? dashboards.size() : 0),
                 Map.entry("rules", rules != null ? rules.size() : 0),
-                Map.entry("slaConfigs", slaConfigs != null ? slaConfigs.size() : 0)
+                Map.entry("slaConfigs", slaConfigs != null ? slaConfigs.size() : 0),
+                Map.entry("decisionDefinitions", decisionDefinitions != null ? decisionDefinitions.size() : 0)
         );
     }
 
@@ -651,6 +669,8 @@ public class PluginManifestExtended extends PluginManifest {
         notificationTemplates = sanitized(notificationTemplates,
                 t -> isCommentObject(t.getCode(), t.getUnknownFields()));
         dashboards = sanitized(dashboards, d -> isCommentObject(d.getCode(), d.getUnknownFields()));
+        decisionDefinitions = sanitized(decisionDefinitions,
+                d -> isCommentObject(d.getDecisionCode(), d.getUnknownFields()));
         i18nResources = sanitized(i18nResources, i -> i.getKey() == null || i.getKey().isBlank());
     }
 

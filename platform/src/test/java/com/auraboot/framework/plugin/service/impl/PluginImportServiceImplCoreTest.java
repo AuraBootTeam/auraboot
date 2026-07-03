@@ -3,6 +3,13 @@ package com.auraboot.framework.plugin.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.rule.DroolsRuleService;
 import com.auraboot.framework.bpm.service.SlaConfigService;
+import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
+import com.auraboot.framework.decision.dto.DrtDefinitionDTO;
+import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
+import com.auraboot.framework.decision.dto.DrtVersionDTO;
+import com.auraboot.framework.decision.model.DecisionValidateResult;
+import com.auraboot.framework.decision.service.DecisionVersionService;
+import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.i18n.compiler.I18nCompiler;
 import com.auraboot.framework.i18n.entity.I18nResource;
@@ -23,6 +30,7 @@ import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.plugin.config.PlatformProperties;
 import com.auraboot.framework.plugin.dto.PluginManifest;
 import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
+import com.auraboot.framework.plugin.dto.imports.DecisionDefinitionSeedDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
 import com.auraboot.framework.plugin.dto.imports.ImportExecuteResult;
 import com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO;
@@ -50,6 +58,8 @@ import com.auraboot.framework.view.mapper.SavedViewMapper;
 import com.auraboot.framework.view.entity.SavedView;
 import com.auraboot.framework.view.entity.ViewConfig;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -76,6 +86,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -125,6 +136,8 @@ class PluginImportServiceImplCoreTest {
     @Mock private DocumentCommandGenerator documentCommandGenerator;
     @Mock private DroolsRuleService droolsRuleService;
     @Mock private SlaConfigService slaConfigService;
+    @Mock private DrtDefinitionService drtDefinitionService;
+    @Mock private DecisionVersionService decisionVersionService;
     @Mock private JdbcTemplate jdbcTemplate;
 
     @InjectMocks private PluginImportServiceImpl service;
@@ -280,6 +293,151 @@ class PluginImportServiceImplCoreTest {
                 .isInstanceOf(PluginException.class)
                 .hasMessageContaining("Failed to parse ZIP resource file")
                 .hasMessageContaining("config/binding-rules/rules.json");
+    }
+
+    @Test
+    @DisplayName("ZIP resourceDirs loads decisionDefinitions from declared JSON files")
+    void zipResourceDirs_loadsDecisionDefinitions() {
+        PluginManifestExtended m = baseManifest();
+        m.setResourceDirs(Map.of("decisionDefinitions", "config/decisions"));
+        Map<String, byte[]> files = Map.of(
+                "config/decisions/rule-center.json",
+                """
+                [
+                  {
+                    "decisionCode": "approval_routing",
+                    "decisionName": "审批路由",
+                    "scopeType": "BPM",
+                    "ownerModule": "bpm",
+                    "kind": "SIMPLE_CONDITION",
+                    "runtimeAdapter": "AST_EVALUATOR",
+                    "contentJson": {
+                      "condition": { "type": "group", "op": "AND", "children": [] },
+                      "outputs": { "primaryAssignee": "manager" }
+                    }
+                  }
+                ]
+                """.getBytes(StandardCharsets.UTF_8)
+        );
+
+        invokeLoadResourcesFromZip(m, files);
+
+        assertThat(m.getDecisionDefinitions())
+                .extracting(DecisionDefinitionSeedDTO::getDecisionCode)
+                .containsExactly("approval_routing");
+        assertThat(m.getDecisionDefinitions().get(0).getContentJson()
+                .at("/outputs/primaryAssignee").asText()).isEqualTo("manager");
+    }
+
+    @Test
+    @DisplayName("importDecisionDefinitions creates validates and publishes DRT seed versions")
+    void importDecisionDefinitionsCreatesValidatesAndPublishes() throws Exception {
+        JsonNode content = new ObjectMapper().readTree("""
+                {
+                  "condition": { "type": "group", "op": "AND", "children": [] },
+                  "outputs": { "deadlineMinutes": 30 }
+                }
+                """);
+        DecisionDefinitionSeedDTO seed = DecisionDefinitionSeedDTO.builder()
+                .decisionCode("complaint_sla_deadline")
+                .decisionName("投诉 SLA 截止时间")
+                .scopeType("SLA")
+                .ownerModule("bpm")
+                .kind("SIMPLE_CONDITION")
+                .runtimeAdapter("AST_EVALUATOR")
+                .versionTag("seed-v1")
+                .contentJson(content)
+                .publish(true)
+                .build();
+        PluginManifestExtended manifest = baseManifest();
+        manifest.setDecisionDefinitions(List.of(seed));
+
+        DrtDefinitionDTO createdDefinition = new DrtDefinitionDTO();
+        createdDefinition.setPid("def-pid");
+        createdDefinition.setDecisionCode("complaint_sla_deadline");
+        when(drtDefinitionService.findByCode("complaint_sla_deadline")).thenReturn(null);
+        when(drtDefinitionService.create(any(DrtDefinitionCreateRequest.class))).thenReturn(createdDefinition);
+
+        DrtVersionDTO draft = new DrtVersionDTO();
+        draft.setPid("ver-pid");
+        when(decisionVersionService.createDraft(eq("complaint_sla_deadline"), any(DrtVersionCreateRequest.class)))
+                .thenReturn(draft);
+        when(decisionVersionService.validate("ver-pid"))
+                .thenReturn(DecisionValidateResult.ok(List.of("process.taskKey"), List.of()));
+
+        invokeImportDecisionDefinitions(manifest);
+
+        ArgumentCaptor<DrtDefinitionCreateRequest> definitionCaptor =
+                ArgumentCaptor.forClass(DrtDefinitionCreateRequest.class);
+        verify(drtDefinitionService).create(definitionCaptor.capture());
+        assertThat(definitionCaptor.getValue().getDecisionCode()).isEqualTo("complaint_sla_deadline");
+        assertThat(definitionCaptor.getValue().getScopeType()).isEqualTo("SLA");
+
+        ArgumentCaptor<DrtVersionCreateRequest> versionCaptor =
+                ArgumentCaptor.forClass(DrtVersionCreateRequest.class);
+        verify(decisionVersionService).createDraft(eq("complaint_sla_deadline"), versionCaptor.capture());
+        assertThat(versionCaptor.getValue().getKind()).isEqualTo("SIMPLE_CONDITION");
+        assertThat(versionCaptor.getValue().getRuntimeAdapter()).isEqualTo("AST_EVALUATOR");
+        assertThat(versionCaptor.getValue().getContentJson().at("/outputs/deadlineMinutes").asInt()).isEqualTo(30);
+        verify(decisionVersionService).publish("ver-pid", true);
+    }
+
+    @Test
+    @DisplayName("importDecisionDefinitions skips draft creation when published seed content is unchanged")
+    void importDecisionDefinitionsSkipsUnchangedPublishedVersion() throws Exception {
+        JsonNode content = new ObjectMapper().readTree("""
+                {
+                  "hitPolicy": "FIRST",
+                  "inputs": [
+                    {
+                      "id": "targetKey",
+                      "expr": { "type": "path", "scope": "record", "path": "data.targetKey", "dataType": "string" }
+                    }
+                  ],
+                  "outputs": [
+                    { "id": "deadlineMinutes", "dataType": "integer" }
+                  ],
+                  "rules": [
+                    {
+                      "ruleId": "node-sla",
+                      "when": { "targetKey": { "operator": "EQ", "value": "task_manager_approve" } },
+                      "then": { "deadlineMinutes": 30 }
+                    }
+                  ]
+                }
+                """);
+        DecisionDefinitionSeedDTO seed = DecisionDefinitionSeedDTO.builder()
+                .decisionCode("complaint_sla_deadline")
+                .decisionName("投诉 SLA 截止时间")
+                .scopeType("SLA")
+                .ownerModule("bpm")
+                .kind("DECISION_TABLE")
+                .runtimeAdapter("PLATFORM_DECISION_TABLE")
+                .versionTag("seed-v1")
+                .contentJson(content)
+                .publish(true)
+                .build();
+        PluginManifestExtended manifest = baseManifest();
+        manifest.setDecisionDefinitions(List.of(seed));
+
+        DrtDefinitionDTO existingDefinition = new DrtDefinitionDTO();
+        existingDefinition.setPid("def-pid");
+        existingDefinition.setDecisionCode("complaint_sla_deadline");
+        when(drtDefinitionService.findByCode("complaint_sla_deadline")).thenReturn(existingDefinition);
+
+        DrtVersionDTO published = new DrtVersionDTO();
+        published.setPid("published-pid");
+        published.setStatus("PUBLISHED");
+        published.setKind("DECISION_TABLE");
+        published.setRuntimeAdapter("PLATFORM_DECISION_TABLE");
+        published.setContentJson(content);
+        when(decisionVersionService.listByCode("complaint_sla_deadline")).thenReturn(List.of(published));
+
+        invokeImportDecisionDefinitions(manifest);
+
+        verify(drtDefinitionService).update(eq("def-pid"), any(DrtDefinitionCreateRequest.class));
+        verify(decisionVersionService, never()).createDraft(anyString(), any(DrtVersionCreateRequest.class));
+        verify(decisionVersionService, never()).publish(anyString(), anyBoolean());
     }
 
     @Test
@@ -1066,6 +1224,23 @@ class PluginImportServiceImplCoreTest {
                     "importSavedViews", PluginManifestExtended.class, ImportExecuteResult.class, Long.class);
             method.setAccessible(true);
             method.invoke(service, manifest, result, tenantId);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void invokeImportDecisionDefinitions(PluginManifestExtended manifest) {
+        try {
+            Method method = PluginImportServiceImpl.class.getDeclaredMethod(
+                    "importDecisionDefinitions", PluginManifestExtended.class);
+            method.setAccessible(true);
+            method.invoke(service, manifest);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof RuntimeException runtimeException) {
