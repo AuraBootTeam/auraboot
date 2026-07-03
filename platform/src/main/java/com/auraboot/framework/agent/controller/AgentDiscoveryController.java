@@ -16,13 +16,18 @@ import java.util.concurrent.TimeUnit;
 /**
  * A2A Agent Card discovery endpoints.
  * <p>
- * Exposes publicly accessible metadata about AuraBoot agents following the
- * Agent-to-Agent (A2A) protocol (https://google.github.io/A2A/).
+ * Exposes metadata about AuraBoot agents following the Agent-to-Agent (A2A)
+ * protocol (https://google.github.io/A2A/) under the RFC 8615 {@code /.well-known/}
+ * convention. Only non-sensitive information (name, description, skills) is exposed;
+ * internal fields (system_prompt, soul_profile, API keys) are never included.
  * <p>
- * These endpoints are intentionally NOT protected by authentication — A2A
- * discovery metadata is public by design (RFC 8615 /.well-known/ convention).
- * Only non-sensitive information (name, description, skills) is exposed; internal
- * fields (system_prompt, soul_profile, API keys) are never included.
+ * <b>Security (REG-3, DDR-2026-06-30):</b> these endpoints require authentication and
+ * are tenant-scoped. They were originally anonymous (on the security WhiteList), but that
+ * leaked every tenant's agent metadata to unauthenticated callers, so the paths were removed
+ * from the WhiteList (OSS #1147) and {@link AgentCardService} now scopes discovery and card
+ * lookup to the caller's tenant. Do NOT re-add {@code /.well-known/agent*} to the WhiteList.
+ * Anonymous access → 401 is locked by
+ * {@code AgentDiscoveryAnonymousAuthIT}; tenant scoping by {@code AgentDiscoveryTenantScopeIT}.
  */
 @Slf4j
 @RestController
