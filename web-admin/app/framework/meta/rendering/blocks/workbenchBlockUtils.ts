@@ -370,7 +370,12 @@ export async function executeSimpleWorkbenchAction(
     if (Array.isArray(args.inputFields) && args.inputFields.length > 0) {
       const { promptInputForm } = await import('~/framework/meta/runtime/actions/ActionRegistry');
       try {
-        collectedInputs = await promptInputForm(args.inputFields, args.inputFieldsTitle, fetchResult);
+        collectedInputs = await promptInputForm(
+          args.inputFields,
+          args.inputFieldsTitle,
+          fetchResult,
+          args.inputFieldsSubmitLabel,
+        );
       } catch {
         return; // user cancelled the form — abort without executing the command
       }
