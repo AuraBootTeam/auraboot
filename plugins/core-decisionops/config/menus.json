@@ -19,27 +19,6 @@
     }
   },
   {
-    "code": "decisionops_console_preview",
-    "parentCode": "decisionops_console",
-    "name": "策略编排器",
-    "name:zh-CN": "策略编排器",
-    "name:en": "Strategy Studio",
-    "path": "/decision-ops",
-    "component": null,
-    "icon": "layout-dashboard",
-    "type": 1,
-    "permissionCode": "decision.definition.read",
-    "orderNo": 23,
-    "visible": true,
-    "extension": {
-      "platforms": [
-        "web"
-      ],
-      "implementation": "strategy-studio",
-      "pairedDslEntry": "/p/decisionops_rollouts"
-    }
-  },
-  {
     "code": "decisionops_definitions",
     "parentCode": "decisionops_console",
     "name": "决策定义",

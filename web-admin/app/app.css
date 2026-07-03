@@ -2061,12 +2061,13 @@
   }
 
   .decisionops-shell .doc-tabs {
-    display: flex;
-    overflow-x: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+    overflow: visible;
   }
 
   .decisionops-shell .doc-tabs button {
-    min-width: 150px;
+    min-width: 0;
   }
 }
 
