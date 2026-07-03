@@ -29,6 +29,30 @@ function api(): DecisionApi {
     validatePolicyVersion: vi.fn(async () => ({ pid: 'draft-pid-1', status: 'VALIDATED', version: 2 })),
     publishPolicyVersion: vi.fn(async () => ({ pid: 'draft-pid-1', status: 'PUBLISHED', version: 2 })),
     runPolicy: vi.fn(async () => ({ status: 'MATCHED', matchedRuleCodes: ['R-1'] })),
+    getActionCatalog: vi.fn(async () => ({
+      actions: [
+        { actionType: 'NOTIFY', label: 'Send notification', handlerAvailable: true, inputSchema: {} },
+        { actionType: 'START_PROCESS', label: 'Start BPM process', handlerAvailable: true, inputSchema: {} },
+        { actionType: 'ADD_COMMENT', label: 'Add comment', handlerAvailable: true, inputSchema: {} },
+        { actionType: 'UPDATE_RECORD', label: 'Update record', handlerAvailable: true, inputSchema: {} },
+        { actionType: 'PATCH_RECORD', label: 'Patch record', handlerAvailable: true, inputSchema: {} },
+        { actionType: 'WEBHOOK', label: 'Webhook', handlerAvailable: true, inputSchema: {} },
+        { actionType: 'WRITE_AUDIT', label: 'Write audit', handlerAvailable: true, inputSchema: {} },
+      ],
+    })),
+  } as unknown as DecisionApi;
+}
+
+function apiWithActionCatalog(): DecisionApi {
+  return {
+    ...api(),
+    getActionCatalog: vi.fn(async () => ({
+      actions: [
+        { actionType: 'NOTIFY', label: 'Send notification', handlerAvailable: true, inputSchema: {} },
+        { actionType: 'PATCH_RECORD', label: 'Patch record', handlerAvailable: true, inputSchema: {} },
+        { actionType: 'WRITE_AUDIT', label: 'Write audit', handlerAvailable: true, inputSchema: {} },
+      ],
+    })),
   } as unknown as DecisionApi;
 }
 
@@ -65,6 +89,22 @@ describe('EventPolicyDesignerWorkflow', () => {
       type: 'NOTIFY',
       target: 'ROLE:support_manager',
     });
+  });
+
+  it('loads runtime action catalog and hides unsupported action types', async () => {
+    const fakeApi = apiWithActionCatalog();
+    render(<EventPolicyDesignerWorkflow api={fakeApi} fields={FIELDS} selectedPolicy={POLICY} />);
+
+    fireEvent.click(screen.getByTestId('epd-step-actions'));
+    fireEvent.click(screen.getByTestId('epd-add-action'));
+
+    await waitFor(() => expect(fakeApi.getActionCatalog).toHaveBeenCalledOnce());
+    const select = screen.getByLabelText('action-type-0') as HTMLSelectElement;
+    const options = Array.from(select.options)
+      .map((option) => option.value);
+    expect(options).toContain('PATCH_RECORD');
+    expect(options).toContain('WRITE_AUDIT');
+    expect(options).not.toContain('CREATE_TASK');
   });
 
   it('creates, validates, and publishes an EventPolicy version from the publish step', async () => {
@@ -117,10 +157,10 @@ describe('EventPolicyDesignerWorkflow', () => {
             condition: { op: 'AND', children: [] },
             actions: [
               {
-                type: 'CREATE_TASK',
-                target: 'QUEUE:vip-support',
+                type: 'PATCH_RECORD',
+                target: '',
                 order: 1,
-                payload: { severity: 'high' },
+                payload: { fields: { severity: 'high' } },
                 idempotencyKeyTemplate: '${record.recordPid}:vip',
               },
             ],
@@ -133,7 +173,7 @@ describe('EventPolicyDesignerWorkflow', () => {
 
     await waitFor(() => expect(fakeApi.listPolicyVersions).toHaveBeenCalledWith('complaint_form_submit_policy'));
     fireEvent.click(screen.getByTestId('epd-step-actions'));
-    expect(screen.getByLabelText('action-target-0')).toHaveValue('QUEUE:vip-support');
+    expect(screen.getByLabelText('action-type-0')).toHaveValue('PATCH_RECORD');
 
     fireEvent.click(screen.getByTestId('epd-step-publish'));
     fireEvent.click(screen.getByTestId('epd-save-draft'));
@@ -152,9 +192,9 @@ describe('EventPolicyDesignerWorkflow', () => {
           ruleName: 'VIP escalation',
           actions: [
             expect.objectContaining({
-              type: 'CREATE_TASK',
-              target: 'QUEUE:vip-support',
-              payload: { severity: 'high' },
+              type: 'PATCH_RECORD',
+              target: '',
+              payload: { fields: { severity: 'high' } },
             }),
           ],
         }),

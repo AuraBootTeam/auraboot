@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DecisionApi, EventPolicySummary, EventPolicyVersionSummary, ScopedContext } from '../api/decisionApi';
+import type {
+  DecisionAction,
+  DecisionApi,
+  EventPolicySummary,
+  EventPolicyVersionSummary,
+  ScopedContext,
+} from '../api/decisionApi';
 import { group, type CompareNode, type ConditionNode, type GroupNode } from '../ast/conditionAst';
 import { PolicyRulesEditor, type MatchMode, type PolicyRulesValue } from './PolicyRulesEditor';
 import type { FieldOption } from './ConditionBuilder';
@@ -47,6 +53,15 @@ const CONFLICT_STRATEGIES: readonly ConflictStrategy[] = [
   'REJECT_ON_CONFLICT', 'PRIORITY_WINS', 'LAST_WRITE_WINS', 'MERGE_IF_COMPATIBLE',
 ];
 const DEDUP_STRATEGIES: readonly DedupStrategy[] = ['NONE', 'BY_IDEMPOTENCY_KEY', 'BY_ACTION_TYPE_AND_TARGET'];
+const SAFE_ACTIONS: DecisionAction[] = [
+  { actionType: 'NOTIFY', label: 'NOTIFY', handlerAvailable: true },
+  { actionType: 'START_PROCESS', label: 'START_PROCESS', handlerAvailable: true },
+  { actionType: 'ADD_COMMENT', label: 'ADD_COMMENT', handlerAvailable: true },
+  { actionType: 'UPDATE_RECORD', label: 'UPDATE_RECORD', handlerAvailable: true },
+  { actionType: 'PATCH_RECORD', label: 'PATCH_RECORD', handlerAvailable: true },
+  { actionType: 'WEBHOOK', label: 'WEBHOOK', handlerAvailable: true },
+  { actionType: 'WRITE_AUDIT', label: 'WRITE_AUDIT', handlerAvailable: true },
+];
 
 function defaultRules(matchMode?: string): PolicyRulesValue {
   return {
@@ -194,11 +209,18 @@ export function EventPolicyDesignerWorkflow({
   const [versionLoading, setVersionLoading] = useState(false);
   const [versionError, setVersionError] = useState('');
   const [runResult, setRunResult] = useState<unknown>(null);
+  const [catalogActions, setCatalogActions] = useState<DecisionAction[]>([]);
+  const [catalogError, setCatalogError] = useState('');
 
   const currentRuleIdx = selectedRuleIndex(rulesValue, selectedRuleCode);
   const currentRule = rulesValue.rules[currentRuleIdx];
   const currentActions = actionsOf(currentRule);
   const firstSampleContext = samples[0]?.context ?? { record: { data: {} } };
+  const actionOptions = useMemo(() => {
+    const runtimeActions = catalogActions
+      .filter((action) => action.actionType && action.handlerAvailable !== false);
+    return runtimeActions.length > 0 ? runtimeActions : SAFE_ACTIONS;
+  }, [catalogActions]);
 
   const draftJson = useMemo(() => ({
     phase,
@@ -209,6 +231,22 @@ export function EventPolicyDesignerWorkflow({
     dedupStrategy,
     rules: buildRulesJson(rulesValue),
   }), [conflictStrategy, dedupStrategy, executionMode, failureStrategy, phase, rulesValue]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCatalogError('');
+    api.getActionCatalog()
+      .then((catalog) => {
+        if (!cancelled) setCatalogActions(catalog.actions ?? []);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setCatalogActions([]);
+          setCatalogError(e instanceof Error ? e.message : String(e));
+        }
+      });
+    return () => { cancelled = true; };
+  }, [api]);
 
   useEffect(() => {
     const policyCode = selectedPolicy?.policyCode;
@@ -276,7 +314,7 @@ export function EventPolicyDesignerWorkflow({
 
   const addAction = () => {
     patchRuleActions([...currentActions, {
-      type: 'NOTIFY',
+      type: actionOptions[0]?.actionType ?? 'NOTIFY',
       target: '',
       order: currentActions.length + 1,
       payloadJson: '{}',
@@ -388,6 +426,7 @@ export function EventPolicyDesignerWorkflow({
           <select id="epd-rule-select" value={currentRule?.ruleCode ?? ''} onChange={(e) => setSelectedRuleCode(e.target.value)}>
             {rulesValue.rules.map((rule) => <option key={rule.ruleCode} value={rule.ruleCode}>{rule.ruleCode}</option>)}
           </select>
+          {catalogError && <div data-testid="epd-action-catalog-error">Action catalog unavailable</div>}
           {currentActions.map((action, idx) => (
             <div key={idx} data-testid={`epd-action-${idx}`}>
               <select
@@ -395,12 +434,11 @@ export function EventPolicyDesignerWorkflow({
                 value={action.type}
                 onChange={(e) => updateAction(idx, { type: e.target.value })}
               >
-                <option value="NOTIFY">NOTIFY</option>
-                <option value="START_PROCESS">START_PROCESS</option>
-                <option value="CREATE_TASK">CREATE_TASK</option>
-                <option value="ADD_COMMENT">ADD_COMMENT</option>
-                <option value="UPDATE_RECORD">UPDATE_RECORD</option>
-                <option value="WEBHOOK">WEBHOOK</option>
+                {actionOptions.map((option) => (
+                  <option key={option.actionType} value={option.actionType}>
+                    {option.actionType}
+                  </option>
+                ))}
               </select>
               <input
                 aria-label={`action-target-${idx}`}

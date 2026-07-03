@@ -8,6 +8,7 @@ import com.auraboot.framework.decision.dto.ConditionFragmentEvaluateRequest;
 import com.auraboot.framework.decision.dto.ConditionFragmentEvaluationDTO;
 import com.auraboot.framework.decision.dto.ConditionFragmentImpactDTO;
 import com.auraboot.framework.decision.dto.ConditionFragmentVersionCreateRequest;
+import com.auraboot.framework.decision.dto.DecisionActionCatalogDTO;
 import com.auraboot.framework.decision.dto.DecisionDashboardDTO;
 import com.auraboot.framework.decision.dto.DecisionFieldImpactDTO;
 import com.auraboot.framework.decision.dto.DecisionFieldPreflightDTO;
@@ -38,6 +39,7 @@ import com.auraboot.framework.decision.dto.DrtVersionDTO;
 import com.auraboot.framework.decision.model.DecisionResult;
 import com.auraboot.framework.decision.model.DecisionValidateResult;
 import com.auraboot.framework.decision.service.ConditionFragmentService;
+import com.auraboot.framework.decision.service.DecisionActionCatalogService;
 import com.auraboot.framework.decision.service.DecisionDashboardService;
 import com.auraboot.framework.decision.service.DecisionImpactService;
 import com.auraboot.framework.decision.service.DecisionModelFieldService;
@@ -92,6 +94,7 @@ public class DecisionRuntimeController {
     private final DecisionTableAnalysisService tableAnalysisService;
     private final DecisionTableDmnXmlService tableDmnXmlService;
     private final ConditionFragmentService conditionFragmentService;
+    private final DecisionActionCatalogService actionCatalogService;
 
     // ==================== Stateless validation + evaluation ====================
 
@@ -730,6 +733,15 @@ public class DecisionRuntimeController {
             @RequestParam(required = false) String modelCode) {
         log.info("Listing DecisionOps fact catalog: modelCode={}", modelCode);
         return ApiResponse.success(modelFieldService.getFactCatalog(modelCode));
+    }
+
+    @GetMapping("/actions/catalog")
+    @Operation(summary = "List DecisionOps action catalog",
+            description = "Reports action types backed by production EventPolicy handlers for Strategy Studio.")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_READ)
+    public ApiResponse<DecisionActionCatalogDTO> getActionCatalog() {
+        log.info("Listing DecisionOps action catalog");
+        return ApiResponse.success(actionCatalogService.getActionCatalog());
     }
 
     // ==================== Permission governance ====================
