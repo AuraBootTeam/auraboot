@@ -150,6 +150,16 @@ function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
     createDraftVersion: vi.fn(async () => ({ pid: 'draft-default', status: 'DRAFT' })),
     validateVersion: vi.fn(async () => ({ valid: true })),
     publishVersion: vi.fn(async () => ({ pid: 'draft-default', status: 'PUBLISHED' })),
+    getActionCatalog: vi.fn(async () => ({
+      actions: [
+        { actionType: 'NOTIFY', label: 'Send notification', handlerAvailable: true, category: 'messaging' },
+        { actionType: 'START_PROCESS', label: 'Start BPM process', handlerAvailable: true, category: 'workflow' },
+        { actionType: 'ADD_COMMENT', label: 'Add comment', handlerAvailable: true, category: 'collaboration' },
+        { actionType: 'PATCH_RECORD', label: 'Patch record', handlerAvailable: true, category: 'data' },
+        { actionType: 'WEBHOOK', label: 'Webhook', handlerAvailable: true, category: 'integration' },
+        { actionType: 'WRITE_AUDIT', label: 'Write audit', handlerAvailable: true, category: 'governance' },
+      ],
+    })),
     ...overrides,
   } as unknown as DecisionApi;
 }
@@ -342,7 +352,7 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('strategy-scenario-SLA')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('优先级');
     expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('高价值');
-    expect(screen.getByTestId('strategy-action-plan')).toHaveTextContent('发送');
+    expect(screen.getByTestId('strategy-action-plan')).toHaveTextContent('NOTIFY');
     expect(screen.getByTestId('decision-rule-binding-block')).toBeInTheDocument();
   });
 
@@ -442,6 +452,12 @@ describe('DecisionOpsConsole', () => {
       expect.objectContaining({
         kind: 'SIMPLE_CONDITION',
         runtimeAdapter: 'AST_EVALUATOR',
+        outputSchemaJson: expect.objectContaining({
+          actions: expect.arrayContaining([
+            expect.objectContaining({ actionType: 'NOTIFY' }),
+            expect.objectContaining({ actionType: 'PATCH_RECORD' }),
+          ]),
+        }),
       }),
     );
     expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('草稿已保存');
@@ -469,6 +485,12 @@ describe('DecisionOpsConsole', () => {
           sample: expect.objectContaining({
             process: expect.objectContaining({ taskKey: 'approval' }),
           }),
+        }),
+        outputSchemaJson: expect.objectContaining({
+          actions: expect.arrayContaining([
+            expect.objectContaining({ actionType: 'START_PROCESS' }),
+            expect.objectContaining({ actionType: 'WRITE_AUDIT' }),
+          ]),
         }),
       }),
     );

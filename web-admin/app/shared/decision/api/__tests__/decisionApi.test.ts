@@ -161,6 +161,13 @@ describe('decisionApi client', () => {
     expect(calls[0]).toMatchObject({ method: 'get', endpoint: '/decision/model/fields' });
   });
 
+  it('getActionCatalog fetches runtime-backed action definitions', async () => {
+    const { http, calls } = fakeHttp();
+    const api = createDecisionApi(http) as unknown as { getActionCatalog: () => Promise<unknown> };
+    await api.getActionCatalog();
+    expect(calls[0]).toMatchObject({ method: 'get', endpoint: '/decision/actions/catalog' });
+  });
+
   it('listConnectors fetches and adapts platform API connectors for the DecisionOps registry', async () => {
     const calls: { method: string; endpoint: string }[] = [];
     const http = {

@@ -131,6 +131,20 @@ export interface DecisionModelField {
   decisionCodes?: string[];
 }
 
+export interface DecisionAction {
+  actionType: string;
+  label?: string;
+  category?: string;
+  description?: string;
+  scopes?: string[];
+  handlerAvailable?: boolean;
+  inputSchema?: Record<string, unknown>;
+}
+
+export interface DecisionActionCatalog {
+  actions: DecisionAction[];
+}
+
 export type DecisionPermissionCapabilityKey =
   | 'view'
   | 'test'
@@ -609,6 +623,7 @@ export function createDecisionApi(http: HttpClient) {
     getDashboard: () =>
       http.get<DecisionDashboardResponse>(`${D}/dashboard/summary`).then(unwrap),
     getModelFields: () => http.get<DecisionModelField[]>(`${D}/model/fields`).then(unwrap),
+    getActionCatalog: () => http.get<DecisionActionCatalog>(`${D}/actions/catalog`).then(unwrap),
     getPermissionMatrix: () =>
       http.get<DecisionPermissionMatrix>(`${D}/permissions/matrix`).then(unwrap),
     getDecisionImpact: (code: string) =>
