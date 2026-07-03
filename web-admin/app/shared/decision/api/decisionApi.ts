@@ -7,10 +7,25 @@ import type { ConditionNode, DataType } from '../ast/conditionAst';
 import type { DecisionTable } from '../table/decisionTable';
 
 /** Minimal surface of the platform ApiService used here (get/post returning an ApiResponse). */
+interface HttpResult<T> {
+  data: T;
+  success?: boolean;
+  message?: string;
+  desc?: string;
+  code?: string;
+}
+
 export interface HttpClient {
-  get<T>(endpoint: string, params?: Record<string, unknown>): Promise<{ data: T }>;
-  post<T>(endpoint: string, body?: unknown): Promise<{ data: T }>;
-  delete<T>(endpoint: string): Promise<{ data: T }>;
+  get<T>(endpoint: string, params?: Record<string, unknown>): Promise<HttpResult<T>>;
+  post<T>(endpoint: string, body?: unknown): Promise<HttpResult<T>>;
+  delete<T>(endpoint: string): Promise<HttpResult<T>>;
+}
+
+function unwrap<T>(result: HttpResult<T>): T {
+  if (result.success === false) {
+    throw new Error(result.message ?? result.desc ?? `Decision API request failed: ${result.code}`);
+  }
+  return result.data;
 }
 
 export type DecisionStatus =
@@ -520,31 +535,31 @@ export function createDecisionApi(http: HttpClient) {
     validate: (kind: string, runtimeAdapter: string, contentJson: ConditionNode | unknown) =>
       http
         .post<ValidateResult>(`${D}/validate`, { kind, runtimeAdapter, contentJson })
-        .then((r) => r.data),
+        .then(unwrap),
 
     testRun: (req: {
       kind: string;
       runtimeAdapter: string;
       contentJson: unknown;
       context: ScopedContext;
-    }) => http.post<DecisionResult>(`${D}/test-run`, req).then((r) => r.data),
+    }) => http.post<DecisionResult>(`${D}/test-run`, req).then(unwrap),
 
     evaluate: (req: EvaluateRequest) =>
-      http.post<DecisionResult>(`${D}/evaluate`, req).then((r) => r.data),
+      http.post<DecisionResult>(`${D}/evaluate`, req).then(unwrap),
 
     batchEvaluate: (requests: EvaluateRequest[]) =>
-      http.post<DecisionResult[]>(`${D}/batch-evaluate`, requests).then((r) => r.data),
+      http.post<DecisionResult[]>(`${D}/batch-evaluate`, requests).then(unwrap),
 
     createDefinition: (req: {
       decisionCode: string;
       decisionName?: string;
       scopeType?: string;
       ownerModule?: string;
-    }) => http.post<unknown>(`${D}/definitions`, req).then((r) => r.data),
+    }) => http.post<unknown>(`${D}/definitions`, req).then(unwrap),
 
     getDefinition: (code: string) =>
-      http.get<unknown>(`${D}/definitions/${code}`).then((r) => r.data),
-    listDefinitions: () => http.get<unknown>(`${D}/definitions`).then((r) => r.data),
+      http.get<unknown>(`${D}/definitions/${code}`).then(unwrap),
+    listDefinitions: () => http.get<unknown>(`${D}/definitions`).then(unwrap),
 
     createDraftVersion: (
       code: string,
@@ -560,58 +575,58 @@ export function createDecisionApi(http: HttpClient) {
     ) =>
       http
         .post<DecisionVersionSummary>(`${D}/definitions/${code}/versions`, req)
-        .then((r) => r.data),
+        .then(unwrap),
 
     listVersions: (code: string) =>
-      http.get<DecisionVersionSummary[]>(`${D}/definitions/${code}/versions`).then((r) => r.data),
+      http.get<DecisionVersionSummary[]>(`${D}/definitions/${code}/versions`).then(unwrap),
 
     validateVersion: (pid: string) =>
-      http.post<ValidateResult>(`${D}/versions/${pid}/validate`).then((r) => r.data),
+      http.post<ValidateResult>(`${D}/versions/${pid}/validate`).then(unwrap),
     publishVersion: (pid: string, req?: DecisionVersionTransitionRequest) =>
-      http.post<unknown>(`${D}/versions/${pid}/publish`, req).then((r) => r.data),
+      http.post<unknown>(`${D}/versions/${pid}/publish`, req).then(unwrap),
     submitVersionForApproval: (pid: string, req?: Pick<DecisionVersionTransitionRequest, 'note'>) =>
       http
         .post<DecisionVersionSummary>(`${D}/versions/${pid}/submit-for-approval`, req)
-        .then((r) => r.data),
+        .then(unwrap),
     approveVersion: (pid: string, req?: DecisionVersionTransitionRequest) =>
-      http.post<DecisionVersionSummary>(`${D}/versions/${pid}/approve`, req).then((r) => r.data),
+      http.post<DecisionVersionSummary>(`${D}/versions/${pid}/approve`, req).then(unwrap),
     rejectVersion: (pid: string, req?: Pick<DecisionVersionTransitionRequest, 'note'>) =>
-      http.post<DecisionVersionSummary>(`${D}/versions/${pid}/reject`, req).then((r) => r.data),
+      http.post<DecisionVersionSummary>(`${D}/versions/${pid}/reject`, req).then(unwrap),
     deprecateVersion: (pid: string, req?: DecisionVersionTransitionRequest) =>
-      http.post<DecisionVersionSummary>(`${D}/versions/${pid}/deprecate`, req).then((r) => r.data),
+      http.post<DecisionVersionSummary>(`${D}/versions/${pid}/deprecate`, req).then(unwrap),
     retireVersion: (pid: string, req?: DecisionVersionTransitionRequest) =>
-      http.post<DecisionVersionSummary>(`${D}/versions/${pid}/retire`, req).then((r) => r.data),
+      http.post<DecisionVersionSummary>(`${D}/versions/${pid}/retire`, req).then(unwrap),
     deleteVersion: (pid: string) =>
-      http.delete<DecisionVersionSummary>(`${D}/versions/${pid}`).then((r) => r.data),
+      http.delete<DecisionVersionSummary>(`${D}/versions/${pid}`).then(unwrap),
     getLogs: (traceId: string) =>
-      http.get<DecisionLogRecord[]>(`${D}/logs`, { traceId }).then((r) => r.data),
+      http.get<DecisionLogRecord[]>(`${D}/logs`, { traceId }).then(unwrap),
     getRecentLogs: (filters: DecisionLogFilters = {}) =>
       http
         .get<DecisionPageResult<DecisionLogRecord>>(`${D}/logs/recent`, compactParams(filters))
-        .then((r) => r.data),
+        .then(unwrap),
     getLogByPid: (pid: string) =>
-      http.get<DecisionLogRecord>(`${D}/logs/${encodeURIComponent(pid)}`).then((r) => r.data),
+      http.get<DecisionLogRecord>(`${D}/logs/${encodeURIComponent(pid)}`).then(unwrap),
     getDashboard: () =>
-      http.get<DecisionDashboardResponse>(`${D}/dashboard/summary`).then((r) => r.data),
-    getModelFields: () => http.get<DecisionModelField[]>(`${D}/model/fields`).then((r) => r.data),
+      http.get<DecisionDashboardResponse>(`${D}/dashboard/summary`).then(unwrap),
+    getModelFields: () => http.get<DecisionModelField[]>(`${D}/model/fields`).then(unwrap),
     getPermissionMatrix: () =>
-      http.get<DecisionPermissionMatrix>(`${D}/permissions/matrix`).then((r) => r.data),
+      http.get<DecisionPermissionMatrix>(`${D}/permissions/matrix`).then(unwrap),
     getDecisionImpact: (code: string) =>
-      http.get<DecisionImpact>(`${D}/definitions/${code}/impact`).then((r) => r.data),
+      http.get<DecisionImpact>(`${D}/definitions/${code}/impact`).then(unwrap),
     createRollout: (code: string, req: DecisionRolloutCreateRequest) =>
-      http.post<DecisionRollout>(`${D}/definitions/${code}/rollouts`, req).then((r) => r.data),
+      http.post<DecisionRollout>(`${D}/definitions/${code}/rollouts`, req).then(unwrap),
     listRollouts: (code: string) =>
-      http.get<DecisionRollout[]>(`${D}/definitions/${code}/rollouts`).then((r) => r.data),
+      http.get<DecisionRollout[]>(`${D}/definitions/${code}/rollouts`).then(unwrap),
     getActiveRollout: (code: string) =>
-      http.get<DecisionRollout>(`${D}/definitions/${code}/rollouts/active`).then((r) => r.data),
+      http.get<DecisionRollout>(`${D}/definitions/${code}/rollouts/active`).then(unwrap),
     activateRollout: (pid: string, req?: DecisionRolloutActionRequest) =>
-      http.post<DecisionRollout>(`${D}/rollouts/${pid}/activate`, req).then((r) => r.data),
+      http.post<DecisionRollout>(`${D}/rollouts/${pid}/activate`, req).then(unwrap),
     pauseRollout: (pid: string, req?: DecisionRolloutActionRequest) =>
-      http.post<DecisionRollout>(`${D}/rollouts/${pid}/pause`, req).then((r) => r.data),
+      http.post<DecisionRollout>(`${D}/rollouts/${pid}/pause`, req).then(unwrap),
     promoteRollout: (pid: string, req?: DecisionRolloutActionRequest) =>
-      http.post<DecisionRollout>(`${D}/rollouts/${pid}/promote`, req).then((r) => r.data),
+      http.post<DecisionRollout>(`${D}/rollouts/${pid}/promote`, req).then(unwrap),
     rollbackRollout: (pid: string, req?: DecisionRolloutActionRequest) =>
-      http.post<DecisionRollout>(`${D}/rollouts/${pid}/rollback`, req).then((r) => r.data),
+      http.post<DecisionRollout>(`${D}/rollouts/${pid}/rollback`, req).then(unwrap),
     getRolloutMetrics: (pid: string, params?: DecisionRolloutMetricsParams) => {
       const query = compactParams(params ?? {});
       return http
@@ -619,20 +634,20 @@ export function createDecisionApi(http: HttpClient) {
           `${D}/rollouts/${pid}/metrics`,
           Object.keys(query).length > 0 ? query : undefined,
         )
-        .then((r) => r.data);
+        .then(unwrap);
     },
     getFieldImpact: (fieldRef: string) =>
-      http.get<DecisionFieldImpact>(`${D}/fields/impact`, { fieldRef }).then((r) => r.data),
+      http.get<DecisionFieldImpact>(`${D}/fields/impact`, { fieldRef }).then(unwrap),
     getIntegrationImpact: (targetType: string, targetCode: string) =>
       http
         .get<DecisionIntegrationImpact>(`${D}/integrations/impact`, { targetType, targetCode })
-        .then((r) => r.data),
+        .then(unwrap),
     preflightFieldChange: (req: DecisionFieldPreflightRequest) =>
-      http.post<DecisionFieldPreflight>(`${D}/fields/preflight`, req).then((r) => r.data),
+      http.post<DecisionFieldPreflight>(`${D}/fields/preflight`, req).then(unwrap),
     analyzeTable: (model: DecisionTable, decisionCode?: string, versionPid?: string) =>
       http
         .post<DecisionTableAnalysis>(`${D}/tables/analyze`, { decisionCode, versionPid, model })
-        .then((r) => r.data),
+        .then(unwrap),
     exportTableDmn: (model: DecisionTable, decisionName = 'decision_table', decisionId?: string) =>
       http
         .post<DecisionTableDmnXmlResult>(`${D}/tables/export-dmn`, {
@@ -640,11 +655,11 @@ export function createDecisionApi(http: HttpClient) {
           decisionName,
           model,
         })
-        .then((r) => r.data),
+        .then(unwrap),
     importTableDmn: (dmnXml: string) =>
       http
         .post<DecisionTableDmnXmlResult>(`${D}/tables/import-dmn`, { dmnXml })
-        .then((r) => r.data),
+        .then(unwrap),
     roundTripTableDmn: (
       model: DecisionTable,
       decisionName = 'decision_table',
@@ -656,17 +671,20 @@ export function createDecisionApi(http: HttpClient) {
           decisionName,
           model,
         })
-        .then((r) => r.data),
+        .then(unwrap),
     rebuildUsageIndex: () =>
-      http.post<DecisionUsageIndexRebuild>(`${D}/usage-index/rebuild`).then((r) => r.data),
+      http.post<DecisionUsageIndexRebuild>(`${D}/usage-index/rebuild`).then(unwrap),
     refreshUsageIndexSource: (sourceType: string, sourcePid: string) =>
       http
         .post<DecisionUsageIndexRebuild>(
           `${D}/usage-index/sources/${encodeURIComponent(sourceType)}/${encodeURIComponent(sourcePid)}/refresh`,
         )
-        .then((r) => r.data),
+        .then(unwrap),
     listConnectors: () =>
-      http.get<PlatformApiConnector[]>(C).then((r) => r.data.map(toDecisionConnector)),
+      http
+        .get<PlatformApiConnector[]>(C)
+        .then(unwrap)
+        .then((connectors) => connectors.map(toDecisionConnector)),
 
     // ── Event Policy ──
     listPolicies: (filters: PolicyListFilters = {}) =>
@@ -674,48 +692,48 @@ export function createDecisionApi(http: HttpClient) {
         .get<
           EventPolicySummary[] | { records?: EventPolicySummary[]; data?: EventPolicySummary[] }
         >(`${P}/definitions`, policyListParams(filters))
-        .then((r) => r.data),
+        .then(unwrap),
 
     createPolicyDefinition: (req: EventPolicyDefinitionRequest) =>
-      http.post<EventPolicySummary>(`${P}/definitions`, req).then((r) => r.data),
+      http.post<EventPolicySummary>(`${P}/definitions`, req).then(unwrap),
 
     setPolicyEnabled: (code: string, enabled: boolean) =>
       http
         .post<EventPolicySummary>(`${P}/definitions/${code}/enabled`, { enabled })
-        .then((r) => r.data),
+        .then(unwrap),
 
     copyPolicyDefinition: (code: string, req: EventPolicyCopyRequest) =>
-      http.post<EventPolicySummary>(`${P}/definitions/${code}/copy`, req).then((r) => r.data),
+      http.post<EventPolicySummary>(`${P}/definitions/${code}/copy`, req).then(unwrap),
 
     runPolicy: (req: {
       eventType: string;
       targetType: string;
       targetKey: string;
       context: ScopedContext;
-    }) => http.post<unknown>(`${P}/run`, req).then((r) => r.data),
+    }) => http.post<unknown>(`${P}/run`, req).then(unwrap),
 
     runAndExecutePolicy: (req: {
       eventType: string;
       targetType: string;
       targetKey: string;
       context: ScopedContext;
-    }) => http.post<unknown>(`${P}/run-and-execute`, req).then((r) => r.data),
+    }) => http.post<unknown>(`${P}/run-and-execute`, req).then(unwrap),
 
     createPolicyDraftVersion: (code: string, req: EventPolicyDraftVersionRequest) =>
       http
         .post<EventPolicyVersionSummary>(`${P}/definitions/${code}/versions`, req)
-        .then((r) => r.data),
+        .then(unwrap),
 
     listPolicyVersions: (code: string) =>
       http
         .get<EventPolicyVersionSummary[]>(`${P}/definitions/${code}/versions`)
-        .then((r) => r.data),
+        .then(unwrap),
 
     validatePolicyVersion: (pid: string) =>
-      http.post<EventPolicyVersionSummary>(`${P}/versions/${pid}/validate`).then((r) => r.data),
+      http.post<EventPolicyVersionSummary>(`${P}/versions/${pid}/validate`).then(unwrap),
 
     publishPolicyVersion: (pid: string) =>
-      http.post<EventPolicyVersionSummary>(`${P}/versions/${pid}/publish`).then((r) => r.data),
+      http.post<EventPolicyVersionSummary>(`${P}/versions/${pid}/publish`).then(unwrap),
   };
 }
 
