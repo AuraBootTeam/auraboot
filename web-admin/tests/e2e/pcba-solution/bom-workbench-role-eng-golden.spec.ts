@@ -87,8 +87,12 @@ function validateStandardBomWorkbook(filePath: string, created: BomWorkbenchSeed
     '备注',
   ]);
 
-  const resistorRow = bomRows.find((row) => cell(row, 3) === '10K resistor canonical');
-  expect(resistorRow, 'standard BOM should include unresolved resistor row').toBeTruthy();
+  // Source-truth semantics (plugins #144): undo restores the raw-line source values onto
+  // the standard row, so after this spec's confirm → undo flow the exported row carries the
+  // raw name — locate by stable refdes and pin the restored source name.
+  const resistorRow = bomRows.find((row) => cell(row, 7) === 'R1,R2');
+  expect(resistorRow, 'standard BOM should include unresolved resistor row (refdes R1,R2)').toBeTruthy();
+  expect(cell(resistorRow, 3), 'undo restores the raw-source material name').toBe('10K resistor raw');
   expect(cell(resistorRow, 2), 'unconfirmed multi-candidate material code stays blank').toBe('');
 
   const mcuRow = bomRows.find((row) => cell(row, 3) === 'MCU direct copy');
