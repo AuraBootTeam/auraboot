@@ -557,7 +557,6 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const initialLayout = initialLayoutRef.current;
 
   const [selectedCandidateKey, setSelectedCandidateKey] = useState('');
-  const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [position, setPosition] = useState({
     left: initialLayout.left,
@@ -605,11 +604,22 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
 
   useEffect(() => {
     setSelectedCandidateKey('');
-    setIsMinimized(false);
     if (candidatesConfig.selection?.bind) {
       writeRuntimeState(runtime, candidatesConfig.selection.bind, {});
     }
   }, [selectedRecordKey, candidatesConfig.selection?.bind, runtime]);
+
+  // Fully close the review drawer by clearing the selected context row, so it returns to the
+  // inline empty state instead of collapsing to a floating "展开行级复核" pill.
+  const closeDrawer = () => {
+    setSelectedCandidateKey('');
+    if (candidatesConfig.selection?.bind) {
+      writeRuntimeState(runtime, candidatesConfig.selection.bind, {});
+    }
+    if (contextStateBinding) {
+      writeRuntimeState(runtime, contextStateBinding, {});
+    }
+  };
 
   useEffect(() => {
     layoutRef.current = {
@@ -816,20 +826,6 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     writeRuntimeState(runtime, contextStateBinding, contextRows[nextIndex]);
   };
 
-  if (isMinimized) {
-    return (
-      <button
-        type="button"
-        data-testid="review-drawer-minimized"
-        aria-label={localized(locale, t, '展开复核浮层', 'Expand review drawer')}
-        onClick={() => setIsMinimized(false)}
-        className="rounded-pill bg-accent hover:bg-accent-hover fixed right-6 bottom-6 z-50 border border-blue-300 px-4 py-2 text-sm font-semibold text-white shadow-xl"
-      >
-        {localized(locale, t, '展开行级复核', 'Open row review')}
-      </button>
-    );
-  }
-
   const drawerStyle: React.CSSProperties = isMaximized
     ? {
         left: 16,
@@ -889,14 +885,6 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
           </button>
           <button
             type="button"
-            aria-label={localized(locale, t, '收起复核浮层', 'Minimize review drawer')}
-            onClick={() => setIsMinimized(true)}
-            className="rounded-control inline-flex h-7 w-7 items-center justify-center text-lg leading-none text-white hover:bg-white/15"
-          >
-            -
-          </button>
-          <button
-            type="button"
             aria-label={localized(locale, t, '切换最大化', 'Toggle maximize')}
             onClick={() => setIsMaximized((value) => !value)}
             className="rounded-control inline-flex h-7 w-7 items-center justify-center text-sm text-white hover:bg-white/15"
@@ -906,7 +894,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
           <button
             type="button"
             aria-label={localized(locale, t, '关闭复核浮层', 'Close review drawer')}
-            onClick={() => setIsMinimized(true)}
+            onClick={closeDrawer}
             className="rounded-control inline-flex h-7 w-7 items-center justify-center text-sm text-white hover:bg-white/15"
           >
             ×
