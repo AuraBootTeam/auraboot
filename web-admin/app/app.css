@@ -780,6 +780,416 @@
   color: var(--color-status-red);
 }
 
+.strategy-studio {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.strategy-studio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-subtle);
+  padding: 14px;
+}
+
+.strategy-studio-header p {
+  margin: 0 0 4px;
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.strategy-studio-header h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 18px;
+  font-weight: 850;
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
+.strategy-studio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.strategy-studio button {
+  min-height: 32px;
+  min-width: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 6px;
+  background: var(--color-panel);
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 5px 10px;
+}
+
+.strategy-studio button:hover {
+  background: var(--color-hover);
+}
+
+.strategy-studio-primary {
+  border-color: var(--color-accent) !important;
+  background: var(--color-accent) !important;
+  color: var(--color-inverse-text) !important;
+}
+
+.strategy-operation-status {
+  border: 1px solid var(--color-status-green);
+  border-radius: 8px;
+  background: var(--color-status-green-bg);
+  color: var(--color-status-green);
+  font-size: 13px;
+  font-weight: 800;
+  padding: 8px 10px;
+}
+
+.strategy-scenarios {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.strategy-scenarios button {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  min-height: 64px;
+  min-width: 0;
+  border-color: var(--color-border);
+  background: var(--color-panel);
+  text-align: left;
+}
+
+.strategy-scenarios button[aria-pressed='true'] {
+  border-color: #60a5fa;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.strategy-scenarios span {
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.strategy-scenarios strong {
+  overflow: hidden;
+  color: var(--color-text-2);
+  font-size: 11px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
+}
+
+.strategy-studio-metrics {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.strategy-studio-metrics > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  padding: 12px;
+}
+
+.strategy-studio-metrics span,
+.strategy-studio-metrics small {
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.strategy-studio-metrics strong {
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strategy-studio-grid {
+  display: grid;
+  align-items: start;
+  gap: 12px;
+  grid-template-columns: minmax(180px, 230px) minmax(0, 1fr) minmax(220px, 280px);
+  min-width: 0;
+}
+
+.strategy-studio-center,
+.strategy-studio-side {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.strategy-studio-panel {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-panel);
+  padding: 12px;
+}
+
+.strategy-studio-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.strategy-studio-panel-head strong {
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 850;
+}
+
+.strategy-studio-panel-head span {
+  overflow: hidden;
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strategy-fact-list,
+.strategy-fragment-list,
+.strategy-action-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+}
+
+.strategy-fact-list li,
+.strategy-fragment-list li,
+.strategy-action-list li {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-subtle);
+  color: var(--color-text);
+  font-size: 13px;
+  list-style: none;
+  padding: 9px;
+}
+
+.strategy-fragment-list li[data-active='true'] {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.strategy-fragment-list button {
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  width: 100%;
+  min-height: auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+}
+
+.strategy-fragment-list button:hover {
+  background: transparent;
+}
+
+.strategy-fact-list span,
+.strategy-fragment-list span {
+  overflow: hidden;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strategy-fact-list code {
+  overflow: hidden;
+  color: var(--color-text-2);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strategy-fact-list small,
+.strategy-fragment-list small {
+  color: var(--color-text-3);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.strategy-action-list {
+  counter-reset: action;
+}
+
+.strategy-action-list li {
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+}
+
+.strategy-action-list li::before {
+  content: counter(action);
+  counter-increment: action;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-inverse-text);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.strategy-dmn-table {
+  display: grid;
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+}
+
+.strategy-dmn-table > div {
+  min-width: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: 13px;
+  padding: 9px;
+}
+
+.strategy-dmn-table > div:nth-child(-n + 4) {
+  background: var(--color-subtle);
+  color: var(--color-text-2);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.strategy-dmn-table > div:nth-child(4n) {
+  border-right: 0;
+}
+
+.strategy-dmn-table > div:nth-last-child(-n + 4) {
+  border-bottom: 0;
+}
+
+.strategy-check-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.strategy-check-list span {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-subtle);
+  color: var(--color-text-2);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 8px;
+}
+
+.strategy-check-list span[data-state='ok'] {
+  border-color: var(--color-status-green);
+  background: var(--color-status-green-bg);
+  color: var(--color-status-green);
+}
+
+.strategy-check-list span[data-state='warn'] {
+  border-color: var(--color-status-amber);
+  background: var(--color-status-amber-bg);
+  color: var(--color-status-amber);
+}
+
+@media (max-width: 1280px) {
+  .strategy-studio-grid {
+    grid-template-columns: minmax(170px, 210px) minmax(0, 1fr);
+  }
+
+  .strategy-studio-side {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 980px) {
+  .strategy-studio-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .strategy-studio-actions {
+    justify-content: flex-start;
+  }
+
+  .strategy-scenarios,
+  .strategy-studio-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .strategy-studio-grid,
+  .strategy-studio-side {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .strategy-studio-header,
+  .strategy-studio-panel {
+    padding: 10px;
+  }
+
+  .strategy-studio-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .strategy-studio-actions button {
+    width: 100%;
+  }
+
+  .strategy-scenarios,
+  .strategy-studio-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .strategy-studio-panel-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .strategy-studio-panel-head span {
+    white-space: normal;
+  }
+
+  .strategy-dmn-table {
+    grid-template-columns: repeat(4, minmax(132px, 1fr));
+  }
+}
+
 .ddl-section-head {
   display: flex;
   align-items: center;
