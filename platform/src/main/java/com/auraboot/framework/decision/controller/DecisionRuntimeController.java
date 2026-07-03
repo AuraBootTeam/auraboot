@@ -12,6 +12,7 @@ import com.auraboot.framework.decision.dto.DecisionDashboardDTO;
 import com.auraboot.framework.decision.dto.DecisionFieldImpactDTO;
 import com.auraboot.framework.decision.dto.DecisionFieldPreflightDTO;
 import com.auraboot.framework.decision.dto.DecisionFieldPreflightRequest;
+import com.auraboot.framework.decision.dto.DecisionFactCatalogDTO;
 import com.auraboot.framework.decision.dto.DecisionImpactDTO;
 import com.auraboot.framework.decision.dto.DecisionIntegrationImpactDTO;
 import com.auraboot.framework.decision.dto.DecisionModelFieldDTO;
@@ -717,6 +718,18 @@ public class DecisionRuntimeController {
     public ApiResponse<List<DecisionModelFieldDTO>> listModelFields() {
         log.info("Listing DecisionOps model fields");
         return ApiResponse.success(modelFieldService.listFields());
+    }
+
+    @GetMapping("/facts/catalog")
+    @Operation(summary = "List DecisionOps fact catalog",
+            description = "Builds the Strategy Studio fact catalog from meta models, dictionary bindings, "
+                    + "reference metadata, virtual model sources, and shared runtime contexts.")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_READ)
+    public ApiResponse<DecisionFactCatalogDTO> getFactCatalog(
+            @Parameter(description = "Optional model code to scope record facts")
+            @RequestParam(required = false) String modelCode) {
+        log.info("Listing DecisionOps fact catalog: modelCode={}", modelCode);
+        return ApiResponse.success(modelFieldService.getFactCatalog(modelCode));
     }
 
     // ==================== Permission governance ====================

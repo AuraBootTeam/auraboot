@@ -2,13 +2,21 @@ package com.auraboot.framework.decision.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.decision.dto.DecisionFactCatalogDTO;
+import com.auraboot.framework.decision.dto.DecisionFactDTO;
+import com.auraboot.framework.decision.dto.DecisionFactEntityDTO;
+import com.auraboot.framework.decision.dto.DecisionFactOptionDTO;
 import com.auraboot.framework.decision.dto.DecisionModelFieldDTO;
 import com.auraboot.framework.decision.entity.DrtVersionEntity;
 import com.auraboot.framework.decision.mapper.DrtVersionMapper;
 import com.auraboot.framework.decision.service.DecisionModelFieldService;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.MetaFieldDTO;
+import com.auraboot.framework.meta.entity.Dict;
+import com.auraboot.framework.meta.entity.DictItem;
 import com.auraboot.framework.meta.entity.Model;
+import com.auraboot.framework.meta.mapper.DictItemMapper;
+import com.auraboot.framework.meta.mapper.DictMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.service.ModelFieldBindingService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -32,12 +40,14 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
 
     private static final Set<String> SUPPORTED_DATA_TYPES = Set.of(
             "string", "text", "integer", "decimal", "boolean", "date", "time",
-            "datetime", "duration", "enum", "dict", "user", "role", "group",
+            "datetime", "duration", "enum", "dict", "reference", "user", "role", "group",
             "department", "collection", "object");
 
     private final DrtVersionMapper versionMapper;
     private final MetaModelMapper metaModelMapper;
     private final ModelFieldBindingService modelFieldBindingService;
+    private final DictMapper dictMapper;
+    private final DictItemMapper dictItemMapper;
 
     @Override
     public List<DecisionModelFieldDTO> listFields() {
@@ -64,6 +74,32 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
                 .sorted(Comparator.comparing(DecisionModelFieldDTO::getEntityCode)
                         .thenComparing(DecisionModelFieldDTO::getPath))
                 .toList();
+    }
+
+    @Override
+    public DecisionFactCatalogDTO getFactCatalog(String modelCode) {
+        requireTenant();
+        DecisionFactCatalogDTO catalog = new DecisionFactCatalogDTO();
+        List<DecisionFactEntityDTO> entities = new ArrayList<>();
+
+        for (Model model : metaModelMapper.findCurrentByTenant()) {
+            if (model == null || !"published".equalsIgnoreCase(String.valueOf(model.getStatus()))) {
+                continue;
+            }
+            if (hasText(modelCode) && !modelCode.equals(model.getCode())) {
+                continue;
+            }
+            DecisionFactEntityDTO entity = buildModelEntity(model);
+            if (!entity.getFacts().isEmpty()) {
+                entities.add(entity);
+            }
+        }
+
+        entities.sort(Comparator.comparing(DecisionFactEntityDTO::getModelCode,
+                Comparator.nullsLast(String::compareTo)));
+        entities.addAll(sharedContextEntities());
+        catalog.setEntities(entities);
+        return catalog;
     }
 
     private Long requireTenant() {
@@ -96,6 +132,127 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
 
     private String recordDataPath(String fieldCode) {
         return fieldCode.startsWith("data.") ? fieldCode : "data." + fieldCode;
+    }
+
+    private DecisionFactEntityDTO buildModelEntity(Model model) {
+        DecisionFactEntityDTO entity = new DecisionFactEntityDTO();
+        entity.setScope("record");
+        entity.setEntityCode(model.getCode());
+        entity.setModelCode(model.getCode());
+        entity.setLabel(hasText(model.getDisplayName()) ? model.getDisplayName() : model.getCode());
+        entity.setSourceType(hasText(model.getSourceType()) ? model.getSourceType() : "physical");
+        entity.setSourceRef(model.getSourceRef());
+
+        List<MetaFieldDTO> modelFields = modelFieldBindingService.getModelFields(model.getPid());
+        for (MetaFieldDTO field : modelFields) {
+            if (field == null || !Boolean.TRUE.equals(field.getVisible()) || !hasText(field.getCode())) {
+                continue;
+            }
+            entity.getFacts().add(buildFieldFact(model, field));
+        }
+        entity.getFacts().sort(Comparator.comparing(DecisionFactDTO::getFactKey));
+        return entity;
+    }
+
+    private DecisionFactDTO buildFieldFact(Model model, MetaFieldDTO field) {
+        String dataType = normalizeDataType(field.getDataType());
+        DecisionFactDTO fact = new DecisionFactDTO();
+        fact.setScope("record");
+        fact.setPath(recordDataPath(field.getCode()));
+        fact.setFactKey("record." + fact.getPath());
+        fact.setModelCode(model.getCode());
+        fact.setSourceType(hasText(model.getSourceType()) ? model.getSourceType() : "physical");
+        fact.setLabel(field.getDisplayName());
+        fact.setDataType(dataType);
+        fact.setOperators(operatorsFor(dataType));
+        fact.setDictCode(field.getDictCode());
+        fact.setAllowedValues(loadDictOptions(field.getDictCode()));
+        fact.setReference(field.getRefTarget());
+        fact.setRequired(field.getRequired());
+        fact.setVisible(field.getVisible());
+        fact.setEditable(field.getEditable());
+        return fact;
+    }
+
+    private List<DecisionFactOptionDTO> loadDictOptions(String dictCode) {
+        if (!hasText(dictCode)) {
+            return List.of();
+        }
+        Dict dict = dictMapper.findCurrentByCode(dictCode);
+        if (dict == null || dict.getId() == null || !"published".equalsIgnoreCase(String.valueOf(dict.getStatus()))) {
+            return List.of();
+        }
+        List<DecisionFactOptionDTO> options = new ArrayList<>();
+        for (DictItem item : dictItemMapper.findByDictId(dict.getId())) {
+            DecisionFactOptionDTO option = new DecisionFactOptionDTO();
+            option.setValue(item.getValue());
+            option.setLabel(item.getLabel());
+            option.setParentValue(item.getParentValue());
+            option.setDisabled(!"enabled".equalsIgnoreCase(String.valueOf(item.getStatus())));
+            options.add(option);
+        }
+        return options;
+    }
+
+    private List<DecisionFactEntityDTO> sharedContextEntities() {
+        List<DecisionFactEntityDTO> entities = new ArrayList<>();
+        entities.add(sharedEntity("actor", "Actor", List.of(
+                sharedFact("actor", "userId", "Current User", "user"),
+                sharedFact("actor", "roleCodes", "Current Roles", "collection"),
+                sharedFact("actor", "departmentId", "Department", "department"))));
+        entities.add(sharedEntity("event", "Event", List.of(
+                sharedFact("event", "type", "Event Type", "string"),
+                sharedFact("event", "source", "Event Source", "string"),
+                sharedFact("event", "occurredAt", "Occurred At", "datetime"))));
+        entities.add(sharedEntity("time", "Time", List.of(
+                sharedFact("time", "now", "Current Time", "datetime"),
+                sharedFact("time", "businessHours", "Business Hours", "boolean"),
+                sharedFact("time", "weekday", "Weekday", "integer"))));
+        entities.add(sharedEntity("tenant", "Tenant", List.of(
+                sharedFact("tenant", "id", "Tenant ID", "string"),
+                sharedFact("tenant", "timezone", "Timezone", "string"),
+                sharedFact("tenant", "locale", "Locale", "string"))));
+        return entities;
+    }
+
+    private DecisionFactEntityDTO sharedEntity(String scope, String label, List<DecisionFactDTO> facts) {
+        DecisionFactEntityDTO entity = new DecisionFactEntityDTO();
+        entity.setScope(scope);
+        entity.setEntityCode(scope);
+        entity.setLabel(label);
+        entity.setSourceType("runtime");
+        entity.setFacts(new ArrayList<>(facts));
+        return entity;
+    }
+
+    private DecisionFactDTO sharedFact(String scope, String path, String label, String dataType) {
+        String normalizedDataType = normalizeDataType(dataType);
+        DecisionFactDTO fact = new DecisionFactDTO();
+        fact.setScope(scope);
+        fact.setPath(path);
+        fact.setFactKey(scope + "." + path);
+        fact.setLabel(label);
+        fact.setDataType(normalizedDataType);
+        fact.setSourceType("runtime");
+        fact.setOperators(operatorsFor(normalizedDataType));
+        fact.setVisible(true);
+        fact.setEditable(false);
+        return fact;
+    }
+
+    private List<String> operatorsFor(String dataType) {
+        return switch (normalizeDataType(dataType)) {
+            case "integer", "decimal", "duration" -> List.of(
+                    "EQ", "NE", "GT", "GTE", "LT", "LTE", "BETWEEN", "IS_EMPTY", "IS_NOT_EMPTY");
+            case "date", "time", "datetime" -> List.of(
+                    "EQ", "NE", "BEFORE", "AFTER", "BETWEEN", "IS_EMPTY", "IS_NOT_EMPTY");
+            case "boolean" -> List.of("EQ", "NE", "IS_EMPTY", "IS_NOT_EMPTY");
+            case "enum", "dict", "reference", "user", "role", "group", "department" -> List.of(
+                    "EQ", "NE", "IN", "NOT_IN", "IS_EMPTY", "IS_NOT_EMPTY");
+            default -> List.of(
+                    "EQ", "NE", "CONTAINS", "NOT_CONTAINS", "STARTS_WITH", "ENDS_WITH",
+                    "IN", "NOT_IN", "IS_EMPTY", "IS_NOT_EMPTY");
+        };
     }
 
     private boolean hasText(String value) {
