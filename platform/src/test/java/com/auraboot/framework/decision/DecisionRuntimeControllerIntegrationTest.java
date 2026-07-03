@@ -645,6 +645,23 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void httpActionCatalogReportsRuntimeHandlersAndDoesNotAdvertiseCreateTask() throws Exception {
+        String body = mockMvc.perform(get("/api/decision/actions/catalog"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode actions = json.readTree(body).path("data").path("actions");
+        assertAvailableAction(actions, "NOTIFY");
+        assertAvailableAction(actions, "START_PROCESS");
+        assertAvailableAction(actions, "ADD_COMMENT");
+        assertAvailableAction(actions, "UPDATE_RECORD");
+        assertAvailableAction(actions, "PATCH_RECORD");
+        assertAvailableAction(actions, "WEBHOOK");
+        assertAvailableAction(actions, "WRITE_AUDIT");
+        assertTrue(findCatalogAction(actions, "CREATE_TASK").isMissingNode());
+    }
+
+    @Test
     void httpConditionFragments_createEvaluateAndReportImpactRefs() throws Exception {
         String code = "it_fragment_" + System.nanoTime();
         JsonNode conditionSpec = json.readTree("""
@@ -935,6 +952,22 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         for (JsonNode fact : facts) {
             if (factKey.equals(fact.path("factKey").asText())) {
                 return fact;
+            }
+        }
+        return MissingNode.getInstance();
+    }
+
+    private void assertAvailableAction(JsonNode actions, String actionType) {
+        JsonNode action = findCatalogAction(actions, actionType);
+        assertTrue(!action.isMissingNode());
+        assertTrue(action.path("handlerAvailable").asBoolean());
+        assertTrue(action.path("inputSchema").isObject());
+    }
+
+    private JsonNode findCatalogAction(JsonNode actions, String actionType) {
+        for (JsonNode action : actions) {
+            if (actionType.equals(action.path("actionType").asText())) {
+                return action;
             }
         }
         return MissingNode.getInstance();

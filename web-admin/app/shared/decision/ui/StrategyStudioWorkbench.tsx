@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   DecisionRuleBindingBlock,
   type DecisionOption,
 } from '~/ui/smart/decision/DecisionRuleBindingBlock'
-import type { DecisionApi } from '../api/decisionApi'
+import type { DecisionAction, DecisionApi } from '../api/decisionApi'
 import type { FieldOption } from './ConditionBuilder'
 
 type StrategyScenarioKey = 'SLA' | 'BPM' | 'AUTOMATION' | 'PERMISSION'
@@ -16,7 +16,7 @@ interface StrategyScenario {
   ruleCode: string
   decisionCode: string
   fragment: string
-  actions: string[]
+  actionTypes: string[]
   blockers: number
   fields: FieldOption[]
 }
@@ -36,7 +36,7 @@ const SCENARIOS: StrategyScenario[] = [
     ruleCode: 'SLA_ESCALATE_HIGH_VALUE',
     decisionCode: 'complaint_sla_deadline',
     fragment: '高价值紧急客诉 v3',
-    actions: ['发送 IM / Email', '升级负责人', '更新 SLA 风险等级'],
+    actionTypes: ['NOTIFY', 'PATCH_RECORD', 'WRITE_AUDIT'],
     blockers: 1,
     fields: [
       {
@@ -58,7 +58,7 @@ const SCENARIOS: StrategyScenario[] = [
     ruleCode: 'BPM_APPROVER_ROUTE',
     decisionCode: 'approval_routing',
     fragment: '高金额审批升级 v5',
-    actions: ['分配审批人', '抄送任务', '写入流程变量'],
+    actionTypes: ['START_PROCESS', 'ADD_COMMENT', 'WRITE_AUDIT'],
     blockers: 0,
     fields: [
       { scope: 'process', path: 'taskKey', label: '流程节点', dataType: 'string' },
@@ -74,7 +74,7 @@ const SCENARIOS: StrategyScenario[] = [
     ruleCode: 'AUTO_TICKET_ESCALATION',
     decisionCode: 'ticket_escalation_action',
     fragment: '逾期未响应工单 v2',
-    actions: ['调用 Webhook', '发送短信', '创建跟进任务'],
+    actionTypes: ['WEBHOOK', 'NOTIFY', 'PATCH_RECORD'],
     blockers: 0,
     fields: [
       { scope: 'event', path: 'changedFields', label: '变更字段', dataType: 'collection' },
@@ -90,7 +90,7 @@ const SCENARIOS: StrategyScenario[] = [
     ruleCode: 'ABAC_TICKET_VISIBILITY',
     decisionCode: 'ticket_visibility_policy',
     fragment: '同组织负责人可见 v2',
-    actions: ['限制行级数据', '注入权限上下文', '记录审计事件'],
+    actionTypes: ['WRITE_AUDIT'],
     blockers: 0,
     fields: [
       { scope: 'actor', path: 'orgPath', label: '组织路径', dataType: 'department' },
@@ -105,6 +105,16 @@ const DECISIONS = [
   { code: 'approval_routing', name: '审批路由' },
   { code: 'ticket_escalation_action', name: '工单升级动作' },
   { code: 'ticket_visibility_policy', name: '工单可见性策略' },
+]
+
+const SAFE_ACTIONS: DecisionAction[] = [
+  { actionType: 'NOTIFY', label: 'NOTIFY', handlerAvailable: true, category: 'messaging' },
+  { actionType: 'START_PROCESS', label: 'START_PROCESS', handlerAvailable: true, category: 'workflow' },
+  { actionType: 'ADD_COMMENT', label: 'ADD_COMMENT', handlerAvailable: true, category: 'collaboration' },
+  { actionType: 'UPDATE_RECORD', label: 'UPDATE_RECORD', handlerAvailable: true, category: 'data' },
+  { actionType: 'PATCH_RECORD', label: 'PATCH_RECORD', handlerAvailable: true, category: 'data' },
+  { actionType: 'WEBHOOK', label: 'WEBHOOK', handlerAvailable: true, category: 'integration' },
+  { actionType: 'WRITE_AUDIT', label: 'WRITE_AUDIT', handlerAvailable: true, category: 'governance' },
 ]
 
 function fieldKey(field: Pick<FieldOption, 'scope' | 'path'>): string {
@@ -126,6 +136,36 @@ function mergeDecisions(primary: DecisionOption[], secondary: DecisionOption[]):
   secondary.forEach((decision) => byCode.set(decision.code, decision))
   primary.forEach((decision) => byCode.set(decision.code, decision))
   return Array.from(byCode.values())
+}
+
+function actionMap(actions: DecisionAction[]): Map<string, DecisionAction> {
+  const map = new Map<string, DecisionAction>()
+  actions
+    .filter((action) => action.actionType && action.handlerAvailable !== false)
+    .forEach((action) => map.set(action.actionType, action))
+  return map
+}
+
+function resolveScenarioActions(
+  scenario: StrategyScenario,
+  actionsByType: Map<string, DecisionAction>,
+): DecisionAction[] {
+  return scenario.actionTypes.map((actionType) => actionsByType.get(actionType) ?? {
+    actionType,
+    label: actionType,
+    handlerAvailable: false,
+  })
+}
+
+function actionOutputSchema(actions: DecisionAction[]) {
+  return actions
+    .filter((action) => action.handlerAvailable !== false)
+    .map((action) => ({
+      actionType: action.actionType,
+      label: action.label ?? action.actionType,
+      category: action.category,
+      inputSchema: action.inputSchema,
+    }))
 }
 
 function formatFieldPath(field: FieldOption): string {
@@ -191,12 +231,34 @@ export function StrategyStudioWorkbench({ fields, decisions = [], api }: Strateg
   const [scenarioKey, setScenarioKey] = useState<StrategyScenarioKey>('SLA')
   const [operationStatus, setOperationStatus] = useState<string | null>(null)
   const [draftVersionPids, setDraftVersionPids] = useState<Record<string, string>>({})
+  const [catalogActions, setCatalogActions] = useState<DecisionAction[]>([])
   const scenario = SCENARIOS.find((candidate) => candidate.key === scenarioKey) ?? SCENARIOS[0]
   const decisionOptions = useMemo(() => mergeDecisions(decisions, DECISIONS), [decisions])
+  const actionsByType = useMemo(
+    () => actionMap(catalogActions.length > 0 ? catalogActions : SAFE_ACTIONS),
+    [catalogActions],
+  )
+  const scenarioActions = useMemo(
+    () => resolveScenarioActions(scenario, actionsByType),
+    [actionsByType, scenario],
+  )
   const scenarioFields = useMemo(
     () => mergeFields(scenario.fields, fields),
     [fields, scenario.fields],
   )
+
+  useEffect(() => {
+    let cancelled = false
+    api.getActionCatalog()
+      .then((catalog) => {
+        if (!cancelled) setCatalogActions(catalog.actions ?? [])
+      })
+      .catch(() => {
+        if (!cancelled) setCatalogActions([])
+      })
+    return () => { cancelled = true }
+  }, [api])
+
   const selectScenario = (next: StrategyScenario) => {
     setScenarioKey(next.key)
     setOperationStatus(`已加载共享片段 · ${next.fragment}`)
@@ -268,7 +330,7 @@ export function StrategyStudioWorkbench({ fields, decisions = [], api }: Strateg
         versionTag: `studio-${target.key.toLowerCase()}`,
         contentJson: draftCondition(targetFields),
         inputSchemaJson: { fields: targetFields.map(formatFieldPath) },
-        outputSchemaJson: { actions: target.actions },
+        outputSchemaJson: { actions: actionOutputSchema(resolveScenarioActions(target, actionsByType)) },
         contextSchemaJson: { sample: sampleContext() },
       })
       if (draft.pid) {
@@ -385,7 +447,7 @@ export function StrategyStudioWorkbench({ fields, decisions = [], api }: Strateg
         </div>
         <div>
           <span>动作</span>
-          <strong>{scenario.actions.length}</strong>
+          <strong>{scenarioActions.length}</strong>
           <small>命中后统一执行</small>
         </div>
         <div>
@@ -455,7 +517,7 @@ export function StrategyStudioWorkbench({ fields, decisions = [], api }: Strateg
               <div>HIGH</div>
               <div>&gt; 100000</div>
               <div>{scenario.key === 'BPM' ? 'director' : 'escalate'}</div>
-              <div>{scenario.actions.slice(0, 2).join(' + ')}</div>
+              <div>{scenarioActions.slice(0, 2).map((action) => action.actionType).join(' + ')}</div>
             </div>
           </div>
         </main>
@@ -486,11 +548,14 @@ export function StrategyStudioWorkbench({ fields, decisions = [], api }: Strateg
           <section className="strategy-studio-panel" data-testid="strategy-action-plan">
             <div className="strategy-studio-panel-head">
               <strong>动作输出</strong>
-              <span>{scenario.actions.length}</span>
+              <span>{scenarioActions.length}</span>
             </div>
             <ol className="strategy-action-list">
-              {scenario.actions.map((action) => (
-                <li key={action}>{action}</li>
+              {scenarioActions.map((action) => (
+                <li key={action.actionType}>
+                  <strong>{action.actionType}</strong>
+                  <span>{action.label ?? action.actionType}</span>
+                </li>
               ))}
             </ol>
           </section>
