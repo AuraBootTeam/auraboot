@@ -702,26 +702,20 @@ export async function ensureTenantAdminModelPermissions(
 export function createCorrectedBomWorkbook(filePath: string): string {
   mkdirSync(path.dirname(filePath), { recursive: true });
   const workbook = XLSXUtils.book_new();
+  // Standard BOM shape (matches StandardBomTemplateWriter / ImportCorrectedBomHandler's
+  // requireStandardBomFormat): free-form preamble on rows 1-3, the fixed 12-column
+  // header on row 4 (index 3), data from row 5. Non-standard uploads are now rejected.
+  // Material code -> mpn, 用量 -> qty, 规格描述 -> description via the handler's aliases.
   const worksheet = XLSXUtils.aoa_to_sheet([
-    [
-      'MPN',
-      'Description',
-      'RefDes',
-      'Qty',
-      'Unit',
-      'Package',
-      'SMT Points',
-      'THT Points',
-      'Pin Count',
-      'Hole Count',
-      'Positioning Pin Count',
-      'Function Pin Count',
-    ],
-    ['RC0603FR-0710KL', '10K resistor', 'R1,R2', 7600, 'pcs', '0603', 2, 0, 2, 0, 0, 2],
-    ['STM32F103C8T6', 'MCU', 'U1', 200, 'pcs', 'LQFP48', 48, 0, 48, 0, 0, 48],
-    ['', 'missing mpn row', 'C1', 10, 'pcs', '0603', 1, 0, 2, 0, 0, 2],
+    ['捷嘉智造工业互联网(深圳)有限公司', '', '', '', '', '', '', '', '', '', '', ''],
+    ['型号: E2E', '', '', '', '', '', '', '', '', '', '', ''],
+    ['发行日期: 2026-01-01', '', '', '', '', '', '', '', 'PCBA 编码: E2E', '', '', ''],
+    ['序号', '层级', '物料编码', '物料名称', '规格描述', '单位', '用量', '位置', '工段', '品牌/制造商', '原料号', '备注'],
+    ['1', '1', 'RC0603FR-0710KL', '10K resistor', '10K resistor 0603', 'pcs', 7600, 'R1,R2', '', '', '', ''],
+    ['2', '1', 'STM32F103C8T6', 'MCU', 'LQFP48 MCU', 'pcs', 200, 'U1', '', '', '', ''],
+    ['3', '1', '', 'missing mpn row', '0603', 'pcs', 10, 'C1', '', '', '', ''],
   ]);
-  XLSXUtils.book_append_sheet(workbook, worksheet, 'Corrected BOM');
+  XLSXUtils.book_append_sheet(workbook, worksheet, 'BOM');
   const bytes = write(workbook, { bookType: 'xlsx', type: 'buffer' });
   writeFileSync(filePath, bytes);
   return filePath;

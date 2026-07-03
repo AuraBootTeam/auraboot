@@ -3,6 +3,7 @@ import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { executeSimpleWorkbenchAction, useRuntimeStateSubscription } from './workbenchBlockUtils';
+import { LoadingOverlay } from '~/ui/LoadingOverlay';
 
 export interface WorkbenchActionBarBlockRendererProps {
   block: BlockConfig;
@@ -102,17 +103,23 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
 
   if (title) {
     return (
-      <div className={`${surfaceClass} justify-between`} data-testid="workbench-action-bar">
-        <h3 className="text-text text-base font-semibold">{title}</h3>
-        <div className={`flex flex-wrap items-center gap-2 ${alignClass}`}>{actionButtons}</div>
-      </div>
+      <>
+        <LoadingOverlay visible={runningAction !== null} label={t('common.loading')} />
+        <div className={`${surfaceClass} justify-between`} data-testid="workbench-action-bar">
+          <h3 className="text-text text-base font-semibold">{title}</h3>
+          <div className={`flex flex-wrap items-center gap-2 ${alignClass}`}>{actionButtons}</div>
+        </div>
+      </>
     );
   }
 
   return (
-    <div className={`${surfaceClass} ${alignClass}`} data-testid="workbench-action-bar">
-      {actionButtons}
-    </div>
+    <>
+      <LoadingOverlay visible={runningAction !== null} label={t('common.loading')} />
+      <div className={`${surfaceClass} ${alignClass}`} data-testid="workbench-action-bar">
+        {actionButtons}
+      </div>
+    </>
   );
 };
 

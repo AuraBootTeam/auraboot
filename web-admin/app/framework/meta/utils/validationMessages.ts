@@ -1,5 +1,10 @@
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
+
 export function buildRequiredFieldMessage(
-  label: string,
+  // Accept a raw label which may be a LocalizedText object ({ "zh-CN": "..." }),
+  // an $i18n: key, or a plain string. Callers pass rawField.label / displayName
+  // untouched, so we resolve here to avoid rendering "[object Object]".
+  label: unknown,
   options?: {
     dataType?: string;
     component?: string;
@@ -7,7 +12,9 @@ export function buildRequiredFieldMessage(
     t?: (key: string) => string;
   },
 ): string {
-  const normalizedLabel = String(label || '').trim() || 'This field';
+  const normalizedLabel =
+    String(getLocalizedText(label as any, options?.locale, options?.t) || '').trim() ||
+    'This field';
   const normalizedDataType = String(options?.dataType || '').toLowerCase();
   const normalizedComponent = String(options?.component || '').toLowerCase();
   const locale = String(options?.locale || 'en-US');

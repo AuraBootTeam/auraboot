@@ -1,7 +1,9 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.CommandCascadeDeleteExecutor;
 import com.auraboot.framework.meta.service.impl.CommandFieldMapExecutor;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
@@ -42,10 +44,13 @@ class FieldMapPhaseTest {
     @Mock
     private CommandHandlerExtension pluginHandler;
 
+    @Mock
+    private MetaModelService metaModelService;
+
     @Test
     void executeSkipsImplicitStateTransitionWhenPluginHandlerDisablesDslPersistence() {
         FieldMapPhase phase = new FieldMapPhase(
-                fieldMapExecutor, cascadeDeleteExecutor, snapshotReader, extensionRegistry);
+                fieldMapExecutor, cascadeDeleteExecutor, snapshotReader, extensionRegistry, metaModelService);
 
         CommandExecuteRequest request = new CommandExecuteRequest();
         request.setOperationType("state_transition");
@@ -98,7 +103,7 @@ class FieldMapPhaseTest {
     @Test
     void deleteCommandWithoutOperationTypeStillRoutesToImplicitFieldMap() {
         FieldMapPhase phase = new FieldMapPhase(
-                fieldMapExecutor, cascadeDeleteExecutor, snapshotReader, extensionRegistry);
+                fieldMapExecutor, cascadeDeleteExecutor, snapshotReader, extensionRegistry, metaModelService);
 
         CommandExecuteRequest request = new CommandExecuteRequest();
         // operationType deliberately not set — the CLI/API flow we're regressing
@@ -123,14 +128,65 @@ class FieldMapPhaseTest {
                 .build();
 
         when(extensionRegistry.getCommandHandler("acs:delete_safety_rule")).thenReturn(Optional.empty());
+        when(metaModelService.getModelDefinition("acs_safety_rule")).thenReturn(Optional.empty());
         when(fieldMapExecutor.executeImplicitFieldMapPhase(
                 same(execConfig), same(ctx.getPayload()), eq(1L), same(request), same(command)))
                 .thenReturn(Map.of("acs_safety_rule_deleted", 1));
 
         phase.execute(ctx);
 
+        // Non-soft-delete model → physical cascade delete runs.
+        verify(cascadeDeleteExecutor).executeCascadeDeletePhase(same(execConfig), eq(1L), same(request));
         verify(fieldMapExecutor).executeImplicitFieldMapPhase(
                 same(execConfig), same(ctx.getPayload()), eq(1L), same(request), same(command));
         assertThat(ctx.getFieldMapResults()).containsEntry("acs_safety_rule_deleted", 1);
+    }
+
+    /**
+     * Soft-delete model: the parent is only flagged deleted, so the physical
+     * cascade-delete of children must be skipped (children survive / stay
+     * recoverable). The flag-update itself happens inside the implicit field-map
+     * executor (CommandFieldMapExecutor's soft/hard delete split).
+     */
+    @Test
+    void deleteOfSoftDeleteModel_skipsPhysicalCascadeDelete() {
+        FieldMapPhase phase = new FieldMapPhase(
+                fieldMapExecutor, cascadeDeleteExecutor, snapshotReader, extensionRegistry, metaModelService);
+
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setOperationType("delete");
+        request.setTargetRecordId("quote-pid-7");
+
+        CommandDefinition command = new CommandDefinition();
+        command.setCode("qo_quote_common:delete");
+        command.setModelCode("qo_quote_common");
+
+        Map<String, Object> execConfig = new HashMap<>(Map.of("type", "delete"));
+
+        CommandPipelineContext ctx = CommandPipelineContext.builder()
+                .commandCode(command.getCode())
+                .request(request)
+                .tenantId(1L)
+                .userId(2L)
+                .startTime(System.currentTimeMillis())
+                .command(command)
+                .payload(new HashMap<>())
+                .execConfig(execConfig)
+                .rulesByType(new HashMap<>())
+                .build();
+
+        when(metaModelService.getModelDefinition("qo_quote_common"))
+                .thenReturn(Optional.of(ModelDefinition.builder().softDelete(true).build()));
+        when(extensionRegistry.getCommandHandler("qo_quote_common:delete")).thenReturn(Optional.empty());
+        when(fieldMapExecutor.executeImplicitFieldMapPhase(
+                same(execConfig), same(ctx.getPayload()), eq(1L), same(request), same(command)))
+                .thenReturn(Map.of("qo_quote_common_deleted", 1));
+
+        phase.execute(ctx);
+
+        verify(cascadeDeleteExecutor, never())
+                .executeCascadeDeletePhase(same(execConfig), eq(1L), same(request));
+        verify(fieldMapExecutor).executeImplicitFieldMapPhase(
+                same(execConfig), same(ctx.getPayload()), eq(1L), same(request), same(command));
     }
 }

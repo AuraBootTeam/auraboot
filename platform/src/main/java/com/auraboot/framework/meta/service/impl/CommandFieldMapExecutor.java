@@ -132,7 +132,17 @@ public class CommandFieldMapExecutor {
                 conditions.put("tenant_id", tenantId);
                 var delIdEntry = CommandExecutorUtils.resolveRecordIdColumn(request.getTargetRecordId());
                 conditions.put(delIdEntry.getKey(), delIdEntry.getValue());
-                int deleted = dynamicDataMapper.delete(tableName, conditions);
+                int deleted;
+                if (modelDef != null && modelDef.isSoftDelete()) {
+                    // Soft-delete model: flag the row (recoverable/auditable) instead of
+                    // physically deleting — mirrors DynamicDataServiceImpl.delete's soft path.
+                    Map<String, Object> softDelete = new HashMap<>();
+                    softDelete.put("deleted_flag", true);
+                    softDelete.put("updated_at", Instant.now());
+                    deleted = dynamicDataMapper.update(tableName, softDelete, conditions);
+                } else {
+                    deleted = dynamicDataMapper.delete(tableName, conditions);
+                }
                 results.put(targetModel + "_deleted", deleted);
             } else {
                 // Defense: reject delete/update without targetRecordPid.
@@ -302,7 +312,17 @@ public class CommandFieldMapExecutor {
             conditions.put("tenant_id", tenantId);
             var delIdEntry = CommandExecutorUtils.resolveRecordIdColumn(request.getTargetRecordId());
             conditions.put(delIdEntry.getKey(), delIdEntry.getValue());
-            int deleted = dynamicDataMapper.delete(tableName, conditions);
+            int deleted;
+            if (modelDef != null && modelDef.isSoftDelete()) {
+                // Soft-delete model: flag the row (recoverable/auditable) instead of
+                // physically deleting — mirrors DynamicDataServiceImpl.delete's soft path.
+                Map<String, Object> softDelete = new HashMap<>();
+                softDelete.put("deleted_flag", true);
+                softDelete.put("updated_at", Instant.now());
+                deleted = dynamicDataMapper.update(tableName, softDelete, conditions);
+            } else {
+                deleted = dynamicDataMapper.delete(tableName, conditions);
+            }
             results.put(modelCode + "_deleted", deleted);
             log.info("Implicit FIELD_MAP DELETE: {} rows in {} (command={})", deleted, modelCode, command.getCode());
         } else {
