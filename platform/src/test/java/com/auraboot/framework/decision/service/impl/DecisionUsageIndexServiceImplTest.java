@@ -507,10 +507,10 @@ class DecisionUsageIndexServiceImplTest {
                 .containsExactlyInAnyOrder(
                         org.assertj.core.groups.Tuple.tuple(
                                 "BPM_PROCESS", "approval_process", "4",
-                                "DECISION", "approval_routing", null, "DESIGNER_NODE"),
+                                "DECISION", "approval_routing", "nodes.gateway_route", "DESIGNER_NODE"),
                         org.assertj.core.groups.Tuple.tuple(
                                 "BPM_PROCESS", "approval_process", "4",
-                                "DECISION", "task_assignee", null, "DESIGNER_NODE"),
+                                "DECISION", "task_assignee", "nodes.task_assign", "DESIGNER_NODE"),
                         org.assertj.core.groups.Tuple.tuple(
                                 "BPM_PROCESS", "approval_process", "4",
                                 "FIELD", null, "record.amount", "DESIGNER_NODE"),
@@ -535,6 +535,96 @@ class DecisionUsageIndexServiceImplTest {
                     assertThat(ref.getMetadataJson().get("sourceNodeId").asText()).isEqualTo("gateway_route");
                     assertThat(ref.getMetadataJson().get("targetNodeId").asText()).isEqualTo("task_assign");
                 });
+    }
+
+    @Test
+    void rebuildKeepsBpmDesignerRefsForEachNodeWhenDecisionIsShared() {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        when(versionMapper.selectList(any())).thenReturn(List.of());
+        when(automationMapper.selectList(any())).thenReturn(List.of());
+        when(slaConfigMapper.selectList(any())).thenReturn(List.of());
+        when(policyVersionMapper.selectList(any())).thenReturn(List.of());
+        when(namedQueryMapper.selectList(any())).thenReturn(List.of());
+
+        BpmProcessDefinition process = new BpmProcessDefinition();
+        process.setPid("bpm-proc-shared-routing");
+        process.setTenantId(10L);
+        process.setProcessKey("wd_leave_approval");
+        process.setProcessName("Leave Approval");
+        process.setStatus("deployed");
+        process.setVersion(1);
+        process.setIsCurrent(true);
+        process.setDeletedFlag(false);
+        process.setExtension(Map.of("designerJson", """
+                {
+                  "key": "wd_leave_approval",
+                  "nodes": [
+                    {
+                      "id": "task_manager_approve",
+                      "type": "userTask",
+                      "data": {
+                        "type": "userTask",
+                        "label": "Manager Approve",
+                        "config": {
+                          "assignmentRuleBinding": {
+                            "consumerType": "BPM",
+                            "consumerCode": "wd_leave_approval",
+                            "consumerNodeId": "task_manager_approve",
+                            "bindingKind": "DECISION_REF",
+                            "decisionBinding": {
+                              "decisionCode": "approval_routing",
+                              "versionPolicy": "LATEST_PUBLISHED"
+                            },
+                            "enabled": true
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "id": "task_hr_approve",
+                      "type": "userTask",
+                      "data": {
+                        "type": "userTask",
+                        "label": "HR Approve",
+                        "config": {
+                          "assignmentRuleBinding": {
+                            "consumerType": "BPM",
+                            "consumerCode": "wd_leave_approval",
+                            "consumerNodeId": "task_hr_approve",
+                            "bindingKind": "DECISION_REF",
+                            "decisionBinding": {
+                              "decisionCode": "approval_routing",
+                              "versionPolicy": "LATEST_PUBLISHED"
+                            },
+                            "enabled": true
+                          }
+                        }
+                      }
+                    }
+                  ],
+                  "edges": []
+                }
+                """));
+        when(bpmProcessDefinitionMapper.selectList(any())).thenReturn(List.of(process));
+
+        DecisionUsageIndexRebuildDTO summary = service.rebuild();
+
+        ArgumentCaptor<DecisionUsageRefEntity> captor = ArgumentCaptor.forClass(DecisionUsageRefEntity.class);
+        verify(usageRefMapper).deleteByTenant(10L);
+        verify(usageRefMapper, times(2)).insert(captor.capture());
+        assertThat(summary.getConsumerRefs()).isEqualTo(2);
+        assertThat(captor.getAllValues())
+                .extracting(DecisionUsageRefEntity::getSourceType, DecisionUsageRefEntity::getSourceCode,
+                        DecisionUsageRefEntity::getSourceVersion, DecisionUsageRefEntity::getTargetType,
+                        DecisionUsageRefEntity::getTargetCode, DecisionUsageRefEntity::getTargetPath,
+                        DecisionUsageRefEntity::getBinding)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(
+                                "BPM_PROCESS", "wd_leave_approval", "1",
+                                "DECISION", "approval_routing", "nodes.task_manager_approve", "DESIGNER_NODE"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "BPM_PROCESS", "wd_leave_approval", "1",
+                                "DECISION", "approval_routing", "nodes.task_hr_approve", "DESIGNER_NODE"));
     }
 
     @Test
