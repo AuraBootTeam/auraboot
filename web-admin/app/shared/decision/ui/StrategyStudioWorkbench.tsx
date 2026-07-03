@@ -1,5 +1,9 @@
 import { useMemo, useState } from 'react'
-import { DecisionRuleBindingBlock } from '~/ui/smart/decision/DecisionRuleBindingBlock'
+import {
+  DecisionRuleBindingBlock,
+  type DecisionOption,
+} from '~/ui/smart/decision/DecisionRuleBindingBlock'
+import type { DecisionApi } from '../api/decisionApi'
 import type { FieldOption } from './ConditionBuilder'
 
 type StrategyScenarioKey = 'SLA' | 'BPM' | 'AUTOMATION' | 'PERMISSION'
@@ -19,6 +23,8 @@ interface StrategyScenario {
 
 export interface StrategyStudioWorkbenchProps {
   fields: FieldOption[]
+  decisions?: DecisionOption[]
+  api: DecisionApi
 }
 
 const SCENARIOS: StrategyScenario[] = [
@@ -115,16 +121,80 @@ function mergeFields(primary: FieldOption[], secondary: FieldOption[]): FieldOpt
   })
 }
 
+function mergeDecisions(primary: DecisionOption[], secondary: DecisionOption[]): DecisionOption[] {
+  const byCode = new Map<string, DecisionOption>()
+  secondary.forEach((decision) => byCode.set(decision.code, decision))
+  primary.forEach((decision) => byCode.set(decision.code, decision))
+  return Array.from(byCode.values())
+}
+
 function formatFieldPath(field: FieldOption): string {
   return `${field.scope}.${field.path}`
 }
 
-export function StrategyStudioWorkbench({ fields }: StrategyStudioWorkbenchProps) {
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : '操作失败'
+}
+
+function validationMessage(result: Awaited<ReturnType<DecisionApi['validateVersion']>>): string {
+  return result?.errors?.[0]?.message ?? '版本校验未通过'
+}
+
+function sampleContext() {
+  return {
+    record: {
+      data: {
+        amount: 120000,
+        customerTier: 'VIP',
+        departmentId: 'dept-sales',
+        ownerUserId: 'user-owner',
+        priority: 'HIGH',
+        status: 'OPEN',
+      },
+    },
+    actor: {
+      orgPath: '/hq/sales',
+      roles: ['department_manager'],
+    },
+    event: { changedFields: ['status', 'ownerUserId'] },
+    process: { taskKey: 'approval' },
+    sla: { overdueMinutes: 45 },
+    tenant: { id: 'tenant-demo' },
+    time: { now: '2026-07-03T12:00:00Z' },
+  }
+}
+
+function draftCondition(fields: FieldOption[]) {
+  const first = fields[0]
+  return {
+    type: 'group',
+    op: 'AND',
+    children: first
+      ? [
+          {
+            type: 'compare',
+            enabled: true,
+            left: {
+              type: 'path',
+              scope: first.scope,
+              path: first.path,
+              dataType: first.dataType,
+            },
+            operator: 'IS_NOT_NULL',
+          },
+        ]
+      : [],
+  }
+}
+
+export function StrategyStudioWorkbench({ fields, decisions = [], api }: StrategyStudioWorkbenchProps) {
   const [scenarioKey, setScenarioKey] = useState<StrategyScenarioKey>('SLA')
   const [operationStatus, setOperationStatus] = useState<string | null>(null)
+  const [draftVersionPids, setDraftVersionPids] = useState<Record<string, string>>({})
   const scenario = SCENARIOS.find((candidate) => candidate.key === scenarioKey) ?? SCENARIOS[0]
+  const decisionOptions = useMemo(() => mergeDecisions(decisions, DECISIONS), [decisions])
   const scenarioFields = useMemo(
-    () => mergeFields(fields, scenario.fields),
+    () => mergeFields(scenario.fields, fields),
     [fields, scenario.fields],
   )
   const selectScenario = (next: StrategyScenario) => {
@@ -137,6 +207,111 @@ export function StrategyStudioWorkbench({ fields }: StrategyStudioWorkbenchProps
       ? `发布被阻断 · ${scenario.blockers} 项待处理`
       : `发布检查通过 · ${scenario.consumer}`
 
+  const refreshImpact = async () => {
+    setOperationStatus('影响面查询中...')
+    try {
+      const impact = await api.getDecisionImpact(scenario.decisionCode)
+      const refCount = (impact.incoming?.length ?? 0) + (impact.outgoing?.length ?? 0)
+      setOperationStatus(`${impact.risk?.summary ?? '影响面已更新'} · ${refCount} 个引用`)
+    } catch (error) {
+      setOperationStatus(`影响面失败 · ${errorMessage(error)}`)
+    }
+  }
+
+  const runTest = async () => {
+    setOperationStatus('测试运行中...')
+    try {
+      const result = await api.evaluate({
+        decisionCode: scenario.decisionCode,
+        binding: 'LATEST',
+        callerType: scenario.key,
+        callerRef: scenario.ruleCode,
+        context: sampleContext(),
+      })
+      if (!result) {
+        throw new Error('决策执行无返回结果')
+      }
+      setOperationStatus(
+        `${result.matched ? '测试通过' : '测试未命中'} · ${result.traceId ?? result.status}`,
+      )
+    } catch (error) {
+      setOperationStatus(`测试失败 · ${errorMessage(error)}`)
+    }
+  }
+
+  const ensureDefinition = async (target: StrategyScenario) => {
+    const decisionName =
+      decisionOptions.find((decision) => decision.code === target.decisionCode)?.name ??
+      target.ruleCode
+    try {
+      const existing = await api.getDefinition(target.decisionCode)
+      if (existing) return
+    } catch {
+      // Missing definitions are created below; other API failures still surface through create.
+    }
+    await api.createDefinition({
+      decisionCode: target.decisionCode,
+      decisionName,
+      scopeType: target.consumer,
+      ownerModule: target.key,
+    })
+  }
+
+  const saveDraft = async (target: StrategyScenario = scenario): Promise<string | null> => {
+    setOperationStatus('草稿保存中...')
+    try {
+      await ensureDefinition(target)
+      const targetFields = mergeFields(target.fields, fields)
+      const draft = await api.createDraftVersion(target.decisionCode, {
+        kind: 'SIMPLE_CONDITION',
+        runtimeAdapter: 'AST_EVALUATOR',
+        versionTag: `studio-${target.key.toLowerCase()}`,
+        contentJson: draftCondition(targetFields),
+        inputSchemaJson: { fields: targetFields.map(formatFieldPath) },
+        outputSchemaJson: { actions: target.actions },
+        contextSchemaJson: { sample: sampleContext() },
+      })
+      if (draft.pid) {
+        setDraftVersionPids((current) => ({ ...current, [target.key]: draft.pid }))
+      }
+      setOperationStatus(`草稿已保存 · ${target.ruleCode}`)
+      return draft.pid ?? null
+    } catch (error) {
+      setOperationStatus(`保存失败 · ${errorMessage(error)}`)
+      return null
+    }
+  }
+
+  const publish = async () => {
+    if (scenario.blockers > 0) {
+      setOperationStatus(publishStatus)
+      return
+    }
+    setOperationStatus('发布中...')
+    const pid = draftVersionPids[scenario.key] ?? (await saveDraft())
+    if (!pid) return
+    try {
+      const validation = await api.validateVersion(pid)
+      if (!validation) {
+        throw new Error('版本校验无返回结果')
+      }
+      if (!validation.valid) {
+        setOperationStatus(`发布失败 · ${validationMessage(validation)}`)
+        return
+      }
+      const published = await api.publishVersion(pid, {
+        impactAcknowledged: true,
+        note: `Published from Strategy Studio for ${scenario.consumer}`,
+      })
+      if (!published) {
+        throw new Error('发布接口未返回版本结果')
+      }
+      setOperationStatus(`发布成功 · ${scenario.consumer}`)
+    } catch (error) {
+      setOperationStatus(`发布失败 · ${errorMessage(error)}`)
+    }
+  }
+
   return (
     <section className="strategy-studio" data-testid="strategy-studio">
       <header className="strategy-studio-header">
@@ -148,21 +323,21 @@ export function StrategyStudioWorkbench({ fields }: StrategyStudioWorkbenchProps
           <button
             type="button"
             data-testid="strategy-impact-preview"
-            onClick={() => setOperationStatus(`影响面已更新 · ${scenario.consumer}`)}
+            onClick={() => void refreshImpact()}
           >
             影响面
           </button>
           <button
             type="button"
             data-testid="strategy-run-test"
-            onClick={() => setOperationStatus(`测试通过 · ${scenario.decisionCode}`)}
+            onClick={() => void runTest()}
           >
             测试运行
           </button>
           <button
             type="button"
             data-testid="strategy-save-draft"
-            onClick={() => setOperationStatus(`草稿已保存 · ${scenario.ruleCode}`)}
+            onClick={() => void saveDraft()}
           >
             保存草稿
           </button>
@@ -170,7 +345,7 @@ export function StrategyStudioWorkbench({ fields }: StrategyStudioWorkbenchProps
             type="button"
             data-testid="strategy-publish"
             className="strategy-studio-primary"
-            onClick={() => setOperationStatus(publishStatus)}
+            onClick={() => void publish()}
           >
             发布
           </button>
@@ -255,17 +430,15 @@ export function StrategyStudioWorkbench({ fields }: StrategyStudioWorkbenchProps
                   showTestRunner: true,
                   initialDecisionCode: scenario.decisionCode,
                   initialContextJson: JSON.stringify(
-                    {
-                      record: { data: { priority: 'HIGH', amount: 120000 } },
-                      actor: { roles: ['department_manager'] },
-                    },
+                    sampleContext(),
                     null,
                     2,
                   ),
                   fields: scenarioFields,
-                  decisions: DECISIONS,
+                  decisions: decisionOptions,
                 },
               }}
+              api={api}
             />
           </div>
 

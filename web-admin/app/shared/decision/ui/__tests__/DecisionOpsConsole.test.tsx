@@ -134,6 +134,22 @@ function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
     pauseRollout: vi.fn(async () => ({ pid: 'rollout-new', status: 'PAUSED' })),
     promoteRollout: vi.fn(async () => ({ pid: 'rollout-new', status: 'PROMOTED' })),
     rollbackRollout: vi.fn(async () => ({ pid: 'rollout-new', status: 'ROLLED_BACK' })),
+    getDecisionImpact: vi.fn(async () => ({
+      incoming: [],
+      outgoing: [],
+      risk: { level: 'LOW', summary: '无阻塞引用' },
+    })),
+    evaluate: vi.fn(async () => ({
+      traceId: 'trace-default',
+      status: 'MATCHED',
+      matched: true,
+      outputs: {},
+    })),
+    createDefinition: vi.fn(async () => ({ decisionCode: 'approval_routing' })),
+    getDefinition: vi.fn(async () => ({ decisionCode: 'approval_routing' })),
+    createDraftVersion: vi.fn(async () => ({ pid: 'draft-default', status: 'DRAFT' })),
+    validateVersion: vi.fn(async () => ({ valid: true })),
+    publishVersion: vi.fn(async () => ({ pid: 'draft-default', status: 'PUBLISHED' })),
     ...overrides,
   } as unknown as DecisionApi;
 }
@@ -204,6 +220,36 @@ function renderConsoleWithoutModelFields(apiOverrides: Partial<DecisionApi> = {}
         api={apiInstance}
         fields={FIELDS}
         initialTab="model"
+        logs={[{ traceId: 't1', policyCode: 'p1', status: 'SUCCESS' }]}
+        connectors={[
+          { code: 'c1', name: 'Hook', type: 'WEBHOOK', health: 'HEALTHY', enabled: true },
+        ]}
+        permissionGrants={[{ role: '管理员', caps: { view: true, publish: true } }]}
+        dashboard={{
+          summary: {
+            definitions: 5,
+            policies: 2,
+            evaluationsToday: 10,
+            matched: 8,
+            failed: 0,
+            retrying: 0,
+          },
+          exceptions: [],
+        }}
+      />
+    </QueryClientProvider>,
+  );
+}
+
+function renderStudioWithoutModelFields(apiOverrides: Partial<DecisionApi> = {}) {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const apiInstance = api(apiOverrides);
+  return render(
+    <QueryClientProvider client={client}>
+      <DecisionOpsConsole
+        api={apiInstance}
+        fields={FIELDS}
+        initialTab="studio"
         logs={[{ traceId: 't1', policyCode: 'p1', status: 'SUCCESS' }]}
         connectors={[
           { code: 'c1', name: 'Hook', type: 'WEBHOOK', health: 'HEALTHY', enabled: true },
@@ -300,6 +346,196 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('decision-rule-binding-block')).toBeInTheDocument();
   });
 
+  it('hydrates Strategy Studio decisions and fact fields from the Decision Runtime APIs', async () => {
+    const listDefinitions = vi.fn(async () => [
+      {
+        decisionCode: 'approval_routing',
+        decisionName: 'API 审批路由',
+        enabled: true,
+      },
+    ]);
+    const getModelFields = vi.fn(async () => [
+      {
+        entityCode: 'wd_leave_request',
+        path: 'record.data.amount',
+        label: '申请金额',
+        dataType: 'decimal',
+        refs: 4,
+      },
+    ]);
+
+    renderStudioWithoutModelFields({
+      listDefinitions,
+      getModelFields,
+    } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() => expect(listDefinitions).toHaveBeenCalledOnce());
+    await waitFor(() => expect(getModelFields).toHaveBeenCalledOnce());
+
+    fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('decision-code')).toHaveTextContent(
+        'API 审批路由 (approval_routing)',
+      ),
+    );
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('申请金额');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('record.data.amount');
+  });
+
+  it('runs Strategy Studio header actions through the Decision Runtime APIs', async () => {
+    const getDecisionImpact = vi.fn(async () => ({
+      decisionCode: 'complaint_sla_deadline',
+      incoming: [{ sourceType: 'SLA_RULE', sourceCode: 'manager_sla' }],
+      outgoing: [],
+      risk: { blocking: false, summary: '1 个消费方引用' },
+    }));
+    const evaluate = vi.fn(async () => ({
+      traceId: 'trace-studio',
+      decisionCode: 'complaint_sla_deadline',
+      status: 'MATCHED',
+      matched: true,
+      outputs: { deadlineMinutes: 30 },
+    }));
+    const getDefinition = vi.fn(async () => {
+      throw new Error('not found');
+    });
+    const createDefinition = vi.fn(async () => ({ decisionCode: 'complaint_sla_deadline' }));
+    const createDraftVersion = vi.fn(async () => ({ pid: 'draft-studio-1', status: 'DRAFT' }));
+    const validateVersion = vi.fn(async () => ({ valid: true }));
+    const publishVersion = vi.fn(async () => ({ pid: 'draft-studio-1', status: 'PUBLISHED' }));
+
+    renderConsole(undefined, {
+      getDecisionImpact,
+      evaluate,
+      getDefinition,
+      createDefinition,
+      createDraftVersion,
+      validateVersion,
+      publishVersion,
+    } as unknown as Partial<DecisionApi>);
+
+    fireEvent.click(screen.getByTestId('strategy-impact-preview'));
+    await waitFor(() => expect(getDecisionImpact).toHaveBeenCalledWith('complaint_sla_deadline'));
+    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('1 个消费方引用');
+
+    fireEvent.click(screen.getByTestId('strategy-run-test'));
+    await waitFor(() => expect(evaluate).toHaveBeenCalledOnce());
+    expect(evaluate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        decisionCode: 'complaint_sla_deadline',
+        callerType: 'SLA',
+        callerRef: 'SLA_ESCALATE_HIGH_VALUE',
+      }),
+    );
+    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('trace-studio');
+
+    fireEvent.click(screen.getByTestId('strategy-save-draft'));
+    await waitFor(() => expect(createDefinition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        decisionCode: 'complaint_sla_deadline',
+        ownerModule: 'SLA',
+      }),
+    ));
+    expect(createDraftVersion).toHaveBeenCalledWith(
+      'complaint_sla_deadline',
+      expect.objectContaining({
+        kind: 'SIMPLE_CONDITION',
+        runtimeAdapter: 'AST_EVALUATOR',
+      }),
+    );
+    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('草稿已保存');
+
+    fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+    fireEvent.click(screen.getByTestId('strategy-publish'));
+
+    await waitFor(() => expect(publishVersion).toHaveBeenCalled());
+    expect(validateVersion).toHaveBeenCalledWith('draft-studio-1');
+    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('发布成功');
+    expect(createDraftVersion).toHaveBeenLastCalledWith(
+      'approval_routing',
+      expect.objectContaining({
+        contentJson: expect.objectContaining({
+          children: expect.arrayContaining([
+            expect.objectContaining({
+              left: expect.objectContaining({
+                scope: 'process',
+                path: 'taskKey',
+              }),
+            }),
+          ]),
+        }),
+        contextSchemaJson: expect.objectContaining({
+          sample: expect.objectContaining({
+            process: expect.objectContaining({ taskKey: 'approval' }),
+          }),
+        }),
+      }),
+    );
+  });
+
+  it('does not report Strategy Studio publish success when the runtime rejects the transition', async () => {
+    const validateVersion = vi.fn(async () => ({ valid: true }));
+    const publishVersion = vi.fn(async () => null);
+
+    renderConsole(undefined, {
+      validateVersion,
+      publishVersion,
+    } as unknown as Partial<DecisionApi>);
+
+    fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+    fireEvent.click(screen.getByTestId('strategy-publish'));
+
+    await waitFor(() => expect(validateVersion).toHaveBeenCalledWith('draft-default'));
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent(
+        '发布失败 · 发布接口未返回版本结果',
+      ),
+    );
+  });
+
+  it('shows a stable Strategy Studio test-run failure when the runtime returns no result body', async () => {
+    const evaluate = vi.fn(async () => null);
+
+    renderConsole(undefined, {
+      evaluate,
+    } as unknown as Partial<DecisionApi>);
+
+    fireEvent.click(screen.getByTestId('strategy-run-test'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent(
+        '测试失败 · 决策执行无返回结果',
+      ),
+    );
+  });
+
+  it('does not recreate an existing Strategy Studio decision definition before saving a draft', async () => {
+    const getDefinition = vi.fn(async () => ({
+      decisionCode: 'complaint_sla_deadline',
+      decisionName: '投诉 SLA 截止时间',
+    }));
+    const createDefinition = vi.fn(async () => ({ decisionCode: 'complaint_sla_deadline' }));
+    const createDraftVersion = vi.fn(async () => ({ pid: 'draft-existing-1', status: 'DRAFT' }));
+
+    renderConsole(undefined, {
+      getDefinition,
+      createDefinition,
+      createDraftVersion,
+    } as unknown as Partial<DecisionApi>);
+
+    fireEvent.click(screen.getByTestId('strategy-save-draft'));
+
+    await waitFor(() => expect(getDefinition).toHaveBeenCalledWith('complaint_sla_deadline'));
+    expect(createDefinition).not.toHaveBeenCalled();
+    expect(createDraftVersion).toHaveBeenCalledWith(
+      'complaint_sla_deadline',
+      expect.objectContaining({
+        kind: 'SIMPLE_CONDITION',
+      }),
+    );
+  });
+
   it('switches Strategy Studio scenarios and keeps the reusable rule binding workflow visible', () => {
     renderConsole();
 
@@ -312,7 +548,7 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('decision-binding-editor')).toBeInTheDocument();
   });
 
-  it('reuses a shared condition fragment to switch consumers and shows operation feedback', () => {
+  it('reuses a shared condition fragment to switch consumers and shows operation feedback', async () => {
     renderConsole();
 
     fireEvent.click(screen.getByTestId('strategy-fragment-BPM'));
@@ -323,10 +559,14 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByLabelText('decision-code')).toHaveValue('approval_routing');
 
     fireEvent.click(screen.getByTestId('strategy-run-test'));
-    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('测试通过');
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('测试通过'),
+    );
 
     fireEvent.click(screen.getByTestId('strategy-publish'));
-    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('发布检查通过');
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('发布成功'),
+    );
   });
 
   it('switches to the dashboard tab and renders runtime metrics', () => {

@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { DecisionDefinitionListPage } from './DecisionDefinitionListPage';
+import {
+  DecisionDefinitionListPage,
+  type DefinitionSummary,
+} from './DecisionDefinitionListPage';
 import { DecisionTableEditor } from './DecisionTableEditor';
 import { EventPolicyListPage } from './EventPolicyListPage';
 import { EventPolicyDesignerWorkflow } from './EventPolicyDesignerWorkflow';
@@ -21,6 +24,7 @@ import type {
   DecisionTableDmnXmlResult,
   EventPolicySummary,
 } from '../api/decisionApi';
+import type { DataType, Scope } from '../ast/conditionAst';
 
 /**
  * DecisionOps console assembly (mockup F1–F8, docs/1.md §22): a tabbed shell composing the console
@@ -96,6 +100,75 @@ const DEFAULT_TABLE: DecisionTable = {
   rules: [],
 };
 
+const FIELD_SCOPES = new Set<Scope>([
+  'meta',
+  'event',
+  'record',
+  'before',
+  'after',
+  'process',
+  'task',
+  'sla',
+  'actor',
+  'tenant',
+  'time',
+  'env',
+]);
+
+const DATA_TYPES = new Set<DataType>([
+  'string',
+  'text',
+  'integer',
+  'decimal',
+  'boolean',
+  'date',
+  'time',
+  'datetime',
+  'duration',
+  'enum',
+  'dict',
+  'user',
+  'role',
+  'group',
+  'department',
+  'collection',
+  'object',
+]);
+
+function asDefinitionList(raw: unknown): DefinitionSummary[] {
+  if (Array.isArray(raw)) return raw as DefinitionSummary[];
+  if (raw && typeof raw === 'object') {
+    const o = raw as Record<string, unknown>;
+    if (Array.isArray(o.records)) return o.records as DefinitionSummary[];
+    if (Array.isArray(o.data)) return o.data as DefinitionSummary[];
+  }
+  return [];
+}
+
+function normalizeDataType(value: unknown): DataType {
+  return DATA_TYPES.has(value as DataType) ? (value as DataType) : 'string';
+}
+
+function toFieldOption(field: ModelField): FieldOption {
+  const parts = field.path.split('.');
+  const pathScope = parts[0] as Scope;
+  if (FIELD_SCOPES.has(pathScope) && parts.length > 1) {
+    return {
+      scope: pathScope,
+      path: parts.slice(1).join('.'),
+      label: field.label,
+      dataType: normalizeDataType(field.dataType),
+    };
+  }
+  const entityScope = field.entityCode as Scope;
+  return {
+    scope: FIELD_SCOPES.has(entityScope) ? entityScope : 'record',
+    path: field.path,
+    label: field.label,
+    dataType: normalizeDataType(field.dataType),
+  };
+}
+
 export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
   const {
     api,
@@ -125,12 +198,24 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
   });
   const dashboardData = dashboard ??
     dashboardQuery.data ?? { summary: EMPTY_SUMMARY, exceptions: [] };
+  const definitionQuery = useQuery({
+    queryKey: ['strategy-studio-definitions'],
+    queryFn: () => api.listDefinitions(),
+    enabled: tab === 'studio',
+  });
   const modelFieldQuery = useQuery({
     queryKey: ['decision-model-fields'],
     queryFn: () => api.getModelFields(),
-    enabled: modelFields == null && tab === 'model',
+    enabled: modelFields == null && (tab === 'model' || tab === 'studio'),
   });
   const modelFieldData = modelFields ?? modelFieldQuery.data ?? [];
+  const strategyDecisions = asDefinitionList(definitionQuery.data)
+    .filter((definition) => definition.decisionCode)
+    .map((definition) => ({
+      code: definition.decisionCode,
+      name: definition.decisionName,
+    }));
+  const strategyFields = modelFieldData.map(toFieldOption);
   const connectorQuery = useQuery({
     queryKey: ['decision-connectors'],
     queryFn: () => api.listConnectors(),
@@ -275,7 +360,13 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
           </div>
 
           <div className="doc-panel decisionops-content-card" data-testid={`doc-panel-${tab}`}>
-            {tab === 'studio' && <StrategyStudioWorkbench fields={fields} />}
+            {tab === 'studio' && (
+              <StrategyStudioWorkbench
+                api={api}
+                fields={strategyFields.length > 0 ? strategyFields : fields}
+                decisions={strategyDecisions}
+              />
+            )}
             {tab === 'dashboard' && (
               <>
                 {!dashboard && dashboardQuery.isLoading && (
