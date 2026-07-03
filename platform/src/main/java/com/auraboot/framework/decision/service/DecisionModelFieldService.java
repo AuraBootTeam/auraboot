@@ -1,6 +1,7 @@
 package com.auraboot.framework.decision.service;
 
 import com.auraboot.framework.decision.dto.DecisionModelFieldDTO;
+import com.auraboot.framework.decision.dto.DecisionFactCatalogDTO;
 
 import java.util.List;
 
@@ -10,4 +11,6 @@ import java.util.List;
 public interface DecisionModelFieldService {
 
     List<DecisionModelFieldDTO> listFields();
+
+    DecisionFactCatalogDTO getFactCatalog(String modelCode);
 }

@@ -30,12 +30,19 @@ import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyDefinitionMapper;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.meta.entity.Dict;
+import com.auraboot.framework.meta.entity.DictItem;
 import com.auraboot.framework.meta.entity.Field;
+import com.auraboot.framework.meta.entity.FieldDictBinding;
 import com.auraboot.framework.meta.entity.Model;
 import com.auraboot.framework.meta.entity.ModelFieldBinding;
 import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
+import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
+import com.auraboot.framework.meta.mapper.DictItemMapper;
+import com.auraboot.framework.meta.mapper.DictMapper;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
+import com.auraboot.framework.meta.mapper.MetaFieldDictBindingMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.permission.entity.Permission;
@@ -47,6 +54,7 @@ import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.MissingNode;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.BeforeEach;
@@ -95,6 +103,9 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private MetaModelMapper metaModelMapper;
     @Autowired private MetaFieldMapper metaFieldMapper;
     @Autowired private MetaModelFieldBindingMapper metaModelFieldBindingMapper;
+    @Autowired private MetaFieldDictBindingMapper metaFieldDictBindingMapper;
+    @Autowired private DictMapper dictMapper;
+    @Autowired private DictItemMapper dictItemMapper;
 
     private final ObjectMapper json = new ObjectMapper();
     private MockMvc mockMvc;
@@ -566,6 +577,74 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    void httpFactCatalog_exposesMetaModelFactsWithDictReferenceAndVirtualSource() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String targetModelCode = "it_supplier_" + suffix;
+        String modelCode = "it_invoice_view_" + suffix;
+        String dictCode = "it_priority_dict_" + suffix;
+        String priorityFieldCode = "priority_" + suffix;
+        String supplierFieldCode = "supplier_" + suffix;
+
+        createPublishedModel(targetModelCode, "Supplier " + suffix, "physical", null);
+        Model model = createPublishedModel(modelCode, "Invoice View " + suffix, "sqlView", "vw_invoice_" + suffix);
+
+        Dict dict = createPublishedDict(dictCode, "Priority " + suffix);
+        createDictItem(dict, "high", "High");
+        createDictItem(dict, "low", "Low");
+
+        Field priority = createPublishedField(priorityFieldCode, "dict", "Priority " + suffix);
+        bindFieldToModel(model, priority, 0);
+        bindFieldToDict(priority, dict);
+
+        FieldRefTargetBean refTarget = new FieldRefTargetBean();
+        refTarget.setRefType("entity");
+        refTarget.setTargetEntity(targetModelCode);
+        refTarget.setValueField("pid");
+        refTarget.setDisplayField("name");
+        Field supplier = createPublishedField(supplierFieldCode, "reference", "Supplier " + suffix);
+        supplier.setRefTarget(refTarget);
+        metaFieldMapper.updateById(supplier);
+        bindFieldToModel(model, supplier, 1);
+
+        String body = mockMvc.perform(get("/api/decision/facts/catalog")
+                        .param("modelCode", modelCode))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode data = json.readTree(body).path("data");
+        JsonNode entity = findEntity(data.path("entities"), modelCode);
+        assertTrue(!entity.isMissingNode());
+        assertTrue("sqlView".equals(entity.path("sourceType").asText()));
+        assertTrue(("vw_invoice_" + suffix).equals(entity.path("sourceRef").asText()));
+
+        JsonNode priorityFact = findFact(entity.path("facts"), "record.data." + priorityFieldCode);
+        assertTrue(!priorityFact.isMissingNode());
+        assertTrue(dictCode.equals(priorityFact.path("dictCode").asText()));
+        assertTrue(hasArrayText(priorityFact.path("operators"), "IN"));
+        assertTrue(hasOption(priorityFact.path("allowedValues"), "high", "High"));
+        assertTrue(hasOption(priorityFact.path("allowedValues"), "low", "Low"));
+
+        JsonNode supplierFact = findFact(entity.path("facts"), "record.data." + supplierFieldCode);
+        assertTrue(!supplierFact.isMissingNode());
+        assertTrue("reference".equals(supplierFact.path("dataType").asText()));
+        assertTrue(targetModelCode.equals(supplierFact.path("reference").path("targetEntity").asText()));
+        assertTrue("pid".equals(supplierFact.path("reference").path("valueField").asText()));
+    }
+
+    @Test
+    void httpFactCatalog_includesSharedContextFactsForCrossModuleRules() throws Exception {
+        String body = mockMvc.perform(get("/api/decision/facts/catalog"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        JsonNode entities = json.readTree(body).path("data").path("entities");
+        assertTrue(!findFact(findEntityByScope(entities, "actor").path("facts"), "actor.userId").isMissingNode());
+        assertTrue(!findFact(findEntityByScope(entities, "event").path("facts"), "event.type").isMissingNode());
+        assertTrue(!findFact(findEntityByScope(entities, "time").path("facts"), "time.now").isMissingNode());
+        assertTrue(!findFact(findEntityByScope(entities, "tenant").path("facts"), "tenant.id").isMissingNode());
+    }
+
+    @Test
     void httpConditionFragments_createEvaluateAndReportImpactRefs() throws Exception {
         String code = "it_fragment_" + System.nanoTime();
         JsonNode conditionSpec = json.readTree("""
@@ -733,6 +812,150 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         ExtensionBean extension = new ExtensionBean();
         extension.setExtension(Map.of(key, value));
         return extension;
+    }
+
+    private Model createPublishedModel(String code, String name, String sourceType, String sourceRef) {
+        Model model = new Model();
+        model.setPid(UniqueIdGenerator.generate());
+        model.setTenantId(getTestTenant().getId());
+        model.setCode(code);
+        model.setExtension(extension("displayName", name));
+        model.setTableName("mt_" + code);
+        model.setSourceType(sourceType);
+        model.setSourceRef(sourceRef);
+        model.setVersion(1);
+        model.setSemver("1.0.0");
+        model.setRowVersion(1);
+        model.setIsCurrent(true);
+        model.setStatus("published");
+        model.setDeletedFlag(false);
+        model.setCreatedAt(Instant.now());
+        model.setUpdatedAt(Instant.now());
+        metaModelMapper.insert(model);
+        return model;
+    }
+
+    private Field createPublishedField(String code, String dataType, String name) {
+        Field field = new Field();
+        field.setPid(UniqueIdGenerator.generate());
+        field.setTenantId(getTestTenant().getId());
+        field.setCode(code);
+        field.setDataType(dataType);
+        field.setExtension(extension("displayName", name));
+        FieldFeatureBean feature = new FieldFeatureBean();
+        feature.setRequired(false);
+        feature.setUnique(false);
+        field.setFeature(feature);
+        field.setVersion(1);
+        field.setSemver("1.0.0");
+        field.setRowVersion(1);
+        field.setIsCurrent(true);
+        field.setStatus("published");
+        field.setDeletedFlag(false);
+        field.setCreatedAt(Instant.now());
+        field.setUpdatedAt(Instant.now());
+        metaFieldMapper.insert(field);
+        return field;
+    }
+
+    private void bindFieldToModel(Model model, Field field, int order) {
+        ModelFieldBinding binding = new ModelFieldBinding(getTestTenant().getId(), model.getId(), field.getId(), order);
+        binding.setCreatedAt(Instant.now());
+        binding.setUpdatedAt(Instant.now());
+        metaModelFieldBindingMapper.insert(binding);
+    }
+
+    private Dict createPublishedDict(String code, String name) {
+        Dict dict = new Dict();
+        dict.setPid(UniqueIdGenerator.generate());
+        dict.setTenantId(getTestTenant().getId());
+        dict.setCode(code);
+        dict.setName(name);
+        dict.setDictType("static");
+        dict.setStatus("published");
+        dict.setVersion(1);
+        dict.setSemver("1.0.0");
+        dict.setIsCurrent(true);
+        dict.setCreatedAt(Instant.now());
+        dict.setUpdatedAt(Instant.now());
+        dictMapper.insert(dict);
+        return dict;
+    }
+
+    private void createDictItem(Dict dict, String value, String label) {
+        DictItem item = new DictItem();
+        item.setPid(UniqueIdGenerator.generate());
+        item.setTenantId(getTestTenant().getId());
+        item.setDictId(dict.getId());
+        item.setValue(value);
+        item.setLabel(label);
+        item.setSortNo(0);
+        item.setStatus("enabled");
+        item.setSource("user");
+        item.setCreatedAt(Instant.now());
+        item.setUpdatedAt(Instant.now());
+        dictItemMapper.insert(item);
+    }
+
+    private void bindFieldToDict(Field field, Dict dict) {
+        FieldDictBinding binding = FieldDictBinding.builder()
+                .pid(UniqueIdGenerator.generate())
+                .fieldId(field.getId())
+                .fieldPid(field.getPid())
+                .fieldCode(field.getCode())
+                .dictId(dict.getId())
+                .dictCode(dict.getCode())
+                .tenantId(getTestTenant().getId())
+                .deletedFlag(false)
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+        metaFieldDictBindingMapper.insert(binding);
+    }
+
+    private JsonNode findEntity(JsonNode entities, String modelCode) {
+        for (JsonNode entity : entities) {
+            if (modelCode.equals(entity.path("modelCode").asText())) {
+                return entity;
+            }
+        }
+        return MissingNode.getInstance();
+    }
+
+    private JsonNode findEntityByScope(JsonNode entities, String scope) {
+        for (JsonNode entity : entities) {
+            if (scope.equals(entity.path("scope").asText())) {
+                return entity;
+            }
+        }
+        return MissingNode.getInstance();
+    }
+
+    private JsonNode findFact(JsonNode facts, String factKey) {
+        for (JsonNode fact : facts) {
+            if (factKey.equals(fact.path("factKey").asText())) {
+                return fact;
+            }
+        }
+        return MissingNode.getInstance();
+    }
+
+    private boolean hasArrayText(JsonNode array, String expected) {
+        for (JsonNode item : array) {
+            if (expected.equals(item.asText())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasOption(JsonNode array, String value, String label) {
+        for (JsonNode item : array) {
+            if (value.equals(item.path("value").asText()) && label.equals(item.path("label").asText())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private JsonNode conditionSpecGreaterThan(int threshold) throws Exception {
