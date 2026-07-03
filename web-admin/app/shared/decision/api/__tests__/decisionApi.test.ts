@@ -36,6 +36,24 @@ describe('decisionApi client', () => {
     expect(res).toMatchObject({ status: 'MATCHED', matched: true });
   });
 
+  it('throws the API error message instead of returning null data', async () => {
+    const http = {
+      post: vi.fn(async () => ({
+        success: false,
+        data: null,
+        message: 'Cannot publish from status DRAFT. Must be VALIDATED first.',
+        code: '35000',
+      })),
+      get: vi.fn(),
+      delete: vi.fn(),
+    } as unknown as HttpClient;
+    const api = createDecisionApi(http);
+
+    await expect(api.evaluate({ decisionCode: 'big', context: {} })).rejects.toThrow(
+      'Cannot publish from status DRAFT. Must be VALIDATED first.',
+    );
+  });
+
   it('batchEvaluate posts the request array to /batch-evaluate', async () => {
     const { http, calls } = fakeHttp();
     const api = createDecisionApi(http);
