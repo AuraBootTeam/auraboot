@@ -3,6 +3,7 @@ package com.auraboot.framework.saas.bootstrap;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.plugin.service.BuiltinPluginImportService;
+import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.auraboot.framework.rbac.service.RoleService;
@@ -24,6 +25,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -90,6 +93,35 @@ class BootstrapRepairServiceTenantBootstrapTest {
                 BootstrapRepairService.STEP_BUSINESS_TENANT_BOOTSTRAP,
                 BootstrapRepairService.STEP_BUILTIN_PLUGINS
             );
+    }
+
+    @Test
+    void repairBusinessTenantBootstrapIsNoOpWhenPlatformBaselineRolesPresent() {
+        User admin = new User();
+        admin.setId(42L);
+        admin.setPid("usr-admin");
+
+        Tenant tenant = new Tenant();
+        tenant.setId(7L);
+        tenant.setName("Acme");
+
+        when(userService.findByEmail("admin@auraboot.com")).thenReturn(admin);
+        when(tenantService.findByName("Acme")).thenReturn(tenant);
+        // A correctly bootstrapped platform-baseline tenant (post-#1167): tenant_admin + tenant_member.
+        // The stale required set {tenant_admin, operator, viewer} would have mis-flagged this as a
+        // "partial template roles" error; the corrected set treats it as already present (no-op).
+        when(roleService.findByTenantId(7L)).thenReturn(List.of(role("tenant_admin"), role("tenant_member")));
+
+        RepairStepResult result = service.repairBusinessTenantBootstrap(options());
+
+        assertThat(result.status()).isEqualTo(RepairStepResult.Status.PRESENT);
+        verify(tenantBootstrapService, never()).bootstrapTenant(anyLong(), anyLong());
+    }
+
+    private static Role role(String code) {
+        Role role = new Role();
+        role.setCode(code);
+        return role;
     }
 
     private static BootstrapRepairService.RepairOptions options() {
