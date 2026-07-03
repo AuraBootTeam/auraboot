@@ -1,0 +1,50 @@
+{
+  "_comment": "SOT for RBAC regression (docs/agent-rules/rbac-golden-and-cross-cutting-regression.md). Independent declaration of INTENDED access — NOT derived from default-bootstrap.json — so it catches bootstrap misconfig. Both the backend enforcement IT (A layer) and the Playwright per-role golden (B layer) read this one file. A drift check asserts every referenced role/permission code exists in the system.",
+  "deployments": {
+    "platform-baseline": {
+      "_comment": "default profile: only platform roles exist. operator/viewer retired 2026-07-03 (OSS #1167).",
+      "roles": {
+        "tenant_admin": {
+          "layer": "L2-all",
+          "assignment": "explicit",
+          "allow": ["*"],
+          "deny": []
+        },
+        "tenant_member": {
+          "layer": "L1-baseline",
+          "assignment": "implicit-baseline",
+          "allow": [
+            "meta.model.read",
+            "page.page.read",
+            "dashboard.saved_view.read",
+            "bpm.process.read",
+            "notification.view"
+          ],
+          "deny": [
+            "org.user_role.update",
+            "org.role.update",
+            "meta.permission.update",
+            "dashboard.read"
+          ]
+        }
+      }
+    }
+  },
+  "specialRules": {
+    "REG-2-platform-admin": {
+      "endpoint": "/api/platform/**",
+      "nonPlatformAdmin": 403
+    },
+    "REG-3-anon-discovery": {
+      "endpoint": "/.well-known/agent.json",
+      "anonymous": 401
+    },
+    "REG-5-6-assignment": {
+      "codes": ["org.user_role.update", "org.role.update", "meta.permission.update"],
+      "nonTenantAdmin": 403
+    },
+    "cross-tenant": {
+      "assert": "a member of tenant A must not resolve or read tenant B's roles/rows"
+    }
+  }
+}
