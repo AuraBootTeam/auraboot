@@ -62,6 +62,7 @@
   "test_paths": [
     "tests/e2e/auth/**",
     "tests/e2e/permission/**",
+    "tests/e2e/rbac/**",
     "tests/e2e/org/**",
     "tests/e2e/organization/**",
     "tests/e2e/user/**",
