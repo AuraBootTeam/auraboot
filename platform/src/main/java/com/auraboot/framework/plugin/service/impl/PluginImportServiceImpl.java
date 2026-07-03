@@ -1,5 +1,12 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
+import com.auraboot.framework.decision.dto.DrtDefinitionDTO;
+import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
+import com.auraboot.framework.decision.dto.DrtVersionDTO;
+import com.auraboot.framework.decision.model.DecisionValidateResult;
+import com.auraboot.framework.decision.service.DecisionVersionService;
+import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.i18n.compiler.I18nCompiler;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.service.I18nResourceService;
@@ -124,6 +131,8 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.meta.template.generator.DocumentCommandGenerator documentCommandGenerator;
     private final com.auraboot.framework.bpm.rule.DroolsRuleService droolsRuleService;
     private final com.auraboot.framework.bpm.service.SlaConfigService slaConfigService;
+    private final DrtDefinitionService drtDefinitionService;
+    private final DecisionVersionService decisionVersionService;
     private final JdbcTemplate jdbcTemplate;
     /** Used by {@link #verifyImportReferenceIntegrity()} to enumerate the tenant's commands. */
     private final com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitionMapper;
@@ -485,6 +494,16 @@ public class PluginImportServiceImpl implements PluginImportService {
                 if (!templates.isEmpty()) {
                     manifest.setNotificationTemplates(
                             mergeResourceList(manifest.getNotificationTemplates(), templates));
+                }
+            }
+
+            // Load Decision Runtime definitions
+            if (resourceDirs.containsKey("decisionDefinitions")) {
+                List<DecisionDefinitionSeedDTO> decisions = loadResourceListFromZip(
+                        files, resourceDirs.get("decisionDefinitions"), DecisionDefinitionSeedDTO.class);
+                if (!decisions.isEmpty()) {
+                    manifest.setDecisionDefinitions(
+                            mergeResourceList(manifest.getDecisionDefinitions(), decisions));
                 }
             }
 
@@ -1498,6 +1517,7 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         // Import Drools rules and SLA configs (extension resources — not tracked via
         // PluginResource / ResourceType to avoid enum/DB check-constraint churn).
+        importDecisionDefinitions(manifest);
         importRules(manifest);
         importSlaConfigs(manifest);
         importFieldMasks(manifest);
@@ -2179,6 +2199,85 @@ public class PluginImportServiceImpl implements PluginImportService {
         if (created > 0) {
             log.info("Imported {} Drools rule(s) for plugin {}", created, logSafe(manifest.getPluginId()));
         }
+    }
+
+    private void importDecisionDefinitions(PluginManifestExtended manifest) {
+        if (manifest.getDecisionDefinitions() == null || manifest.getDecisionDefinitions().isEmpty()) return;
+        int imported = 0;
+        for (DecisionDefinitionSeedDTO dto : manifest.getDecisionDefinitions()) {
+            if (!dto.isValid()) {
+                log.warn("Skipping invalid decision definition seed (missing code/name/kind/runtime/content): index={}",
+                        manifest.getDecisionDefinitions().indexOf(dto));
+                continue;
+            }
+            importDecisionDefinition(dto);
+            imported++;
+        }
+        if (imported > 0) {
+            log.info("Imported {} Decision Runtime definition seed(s) for plugin {}",
+                    imported, logSafe(manifest.getPluginId()));
+        }
+    }
+
+    private void importDecisionDefinition(DecisionDefinitionSeedDTO dto) {
+        DrtDefinitionCreateRequest definitionRequest = new DrtDefinitionCreateRequest();
+        definitionRequest.setDecisionCode(dto.getDecisionCode());
+        definitionRequest.setDecisionName(dto.getDecisionName());
+        definitionRequest.setDescription(dto.getDescription());
+        definitionRequest.setScopeType(dto.getScopeType());
+        definitionRequest.setScopeRef(dto.getScopeRef());
+        definitionRequest.setOwnerModule(dto.getOwnerModule());
+        definitionRequest.setEnabled(dto.getEnabled());
+
+        DrtDefinitionDTO existing = drtDefinitionService.findByCode(dto.getDecisionCode());
+        if (existing == null) {
+            drtDefinitionService.create(definitionRequest);
+        } else {
+            drtDefinitionService.update(existing.getPid(), definitionRequest);
+        }
+
+        if (hasMatchingPublishedDecisionVersion(dto)) {
+            log.info("Decision seed unchanged; keeping existing published version: code={}",
+                    logSafe(dto.getDecisionCode()));
+            return;
+        }
+
+        DrtVersionCreateRequest versionRequest = new DrtVersionCreateRequest();
+        versionRequest.setKind(dto.getKind());
+        versionRequest.setRuntimeAdapter(dto.getRuntimeAdapter());
+        versionRequest.setVersionTag(dto.getVersionTag());
+        versionRequest.setContentJson(dto.getContentJson());
+        versionRequest.setInputSchemaJson(dto.getInputSchemaJson());
+        versionRequest.setOutputSchemaJson(dto.getOutputSchemaJson());
+        versionRequest.setContextSchemaJson(dto.getContextSchemaJson());
+
+        DrtVersionDTO draft = decisionVersionService.createDraft(dto.getDecisionCode(), versionRequest);
+        DecisionValidateResult validation = decisionVersionService.validate(draft.getPid());
+        if (!validation.valid()) {
+            String messages = validation.errors().stream()
+                    .map(DecisionValidateResult.Issue::message)
+                    .collect(Collectors.joining("; "));
+            throw new PluginException("Decision seed validation failed for "
+                    + dto.getDecisionCode() + ": " + messages);
+        }
+        if (dto.isPublish()) {
+            decisionVersionService.publish(draft.getPid(), true);
+        }
+    }
+
+    private boolean hasMatchingPublishedDecisionVersion(DecisionDefinitionSeedDTO dto) {
+        List<DrtVersionDTO> versions = decisionVersionService.listByCode(dto.getDecisionCode());
+        if (versions == null || versions.isEmpty()) {
+            return false;
+        }
+        return versions.stream().anyMatch(version ->
+                "PUBLISHED".equals(version.getStatus())
+                        && Objects.equals(version.getKind(), dto.getKind())
+                        && Objects.equals(version.getRuntimeAdapter(), dto.getRuntimeAdapter())
+                        && Objects.equals(version.getContentJson(), dto.getContentJson())
+                        && Objects.equals(version.getInputSchemaJson(), dto.getInputSchemaJson())
+                        && Objects.equals(version.getOutputSchemaJson(), dto.getOutputSchemaJson())
+                        && Objects.equals(version.getContextSchemaJson(), dto.getContextSchemaJson()));
     }
 
     private void importSlaConfigs(PluginManifestExtended manifest) {

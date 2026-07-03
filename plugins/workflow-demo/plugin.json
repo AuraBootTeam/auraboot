@@ -41,6 +41,7 @@
     "processes": "config/processes.json",
     "namedQueries": "config/namedQueries.json",
     "rules": "config/rules.json",
+    "decisionDefinitions": "config/decision-definitions.json",
     "sla": "config/sla.json",
     "i18n": "config/i18n.json",
     "defaultBootstrap": "config/default-bootstrap.json"
