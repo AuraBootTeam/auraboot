@@ -450,8 +450,14 @@ describe('DecisionOpsConsole', () => {
     expect(createDraftVersion).toHaveBeenCalledWith(
       'complaint_sla_deadline',
       expect.objectContaining({
-        kind: 'SIMPLE_CONDITION',
-        runtimeAdapter: 'AST_EVALUATOR',
+        kind: 'DECISION_TABLE',
+        runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+        contentJson: expect.objectContaining({
+          hitPolicy: 'FIRST',
+          inputs: expect.arrayContaining([
+            expect.objectContaining({ id: 'sla_overdueMinutes', scope: 'sla', path: 'overdueMinutes' }),
+          ]),
+        }),
         outputSchemaJson: expect.objectContaining({
           actions: expect.arrayContaining([
             expect.objectContaining({ actionType: 'NOTIFY' }),
@@ -472,12 +478,11 @@ describe('DecisionOpsConsole', () => {
       'approval_routing',
       expect.objectContaining({
         contentJson: expect.objectContaining({
-          children: expect.arrayContaining([
+          inputs: expect.arrayContaining([
             expect.objectContaining({
-              left: expect.objectContaining({
-                scope: 'process',
-                path: 'taskKey',
-              }),
+              id: 'process_taskKey',
+              scope: 'process',
+              path: 'taskKey',
             }),
           ]),
         }),
@@ -494,6 +499,134 @@ describe('DecisionOpsConsole', () => {
         }),
       }),
     );
+  });
+
+  it('edits the Strategy Studio DMN table and saves it as the scenario decision table', async () => {
+    const createDraftVersion = vi.fn(async (_code: string, _req: unknown) => ({
+      pid: 'draft-dmn-1',
+      status: 'DRAFT',
+    }));
+
+    renderConsole(undefined, {
+      createDraftVersion,
+    } as unknown as Partial<DecisionApi>);
+
+    expect(screen.getByTestId('strategy-dmn-panel')).toBeInTheDocument();
+    expect(screen.getByTestId('decision-table-editor')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('dt-add-rule'));
+    fireEvent.change(screen.getByLabelText('feel-0-sla_overdueMinutes'), {
+      target: { value: '> 30' },
+    });
+    fireEvent.change(screen.getByLabelText('out-0-route'), {
+      target: { value: 'escalate' },
+    });
+    fireEvent.click(screen.getByTestId('strategy-save-draft'));
+
+    await waitFor(() => expect(createDraftVersion).toHaveBeenCalled());
+    const [, draftRequest] = createDraftVersion.mock.calls[0];
+    expect(draftRequest).toMatchObject({
+      kind: 'DECISION_TABLE',
+      runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+      contentJson: {
+        hitPolicy: 'FIRST',
+        rules: [
+          {
+            when: {
+              sla_overdueMinutes: { feel: '> 30' },
+            },
+            then: { route: 'escalate' },
+          },
+        ],
+      },
+    });
+  });
+
+  it('runs Strategy Studio DMN analysis and XML round-trip from the scenario table editor', async () => {
+    const analyzeTable = vi.fn(async () => ({
+      valid: true,
+      metrics: {
+        ruleCount: 1,
+        gapCount: 0,
+        overlapCount: 0,
+        conflictCount: 0,
+        unreachableRuleCount: 0,
+        finiteCombinationCount: 1,
+        finiteDomainComplete: true,
+      },
+      errors: [],
+      warnings: [],
+    }));
+    const exportTableDmn = vi.fn(async () => ({
+      valid: true,
+      dmnXml: '<definitions id="strategy"><decisionTable /></definitions>',
+      errors: [],
+      warnings: [],
+    }));
+    const roundTripTableDmn = vi.fn(async () => ({
+      valid: true,
+      dmnXml: '<definitions id="strategy-roundtrip"><decisionTable /></definitions>',
+      model: {
+        hitPolicy: 'FIRST',
+        inputs: [
+          {
+            id: 'sla_overdueMinutes',
+            label: '超时分钟',
+            scope: 'sla',
+            path: 'overdueMinutes',
+            dataType: 'integer',
+          },
+        ],
+        outputs: [{ id: 'route', label: 'Route', dataType: 'string' }],
+        rules: [
+          {
+            ruleId: 'warn',
+            priority: 10,
+            when: { sla_overdueMinutes: { operator: 'EQ', value: '', feel: '> 30' } },
+            then: { route: 'escalate' },
+          },
+        ],
+      },
+      errors: [],
+      warnings: [],
+    }));
+
+    renderConsole(undefined, {
+      analyzeTable,
+      exportTableDmn,
+      roundTripTableDmn,
+    } as unknown as Partial<DecisionApi>);
+
+    fireEvent.click(screen.getByTestId('dt-add-rule'));
+    fireEvent.change(screen.getByLabelText('feel-0-sla_overdueMinutes'), {
+      target: { value: '> 30' },
+    });
+    fireEvent.click(screen.getByTestId('dt-analyze'));
+
+    await waitFor(() => expect(analyzeTable).toHaveBeenCalledOnce());
+    expect(analyzeTable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inputs: expect.arrayContaining([
+          expect.objectContaining({ id: 'sla_overdueMinutes', path: 'overdueMinutes' }),
+        ]),
+      }),
+      'complaint_sla_deadline',
+      undefined,
+    );
+    expect(screen.getByTestId('dt-analysis-summary')).toHaveTextContent('规则 1');
+
+    fireEvent.click(screen.getByTestId('dt-export-dmn'));
+    await waitFor(() => expect(exportTableDmn).toHaveBeenCalledOnce());
+    expect(screen.getByLabelText('dmn-xml')).toHaveValue(
+      '<definitions id="strategy"><decisionTable /></definitions>',
+    );
+
+    fireEvent.click(screen.getByTestId('dt-roundtrip-dmn'));
+    await waitFor(() => expect(roundTripTableDmn).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.getByLabelText('feel-0-sla_overdueMinutes')).toHaveValue('> 30'),
+    );
+    expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('Round-trip 通过');
   });
 
   it('does not report Strategy Studio publish success when the runtime rejects the transition', async () => {
@@ -553,7 +686,8 @@ describe('DecisionOpsConsole', () => {
     expect(createDraftVersion).toHaveBeenCalledWith(
       'complaint_sla_deadline',
       expect.objectContaining({
-        kind: 'SIMPLE_CONDITION',
+        kind: 'DECISION_TABLE',
+        runtimeAdapter: 'PLATFORM_DECISION_TABLE',
       }),
     );
   });
