@@ -561,7 +561,8 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
                             "version", process.getVersion(),
                             "nodeId", nodeId,
                             "nodeType", nodeType,
-                            "nodeLabel", jsonText(node.path("data").get("label")))));
+                            "nodeLabel", jsonText(node.path("data").get("label"))),
+                    bpmDesignerPath("nodes", nodeId)));
         }
         return refs;
     }
@@ -577,16 +578,18 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
             if (edge == null || !edge.isObject()) {
                 continue;
             }
+            String edgeId = jsonText(edge.get("id"));
             refs.addAll(refsForBpmJson(tenantId, process, edge, "DESIGNER_EDGE",
                     metadata("sourceName", process.getProcessName(),
                             "processKey", process.getProcessKey(),
                             "status", process.getStatus(),
                             "version", process.getVersion(),
-                            "edgeId", jsonText(edge.get("id")),
+                            "edgeId", edgeId,
                             "nodeId", jsonText(edge.get("source")),
                             "sourceNodeId", jsonText(edge.get("source")),
                             "targetNodeId", jsonText(edge.get("target")),
-                            "edgeLabel", jsonText(edge.path("data").get("label")))));
+                            "edgeLabel", jsonText(edge.path("data").get("label"))),
+                    bpmDesignerPath("edges", edgeId)));
         }
         return refs;
     }
@@ -610,6 +613,12 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
 
     private List<DecisionUsageRefEntity> refsForBpmJson(Long tenantId, BpmProcessDefinition process, JsonNode node,
                                                         String binding, Map<String, Object> metadata) {
+        return refsForBpmJson(tenantId, process, node, binding, metadata, null);
+    }
+
+    private List<DecisionUsageRefEntity> refsForBpmJson(Long tenantId, BpmProcessDefinition process, JsonNode node,
+                                                        String binding, Map<String, Object> metadata,
+                                                        String decisionTargetPath) {
         RuleReferenceSet ruleRefs = RuleReferenceCollector.collect(node);
         if (ruleRefs.decisionRefs().isEmpty() && ruleRefs.fieldRefs().isEmpty()) {
             return List.of();
@@ -617,13 +626,17 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         List<DecisionUsageRefEntity> refs = new ArrayList<>();
         for (String decisionRef : ruleRefs.decisionRefs()) {
             refs.add(ref(tenantId, "BPM_PROCESS", process.getProcessKey(), versionNumber(process),
-                    process.getPid(), "DECISION", decisionRef, null, binding, metadata));
+                    process.getPid(), "DECISION", decisionRef, decisionTargetPath, binding, metadata));
         }
         for (String fieldRef : ruleRefs.fieldRefs()) {
             refs.add(ref(tenantId, "BPM_PROCESS", process.getProcessKey(), versionNumber(process),
                     process.getPid(), "FIELD", null, fieldRef, binding, metadata));
         }
         return refs;
+    }
+
+    private String bpmDesignerPath(String prefix, String id) {
+        return id == null || id.isBlank() ? null : prefix + "." + id;
     }
 
     private JsonNode parseDesignerJson(BpmProcessDefinition process) {
