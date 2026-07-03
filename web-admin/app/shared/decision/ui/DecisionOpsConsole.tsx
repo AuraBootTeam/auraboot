@@ -11,6 +11,7 @@ import { PermissionMatrix, type RoleGrants } from './PermissionMatrix';
 import { ConnectorListView, type Connector } from './ConnectorListView';
 import { DecisionDashboard, type DashboardSummary, type ExceptionItem } from './DecisionDashboard';
 import { DecisionRolloutMonitor } from './DecisionRolloutMonitor';
+import { StrategyStudioWorkbench } from './StrategyStudioWorkbench';
 import { type FieldOption } from './ConditionBuilder';
 import { type TestSample } from './ConditionTestRunPanel';
 import type { DecisionTable } from '../table/decisionTable';
@@ -31,6 +32,7 @@ import type {
  */
 
 export type ConsoleTab =
+  | 'studio'
   | 'dashboard'
   | 'policies'
   | 'definitions'
@@ -55,6 +57,7 @@ export interface DecisionOpsConsoleProps {
 }
 
 const TABS: { key: ConsoleTab; label: string; description: string }[] = [
+  { key: 'studio', label: '策略编排器', description: '跨模块规则复用' },
   { key: 'dashboard', label: '概览', description: '运行态总览' },
   { key: 'policies', label: 'Event Policy', description: '事件触发策略' },
   { key: 'definitions', label: '决策定义', description: '版本与影响面' },
@@ -103,7 +106,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     connectors,
     permissionGrants,
     dashboard,
-    initialTab = 'dashboard',
+    initialTab = 'studio',
   } = props;
   const [tab, setTab] = useState<ConsoleTab>(initialTab);
   const [selectedPolicy, setSelectedPolicy] = useState<EventPolicySummary | null>(null);
@@ -236,8 +239,8 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     <div className="decisionops-shell" data-testid="decisionops-console">
       <header className="decisionops-page-header">
         <div>
-          <p className="decisionops-eyebrow">DecisionOps</p>
-          <h1>决策运营工作台</h1>
+          <p className="decisionops-eyebrow">Rule Center</p>
+          <h1>策略编排器</h1>
         </div>
         <div className="decisionops-header-meta">
           <span>Definitions {dashboardData.summary.definitions}</span>
@@ -272,6 +275,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
           </div>
 
           <div className="doc-panel decisionops-content-card" data-testid={`doc-panel-${tab}`}>
+            {tab === 'studio' && <StrategyStudioWorkbench fields={fields} />}
             {tab === 'dashboard' && (
               <>
                 {!dashboard && dashboardQuery.isLoading && (

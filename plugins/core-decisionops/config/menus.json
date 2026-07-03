@@ -5,7 +5,7 @@
     "name": "决策中心",
     "name:zh-CN": "决策中心",
     "name:en": "DecisionOps",
-    "path": "/p/decisionops_rollouts",
+    "path": "/decision-ops",
     "component": null,
     "icon": "partition",
     "type": 1,
@@ -21,9 +21,9 @@
   {
     "code": "decisionops_console_preview",
     "parentCode": "decisionops_console",
-    "name": "综合控制台预览",
-    "name:zh-CN": "综合控制台预览",
-    "name:en": "Console Preview",
+    "name": "策略编排器",
+    "name:zh-CN": "策略编排器",
+    "name:en": "Strategy Studio",
     "path": "/decision-ops",
     "component": null,
     "icon": "layout-dashboard",
@@ -35,7 +35,7 @@
       "platforms": [
         "web"
       ],
-      "implementation": "react-console-preview",
+      "implementation": "strategy-studio",
       "pairedDslEntry": "/p/decisionops_rollouts"
     }
   },

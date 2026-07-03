@@ -17,22 +17,22 @@ function readMenus(): MenuConfig[] {
 }
 
 describe('DecisionOps menu entries', () => {
-  it('surfaces both the DSL governance pages and the integrated console preview', () => {
+  it('surfaces Strategy Studio as the default DecisionOps entry while keeping DSL governance pages', () => {
     const menus = readMenus();
     const parent = menus.find((menu) => menu.code === 'decisionops_console');
     const preview = menus.find((menu) => menu.code === 'decisionops_console_preview');
     const rollout = menus.find((menu) => menu.code === 'decisionops_rollouts');
 
     expect(parent).toMatchObject({
-      path: '/p/decisionops_rollouts',
+      path: '/decision-ops',
       visible: true,
     });
     expect(preview).toMatchObject({
       parentCode: 'decisionops_console',
-      name: '综合控制台预览',
+      name: '策略编排器',
       path: '/decision-ops',
       visible: true,
-      extension: expect.objectContaining({ implementation: 'react-console-preview' }),
+      extension: expect.objectContaining({ implementation: 'strategy-studio' }),
     });
     expect(rollout).toMatchObject({
       parentCode: 'decisionops_console',
