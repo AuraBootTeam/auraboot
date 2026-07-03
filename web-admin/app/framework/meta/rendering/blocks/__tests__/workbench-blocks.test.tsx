@@ -1645,10 +1645,11 @@ describe('ReviewDrawerBlockRenderer', () => {
     );
     expect(screen.queryByText('Rev 04')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: '收起复核浮层' }));
-    expect(screen.getByTestId('review-drawer-minimized')).toHaveTextContent('展开行级复核');
-    fireEvent.click(screen.getByRole('button', { name: '展开复核浮层' }));
-    expect(screen.getByTestId('review-drawer')).toHaveTextContent('Row 5 · LED1 · 待确认');
+    // The drawer minimizes to a floating "展开行级复核" pill no longer exists: close fully
+    // dismisses the drawer. The minimize affordance and its restore pill are removed.
+    expect(screen.queryByRole('button', { name: '收起复核浮层' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('review-drawer-minimized')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '关闭复核浮层' })).toBeInTheDocument();
   });
 
   it('restores the last review drawer position and size from local storage', () => {

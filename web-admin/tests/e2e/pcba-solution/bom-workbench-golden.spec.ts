@@ -297,14 +297,15 @@ test.describe('BOM standardization workbench golden', () => {
           decisions: ['manual_confirm', 'undo'],
         });
 
-      // Minimize the review drawer before exercising the toolbar-level regenerate action: the
+      // Close the review drawer before exercising the toolbar-level regenerate action: the
       // floating drawer (fixed z-50) overlays the workbench toolbar and would intercept the
-      // click on workbench-action-download_new_bom. Close collapses it to the minimized bar
-      // (bottom-right), which does not occlude the toolbar.
+      // click on workbench-action-download_new_bom. Close fully dismisses the drawer (clears the
+      // selected row -> inline empty state), so the toolbar is reachable.
       await page
         .getByRole('button', { name: /关闭复核浮层|Close review drawer/i })
         .click();
-      await expect(page.getByTestId('review-drawer-minimized')).toBeVisible({ timeout: 10_000 });
+      await expect(page.getByTestId('review-drawer')).toHaveCount(0, { timeout: 10_000 });
+      await expect(page.getByTestId('review-drawer-empty')).toBeVisible({ timeout: 10_000 });
 
       const regenerateResponsePromise = page.waitForResponse(
         (response) =>
@@ -352,9 +353,9 @@ test.describe('BOM standardization workbench golden', () => {
           revisionCount: 2,
         });
 
-      // Drawer was already minimized before the toolbar regenerate action above; assert it
-      // stays minimized (the export-revisions timeline lives in the workbench body, not the drawer).
-      await expect(page.getByTestId('review-drawer-minimized')).toBeVisible({ timeout: 10_000 });
+      // Drawer was closed before the toolbar regenerate action above; assert it stays closed
+      // (the export-revisions timeline lives in the workbench body, not the drawer).
+      await expect(page.getByTestId('review-drawer')).toHaveCount(0, { timeout: 10_000 });
       await page.getByRole('tab', { name: /导出版本|Export Revisions/i }).click();
       await expect(page.getByTestId('artifact-timeline')).toBeVisible({ timeout: 20_000 });
       await expect(page.getByTestId('artifact-timeline')).toContainText('Rev 2');
