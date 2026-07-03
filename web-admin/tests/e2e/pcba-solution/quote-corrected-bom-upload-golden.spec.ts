@@ -140,9 +140,18 @@ test.describe('QuoteOps corrected BOM upload golden', () => {
       expect(quoteLines.find((row) => row.qo_ql_mpn === 'RC0603FR-0710KL')).toEqual(
         expect.objectContaining({
           qo_ql_source_workbook: 'customer-corrected-bom-e2e.xlsx',
-          qo_ql_source_row_no: 2,
+          // Standard BOM format's fixed 12-column header now lives on row 4 (index 3,
+          // after the free-form preamble on rows 1-3 — see createCorrectedBomWorkbook),
+          // so data rows are 1-based from row 5, not row 2 as with the old non-standard
+          // fixture layout.
+          qo_ql_source_row_no: 5,
           qo_ql_import_version: importVersion,
           qo_ql_validation_status: 'valid',
+          // Standard BOM has no package/footprint or process-point columns, so the
+          // handler leaves these at their defaults instead of inferring them.
+          qo_ql_package: '',
+          qo_ql_smt_points: 0,
+          qo_ql_tht_points: 0,
         }),
       );
 

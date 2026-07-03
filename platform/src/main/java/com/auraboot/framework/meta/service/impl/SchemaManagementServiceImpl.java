@@ -239,6 +239,14 @@ public class SchemaManagementServiceImpl implements SchemaManagementService {
         if (!existingColumns.contains("tenant_id")) {
             columnDefinitions.add("    tenant_id BIGINT NOT NULL");
         }
+        // Soft-delete marker: models with extension.softDelete=true get a physical
+        // deleted_flag column so command `type:delete` flags-and-hides instead of
+        // physically deleting, and QueryBuilder can filter it out. Tables imported
+        // before soft delete was enabled are back-filled by SoftDeleteColumnInitializer
+        // (Flyway can't reach import-created mt_ tables).
+        if (model.isSoftDelete() && !existingColumns.contains("deleted_flag")) {
+            columnDefinitions.add("    deleted_flag BOOLEAN NOT NULL DEFAULT FALSE");
+        }
 
         // 添加字段定义
         ddl.append(String.join(",\n", columnDefinitions));

@@ -1068,6 +1068,12 @@ export function FormPageContent(props: PageContentProps) {
     [runtime, recordPid],
   );
 
+  // Tracks an in-flight submit so the form buttons disable + show a spinner.
+  // Save/submit run through handleFormAction -> fetchResult directly (not
+  // useActionHandler), so its `loading` never flips for these paths; this
+  // local flag covers them and prevents duplicate submits.
+  const [submitting, setSubmitting] = useState(false);
+
   // Sync formData with runtime scope state
   useEffect(() => {
     syncRuntimeFormScope(formData);
@@ -1488,11 +1494,14 @@ export function FormPageContent(props: PageContentProps) {
         }
         setFieldErrors({});
         setSummaryErrors([]);
-        onSubmitOverride(formData).catch((err) => {
-          const errorMessage = err instanceof Error ? err.message : 'Submit failed';
-          setError(errorMessage);
-          showErrorToast(errorMessage);
-        });
+        setSubmitting(true);
+        onSubmitOverride(formData)
+          .catch((err) => {
+            const errorMessage = err instanceof Error ? err.message : 'Submit failed';
+            setError(errorMessage);
+            showErrorToast(errorMessage);
+          })
+          .finally(() => setSubmitting(false));
         return;
       }
       const mergedEditData = recordPid
@@ -1582,19 +1591,27 @@ export function FormPageContent(props: PageContentProps) {
       // This avoids ambiguity from generic action routing branches (navigate/action registry).
       const submitEndpoint = resolveFormSubmitEndpoint(schema, recordPid || null, actionRecord);
       if (submitEndpoint && ['save', 'submit', 'create', 'update'].includes(effectiveActionType)) {
+        setSubmitting(true);
         return fetchResult(submitEndpoint.endpoint, {
           method: submitEndpoint.method,
           params: commandPayload,
           token: token || undefined,
-        }).then((result) => {
-          if (!ResultHelper.isSuccess(result)) {
-            throw new Error(result.desc || result.message || 'Failed to submit form');
-          }
-          showSuccessToast(t('common.saveSuccess') || 'Saved successfully');
-          dirtyFieldsRef.current.clear();
-          clearFormDraftRef.current();
-          navigate(resolveAfterSubmitRedirect(schema, tableName, result.data, recordPid));
-        });
+        })
+          .then((result) => {
+            if (!ResultHelper.isSuccess(result)) {
+              throw new Error(result.desc || result.message || 'Failed to submit form');
+            }
+            showSuccessToast(t('common.saveSuccess') || 'Saved successfully');
+            dirtyFieldsRef.current.clear();
+            clearFormDraftRef.current();
+            navigate(resolveAfterSubmitRedirect(schema, tableName, result.data, recordPid));
+          })
+          .catch((err) => {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to submit form';
+            setError(errorMessage);
+            showErrorToast(errorMessage);
+          })
+          .finally(() => setSubmitting(false));
       }
 
       if (effectiveCommandCode) {
@@ -1617,6 +1634,7 @@ export function FormPageContent(props: PageContentProps) {
           return;
         }
 
+        setSubmitting(true);
         fetchResult(`/api/meta/commands/execute/${effectiveCommandCode}`, {
           method: 'post',
           params: {
@@ -1658,7 +1676,8 @@ export function FormPageContent(props: PageContentProps) {
             const errorMessage = err instanceof Error ? err.message : 'Failed to execute command';
             setError(errorMessage);
             showErrorToast(errorMessage);
-          });
+          })
+          .finally(() => setSubmitting(false));
         return;
       }
 
@@ -1713,21 +1732,30 @@ export function FormPageContent(props: PageContentProps) {
               )
             : payload;
 
+        setSubmitting(true);
         return fetchResult(endpoint, {
           method,
           params: normalizedPayload,
           token: token || undefined,
-        }).then((result) => {
-          if (!ResultHelper.isSuccess(result)) {
-            throw new Error(
-              result.desc || result.message || `Failed to ${effectiveActionType} record`,
-            );
-          }
-          showSuccessToast(t('common.saveSuccess') || 'Saved successfully');
-          dirtyFieldsRef.current.clear();
-          clearFormDraftRef.current();
-          navigate(resolveAfterSubmitRedirect(schema, targetModelCode, result.data, recordPid));
-        });
+        })
+          .then((result) => {
+            if (!ResultHelper.isSuccess(result)) {
+              throw new Error(
+                result.desc || result.message || `Failed to ${effectiveActionType} record`,
+              );
+            }
+            showSuccessToast(t('common.saveSuccess') || 'Saved successfully');
+            dirtyFieldsRef.current.clear();
+            clearFormDraftRef.current();
+            navigate(resolveAfterSubmitRedirect(schema, targetModelCode, result.data, recordPid));
+          })
+          .catch((err) => {
+            const errorMessage =
+              err instanceof Error ? err.message : `Failed to ${effectiveActionType} record`;
+            setError(errorMessage);
+            showErrorToast(errorMessage);
+          })
+          .finally(() => setSubmitting(false));
       }
 
       return handleAction(effectiveButton as any, actionRecord as any);
@@ -2442,16 +2470,19 @@ export function FormPageContent(props: PageContentProps) {
                           button.code,
                         )}
                         onClick={() => handleFormAction(button)}
-                        disabled={loading || !submitReady}
+                        disabled={loading || submitting || !submitReady}
                         className={`rounded-control px-4 py-2 text-sm font-medium ${
                           button.primary
                             ? 'bg-accent hover:bg-accent-hover text-white disabled:bg-blue-400'
                             : 'border-border-strong bg-panel text-text-2 hover:bg-hover border disabled:bg-gray-100'
                         } ${button.danger ? 'bg-red-600 text-white hover:bg-red-700' : ''} disabled:cursor-not-allowed`}
                       >
-                        {loading && button.code === 'submit' && (
-                          <span className="loading loading-spinner loading-sm mr-2"></span>
-                        )}
+                        {(loading || submitting) &&
+                          (button.code === 'submit' ||
+                            button.code === 'save' ||
+                            button.primary) && (
+                            <span className="loading loading-spinner loading-sm mr-2"></span>
+                          )}
                         {resolveFormButtonContent(button, locale, t)}
                       </button>
                     );

@@ -12,6 +12,7 @@ import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { useAuth } from '~/contexts/AuthContext';
 import { useToastContext } from '~/contexts/ToastContext';
+import { LoadingOverlay } from '~/ui/LoadingOverlay';
 
 export interface ToolbarBlockRendererProps {
   block: BlockConfig;
@@ -114,7 +115,9 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
   };
 
   return (
-    <div className="toolbar-block flex space-x-2">
+    <>
+      <LoadingOverlay visible={busy} label={t('common.loading')} />
+      <div className="toolbar-block flex space-x-2">
       {buttons.map((button) => {
         // 条件渲染
         if (button.visibleWhen) {
@@ -147,7 +150,8 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
           </button>
         );
       })}
-    </div>
+      </div>
+    </>
   );
 };
 
