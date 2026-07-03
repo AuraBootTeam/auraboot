@@ -3,8 +3,15 @@ import {
   DecisionRuleBindingBlock,
   type DecisionOption,
 } from '~/ui/smart/decision/DecisionRuleBindingBlock'
-import type { DecisionAction, DecisionApi } from '../api/decisionApi'
+import type {
+  DecisionAction,
+  DecisionApi,
+  DecisionTableAnalysis,
+  DecisionTableDmnXmlResult,
+} from '../api/decisionApi'
+import type { DecisionTable } from '../table/decisionTable'
 import type { FieldOption } from './ConditionBuilder'
+import { DecisionTableEditor } from './DecisionTableEditor'
 
 type StrategyScenarioKey = 'SLA' | 'BPM' | 'AUTOMATION' | 'PERMISSION'
 
@@ -172,12 +179,73 @@ function formatFieldPath(field: FieldOption): string {
   return `${field.scope}.${field.path}`
 }
 
+function sanitizeTableId(value: string): string {
+  return value
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'field'
+}
+
+function tableInputId(field: FieldOption): string {
+  return `${field.scope}_${sanitizeTableId(field.path)}`
+}
+
+function scenarioRouteValues(scenario: StrategyScenario): string[] {
+  if (scenario.key === 'BPM') return ['director', 'manager', 'fallback']
+  if (scenario.key === 'SLA') return ['escalate', 'notify', 'fallback']
+  if (scenario.key === 'AUTOMATION') return ['webhook', 'notify', 'fallback']
+  return ['allow', 'deny', 'audit']
+}
+
+function buildScenarioTable(scenario: StrategyScenario): DecisionTable {
+  const routeValues = scenarioRouteValues(scenario)
+  return {
+    hitPolicy: 'FIRST',
+    inputs: scenario.fields.map((field) => ({
+      id: tableInputId(field),
+      label: field.label,
+      scope: field.scope,
+      path: field.path,
+      dataType: field.dataType,
+      allowedValues: field.options,
+    })),
+    outputs: [
+      { id: 'route', label: 'Route', dataType: 'string', allowedValues: routeValues },
+      {
+        id: 'actions',
+        label: 'Actions',
+        dataType: 'collection',
+        allowedValues: scenario.actionTypes,
+      },
+    ],
+    rules: [],
+    defaultOutput: {
+      route: routeValues[routeValues.length - 1] ?? 'fallback',
+      actions: ['WRITE_AUDIT'],
+    },
+  }
+}
+
+function initialScenarioTables(): Record<StrategyScenarioKey, DecisionTable> {
+  return Object.fromEntries(
+    SCENARIOS.map((scenario) => [scenario.key, buildScenarioTable(scenario)]),
+  ) as Record<StrategyScenarioKey, DecisionTable>
+}
+
+function tableInputRefs(table: DecisionTable): string[] {
+  return table.inputs.map((input) => `${input.scope}.${input.path}`)
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : '操作失败'
 }
 
 function validationMessage(result: Awaited<ReturnType<DecisionApi['validateVersion']>>): string {
   return result?.errors?.[0]?.message ?? '版本校验未通过'
+}
+
+function formatDmnError(result: DecisionTableDmnXmlResult): string {
+  const first = result.errors?.[0]
+  return first ? `${first.code}: ${first.message ?? 'DMN XML 处理失败'}` : 'DMN XML 处理失败'
 }
 
 function sampleContext() {
@@ -204,34 +272,21 @@ function sampleContext() {
   }
 }
 
-function draftCondition(fields: FieldOption[]) {
-  const first = fields[0]
-  return {
-    type: 'group',
-    op: 'AND',
-    children: first
-      ? [
-          {
-            type: 'compare',
-            enabled: true,
-            left: {
-              type: 'path',
-              scope: first.scope,
-              path: first.path,
-              dataType: first.dataType,
-            },
-            operator: 'IS_NOT_NULL',
-          },
-        ]
-      : [],
-  }
-}
-
 export function StrategyStudioWorkbench({ fields, decisions = [], api }: StrategyStudioWorkbenchProps) {
   const [scenarioKey, setScenarioKey] = useState<StrategyScenarioKey>('SLA')
   const [operationStatus, setOperationStatus] = useState<string | null>(null)
   const [draftVersionPids, setDraftVersionPids] = useState<Record<string, string>>({})
   const [catalogActions, setCatalogActions] = useState<DecisionAction[]>([])
+  const [tableDrafts, setTableDrafts] = useState<Record<StrategyScenarioKey, DecisionTable>>(
+    initialScenarioTables,
+  )
+  const [tableAnalyses, setTableAnalyses] = useState<Partial<Record<StrategyScenarioKey, DecisionTableAnalysis | null>>>({})
+  const [tableAnalysisErrors, setTableAnalysisErrors] = useState<Partial<Record<StrategyScenarioKey, string | null>>>({})
+  const [tableAnalyzing, setTableAnalyzing] = useState(false)
+  const [tableDmnXmls, setTableDmnXmls] = useState<Partial<Record<StrategyScenarioKey, string>>>({})
+  const [tableDmnErrors, setTableDmnErrors] = useState<Partial<Record<StrategyScenarioKey, string | null>>>({})
+  const [tableDmnStatuses, setTableDmnStatuses] = useState<Partial<Record<StrategyScenarioKey, string | null>>>({})
+  const [tableDmnBusy, setTableDmnBusy] = useState(false)
   const scenario = SCENARIOS.find((candidate) => candidate.key === scenarioKey) ?? SCENARIOS[0]
   const decisionOptions = useMemo(() => mergeDecisions(decisions, DECISIONS), [decisions])
   const actionsByType = useMemo(
@@ -246,6 +301,7 @@ export function StrategyStudioWorkbench({ fields, decisions = [], api }: Strateg
     () => mergeFields(scenario.fields, fields),
     [fields, scenario.fields],
   )
+  const scenarioTable = tableDrafts[scenario.key] ?? buildScenarioTable(scenario)
 
   useEffect(() => {
     let cancelled = false
@@ -263,6 +319,21 @@ export function StrategyStudioWorkbench({ fields, decisions = [], api }: Strateg
     setScenarioKey(next.key)
     setOperationStatus(`已加载共享片段 · ${next.fragment}`)
   }
+
+  const clearTableFeedback = (key: StrategyScenarioKey) => {
+    setTableAnalyses((current) => ({ ...current, [key]: null }))
+    setTableAnalysisErrors((current) => ({ ...current, [key]: null }))
+    setTableDmnErrors((current) => ({ ...current, [key]: null }))
+    setTableDmnStatuses((current) => ({ ...current, [key]: null }))
+  }
+
+  const updateScenarioTable = (key: StrategyScenarioKey, next: DecisionTable) => {
+    setTableDrafts((current) => ({ ...current, [key]: next }))
+    clearTableFeedback(key)
+  }
+
+  const getScenarioTable = (target: StrategyScenario): DecisionTable =>
+    tableDrafts[target.key] ?? buildScenarioTable(target)
 
   const publishStatus =
     scenario.blockers > 0
@@ -301,6 +372,106 @@ export function StrategyStudioWorkbench({ fields, decisions = [], api }: Strateg
     }
   }
 
+  const analyzeScenarioTable = async () => {
+    const target = scenario
+    setTableAnalyzing(true)
+    setTableAnalysisErrors((current) => ({ ...current, [target.key]: null }))
+    try {
+      const result = await api.analyzeTable(
+        getScenarioTable(target),
+        target.decisionCode,
+        draftVersionPids[target.key],
+      )
+      setTableAnalyses((current) => ({ ...current, [target.key]: result }))
+    } catch (error) {
+      setTableAnalyses((current) => ({ ...current, [target.key]: null }))
+      setTableAnalysisErrors((current) => ({ ...current, [target.key]: errorMessage(error) }))
+    } finally {
+      setTableAnalyzing(false)
+    }
+  }
+
+  const setScenarioDmnXml = (key: StrategyScenarioKey, xml: string) => {
+    setTableDmnXmls((current) => ({ ...current, [key]: xml }))
+    setTableDmnErrors((current) => ({ ...current, [key]: null }))
+    setTableDmnStatuses((current) => ({ ...current, [key]: null }))
+  }
+
+  const applyDmnResult = (
+    key: StrategyScenarioKey,
+    result: DecisionTableDmnXmlResult,
+    status: string,
+    updateModel: boolean,
+  ) => {
+    if (result.dmnXml !== undefined) {
+      setTableDmnXmls((current) => ({ ...current, [key]: result.dmnXml ?? '' }))
+    }
+    if (updateModel && result.model) {
+      updateScenarioTable(key, result.model)
+    }
+    if (!result.valid) {
+      throw new Error(formatDmnError(result))
+    }
+    const warningCount = result.warnings?.length ?? 0
+    setTableDmnStatuses((current) => ({
+      ...current,
+      [key]: warningCount > 0 ? `${status} · warnings ${warningCount}` : status,
+    }))
+  }
+
+  const exportScenarioDmn = async () => {
+    const target = scenario
+    setTableDmnBusy(true)
+    setTableDmnErrors((current) => ({ ...current, [target.key]: null }))
+    try {
+      const result = await api.exportTableDmn(
+        getScenarioTable(target),
+        target.ruleCode,
+        target.decisionCode,
+      )
+      applyDmnResult(target.key, result, 'DMN XML 已导出', false)
+    } catch (error) {
+      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error) }))
+      setTableDmnStatuses((current) => ({ ...current, [target.key]: null }))
+    } finally {
+      setTableDmnBusy(false)
+    }
+  }
+
+  const importScenarioDmn = async () => {
+    const target = scenario
+    setTableDmnBusy(true)
+    setTableDmnErrors((current) => ({ ...current, [target.key]: null }))
+    try {
+      const result = await api.importTableDmn(tableDmnXmls[target.key] ?? '')
+      applyDmnResult(target.key, result, 'DMN XML 已导入', true)
+    } catch (error) {
+      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error) }))
+      setTableDmnStatuses((current) => ({ ...current, [target.key]: null }))
+    } finally {
+      setTableDmnBusy(false)
+    }
+  }
+
+  const roundTripScenarioDmn = async () => {
+    const target = scenario
+    setTableDmnBusy(true)
+    setTableDmnErrors((current) => ({ ...current, [target.key]: null }))
+    try {
+      const result = await api.roundTripTableDmn(
+        getScenarioTable(target),
+        target.ruleCode,
+        target.decisionCode,
+      )
+      applyDmnResult(target.key, result, 'Round-trip 通过', true)
+    } catch (error) {
+      setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error) }))
+      setTableDmnStatuses((current) => ({ ...current, [target.key]: null }))
+    } finally {
+      setTableDmnBusy(false)
+    }
+  }
+
   const ensureDefinition = async (target: StrategyScenario) => {
     const decisionName =
       decisionOptions.find((decision) => decision.code === target.decisionCode)?.name ??
@@ -323,13 +494,13 @@ export function StrategyStudioWorkbench({ fields, decisions = [], api }: Strateg
     setOperationStatus('草稿保存中...')
     try {
       await ensureDefinition(target)
-      const targetFields = mergeFields(target.fields, fields)
+      const table = getScenarioTable(target)
       const draft = await api.createDraftVersion(target.decisionCode, {
-        kind: 'SIMPLE_CONDITION',
-        runtimeAdapter: 'AST_EVALUATOR',
+        kind: 'DECISION_TABLE',
+        runtimeAdapter: 'PLATFORM_DECISION_TABLE',
         versionTag: `studio-${target.key.toLowerCase()}`,
-        contentJson: draftCondition(targetFields),
-        inputSchemaJson: { fields: targetFields.map(formatFieldPath) },
+        contentJson: table,
+        inputSchemaJson: { fields: tableInputRefs(table) },
         outputSchemaJson: { actions: actionOutputSchema(resolveScenarioActions(target, actionsByType)) },
         contextSchemaJson: { sample: sampleContext() },
       })
@@ -509,15 +680,23 @@ export function StrategyStudioWorkbench({ fields, decisions = [], api }: Strateg
               <strong>DMN 决策输出</strong>
               <span>{scenario.decisionCode}</span>
             </div>
-            <div className="strategy-dmn-table">
-              <div>priority</div>
-              <div>amount</div>
-              <div>route</div>
-              <div>actions</div>
-              <div>HIGH</div>
-              <div>&gt; 100000</div>
-              <div>{scenario.key === 'BPM' ? 'director' : 'escalate'}</div>
-              <div>{scenarioActions.slice(0, 2).map((action) => action.actionType).join(' + ')}</div>
+            <div className="strategy-table-panel">
+              <DecisionTableEditor
+                value={scenarioTable}
+                onChange={(next) => updateScenarioTable(scenario.key, next)}
+                analysis={tableAnalyses[scenario.key] ?? null}
+                analyzing={tableAnalyzing}
+                analysisError={tableAnalysisErrors[scenario.key] ?? null}
+                onAnalyze={analyzeScenarioTable}
+                dmnXml={tableDmnXmls[scenario.key] ?? ''}
+                dmnBusy={tableDmnBusy}
+                dmnError={tableDmnErrors[scenario.key] ?? null}
+                dmnStatus={tableDmnStatuses[scenario.key] ?? null}
+                onDmnXmlChange={(xml) => setScenarioDmnXml(scenario.key, xml)}
+                onExportDmnXml={exportScenarioDmn}
+                onImportDmnXml={importScenarioDmn}
+                onRoundTripDmnXml={roundTripScenarioDmn}
+              />
             </div>
           </div>
         </main>
