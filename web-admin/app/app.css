@@ -1063,36 +1063,21 @@
   font-weight: 850;
 }
 
-.strategy-dmn-table {
-  display: grid;
-  overflow-x: auto;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  grid-template-columns: repeat(4, minmax(110px, 1fr));
-}
-
-.strategy-dmn-table > div {
+.strategy-table-panel {
   min-width: 0;
-  border-bottom: 1px solid var(--color-border);
-  border-right: 1px solid var(--color-border);
-  color: var(--color-text);
-  font-size: 13px;
-  padding: 9px;
+  overflow-x: auto;
 }
 
-.strategy-dmn-table > div:nth-child(-n + 4) {
-  background: var(--color-subtle);
-  color: var(--color-text-2);
-  font-size: 11px;
-  font-weight: 850;
+.strategy-table-panel [data-testid='decision-table-editor'] {
+  max-width: none;
 }
 
-.strategy-dmn-table > div:nth-child(4n) {
-  border-right: 0;
+.strategy-table-panel .dt-column-row {
+  min-width: 720px;
 }
 
-.strategy-dmn-table > div:nth-last-child(-n + 4) {
-  border-bottom: 0;
+.strategy-table-panel .dt-grid {
+  min-width: 760px;
 }
 
 .strategy-check-list {
@@ -1185,8 +1170,9 @@
     white-space: normal;
   }
 
-  .strategy-dmn-table {
-    grid-template-columns: repeat(4, minmax(132px, 1fr));
+  .strategy-table-panel .dt-column-row,
+  .strategy-table-panel .dt-grid {
+    min-width: 680px;
   }
 }
 
