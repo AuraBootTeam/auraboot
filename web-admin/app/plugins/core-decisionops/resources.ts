@@ -2,16 +2,16 @@ import type { PluginResource } from '../_shared/types.js'
 
 export const RESOURCES: PluginResource[] = [
   {
-    key: 'decisionops.consolePreview',
+    key: 'decisionops.strategyStudio',
     path: '/decision-ops',
-    title: { en: 'DecisionOps Console Preview', zh: '决策中心综合控制台预览' },
+    title: { en: 'Strategy Studio', zh: '策略编排器' },
     icon: 'git-branch',
     menu: { hidden: true },
     breadcrumb: false,
     tab: false,
     file: './plugins/core-decisionops/pages/DecisionOpsConsolePage.tsx',
     meta: {
-      implementation: 'react-console-preview',
+      implementation: 'strategy-studio',
       pairedDslEntry: '/p/decisionops_rollouts',
     },
   },

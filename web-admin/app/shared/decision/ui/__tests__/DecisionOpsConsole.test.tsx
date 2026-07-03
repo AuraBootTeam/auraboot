@@ -288,9 +288,50 @@ function renderConsoleWithoutPermissionGrants(apiOverrides: Partial<DecisionApi>
 }
 
 describe('DecisionOpsConsole', () => {
-  it('renders the tab bar + the default dashboard tab', () => {
+  it('renders the tab bar + the Strategy Studio as the default product entry', () => {
     renderConsole();
+    expect(screen.getByTestId('doc-tab-studio')).toBeInTheDocument();
     expect(screen.getByTestId('doc-tab-definitions')).toBeInTheDocument();
+    expect(screen.getByTestId('strategy-studio')).toBeInTheDocument();
+    expect(screen.getByTestId('strategy-scenario-SLA')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('优先级');
+    expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('高价值');
+    expect(screen.getByTestId('strategy-action-plan')).toHaveTextContent('发送');
+    expect(screen.getByTestId('decision-rule-binding-block')).toBeInTheDocument();
+  });
+
+  it('switches Strategy Studio scenarios and keeps the reusable rule binding workflow visible', () => {
+    renderConsole();
+
+    fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+
+    expect(screen.getByTestId('strategy-scenario-BPM')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent('BPM');
+    expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent('task.enter.approval');
+    expect(screen.getByLabelText('decision-code')).toHaveValue('approval_routing');
+    expect(screen.getByTestId('decision-binding-editor')).toBeInTheDocument();
+  });
+
+  it('reuses a shared condition fragment to switch consumers and shows operation feedback', () => {
+    renderConsole();
+
+    fireEvent.click(screen.getByTestId('strategy-fragment-BPM'));
+
+    expect(screen.getByTestId('strategy-scenario-BPM')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent('BPM');
+    expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('高金额审批升级');
+    expect(screen.getByLabelText('decision-code')).toHaveValue('approval_routing');
+
+    fireEvent.click(screen.getByTestId('strategy-run-test'));
+    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('测试通过');
+
+    fireEvent.click(screen.getByTestId('strategy-publish'));
+    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('发布检查通过');
+  });
+
+  it('switches to the dashboard tab and renders runtime metrics', () => {
+    renderConsole();
+    fireEvent.click(screen.getByTestId('doc-tab-dashboard'));
     expect(screen.getByTestId('decision-dashboard')).toBeInTheDocument();
     expect(screen.getByTestId('dd-card-definitions')).toHaveTextContent('5');
   });
@@ -319,6 +360,7 @@ describe('DecisionOpsConsole', () => {
     renderConsoleWithoutDashboard({ getDashboard } as unknown as Partial<DecisionApi>);
 
     await waitFor(() => expect(getDashboard).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByTestId('doc-tab-dashboard'));
     await waitFor(() => expect(screen.getByTestId('dd-card-definitions')).toHaveTextContent('7'));
     expect(screen.getByTestId('dd-card-policies')).toHaveTextContent('4');
     expect(screen.getByTestId('dd-card-p95')).toHaveTextContent('42ms');

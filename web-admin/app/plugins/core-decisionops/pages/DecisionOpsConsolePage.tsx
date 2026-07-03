@@ -8,9 +8,10 @@ import { DecisionOpsConsole } from '~/shared/decision/ui/DecisionOpsConsole'
 import { getApiService } from '~/shared/services/ApiService'
 
 /**
- * Integrated DecisionOps console preview.
- * Production governance pages remain DSL-first under /p/decisionops_*; this
- * route keeps the earlier all-in-one console available for design comparison.
+ * Integrated Strategy Studio entry.
+ * Governance asset pages stay DSL-first under /p/decisionops_*; this route is
+ * the cross-module authoring surface for rule consumers such as SLA, BPM,
+ * Automation, and Permission.
  */
 const DEFAULT_FIELDS: FieldOption[] = [
   {
@@ -37,5 +38,5 @@ function createApi() {
 
 export default function DecisionOpsConsolePage() {
   const api = useMemo(() => createApi(), [])
-  return <DecisionOpsConsole api={api} fields={DEFAULT_FIELDS} initialTab="dashboard" />
+  return <DecisionOpsConsole api={api} fields={DEFAULT_FIELDS} initialTab="studio" />
 }

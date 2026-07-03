@@ -6,7 +6,7 @@ import { getApiService } from '~/shared/services/ApiService';
 
 vi.mock('~/shared/decision/ui/DecisionOpsConsole', () => ({
   DecisionOpsConsole: ({ api, fields, initialTab }: any) => (
-    <div data-testid="decisionops-console-preview">
+    <div data-testid="decisionops-console">
       {initialTab}:{fields.length}:{api === fakeDecisionApi ? 'api-ready' : 'api-missing'}
     </div>
   ),
@@ -28,11 +28,11 @@ vi.mock('~/shared/decision/api/decisionApi', () => ({
 }));
 
 describe('DecisionOpsConsolePage', () => {
-  it('renders the integrated console preview instead of redirecting to a DSL page', () => {
+  it('renders the Strategy Studio product entry instead of redirecting to a DSL page', () => {
     render(<DecisionOpsConsolePage />);
 
-    expect(screen.getByTestId('decisionops-console-preview')).toHaveTextContent(
-      'dashboard:3:api-ready',
+    expect(screen.getByTestId('decisionops-console')).toHaveTextContent(
+      'studio:3:api-ready',
     );
     expect(getApiService).toHaveBeenCalled();
     expect(createDecisionApi).toHaveBeenCalledWith(
