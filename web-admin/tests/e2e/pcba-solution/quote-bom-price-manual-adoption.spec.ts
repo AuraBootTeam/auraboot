@@ -178,25 +178,24 @@ test.describe('PCBA quote BOM price manual adoption', () => {
       await expect(manualAction).toBeEnabled();
       await manualAction.click();
 
-      const form = page.getByTestId('review-drawer-action-form');
+      // The manual-price action routes through the platform FormDialog (standard DSL inputFields
+      // sugar), not a bespoke drawer form — so it gets localized validation, not the browser-native
+      // 'Please fill out this field.' message.
+      const form = page.getByTestId('form-dialog');
       await expect(form).toBeVisible({ timeout: 5_000 });
       await expect(form).toContainText('录入人工价');
-      await expect(page.getByTestId('review-drawer-action-form-submit')).toContainText(
-        '录入并采用',
-      );
+      await expect(page.getByTestId('form-dialog-submit')).toContainText('录入并采用');
 
-      const unitPriceField = page.getByTestId('review-drawer-action-form-field-unitPrice');
-      await page.getByTestId('review-drawer-action-form-field-sourceNote').fill(MANUAL_SOURCE_NOTE);
-      await page.getByTestId('review-drawer-action-form-submit').click();
-      const unitPriceValidation = await unitPriceField.evaluate(
-        (node) => (node as HTMLInputElement).validationMessage,
-      );
-      expect(unitPriceValidation, 'manual unit price is required before submit').toBeTruthy();
+      // Empty required submit shows the platform's localized validation and keeps the dialog open.
+      await page.getByTestId('form-dialog-field-sourceNote').fill(MANUAL_SOURCE_NOTE);
+      await page.getByTestId('form-dialog-submit').click();
+      await expect(form).toBeVisible();
+      await expect(form).toContainText(/请填写|必填|required/i);
 
-      await unitPriceField.fill(String(MANUAL_UNIT_PRICE));
-      await page.getByTestId('review-drawer-action-form-field-supplierName').fill(MANUAL_SUPPLIER);
-      await page.getByTestId('review-drawer-action-form-field-reason').fill(MANUAL_REASON);
-      await page.getByTestId('review-drawer-action-form-field-validUntil').fill(MANUAL_VALID_UNTIL);
+      await page.getByTestId('form-dialog-field-unitPrice').fill(String(MANUAL_UNIT_PRICE));
+      await page.getByTestId('form-dialog-field-supplierName').fill(MANUAL_SUPPLIER);
+      await page.getByTestId('form-dialog-field-reason').fill(MANUAL_REASON);
+      await page.getByTestId('form-dialog-field-validUntil').fill(MANUAL_VALID_UNTIL);
 
       const manualCommandResponse = page.waitForResponse(
         (response) =>
@@ -206,7 +205,7 @@ test.describe('PCBA quote BOM price manual adoption', () => {
           response.request().method() === 'POST',
         { timeout: 30_000 },
       );
-      await page.getByTestId('review-drawer-action-form-submit').click();
+      await page.getByTestId('form-dialog-submit').click();
       const response = await manualCommandResponse;
       const responseBody = await response.json().catch(() => ({}));
       expect(String((responseBody as any).code), JSON.stringify(responseBody).slice(0, 800)).toBe(
@@ -227,7 +226,7 @@ test.describe('PCBA quote BOM price manual adoption', () => {
         reason: MANUAL_REASON,
         validUntil: MANUAL_VALID_UNTIL,
       });
-      await expect(page.getByTestId('review-drawer-action-form')).toHaveCount(0, {
+      await expect(page.getByTestId('form-dialog')).toHaveCount(0, {
         timeout: 10_000,
       });
 

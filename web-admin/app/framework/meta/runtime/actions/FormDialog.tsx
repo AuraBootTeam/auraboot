@@ -36,6 +36,7 @@ interface FormDialogState {
   fields: FormFieldConfig[];
   fieldOptions: Record<string, Array<{ label: string; value: string }>>;
   defaults: Record<string, any>;
+  submitLabel?: string | Record<string, string>;
   onSubmit?: (formData: Record<string, any>) => void;
   onCancel?: () => void;
 }
@@ -65,6 +66,7 @@ export default function FormDialog() {
         fields: detail.fields || [],
         fieldOptions: detail.fieldOptions || {},
         defaults,
+        submitLabel: detail.submitLabel,
         onSubmit: detail.onSubmit,
         onCancel: detail.onCancel,
       });
@@ -279,7 +281,9 @@ export default function FormDialog() {
             onClick={handleSubmit}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none"
           >
-            {t('common.confirm') || 'Confirm'}
+            {state.submitLabel
+              ? getLocalizedText(state.submitLabel, locale, t)
+              : t('common.confirm') || 'Confirm'}
           </button>
         </div>
       </div>

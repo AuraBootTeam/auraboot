@@ -239,19 +239,20 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       const drawer = page.getByTestId('review-drawer');
       await expect(drawer).toBeVisible({ timeout: 20_000 });
       await page.getByTestId('review-drawer-candidate-action-record_manual_price').click();
-      await expect(page.getByTestId('review-drawer-action-form')).toBeVisible({ timeout: 15_000 });
-      await page.getByTestId('review-drawer-action-form-field-unitPrice').fill(String(MANUAL_UNIT_PRICE));
-      await page.getByTestId('review-drawer-action-form-field-supplierName').fill(MANUAL_SUPPLIER);
-      await page.getByTestId('review-drawer-action-form-field-reason').fill(MANUAL_REASON);
-      await page.getByTestId('review-drawer-action-form-field-validUntil').fill(MANUAL_VALID_UNTIL);
-      await page.getByTestId('review-drawer-action-form-field-sourceNote').fill('smoke sales golden');
+      // manual price collects via the platform FormDialog (standard DSL inputFields sugar)
+      await expect(page.getByTestId('form-dialog')).toBeVisible({ timeout: 15_000 });
+      await page.getByTestId('form-dialog-field-unitPrice').fill(String(MANUAL_UNIT_PRICE));
+      await page.getByTestId('form-dialog-field-supplierName').fill(MANUAL_SUPPLIER);
+      await page.getByTestId('form-dialog-field-reason').fill(MANUAL_REASON);
+      await page.getByTestId('form-dialog-field-validUntil').fill(MANUAL_VALID_UNTIL);
+      await page.getByTestId('form-dialog-field-sourceNote').fill('smoke sales golden');
       const manualResponsePromise = page.waitForResponse(
         (response) =>
           response.url().includes('/api/meta/commands/execute/qo_quote_line_common:record_manual_price') &&
           response.request().method() === 'POST',
         { timeout: 30_000 },
       );
-      await page.getByTestId('review-drawer-action-form-submit').click();
+      await page.getByTestId('form-dialog-submit').click();
       const manualBody = (await (await manualResponsePromise).json().catch(() => ({}))) as Record<string, unknown>;
       expect(String(manualBody.code), `record_manual_price response: ${JSON.stringify(manualBody).slice(0, 600)}`).toBe('0');
 

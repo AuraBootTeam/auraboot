@@ -632,6 +632,7 @@ export async function promptInputForm(
   fields: Array<Record<string, any>>,
   title: any,
   fetchResult?: (url: string, opts: any) => Promise<any>,
+  submitLabel?: any,
 ): Promise<Record<string, any>> {
   // Pre-fetch options for select fields with API datasources
   const fieldOptions: Record<string, Array<{ label: string; value: string }>> = {};
@@ -682,6 +683,7 @@ export async function promptInputForm(
         fields,
         fieldOptions,
         defaults,
+        submitLabel,
         onSubmit: (formData: Record<string, any>) => resolve(formData),
         onCancel: () => reject(new Error('User cancelled')),
       },
@@ -997,7 +999,12 @@ actionRegistry.register(
     if (Array.isArray(args?.inputFields) && args.inputFields.length > 0) {
       let collected: Record<string, any>;
       try {
-        collected = await promptInputForm(args.inputFields, args?.inputFieldsTitle, fetchResult);
+        collected = await promptInputForm(
+          args.inputFields,
+          args?.inputFieldsTitle,
+          fetchResult,
+          args?.inputFieldsSubmitLabel,
+        );
       } catch {
         return; // user cancelled the form — abort the command silently
       }

@@ -1948,16 +1948,14 @@ describe('ReviewDrawerBlockRenderer', () => {
                       source: 'manual',
                     },
                     reload: ['priceEvidence'],
+                    inputFieldsTitle: '录入人工价',
+                    inputFieldsSubmitLabel: '录入并采用',
+                    inputFields: [
+                      { field: 'unitPrice', label: '人工单价', type: 'number', required: true },
+                      { field: 'currency', label: '币种', type: 'text', defaultValue: 'CNY' },
+                      { field: 'reason', label: '来源说明', type: 'textarea' },
+                    ],
                   },
-                },
-                form: {
-                  title: '录入人工价',
-                  submitLabel: '录入并采用',
-                  fields: [
-                    { name: 'unitPrice', label: '人工单价', type: 'number', required: true },
-                    { name: 'currency', label: '币种', type: 'text', defaultValue: 'CNY' },
-                    { name: 'reason', label: '来源说明', type: 'textarea' },
-                  ],
                 },
               },
             ],
@@ -1967,16 +1965,27 @@ describe('ReviewDrawerBlockRenderer', () => {
       />,
     );
 
+    // The drawer routes form-bearing actions through the platform inputFields sugar: clicking the
+    // action dispatches a 'dialog:form' event (rendered by the shared FormDialog, mounted at page
+    // level) rather than a bespoke drawer form. Capture the request and simulate the user submit.
+    let formDetail: any;
+    const dialogHandler = (event: Event) => {
+      formDetail = (event as CustomEvent).detail;
+    };
+    window.addEventListener('dialog:form', dialogHandler);
     fireEvent.click(screen.getByTestId('review-drawer-candidate-action-record_manual_price'));
+    await waitFor(() => expect(formDetail).toBeTruthy());
+    window.removeEventListener('dialog:form', dialogHandler);
 
-    expect(screen.getByTestId('review-drawer-action-form')).toHaveTextContent('录入人工价');
-    fireEvent.change(screen.getByTestId('review-drawer-action-form-field-unitPrice'), {
-      target: { value: '8.88' },
-    });
-    fireEvent.change(screen.getByTestId('review-drawer-action-form-field-reason'), {
-      target: { value: '业务裁决价' },
-    });
-    fireEvent.click(screen.getByTestId('review-drawer-action-form-submit'));
+    expect(formDetail.title).toBe('录入人工价');
+    expect(formDetail.submitLabel).toBe('录入并采用');
+    expect(formDetail.fields.map((field: any) => field.field)).toEqual([
+      'unitPrice',
+      'currency',
+      'reason',
+    ]);
+    // simulate the user filling + submitting the standard FormDialog
+    formDetail.onSubmit({ unitPrice: '8.88', currency: 'CNY', reason: '业务裁决价' });
 
     await waitFor(() => {
       expect(fetchResultMock).toHaveBeenCalledWith(
