@@ -388,10 +388,7 @@ describe('MetricStripBlockRenderer', () => {
       'h-28',
       'overflow-hidden',
     );
-    expect(screen.getByTestId('metric-strip-value-rule_file')).toHaveClass(
-      'min-w-0',
-      'truncate',
-    );
+    expect(screen.getByTestId('metric-strip-value-rule_file')).toHaveClass('min-w-0', 'truncate');
     expect(screen.getByTestId('metric-strip-subtext-rule_file')).toHaveClass('line-clamp-2');
   });
 
@@ -1108,6 +1105,71 @@ describe('CandidateListBlockRenderer', () => {
       );
     });
     expect(screen.getByTestId('candidate-list-item-C-1')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('moves the default selection when the state record is filtered out', async () => {
+    const data = {
+      candidates: [
+        { pid: 'C-1', materialCode: 'D410000098100' },
+        { pid: 'C-2', materialCode: 'D410000098200' },
+      ],
+    };
+    const runtime = makeRuntime({ data }) as any;
+    runtime.getContext().state.selectedCandidate = data.candidates[1];
+    const block: BlockConfig = {
+      id: 'candidate_list',
+      blockType: 'candidate-list',
+      dataSource: 'candidates',
+      selection: { mode: 'single', bind: 'selectedCandidate', defaultFirst: true },
+      item: {
+        rowKey: 'pid',
+        titleField: 'materialCode',
+      },
+    };
+
+    const { rerender } = render(<CandidateListBlockRenderer block={block} runtime={runtime} />);
+    expect(screen.getByTestId('candidate-list-item-C-2')).toHaveAttribute('aria-pressed', 'true');
+
+    data.candidates = [data.candidates[0]];
+    rerender(<CandidateListBlockRenderer block={block} runtime={runtime} />);
+
+    await waitFor(() => {
+      expect(runtime.__updateState).toHaveBeenCalledWith(
+        'scope-1',
+        'selectedCandidate',
+        expect.objectContaining({ pid: 'C-1' }),
+      );
+    });
+    expect(screen.getByTestId('candidate-list-item-C-1')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('clears the bound selection when all candidates are filtered out', async () => {
+    const data = {
+      candidates: [{ pid: 'C-1', materialCode: 'D410000098100' }],
+    };
+    const runtime = makeRuntime({ data }) as any;
+    runtime.getContext().state.selectedCandidate = data.candidates[0];
+    const block: BlockConfig = {
+      id: 'candidate_list',
+      blockType: 'candidate-list',
+      dataSource: 'candidates',
+      selection: { mode: 'single', bind: 'selectedCandidate', defaultFirst: true },
+      item: {
+        rowKey: 'pid',
+        titleField: 'materialCode',
+      },
+    };
+
+    const { rerender } = render(<CandidateListBlockRenderer block={block} runtime={runtime} />);
+    expect(screen.getByTestId('candidate-list-item-C-1')).toHaveAttribute('aria-pressed', 'true');
+
+    data.candidates = [];
+    rerender(<CandidateListBlockRenderer block={block} runtime={runtime} />);
+
+    await waitFor(() => {
+      expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedCandidate', null);
+    });
+    expect(screen.getByTestId('candidate-list-empty')).toBeInTheDocument();
   });
 
   it('renders queue-style record metadata from generic item configuration', () => {
@@ -1995,7 +2057,9 @@ describe('ReviewDrawerBlockRenderer', () => {
 
     fireEvent.click(screen.getByTestId('review-drawer-candidate-ME-1'));
 
-    expect(screen.getByTestId('review-drawer-candidate-ME-1').querySelector('.bg-amber-50')).toBeTruthy();
+    expect(
+      screen.getByTestId('review-drawer-candidate-ME-1').querySelector('.bg-amber-50'),
+    ).toBeTruthy();
     expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent('品牌');
     expect(screen.getByTestId('review-drawer-selected-group-brand')).toHaveTextContent(
       'source and candidate brand differ',

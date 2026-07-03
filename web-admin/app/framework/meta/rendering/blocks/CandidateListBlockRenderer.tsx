@@ -36,7 +36,13 @@ function isPresent(value: unknown): boolean {
   return value !== undefined && value !== null && String(value).trim() !== '';
 }
 
-function renderTemplate(template: any, row: any, context: any, locale: string, t: (key: string) => string): string {
+function renderTemplate(
+  template: any,
+  row: any,
+  context: any,
+  locale: string,
+  t: (key: string) => string,
+): string {
   const text = getLocalizedText(template, locale, t);
   if (!text || typeof text !== 'string') return formatInlineValue(text);
   const templateContext = { ...context, row, record: row };
@@ -143,10 +149,16 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
           maxHeight: typeof maxHeight === 'number' ? `${maxHeight}px` : String(maxHeight),
         };
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const firstRowKey = rows.length > 0 ? String(readPath(rows[0], rowKeyField) ?? 0) : null;
   const stateRecord = bindKey ? readPath(context.state || {}, bindKey) : undefined;
   const stateRecordKey = stateRecord ? String(readPath(stateRecord, rowKeyField) ?? '') : '';
-  const effectiveSelectedKey = selectedKey || stateRecordKey || null;
+  const effectiveSelectedKey = stateRecordKey || selectedKey || null;
+  const rowKeySet = useMemo(() => {
+    const keys = new Set<string>();
+    rows.forEach((row: any, index: number) => {
+      keys.add(String(readPath(row, rowKeyField) ?? index));
+    });
+    return keys;
+  }, [rowKeyField, rows]);
   const rowTitleCache = useMemo(() => {
     const map = new Map<string, string>();
     rows.forEach((row: any, index: number) => {
@@ -163,12 +175,42 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
   }, [context, evaluator, item, locale, rowKeyField, rows, t]);
 
   useEffect(() => {
-    if (!bindKey || !selection?.defaultFirst || rows.length === 0 || stateRecord) return;
-    const firstRow = rows[0];
-    const key = String(readPath(firstRow, rowKeyField) ?? 0);
-    setSelectedKey(key);
-    writeRuntimeState(runtime, bindKey, firstRow);
-  }, [bindKey, firstRowKey, rowKeyField, rows, runtime, selection?.defaultFirst, stateRecord]);
+    if (!bindKey) return;
+
+    if (rows.length === 0) {
+      if (selectedKey !== null) setSelectedKey(null);
+      if (stateRecord) writeRuntimeState(runtime, bindKey, null);
+      return;
+    }
+
+    if (stateRecordKey && rowKeySet.has(stateRecordKey)) {
+      if (selectedKey !== stateRecordKey) setSelectedKey(stateRecordKey);
+      return;
+    }
+
+    if (selectedKey && rowKeySet.has(selectedKey) && !stateRecord) return;
+
+    if (selection?.defaultFirst) {
+      const firstRow = rows[0];
+      const key = String(readPath(firstRow, rowKeyField) ?? 0);
+      if (selectedKey !== key) setSelectedKey(key);
+      if (stateRecordKey !== key) writeRuntimeState(runtime, bindKey, firstRow);
+      return;
+    }
+
+    if (selectedKey !== null) setSelectedKey(null);
+    if (stateRecord) writeRuntimeState(runtime, bindKey, null);
+  }, [
+    bindKey,
+    rowKeyField,
+    rows,
+    rowKeySet,
+    runtime,
+    selectedKey,
+    selection?.defaultFirst,
+    stateRecord,
+    stateRecordKey,
+  ]);
 
   if (rows.length === 0) {
     return (
@@ -207,7 +249,9 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
                 t,
               )
             : undefined;
-          const statusTone = String(item.statusToneMap?.[String(statusRaw)] || item.statusTone || 'default');
+          const statusTone = String(
+            item.statusToneMap?.[String(statusRaw)] || item.statusTone || 'default',
+          );
           const score = readPath(row, item.scoreField);
           const active = effectiveSelectedKey === rowKey;
 
@@ -222,7 +266,9 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
               }}
               aria-pressed={active}
               className={`rounded-card w-full border p-3 text-left transition ${
-                active ? 'bg-accent-weak border-blue-400 shadow-sm' : 'border-border bg-panel hover:bg-subtle'
+                active
+                  ? 'bg-accent-weak border-blue-400 shadow-sm'
+                  : 'border-border bg-panel hover:bg-subtle'
               }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -239,8 +285,12 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   {statusLabel && (
-                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium ${statusToneClass[statusTone] || statusToneClass.default}`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${statusDotClass[statusTone] || statusDotClass.default}`} />
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium ${statusToneClass[statusTone] || statusToneClass.default}`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${statusDotClass[statusTone] || statusDotClass.default}`}
+                      />
                       {statusLabel}
                     </span>
                   )}
@@ -290,7 +340,7 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
               if (!visible) return null;
             }
             const disabled =
-              !selectedKey ||
+              !effectiveSelectedKey ||
               (actionConfig.disabledWhen
                 ? evaluator.evaluateCondition(actionConfig.disabledWhen, context)
                 : false);
