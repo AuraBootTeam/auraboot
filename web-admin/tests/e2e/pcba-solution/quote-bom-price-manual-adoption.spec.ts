@@ -17,6 +17,7 @@ const MANUAL_REASON = 'E2E business裁决: record and adopt manual price';
 const MANUAL_VALID_UNTIL = '2030-12-31';
 const EXPECTED_LINE_COST = Number((MANUAL_UNIT_PRICE * 10).toFixed(2));
 const PURCHASE_ANALYSIS_RECENT_PRICE_LABEL = '采购分析近期价';
+const YUNHAN_PRICE_LABEL = '云汉芯城';
 
 async function tableHeaders(table: Locator): Promise<string[]> {
   const headers = table.locator('thead th, [role="columnheader"]');
@@ -112,14 +113,17 @@ test.describe('PCBA quote BOM price manual adoption', () => {
 
       const priceTable = priceRow.locator('xpath=ancestor::table[1]');
       const headers = await tableHeaders(priceTable);
-      // Multi-source columns (立创商城/云汉芯城/华强电子网/供应商 RFQ) were moved out of the
-      // compact waterfall table into the evidence review drawer in aura-quote PR #123 (939d414);
-      // the main table now shows only the adopted-price summary. Detail-per-source is asserted
-      // via the drawer candidates below.
+      // Multi-source columns (立创商城/华强电子网/供应商 RFQ) were moved out of the compact
+      // waterfall table into the evidence review drawer in aura-quote PR #123 (939d414); the
+      // main table shows only the adopted-price summary plus a dedicated 云汉芯城 (Yunhan/
+      // ickey.cn) column (qo_quote_common_detail.json "yunhan_price" field, re-added as its
+      // own column rather than folded into the drawer like the other multi-source columns).
+      // Detail-per-source is asserted via the drawer candidates below.
       expect(headers).toEqual([
         '物料',
         'BOM用量',
         PURCHASE_ANALYSIS_RECENT_PRICE_LABEL,
+        YUNHAN_PRICE_LABEL,
         'DeepSeek建议价',
         '采用价格',
         '采用来源',
@@ -133,6 +137,9 @@ test.describe('PCBA quote BOM price manual adoption', () => {
       );
       expect(cellTextByHeader.get('BOM用量')).toBe('10');
       expect(cellTextByHeader.get(PURCHASE_ANALYSIS_RECENT_PRICE_LABEL) ?? '').toMatch(/^[-—–]?$/);
+      // No yunhan price-evidence row was seeded for this line (seedBomPriceManualReviewQuote
+      // only seeds deepseek_llm + kingdee_purchase_history), so the column stays empty.
+      expect(cellTextByHeader.get(YUNHAN_PRICE_LABEL) ?? '').toMatch(/^[-—–]?$/);
       expect(cellTextByHeader.get('采用来源') ?? '').toMatch(/^[-—–]?$/);
       expect(cellTextByHeader.get('当前状态')).toContain('AI建议待确认');
 

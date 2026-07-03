@@ -1,7 +1,9 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.BindingRule;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.impl.CommandCascadeDeleteExecutor;
 import com.auraboot.framework.meta.service.impl.CommandFieldMapExecutor;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
@@ -29,6 +31,7 @@ public class FieldMapPhase implements CommandPhase {
     private final CommandCascadeDeleteExecutor cascadeDeleteExecutor;
     private final RecordSnapshotReader snapshotReader;
     private final ExtensionRegistry extensionRegistry;
+    private final MetaModelService metaModelService;
 
     @Override
     public String name() {
@@ -49,7 +52,9 @@ public class FieldMapPhase implements CommandPhase {
         Object execType = ctx.getExecConfig() != null ? ctx.getExecConfig().get("type") : null;
         boolean isDeleteOperation = "delete".equalsIgnoreCase(ctx.getRequest().getOperationType())
                 || (execType instanceof String s && "delete".equalsIgnoreCase(s));
-        if (isDeleteOperation) {
+        if (isDeleteOperation && !isSoftDeleteModel(ctx.getCommand().getModelCode())) {
+            // Soft-delete models flag the parent only — children must survive (recoverable),
+            // so skip the physical cascade-delete for them.
             cascadeDeleteExecutor.executeCascadeDeletePhase(ctx.getExecConfig(), ctx.getTenantId(), ctx.getRequest());
         }
 
@@ -91,6 +96,19 @@ public class FieldMapPhase implements CommandPhase {
 
         // Propagate record pid from fieldMapResults to request (inline)
         propagateFieldMapRecordId(ctx.getRequest(), fieldMapResults);
+    }
+
+    private boolean isSoftDeleteModel(String modelCode) {
+        if (!StringUtils.hasText(modelCode)) {
+            return false;
+        }
+        try {
+            return metaModelService.getModelDefinition(modelCode)
+                    .map(ModelDefinition::isSoftDelete)
+                    .orElse(false);
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private void propagateFieldMapRecordId(CommandExecuteRequest request, Map<String, Object> fieldMapResults) {

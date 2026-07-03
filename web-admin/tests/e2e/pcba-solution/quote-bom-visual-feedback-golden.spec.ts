@@ -146,9 +146,14 @@ test.describe('QuoteOps visual feedback golden', () => {
         : page.getByText(/导入失败\s*\/\s*Failed/i).locator('xpath=ancestor::*[self::div][1]');
       await expect(failurePanel.first()).toBeVisible({ timeout: 20_000 });
       await expect(page.getByText(/导入失败\s*\/\s*Failed/i).first()).toBeVisible();
-      await expect(page.getByText(/Corrected BOM missing required header row/i).first()).toBeVisible({
+      // ImportCorrectedBomHandler.requireStandardBomFormat now rejects any upload whose
+      // fixed 12-column standard-BOM header isn't on row 4 (see the workbook's "Part
+      // Number"/"Count" 2-column header above), surfacing this message instead of the
+      // old generic "missing required header row" text.
+      await expect(page.getByText(/不是标准BOM格式/i).first()).toBeVisible({
         timeout: 20_000,
       });
+      await expect(page.getByText(/第4行.*12列表头/i).first()).toBeVisible();
 
       const imports = await queryDynamicRecords(page, 'qo_bom_import_common', [
         { fieldName: 'qo_bi_quote_id', operator: 'EQ', value: created.quoteId },
