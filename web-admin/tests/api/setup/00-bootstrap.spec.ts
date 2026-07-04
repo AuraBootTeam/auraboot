@@ -109,7 +109,9 @@ function psqlInt(query: string): number {
 /**
  * Tenant invite-code APIs are guarded by org.tenant.invite.manage. Older dev and
  * CI databases can predate that template permission, so setup owns the E2E
- * precondition explicitly instead of letting INV-* specs skip on 403.
+ * precondition explicitly for tenant_admin instead of letting INV-* specs skip
+ * on 403. operator/viewer template roles were retired from the OSS platform
+ * baseline in OSS #1167.
  */
 function ensureTenantInviteManageGrant(): void {
   psql(`
@@ -129,7 +131,7 @@ WHERE p.code = '${TENANT_INVITE_MANAGE_PERMISSION}'
       SELECT DISTINCT r.tenant_id
       FROM ab_role r
       WHERE r.tenant_id IS NOT NULL
-        AND r.code IN ('tenant_admin', 'operator')
+        AND r.code = 'tenant_admin'
         AND r.status = 'active'
         AND r.deleted_flag = FALSE
   );
@@ -169,7 +171,7 @@ FROM (
     SELECT DISTINCT r.tenant_id
     FROM ab_role r
     WHERE r.tenant_id IS NOT NULL
-      AND r.code IN ('tenant_admin', 'operator')
+      AND r.code = 'tenant_admin'
       AND r.status = 'active'
       AND r.deleted_flag = FALSE
 ) t
@@ -192,7 +194,7 @@ JOIN ab_permission p
 WHERE rp.tenant_id = r.tenant_id
   AND rp.role_id = r.id
   AND rp.permission_id = p.id
-  AND r.code IN ('tenant_admin', 'operator')
+  AND r.code = 'tenant_admin'
   AND r.status = 'active'
   AND r.deleted_flag = FALSE;
 
@@ -225,7 +227,7 @@ JOIN ab_permission p
  AND p.code = '${TENANT_INVITE_MANAGE_PERMISSION}'
  AND p.status = 'active'
  AND p.deleted_flag = FALSE
-WHERE r.code IN ('tenant_admin', 'operator')
+WHERE r.code = 'tenant_admin'
   AND r.status = 'active'
   AND r.deleted_flag = FALSE
   AND NOT EXISTS (
@@ -386,17 +388,17 @@ test('00-bootstrap: invariant 8 — Business Tenant template roles exist', async
      FROM ab_role r
      JOIN ab_tenant t ON r.tenant_id = t.id
      WHERE t.name = '${COMPANY_NAME}'
-       AND r.code IN ('tenant_admin', 'operator', 'viewer')
+       AND r.code IN ('tenant_admin', 'tenant_member')
        AND COALESCE(r.deleted_flag, false) = false
      ORDER BY r.code`,
   )
     .split('\n')
     .filter(Boolean);
 
-  expect(roles).toEqual(['operator', 'tenant_admin', 'viewer']);
+  expect(roles).toEqual(['tenant_admin', 'tenant_member']);
 });
 
-test('00-bootstrap: invariant 8b — tenant_admin/operator can manage invite codes', async () => {
+test('00-bootstrap: invariant 8b — tenant_admin can manage invite codes', async () => {
   ensureTenantInviteManageGrant();
 
   const missingGrantRows = psqlInt(
@@ -416,7 +418,7 @@ test('00-bootstrap: invariant 8b — tenant_admin/operator can manage invite cod
       AND rp.status = 'active'
       AND rp.deleted_flag = false
      WHERE t.name = '${COMPANY_NAME}'
-       AND r.code IN ('tenant_admin', 'operator')
+       AND r.code = 'tenant_admin'
        AND r.status = 'active'
        AND r.deleted_flag = false
        AND rp.id IS NULL`,
@@ -424,7 +426,7 @@ test('00-bootstrap: invariant 8b — tenant_admin/operator can manage invite cod
 
   expect(
     missingGrantRows,
-    `${TENANT_INVITE_MANAGE_PERMISSION} grant missing for ${COMPANY_NAME} tenant_admin/operator`,
+    `${TENANT_INVITE_MANAGE_PERMISSION} grant missing for ${COMPANY_NAME} tenant_admin`,
   ).toBe(0);
 });
 

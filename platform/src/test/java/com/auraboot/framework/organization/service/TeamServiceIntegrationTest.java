@@ -165,7 +165,7 @@ class TeamServiceIntegrationTest extends BaseIntegrationTest {
         assertThatThrownBy(() ->
                 teamMemberService.addMember(teamPid, request, getTestUser().getId()))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("User not found");
+                .hasMessageContaining("not a member of current tenant");
     }
 
     // ==================== TS-07: getTeamMembershipsByUserId ====================

@@ -7,6 +7,7 @@ import java.time.Duration;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -48,6 +49,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         classes = TestApplication.class,
         webEnvironment = SpringBootTest.WebEnvironment.NONE
 )
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class SpringContextLoadsSmokeTest {
 
     /**

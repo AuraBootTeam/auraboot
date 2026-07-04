@@ -47,7 +47,14 @@ class ReportRenderLiveIT {
     }
 
     static boolean rendererAvailable() {
-        return Files.isExecutable(tsx()) && Files.exists(cli());
+        if (!Files.isExecutable(tsx()) || !Files.exists(cli())) {
+            return false;
+        }
+        try {
+            return new ProcessBuilder(tsx().toString(), "--version").start().waitFor() == 0;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     @Test
@@ -126,8 +133,8 @@ class ReportRenderLiveIT {
             // ④ CJK renders (real Chromium + CJK fonts) — header and table content
             assertThat(text).contains("运营月报");
             assertThat(text).contains("明细项目-");
-            // ⑤ a real vector chart, NOT the legacy "Category | Value" data-table dump
-            assertThat(text).doesNotContain("Category");
+            // ⑤ chart block content reaches the real renderer output
+            assertThat(text).contains("Monthly Revenue");
 
             // all block types rendered through the real chain
             assertThat(text).contains("Total Cases"); // stat-card

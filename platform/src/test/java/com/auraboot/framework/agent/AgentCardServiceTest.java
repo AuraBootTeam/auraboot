@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.agent.service.AgentCardService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
@@ -43,17 +44,41 @@ public class AgentCardServiceTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
+    private Long activeAgentTenantId;
+
     // ──────────────────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────────────────
 
-    /** Returns the agent_code of the first active system-level agent (tenant_id = 0). */
+    @BeforeEach
+    void setTenantContext() {
+        List<Long> tenantIds = jdbcTemplate.queryForList(
+                "SELECT tenant_id FROM ab_agent_definition " +
+                "WHERE status = 'active' AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
+                "ORDER BY id LIMIT 1",
+                Long.class);
+        activeAgentTenantId = tenantIds.isEmpty() ? null : tenantIds.get(0);
+        if (activeAgentTenantId != null) {
+            MetaContext.setContext(activeAgentTenantId, getTestUser().getId(), getTestUser().getPid(), getTestUser().getUserName());
+        }
+    }
+
+    @AfterEach
+    void clearAgentCardTenantContext() {
+        MetaContext.clear();
+    }
+
+    /** Returns the agent_code of the first active agent visible in the current tenant. */
     private String firstActiveAgentCode() {
+        if (activeAgentTenantId == null) {
+            return null;
+        }
         List<String> codes = jdbcTemplate.queryForList(
                 "SELECT agent_code FROM ab_agent_definition " +
                 "WHERE status = 'active' AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
+                "AND tenant_id = ? " +
                 "ORDER BY id LIMIT 1",
-                String.class);
+                String.class, activeAgentTenantId);
         return codes.isEmpty() ? null : codes.get(0);
     }
 
@@ -247,11 +272,12 @@ public class AgentCardServiceTest extends BaseIntegrationTest {
     @Order(13)
     @DisplayName("generateDiscoveryDocument lists active agents (at least system templates)")
     void generateDiscoveryDocument_listsActiveAgents() {
-        // Seed data contains at least 3 system agents (tenant_id = 0)
+        assumeActiveAgentExists(firstActiveAgentCode());
         long activeCount = jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM ab_agent_definition " +
-                "WHERE status = 'active' AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
-                Long.class);
+                "WHERE status = 'active' AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
+                "AND tenant_id = ?",
+                Long.class, activeAgentTenantId);
 
         Map<String, Object> doc = agentCardService.generateDiscoveryDocument();
 

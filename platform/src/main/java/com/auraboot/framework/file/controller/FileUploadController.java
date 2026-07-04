@@ -5,7 +5,6 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import com.auraboot.framework.application.annotation.CurrentUserId;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.file.constant.StorageType;
-import com.auraboot.framework.file.dao.mapper.FileMapper;
 import com.auraboot.framework.file.dto.FileInfoRequestDTO;
 import com.auraboot.framework.file.dto.FileRelationRequestDTO;
 import com.auraboot.framework.file.dto.FileUploadResponseDTO;
@@ -45,8 +44,6 @@ import com.auraboot.framework.common.constant.StatusConstants;
 public class FileUploadController {
     private static final Logger LOG = LoggerFactory.getLogger(FileUploadController.class);
 
-    @Autowired
-    private FileMapper fileMapper;
     @Autowired
     private FileService fileService;
     @Autowired
@@ -138,15 +135,14 @@ public class FileUploadController {
         String storageKey = fileEntity.getFileName();
         if (StringUtils.hasText(storageKey)) {
             Long tenantId = MetaContext.getCurrentTenantId();
-            if (tenantId != null
-                    && fileMapper.countByFileNameInOtherTenants(storageKey, tenantId) > 0) {
+            if (fileService.existsStorageKeyInOtherTenants(storageKey, tenantId)) {
                 throw new IllegalArgumentException(
                         "Storage key is already registered by another tenant");
             }
         }
 
         // 保存到数据库
-        fileMapper.insert(fileEntity);
+        fileService.saveMetadata(fileEntity);
         
         // 构建响应
         return buildUploadResponse(fileEntity);

@@ -163,7 +163,7 @@ class BootstrapBillingAccountIT {
         // Detach billing_account_id FK before deleting tenants / accounts
         jdbcTemplate.update("UPDATE ab_tenant SET billing_account_id = NULL WHERE 1=1");
         jdbcTemplate.update("DELETE FROM ab_tenant WHERE 1=1");
-        jdbcTemplate.update("DELETE FROM ab_billing_account WHERE 1=1");
+        jdbcTemplate.execute("TRUNCATE TABLE ab_billing_account CASCADE");
         jdbcTemplate.update("DELETE FROM ab_user WHERE 1=1");
         jdbcTemplate.update("DELETE FROM ab_system_config WHERE 1=1");
         jdbcTemplate.update("DELETE FROM ab_bootstrap WHERE 1=1");
