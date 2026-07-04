@@ -148,6 +148,26 @@ class PermissionPolicyServiceImplTest {
     }
 
     @Test
+    void getConditionGuardsIncludesRuleCenterConditionsJson() {
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
+        Permission perm = new Permission();
+        perm.setId(50L);
+        when(permissionMapper.findByCode("model.invoice.approve")).thenReturn(perm);
+        RolePermissionMapper.RolePermissionConditionAstRow row =
+                new RolePermissionMapper.RolePermissionConditionAstRow();
+        row.setId(900L);
+        row.setConditionAstJson(null);
+        row.setConditionsJson("{\"dynamicAbac\":{\"ruleBinding\":{\"bindingKind\":\"DECISION_REF\"}}}");
+        when(rolePermissionMapper.findConditionAstGrants(List.of(7L), 50L)).thenReturn(List.of(row));
+
+        List<com.auraboot.framework.permission.service.PermissionPolicyService.ConditionGuard> guards =
+                service.getConditionGuards(1L, "model.invoice.approve");
+
+        assertThat(guards).hasSize(1);
+        assertThat(guards.get(0).conditionsJson()).contains("dynamicAbac");
+    }
+
+    @Test
     void getPolicySchemaReturnsNullWhenPermissionMissing() {
         when(permissionMapper.findByCode("model.user.update")).thenReturn(null);
 
