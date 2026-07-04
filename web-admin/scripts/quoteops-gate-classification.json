@@ -1,0 +1,17 @@
+{
+  "$comment": "Classification of every pcba-solution quote/bom Playwright spec relative to the focused quoteops RELEASE gate (playwright.config.ts `quoteOpsCurrentSpecNames` / --project=quoteops, driven by aura-quote scripts/run-quoteops-bom-gate.sh). Every spec on disk MUST be in one of the two lists below (enforced by check-quoteops-gate-drift.mjs). This exists because a spec listed on the gate's command line but missing from quoteOpsCurrentSpecNames is DROPPED SILENTLY by the project testMatch and the gate goes GREEN without running it (2026-06 incident, OSS#1156 / DDR-2026-06-29 §8). Adding a new pcba-solution quote/bom spec forces a conscious choice here; it never silently escapes the gate.",
+  "excludedFromQuoteOpsGate": {
+    "$comment": "Specs that intentionally run under the broader chromium / enterprise-* Playwright projects, NOT the focused quoteops release gate. Keep the reason accurate; if a spec should be part of the release gate, add it to quoteOpsCurrentSpecNames in playwright.config.ts instead of here.",
+    "bom-format-review-ui": "BOM LLM format-review UI depth (BOM-09/10) — enterprise project coverage, not the release smoke/full role gate.",
+    "bom-workbench-lines": "BOM workbench candidate confirm/undo/exclude depth (BOM-05/06) — deep workbench coverage under the enterprise project.",
+    "quote-actions": "Quote actions deep dive (upload/process-fee/gerber/deepseek) — depth suite, superset of the focused quoteops action checks.",
+    "quote-bom-badfile-permissions": "Bad-file convert + permissions-page edge coverage (BOM-04) — enterprise project.",
+    "quote-bom-convert-export": "BOM convert + export deep (BOM-03/05/08 + XLS-B) — depth suite beyond the release gate's export smoke.",
+    "quote-bom-customer-crud-isolation": "Customer delete + data-scope isolation — data-scope suite under the enterprise project.",
+    "quote-bom-forms-search-datascope": "Forms + search + dropdown + linkage + project data-scope — breadth suite under the enterprise project.",
+    "quote-bom-org-admin": "Org admin CRUD (ORG-01/03) — org-governance coverage, not the quoteops release gate.",
+    "quote-data-scope-isolation": "Quote data-scope isolation self/all — data-scope suite under the enterprise project.",
+    "quote-doc-excel": "Quote pricing + document excel depth (QO-04/07 + XLS-Q) — depth suite; the release gate covers quote-excel-download as its download smoke.",
+    "quote-form-dropdowns": "Quote form reference dropdowns searchable (DD-04/05) — form-control coverage under the enterprise project."
+  }
+}
