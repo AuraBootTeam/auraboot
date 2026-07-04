@@ -38,6 +38,18 @@ export type BomPriceYunhanSeed = CreatedRows & {
   sku: string;
 };
 
+export type BomPriceLadderMoqSeed = CreatedRows & {
+  // Line whose demand qty spans multiple ladder tiers -> the drawer must show the 阶梯价 tier table.
+  ladderLineId: string;
+  ladderEvidenceId: string;
+  ladderMpn: string;
+  // Line whose demand qty is below MOQ -> the drawer must show the 起订提醒 over-buy warning, with
+  // the effective spend computed from the MOQ-tier ladder price (not the low-qty unit price).
+  moqLineId: string;
+  moqEvidenceId: string;
+  moqMpn: string;
+};
+
 export type BomWorkbenchSeed = CreatedRows & {
   projectId: string;
   taskId: string;
@@ -1477,6 +1489,121 @@ export async function seedBomPriceYunhanQuote(page: Page): Promise<BomPriceYunha
           ladderNums: [1],
           ladderPrices: [unitPrice],
           detailUrl: `https://www.ickey.cn/detail/${sku}/1N4148W.html`,
+        },
+      },
+      created.rows,
+    );
+
+    return created;
+  } catch (error) {
+    await cleanupRows(page, created);
+    throw error;
+  }
+}
+
+/**
+ * Seed a quote with two captured `yunhan` price-evidence rows that exercise the review drawer's
+ * 阶梯价 (ladder) and 起订提醒 (MOQ over-buy) columns deterministically (no live ickey call):
+ * - Ladder line: demand qty 1000 with a 5-tier ladder -> the drawer shows the full tier table and
+ *   NO MOQ warning (qty >= MOQ).
+ * - MOQ line: demand qty 2 with MOQ 5000 -> the drawer shows the over-buy warning whose effective
+ *   spend uses the MOQ-tier ladder price (5000 x 0.0039 = 19.50), not the low-qty unit price.
+ */
+export async function seedBomPriceLadderMoqQuote(page: Page): Promise<BomPriceLadderMoqSeed> {
+  const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
+  const ladderMpn = 'CC0603-LADDER';
+  const moqMpn = 'RC0603-MOQ';
+  const created = (await seedQuoteScaffold(page, 'LADDERMOQ', [
+    {
+      sourceRef: `BOM-LADDER-${suffix}`,
+      sourceRowNo: 1,
+      description: '电容 0603 100nF (阶梯价演示)',
+      refdes: 'C1',
+      mpn: ladderMpn,
+      packageName: '0603',
+      qty: 1000,
+      unitCost: 0,
+      lineCost: 0,
+      linePrice: 0,
+      smtPoints: 1,
+      thtPoints: 0,
+    },
+    {
+      sourceRef: `BOM-MOQ-${suffix}`,
+      sourceRowNo: 2,
+      description: '电阻 0603 10K (起订提醒演示)',
+      refdes: 'R1',
+      mpn: moqMpn,
+      packageName: '0603',
+      qty: 2,
+      unitCost: 0,
+      lineCost: 0,
+      linePrice: 0,
+      smtPoints: 1,
+      thtPoints: 0,
+    },
+  ])) as BomPriceLadderMoqSeed;
+
+  try {
+    const lineRows = created.rows.filter((row) => row.model === 'qo_quote_line_common');
+    expect(lineRows.length, 'ladder/moq seed should create two quote lines').toBe(2);
+    const [ladderLineId, moqLineId] = [lineRows[0].pid, lineRows[1].pid];
+    created.ladderLineId = ladderLineId;
+    created.moqLineId = moqLineId;
+    created.ladderMpn = ladderMpn;
+    created.moqMpn = moqMpn;
+
+    // Ladder line: 5-tier ladder, MOQ below demand qty (no over-buy warning).
+    created.ladderEvidenceId = await dynamicCreate(
+      page,
+      'qo_price_evidence_common',
+      {
+        qo_pe_quote_line_id: ladderLineId,
+        qo_pe_part_no: ladderMpn,
+        qo_pe_source: 'yunhan',
+        qo_pe_source_ref: `yunhan:ladder-${suffix}`,
+        qo_pe_supplier_name: 'SAMSUNG/三星',
+        qo_pe_unit_price: 0.009,
+        qo_pe_currency: 'CNY',
+        qo_pe_moq: 100,
+        qo_pe_mpq: 100,
+        qo_pe_confidence: 0.9,
+        qo_pe_valid_until: '2030-12-31',
+        qo_pe_status: 'captured',
+        qo_pe_snapshot: {
+          source: 'yunhan',
+          matchedBy: 'mpn',
+          keyword: ladderMpn,
+          ladderNums: [100, 1000, 3000, 10000, 50000],
+          ladderPrices: [0.0092, 0.009, 0.0088, 0.0086, 0.0082],
+        },
+      },
+      created.rows,
+    );
+
+    // MOQ line: demand qty 2 < MOQ 5000 -> over-buy warning; effective spend uses the 5000-tier price.
+    created.moqEvidenceId = await dynamicCreate(
+      page,
+      'qo_price_evidence_common',
+      {
+        qo_pe_quote_line_id: moqLineId,
+        qo_pe_part_no: moqMpn,
+        qo_pe_source: 'yunhan',
+        qo_pe_source_ref: `yunhan:moq-${suffix}`,
+        qo_pe_supplier_name: 'UNI-ROYAL/厚声',
+        qo_pe_unit_price: 0.0051,
+        qo_pe_currency: 'CNY',
+        qo_pe_moq: 5000,
+        qo_pe_mpq: 5000,
+        qo_pe_confidence: 0.9,
+        qo_pe_valid_until: '2030-12-31',
+        qo_pe_status: 'captured',
+        qo_pe_snapshot: {
+          source: 'yunhan',
+          matchedBy: 'mpn',
+          keyword: moqMpn,
+          ladderNums: [100, 1000, 5000],
+          ladderPrices: [0.0051, 0.0045, 0.0039],
         },
       },
       created.rows,
