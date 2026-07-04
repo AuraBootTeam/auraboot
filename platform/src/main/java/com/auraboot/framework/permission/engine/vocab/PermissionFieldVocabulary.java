@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
@@ -47,14 +48,24 @@ public class PermissionFieldVocabulary {
      */
     @SuppressWarnings("unchecked")
     public DecisionContext buildContext(Long memberId, Object record) {
+        DecisionContext.Builder builder = DecisionContext.builder();
+        buildScopes(memberId, record).forEach(builder::scope);
+        return builder.build();
+    }
+
+    /**
+     * Build the raw scoped fact map used by Rule Center bindings.
+     */
+    @SuppressWarnings("unchecked")
+    public Map<Scope, Map<String, Object>> buildScopes(Long memberId, Object record) {
         Map<String, Object> recordData = (record instanceof Map<?, ?> m)
                 ? (Map<String, Object>) m
                 : Map.of();
 
-        return DecisionContext.builder()
-                .record(recordData)
-                .scope(Scope.ACTOR, buildActorScope(memberId))
-                .build();
+        Map<Scope, Map<String, Object>> scopes = new EnumMap<>(Scope.class);
+        scopes.put(Scope.RECORD, Map.of("data", recordData));
+        scopes.put(Scope.ACTOR, buildActorScope(memberId));
+        return Map.copyOf(scopes);
     }
 
     /**
