@@ -1,0 +1,80 @@
+[
+  {
+    "automationKey": "wd_leave_high_value_notify",
+    "name": "长假申请提醒",
+    "description": "When a leave request is created, evaluate the shared Rule Center decision and notify only when the decision matches.",
+    "modelCode": "wd_leave_request",
+    "triggerType": "on_record_create",
+    "triggerConfig": {
+      "modelCode": "wd_leave_request",
+      "ruleBinding": {
+        "consumerType": "AUTOMATION",
+        "consumerCode": "wd_leave_high_value_notify",
+        "consumerNodeId": "trigger",
+        "bindingKind": "DECISION_REF",
+        "enabled": true,
+        "decisionBinding": {
+          "decisionCode": "leave_request_automation",
+          "versionPolicy": "LATEST_PUBLISHED",
+          "traceMode": "ALWAYS",
+          "timeoutMs": 300,
+          "enabled": true,
+          "inputMappings": [
+            {
+              "input": "leaveDays",
+              "source": {
+                "kind": "FIELD",
+                "scope": "RECORD",
+                "path": "data.wd_req_days"
+              }
+            }
+          ],
+          "outputMappings": [
+            {
+              "output": "severity",
+              "target": {
+                "kind": "ACTION_PARAM",
+                "path": "severity"
+              }
+            },
+            {
+              "output": "message",
+              "target": {
+                "kind": "ACTION_PARAM",
+                "path": "message"
+              }
+            },
+            {
+              "output": "actionType",
+              "target": {
+                "kind": "ACTION_PARAM",
+                "path": "actionType"
+              }
+            }
+          ],
+          "fallbackPolicy": {
+            "mode": "FAIL_CLOSED",
+            "defaultOutputs": {},
+            "reason": "Automation decision unavailable"
+          }
+        }
+      }
+    },
+    "triggerCondition": "#decision['outputs']['actionType'] == 'send_notification'",
+    "actions": [
+      {
+        "type": "send_notification",
+        "label": "Notify manager",
+        "sequence": 0,
+        "continueOnError": true,
+        "config": {
+          "type": "in_app",
+          "title": "长假申请提醒",
+          "content": "${recordPid} needs manager attention",
+          "recipients": []
+        }
+      }
+    ],
+    "enabled": true
+  }
+]

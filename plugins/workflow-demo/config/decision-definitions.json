@@ -162,5 +162,72 @@
         "primaryAssignee": ""
       }
     }
+  },
+  {
+    "decisionCode": "leave_request_automation",
+    "decisionName": "请假申请自动化策略",
+    "description": "Workflow demo automation policy. Automation triggers consume it through triggerConfig.ruleBinding before running actions.",
+    "scopeType": "AUTOMATION",
+    "scopeRef": "wd_leave_request",
+    "ownerModule": "workflow-demo",
+    "enabled": true,
+    "versionTag": "workflow-demo-v1",
+    "kind": "DECISION_TABLE",
+    "runtimeAdapter": "PLATFORM_DECISION_TABLE",
+    "publish": true,
+    "contentJson": {
+      "hitPolicy": "FIRST",
+      "inputs": [
+        {
+          "id": "leaveDays",
+          "label": "Leave days",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.leaveDays",
+            "dataType": "decimal"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "id": "severity",
+          "label": "Severity",
+          "dataType": "string"
+        },
+        {
+          "id": "message",
+          "label": "Message",
+          "dataType": "string"
+        },
+        {
+          "id": "actionType",
+          "label": "Action type",
+          "dataType": "string"
+        }
+      ],
+      "rules": [
+        {
+          "ruleId": "long-leave-notification",
+          "priority": 10,
+          "when": {
+            "leaveDays": {
+              "operator": "GTE",
+              "value": 3
+            }
+          },
+          "then": {
+            "severity": "warning",
+            "message": "Long leave request needs manager attention",
+            "actionType": "send_notification"
+          }
+        }
+      ],
+      "defaultOutput": {
+        "severity": "normal",
+        "message": "No automation action required",
+        "actionType": ""
+      }
+    }
   }
 ]

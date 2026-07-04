@@ -211,6 +211,7 @@
         "namedQueries": { "type": "string" },
         "rules": { "type": "string" },
         "decisionDefinitions": { "type": "string" },
+        "automations": { "type": "string" },
         "sla": { "type": "string" },
         "savedViews": { "type": "string" },
         "fieldMasks": { "type": "string" },
