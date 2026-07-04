@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.mapper;
 
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -200,10 +201,22 @@ public class DynamicSqlProvider {
             throw new IllegalArgumentException("Batch insert row cannot be empty");
         }
 
+        // Column list must be the union of every row's keys (not just the first
+        // row): a key that only appears in later rows would otherwise be silently
+        // dropped from the whole batch. First-seen order (LinkedHashSet) keeps the
+        // common all-rows-same-shape case byte-for-byte identical to the historical
+        // first-row-only output. MyBatis/OGNL resolves a missing Map key to null,
+        // so rows lacking a union key bind null for that placeholder — column order
+        // and value order therefore MUST be driven by this single shared union set.
+        Set<String> columns = new LinkedHashSet<>();
+        for (Map<String, Object> row : dataList) {
+            columns.addAll(row.keySet());
+        }
+
         StringBuilder sql = new StringBuilder();
         sql.append("INSERT INTO ").append(tableName).append(" (");
         boolean first = true;
-        for (String key : firstRow.keySet()) {
+        for (String key : columns) {
             requireName(key, "column name");
             if (!first) {
                 sql.append(", ");
@@ -214,13 +227,12 @@ public class DynamicSqlProvider {
         sql.append(") VALUES ");
 
         for (int i = 0; i < dataList.size(); i++) {
-            Map<String, Object> row = dataList.get(i);
             if (i > 0) {
                 sql.append(", ");
             }
             sql.append("(");
             first = true;
-            for (String key : firstRow.keySet()) {
+            for (String key : columns) {
                 if (!first) {
                     sql.append(", ");
                 }
