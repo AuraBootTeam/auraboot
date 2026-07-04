@@ -491,6 +491,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const sourceRecordConfig = sourceConfig.record || {};
   const contextDataSource = (block as any).contextDataSource;
   const contextKeyField = (block as any).contextKeyField || 'pid';
+  const closeClearsContext = (block as any).closeClearsContext !== false;
   const rawRecordConfig = compareConfig.rawRecord || {};
   const canonicalRecordConfig = compareConfig.canonicalRecord || {};
   const rawDataSource = rawRecordConfig.dataSource;
@@ -515,6 +516,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const initialLayout = initialLayoutRef.current;
 
   const [selectedCandidateKey, setSelectedCandidateKey] = useState('');
+  const [dismissedRecordKey, setDismissedRecordKey] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
   const [position, setPosition] = useState({
     left: initialLayout.left,
@@ -566,6 +568,12 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     }
   }, [selectedRecordKey, candidatesConfig.selection?.bind, runtime]);
 
+  useEffect(() => {
+    if (!selectedRecordKey) {
+      setDismissedRecordKey('');
+    }
+  }, [selectedRecordKey]);
+
   const runAction = async (actionConfig: any, source: 'candidate' | 'export') => {
     const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
     setRunningAction(`${source}:${code}`);
@@ -584,6 +592,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     setSelectedCandidateKey('');
     if (candidatesConfig.selection?.bind) {
       writeRuntimeState(runtime, candidatesConfig.selection.bind, {});
+    }
+    if (!closeClearsContext) {
+      setDismissedRecordKey(selectedRecordKey);
+      return;
     }
     if (contextStateBinding) {
       writeRuntimeState(runtime, contextStateBinding, {});
@@ -661,6 +673,19 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
       >
         {emptyTitle}
       </div>
+    );
+  }
+
+  if (!closeClearsContext && dismissedRecordKey && dismissedRecordKey === selectedRecordKey) {
+    return (
+      <button
+        type="button"
+        className="rounded-control bg-panel text-text fixed right-4 bottom-4 z-50 border border-blue-200 px-4 py-2 text-sm font-medium shadow-lg hover:bg-blue-50"
+        data-testid="review-drawer-minimized"
+        onClick={() => setDismissedRecordKey('')}
+      >
+        {localized(locale, t, '展开行级复核', 'Open row review')}
+      </button>
     );
   }
 
