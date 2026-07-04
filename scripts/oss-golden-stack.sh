@@ -15,7 +15,9 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--no-frontend] [--ttl 6h] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--no-frontend] [--no-warm] [--ttl 6h] [--plugin-profile P|--plugin X]
+#       --no-warm : keep the frontend but skip the setup/auth/pre-warm step — for goldens
+#                   that self-provision accounts and run with --no-deps (no storageState).
 #   ./scripts/oss-golden-stack.sh import <name> [--plugin-profile P|--plugin X]
 #   ./scripts/oss-golden-stack.sh warm <name>          # re-run setup→auth→pre-warm (up does this)
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
@@ -140,12 +142,13 @@ PY
 # ---- up ------------------------------------------------------------------------------
 cmd_up() {
   local name="$1"; shift
-  local slot="" ttl="6h" frontend=1
+  local slot="" ttl="6h" frontend=1 warm=1
   local plugin_profile="" import_plugins=()
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
     --ttl) ttl="$2"; shift 2;;
     --no-frontend) frontend=0; shift;;
+    --no-warm) warm=0; shift;;
     --plugin-profile) plugin_profile="$2"; shift 2;;
     --plugin) import_plugins+=("$2"); shift 2;;
     --plugins)
@@ -252,9 +255,11 @@ cmd_up() {
     log "7/9 frontend: skipped (--no-frontend)"
   fi
 
-  if [ "$frontend" -eq 1 ]; then
+  if [ "$frontend" -eq 1 ] && [ "$warm" -eq 1 ]; then
     log "8/9 warm: setup → auth storageState → pre-warm heavy routes"
     cmd_warm "$name"
+  elif [ "$frontend" -eq 1 ]; then
+    log "8/9 warm: skipped (--no-warm; caller's golden self-provisions via --no-deps)"
   else
     log "8/9 warm: skipped (--no-frontend)"
   fi
