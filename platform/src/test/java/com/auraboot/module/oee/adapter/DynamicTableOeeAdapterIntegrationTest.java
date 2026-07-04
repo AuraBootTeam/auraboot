@@ -95,19 +95,22 @@ class DynamicTableOeeAdapterIntegrationTest {
 
     /**
      * Point the Spring context at an isolated Postgres instead of the shared host DB, honoring the
-     * multi-worktree isolation rule (§11): the canonical enterprise backend keeps the shared
-     * {@code aura_boot} on 5432, so this test runs against an offset-port copy. Override the four
-     * {@code OEE_IT_PG_*} env vars to retarget. Defaults match the local isolated container
-     * ({@code COMPOSE-style} name {@code oee-adaptertest-pg} on 5501 seeded from a full dump).
+     * multi-worktree isolation rule (§11): set the four {@code OEE_IT_PG_*} env vars to retarget
+     * this test to an isolated database. When they are absent, the test intentionally uses the
+     * standard {@code integration-test} datasource so plain {@code ./gradlew test} does not fail
+     * just because an optional local OEE database was not started.
      */
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
         String datasourceUrl = firstEnv("SPRING_DATASOURCE_URL", "DATABASE_URL");
-        if (datasourceUrl == null) {
+        if (datasourceUrl == null && hasAnyEnv("OEE_IT_PG_HOST", "OEE_IT_PG_PORT", "OEE_IT_PG_DB")) {
             String host = env("OEE_IT_PG_HOST", "localhost");
-            String port = env("OEE_IT_PG_PORT", "5501");
+            String port = env("OEE_IT_PG_PORT", "5432");
             String dbName = env("OEE_IT_PG_DB", "aura_boot");
             datasourceUrl = "jdbc:postgresql://" + host + ":" + port + "/" + dbName + "?charSet=UTF8";
+        }
+        if (datasourceUrl == null) {
+            return;
         }
         String user = env("SPRING_DATASOURCE_USERNAME", env("OEE_IT_PG_USER", "ghj"));
         String password = env("SPRING_DATASOURCE_PASSWORD", env("OEE_IT_PG_PASSWORD", ""));
@@ -125,6 +128,16 @@ class DynamicTableOeeAdapterIntegrationTest {
             }
         }
         return null;
+    }
+
+    private static boolean hasAnyEnv(String... keys) {
+        for (String key : keys) {
+            String value = System.getenv(key);
+            if (value != null && !value.isBlank()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String env(String key, String def) {

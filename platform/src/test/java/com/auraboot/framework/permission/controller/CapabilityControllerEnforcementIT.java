@@ -1,10 +1,13 @@
 package com.auraboot.framework.permission.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.application.security.AdminRoleChecker;
 import com.auraboot.framework.auth.dto.CustomUserDetails;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.permission.enums.RoleCodes;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.rbac.entity.RolePermission;
@@ -15,6 +18,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
@@ -47,9 +51,14 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
     private RolePermissionMapper rolePermissionMapper;
     @Autowired
     private UserPermissionService userPermissionService;
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private AdminRoleChecker adminRoleChecker;
 
     @BeforeEach
     void cleanSlate() {
+        grantTenantAdminRoleToTestUser();
         revokeFromTestRole(MetaPermission.ROLE_READ);
         revokeFromTestRole(MetaPermission.ROLE_MANAGE);
         userPermissionService.evictUserPermissions(getTestUser().getId());
@@ -110,6 +119,43 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
         userPermissionService.evictUserPermissions(getTestUser().getId());
         mvc().perform(put(url()).contentType(MediaType.APPLICATION_JSON).content("[]"))
                 .andExpect(status().isOk());
+    }
+
+    private void grantTenantAdminRoleToTestUser() {
+        Long tenantId = getTestTenant().getId();
+        Long memberId = getTestTenantMember().getId();
+        Long roleId = jdbcTemplate.query("""
+                SELECT id FROM ab_role
+                WHERE tenant_id = ? AND code = ? AND (deleted_flag = FALSE OR deleted_flag IS NULL)
+                ORDER BY id LIMIT 1
+                """, rs -> rs.next() ? rs.getLong(1) : null, tenantId, RoleCodes.TENANT_ADMIN);
+        if (roleId == null) {
+            roleId = com.baomidou.mybatisplus.core.toolkit.IdWorker.getId();
+            jdbcTemplate.update("""
+                    INSERT INTO ab_role (
+                        id, pid, tenant_id, code, name, type, scope_type, status,
+                        is_default, is_system, deleted_flag, priority, created_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, 'tenant', 'tenant', 'active',
+                            FALSE, FALSE, FALSE, 0, NOW(), NOW())
+                    """, roleId, UniqueIdGenerator.generate(), tenantId, RoleCodes.TENANT_ADMIN, "Tenant Admin");
+        }
+        Integer existing = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM ab_user_role
+                WHERE member_id = ? AND role_id = ? AND tenant_id = ?
+                  AND status = 'active' AND (deleted_flag = FALSE OR deleted_flag IS NULL)
+                """, Integer.class, memberId, roleId, tenantId);
+        if (existing == null || existing == 0) {
+            jdbcTemplate.update("""
+                    INSERT INTO ab_user_role (
+                        id, pid, member_id, role_id, tenant_id, assign_type, status,
+                        deleted_flag, created_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, 'direct', 'active', FALSE, NOW(), NOW())
+                    """, com.baomidou.mybatisplus.core.toolkit.IdWorker.getId(),
+                    UniqueIdGenerator.generate(), memberId, roleId, tenantId);
+        }
+        adminRoleChecker.invalidateAll();
     }
 
     private void grantToTestRole(String code) {

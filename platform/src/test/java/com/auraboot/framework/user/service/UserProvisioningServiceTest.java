@@ -1,5 +1,6 @@
 package com.auraboot.framework.user.service;
 
+import com.auraboot.framework.auth.service.PasswordPolicyService;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.service.RoleService;
@@ -9,6 +10,7 @@ import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.dto.UserProvisionRequest;
 import com.auraboot.framework.user.dto.UserProvisionResponse;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -26,7 +28,13 @@ class UserProvisioningServiceTest {
     @Mock private UserService userService;
     @Mock private TenantMemberService tenantMemberService;
     @Mock private RoleService roleService;
+    @Mock private PasswordPolicyService passwordPolicyService;
     @InjectMocks private UserProvisioningService service;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(passwordPolicyService.validate(anyString())).thenReturn(List.of());
+    }
 
     private User user(Long id) {
         User u = new User();

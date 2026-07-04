@@ -51,11 +51,14 @@ class DynamicTableOeeAdapterCurrentSchemaIntegrationTest {
     @DynamicPropertySource
     static void datasource(DynamicPropertyRegistry registry) {
         String datasourceUrl = firstEnv("SPRING_DATASOURCE_URL", "DATABASE_URL");
-        if (datasourceUrl == null) {
+        if (datasourceUrl == null && hasAnyEnv("OEE_IT_PG_HOST", "OEE_IT_PG_PORT", "OEE_IT_PG_DB")) {
             String host = env("OEE_IT_PG_HOST", "localhost");
-            String port = env("OEE_IT_PG_PORT", "5501");
+            String port = env("OEE_IT_PG_PORT", "5432");
             String dbName = env("OEE_IT_PG_DB", "aura_boot");
             datasourceUrl = "jdbc:postgresql://" + host + ":" + port + "/" + dbName + "?charSet=UTF8";
+        }
+        if (datasourceUrl == null) {
+            return;
         }
         String user = env("SPRING_DATASOURCE_USERNAME", env("OEE_IT_PG_USER", "ghj"));
         String password = env("SPRING_DATASOURCE_PASSWORD", env("OEE_IT_PG_PASSWORD", ""));
@@ -73,6 +76,16 @@ class DynamicTableOeeAdapterCurrentSchemaIntegrationTest {
             }
         }
         return null;
+    }
+
+    private static boolean hasAnyEnv(String... keys) {
+        for (String key : keys) {
+            String value = System.getenv(key);
+            if (value != null && !value.isBlank()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String env(String key, String def) {

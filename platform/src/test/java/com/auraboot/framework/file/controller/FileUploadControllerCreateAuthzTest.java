@@ -1,8 +1,8 @@
 package com.auraboot.framework.file.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.file.dao.mapper.FileMapper;
 import com.auraboot.framework.file.dto.FileInfoRequestDTO;
+import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import org.junit.jupiter.api.AfterEach;
@@ -35,8 +35,6 @@ import static org.mockito.Mockito.when;
 class FileUploadControllerCreateAuthzTest {
 
     @Mock
-    private FileMapper fileMapper;
-    @Mock
     private FileService fileService;
     @Mock
     private StorageProvider storageProvider;
@@ -58,12 +56,12 @@ class FileUploadControllerCreateAuthzTest {
     @DisplayName("registering a storage key owned by another tenant is rejected (no insert)")
     void create_crossTenantKey_rejected() {
         String victimKey = "01HZZZZZZZZZZZZZZZZZZZZZZZZ.xlsx";
-        when(fileMapper.countByFileNameInOtherTenants(eq(victimKey), eq(1L))).thenReturn(1);
+        when(fileService.existsStorageKeyInOtherTenants(eq(victimKey), eq(1L))).thenReturn(true);
 
         FileInfoRequestDTO dto = new FileInfoRequestDTO();
         dto.setFileName(victimKey);
 
         assertThrows(IllegalArgumentException.class, () -> controller.create(dto, 100L));
-        verify(fileMapper, never()).insert(any(com.auraboot.framework.file.entity.FileEntity.class));
+        verify(fileService, never()).saveMetadata(any(FileEntity.class));
     }
 }

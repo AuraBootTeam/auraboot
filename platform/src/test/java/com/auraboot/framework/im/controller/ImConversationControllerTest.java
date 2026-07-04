@@ -8,6 +8,7 @@ import com.auraboot.framework.im.websocket.ImWebSocketHandler;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -31,6 +32,16 @@ class ImConversationControllerTest {
 
     @Mock
     private com.auraboot.framework.im.service.ImMessageService messageService;
+
+    @BeforeEach
+    void setUpMembership() {
+        org.mockito.Mockito.lenient()
+                .when(conversationService.isMember(
+                        org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyLong(),
+                        org.mockito.ArgumentMatchers.anyLong()))
+                .thenReturn(true);
+    }
 
     @AfterEach
     void tearDown() {

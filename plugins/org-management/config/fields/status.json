@@ -1,0 +1,17 @@
+{
+  "code": "status",
+  "displayName:zh-CN": "状态",
+  "displayName:en": "Status",
+  "dataType": "string",
+  "constraints": {
+    "defaultValue": "active",
+    "maxLength": 20
+  },
+  "extension": {
+    "dictCode": "org_team_status"
+  },
+  "feature": {
+    "searchable": true,
+    "sortable": true
+  }
+}
