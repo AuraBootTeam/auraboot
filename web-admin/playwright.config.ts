@@ -61,6 +61,7 @@ const quoteOpsCurrentSpecNames = [
   'quote-bom-price-manual-adoption',
   'form-and-overlay-golden',
   'quote-bom-price-yunhan-adoption',
+  'quote-bom-price-ladder-moq',
   'quote-bom-price-deepseek-suggestions',
   'quote-process-fee-review',
   'quote-gerber-runtime',
