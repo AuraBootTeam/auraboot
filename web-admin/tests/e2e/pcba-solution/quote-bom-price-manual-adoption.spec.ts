@@ -226,7 +226,9 @@ test.describe('PCBA quote BOM price manual adoption', () => {
       expect(requestBody.operationType).toBe('UPDATE');
       expect(requestBody.payload).toMatchObject({
         source: 'manual',
-        unitPrice: String(MANUAL_UNIT_PRICE),
+        // The platform FormDialog number field emits a JS number (not the bespoke form's raw
+        // string); the backend record_manual_price handler accepts it and adopts it correctly.
+        unitPrice: MANUAL_UNIT_PRICE,
         currency: 'CNY',
         supplierName: MANUAL_SUPPLIER,
         sourceNote: MANUAL_SOURCE_NOTE,
