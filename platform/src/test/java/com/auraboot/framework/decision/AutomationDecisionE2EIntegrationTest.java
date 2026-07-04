@@ -7,8 +7,13 @@ import com.auraboot.framework.automation.entity.TriggerConfig;
 import com.auraboot.framework.automation.service.AutomationService;
 import com.auraboot.framework.automation.trigger.AutomationTriggerService;
 import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
+import com.auraboot.framework.decision.dto.DrtDefinitionDTO;
 import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionDTO;
+import com.auraboot.framework.plugin.dto.imports.AutomationDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.DecisionDefinitionSeedDTO;
+import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
+import com.auraboot.framework.plugin.service.impl.PluginDirectoryLoader;
 import com.auraboot.framework.decision.service.DecisionVersionService;
 import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
@@ -21,6 +26,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
@@ -127,5 +134,120 @@ class AutomationDecisionE2EIntegrationTest extends BaseIntegrationTest {
             }
         }
         assertThat(count).as("automation triggered via injected #decision match").isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    void workflowDemoAutomationSeedUsesRuleCenterBindingAndLogsDecisionTrace() throws Exception {
+        PluginManifestExtended manifest = new PluginDirectoryLoader().loadFromDirectory(workflowDemoDir());
+        DecisionDefinitionSeedDTO decisionSeed = manifest.getDecisionDefinitions().stream()
+                .filter(seed -> "leave_request_automation".equals(seed.getDecisionCode()))
+                .findFirst()
+                .orElseThrow();
+        publishSeedDecision(decisionSeed);
+
+        AutomationDefinitionDTO automationSeed = manifest.getAutomations().stream()
+                .filter(seed -> "wd_leave_high_value_notify".equals(seed.getAutomationKey()))
+                .findFirst()
+                .orElseThrow();
+        AutomationCreateRequest req = new AutomationCreateRequest();
+        req.setName(automationSeed.getName() + " " + System.nanoTime());
+        req.setDescription(automationSeed.getDescription());
+        req.setModelCode(automationSeed.getModelCode());
+        req.setTriggerType(automationSeed.getTriggerType());
+        req.setTriggerConfig(automationSeed.getTriggerConfig());
+        req.setTriggerCondition(automationSeed.getTriggerCondition());
+        req.setActions(automationSeed.getActions());
+        req.setFlowConfig(automationSeed.getFlowConfig());
+        req.setEnabled(true);
+        AutomationDTO dto = automationService.create(req);
+        automationId = dto.getId();
+        automationPid = dto.getPid();
+
+        triggerService.onRecordCreate("wd_leave_request", "REC-AUTO-LOW", Map.of("wd_req_days", 1));
+        Thread.sleep(1200);
+        Integer lowCount = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM ab_automation_log WHERE automation_id=?", Integer.class, automationPid);
+        assertThat(lowCount).as("non-matching decision should skip automation").isZero();
+
+        triggerService.onRecordCreate("wd_leave_request", "REC-AUTO-HIGH", Map.of("wd_req_days", 5));
+
+        Integer highCount = 0;
+        for (int i = 0; i < 40 && highCount == 0; i++) {
+            highCount = jdbcTemplate.queryForObject(
+                    "SELECT count(*) FROM ab_automation_log WHERE automation_id=?", Integer.class, automationPid);
+            if (highCount == 0) {
+                Thread.sleep(300);
+            }
+        }
+        assertThat(highCount).as("matching Rule Center decision should trigger automation").isEqualTo(1);
+
+        String payloadJson = jdbcTemplate.queryForObject("""
+                SELECT trigger_payload::text
+                FROM ab_automation_log
+                WHERE automation_id=?
+                ORDER BY id DESC
+                LIMIT 1
+                """, String.class, automationPid);
+        JsonNode payload = mapper.readTree(payloadJson);
+        assertThat(payload.at("/decision/matched").asBoolean()).isTrue();
+        assertThat(payload.at("/decision/outputs/severity").asText()).isEqualTo("warning");
+        assertThat(payload.at("/decision/traceId").asText()).isNotBlank();
+
+        Integer completedNodes = 0;
+        for (int i = 0; i < 40 && completedNodes == 0; i++) {
+            completedNodes = jdbcTemplate.queryForObject("""
+                    SELECT count(*)
+                    FROM ab_automation_node_execution n
+                    JOIN ab_automation_log l ON l.id = n.automation_log_id
+                    WHERE l.automation_id = ? AND n.status = 'completed'
+                    """, Integer.class, automationPid);
+            if (completedNodes == 0) {
+                Thread.sleep(300);
+            }
+        }
+        assertThat(completedNodes).as("automation action node should execute and be auditable")
+                .isGreaterThanOrEqualTo(1);
+    }
+
+    private void publishSeedDecision(DecisionDefinitionSeedDTO seed) {
+        DrtDefinitionCreateRequest def = new DrtDefinitionCreateRequest();
+        def.setDecisionCode(seed.getDecisionCode());
+        def.setDecisionName(seed.getDecisionName());
+        def.setDescription(seed.getDescription());
+        def.setScopeType(seed.getScopeType());
+        def.setScopeRef(seed.getScopeRef());
+        def.setOwnerModule(seed.getOwnerModule());
+        def.setEnabled(seed.getEnabled());
+
+        DrtDefinitionDTO existing = drtDefinitionService.findByCode(seed.getDecisionCode());
+        if (existing == null) {
+            drtDefinitionService.create(def);
+        } else {
+            drtDefinitionService.update(existing.getPid(), def);
+        }
+
+        DrtVersionCreateRequest ver = new DrtVersionCreateRequest();
+        ver.setKind(seed.getKind());
+        ver.setRuntimeAdapter(seed.getRuntimeAdapter());
+        ver.setVersionTag(seed.getVersionTag());
+        ver.setContentJson(seed.getContentJson());
+        ver.setInputSchemaJson(seed.getInputSchemaJson());
+        ver.setOutputSchemaJson(seed.getOutputSchemaJson());
+        ver.setContextSchemaJson(seed.getContextSchemaJson());
+        DrtVersionDTO draft = drtVersionService.createDraft(seed.getDecisionCode(), ver);
+        drtVersionService.validate(draft.getPid());
+        drtVersionService.publish(draft.getPid(), true);
+    }
+
+    private Path workflowDemoDir() {
+        Path userDir = Path.of(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        List<Path> candidates = List.of(
+                userDir.resolve("../plugins/workflow-demo").normalize(),
+                userDir.resolve("plugins/workflow-demo"),
+                userDir.resolve("../../plugins/workflow-demo").normalize());
+        return candidates.stream()
+                .filter(path -> Files.exists(path.resolve("plugin.json")))
+                .findFirst()
+                .orElseThrow();
     }
 }

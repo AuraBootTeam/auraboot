@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -347,8 +348,37 @@ class PluginDirectoryLoaderRulesSlaTest {
         assertAssignmentBinding(process, "task_hr_approve");
     }
 
+    @Test
+    @DisplayName("workflow-demo wires rule-center seed into Automation trigger")
+    void workflowDemoDeclaresRuleCenterAutomationSeed() throws Exception {
+        PluginManifestExtended manifest = loader.loadFromDirectory(workflowDemoDir());
+
+        assertThat(manifest.getResourceCounts()).containsEntry("automations", 1);
+
+        List<?> automations = (List<?>) invokeGetter(manifest, "getAutomations");
+        assertThat(automations).hasSize(1);
+        Object automation = automations.get(0);
+        assertThat(invokeGetter(automation, "getAutomationKey"))
+                .isEqualTo("wd_leave_high_value_notify");
+        assertThat(invokeGetter(automation, "getModelCode")).isEqualTo("wd_leave_request");
+        assertThat(invokeGetter(automation, "getTriggerType")).isEqualTo("on_record_create");
+        assertThat(invokeGetter(automation, "getTriggerCondition"))
+                .isEqualTo("#decision['outputs']['actionType'] == 'send_notification'");
+        Object triggerConfig = invokeGetter(automation, "getTriggerConfig");
+        Object ruleBinding = invokeGetter(triggerConfig, "getRuleBinding");
+        assertThat(invokeGetter(ruleBinding, "consumerType")).isEqualTo("AUTOMATION");
+        assertThat(invokeGetter(ruleBinding, "consumerCode")).isEqualTo("wd_leave_high_value_notify");
+        Object decisionBinding = invokeGetter(ruleBinding, "decisionBinding");
+        assertThat(invokeGetter(decisionBinding, "decisionCode")).isEqualTo("leave_request_automation");
+    }
+
     private void writeManifest(Path pluginDir, String json) throws IOException {
         Files.writeString(pluginDir.resolve("plugin.json"), json);
+    }
+
+    private Object invokeGetter(Object target, String getterName) throws ReflectiveOperationException {
+        Method method = target.getClass().getMethod(getterName);
+        return method.invoke(target);
     }
 
     private Path workflowDemoDir() {

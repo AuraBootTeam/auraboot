@@ -1,6 +1,11 @@
 package com.auraboot.framework.plugin.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.automation.dto.AutomationCreateRequest;
+import com.auraboot.framework.automation.dto.AutomationDTO;
+import com.auraboot.framework.automation.entity.AutomationAction;
+import com.auraboot.framework.automation.entity.TriggerConfig;
+import com.auraboot.framework.automation.service.AutomationService;
 import com.auraboot.framework.bpm.rule.DroolsRuleService;
 import com.auraboot.framework.bpm.service.SlaConfigService;
 import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
@@ -10,6 +15,9 @@ import com.auraboot.framework.decision.dto.DrtVersionDTO;
 import com.auraboot.framework.decision.model.DecisionValidateResult;
 import com.auraboot.framework.decision.service.DecisionVersionService;
 import com.auraboot.framework.decision.service.DrtDefinitionService;
+import com.auraboot.framework.decision.rule.DecisionBinding;
+import com.auraboot.framework.decision.rule.RuleBindingKind;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.i18n.compiler.I18nCompiler;
 import com.auraboot.framework.i18n.entity.I18nResource;
@@ -29,6 +37,7 @@ import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.plugin.config.PlatformProperties;
 import com.auraboot.framework.plugin.dto.PluginManifest;
+import com.auraboot.framework.plugin.dto.imports.AutomationDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
 import com.auraboot.framework.plugin.dto.imports.DecisionDefinitionSeedDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
@@ -136,6 +145,7 @@ class PluginImportServiceImplCoreTest {
     @Mock private DocumentCommandGenerator documentCommandGenerator;
     @Mock private DroolsRuleService droolsRuleService;
     @Mock private SlaConfigService slaConfigService;
+    @Mock private AutomationService automationService;
     @Mock private DrtDefinitionService drtDefinitionService;
     @Mock private DecisionVersionService decisionVersionService;
     @Mock private JdbcTemplate jdbcTemplate;
@@ -438,6 +448,76 @@ class PluginImportServiceImplCoreTest {
         verify(drtDefinitionService).update(eq("def-pid"), any(DrtDefinitionCreateRequest.class));
         verify(decisionVersionService, never()).createDraft(anyString(), any(DrtVersionCreateRequest.class));
         verify(decisionVersionService, never()).publish(anyString(), anyBoolean());
+    }
+
+    @Test
+    @DisplayName("importAutomations creates Automation seed with Rule Center binding")
+    void importAutomationsCreatesRuleCenterBoundAutomation() {
+        TriggerConfig triggerConfig = new TriggerConfig();
+        triggerConfig.setModelCode("wd_leave_request");
+        triggerConfig.setRuleBinding(new RuleConsumerBinding(
+                "AUTOMATION",
+                "wd_leave_high_value_notify",
+                "trigger",
+                RuleBindingKind.DECISION_REF,
+                null,
+                new DecisionBinding(
+                        "leave_request_automation",
+                        null,
+                        null,
+                        null,
+                        null,
+                        List.of(),
+                        List.of(),
+                        DecisionBinding.FallbackPolicy.failClosed(),
+                        300,
+                        DecisionBinding.TraceMode.ALWAYS,
+                        true,
+                        null,
+                        null),
+                true));
+        AutomationDefinitionDTO seed = AutomationDefinitionDTO.builder()
+                .automationKey("wd_leave_high_value_notify")
+                .name("长假申请提醒")
+                .description("Rule Center bound automation seed")
+                .modelCode("wd_leave_request")
+                .triggerType("on_record_create")
+                .triggerConfig(triggerConfig)
+                .triggerCondition("#decision['outputs']['actionType'] == 'send_notification'")
+                .actions(List.of(AutomationAction.builder()
+                        .type("send_notification")
+                        .label("Notify manager")
+                        .sequence(0)
+                        .continueOnError(true)
+                        .config(Map.of("type", "in_app", "title", "长假申请提醒", "recipients", List.of()))
+                        .build()))
+                .enabled(true)
+                .build();
+        PluginManifestExtended manifest = baseManifest();
+        manifest.setAutomations(List.of(seed));
+        when(automationService.create(any(AutomationCreateRequest.class)))
+                .thenReturn(AutomationDTO.builder()
+                        .pid("auto-pid")
+                        .name("长假申请提醒")
+                        .enabled(true)
+                        .build());
+
+        invokeImportAutomations(manifest);
+
+        ArgumentCaptor<AutomationCreateRequest> requestCaptor =
+                ArgumentCaptor.forClass(AutomationCreateRequest.class);
+        verify(automationService).create(requestCaptor.capture());
+        AutomationCreateRequest request = requestCaptor.getValue();
+        assertThat(request.getName()).isEqualTo("长假申请提醒");
+        assertThat(request.getModelCode()).isEqualTo("wd_leave_request");
+        assertThat(request.getTriggerType()).isEqualTo("on_record_create");
+        assertThat(request.getTriggerCondition())
+                .isEqualTo("#decision['outputs']['actionType'] == 'send_notification'");
+        assertThat(request.getActions()).hasSize(1);
+        assertThat(request.getEnabled()).isTrue();
+        assertThat(request.getTriggerConfig().getRuleBinding().consumerType()).isEqualTo("AUTOMATION");
+        assertThat(request.getTriggerConfig().getRuleBinding().decisionBinding().decisionCode())
+                .isEqualTo("leave_request_automation");
     }
 
     @Test
@@ -1239,6 +1319,23 @@ class PluginImportServiceImplCoreTest {
         try {
             Method method = PluginImportServiceImpl.class.getDeclaredMethod(
                     "importDecisionDefinitions", PluginManifestExtended.class);
+            method.setAccessible(true);
+            method.invoke(service, manifest);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void invokeImportAutomations(PluginManifestExtended manifest) {
+        try {
+            Method method = PluginImportServiceImpl.class.getDeclaredMethod(
+                    "importAutomations", PluginManifestExtended.class);
             method.setAccessible(true);
             method.invoke(service, manifest);
         } catch (InvocationTargetException e) {

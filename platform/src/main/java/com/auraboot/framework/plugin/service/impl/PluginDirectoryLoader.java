@@ -353,6 +353,16 @@ public class PluginDirectoryLoader {
             }
         }
 
+        // Load Automation seeds
+        if (resourceDirs.containsKey("automations")) {
+            List<AutomationDefinitionDTO> automations = loadResourceList(
+                    resourcePath(pluginDir, resourceDirs, "automations"),
+                    AutomationDefinitionDTO.class);
+            if (!automations.isEmpty()) {
+                manifest.setAutomations(mergeList(manifest.getAutomations(), automations));
+            }
+        }
+
         // Load SLA configs
         if (resourceDirs.containsKey("sla")) {
             List<SlaConfigDefinitionDTO> slaConfigs = loadResourceList(
@@ -622,6 +632,10 @@ public class PluginDirectoryLoader {
         // Decision Runtime definitions
         loadSourceResource(source, resourceDirs, "decisionDefinitions", DecisionDefinitionSeedDTO.class,
                 manifest::getDecisionDefinitions, manifest::setDecisionDefinitions);
+
+        // Automation seeds
+        loadSourceResource(source, resourceDirs, "automations", AutomationDefinitionDTO.class,
+                manifest::getAutomations, manifest::setAutomations);
     }
 
     private void loadAgentDefinitionsByConventionFromSource(PluginSource source, PluginManifestExtended manifest,
