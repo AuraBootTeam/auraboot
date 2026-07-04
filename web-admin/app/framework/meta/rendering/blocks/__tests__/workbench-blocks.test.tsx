@@ -1652,6 +1652,27 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByRole('button', { name: '关闭复核浮层' })).toBeInTheDocument();
   });
 
+  it('can dismiss the drawer without clearing the selected context row', () => {
+    const runtime = makeReviewDrawerRuntime();
+
+    render(
+      <ReviewDrawerBlockRenderer
+        block={{ ...reviewDrawerBlock, closeClearsContext: false } as BlockConfig}
+        runtime={runtime}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭复核浮层' }));
+
+    expect(runtime.__updateState).not.toHaveBeenCalledWith('scope-1', 'selectedBomLine', {});
+    expect(screen.queryByTestId('review-drawer')).not.toBeInTheDocument();
+    expect(screen.getByTestId('review-drawer-minimized')).toHaveTextContent('展开行级复核');
+
+    fireEvent.click(screen.getByTestId('review-drawer-minimized'));
+
+    expect(screen.getByTestId('review-drawer')).toHaveTextContent('Row 5 · LED1 · 待确认');
+  });
+
   it('restores the last review drawer position and size from local storage', () => {
     window.localStorage.setItem(
       reviewDrawerStorageKey,

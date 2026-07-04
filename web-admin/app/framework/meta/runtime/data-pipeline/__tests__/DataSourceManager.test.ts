@@ -441,6 +441,58 @@ describe('DataSourceManager', () => {
     ]);
   });
 
+  it('clears nested state-dependent data instead of fetching without a leaf value', async () => {
+    mockedFetchResult.mockResolvedValue({
+      code: '0',
+      data: { records: [{ pid: 'shadow-1' }], total: 1, current: 1, pageSize: 1 },
+    } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        state: {
+          selectedDevice: { iot_d_device_code: 'RF-01-TC-CTRL' },
+        },
+      } as any),
+    );
+    manager.register('selectedDeviceShadow', {
+      type: 'api',
+      endpoint: '/api/dynamic/iot_device_shadow_list/list',
+      method: 'get',
+      adaptor: 'table',
+      autoFetch: false,
+      params: {
+        pageNum: 1,
+        pageSize: 1,
+        filters: [
+          {
+            fieldName: 'iot_sh_device_code',
+            operator: 'EQ',
+            value: '${state.selectedDevice.iot_d_device_code}',
+          },
+        ],
+      },
+      dependOn: ['state.selectedDevice.iot_d_device_code'],
+    });
+
+    await manager.fetch('selectedDeviceShadow');
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+    expect(manager.getData('selectedDeviceShadow')?.records).toEqual([{ pid: 'shadow-1' }]);
+
+    manager.updateContext(
+      createExpressionContext({
+        state: {
+          selectedDevice: {},
+        },
+      } as any),
+    );
+
+    await manager.notifyStateChanged('selectedDevice');
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+    expect(manager.getData('selectedDeviceShadow')).toBeNull();
+  });
+
   it('converts dynamic list field params into filters and skips blank optional values', async () => {
     mockedFetchResult.mockResolvedValueOnce({
       code: '0',

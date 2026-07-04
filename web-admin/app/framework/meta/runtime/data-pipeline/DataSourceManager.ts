@@ -850,7 +850,9 @@ export class DataSourceManager {
         return { matched: true, missingParent: true, value: undefined };
       }
       value = value[segments[index]];
-      if ((value === undefined || value === null) && index < segments.length - 1) {
+      const isLastSegment = index === segments.length - 1;
+      const isNestedDependency = segments.length > 2;
+      if ((value === undefined || value === null) && (!isLastSegment || isNestedDependency)) {
         return { matched: true, missingParent: true, value: undefined };
       }
     }
