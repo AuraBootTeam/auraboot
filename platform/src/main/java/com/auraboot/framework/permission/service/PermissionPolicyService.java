@@ -24,14 +24,25 @@ public interface PermissionPolicyService {
      *
      * @param grantId          ab_role_permission.id
      * @param conditionAstJson materialized {@code condition_ast} as raw JSON, or {@code null}
-     *                         for an unconditional grant
+     *                         when no materialized guard exists
+     * @param conditionsJson   legacy/config {@code conditions} as raw JSON. The runtime only
+     *                         treats recognized Rule Center bindings as guards; unrelated legacy
+     *                         policy values remain config-only.
      */
-    record ConditionGuard(Long grantId, String conditionAstJson) {
+    record ConditionGuard(Long grantId, String conditionAstJson, String conditionsJson) {
+
+        public ConditionGuard(Long grantId, String conditionAstJson) {
+            this(grantId, conditionAstJson, null);
+        }
 
         /** An unconditional grant always satisfies the guard layer. */
         public boolean unconditional() {
             return conditionAstJson == null || conditionAstJson.isBlank()
                     || "null".equals(conditionAstJson.trim());
+        }
+
+        public boolean hasConditionAst() {
+            return !unconditional();
         }
     }
 

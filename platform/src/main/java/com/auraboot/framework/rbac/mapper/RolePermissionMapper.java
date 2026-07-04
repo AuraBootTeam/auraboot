@@ -507,11 +507,12 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
      * Permission Governance S1 (Plan B): load the materialized {@code condition_ast} of every
      * active GRANT binding for a member's roles on a single permission.
      *
-     * <p>Returns the binding id and its {@code condition_ast} as raw JSON text (bypassing the
-     * JacksonTypeHandler, mirroring {@link #getConditionsById}). A row with a NULL
-     * {@code condition_ast} represents an unconditional grant; it is still returned so the
-     * evaluator can short-circuit to ALLOW. DENY bindings are excluded — DENY semantics are
-     * resolved by the upstream RBAC step, not by this guard layer.
+     * <p>Returns the binding id, its {@code condition_ast}, and legacy/config {@code conditions}
+     * as raw JSON text (bypassing the JacksonTypeHandler, mirroring {@link #getConditionsById}).
+     * A row with a NULL {@code condition_ast} and no rule-center binding in {@code conditions}
+     * represents an unconditional grant; it is still returned so the evaluator can short-circuit
+     * to ALLOW. DENY bindings are excluded — DENY semantics are resolved by the upstream RBAC
+     * step, not by this guard layer.
      *
      * @param roleIds      the member's role ids
      * @param permissionId target permission id
@@ -519,7 +520,9 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
      */
     @Select("""
         <script>
-        SELECT id, condition_ast::text AS condition_ast_json
+        SELECT id,
+               condition_ast::text AS condition_ast_json,
+               conditions::text AS conditions_json
         FROM ab_role_permission
         WHERE permission_id = #{permissionId}
           AND grant_type = 'grant'
@@ -535,7 +538,8 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
         """)
     @Results({
         @Result(property = "id", column = "id"),
-        @Result(property = "conditionAstJson", column = "condition_ast_json")
+        @Result(property = "conditionAstJson", column = "condition_ast_json"),
+        @Result(property = "conditionsJson", column = "conditions_json")
     })
     List<RolePermissionConditionAstRow> findConditionAstGrants(
         @Param("roleIds") List<Long> roleIds,
@@ -548,10 +552,13 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
     class RolePermissionConditionAstRow {
         private Long id;
         private String conditionAstJson;
+        private String conditionsJson;
 
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
         public String getConditionAstJson() { return conditionAstJson; }
         public void setConditionAstJson(String conditionAstJson) { this.conditionAstJson = conditionAstJson; }
+        public String getConditionsJson() { return conditionsJson; }
+        public void setConditionsJson(String conditionsJson) { this.conditionsJson = conditionsJson; }
     }
 }

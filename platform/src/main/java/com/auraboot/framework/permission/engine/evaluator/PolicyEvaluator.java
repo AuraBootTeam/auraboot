@@ -5,14 +5,25 @@ import com.auraboot.framework.decision.ast.ConditionNode;
 import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.EvalTrace;
 import com.auraboot.framework.decision.ast.Truth;
+import com.auraboot.framework.decision.rule.ConditionSpec;
+import com.auraboot.framework.decision.rule.DecisionBinding;
+import com.auraboot.framework.decision.rule.RuleBindingKind;
+import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.decision.rule.RuleEvaluationContext;
+import com.auraboot.framework.decision.rule.RuleEvaluationService;
+import com.auraboot.framework.decision.rule.RuleEvaluationTrace;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
 import com.auraboot.framework.permission.engine.vocab.PermissionFieldVocabulary;
 import com.auraboot.framework.permission.service.PermissionPolicyService;
 import com.auraboot.framework.permission.service.PermissionPolicyService.ConditionGuard;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -50,6 +61,7 @@ public class PolicyEvaluator {
     private final PermissionPolicyService policyService;
     private final PermissionFieldVocabulary fieldVocabulary;
     private final ObjectMapper objectMapper;
+    private final ObjectProvider<RuleEvaluationService> ruleEvaluationServiceProvider;
 
     private final ConditionAstEvaluator astEvaluator = new ConditionAstEvaluator();
 
@@ -83,30 +95,52 @@ public class PolicyEvaluator {
         List<String> denyReasons = new ArrayList<>();
 
         for (ConditionGuard guard : guards) {
-            if (guard.unconditional()) {
+            ParsedRuleBinding parsedBinding = parseRuleBinding(guard);
+            if (parsedBinding.error() != null) {
+                denyReasons.add("grant#" + guard.grantId() + ": " + parsedBinding.error());
+                continue;
+            }
+
+            RuleConsumerBinding ruleBinding = parsedBinding.binding();
+            if (!guard.hasConditionAst() && !hasActiveRuleCenterGuard(ruleBinding)) {
                 return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
                         "Unconditional grant satisfies guard");
             }
             hasConditionalGuard = true;
 
-            ConditionNode ast = parseAst(guard);
-            if (ast == null) {
-                // A grant whose condition_ast cannot be parsed is unsafe to honor → treat as deny
-                // for this grant (default-deny); other grants may still allow.
-                denyReasons.add("grant#" + guard.grantId() + ": unparseable condition_ast");
-                continue;
+            if (guard.hasConditionAst()) {
+                ConditionNode ast = parseAst(guard);
+                if (ast == null) {
+                    // A grant whose condition_ast cannot be parsed is unsafe to honor → treat as deny
+                    // for this grant (default-deny); other grants may still allow.
+                    denyReasons.add("grant#" + guard.grantId() + ": unparseable condition_ast");
+                    continue;
+                }
+
+                if (ctx == null) {
+                    ctx = fieldVocabulary.buildContext(memberId, record);
+                }
+                EvalTrace trace = astEvaluator.evaluate(ast, ctx);
+                if (trace.result() != Truth.TRUE) {
+                    denyReasons.add("grant#" + guard.grantId() + ": "
+                            + trace.result() + " — " + summarize(trace));
+                    continue;
+                }
             }
 
-            if (ctx == null) {
-                ctx = fieldVocabulary.buildContext(memberId, record);
-            }
-            EvalTrace trace = astEvaluator.evaluate(ast, ctx);
-            if (trace.result() == Truth.TRUE) {
+            if (hasActiveRuleCenterGuard(ruleBinding)) {
+                RuleGuardResult ruleResult = evaluateRuleCenterGuard(
+                        ruleBinding, parsedBinding.expectedMatched(), memberId, permissionCode, record);
+                if (!ruleResult.matchedExpected()) {
+                    denyReasons.add("grant#" + guard.grantId() + ": " + ruleResult.reason());
+                    continue;
+                }
                 return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
-                        "Condition guard satisfied: " + summarize(trace));
+                        "Rule Center guard satisfied: " + ruleResult.reason());
             }
-            denyReasons.add("grant#" + guard.grantId() + ": "
-                    + trace.result() + " — " + summarize(trace));
+
+            return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
+                    "Condition guard satisfied");
         }
 
         if (!hasConditionalGuard) {
@@ -145,4 +179,123 @@ public class PolicyEvaluator {
         }
         return sb.toString();
     }
+
+    private ParsedRuleBinding parseRuleBinding(ConditionGuard guard) {
+        String conditionsJson = guard.conditionsJson();
+        if (conditionsJson == null || conditionsJson.isBlank() || "null".equals(conditionsJson.trim())) {
+            return ParsedRuleBinding.none();
+        }
+        try {
+            JsonNode root = objectMapper.readTree(conditionsJson);
+            JsonNode dynamicAbac = child(root, "dynamicAbac");
+            Boolean expectedMatched = expectedMatched(root, dynamicAbac);
+
+            JsonNode ruleBinding = firstNonNull(child(root, "ruleBinding"), child(dynamicAbac, "ruleBinding"));
+            if (ruleBinding != null) {
+                return new ParsedRuleBinding(ruleMapper().convertValue(ruleBinding, RuleConsumerBinding.class),
+                        expectedMatched, null);
+            }
+
+            JsonNode looseNode = dynamicAbac != null ? dynamicAbac : root;
+            JsonNode decisionBinding = child(looseNode, "decisionBinding");
+            JsonNode conditionSpec = child(looseNode, "conditionSpec");
+            if (decisionBinding == null && conditionSpec == null) {
+                return ParsedRuleBinding.none();
+            }
+            DecisionBinding decision = decisionBinding == null
+                    ? null
+                    : ruleMapper().convertValue(decisionBinding, DecisionBinding.class);
+            ConditionSpec condition = conditionSpec == null
+                    ? null
+                    : ruleMapper().convertValue(conditionSpec, ConditionSpec.class);
+            RuleBindingKind kind = decision != null ? RuleBindingKind.DECISION_REF : RuleBindingKind.CONDITION;
+            return new ParsedRuleBinding(new RuleConsumerBinding(
+                    "PERMISSION", null, "dynamicAbac", kind, condition, decision, true),
+                    expectedMatched, null);
+        } catch (Exception e) {
+            return new ParsedRuleBinding(null, null,
+                    "unparseable Rule Center binding in conditions: " + e.getMessage());
+        }
+    }
+
+    private boolean hasActiveRuleCenterGuard(RuleConsumerBinding binding) {
+        return binding != null
+                && binding.active()
+                && ((binding.bindingKind() == RuleBindingKind.CONDITION && binding.conditionSpec() != null)
+                || (binding.bindingKind() == RuleBindingKind.DECISION_REF && binding.decisionBinding() != null));
+    }
+
+    private RuleGuardResult evaluateRuleCenterGuard(RuleConsumerBinding binding,
+                                                     Boolean expectedMatched,
+                                                     Long memberId,
+                                                     String permissionCode,
+                                                     Object record) {
+        RuleEvaluationService ruleEvaluationService = ruleEvaluationServiceProvider.getIfAvailable();
+        if (ruleEvaluationService == null) {
+            return new RuleGuardResult(false, describe(binding)
+                    + " cannot be evaluated because RuleEvaluationService is unavailable");
+        }
+        RuleEvaluationContext context = new RuleEvaluationContext(
+                fieldVocabulary.buildScopes(memberId, record),
+                "PERMISSION",
+                firstNonBlank(binding.consumerCode(), permissionCode),
+                firstNonBlank(binding.consumerNodeId(), "dynamicAbac"),
+                null,
+                null,
+                null);
+
+        RuleEvaluationTrace trace;
+        if (binding.bindingKind() == RuleBindingKind.CONDITION) {
+            trace = ruleEvaluationService.evaluateCondition(binding.conditionSpec(), context);
+        } else {
+            trace = ruleEvaluationService.evaluateDecisionBinding(binding.decisionBinding(), context);
+        }
+        boolean expected = expectedMatched == null || expectedMatched;
+        boolean matchedExpected = trace.matched() == expected;
+        return new RuleGuardResult(matchedExpected,
+                describe(binding) + " expected matched=" + expected + " but was " + trace.matched());
+    }
+
+    private String describe(RuleConsumerBinding binding) {
+        if (binding != null && binding.decisionBinding() != null
+                && binding.decisionBinding().decisionCode() != null) {
+            return binding.decisionBinding().decisionCode();
+        }
+        return "rule-center condition";
+    }
+
+    private ObjectMapper ruleMapper() {
+        return objectMapper.copy()
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_ENUMS, true);
+    }
+
+    private JsonNode child(JsonNode node, String field) {
+        if (node == null || node.isNull() || !node.isObject()) {
+            return null;
+        }
+        JsonNode child = node.get(field);
+        return child == null || child.isNull() ? null : child;
+    }
+
+    private JsonNode firstNonNull(JsonNode first, JsonNode second) {
+        return first != null ? first : second;
+    }
+
+    private Boolean expectedMatched(JsonNode root, JsonNode dynamicAbac) {
+        JsonNode node = firstNonNull(child(dynamicAbac, "expectedMatched"), child(root, "expectedMatched"));
+        return node != null && node.isBoolean() ? node.booleanValue() : null;
+    }
+
+    private String firstNonBlank(String preferred, String fallback) {
+        return preferred == null || preferred.isBlank() ? fallback : preferred;
+    }
+
+    private record ParsedRuleBinding(RuleConsumerBinding binding, Boolean expectedMatched, String error) {
+        static ParsedRuleBinding none() {
+            return new ParsedRuleBinding(null, null, null);
+        }
+    }
+
+    private record RuleGuardResult(boolean matchedExpected, String reason) {}
 }

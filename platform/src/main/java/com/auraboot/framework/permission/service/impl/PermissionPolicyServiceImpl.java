@@ -69,7 +69,7 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
 
         List<ConditionGuard> guards = new ArrayList<>(rows.size());
         for (var row : rows) {
-            guards.add(new ConditionGuard(row.getId(), row.getConditionAstJson()));
+            guards.add(new ConditionGuard(row.getId(), row.getConditionAstJson(), row.getConditionsJson()));
         }
         return guards;
     }
