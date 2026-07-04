@@ -898,22 +898,22 @@ export async function seedQuoteForCorrectedBomUpload(page: Page): Promise<Create
 async function openPgClient(): Promise<{ client: import('pg').Client; database: string }> {
   const { Client } = await import('pg');
   // The Quote/BOM golden stack DB is exposed via POSTGRES_* (runtime env file, sourced by
-  // the gate runner); fall back to PG_*/libpq PG* used elsewhere in the suite.
-  const host = process.env.POSTGRES_HOST ?? process.env.PG_HOST ?? process.env.PGHOST ?? '127.0.0.1';
-  const port = Number(process.env.POSTGRES_PORT ?? process.env.PG_PORT ?? process.env.PGPORT ?? '5432');
-  const database = process.env.POSTGRES_DB ?? process.env.PG_DB ?? process.env.PGDATABASE;
+  // the gate runner); fall back to the standard libpq PG* vars. The PG_HOST/PG_PORT/PG_USER/
+  // PG_DB/PGPASSWORD env-contract vars are intentionally NOT read here (test-env-lint owns them).
+  const host = process.env.POSTGRES_HOST ?? process.env.PGHOST ?? '127.0.0.1';
+  const port = Number(process.env.POSTGRES_PORT ?? process.env.PGPORT ?? '5432');
+  const database = process.env.POSTGRES_DB ?? process.env.PGDATABASE;
   if (!database) {
     // Never default to the shared aura_boot DB: this helper runs UPDATE ... SET created_by,
     // and pointing it at the shared canonical DB could clobber a concurrent session's data.
     // The gate runner exports POSTGRES_DB from the runtime env file; standalone runs must too.
     throw new Error(
-      'openPgClient: set POSTGRES_DB / PG_DB / PGDATABASE to the golden-stack DB ' +
+      'openPgClient: set POSTGRES_DB / PGDATABASE to the golden-stack DB ' +
         '(refusing to fall back to the shared aura_boot DB for an owner-reassign UPDATE).',
     );
   }
-  const user =
-    process.env.POSTGRES_USER ?? process.env.PG_USER ?? process.env.PGUSER ?? process.env.USER ?? 'ghj';
-  const password = process.env.POSTGRES_PASSWORD ?? process.env.PGPASSWORD ?? process.env.PG_PASSWORD;
+  const user = process.env.POSTGRES_USER ?? process.env.PGUSER ?? process.env.USER ?? 'auraboot';
+  const password = process.env.POSTGRES_PASSWORD ?? process.env.PG_PASSWORD;
   const client = new Client({ host, port, database, user, password });
   await client.connect();
   return { client, database };
