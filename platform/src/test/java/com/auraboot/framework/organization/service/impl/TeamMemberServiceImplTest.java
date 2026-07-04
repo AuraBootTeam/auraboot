@@ -8,6 +8,8 @@ import com.auraboot.framework.organization.entity.Team;
 import com.auraboot.framework.organization.entity.TeamMember;
 import com.auraboot.framework.organization.mapper.TeamMapper;
 import com.auraboot.framework.organization.mapper.TeamMemberMapper;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -35,6 +37,7 @@ class TeamMemberServiceImplTest {
     @Mock private TeamMapper teamMapper;
     @Mock private TeamMemberMapper teamMemberMapper;
     @Mock private UserService userService;
+    @Mock private TenantMemberService tenantMemberService;
 
     private TeamMemberServiceImpl service;
     private TeamMemberServiceImpl spyService;
@@ -46,6 +49,7 @@ class TeamMemberServiceImplTest {
         injectField(service, "teamMemberMapper", teamMemberMapper);
         injectField(service, "teamMapper", teamMapper);
         injectField(service, "userService", userService);
+        injectField(service, "tenantMemberService", tenantMemberService);
         spyService = spy(service);
         MetaContext.setContext(1L, 5L, "user-pid", "alice");
     }
@@ -77,6 +81,14 @@ class TeamMemberServiceImplTest {
         t.setCode("c");
         t.setName("n");
         return t;
+    }
+
+    private TenantMember tenantMember(Long userId) {
+        TenantMember member = new TenantMember();
+        member.setTenantId(1L);
+        member.setUserId(userId);
+        member.setPid("tm-" + userId);
+        return member;
     }
 
     @Test
@@ -121,6 +133,7 @@ class TeamMemberServiceImplTest {
     @DisplayName("addMember happy path")
     void addMemberHappy() {
         when(teamMapper.findByPid("p1")).thenReturn(team(1L, "p1"));
+        when(tenantMemberService.findByTenantIdAndUserId(1L, 7L)).thenReturn(tenantMember(7L));
         when(teamMemberMapper.findByTeamIdAndUserId(1L, 7L)).thenReturn(null);
         User u = new User();
         u.setNickName("Alice");
@@ -140,6 +153,7 @@ class TeamMemberServiceImplTest {
     @DisplayName("addMember defaults role to 'member' when null")
     void addMemberDefaultRole() {
         when(teamMapper.findByPid("p1")).thenReturn(team(1L, "p1"));
+        when(tenantMemberService.findByTenantIdAndUserId(1L, 7L)).thenReturn(tenantMember(7L));
         when(teamMemberMapper.findByTeamIdAndUserId(1L, 7L)).thenReturn(null);
         when(userService.findByUserId(7L)).thenReturn(new User());
         doReturn(true).when(spyService).save(any(TeamMember.class));
@@ -162,6 +176,7 @@ class TeamMemberServiceImplTest {
         assertThrows(BusinessException.class, () -> spyService.addMember("missing", req, 5L));
 
         when(teamMapper.findByPid("p1")).thenReturn(team(1L, "p1"));
+        when(tenantMemberService.findByTenantIdAndUserId(1L, 7L)).thenReturn(tenantMember(7L), tenantMember(7L), tenantMember(7L));
         when(teamMemberMapper.findByTeamIdAndUserId(1L, 7L)).thenReturn(new TeamMember());
         assertThrows(BusinessException.class, () -> spyService.addMember("p1", req, 5L));
 

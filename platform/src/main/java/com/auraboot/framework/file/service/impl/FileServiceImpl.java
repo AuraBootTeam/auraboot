@@ -97,6 +97,18 @@ public class FileServiceImpl implements FileService {
     }
 
     @Override
+    public boolean existsStorageKeyInOtherTenants(String storageKey, Long tenantId) {
+        return StringUtils.hasText(storageKey)
+                && tenantId != null
+                && fileMapper.countByFileNameInOtherTenants(storageKey, tenantId) > 0;
+    }
+
+    @Override
+    public void saveMetadata(FileEntity fileEntity) {
+        fileMapper.insert(fileEntity);
+    }
+
+    @Override
     public FileUploadResponseDTO uploadFile(MultipartFile file, Long userId) {
         try {
             if (file.isEmpty()) {

@@ -280,7 +280,8 @@ public class TenantBootstrapServiceImpl implements TenantBootstrapService {
             
             Permission existing = permissionMapper.findByCode(code);
             if (existing != null) {
-                log.debug("模板Permission已存在,跳过: code={}, id={}", logSafe(code), existing.getId());
+                created.add(existing);
+                log.debug("模板Permission已存在,纳入绑定候选: code={}, id={}", logSafe(code), existing.getId());
                 continue;
             }
             

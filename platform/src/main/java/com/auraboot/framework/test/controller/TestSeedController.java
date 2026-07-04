@@ -85,6 +85,7 @@ public class TestSeedController {
             "tpm_task",
             "tpm_milestone",
             "showcase_all_fields",
+            "org_department",
             "sc_monthly_metric"
     );
 

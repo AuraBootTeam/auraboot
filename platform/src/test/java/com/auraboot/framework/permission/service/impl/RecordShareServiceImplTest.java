@@ -1,9 +1,12 @@
 package com.auraboot.framework.permission.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.entity.RecordShare;
 import com.auraboot.framework.permission.mapper.RecordShareMapper;
 import com.auraboot.framework.rbac.service.UserRoleService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -40,6 +43,16 @@ class RecordShareServiceImplTest {
     @InjectMocks
     private RecordShareServiceImpl service;
 
+    @BeforeEach
+    void setUpMetaContext() {
+        MetaContext.setContext(100L, 99L, "user-pid", "tester");
+    }
+
+    @AfterEach
+    void clearMetaContext() {
+        MetaContext.clear();
+    }
+
     @Test
     void shareRecordInsertsShareEntry() {
         Instant expires = Instant.now().plusSeconds(3600);
@@ -59,6 +72,7 @@ class RecordShareServiceImplTest {
         assertThat(share.getExpiresAt()).isEqualTo(expires);
         assertThat(share.getPid()).isNotBlank();
         assertThat(share.getCreatedAt()).isNotNull();
+        assertThat(share.getCreatedBy()).isEqualTo(99L);
     }
 
     @Test
@@ -82,6 +96,7 @@ class RecordShareServiceImplTest {
         assertThat(share.getExpiresAt()).isEqualTo(expires);
         assertThat(share.getPid()).isNotBlank();
         assertThat(share.getCreatedAt()).isNotNull();
+        assertThat(share.getCreatedBy()).isEqualTo(99L);
     }
 
     @Test

@@ -73,4 +73,14 @@ public interface FileService {
      * @return 文件信息
      */
     FileEntity findByPid(String pid);
+
+    /**
+     * Whether the storage key is already registered by another tenant.
+     */
+    boolean existsStorageKeyInOtherTenants(String storageKey, Long tenantId);
+
+    /**
+     * Persist file metadata that was produced outside the multipart upload flow.
+     */
+    void saveMetadata(FileEntity fileEntity);
 }
