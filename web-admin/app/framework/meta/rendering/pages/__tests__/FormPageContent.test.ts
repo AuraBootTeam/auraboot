@@ -202,6 +202,34 @@ describe('buildFormCommandPayload', () => {
   });
 });
 
+describe('datetime form values', () => {
+  it('submits native datetime-local values with a local timezone offset', () => {
+    const payload = normalizeCommandPayloadValue('2026-06-01T00:00', 'datetime');
+
+    expect(payload).toMatch(/^2026-06-01T00:00:00[+-]\d{2}:\d{2}$/);
+  });
+
+  it('keeps offset-aware datetime payloads unchanged', () => {
+    expect(normalizeCommandPayloadValue('2026-06-01T00:00:00+08:00', 'datetime')).toBe(
+      '2026-06-01T00:00:00+08:00',
+    );
+    expect(normalizeCommandPayloadValue('2026-05-31T16:00:00Z', 'datetime')).toBe(
+      '2026-05-31T16:00:00Z',
+    );
+  });
+
+  it('loads offset-aware datetimes as browser-compatible datetime-local values', () => {
+    const source = '2026-06-01T00:00:30+08:00';
+    const parsed = new Date(source);
+    const pad = (value: number, size = 2) => String(value).padStart(size, '0');
+    const expected =
+      `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`
+      + `T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}:${pad(parsed.getSeconds())}`;
+
+    expect(normalizeLoadedFormValue(source, 'datetime')).toBe(expected);
+  });
+});
+
 describe('resolveAsyncCommandDispatch', () => {
   it('detects command-engine async dispatch payloads nested under data', () => {
     expect(
