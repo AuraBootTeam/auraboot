@@ -170,6 +170,11 @@ public class PluginManifestExtended extends PluginManifest {
      */
     private List<DecisionDefinitionSeedDTO> decisionDefinitions;
 
+    /**
+     * Automation definitions to seed through AutomationService.
+     */
+    private List<AutomationDefinitionDTO> automations;
+
     // ==================== Directory-based Configuration ====================
 
     /**
@@ -356,6 +361,14 @@ public class PluginManifestExtended extends PluginManifest {
         if (decisionDefinitions != null) {
             for (DecisionDefinitionSeedDTO decision : decisionDefinitions) {
                 if (!decision.isValid()) {
+                    return false;
+                }
+            }
+        }
+
+        if (automations != null) {
+            for (AutomationDefinitionDTO automation : automations) {
+                if (!automation.isValid()) {
                     return false;
                 }
             }
@@ -553,6 +566,8 @@ public class PluginManifestExtended extends PluginManifest {
                 NotificationTemplateDefinitionDTO::getUnknownFields, NotificationTemplateDefinitionDTO::getUniqueKey);
         collectUnknownFieldWarnings(warnings, "decisionDefinitions", decisionDefinitions,
                 DecisionDefinitionSeedDTO::getUnknownFields, DecisionDefinitionSeedDTO::getDecisionCode);
+        collectUnknownFieldWarnings(warnings, "automations", automations,
+                AutomationDefinitionDTO::getUnknownFields, AutomationDefinitionDTO::getAutomationKey);
 
         return warnings;
     }
@@ -611,7 +626,8 @@ public class PluginManifestExtended extends PluginManifest {
                 || (dashboards != null && !dashboards.isEmpty())
                 || (rules != null && !rules.isEmpty())
                 || (slaConfigs != null && !slaConfigs.isEmpty())
-                || (decisionDefinitions != null && !decisionDefinitions.isEmpty());
+                || (decisionDefinitions != null && !decisionDefinitions.isEmpty())
+                || (automations != null && !automations.isEmpty());
     }
 
     /**
@@ -639,7 +655,8 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("dashboards", dashboards != null ? dashboards.size() : 0),
                 Map.entry("rules", rules != null ? rules.size() : 0),
                 Map.entry("slaConfigs", slaConfigs != null ? slaConfigs.size() : 0),
-                Map.entry("decisionDefinitions", decisionDefinitions != null ? decisionDefinitions.size() : 0)
+                Map.entry("decisionDefinitions", decisionDefinitions != null ? decisionDefinitions.size() : 0),
+                Map.entry("automations", automations != null ? automations.size() : 0)
         );
     }
 
@@ -671,6 +688,8 @@ public class PluginManifestExtended extends PluginManifest {
         dashboards = sanitized(dashboards, d -> isCommentObject(d.getCode(), d.getUnknownFields()));
         decisionDefinitions = sanitized(decisionDefinitions,
                 d -> isCommentObject(d.getDecisionCode(), d.getUnknownFields()));
+        automations = sanitized(automations,
+                a -> isCommentObject(a.getAutomationKey(), a.getUnknownFields()));
         i18nResources = sanitized(i18nResources, i -> i.getKey() == null || i.getKey().isBlank());
     }
 

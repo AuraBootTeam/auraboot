@@ -127,6 +127,9 @@ public class AutomationServiceImpl implements AutomationService {
 
         automationMapper.insertAutomation(automation);
         usageIndexService.refreshSource("AUTOMATION", automation.getPid());
+        if (Boolean.TRUE.equals(automation.getEnabled())) {
+            automationProcessRuntime.deploy(automation);
+        }
 
         log.info("Automation created: pid={}", automation.getPid());
         return toDTO(automation);

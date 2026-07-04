@@ -1,5 +1,9 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import com.auraboot.framework.automation.dto.AutomationCreateRequest;
+import com.auraboot.framework.automation.dto.AutomationDTO;
+import com.auraboot.framework.automation.dto.AutomationUpdateRequest;
+import com.auraboot.framework.automation.service.AutomationService;
 import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtDefinitionDTO;
 import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
@@ -131,6 +135,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final com.auraboot.framework.meta.template.generator.DocumentCommandGenerator documentCommandGenerator;
     private final com.auraboot.framework.bpm.rule.DroolsRuleService droolsRuleService;
     private final com.auraboot.framework.bpm.service.SlaConfigService slaConfigService;
+    private final AutomationService automationService;
     private final DrtDefinitionService drtDefinitionService;
     private final DecisionVersionService decisionVersionService;
     private final JdbcTemplate jdbcTemplate;
@@ -504,6 +509,16 @@ public class PluginImportServiceImpl implements PluginImportService {
                 if (!decisions.isEmpty()) {
                     manifest.setDecisionDefinitions(
                             mergeResourceList(manifest.getDecisionDefinitions(), decisions));
+                }
+            }
+
+            // Load Automation seeds
+            if (resourceDirs.containsKey("automations")) {
+                List<AutomationDefinitionDTO> automations = loadResourceListFromZip(
+                        files, resourceDirs.get("automations"), AutomationDefinitionDTO.class);
+                if (!automations.isEmpty()) {
+                    manifest.setAutomations(
+                            mergeResourceList(manifest.getAutomations(), automations));
                 }
             }
 
@@ -1518,6 +1533,7 @@ public class PluginImportServiceImpl implements PluginImportService {
         // Import Drools rules and SLA configs (extension resources — not tracked via
         // PluginResource / ResourceType to avoid enum/DB check-constraint churn).
         importDecisionDefinitions(manifest);
+        importAutomations(manifest);
         importRules(manifest);
         importSlaConfigs(manifest);
         importFieldMasks(manifest);
@@ -2295,6 +2311,66 @@ public class PluginImportServiceImpl implements PluginImportService {
         if (created > 0) {
             log.info("Imported {} SLA config(s) for plugin {}", created, logSafe(manifest.getPluginId()));
         }
+    }
+
+    private void importAutomations(PluginManifestExtended manifest) {
+        if (manifest.getAutomations() == null || manifest.getAutomations().isEmpty()) return;
+        int imported = 0;
+        for (AutomationDefinitionDTO dto : manifest.getAutomations()) {
+            if (!dto.isValid()) {
+                log.warn("Skipping invalid automation seed (missing key/name/model/trigger): index={}",
+                        manifest.getAutomations().indexOf(dto));
+                continue;
+            }
+            importAutomation(dto);
+            imported++;
+        }
+        if (imported > 0) {
+            log.info("Imported {} automation seed(s) for plugin {}", imported, logSafe(manifest.getPluginId()));
+        }
+    }
+
+    private void importAutomation(AutomationDefinitionDTO dto) {
+        AutomationDTO existing = findExistingAutomation(dto);
+        if (existing == null) {
+            automationService.create(toAutomationCreateRequest(dto));
+            return;
+        }
+        AutomationUpdateRequest request = new AutomationUpdateRequest();
+        request.setName(dto.getName());
+        request.setDescription(dto.getDescription());
+        request.setTriggerType(dto.getTriggerType());
+        request.setTriggerConfig(dto.getTriggerConfig());
+        request.setTriggerCondition(dto.getTriggerCondition());
+        request.setActions(dto.getActions());
+        request.setFlowConfig(dto.getFlowConfig());
+        request.setEnabled(dto.getEnabled());
+        automationService.update(existing.getPid(), request);
+    }
+
+    private AutomationDTO findExistingAutomation(AutomationDefinitionDTO dto) {
+        List<AutomationDTO> automations = automationService.getByModelCode(dto.getModelCode());
+        if (automations == null || automations.isEmpty()) {
+            return null;
+        }
+        return automations.stream()
+                .filter(existing -> Objects.equals(existing.getName(), dto.getName()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private AutomationCreateRequest toAutomationCreateRequest(AutomationDefinitionDTO dto) {
+        AutomationCreateRequest request = new AutomationCreateRequest();
+        request.setName(dto.getName());
+        request.setDescription(dto.getDescription());
+        request.setModelCode(dto.getModelCode());
+        request.setTriggerType(dto.getTriggerType());
+        request.setTriggerConfig(dto.getTriggerConfig());
+        request.setTriggerCondition(dto.getTriggerCondition());
+        request.setActions(dto.getActions());
+        request.setFlowConfig(dto.getFlowConfig());
+        request.setEnabled(dto.getEnabled());
+        return request;
     }
 
     /**

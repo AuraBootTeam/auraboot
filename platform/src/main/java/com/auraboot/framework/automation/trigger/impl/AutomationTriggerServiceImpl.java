@@ -96,8 +96,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 payload.put("event", "create");
                 payload.put("record", recordData);
 
-                if (shouldTrigger(automation, payload)) {
-                    executeAutomationAsync(automation, recordPid, payload);
+                Map<String, Object> matchedPayload = buildMatchedTriggerPayload(automation, payload);
+                if (matchedPayload != null) {
+                    executeAutomationAsync(automation, recordPid, matchedPayload);
                 }
             } catch (Exception e) {
                 log.error("Error processing automation {} for record create: {}",
@@ -136,8 +137,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 payload.put("after", afterData);
                 payload.put("record", afterData);
 
-                if (shouldTrigger(automation, payload)) {
-                    executeAutomationAsync(automation, recordPid, payload);
+                Map<String, Object> matchedPayload = buildMatchedTriggerPayload(automation, payload);
+                if (matchedPayload != null) {
+                    executeAutomationAsync(automation, recordPid, matchedPayload);
                 }
             } catch (Exception e) {
                 log.error("Error processing automation {} for record update: {}",
@@ -180,8 +182,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 payload.put("oldValue", oldValue);
                 payload.put("newValue", newValue);
 
-                if (shouldTrigger(automation, payload)) {
-                    executeAutomationAsync(automation, recordPid, payload);
+                Map<String, Object> matchedPayload = buildMatchedTriggerPayload(automation, payload);
+                if (matchedPayload != null) {
+                    executeAutomationAsync(automation, recordPid, matchedPayload);
                 }
             } catch (Exception e) {
                 log.error("Error processing automation {} for field change: {}",
@@ -221,8 +224,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                 payload.put("fromState", fromState);
                 payload.put("toState", toState);
 
-                if (shouldTrigger(automation, payload)) {
-                    executeAutomationAsync(automation, recordPid, payload);
+                Map<String, Object> matchedPayload = buildMatchedTriggerPayload(automation, payload);
+                if (matchedPayload != null) {
+                    executeAutomationAsync(automation, recordPid, matchedPayload);
                 }
             } catch (Exception e) {
                 log.error("Error processing automation {} for state change: {}",
@@ -261,8 +265,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                     triggerPayload.putAll(payload);
                 }
 
-                if (shouldTrigger(automation, triggerPayload)) {
-                    executeAutomationAsync(automation, instanceId, triggerPayload);
+                Map<String, Object> matchedPayload = buildMatchedTriggerPayload(automation, triggerPayload);
+                if (matchedPayload != null) {
+                    executeAutomationAsync(automation, instanceId, matchedPayload);
                 }
             } catch (Exception e) {
                 log.error("Error processing automation {} for BPM event: {}",
@@ -409,9 +414,10 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         }
     }
 
-    private boolean shouldTrigger(Automation automation, Map<String, Object> payload) {
+    private Map<String, Object> buildMatchedTriggerPayload(Automation automation, Map<String, Object> payload) {
         String condition = automation.getTriggerCondition();
-        return evaluateCondition(condition, withDecision(automation, payload));
+        Map<String, Object> enrichedPayload = withDecision(automation, payload);
+        return evaluateCondition(condition, enrichedPayload) ? enrichedPayload : null;
     }
 
     /**
