@@ -145,8 +145,10 @@ describe('ExecutionLogTraceBlock', () => {
     await waitFor(() =>
       expect(http.get).toHaveBeenCalledWith('/decision/logs', { traceId: 'trace-1' }),
     );
-    expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('eligibility_gate');
-    expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('R-101');
+    await waitFor(() =>
+      expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('eligibility_gate'),
+    );
+    await waitFor(() => expect(screen.getByTestId('elta-trace-drawer')).toHaveTextContent('R-101'));
     expect(routerMocks.navigate).not.toHaveBeenCalledWith('/decision-ops');
   });
 
