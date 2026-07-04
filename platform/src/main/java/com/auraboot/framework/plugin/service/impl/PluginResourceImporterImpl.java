@@ -601,6 +601,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             if (dto.getConstraints().getPattern() != null) constraints.put("pattern", dto.getConstraints().getPattern());
             if (dto.getConstraints().getMin() != null) constraints.put("min", dto.getConstraints().getMin());
             if (dto.getConstraints().getMax() != null) constraints.put("max", dto.getConstraints().getMax());
+            if (dto.getConstraints().getPrecision() != null) constraints.put("precision", dto.getConstraints().getPrecision());
+            if (dto.getConstraints().getScale() != null) constraints.put("scale", dto.getConstraints().getScale());
             if (dto.getConstraints().getUnique() != null) constraints.put("unique", dto.getConstraints().getUnique());
             if (!constraints.isEmpty()) {
                 extension.put("constraints", constraints);

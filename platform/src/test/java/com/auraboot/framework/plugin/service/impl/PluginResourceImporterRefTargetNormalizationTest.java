@@ -29,11 +29,36 @@ class PluginResourceImporterRefTargetNormalizationTest {
         return (Map<String, Object>) ReflectionTestUtils.invokeMethod(importer, "resolveFieldRefTarget", dto);
     }
 
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> buildFieldExtension(FieldDefinitionDTO dto) {
+        return (Map<String, Object>) ReflectionTestUtils.invokeMethod(importer, "buildFieldExtension", dto);
+    }
+
     private FieldDefinitionDTO refField() {
         FieldDefinitionDTO dto = new FieldDefinitionDTO();
         dto.setCode("some_ref");
         dto.setDataType("reference");
         return dto;
+    }
+
+    @Test
+    @DisplayName("decimal constraints preserve precision and scale for DDL generation")
+    void preservesDecimalPrecisionAndScaleConstraints() {
+        FieldDefinitionDTO dto = new FieldDefinitionDTO();
+        dto.setCode("unit_price");
+        dto.setDataType("decimal");
+        dto.setDisplayName("Unit Price");
+        FieldDefinitionDTO.FieldConstraints constraints = new FieldDefinitionDTO.FieldConstraints();
+        constraints.setPrecision(18);
+        constraints.setScale(6);
+        dto.setConstraints(constraints);
+
+        Map<String, Object> extension = buildFieldExtension(dto);
+
+        assertThat(extension.get("constraints"))
+                .isInstanceOfSatisfying(Map.class, map -> assertThat(map)
+                        .containsEntry("precision", 18)
+                        .containsEntry("scale", 6));
     }
 
     @Test
