@@ -895,7 +895,77 @@ export async function seedQuoteForCorrectedBomUpload(page: Page): Promise<Create
   return seedQuoteScaffold(page, 'CBOM', [], 'consumer');
 }
 
-export async function seedBomWorkbench(page: Page): Promise<BomWorkbenchSeed> {
+async function openPgClient(): Promise<{ client: import('pg').Client; database: string }> {
+  const { Client } = await import('pg');
+  // The Quote/BOM golden stack DB is exposed via POSTGRES_* (runtime env file, sourced by
+  // the gate runner); fall back to the standard libpq PG* vars. The PG_HOST/PG_PORT/PG_USER/
+  // PG_DB/PGPASSWORD env-contract vars are intentionally NOT read here (test-env-lint owns them).
+  const host = process.env.POSTGRES_HOST ?? process.env.PGHOST ?? '127.0.0.1';
+  const port = Number(process.env.POSTGRES_PORT ?? process.env.PGPORT ?? '5432');
+  const database = process.env.POSTGRES_DB ?? process.env.PGDATABASE;
+  if (!database) {
+    // Never default to the shared aura_boot DB: this helper runs UPDATE ... SET created_by,
+    // and pointing it at the shared canonical DB could clobber a concurrent session's data.
+    // The gate runner exports POSTGRES_DB from the runtime env file; standalone runs must too.
+    throw new Error(
+      'openPgClient: set POSTGRES_DB / PGDATABASE to the golden-stack DB ' +
+        '(refusing to fall back to the shared aura_boot DB for an owner-reassign UPDATE).',
+    );
+  }
+  const user = process.env.POSTGRES_USER ?? process.env.PGUSER ?? process.env.USER ?? 'auraboot';
+  const password = process.env.POSTGRES_PASSWORD ?? process.env.PG_PASSWORD;
+  const client = new Client({ host, port, database, user, password });
+  await client.connect();
+  return { client, database };
+}
+
+/**
+ * Reassign `created_by` (owner) of specific dynamic records to a target user, by email.
+ *
+ * Golden-only seed helper. The platform intentionally never lets you set `created_by` via
+ * API (system audit field), so seeding a *self-scoped* fixture for a non-admin role requires
+ * a direct owner rewrite on the physical `mt_<model>` table. Direct SQL is authorized for
+ * golden seed data (coordinator 2026-07-04). Throws loudly if the PG connection is wrong or
+ * the update touches ≠1 row, so a misconfigured stack fails HERE (clear message) instead of
+ * later as a confusing "role cannot see its own seeded task".
+ */
+export async function reassignRecordOwnerByEmail(
+  targets: Array<{ model: string; pid: string }>,
+  ownerEmail: string,
+): Promise<void> {
+  const { client, database } = await openPgClient();
+  try {
+    const uid = await client.query('SELECT id FROM ab_user WHERE email = $1 ORDER BY id LIMIT 1', [
+      ownerEmail,
+    ]);
+    const ownerId = uid.rows[0]?.id;
+    if (!ownerId) {
+      throw new Error(`reassignRecordOwnerByEmail: no ab_user for email ${ownerEmail} (db=${database})`);
+    }
+    for (const { model, pid } of targets) {
+      if (!/^[a-z0-9_]+$/.test(model)) {
+        throw new Error(`reassignRecordOwnerByEmail: unsafe model name ${model}`);
+      }
+      const res = await client.query(`UPDATE mt_${model} SET created_by = $1 WHERE pid = $2`, [
+        ownerId,
+        pid,
+      ]);
+      if (res.rowCount !== 1) {
+        throw new Error(
+          `reassignRecordOwnerByEmail: expected 1 updated row of mt_${model} pid=${pid}, got ${res.rowCount} ` +
+            `— is PG pointed at the golden stack DB? (db=${database})`,
+        );
+      }
+    }
+  } finally {
+    await client.end();
+  }
+}
+
+export async function seedBomWorkbench(
+  page: Page,
+  opts: { ownerEmail?: string } = {},
+): Promise<BomWorkbenchSeed> {
   await ensureTenantAdminModelPermissions(page);
   const suffix = `${Date.now()}${Math.random().toString(16).slice(2, 8)}`;
   const marker = `E2E-BOM-${suffix}`;
@@ -1148,6 +1218,21 @@ export async function seedBomWorkbench(page: Page): Promise<BomWorkbenchSeed> {
       },
       created.rows,
     );
+
+    // Optionally hand ownership of the SELF-scoped records (task + project + account) to a
+    // business role so a non-admin (e.g. bom_engineering) can see the seeded conversion task
+    // under `self` data scope. Child rows (raw/standard/match/evidence/export) are NOT
+    // self-scoped (all-fallback) so they stay admin-owned and remain readable by everyone.
+    if (opts.ownerEmail) {
+      await reassignRecordOwnerByEmail(
+        [
+          { model: 'bom_conversion_task_pcba', pid: created.taskId },
+          { model: 'req_requirement_set_pcba_bom', pid: created.projectId },
+          { model: 'crm_account_common', pid: accountId },
+        ],
+        opts.ownerEmail,
+      );
+    }
 
     return created;
   } catch (error) {

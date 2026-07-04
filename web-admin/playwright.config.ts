@@ -73,6 +73,8 @@ const quoteOpsCurrentSpecNames = [
   'bom-workbench-role-eng-golden',
   'quote-role-sales-golden',
   'quote-role-proc-golden',
+  'quote-bom-soft-delete-golden',
+  'bom-workbench-self-scope-golden',
 ];
 const quoteOpsCurrentGatePattern = new RegExp(
   String.raw`.*\/pcba-solution\/(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$`,

@@ -151,7 +151,11 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
         `ensure smoke_eng failed: HTTP ${resp.status()} ${text.slice(0, 300)}`,
       ).toBe(true);
     }
-    created = await seedBomWorkbench(adminPage);
+    // Seed synthetic BOM data as admin, but hand ownership of the self-scoped records
+    // (conversion task + project + account) to the eng role so it survives the `self` data
+    // scope on bom_conversion_task_pcba read (business-roles.json #243). Child lines are not
+    // self-scoped, so they stay admin-owned yet remain readable by eng (all-fallback).
+    created = await seedBomWorkbench(adminPage, { ownerEmail: ENG_USER.email });
   });
 
   test.afterAll(async () => {
@@ -178,7 +182,9 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
     });
 
     try {
-      // 1. sidebar → workbench list shows the seeded task (conversion tasks are not self-scoped)
+      // 1. sidebar → workbench list shows the seeded task. bom_conversion_task_pcba read is
+      //    self-scoped for bom_engineering, so the task was reassigned to this eng account at
+      //    seed time (see beforeAll); eng sees it because eng now owns it.
       step = 'open workbench list';
       await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
       await ensureSidebarExpanded(page);
