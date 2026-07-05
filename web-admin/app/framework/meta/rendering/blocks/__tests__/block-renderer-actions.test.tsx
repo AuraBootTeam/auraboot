@@ -26,7 +26,7 @@ const showSuccessToastSpy = vi.fn();
 const showErrorToastSpy = vi.fn();
 const showWarningToastSpy = vi.fn();
 const showInfoToastSpy = vi.fn();
-const hasPermissionSpy = vi.fn(() => true);
+const hasPermissionSpy = vi.fn<(code?: string) => boolean>(() => true);
 
 vi.mock('~/framework/meta/hooks/useActionHandler', () => ({
   useActionHandler: (options: any) => ({
@@ -406,7 +406,7 @@ describe('TableBlockRenderer', () => {
   });
 
   it('filters table row actions by permissionCode before rendering', () => {
-    hasPermissionSpy.mockImplementation((code: string) => code !== 'iot.alarm.ack');
+    hasPermissionSpy.mockImplementation((code?: string) => code !== 'iot.alarm.ack');
     const runtime = makeRuntimeWithData();
     const block = {
       type: 'table',
