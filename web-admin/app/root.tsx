@@ -66,6 +66,7 @@ import { QueryProvider } from '~/providers/QueryProvider';
 import { fetchBootstrapStatus, type BootstrapStatus } from '~/services/bootstrapStatus';
 import { BootstrapBanner } from '~/components/BootstrapBanner';
 import { BootstrapNotReady } from '~/components/BootstrapNotReady';
+import { AuthSessionRevalidator } from '~/components/AuthSessionRevalidator';
 
 import { sessionMiddleware } from '~/middleware/auth_filter';
 import { ssrLoaderCache, ssrCacheKey } from '~/utils/ssr-cache';
@@ -297,6 +298,7 @@ export default function App() {
       <ThemeProvider>
         {bootCoreRuntime ? (
           <AuthProvider>
+            <AuthSessionRevalidator enabled={bootCoreRuntime} isAuthenticated={!!data.user} />
             <EntitlementProvider>
               <DslRegistryProvider>{sharedProviders}</DslRegistryProvider>
             </EntitlementProvider>

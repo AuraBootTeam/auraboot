@@ -1,5 +1,7 @@
 Q:有点忘记 jwt 认证过程中的代码关系了,结合项目代码,帮我梳理下逻辑
 
+> SOT 补充：本文只说明 JWT 身份认证流程。RBAC 权限缓存失效、撤权传播、前端停留页会话重校验的权威说明见 `platform/docs/rbac_permission_cache_session_revalidation.md`。
+
 ## JWT认证架构概览
 
 项目采用了Spring Security + JWT的认证方案，主要涉及以下核心组件：
@@ -88,4 +90,3 @@ security:
 5. **异常处理**: 统一的认证失败响应格式
 
 这套架构实现了完整的JWT认证流程，既保证了安全性，又提供了良好的扩展性。
-        
