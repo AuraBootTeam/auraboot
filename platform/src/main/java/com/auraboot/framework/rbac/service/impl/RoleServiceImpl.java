@@ -4,7 +4,6 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.rbac.constant.RoleConstants;
 import com.auraboot.framework.rbac.entity.Role;
-import com.auraboot.framework.rbac.entity.UserRole;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.service.RoleService;
@@ -327,18 +326,8 @@ public class RoleServiceImpl extends ServiceImpl<RoleMapper, Role> implements Ro
     public boolean assignRoleToMember(Long memberId, Long roleId, Long tenantId) {
         log.info("Assigning role {} to member {} in tenant {}", roleId, memberId, tenantId);
 
-        UserRole userRole = new UserRole();
-        userRole.setMemberId(memberId);
-        userRole.setPid(UniqueIdGenerator.generate());
-        userRole.setTenantId(tenantId);
-        userRole.setRoleId(roleId);
-        userRole.setAssignType("direct");
-        userRole.setStatus(StatusConstants.ACTIVE);
-        userRole.setCreatedAt(Instant.now());
-        userRole.setUpdatedAt(Instant.now());
-        userRole.setDeletedFlag(false);
-
-        return userRoleService.save(userRole);
+        Long operatorId = MetaContext.exists() ? MetaContext.getCurrentUserId() : null;
+        return userRoleService.assignRolesToMember(memberId, List.of(roleId), tenantId, operatorId);
     }
 
 
