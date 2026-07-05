@@ -138,7 +138,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // 路由 / 鉴权上下文 — useActionHandler hook 要求
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, hasPermission } = useAuth();
   const schema = runtime.getSchema();
   const tableName = (schema as any).modelCode || schema.id || '';
 
@@ -404,6 +404,9 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     return (
       <div className="flex flex-wrap gap-2">
         {actions.map((button) => {
+          if (button.permissionCode && !hasPermission(button.permissionCode)) {
+            return null;
+          }
           // 条件渲染
           if (button.visibleWhen) {
             const visible = evaluator.evaluateCondition(button.visibleWhen, {
