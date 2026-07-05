@@ -26,6 +26,7 @@ const showSuccessToastSpy = vi.fn();
 const showErrorToastSpy = vi.fn();
 const showWarningToastSpy = vi.fn();
 const showInfoToastSpy = vi.fn();
+const hasPermissionSpy = vi.fn(() => true);
 
 vi.mock('~/framework/meta/hooks/useActionHandler', () => ({
   useActionHandler: (options: any) => ({
@@ -38,7 +39,7 @@ vi.mock('~/framework/meta/hooks/useActionHandler', () => ({
 }));
 
 vi.mock('~/contexts/AuthContext', () => ({
-  useAuth: () => ({ token: 'test-token' }),
+  useAuth: () => ({ token: 'test-token', hasPermission: hasPermissionSpy }),
 }));
 
 vi.mock('~/contexts/ToastContext', () => ({
@@ -110,6 +111,8 @@ beforeEach(() => {
   showErrorToastSpy.mockReset();
   showWarningToastSpy.mockReset();
   showInfoToastSpy.mockReset();
+  hasPermissionSpy.mockReset();
+  hasPermissionSpy.mockReturnValue(true);
 });
 
 // ---------------------------------------------------------------------------
@@ -400,6 +403,41 @@ describe('TableBlockRenderer', () => {
     expect(passedButton.code).toBe('edit');
     expect(passedButton.action).toEqual({ type: 'navigate', to: 'test_model_form' });
     expect(passedRecord).toEqual(baseRow);
+  });
+
+  it('filters table row actions by permissionCode before rendering', () => {
+    hasPermissionSpy.mockImplementation((code: string) => code !== 'iot.alarm.ack');
+    const runtime = makeRuntimeWithData();
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      columns: baseColumns,
+      rowActions: [
+        {
+          code: 'ack',
+          label: 'Acknowledge',
+          permissionCode: 'iot.alarm.ack',
+          action: { type: 'command', command: 'iot_alarm_event:ack' },
+        },
+        {
+          code: 'simulate',
+          label: 'Simulate',
+          permissionCode: 'iot.rule.read',
+          action: { type: 'command', command: 'iot_rule:simulate' },
+        },
+        {
+          code: 'view',
+          label: 'View',
+          action: { type: 'navigate', to: 'test_model_detail' },
+        },
+      ],
+    };
+
+    const { getByTestId, queryByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    expect(queryByTestId('row-action-ack')).toBeNull();
+    expect(getByTestId('row-action-simulate')).toBeInTheDocument();
+    expect(getByTestId('row-action-view')).toBeInTheDocument();
   });
 
   it('dispatches legacy bare button.handler through useActionHandler (normalized to events.onClick.handler)', () => {
