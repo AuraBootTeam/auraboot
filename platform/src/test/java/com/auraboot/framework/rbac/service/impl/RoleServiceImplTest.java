@@ -306,10 +306,11 @@ class RoleServiceImplTest {
     }
 
     @Test
-    @DisplayName("assignRoleToMember saves UserRole")
+    @DisplayName("assignRoleToMember delegates to userRoleService")
     void assignRoleToMember() {
-        when(userRoleService.save(any())).thenReturn(true);
+        when(userRoleService.assignRolesToMember(1L, List.of(2L), 10L, null)).thenReturn(true);
         assertTrue(service.assignRoleToMember(1L, 2L, 10L));
+        verify(userRoleService).assignRolesToMember(1L, List.of(2L), 10L, null);
     }
 
     @Test

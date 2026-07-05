@@ -64,7 +64,9 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
                 userRole.setPid(UniqueIdGenerator.generate());
                 userRole.setTenantId(tenantId);
                 userRole.setRoleId(roleId);
+                userRole.setAssignType("direct");
                 userRole.setStatus(StatusConstants.ACTIVE);
+                userRole.setDeletedFlag(false);
                 userRole.setCreatedAt(Instant.now());
                 userRole.setUpdatedAt(Instant.now());
                 userRoles.add(userRole);
@@ -272,7 +274,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             }
         }
 
-        return saveBatch(userRoles) ? userRoles.size() : 0;
+        if (!saveBatch(userRoles)) {
+            return 0;
+        }
+        publishUserRoleRecordsChange(userRoles, "CREATE");
+        return userRoles.size();
     }
 
     @Override
@@ -282,9 +288,9 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             return 0;
         }
 
-        Long currentTenantId = MetaContext.getCurrentTenantId();
+        Long currentTenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        List<UserRole> records = listByIds(userRoleIds);
         if (currentTenantId != null) {
-            List<UserRole> records = listByIds(userRoleIds);
             for (UserRole record : records) {
                 if (!currentTenantId.equals(record.getTenantId())) {
                     throw new BusinessException("Cannot remove user roles from another tenant");
@@ -292,7 +298,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
             }
         }
 
-        return removeByIds(userRoleIds) ? userRoleIds.size() : 0;
+        if (!removeByIds(userRoleIds)) {
+            return 0;
+        }
+        publishUserRoleRecordsChange(records, "DELETE");
+        return userRoleIds.size();
     }
 
     @Override
@@ -323,7 +333,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
                 .map(UserRole::getId)
                 .filter(Objects::nonNull)
                 .toList();
-        return removeByIds(ids) ? ids.size() : 0;
+        if (!removeByIds(ids)) {
+            return 0;
+        }
+        publishUserRoleRecordsChange(records, "DELETE");
+        return ids.size();
     }
 
     @Override
@@ -512,7 +526,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
                 .set("tenant_id", toTenantId)
                 .set("updated_at", Instant.now());
 
-        return update(wrapper);
+        if (!update(wrapper)) {
+            return false;
+        }
+        publishUserRoleRecordsChange(sourceRoles, "TRANSFER");
+        return true;
     }
 
     @Override
@@ -522,7 +540,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         wrapper.eq("id", userRoleId)
                 .set("status", StatusConstants.ACTIVE)
                 .set("updated_at", Instant.now());
-        return update(wrapper);
+        if (!update(wrapper)) {
+            return false;
+        }
+        publishUserRoleRowsChange(List.of(userRoleId), "UPDATE");
+        return true;
     }
 
     @Override
@@ -532,7 +554,11 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         wrapper.eq("id", userRoleId)
                 .set("status", StatusConstants.INACTIVE)
                 .set("updated_at", Instant.now());
-        return update(wrapper);
+        if (!update(wrapper)) {
+            return false;
+        }
+        publishUserRoleRowsChange(List.of(userRoleId), "UPDATE");
+        return true;
     }
 
     @Override
@@ -664,8 +690,21 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         if (CollectionUtils.isEmpty(userRoleIds)) {
             return;
         }
-        for (UserRole userRole : listByIds(userRoleIds)) {
-            publishMemberRoleChange(userRole.getMemberId(), userRole.getRoleId(), operation);
+        publishUserRoleRecordsChange(listByIds(userRoleIds), operation);
+    }
+
+    private void publishUserRoleRecordsChange(Collection<UserRole> userRoles, String operation) {
+        if (CollectionUtils.isEmpty(userRoles)) {
+            return;
+        }
+        Set<Long> publishedMemberIds = new LinkedHashSet<>();
+        for (UserRole userRole : userRoles) {
+            if (userRole == null || userRole.getMemberId() == null) {
+                continue;
+            }
+            if (publishedMemberIds.add(userRole.getMemberId())) {
+                publishMemberRoleChange(userRole.getMemberId(), userRole.getRoleId(), operation);
+            }
         }
     }
 }
