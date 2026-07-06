@@ -48,6 +48,19 @@ const SYSTEM_MODEL_ENDPOINTS: Record<
 
 const MAX_DYNAMIC_REFERENCE_PAGE_SIZE = 500;
 
+function isJsonLikeField(field: FieldConfig): boolean {
+  return ['json', 'jsonb'].includes(
+    String((field as any).dataType || field.type || '').toLowerCase(),
+  );
+}
+
+function shouldInferJsonEditor(component?: string): boolean {
+  const normalized = String(component || '')
+    .replace(/[-_]/g, '')
+    .toLowerCase();
+  return !normalized || ['input', 'smartinput', 'textarea', 'smarttextarea'].includes(normalized);
+}
+
 /**
  * Runtime 模式字段渲染器
  *
@@ -222,11 +235,15 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   // 构建组件 props
   // 如果有 dictCode 且未指定组件或组件为 SmartInput，自动使用 SmartSelect
   const componentName = useMemo(() => {
-    if (field.dictCode && (!field.component || field.component === 'SmartInput')) {
+    const explicitComponent = field.component || (field as any).fieldType;
+    if (isJsonLikeField(field) && shouldInferJsonEditor(explicitComponent)) {
+      return 'SmartJsonEditor';
+    }
+    if (field.dictCode && (!explicitComponent || explicitComponent === 'SmartInput')) {
       return 'SmartSelect';
     }
-    return field.component || 'SmartInput';
-  }, [field.dictCode, field.component]);
+    return explicitComponent || 'SmartInput';
+  }, [field, field.dictCode, field.component, (field as any).fieldType]);
 
   const localizeText = useMemo(
     () => (value: unknown) =>

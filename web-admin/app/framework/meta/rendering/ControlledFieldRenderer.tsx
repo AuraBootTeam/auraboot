@@ -51,6 +51,19 @@ const SYSTEM_MODEL_ENDPOINTS: Record<
 
 const MAX_DYNAMIC_REFERENCE_PAGE_SIZE = 500;
 
+function isJsonLikeField(field: FieldConfig): boolean {
+  return ['json', 'jsonb'].includes(
+    String((field as any).dataType || field.type || '').toLowerCase(),
+  );
+}
+
+function shouldInferJsonEditor(component?: string): boolean {
+  const normalized = String(component || '')
+    .replace(/[-_]/g, '')
+    .toLowerCase();
+  return !normalized || ['input', 'smartinput', 'textarea', 'smarttextarea'].includes(normalized);
+}
+
 /**
  * Controlled 模式字段渲染器
  *
@@ -105,7 +118,11 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   // 构建组件 props
   // 如果有 dictCode 且未指定组件或组件为 SmartInput，自动使用 SmartSelect
   const componentName = useMemo(() => {
-    const component = String(field.component || '').toLowerCase();
+    const explicitComponent = field.component || (field as any).fieldType;
+    const component = String(explicitComponent || '').toLowerCase();
+    if (isJsonLikeField(field) && shouldInferJsonEditor(explicitComponent)) {
+      return 'SmartJsonEditor';
+    }
     if (
       field.dictCode &&
       !isTreeComponent &&
@@ -121,8 +138,16 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     ) {
       return 'SmartSelect';
     }
-    return field.component || 'SmartInput';
-  }, [field.dictCode, field.component, (field as any).dataType, (field as any).type, isTreeComponent]);
+    return explicitComponent || 'SmartInput';
+  }, [
+    field,
+    field.dictCode,
+    field.component,
+    (field as any).dataType,
+    (field as any).fieldType,
+    (field as any).type,
+    isTreeComponent,
+  ]);
 
   // Resolve field label from i18n keys with progressive fallback.
   let resolvedLabel = getLocalizedText(field.label, context.locale || 'zh-CN', t) || undefined;
@@ -286,10 +311,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
   const createPermissionCode = field.createPermission || createCommandCode;
   const hasCreatePerm = usePermission(createPermissionCode);
   const allowCreate =
-    Boolean(field.allowCreate) &&
-    fieldKind === 'reference' &&
-    !!refTargetModel &&
-    hasCreatePerm;
+    Boolean(field.allowCreate) && fieldKind === 'reference' && !!refTargetModel && hasCreatePerm;
   const [createOpen, setCreateOpen] = useState(false);
   const dataSourceManager = useDataSourceManagerOptional();
   const { executeCommand } = useActionHandler({

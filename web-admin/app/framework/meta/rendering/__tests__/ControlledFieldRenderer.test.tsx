@@ -155,6 +155,57 @@ describe('ControlledFieldRenderer', () => {
     );
   });
 
+  it('infers SmartJsonEditor for json fields that previously declared textarea', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid="component-loader">{componentName}</div>;
+      },
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'iot_p_schema_json',
+            label: { 'zh-CN': 'TSL 物模型', en: 'TSL Schema' },
+            component: 'textarea',
+            dataType: 'json',
+            props: {
+              placeholder: '{"properties":[]}',
+            },
+          } as any
+        }
+        value='{"properties":[]}'
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader')).toHaveTextContent('SmartJsonEditor');
+    });
+
+    expect(capturedPropsSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        componentName: 'SmartJsonEditor',
+        props: expect.objectContaining({
+          name: 'iot_p_schema_json',
+          placeholder: '{"properties":[]}',
+        }),
+      }),
+    );
+  });
+
   it('disables dependent selects and suppresses their data source until the parent has a value', async () => {
     vi.resetModules();
     vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({

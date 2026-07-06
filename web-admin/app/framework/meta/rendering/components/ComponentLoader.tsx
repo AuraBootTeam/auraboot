@@ -15,6 +15,7 @@ import DatePicker from '~/ui/smart/datetime/DatePicker';
 import Select from '~/ui/smart/form/Select';
 import Switch from '~/ui/smart/form/Switch';
 import Textarea from '~/ui/smart/form/Textarea';
+import JsonEditor from '~/ui/smart/form/JsonEditor';
 import TimezoneSelect from '~/ui/TimezoneSelect';
 
 // LRU-style component cache with max size
@@ -43,6 +44,12 @@ const EAGER_CORE_COMPONENTS: Record<string, ComponentType<any>> = {
   smarttextarea: Textarea,
   Textarea,
   SmartTextarea: Textarea,
+  jsoneditor: JsonEditor,
+  'json-editor': JsonEditor,
+  json_editor: JsonEditor,
+  JsonEditor,
+  SmartJsonEditor: JsonEditor,
+  smartjsoneditor: JsonEditor,
   select: Select,
   smartselect: Select,
   Select,
@@ -85,9 +92,9 @@ export function isCoreComponentRegisteredForTest(name: string): boolean {
   const compactName = normalizedName.replace(/[-_]/g, '');
   return Boolean(
     EAGER_CORE_COMPONENTS[normalizedName] ||
-      EAGER_CORE_COMPONENTS[normalizedName.toLowerCase()] ||
-      EAGER_CORE_COMPONENTS[compactName] ||
-      EAGER_CORE_COMPONENTS[compactName.toLowerCase()],
+    EAGER_CORE_COMPONENTS[normalizedName.toLowerCase()] ||
+    EAGER_CORE_COMPONENTS[compactName] ||
+    EAGER_CORE_COMPONENTS[compactName.toLowerCase()],
   );
 }
 
