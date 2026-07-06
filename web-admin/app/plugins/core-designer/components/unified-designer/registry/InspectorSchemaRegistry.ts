@@ -415,7 +415,8 @@ const workbenchActionBarFields: PropertySchema<string>[] = [
 
 // EvidencePanelBlockRenderer reads block.dataSource (string id) / block.context /
 // block.sections / block.title / block.empty. Section: { key, field, label,
-// format }.
+// format, items? }. items maps paths inside a JSON section into semantic
+// operation cards instead of raw JSON pre blocks.
 const evidencePanelFields: PropertySchema<string>[] = [
   { key: 'title', label: 'Title', type: 'text' },
   { key: 'dataSource', label: 'Data source', type: 'text' },
