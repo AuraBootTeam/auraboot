@@ -50,6 +50,11 @@ common:
   end_date: 종료일
 
   confirm_delete: 삭제하시겠습니까?
+  json_editor:
+    valid: 유효
+    invalid: JSON은 객체 또는 배열이어야 합니다
+    invalid_short: 무효
+    format: 서식 지정
 
 # Notification System
 notification:

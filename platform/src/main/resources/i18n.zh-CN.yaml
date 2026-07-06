@@ -168,6 +168,11 @@ common:
   saved_view_preset_reset_failed: 重置预设视图失败
   options_load_failed: 选项加载失败
   retry: 重试
+  json_editor:
+    valid: 有效
+    invalid: JSON 必须是对象或数组
+    invalid_short: 无效
+    format: 格式化
 
   query_conditions: 查询条件
   reset: 重置
