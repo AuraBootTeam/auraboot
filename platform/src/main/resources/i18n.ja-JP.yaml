@@ -50,6 +50,11 @@ common:
   end_date: 終了日
 
   confirm_delete: 削除してもよろしいですか？
+  json_editor:
+    valid: 有効
+    invalid: JSON はオブジェクトまたは配列である必要があります
+    invalid_short: 無効
+    format: 整形
 
 # Notification System
 notification:

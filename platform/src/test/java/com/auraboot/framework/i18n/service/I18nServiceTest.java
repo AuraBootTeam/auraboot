@@ -108,5 +108,16 @@ class I18nServiceTest {
         when(i18nResourceService.getResourceMapByLang(anyString())).thenReturn(Map.of());
         Map<String, Object> data = service.getI18nData("zh-CN"); // direct default — no recursion
         assertThat(data).isNotEmpty();
+        assertThat(data).containsEntry("common.json_editor.valid", "有效");
+        assertThat(data).containsEntry("common.json_editor.format", "格式化");
+    }
+
+    @Test
+    void getI18nData_enLocaleIncludesJsonEditorFallbacksWhenDbEmpty() {
+        when(i18nResourceService.getResourceMapByLang(anyString())).thenReturn(Map.of());
+        Map<String, Object> data = service.getI18nData("en-US");
+
+        assertThat(data).containsEntry("common.json_editor.valid", "Valid");
+        assertThat(data).containsEntry("common.json_editor.format", "Format");
     }
 }

@@ -19,6 +19,8 @@ import * as path from 'node:path';
 
 const REPO_ROOT = path.resolve(__dirname, '../../../../../../../..');
 const ZH_CN_YAML = path.resolve(REPO_ROOT, 'platform/src/main/resources/i18n.zh-CN.yaml');
+const EN_US_YAML = path.resolve(REPO_ROOT, 'platform/src/main/resources/i18n.en-US.yaml');
+const SEED_JSON = path.resolve(REPO_ROOT, 'platform/src/main/resources/seed/i18n-base.json');
 
 const REQUIRED_COMMON_KEYS = [
   // Toolbar literals (#3)
@@ -168,31 +170,51 @@ const REQUIRED_COMMON_KEYS = [
   'cancel',
 ];
 
+const REQUIRED_JSON_EDITOR_KEYS = [
+  'common.json_editor.valid',
+  'common.json_editor.invalid',
+  'common.json_editor.invalid_short',
+  'common.json_editor.format',
+];
+
 /**
  * Extract `common:` block lines (between `^common:` and the next top-level
- * key starting at column 0 that's not a comment/blank). Returns a
- * Record<string, string> for direct child keys with scalar values.
+ * key starting at column 0 that's not a comment/blank). Returns flattened
+ * `common.*` keys for scalar values one nesting level below common.
  */
-function readCommonBlock(yamlPath: string): Record<string, string> {
+function readFlattenedCommonBlock(yamlPath: string): Record<string, string> {
   const raw = fs.readFileSync(yamlPath, 'utf-8');
   const lines = raw.split('\n');
   const result: Record<string, string> = {};
   let inCommon = false;
+  let nestedPrefix = '';
   for (const line of lines) {
     if (/^common:\s*$/.test(line)) {
       inCommon = true;
+      nestedPrefix = '';
       continue;
     }
     if (inCommon) {
       // Top-level key (column 0, alpha) ends the common block.
       if (/^[A-Za-z_][\w-]*:/.test(line) && !/^common:/.test(line)) {
         inCommon = false;
+        nestedPrefix = '';
         continue;
       }
-      // Direct child: exactly two-space indent + `key: value`.
+      const nested = line.match(/^ {2}([a-z_][\w-]*):\s*$/);
+      if (nested) {
+        nestedPrefix = nested[1];
+        continue;
+      }
       const m = line.match(/^ {2}([a-z_][\w-]*):\s*(.+?)\s*$/);
       if (m && !m[2].startsWith('#')) {
-        result[m[1]] = m[2];
+        result[`common.${m[1]}`] = m[2];
+        nestedPrefix = '';
+        continue;
+      }
+      const nestedScalar = line.match(/^ {4}([a-z_][\w-]*):\s*(.+?)\s*$/);
+      if (nestedPrefix && nestedScalar && !nestedScalar[2].startsWith('#')) {
+        result[`common.${nestedPrefix}.${nestedScalar[1]}`] = nestedScalar[2];
       }
     }
   }
@@ -205,17 +227,30 @@ describe('DSL list page i18n zh-CN yaml resource', () => {
   });
 
   it('common: top-level block is present and non-empty', () => {
-    const common = readCommonBlock(ZH_CN_YAML);
+    const common = readFlattenedCommonBlock(ZH_CN_YAML);
     expect(Object.keys(common).length).toBeGreaterThan(10);
   });
 
   it.each(REQUIRED_COMMON_KEYS)('zh-CN yaml defines common.%s with Chinese characters', (key) => {
-    const common = readCommonBlock(ZH_CN_YAML);
-    const value = common[key];
+    const common = readFlattenedCommonBlock(ZH_CN_YAML);
+    const value = common[`common.${key}`];
     expect(value, `common.${key} must be defined to avoid leaking English literal`).toBeDefined();
     expect((value as string).length, `common.${key} value must be non-empty`).toBeGreaterThan(0);
     expect(/[一-龥]/.test(value), `common.${key}="${value}" must contain Chinese characters`).toBe(
       true,
     );
+  });
+
+  it.each(REQUIRED_JSON_EDITOR_KEYS)('%s exists in zh-CN and en-US yaml fallbacks', (key) => {
+    expect(readFlattenedCommonBlock(ZH_CN_YAML)[key]).toBeDefined();
+    expect(readFlattenedCommonBlock(EN_US_YAML)[key]).toBeDefined();
+  });
+
+  it.each(REQUIRED_JSON_EDITOR_KEYS)('%s exists in seed/i18n-base.json', (key) => {
+    const entries = JSON.parse(fs.readFileSync(SEED_JSON, 'utf-8')) as Array<Record<string, string>>;
+    const entry = entries.find((item) => item.key === key);
+    expect(entry, `${key} must be seeded for DB-backed /api/i18n`).toBeDefined();
+    expect(entry?.['zh-CN']).toBeTruthy();
+    expect(entry?.['en-US']).toBeTruthy();
   });
 });
