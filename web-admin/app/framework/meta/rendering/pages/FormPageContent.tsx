@@ -61,8 +61,8 @@ const DATA_TYPE_TO_COMPONENT: Record<string, string> = {
   datetime: 'SmartDatePicker',
   boolean: 'SmartSwitch',
   reference: 'SmartSelect',
-  json: 'SmartTextarea',
-  jsonb: 'SmartTextarea',
+  json: 'SmartJsonEditor',
+  jsonb: 'SmartJsonEditor',
   file: 'SmartUpload',
   money: 'SmartMoneyInput',
 };
@@ -187,13 +187,14 @@ function normalizeDateTimeFormValue(rawValue: any): any {
   }
 
   const base =
-    `${parsed.getFullYear()}-${padDatePart(parsed.getMonth() + 1)}-${padDatePart(parsed.getDate())}`
-    + `T${padDatePart(parsed.getHours())}:${padDatePart(parsed.getMinutes())}`;
+    `${parsed.getFullYear()}-${padDatePart(parsed.getMonth() + 1)}-${padDatePart(parsed.getDate())}` +
+    `T${padDatePart(parsed.getHours())}:${padDatePart(parsed.getMinutes())}`;
   if (parsed.getSeconds() === 0 && parsed.getMilliseconds() === 0) {
     return base;
   }
   const seconds = `:${padDatePart(parsed.getSeconds())}`;
-  const milliseconds = parsed.getMilliseconds() > 0 ? `.${padDatePart(parsed.getMilliseconds(), 3)}` : '';
+  const milliseconds =
+    parsed.getMilliseconds() > 0 ? `.${padDatePart(parsed.getMilliseconds(), 3)}` : '';
   return `${base}${seconds}${milliseconds}`;
 }
 
@@ -366,6 +367,34 @@ function tryParseJsonText(text: string): unknown {
   } catch {
     return text;
   }
+}
+
+export function getJsonFormValueError(
+  rawValue: any,
+  dataType?: string,
+  label = 'JSON',
+): string | null {
+  if (!isJsonLikeDataType(dataType)) return null;
+  const value = unwrapJsonLikeValue(rawValue);
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const looksLikeObjectOrArray =
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'));
+  if (!looksLikeObjectOrArray) {
+    return `${label} must be a valid JSON object or array`;
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!parsed || typeof parsed !== 'object') {
+      return `${label} must be a valid JSON object or array`;
+    }
+  } catch {
+    return `${label} must be valid JSON`;
+  }
+  return null;
 }
 
 function isJsonEnvelope(value: unknown): value is { type?: unknown; value: unknown } {
@@ -1375,13 +1404,23 @@ export function FormPageContent(props: PageContentProps) {
       for (const rawField of fields) {
         const meta = modelFields[rawField.field];
         const rules = mergeFieldValidationRules(rawField, meta, t, locale);
-        const label = rawField.label || meta?.displayName || rawField.field;
+        const label =
+          getLocalizedText(rawField.label, locale, t) || meta?.displayName || rawField.field;
 
         if (rawField.visibleWhen && !evaluateCondition(rawField.visibleWhen, pageContext)) {
           continue;
         }
 
         const value = submissionData[rawField.field];
+        const jsonValueError = getJsonFormValueError(
+          value,
+          rawField.dataType || meta?.dataType,
+          label,
+        );
+        if (jsonValueError) {
+          nextFieldErrors[rawField.field] = jsonValueError;
+          continue;
+        }
         for (const rule of rules) {
           if (!rule?.type) continue;
           if (rule.type === 'required') {
@@ -2286,7 +2325,9 @@ export function FormPageContent(props: PageContentProps) {
                           return null;
                         }
                       }
-                      const blockTitle = block.title ? getLocalizedText(block.title, locale, t) : '';
+                      const blockTitle = block.title
+                        ? getLocalizedText(block.title, locale, t)
+                        : '';
                       const blockDescription = block.description
                         ? getLocalizedText(block.description, locale, t)
                         : '';

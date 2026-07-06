@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildFormCommandPayload,
+  getJsonFormValueError,
   getFormFieldValueWithAlias,
   mergeLoadedRecordWithDirtyFields,
   normalizeCommandPayloadValue,
@@ -223,8 +224,8 @@ describe('datetime form values', () => {
     const parsed = new Date(source);
     const pad = (value: number, size = 2) => String(value).padStart(size, '0');
     const expected =
-      `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}`
-      + `T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}:${pad(parsed.getSeconds())}`;
+      `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}` +
+      `T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}:${pad(parsed.getSeconds())}`;
 
     expect(normalizeLoadedFormValue(source, 'datetime')).toBe(expected);
   });
@@ -332,6 +333,17 @@ describe('JSON-like form values', () => {
 
     expect(JSON.parse(payload)).toEqual({ 'X-Codex-QA': 'true' });
     expect(payload).not.toContain('"type":"jsonb"');
+  });
+
+  it('blocks json/jsonb form values that are not valid objects or arrays', () => {
+    expect(getJsonFormValueError('{"yellow":50}', 'json', 'Alarm Thresholds')).toBeNull();
+    expect(getJsonFormValueError('[{"code":"temp"}]', 'jsonb', 'TSL Schema')).toBeNull();
+    expect(getJsonFormValueError('"scalar"', 'json', 'TSL Schema')).toBe(
+      'TSL Schema must be a valid JSON object or array',
+    );
+    expect(getJsonFormValueError('{"yellow":', 'json', 'Alarm Thresholds')).toBe(
+      'Alarm Thresholds must be a valid JSON object or array',
+    );
   });
 
   it('normalizes loaded records with json and jsonb field metadata', () => {

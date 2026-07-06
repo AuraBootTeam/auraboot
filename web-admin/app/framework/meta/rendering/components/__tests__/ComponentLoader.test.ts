@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { isCoreComponentRegisteredForTest, sanitizeRuntimeComponentProps } from '../ComponentLoader';
+import {
+  isCoreComponentRegisteredForTest,
+  sanitizeRuntimeComponentProps,
+} from '../ComponentLoader';
 
 describe('sanitizeRuntimeComponentProps', () => {
   it('removes model/design metadata before invoking runtime field components', () => {
@@ -22,5 +25,11 @@ describe('ComponentLoader core component resolution', () => {
   it('resolves TimezoneSelect without requiring an async runtime component bundle', () => {
     expect(isCoreComponentRegisteredForTest('TimezoneSelect')).toBe(true);
     expect(isCoreComponentRegisteredForTest('timezone_select')).toBe(true);
+  });
+
+  it('resolves typed JSON editor aliases without requiring an async runtime component bundle', () => {
+    expect(isCoreComponentRegisteredForTest('SmartJsonEditor')).toBe(true);
+    expect(isCoreComponentRegisteredForTest('json-editor')).toBe(true);
+    expect(isCoreComponentRegisteredForTest('json_editor')).toBe(true);
   });
 });
