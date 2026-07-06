@@ -2355,6 +2355,57 @@ describe('EvidencePanelBlockRenderer', () => {
     );
   });
 
+  it('renders semantic JSON evidence items when sections define item paths', () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: {},
+        global: {},
+        state: {
+          rollout: {
+            progress:
+              '{"total":5,"success":2,"failed":1,"percent":68,"failedDevices":[{"deviceCode":"RF-01-TC-CTRL","reason":"温控自检失败"}],"nextAction":"暂停推送并回滚失败设备"}',
+          },
+        },
+      }),
+    });
+    const block: BlockConfig = {
+      id: 'evidence',
+      blockType: 'evidence-panel',
+      context: '${state.rollout}',
+      title: 'Evidence',
+      sections: [
+        {
+          key: 'rollout',
+          label: '推送进度',
+          field: 'progress',
+          format: 'json',
+          items: [
+            { key: 'total', label: '目标设备', path: 'total' },
+            { key: 'failed', label: '失败设备', path: 'failed', tone: 'danger' },
+            { key: 'percent', label: '完成率', path: 'percent', format: 'percent' },
+            { key: 'reason', label: '失败原因', path: 'failedDevices.0.reason' },
+            { key: 'next_action', label: '下一步', path: 'nextAction' },
+          ],
+        },
+      ],
+    };
+
+    render(<EvidencePanelBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('evidence-panel-item-total')).toHaveTextContent('目标设备');
+    expect(screen.getByTestId('evidence-panel-item-total')).toHaveTextContent('5');
+    expect(screen.getByTestId('evidence-panel-item-failed')).toHaveTextContent('失败设备');
+    expect(screen.getByTestId('evidence-panel-item-reason')).toHaveTextContent('温控自检失败');
+    expect(screen.getByTestId('evidence-panel-item-next_action')).toHaveTextContent(
+      '暂停推送并回滚失败设备',
+    );
+    expect(screen.getByTestId('evidence-panel-section-rollout')).not.toHaveTextContent(
+      '"failedDevices"',
+    );
+  });
+
   it('unwraps dynamic jsonb envelopes before rendering JSON evidence', () => {
     const runtime = makeRuntime({
       getContext: () => ({
