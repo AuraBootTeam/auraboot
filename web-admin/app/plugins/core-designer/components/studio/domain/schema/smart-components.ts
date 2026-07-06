@@ -110,6 +110,14 @@ export interface TextareaProps extends FormFieldProps {
   showCount?: boolean;
 }
 
+// SmartJsonEditor properties
+export interface JsonEditorProps extends TextareaProps {
+  readOnly?: boolean;
+  formatOnBlur?: boolean;
+  mode?: 'json' | 'schema';
+  invalidMessage?: string | LocalizedText;
+}
+
 // SmartSelect 属性
 export interface SelectProps extends FormFieldProps {
   options?: OptionItem[];
