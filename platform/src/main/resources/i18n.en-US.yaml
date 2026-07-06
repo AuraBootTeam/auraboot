@@ -875,6 +875,11 @@ common:
   saved_view_preset_reset_failed: Failed to reset preset view
   options_load_failed: Failed to load options
   retry: Retry
+  json_editor:
+    valid: Valid
+    invalid: JSON must be an object or array
+    invalid_short: Invalid
+    format: Format
 admin:
   org:
     title: Organization Management
