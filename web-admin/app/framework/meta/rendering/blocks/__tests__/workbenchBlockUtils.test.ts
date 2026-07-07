@@ -96,16 +96,19 @@ describe('workbenchBlockUtils action runner', () => {
       },
     });
 
-    expect(fetchResultMock).toHaveBeenCalledWith('/api/meta/commands/execute/bom:confirm_candidate', {
-      method: 'post',
-      params: {
-        targetRecordPid: 'LINE-1',
-        operationType: 'UPDATE',
-        payload: {
-          materialCode: 'MAT-001',
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/bom:confirm_candidate',
+      {
+        method: 'post',
+        params: {
+          targetRecordPid: 'LINE-1',
+          operationType: 'UPDATE',
+          payload: {
+            materialCode: 'MAT-001',
+          },
         },
       },
-    });
+    );
     expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
   });
 
@@ -142,7 +145,7 @@ describe('workbenchBlockUtils action runner', () => {
     );
   });
 
-  it('polls async command tasks and reloads dependencies while the task is running', async () => {
+  it('polls async command tasks and throttles dependency reloads while the task is running', async () => {
     const runtime = makeRuntime() as any;
     fetchResultMock
       .mockResolvedValueOnce({
@@ -158,6 +161,10 @@ describe('workbenchBlockUtils action runner', () => {
       })
       .mockResolvedValueOnce({
         code: '0',
+        data: { status: 'running', progress: 70, progressMessage: 'Processed 5/7 quote lines' },
+      })
+      .mockResolvedValueOnce({
+        code: '0',
         data: { status: 'completed', resultData: { processedCount: 7, sourcedCount: 5 } },
       });
 
@@ -169,13 +176,14 @@ describe('workbenchBlockUtils action runner', () => {
         operationType: 'update',
         reload: ['bomPriceMetrics', 'bomPriceWaterfall', 'evidence', 'lines'],
         asyncPollIntervalMs: 0,
+        asyncReloadIntervalMs: 3000,
       },
     });
 
     const urls = fetchResultMock.mock.calls.map((call) => String(call[0]));
     expect(urls).toContain('/api/meta/commands/execute/qo_quote_common:batch_source_prices');
     expect(urls).toContain('/api/async-tasks/TASK-PRICE-1');
-    expect(runtime.__reload).toHaveBeenCalledTimes(3);
+    expect(runtime.__reload).toHaveBeenCalledTimes(2);
     expect(runtime.__reload).toHaveBeenLastCalledWith([
       'bomPriceMetrics',
       'bomPriceWaterfall',
@@ -234,7 +242,10 @@ describe('workbenchBlockUtils action runner', () => {
     vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
     window.localStorage.setItem('jwtToken', 'token-1');
     createElement.mockImplementation((tagName: string) => {
-      const element = document.createElementNS('http://www.w3.org/1999/xhtml', tagName) as HTMLAnchorElement;
+      const element = document.createElementNS(
+        'http://www.w3.org/1999/xhtml',
+        tagName,
+      ) as HTMLAnchorElement;
       if (tagName === 'a') {
         element.click = click;
       }
@@ -253,13 +264,16 @@ describe('workbenchBlockUtils action runner', () => {
       },
     });
 
-    expect(fetchResultMock).toHaveBeenCalledWith('/api/meta/commands/execute/bom:regenerate_export', {
-      method: 'post',
-      params: {
-        targetRecordPid: 'TASK-1',
-        payload: {},
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/bom:regenerate_export',
+      {
+        method: 'post',
+        params: {
+          targetRecordPid: 'TASK-1',
+          payload: {},
+        },
       },
-    });
+    );
     expect(fetchMock).toHaveBeenCalledWith('/api/file/download/export-file-1', {
       method: 'GET',
       headers: {

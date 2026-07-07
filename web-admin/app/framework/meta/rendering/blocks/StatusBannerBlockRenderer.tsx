@@ -175,13 +175,31 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
 
   useEffect(() => {
     if (!shouldPoll || !manager?.reload) return undefined;
-    const intervalId = window.setInterval(
-      () => {
-        void manager.reload(reloadDataSources);
-      },
-      Math.max(1000, pollIntervalMs),
-    );
-    return () => window.clearInterval(intervalId);
+    let cancelled = false;
+    let timeoutId: number | undefined;
+    const intervalMs = Math.max(1000, pollIntervalMs);
+
+    const scheduleNextPoll = () => {
+      if (cancelled) return;
+      timeoutId = window.setTimeout(runPoll, intervalMs);
+    };
+
+    const runPoll = async () => {
+      if (cancelled) return;
+      try {
+        await manager.reload(reloadDataSources);
+      } finally {
+        scheduleNextPoll();
+      }
+    };
+
+    scheduleNextPoll();
+    return () => {
+      cancelled = true;
+      if (timeoutId !== undefined) {
+        window.clearTimeout(timeoutId);
+      }
+    };
   }, [manager, pollIntervalMs, reloadDataSources.join('|'), shouldPoll]);
 
   useEffect(() => {

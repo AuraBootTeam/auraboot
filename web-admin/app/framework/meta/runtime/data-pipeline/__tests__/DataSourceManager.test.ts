@@ -225,6 +225,88 @@ describe('DataSourceManager', () => {
     );
   });
 
+  it('coalesces concurrent requests for the same evaluated data source', async () => {
+    let resolveFetch: ((value: any) => void) | undefined;
+    const pendingFetch = new Promise<any>((resolve) => {
+      resolveFetch = resolve;
+    });
+    mockedFetchResult.mockReturnValueOnce(pendingFetch);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { pid: 'quote-1' },
+      } as any),
+    );
+    manager.register('bomPriceMetrics', {
+      type: 'namedQuery',
+      queryCode: 'qo_quote_bom_price_metrics',
+      format: 'records',
+      adaptor: 'table',
+      autoFetch: false,
+      params: {
+        quoteId: '${form.pid}',
+      },
+    });
+
+    const first = manager.fetch('bomPriceMetrics');
+    const second = manager.fetch('bomPriceMetrics');
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+
+    resolveFetch?.({
+      code: '0',
+      data: { records: [{ total_lines: 7 }], total: 1 },
+    });
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { records: [{ total_lines: 7 }], total: 1, current: 1, pageSize: 10 },
+      { records: [{ total_lines: 7 }], total: 1, current: 1, pageSize: 10 },
+    ]);
+  });
+
+  it('keeps cached namedQuery data during rate-limit backoff', async () => {
+    mockedFetchResult
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { records: [{ total_lines: 7 }], total: 1 },
+      } as any)
+      .mockResolvedValueOnce({
+        code: '500',
+        desc: 'Rate limit exceeded for query: qo_quote_bom_price_metrics (max 60 per minute)',
+        data: null,
+      } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { pid: 'quote-1' },
+      } as any),
+    );
+    manager.register('bomPriceMetrics', {
+      type: 'namedQuery',
+      queryCode: 'qo_quote_bom_price_metrics',
+      format: 'records',
+      adaptor: 'table',
+      autoFetch: false,
+      rateLimitBackoffMs: 30_000,
+      params: {
+        quoteId: '${form.pid}',
+      },
+    } as any);
+
+    await manager.fetch('bomPriceMetrics');
+    const rateLimited = await manager.fetch('bomPriceMetrics');
+    const skipped = await manager.fetch('bomPriceMetrics');
+
+    expect(rateLimited).toEqual({
+      records: [{ total_lines: 7 }],
+      total: 1,
+      current: 1,
+      pageSize: 10,
+    });
+    expect(skipped).toEqual(rateLimited);
+    expect(manager.getState('bomPriceMetrics')?.error).toBeNull();
+    expect(mockedFetchResult).toHaveBeenCalledTimes(2);
+  });
+
   it('omits format for namedQuery sources by default (option/dropdown format)', async () => {
     mockedFetchResult.mockResolvedValueOnce({ code: '0', data: [] } as any);
 

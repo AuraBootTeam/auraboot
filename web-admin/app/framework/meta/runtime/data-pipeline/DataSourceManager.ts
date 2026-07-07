@@ -120,7 +120,8 @@ function unwrapApiResult(result: any): any {
 
   if (result && typeof result === 'object') {
     const rawKeys = Object.keys(result).filter((key) => !RESULT_ENVELOPE_KEYS.has(key));
-    const hasNoEnvelopeCode = result.code === undefined || result.code === null || result.code === '';
+    const hasNoEnvelopeCode =
+      result.code === undefined || result.code === null || result.code === '';
     if (hasNoEnvelopeCode && result.data == null && rawKeys.length > 0) {
       return rawKeys.reduce<Record<string, any>>((raw, key) => {
         raw[key] = result[key];
@@ -130,6 +131,29 @@ function unwrapApiResult(result: any): any {
   }
 
   throw new Error(result?.desc || result?.message || 'API request failed');
+}
+
+type DataSourceFetchPolicy = DataSourceConfig & {
+  minFetchIntervalMs?: number;
+  rateLimitBackoffMs?: number;
+};
+
+function readNonNegativeNumber(value: unknown, fallback: number): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric >= 0 ? numeric : fallback;
+}
+
+function stableStringify(value: unknown): string {
+  if (value === undefined) return 'undefined';
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+    .join(',')}}`;
 }
 
 /**
@@ -146,6 +170,9 @@ export class DataSourceManager {
   private dependencySubscriptions = new Map<string, () => void>();
   /** Request version counter per data source for dedup — stale responses are discarded */
   private fetchVersions = new Map<string, number>();
+  private inFlightFetches = new Map<string, Promise<any>>();
+  private lastFetchStartedAt = new Map<string, number>();
+  private rateLimitBackoffUntil = new Map<string, number>();
   /** DataSource ID → modelCode mapping for real-time data sync */
   private dataSourceModelCodes = new Map<string, string>();
 
@@ -413,6 +440,90 @@ export class DataSourceManager {
     this.notifySubscribers(id, newState);
   }
 
+  private keepExistingData(id: string): any {
+    const state = this.dataSourceStates.get(id);
+    if (!state) return null;
+
+    const newState = {
+      ...state,
+      loading: false,
+      error: null,
+    };
+
+    this.dataSourceStates.set(id, newState);
+    this.notifySubscribers(id, newState);
+    return state.data ?? null;
+  }
+
+  private buildFetchKey(
+    id: string,
+    config: DataSourceConfig,
+    extraParams?: Record<string, any>,
+  ): string {
+    const configuredParams = this.evaluateConfiguredParams(config.params);
+    const mergedParams = {
+      ...(configuredParams && typeof configuredParams === 'object' ? configuredParams : {}),
+      ...(extraParams || {}),
+    };
+    const endpoint =
+      config.endpoint && typeof config.endpoint === 'string'
+        ? expressionEvaluator.evaluateTemplate(config.endpoint, this.getContext())
+        : undefined;
+
+    return `${id}::${stableStringify({
+      type: config.type,
+      endpoint,
+      queryCode: config.queryCode,
+      format: config.format,
+      method: config.method,
+      params: mergedParams,
+    })}`;
+  }
+
+  private shouldSkipForRateLimitBackoff(id: string): boolean {
+    const backoffUntil = this.rateLimitBackoffUntil.get(id) ?? 0;
+    return backoffUntil > Date.now();
+  }
+
+  private shouldSkipForMinInterval(
+    fetchKey: string,
+    config: DataSourceConfig,
+    id: string,
+  ): boolean {
+    const policy = config as DataSourceFetchPolicy;
+    const minFetchIntervalMs = readNonNegativeNumber(policy.minFetchIntervalMs, 0);
+    if (minFetchIntervalMs <= 0) return false;
+    const state = this.dataSourceStates.get(id);
+    if (state?.data === undefined || state.data === null) return false;
+    const lastStartedAt = this.lastFetchStartedAt.get(fetchKey) ?? 0;
+    return Date.now() - lastStartedAt < minFetchIntervalMs;
+  }
+
+  private isRateLimitError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error || '');
+    return /rate limit exceeded|too many requests|限流|请求过于频繁/i.test(message);
+  }
+
+  private applyRateLimitBackoff(id: string, config: DataSourceConfig): void {
+    const policy = config as DataSourceFetchPolicy;
+    const backoffMs = readNonNegativeNumber(policy.rateLimitBackoffMs, 30_000);
+    if (backoffMs > 0) {
+      this.rateLimitBackoffUntil.set(id, Date.now() + backoffMs);
+    }
+  }
+
+  private cleanupFetchBookkeeping(id: string): void {
+    const prefix = `${id}::`;
+    this.fetchVersions.delete(id);
+    this.rateLimitBackoffUntil.delete(id);
+    for (const key of this.inFlightFetches.keys()) {
+      if (key.startsWith(prefix)) this.inFlightFetches.delete(key);
+    }
+    for (const key of this.lastFetchStartedAt.keys()) {
+      if (key.startsWith(prefix)) this.lastFetchStartedAt.delete(key);
+    }
+  }
+
   /**
    * 获取数据 (with request dedup — stale responses are discarded)
    */
@@ -427,45 +538,84 @@ export class DataSourceManager {
       return null;
     }
 
-    // Increment request version for dedup — stale responses will be discarded
+    const fetchKey = this.buildFetchKey(id, config, extraParams);
+    const inFlightFetch = this.inFlightFetches.get(fetchKey);
+    if (inFlightFetch) {
+      return inFlightFetch;
+    }
+
+    if (this.shouldSkipForRateLimitBackoff(id)) {
+      const cachedData = this.dataSourceStates.get(id)?.data;
+      if (cachedData !== undefined && cachedData !== null) {
+        return this.keepExistingData(id);
+      }
+      return cachedData ?? null;
+    }
+
+    if (this.shouldSkipForMinInterval(fetchKey, config, id)) {
+      return this.keepExistingData(id);
+    }
+
+    // Increment request version only for a real request; coalesced callers share this promise.
     const version = (this.fetchVersions.get(id) ?? 0) + 1;
     this.fetchVersions.set(id, version);
+    this.lastFetchStartedAt.set(fetchKey, Date.now());
 
-    this.setLoading(id, true);
+    const request = (async () => {
+      this.setLoading(id, true);
 
-    try {
-      let data: any;
+      try {
+        let data: any;
 
-      switch (config.type) {
-        case 'api':
-          data = await this.fetchApiDataSource(config, extraParams);
-          break;
-        case 'namedQuery':
-          data = await this.fetchNamedQueryDataSource(config, extraParams);
-          break;
-        case 'static':
-          data = config.data || [];
-          break;
-        default:
-          throw new Error(`Unsupported data source type: ${config.type}`);
-      }
+        switch (config.type) {
+          case 'api':
+            data = await this.fetchApiDataSource(config, extraParams);
+            break;
+          case 'namedQuery':
+            data = await this.fetchNamedQueryDataSource(config, extraParams);
+            break;
+          case 'static':
+            data = config.data || [];
+            break;
+          default:
+            throw new Error(`Unsupported data source type: ${config.type}`);
+        }
 
-      // Discard stale response if a newer request was issued
-      if (this.fetchVersions.get(id) !== version) {
+        // Discard stale response if a newer request was issued
+        if (this.fetchVersions.get(id) !== version) {
+          return null;
+        }
+
+        this.setData(id, data);
+        return data;
+      } catch (error) {
+        // Discard stale error if a newer request was issued
+        if (this.fetchVersions.get(id) !== version) {
+          return null;
+        }
+
+        if (this.isRateLimitError(error)) {
+          this.applyRateLimitBackoff(id, config);
+          const cachedData = this.dataSourceStates.get(id)?.data;
+          if (cachedData !== undefined && cachedData !== null) {
+            return this.keepExistingData(id);
+          }
+          console.warn(`[DataSourceManager] Rate limited while fetching data source ${id}:`, error);
+        } else {
+          console.error(`[DataSourceManager] Failed to fetch data source ${id}:`, error);
+        }
+        this.setError(id, error as Error);
         return null;
       }
+    })();
 
-      this.setData(id, data);
-      return data;
-    } catch (error) {
-      // Discard stale error if a newer request was issued
-      if (this.fetchVersions.get(id) !== version) {
-        return null;
+    this.inFlightFetches.set(fetchKey, request);
+    request.finally(() => {
+      if (this.inFlightFetches.get(fetchKey) === request) {
+        this.inFlightFetches.delete(fetchKey);
       }
-      console.error(`[DataSourceManager] Failed to fetch data source ${id}:`, error);
-      this.setError(id, error as Error);
-      return null;
-    }
+    });
+    return request;
   }
 
   /**
@@ -533,7 +683,7 @@ export class DataSourceManager {
     });
 
     if (!ResultHelper.isSuccess(result)) {
-      throw new Error(result.desc || 'NamedQuery data source request failed');
+      throw new Error(result.desc || result.message || 'NamedQuery data source request failed');
     }
 
     return this.adaptData(result.data, config);
@@ -641,7 +791,7 @@ export class DataSourceManager {
    * 重新加载数据源
    */
   async reload(id: string | string[]): Promise<void> {
-    const ids = Array.isArray(id) ? id : [id];
+    const ids = Array.from(new Set(Array.isArray(id) ? id : [id]));
 
     await Promise.all(ids.map((dsId) => this.fetch(dsId)));
   }
@@ -677,9 +827,9 @@ export class DataSourceManager {
         return;
       }
 
-      const dependsOnDataSource = config.dependOn.some((dependency) => dataPaths.some(
-        (path) => dependency === path || dependency.startsWith(`${path}.`),
-      ));
+      const dependsOnDataSource = config.dependOn.some((dependency) =>
+        dataPaths.some((path) => dependency === path || dependency.startsWith(`${path}.`)),
+      );
       if (dependsOnDataSource) {
         ids.push(id);
       }
@@ -766,7 +916,7 @@ export class DataSourceManager {
     this.dataSources.delete(id);
     this.dataSourceStates.delete(id);
     this.subscriptions.delete(id);
-    this.fetchVersions.delete(id);
+    this.cleanupFetchBookkeeping(id);
     this.dataSourceModelCodes.delete(id);
     this.cleanupDependency(id);
   }
@@ -798,6 +948,9 @@ export class DataSourceManager {
     this.dataSourceStates.clear();
     this.subscriptions.clear();
     this.fetchVersions.clear();
+    this.inFlightFetches.clear();
+    this.lastFetchStartedAt.clear();
+    this.rateLimitBackoffUntil.clear();
     this.dependencySubscriptions.forEach((unsubscribe) => unsubscribe());
     this.dependencySubscriptions.clear();
     this.dataSourceModelCodes.clear();
