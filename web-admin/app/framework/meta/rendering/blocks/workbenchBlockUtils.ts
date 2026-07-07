@@ -13,7 +13,10 @@ export function readDataSourceRows(runtime: SchemaRuntime, dataSource?: string):
   return data ? [data] : [];
 }
 
-export function readDataSourceRecord(runtime: SchemaRuntime, dataSource?: string): Record<string, any> {
+export function readDataSourceRecord(
+  runtime: SchemaRuntime,
+  dataSource?: string,
+): Record<string, any> {
   const rows = readDataSourceRows(runtime, dataSource);
   return rows[0] ?? {};
 }
@@ -155,7 +158,7 @@ function resolveFeedbackMessage(
   fallback?: string,
   preferFallback = false,
 ): string | undefined {
-  const raw = preferFallback ? fallback ?? feedback?.[key] : feedback?.[key] ?? fallback;
+  const raw = preferFallback ? (fallback ?? feedback?.[key]) : (feedback?.[key] ?? fallback);
   if (raw === false || raw === undefined || raw === null) return undefined;
   const context = runtime.getContext?.() || {};
   const locale = context.locale || 'zh-CN';
@@ -203,6 +206,11 @@ function resolvePollIntervalMs(args: any): number {
   return Number.isFinite(value) && value >= 0 ? value : 1500;
 }
 
+function resolveAsyncReloadIntervalMs(args: any): number {
+  const value = Number(args?.asyncReloadIntervalMs ?? args?.reloadIntervalMs ?? 3000);
+  return Number.isFinite(value) && value >= 0 ? value : 3000;
+}
+
 function resolvePollAttempts(args: any): number {
   const value = Number(args?.asyncMaxPollAttempts ?? args?.maxPollAttempts ?? 600);
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : 600;
@@ -221,21 +229,38 @@ async function pollWorkbenchAsyncTask(
 ): Promise<any> {
   const terminalStatuses = new Set(['completed', 'failed', 'cancelled']);
   const intervalMs = resolvePollIntervalMs(args);
+  const reloadIntervalMs = resolveAsyncReloadIntervalMs(args);
   const maxAttempts = resolvePollAttempts(args);
+  let lastReloadAt = 0;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const result = await fetchResult<AsyncTaskStatus>(`/api/async-tasks/${encodeURIComponent(taskCode)}`, {
-      method: 'get',
-    });
+    const result = await fetchResult<AsyncTaskStatus>(
+      `/api/async-tasks/${encodeURIComponent(taskCode)}`,
+      {
+        method: 'get',
+      },
+    );
     if (!isSuccessResult(result)) {
-      throw new Error((result as any).message || (result as any).desc || 'Async task status unavailable');
+      throw new Error(
+        (result as any).message || (result as any).desc || 'Async task status unavailable',
+      );
     }
 
     const task: AsyncTaskStatus = result?.data ?? {};
-    await reloadDataSources(runtime, reloadIds);
-
     const status = String(task.status || '').toLowerCase();
-    if (terminalStatuses.has(status)) {
+    const isTerminal = terminalStatuses.has(status);
+    const now = Date.now();
+    const shouldReload =
+      lastReloadAt === 0 ||
+      isTerminal ||
+      reloadIntervalMs <= 0 ||
+      now - lastReloadAt >= reloadIntervalMs;
+    if (shouldReload) {
+      await reloadDataSources(runtime, reloadIds);
+      lastReloadAt = Date.now();
+    }
+
+    if (isTerminal) {
       if (status === 'completed') return task.resultData ?? {};
       if (status === 'cancelled') throw new Error('Task cancelled');
       throw new Error(task.errorMessage || task.message || 'Async task failed');
@@ -261,21 +286,16 @@ function resolveDownloadUrl(commandResult: any, downloadConfig: any): string | u
   if (!downloadConfig) return undefined;
   const data = unwrapCommandData(commandResult);
   const config = downloadConfig === true ? {} : downloadConfig;
-  const url = readFirstPath(data, [
-    config.urlField,
-    config.downloadUrlField,
-    'downloadUrl',
-    'url',
-  ].filter(Boolean));
+  const url = readFirstPath(
+    data,
+    [config.urlField, config.downloadUrlField, 'downloadUrl', 'url'].filter(Boolean),
+  );
   if (url) return String(url);
 
-  const fileId = readFirstPath(data, [
-    config.fileIdField,
-    'fileId',
-    'exportFileId',
-    'id',
-    'pid',
-  ].filter(Boolean));
+  const fileId = readFirstPath(
+    data,
+    [config.fileIdField, 'fileId', 'exportFileId', 'id', 'pid'].filter(Boolean),
+  );
   if (!fileId) return undefined;
   return `/api/file/download/${encodeURIComponent(String(fileId))}`;
 }
@@ -327,7 +347,8 @@ async function downloadWithAuth(url: string): Promise<void> {
   const objectUrl = window.URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = objectUrl;
-  anchor.download = filenameFromContentDisposition(response.headers.get('Content-Disposition')) || 'download';
+  anchor.download =
+    filenameFromContentDisposition(response.headers.get('Content-Disposition')) || 'download';
   anchor.style.display = 'none';
   document.body.appendChild(anchor);
   anchor.click();
@@ -405,11 +426,14 @@ export async function executeSimpleWorkbenchAction(
 
       const reloadIds = resolveReloadIds(args.reload);
       const dispatch = unwrapCommandData(result);
+      const asyncDispatched = isAsyncDispatch(dispatch);
       if (isAsyncDispatch(dispatch)) {
         result = await pollWorkbenchAsyncTask(runtime, dispatch.taskCode, reloadIds, args);
       }
 
-      await reloadDataSources(runtime, reloadIds);
+      if (!asyncDispatched) {
+        await reloadDataSources(runtime, reloadIds);
+      }
       const resultData = unwrapCommandData(result);
       if (isBusinessRejected(resultData)) {
         showCommandFeedback(
@@ -429,7 +453,10 @@ export async function executeSimpleWorkbenchAction(
         try {
           await downloadWithAuth(downloadUrl);
         } catch (error) {
-          console.error('[workbench] authenticated download failed, falling back to direct navigation:', error);
+          console.error(
+            '[workbench] authenticated download failed, falling back to direct navigation:',
+            error,
+          );
           openDownloadUrl(downloadUrl);
         }
       }

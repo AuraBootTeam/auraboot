@@ -882,6 +882,73 @@ describe('StatusBannerBlockRenderer', () => {
     vi.useRealTimers();
   });
 
+  it('waits for a status poll reload to finish before scheduling the next one', async () => {
+    vi.useFakeTimers();
+    let pending = true;
+    let resolveReload: (() => void) | undefined;
+    const reload = vi.fn(() => {
+      if (!pending) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        resolveReload = () => {
+          pending = false;
+          resolve();
+        };
+      });
+    });
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => ({ bom_task_status: 'parsing' }),
+        getState: () => ({
+          data: { bom_task_status: 'parsing' },
+          loading: false,
+          error: null,
+        }),
+        has: () => true,
+        register: vi.fn(),
+        reload,
+        subscribe: vi.fn(() => () => undefined),
+      }),
+    }) as any;
+    const block: BlockConfig = {
+      id: 'task_status',
+      blockType: 'status-banner',
+      dataSource: 'summary',
+      statusField: 'bom_task_status',
+      titleMap: { parsing: 'Parsing BOM' },
+      poll: {
+        enabledWhenStatuses: ['parsing'],
+        intervalMs: 3000,
+        reload: ['summary', 'lines'],
+      },
+    };
+
+    try {
+      render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(reload).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        vi.advanceTimersByTime(9000);
+      });
+      expect(reload).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveReload?.();
+        await Promise.resolve();
+      });
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+
+      expect(reload).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps long summary values inside their grid cells', () => {
     const longCustomerName = 'Golden SmartHub_MAIN_REV1.3_Design_MFG';
     const runtime = makeRuntime({
