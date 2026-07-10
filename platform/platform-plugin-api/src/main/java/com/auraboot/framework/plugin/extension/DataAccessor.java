@@ -1,5 +1,8 @@
 package com.auraboot.framework.plugin.extension;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +37,47 @@ public interface DataAccessor {
      * @return list of matching records
      */
     List<Map<String, Object>> query(String modelCode, Map<String, Object> filters);
+
+    /**
+     * Query records where a single field is in the provided value set.
+     *
+     * <p>The default implementation preserves binary/source compatibility for
+     * existing plugin test doubles by delegating to {@link #query} once per
+     * distinct non-null value. Runtime platform implementations should override
+     * this method and issue a single dynamic query with an {@code IN} condition.
+     *
+     * @param modelCode the model code
+     * @param fieldName field code or supported system field name
+     * @param values    candidate values; duplicates and nulls are ignored
+     * @return list of matching records
+     */
+    default List<Map<String, Object>> queryIn(String modelCode, String fieldName, Collection<?> values) {
+        if (fieldName == null || fieldName.isBlank()) {
+            throw new IllegalArgumentException("fieldName cannot be null or blank");
+        }
+        List<Object> queryValues = distinctNonNullValues(values);
+        if (queryValues.isEmpty()) {
+            return List.of();
+        }
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (Object value : queryValues) {
+            records.addAll(query(modelCode, Map.of(fieldName, value)));
+        }
+        return records;
+    }
+
+    private static List<Object> distinctNonNullValues(Collection<?> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        LinkedHashSet<Object> distinct = new LinkedHashSet<>();
+        for (Object value : values) {
+            if (value != null) {
+                distinct.add(value);
+            }
+        }
+        return List.copyOf(distinct);
+    }
 
     /**
      * Create a new record.

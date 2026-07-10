@@ -97,6 +97,7 @@ class CommandHandlerAsyncTaskExecutorTest {
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getErrorMessage()).contains("source_file_id is required");
+        assertThat(DynamicDataQueryScope.isActive()).isFalse();
     }
 
     @Test
@@ -131,6 +132,24 @@ class CommandHandlerAsyncTaskExecutorTest {
         captured.get().accept(42, "halfway");
         assertThat(reportedPct.get()).isEqualTo(42);
         assertThat(reportedMsg.get()).isEqualTo("halfway");
+    }
+
+    @Test
+    void runsHandlerInsideDynamicDataQueryScopeAndClosesIt() throws Exception {
+        AtomicReference<Boolean> scopeActiveDuringExecute = new AtomicReference<>(false);
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
+            scopeActiveDuringExecute.set(DynamicDataQueryScope.isActive());
+            return Map.of("success", true);
+        });
+        when(extensionRegistry.getCommandHandler(eq("bom:import_material_library")))
+                .thenReturn(Optional.of(handler));
+
+        AsyncTaskResult result = executor.execute(params("bom:import_material_library"), noop);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(scopeActiveDuringExecute.get()).isTrue();
+        assertThat(DynamicDataQueryScope.isActive()).isFalse();
     }
 
     @Test

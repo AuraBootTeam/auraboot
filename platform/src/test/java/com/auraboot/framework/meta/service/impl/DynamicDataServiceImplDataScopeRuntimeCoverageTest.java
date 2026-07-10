@@ -4,8 +4,11 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.dto.ActionExecutionResult;
+import com.auraboot.framework.meta.dto.DynamicQueryRequest;
+import com.auraboot.framework.meta.dto.DynamicBatchResponse;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.dto.QueryValidationResult;
 import com.auraboot.framework.meta.dto.RelationDefinition;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -23,6 +26,7 @@ import com.auraboot.framework.meta.service.TypeSystemManager;
 import com.auraboot.framework.meta.service.ValidationService;
 import com.auraboot.framework.meta.service.VirtualFieldEngine;
 import com.auraboot.framework.meta.service.executor.ExecutorRegistry;
+import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.permission.service.FieldPermissionService;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,11 +50,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -102,6 +109,104 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     }
 
     @Test
+    @DisplayName("list reuses scoped filters for data and count queries within one request")
+    void list_reusesScopedFiltersForDataAndCount() {
+        ModelDefinition model = physicalModel(MODEL_CODE, "mt_phase_one_model");
+        wireModel(model);
+        QueryBuilderService.QueryBuilder dataBuilder = mock(QueryBuilderService.QueryBuilder.class);
+        QueryBuilderService.QueryBuilder countBuilder = mock(QueryBuilderService.QueryBuilder.class);
+        wireListBuilder(dataBuilder, "SELECT * FROM mt_phase_one_model");
+        wireListBuilder(countBuilder, "SELECT * FROM mt_phase_one_model");
+        when(queryBuilderService.buildConditionQuery(eq(model), anyList()))
+                .thenReturn(dataBuilder, countBuilder);
+        when(queryBuilderService.buildPaginationQuery(eq(dataBuilder), any())).thenReturn(dataBuilder);
+        when(queryBuilderService.validateQuery(dataBuilder)).thenReturn(QueryValidationResult.valid());
+        when(secureSqlRewriter.rewriteForCount("SELECT * FROM mt_phase_one_model"))
+                .thenReturn("SELECT count(*) FROM mt_phase_one_model");
+        when(dynamicDataMapper.selectByQuery(eq("SELECT * FROM mt_phase_one_model"), anyMap()))
+                .thenReturn(List.of(Map.of("pid", RECORD_ID, "created_by", USER_ID)));
+        when(dynamicDataMapper.countByQuery(eq("SELECT count(*) FROM mt_phase_one_model"), anyMap()))
+                .thenReturn(1L);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+                .thenReturn("AND created_by = 20");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("AND domain_id = 7");
+        when(dataPermissionEngine.getFieldMaskRules(TENANT_ID, MODEL_CODE, USER_ID)).thenReturn(List.of());
+        when(fieldMaskService.applyMaskingForList(eq(MODEL_CODE), anyList(), eq(USER_ID)))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        when(fieldPermissionService.getFieldPermissions(MEMBER_ID, MODEL_CODE))
+                .thenReturn(FieldPermissionSet.allAllowed(java.util.Set.of("pid")));
+
+        service.list(MODEL_CODE, DynamicQueryRequest.builder()
+                .pageNum(1)
+                .pageSize(20)
+                .conditions(List.of())
+                .build());
+
+        verify(dataPermissionEngine, times(1)).buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID);
+        verify(dataDomainService, times(1)).buildDomainFilter(MODEL_CODE, USER_ID);
+        verify(dataBuilder).addRawCondition("AND created_by = 20");
+        verify(countBuilder).addRawCondition("AND created_by = 20");
+        verify(dataBuilder).addRawCondition("AND domain_id = 7");
+        verify(countBuilder).addRawCondition("AND domain_id = 7");
+    }
+
+    @Test
+    @DisplayName("list reuses permission and domain filters across one command query scope")
+    void list_reusesScopedFiltersAcrossCommandQueryScope() {
+        ModelDefinition model = physicalModel(MODEL_CODE, "mt_phase_one_model");
+        wireModel(model);
+        QueryBuilderService.QueryBuilder firstDataBuilder = mock(QueryBuilderService.QueryBuilder.class);
+        QueryBuilderService.QueryBuilder firstCountBuilder = mock(QueryBuilderService.QueryBuilder.class);
+        QueryBuilderService.QueryBuilder secondDataBuilder = mock(QueryBuilderService.QueryBuilder.class);
+        QueryBuilderService.QueryBuilder secondCountBuilder = mock(QueryBuilderService.QueryBuilder.class);
+        wireListBuilder(firstDataBuilder, "SELECT * FROM mt_phase_one_model");
+        wireListBuilder(firstCountBuilder, "SELECT * FROM mt_phase_one_model");
+        wireListBuilder(secondDataBuilder, "SELECT * FROM mt_phase_one_model");
+        wireListBuilder(secondCountBuilder, "SELECT * FROM mt_phase_one_model");
+        when(queryBuilderService.buildConditionQuery(eq(model), anyList()))
+                .thenReturn(firstDataBuilder, firstCountBuilder, secondDataBuilder, secondCountBuilder);
+        when(queryBuilderService.buildPaginationQuery(eq(firstDataBuilder), any())).thenReturn(firstDataBuilder);
+        when(queryBuilderService.buildPaginationQuery(eq(secondDataBuilder), any())).thenReturn(secondDataBuilder);
+        when(queryBuilderService.validateQuery(firstDataBuilder)).thenReturn(QueryValidationResult.valid());
+        when(queryBuilderService.validateQuery(secondDataBuilder)).thenReturn(QueryValidationResult.valid());
+        when(secureSqlRewriter.rewriteForCount("SELECT * FROM mt_phase_one_model"))
+                .thenReturn("SELECT count(*) FROM mt_phase_one_model");
+        when(dynamicDataMapper.selectByQuery(eq("SELECT * FROM mt_phase_one_model"), anyMap()))
+                .thenReturn(List.of(Map.of("pid", RECORD_ID, "created_by", USER_ID)));
+        when(dynamicDataMapper.countByQuery(eq("SELECT count(*) FROM mt_phase_one_model"), anyMap()))
+                .thenReturn(1L);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+                .thenReturn("AND created_by = 20");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("AND domain_id = 7");
+        when(dataPermissionEngine.getFieldMaskRules(TENANT_ID, MODEL_CODE, USER_ID)).thenReturn(List.of());
+        when(fieldMaskService.applyMaskingForList(eq(MODEL_CODE), anyList(), eq(USER_ID)))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+        when(fieldPermissionService.getFieldPermissions(MEMBER_ID, MODEL_CODE))
+                .thenReturn(FieldPermissionSet.allAllowed(java.util.Set.of("pid")));
+
+        try (DynamicDataQueryScope ignored = DynamicDataQueryScope.open()) {
+            DynamicQueryRequest request = DynamicQueryRequest.builder()
+                    .pageNum(1)
+                    .pageSize(20)
+                    .conditions(List.of())
+                    .build();
+            service.list(MODEL_CODE, request);
+            service.list(MODEL_CODE, request);
+        }
+
+        verify(dataPermissionEngine, times(1)).buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID);
+        verify(dataDomainService, times(1)).buildDomainFilter(MODEL_CODE, USER_ID);
+        verify(firstDataBuilder).addRawCondition("AND created_by = 20");
+        verify(firstCountBuilder).addRawCondition("AND created_by = 20");
+        verify(secondDataBuilder).addRawCondition("AND created_by = 20");
+        verify(secondCountBuilder).addRawCondition("AND created_by = 20");
+        verify(firstDataBuilder).addRawCondition("AND domain_id = 7");
+        verify(firstCountBuilder).addRawCondition("AND domain_id = 7");
+        verify(secondDataBuilder).addRawCondition("AND domain_id = 7");
+        verify(secondCountBuilder).addRawCondition("AND domain_id = 7");
+    }
+
+    @Test
     @DisplayName("batchDelete uses scoped bulk SQL with tenant and DataScope guards")
     void batchDelete_usesScopedBulkSqlWithTenantAndDataScope() {
         ModelDefinition model = physicalModel(MODEL_CODE, "mt_phase_one_model");
@@ -125,6 +230,90 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
                 .containsEntry("tenantId", TENANT_ID)
                 .containsEntry("id0", RECORD_ID);
         verify(dataPermissionEngine, never()).canAccessRecord(any(), anyString(), any(), anyMap());
+        verify(dynamicDataMapper, never()).delete(anyString(), anyMap());
+    }
+
+    @Test
+    @DisplayName("batchCreate must not treat access-denied existing record as missing")
+    void batchCreate_doesNotCreateWhenExistingPrimaryKeyIsOutsideDataScope() {
+        ModelDefinition model = physicalModelWithName(MODEL_CODE, "mt_phase_one_model");
+        wireModel(model);
+        wireSingleRecordRead(model, Map.of("pid", RECORD_ID, "name", "hidden", "created_by", 999L));
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
+                .thenReturn(false);
+
+        DynamicBatchResponse response = service.batchCreate(MODEL_CODE, List.of(
+                new java.util.HashMap<>(Map.of("pid", RECORD_ID, "name", "should-not-write"))));
+
+        assertThat(response.getSuccess()).isZero();
+        assertThat(response.getFailed()).isEqualTo(1);
+        assertThat(response.getErrors()).singleElement()
+                .asString()
+                .contains("Access denied");
+        verify(dynamicDataMapper, never()).insert(anyString(), anyMap());
+        verify(dynamicDataMapper, never()).insertWithJsonb(anyString(), anyMap(), any());
+    }
+
+    @Test
+    @DisplayName("update write SQL keeps tenant and DataScope guards")
+    void update_appliesScopedSqlGuardsToWrite() {
+        ModelDefinition model = physicalModelWithName(MODEL_CODE, "mt_phase_one_model");
+        wireModel(model);
+        wireSingleRecordRead(model, Map.of("pid", RECORD_ID, "name", "before", "created_by", USER_ID));
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
+                .thenReturn(true);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+                .thenReturn("AND created_by = 20");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("AND domain_id = 7");
+        when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+
+        service.update(MODEL_CODE, RECORD_ID, new java.util.HashMap<>(Map.of("name", "after")));
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).updateByQuery(sqlCaptor.capture(), paramsCaptor.capture());
+        assertThat(sqlCaptor.getValue())
+                .contains("UPDATE mt_phase_one_model SET")
+                .containsPattern("name = #\\{params\\.set\\d+}")
+                .contains("WHERE pid = #{params.recordId}")
+                .contains("tenant_id = #{params.tenantId}")
+                .contains("created_by = 20")
+                .contains("domain_id = 7");
+        assertThat(paramsCaptor.getValue())
+                .containsEntry("recordId", RECORD_ID)
+                .containsEntry("tenantId", TENANT_ID)
+                .containsValue("after");
+        verify(dynamicDataMapper, never()).update(anyString(), anyMap(), anyMap());
+        verify(dynamicDataMapper, never()).updateWithJsonb(anyString(), anyMap(), anyMap(), anySet());
+    }
+
+    @Test
+    @DisplayName("delete write SQL keeps tenant and DataScope guards")
+    void delete_appliesScopedSqlGuardsToWrite() {
+        ModelDefinition model = physicalModel(MODEL_CODE, "mt_phase_one_model");
+        wireModel(model);
+        wireSingleRecordRead(model, Map.of("pid", RECORD_ID, "created_by", USER_ID));
+        when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
+                .thenReturn(true);
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, MODEL_CODE, USER_ID))
+                .thenReturn("AND created_by = 20");
+        when(dataDomainService.buildDomainFilter(MODEL_CODE, USER_ID)).thenReturn("AND domain_id = 7");
+        when(dynamicDataMapper.deleteByQuery(anyString(), anyMap())).thenReturn(1);
+
+        service.delete(MODEL_CODE, RECORD_ID);
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).deleteByQuery(sqlCaptor.capture(), paramsCaptor.capture());
+        assertThat(sqlCaptor.getValue())
+                .contains("DELETE FROM mt_phase_one_model")
+                .contains("WHERE pid = #{params.recordId}")
+                .contains("tenant_id = #{params.tenantId}")
+                .contains("created_by = 20")
+                .contains("domain_id = 7");
+        assertThat(paramsCaptor.getValue())
+                .containsEntry("recordId", RECORD_ID)
+                .containsEntry("tenantId", TENANT_ID);
         verify(dynamicDataMapper, never()).delete(anyString(), anyMap());
     }
 
@@ -217,7 +406,17 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
         lenient().when(dataPermissionEngine.getFieldMaskRules(TENANT_ID, model.getCode(), USER_ID)).thenReturn(List.of());
         lenient().when(fieldMaskService.applyMaskingForDetail(eq(model.getCode()), anyMap(), eq(USER_ID)))
                 .thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().when(fieldPermissionService.getFieldPermissions(MEMBER_ID, model.getCode()))
+                .thenReturn(FieldPermissionSet.allAllowed(java.util.Set.of("pid", "name", "created_by")));
         lenient().when(changeTracker.diff(any(), any(), eq(model.getCode()))).thenReturn(List.of());
+    }
+
+    private void wireListBuilder(QueryBuilderService.QueryBuilder builder, String sql) {
+        lenient().when(builder.addCondition(anyString(), anyString(), any())).thenReturn(builder);
+        lenient().when(builder.addRawCondition(anyString())).thenReturn(builder);
+        lenient().when(builder.addOrderBy(anyString(), anyString())).thenReturn(builder);
+        lenient().when(builder.getSql()).thenReturn(sql);
+        lenient().when(builder.getParameterMap()).thenReturn(Map.of());
     }
 
     private ModelDefinition physicalModel(String code, String tableName) {
@@ -226,6 +425,21 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
                 .tableName(tableName)
                 .sourceType("physical")
                 .fields(List.of(primaryKey()))
+                .build();
+    }
+
+    private ModelDefinition physicalModelWithName(String code, String tableName) {
+        return ModelDefinition.builder()
+                .code(code)
+                .tableName(tableName)
+                .sourceType("physical")
+                .fields(List.of(
+                        primaryKey(),
+                        FieldDefinition.builder()
+                                .code("name")
+                                .columnName("name")
+                                .dataType("string")
+                                .build()))
                 .build();
     }
 

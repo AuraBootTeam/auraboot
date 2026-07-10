@@ -46,15 +46,36 @@ function findSampleBom(): string | undefined {
 }
 const SAMPLE_BOM = findSampleBom();
 
+async function waitForQuoteListSettled(page: Page): Promise<void> {
+  await expect.poll(async () => {
+    const searchReady = await page.locator('[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"]').first().count();
+    const tableReady = await page.locator('table, [role="table"]').first().count();
+    const loading = await page.locator('[aria-busy="true"], .ant-spin-spinning, [data-loading="true"]').count();
+    return (searchReady > 0 || tableReady > 0) && loading === 0;
+  }).toBe(true);
+}
+
+async function triggerQuoteSearch(page: Page, marker: string): Promise<void> {
+  const response = page.waitForResponse((r) => (
+    r.url().includes('/api/dynamic/qo_quote_common/list') && r.request().method() === 'GET'
+  ), { timeout: 5000 }).catch(() => null);
+  const btn = page.locator('button:has-text("搜索"), [data-testid="search-button"]').first();
+  if (await btn.count() > 0) await btn.click(); else await page.keyboard.press('Enter');
+  await response;
+  await expect.poll(async () => {
+    const loading = await page.locator('[aria-busy="true"], .ant-spin-spinning, [data-loading="true"]').count();
+    const text = await page.locator('table tbody, [role="table"]').first().innerText().catch(() => '');
+    return loading === 0 && (text.includes(marker) || !text.includes('加载'));
+  }).toBe(true);
+}
+
 async function listHasMarker(page: Page, marker: string): Promise<boolean> {
   await page.goto(QUOTE_LIST, { waitUntil: 'domcontentloaded' });
-  await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  await waitForQuoteListSettled(page);
   const q = page.locator('[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"]').first();
   if (await q.count() > 0) {
     await q.click(); await q.fill(''); await q.pressSequentially(marker, { delay: 12 });
-    const btn = page.locator('button:has-text("搜索"), [data-testid="search-button"]').first();
-    if (await btn.count() > 0) await btn.click(); else await page.keyboard.press('Enter');
-    await page.waitForTimeout(2000);
+    await triggerQuoteSearch(page, marker);
   }
   return (await page.locator(`table tbody tr:has-text("${marker}")`).count()) > 0;
 }

@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 import {
@@ -26,14 +26,28 @@ const users: Record<string, QuoteRoleUser> = {};
 
 async function fillSeq(page: Page, name: string, value: string) {
   const loc = page.locator(`input[name='${name}'], textarea[name='${name}']`).first();
+  await expect(loc).toBeVisible();
   await loc.click();
   await loc.fill('');
   await loc.pressSequentially(value, { delay: 12 });
 }
 
+function modelCodeFromListPath(listPath: string): string {
+  return listPath.split('/').filter(Boolean).pop() || '';
+}
+
+async function waitForListReady(page: Page): Promise<void> {
+  await expect.poll(async () => {
+    const searchReady = await page.locator('[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"], input[type="search"]').first().count();
+    const tableReady = await page.locator('table, [role="table"]').first().count();
+    const loading = await page.locator('[aria-busy="true"], .ant-spin-spinning, [data-loading="true"]').count();
+    return (searchReady > 0 || tableReady > 0) && loading === 0;
+  }).toBe(true);
+}
+
 async function listSearch(page: Page, listPath: string, keyword: string): Promise<number> {
   await page.goto(listPath, { waitUntil: 'domcontentloaded' });
-  await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  await waitForListReady(page);
   const q = page.locator(
     '[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"], input[type="search"]'
   ).first();
@@ -45,14 +59,80 @@ async function listSearch(page: Page, listPath: string, keyword: string): Promis
     const searchBtn = page.locator(
       '[data-testid="search-button"], [data-testid="table-search-button"], button:has-text("搜索")'
     ).first();
+    const modelCode = modelCodeFromListPath(listPath);
+    const response = page.waitForResponse((r) => (
+      r.url().includes(`/api/dynamic/${modelCode}/list`) && r.request().method() === 'GET'
+    ), { timeout: 5000 }).catch(() => null);
     if (await searchBtn.count() > 0) {
       await searchBtn.click();
     } else {
       await page.keyboard.press('Enter');
     }
-    await page.waitForTimeout(2000);
+    await response;
+    await waitForListReady(page);
   }
   return page.locator('table tbody tr').count();
+}
+
+async function saveForm(page: Page): Promise<void> {
+  const response = page.waitForResponse((r) => (
+    r.url().includes('/api/meta/commands/execute/') && r.request().method() === 'POST'
+  ), { timeout: 5000 }).catch(() => null);
+  await page.getByRole('button', { name: '保存' }).first().click({ timeout: 5000 });
+  await response;
+}
+
+async function clickSaveForValidation(page: Page): Promise<void> {
+  const response = page.waitForResponse((r) => (
+    r.url().includes('/api/meta/commands/execute/') && r.request().method() === 'POST'
+  ), { timeout: 5000 }).catch(() => null);
+  await page.getByRole('button', { name: '保存' }).first().click({ timeout: 5000 });
+  await response;
+}
+
+async function createCustomer(page: Page, name: string): Promise<void> {
+  await page.goto(CUST_NEW, { waitUntil: 'domcontentloaded' });
+  await fillSeq(page, 'crm_acc_name', name);
+  await saveForm(page);
+}
+
+async function pickFirstComboboxOptions(page: Page, maxCount: number): Promise<void> {
+  const combos = page.getByRole('combobox');
+  const n = Math.min(await combos.count(), maxCount);
+  for (let i = 0; i < n; i++) {
+    try {
+      await combos.nth(i).click();
+      await expect.poll(async () => page.getByRole('option').count()).toBeGreaterThan(0);
+      await page.getByRole('option').first().click();
+    } catch {
+      // Optional/reference fields vary by role and fixture availability.
+    }
+  }
+}
+
+async function createProject(page: Page, name: string): Promise<void> {
+  await page.goto(PROJ_NEW, { waitUntil: 'domcontentloaded' });
+  await fillSeq(page, 'bom_project_name', name);
+  await pickFirstComboboxOptions(page, 2);
+  await saveForm(page);
+}
+
+async function openRowForEdit(page: Page, row: Locator): Promise<boolean> {
+  const rowEdit = row.getByTestId('row-action-edit');
+  const rowLink = row.locator('a').first();
+  if (await rowEdit.count() > 0 && await rowEdit.click({ timeout: 5000 }).then(() => true).catch(() => false)) return true;
+  if (await rowLink.count() > 0 && await rowLink.click({ timeout: 5000 }).then(() => true).catch(() => false)) return true;
+  const more = row.getByRole('button', { name: 'More actions' });
+  if (await more.count() > 0) {
+    await more.click({ timeout: 5000 }).catch(() => null);
+    const edit = page.getByText('编辑', { exact: false }).first();
+    return edit.click({ timeout: 5000 }).then(() => true).catch(() => false);
+  }
+  return false;
+}
+
+async function waitForMainText(page: Page, expected: string): Promise<void> {
+  await expect.poll(async () => page.locator('main').innerText().catch(() => '')).toContain(expected);
 }
 
 test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scope @smoke', () => {
@@ -78,15 +158,14 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
     const { context, page } = await openQuoteRolePage(browser, users['qo_sales']);
     try {
       await page.goto(CUST_NEW, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
+      await expect(page.locator("input[name='crm_acc_name']")).toBeVisible();
       const saveBtn = page.getByRole('button', { name: '保存' }).first();
       const disabled = await saveBtn.isDisabled().catch(() => false);
       if (disabled) {
         // required-empty → Save disabled is a valid enforcement of the required rule
         expect(disabled, 'Save disabled when required empty').toBeTruthy();
       } else {
-        await saveBtn.click({ timeout: 8000 });
-        await page.waitForTimeout(1500);
+        await clickSaveForValidation(page);
         // core assertion: required-empty is NOT saved → still on the create form (no navigation away)
         expect(await page.locator("input[name='crm_acc_name']").count(),
           'CUST-02: empty-required blocked — still on create form (not saved)').toBeGreaterThan(0);
@@ -104,39 +183,21 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
     const { context, page } = await openQuoteRolePage(browser, users['qo_sales']);
     try {
       const marker = `W1CUST${uid}`.slice(0, 26);
-      await page.goto(CUST_NEW, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
-      await fillSeq(page, 'crm_acc_name', marker);
-      await page.getByRole('button', { name: '保存' }).first().click();
-      await page.waitForTimeout(2500);
+      await createCustomer(page, marker);
       // open the row's edit action (row-scoped), edit remark, save, reopen
       const rows = await listSearch(page, CUST_LIST, marker);
       expect(rows, 'created customer in list').toBeGreaterThan(0);
       const row = page.locator(`table tbody tr:has-text("${marker}")`).first();
       // open detail/edit via the row's edit action or its first link (not clicking the whole row)
-      const rowEdit = row.getByTestId('row-action-edit');
-      const rowLink = row.locator('a').first();
-      if (await rowEdit.count() > 0) {
-        await rowEdit.click({ timeout: 8000 });
-      } else if (await rowLink.count() > 0) {
-        await rowLink.click({ timeout: 8000 });
-      } else {
-        const more = row.getByRole('button', { name: 'More actions' });
-        if (await more.count() > 0) { await more.click(); await page.waitForTimeout(600);
-          await page.getByText('编辑', { exact: false }).first().click().catch(() => {}); }
-      }
-      await page.waitForTimeout(2500);
+      await openRowForEdit(page, row);
       const newRemark = `edited-${uid}`;
       if (await page.locator("textarea[name='crm_acc_remark'], input[name='crm_acc_remark']").count() > 0) {
         await fillSeq(page, 'crm_acc_remark', newRemark);
-        await page.getByRole('button', { name: '保存' }).first().click();
-        await page.waitForTimeout(2500);
+        await saveForm(page);
         await listSearch(page, CUST_LIST, marker);
         const row2 = page.locator(`table tbody tr:has-text("${marker}")`).first();
-        const link2 = row2.locator('a').first();
-        if (await link2.count() > 0) await link2.click({ timeout: 8000 });
-        else if (await row2.getByTestId('row-action-edit').count() > 0) await row2.getByTestId('row-action-edit').click({ timeout: 8000 });
-        await page.waitForTimeout(2000);
+        await openRowForEdit(page, row2);
+        await waitForMainText(page, newRemark);
         expect(await page.locator('main').innerText(), 'edited remark回显').toContain(newRemark);
       } else {
         test.info().annotations.push({ type: 'note', description: 'CUST-03: no editable remark entry found via testid/link — needs selector confirm' });
@@ -151,14 +212,10 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
     const { context, page } = await openQuoteRolePage(browser, users['qo_sales']);
     try {
       const marker = `W1SRCH${uid}`.slice(0, 26);
-      await page.goto(CUST_NEW, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
-      await fillSeq(page, 'crm_acc_name', marker);
-      await page.getByRole('button', { name: '保存' }).first().click();
-      await page.waitForTimeout(2500);
+      await createCustomer(page, marker);
       // baseline: unfiltered row count (stack has many customers → >1)
       await page.goto(CUST_LIST, { waitUntil: 'domcontentloaded' });
-      await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+      await waitForListReady(page);
       const initial = await page.locator('table tbody tr').count();
       // CUST-07: search by the marker → narrows (fewer rows) AND the marker row is present
       const hit = await listSearch(page, CUST_LIST, marker);
@@ -179,13 +236,13 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
     const { context, page } = await openQuoteRolePage(browser, users['qo_sales']);
     try {
       await page.goto(CUST_NEW, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2500);
+      await expect(page.locator("input[name='crm_acc_name']")).toBeVisible();
       expect(page.locator('main').innerText, 'no forbidden').toBeTruthy();
       const combos = page.getByRole('combobox');
       const n = await combos.count();
       expect(n, 'form has dict dropdowns').toBeGreaterThan(0);
       await combos.first().click();
-      await page.waitForTimeout(900);
+      await expect.poll(async () => page.getByRole('option').count()).toBeGreaterThan(0);
       const optCount = await page.getByRole('option').count();
       expect(optCount, 'dict dropdown loads options (DD-01)').toBeGreaterThan(0);
       await page.keyboard.press('Escape');
@@ -199,14 +256,13 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
     const { context, page } = await openQuoteRolePage(browser, users['bom_engineering']);
     try {
       await page.goto(PROJ_NEW, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
+      await expect(page.locator("input[name='bom_project_name']")).toBeVisible();
       const saveBtn = page.getByRole('button', { name: '保存' }).first();
       const disabled = await saveBtn.isDisabled().catch(() => false);
       if (disabled) {
         expect(disabled, 'project Save disabled when required empty').toBeTruthy();
       } else {
-        await saveBtn.click({ timeout: 8000 });
-        await page.waitForTimeout(1500);
+        await clickSaveForValidation(page);
         expect(await page.locator("input[name='bom_project_name']").count(), 'still on project form').toBeGreaterThan(0);
         expect(/必填|不能为空|请输入|请选择|required/i.test(await page.locator('main').innerText()), 'required error').toBeTruthy();
       }
@@ -221,28 +277,10 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
     try {
       // seed a customer this engineer owns (so it's selectable under self-scope)
       const cust = `W1LCUST${uid}`.slice(0, 26);
-      await page.goto(CUST_NEW, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
-      await fillSeq(page, 'crm_acc_name', cust);
-      await page.getByRole('button', { name: '保存' }).first().click();
-      await page.waitForTimeout(2500);
+      await createCustomer(page, cust);
       // create project referencing it
       const proj = `W1LPROJ${uid}`.slice(0, 26);
-      await page.goto(PROJ_NEW, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2000);
-      await fillSeq(page, 'bom_project_name', proj);
-      // pick customer + quality via the comboboxes (DD-03: type to filter)
-      const combos = page.getByRole('combobox');
-      const n = Math.min(await combos.count(), 2);
-      for (let i = 0; i < n; i++) {
-        await combos.nth(i).click();
-        await page.waitForTimeout(700);
-        const opt = page.getByRole('option');
-        if (await opt.count() > 0) await opt.first().click();
-        await page.waitForTimeout(300);
-      }
-      await page.getByRole('button', { name: '保存' }).first().click();
-      await page.waitForTimeout(2500);
+      await createProject(page, proj);
       const rows = await listSearch(page, PROJ_LIST, proj);
       expect(rows, 'project created').toBeGreaterThan(0);
       // LINK-01: project list customer column resolves a NAME (not pid) — no raw ULID
@@ -259,19 +297,7 @@ test.describe('Quote/BOM forms + search + dropdown + linkage + project data-scop
     // engineer A creates a project
     const a = await openQuoteRolePage(browser, users['bom_engineering']);
     try {
-      await a.page.goto(PROJ_NEW, { waitUntil: 'domcontentloaded' });
-      await a.page.waitForTimeout(2000);
-      await fillSeq(a.page, 'bom_project_name', projMarker);
-      const combos = a.page.getByRole('combobox');
-      const n = Math.min(await combos.count(), 2);
-      for (let i = 0; i < n; i++) {
-        await combos.nth(i).click(); await a.page.waitForTimeout(600);
-        const opt = a.page.getByRole('option');
-        if (await opt.count() > 0) await opt.first().click();
-        await a.page.waitForTimeout(250);
-      }
-      await a.page.getByRole('button', { name: '保存' }).first().click();
-      await a.page.waitForTimeout(2500);
+      await createProject(a.page, projMarker);
       expect(await listSearch(a.page, PROJ_LIST, projMarker), 'engineer A sees own project').toBeGreaterThan(0);
     } finally {
       await a.context.close();

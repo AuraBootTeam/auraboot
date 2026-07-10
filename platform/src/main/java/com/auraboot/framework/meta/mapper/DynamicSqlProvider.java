@@ -40,6 +40,18 @@ public class DynamicSqlProvider {
         return sql;
     }
 
+    public static String updateByQuery(Map<String, Object> params) {
+        String sql = requireSql(params);
+        String normalized = sql.trim().toLowerCase();
+        if (!normalized.startsWith("update")) {
+            throw new IllegalArgumentException("updateByQuery SQL must be an UPDATE statement");
+        }
+        if (normalized.contains(";") || normalized.contains("--") || normalized.contains("/*")) {
+            throw new IllegalArgumentException("updateByQuery SQL must not contain injection patterns");
+        }
+        return sql;
+    }
+
     /**
      * @deprecated Dangerous: allows arbitrary SQL execution. Callers should use
      * typed methods (selectByQuery, insert, update, delete) instead.

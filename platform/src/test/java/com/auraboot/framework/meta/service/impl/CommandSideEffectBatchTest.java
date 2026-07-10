@@ -1,13 +1,17 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.service.DataDomainService;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.DocumentFlowService;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -44,6 +48,10 @@ class CommandSideEffectBatchTest {
     private CommandSpelEvaluator spelEvaluator;
     @Mock
     private DocumentFlowService documentFlowService;
+    @Mock
+    private DataPermissionEngine dataPermissionEngine;
+    @Mock
+    private DataDomainService dataDomainService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -55,6 +63,16 @@ class CommandSideEffectBatchTest {
     @BeforeEach
     void setUp() {
         executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper);
+    }
+
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
+    }
+
+    @SuppressWarnings("unchecked")
+    private ArgumentCaptor<Map<String, Object>> mapCaptor() {
+        return ArgumentCaptor.forClass(Map.class);
     }
 
     // ── resolveItemFieldMapping unit tests ────────────────────────────────────
@@ -998,5 +1016,104 @@ class CommandSideEffectBatchTest {
                     eq("mt_site_profile"), anyMap(), anyMap(), eq(Set.of("parser_config")));
             verify(dynamicDataMapper, never()).update(eq("mt_site_profile"), anyMap(), anyMap());
         }
+
+        @Test
+        @DisplayName("UPDATE_RECORD writes through scoped SQL guards when user context exists")
+        void updateRecord_usesScopedSqlGuardsWhenUserContextExists() {
+            withScopedUser();
+            executor = scopedExecutor();
+            ModelDefinition modelDef = modelWithJsonbColumn("config");
+            when(metaModelService.getModelDefinition("target_model"))
+                    .thenReturn(Optional.of(modelDef));
+            when(metaModelService.getTableName("target_model")).thenReturn("mt_target_model");
+            when(dynamicDataMapper.findJsonbColumns("mt_target_model")).thenReturn(Set.of());
+            when(dynamicDataMapper.selectByQuery(anyString(), anyMap()))
+                    .thenReturn(List.of(Map.of("status", "OLD")));
+            when(dataPermissionEngine.buildRowFilter(TENANT_ID, "target_model", USER_ID))
+                    .thenReturn("AND owner_id = 100");
+            when(dataDomainService.buildDomainFilter("target_model", USER_ID))
+                    .thenReturn("AND domain_id = 7");
+            when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+
+            Map<String, Object> currentRecord = Map.of("related_id", "pid-001");
+            Map<String, Object> effect = Map.of(
+                    "action", "update_record",
+                    "targetModel", "target_model",
+                    "targetIdField", "related_id",
+                    "fieldMapping", Map.of("config", Map.of("key", "value"))
+            );
+
+            executor.executeSideEffectPhase(Map.of("sideEffects", List.of(effect)), currentRecord,
+                    TENANT_ID, USER_ID, null, null, null);
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            ArgumentCaptor<Map<String, Object>> paramsCaptor = mapCaptor();
+            verify(dynamicDataMapper).updateByQuery(sqlCaptor.capture(), paramsCaptor.capture());
+            verify(dynamicDataMapper, never()).update(eq("mt_target_model"), anyMap(), anyMap());
+            verify(dynamicDataMapper, never()).updateWithJsonb(eq("mt_target_model"), anyMap(), anyMap(), anySet());
+
+            assertTrue(sqlCaptor.getValue().contains("UPDATE mt_target_model SET"));
+            assertTrue(sqlCaptor.getValue().matches("(?s).*config = #\\{params\\.set\\d+}::jsonb.*"));
+            assertTrue(sqlCaptor.getValue().contains("WHERE pid = #{params.recordId}"));
+            assertTrue(sqlCaptor.getValue().contains("tenant_id = #{params.tenantId}"));
+            assertTrue(sqlCaptor.getValue().contains("owner_id = 100"));
+            assertTrue(sqlCaptor.getValue().contains("domain_id = 7"));
+            assertEquals("pid-001", paramsCaptor.getValue().get("recordId"));
+            assertEquals(TENANT_ID, paramsCaptor.getValue().get("tenantId"));
+        }
+
+        @Test
+        @DisplayName("BATCH_UPDATE_RECORD writes through scoped SQL guards when user context exists")
+        void batchUpdateRecord_usesScopedSqlGuardsWhenUserContextExists() {
+            withScopedUser();
+            executor = scopedExecutor();
+            when(metaModelService.getTableName("inventory")).thenReturn("mt_inventory");
+            when(metaModelService.getModelDefinition("inventory")).thenReturn(Optional.empty());
+            when(dynamicDataMapper.findJsonbColumns("mt_inventory")).thenReturn(Set.of());
+            when(dataPermissionEngine.buildRowFilter(TENANT_ID, "inventory", USER_ID))
+                    .thenReturn("AND owner_id = 100");
+            when(dataDomainService.buildDomainFilter("inventory", USER_ID))
+                    .thenReturn("AND domain_id = 7");
+            when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+
+            Map<String, Object> currentRecord = Map.of("items", List.of(
+                    Map.of("inventory_id", "inv-001", "reserved_qty", 10),
+                    Map.of("inventory_id", "inv-002", "reserved_qty", 20)
+            ));
+
+            executor.executeBatchUpdate("inventory", "items", "inventory_id",
+                    Map.of("reserved_qty", "${item.reserved_qty}"), currentRecord, TENANT_ID);
+
+            ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+            ArgumentCaptor<Map<String, Object>> paramsCaptor = mapCaptor();
+            verify(dynamicDataMapper, times(2)).updateByQuery(sqlCaptor.capture(), paramsCaptor.capture());
+            verify(dynamicDataMapper, never()).update(eq("mt_inventory"), anyMap(), anyMap());
+            assertEquals(2, sqlCaptor.getAllValues().size());
+            for (String sql : sqlCaptor.getAllValues()) {
+                assertTrue(sql.contains("UPDATE mt_inventory SET"));
+                assertTrue(sql.contains("WHERE pid = #{params.recordId}"));
+                assertTrue(sql.contains("tenant_id = #{params.tenantId}"));
+                assertTrue(sql.contains("owner_id = 100"));
+                assertTrue(sql.contains("domain_id = 7"));
+            }
+            assertEquals("inv-001", paramsCaptor.getAllValues().get(0).get("recordId"));
+            assertEquals("inv-002", paramsCaptor.getAllValues().get(1).get("recordId"));
+        }
+    }
+
+    private CommandSideEffectExecutor scopedExecutor() {
+        return new CommandSideEffectExecutor(
+                dynamicDataMapper,
+                dynamicDataService,
+                metaModelService,
+                spelEvaluator,
+                documentFlowService,
+                objectMapper,
+                dataPermissionEngine,
+                dataDomainService);
+    }
+
+    private void withScopedUser() {
+        MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
     }
 }

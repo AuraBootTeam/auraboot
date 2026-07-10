@@ -16,6 +16,17 @@ async function post(page: Page, code: string, payload: any, op = 'create') {
 }
 const pid = (b: any) => b?.data?.data?.recordPid || b?.data?.data?.recordId || b?.data?.recordPid || b?.data?.recordId;
 
+async function listConversionTasks(page: Page): Promise<any[]> {
+  const list = await page.request.get('/api/dynamic/bom_conversion_task_pcba/list?pageNum=1&pageSize=10&sortField=created_at&sortOrder=desc');
+  const lb = await list.json().catch(() => ({} as any));
+  const recs = lb?.data?.records || lb?.data?.data?.records || lb?.data || [];
+  return Array.isArray(recs) ? recs : [];
+}
+
+function findTask(recs: any[], projId: string, fileId: string): any | undefined {
+  return recs.find((r: any) => String(r.bom_task_project_id || '') === String(projId) || String(r.bom_task_raw_file_id || '') === String(fileId));
+}
+
 test.describe('Quote/BOM bad-file convert + permissions page (BOM-04 / SYS-04) @smoke', () => {
   test.describe.configure({ mode: 'serial', timeout: 150_000 });
 
@@ -48,22 +59,19 @@ test.describe('Quote/BOM bad-file convert + permissions page (BOM-04 / SYS-04) @
       // the contract is: a bad file must NOT silently produce a successful conversion with lines.
       let bad = conv.status >= 400;
       if (!bad) {
-        for (let i = 0; i < 18; i++) {
-          await page.waitForTimeout(5000);
-          const list = await page.request.get('/api/dynamic/bom_conversion_task_pcba/list?pageNum=1&pageSize=10&sortField=created_at&sortOrder=desc');
-          const lb = await list.json().catch(() => ({} as any));
-          const recs = lb?.data?.records || lb?.data?.data?.records || lb?.data || [];
-          const mine = (Array.isArray(recs) ? recs : []).find((r: any) => String(r.bom_task_project_id || '') === String(projId) || String(r.bom_task_raw_file_id || '') === String(fileId));
+        await expect.poll(async () => {
+          const mine = findTask(await listConversionTasks(page), projId, fileId);
           if (mine) {
             const st = String(mine.bom_task_status || mine.status || '');
-            if (/fail|error|reject|invalid/i.test(st)) { bad = true; break; }
+            if (/fail|error|reject|invalid/i.test(st)) { bad = true; return true; }
             if (/done|complet|succeed|success|ready|review/i.test(st)) {
               // completed — must have produced NO usable canonical lines for a junk file
               const lc = Number(mine.bom_task_line_count || mine.bom_task_total_lines || 0);
-              bad = lc === 0; break;
+              bad = lc === 0; return true;
             }
           }
-        }
+          return false;
+        }, { timeout: 90_000, intervals: [1_000, 2_000, 5_000] }).toBeTruthy();
       }
       expect(bad, 'BOM-04: junk file does not silently produce a successful conversion with lines').toBeTruthy();
     } finally {
@@ -77,8 +85,11 @@ test.describe('Quote/BOM bad-file convert + permissions page (BOM-04 / SYS-04) @
     const page = await ctx.newPage();
     try {
       await page.goto(PERMISSIONS, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3500);
-      const text = await page.locator('main').innerText().catch(() => '');
+      let text = '';
+      await expect.poll(async () => {
+        text = await page.locator('main').innerText().catch(() => '');
+        return text.length;
+      }, { timeout: 10_000, intervals: [250, 500, 1_000] }).toBeGreaterThan(0);
       // admin reaches it (not bounced to login / not access-denied)
       expect(/登录|login/i.test(page.url()), 'SYS-04: admin not bounced to login').toBeFalsy();
       expect(text.length, 'SYS-04: permissions page renders content').toBeGreaterThan(0);

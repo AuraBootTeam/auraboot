@@ -9,6 +9,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -54,6 +56,45 @@ public class DynamicDataAccessorImpl implements DataAccessor {
 
         PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, request);
         return result.getRecords() != null ? result.getRecords() : List.of();
+    }
+
+    @Override
+    public List<Map<String, Object>> queryIn(String modelCode, String fieldName, Collection<?> values) {
+        if (fieldName == null || fieldName.isBlank()) {
+            throw new IllegalArgumentException("fieldName cannot be null or blank");
+        }
+        List<Object> queryValues = distinctNonNullValues(values);
+        if (queryValues.isEmpty()) {
+            return List.of();
+        }
+
+        log.debug("Plugin DataAccessor: queryIn({}, {}, {} values)", modelCode, fieldName, queryValues.size());
+
+        DynamicQueryRequest request = DynamicQueryRequest.builder()
+                .pageNum(1)
+                .pageSize(10000)
+                .conditions(List.of(QueryCondition.builder()
+                        .fieldName(fieldName)
+                        .operator(QueryCondition.Operator.IN)
+                        .values(queryValues)
+                        .build()))
+                .build();
+
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list(modelCode, request);
+        return result.getRecords() != null ? result.getRecords() : List.of();
+    }
+
+    private static List<Object> distinctNonNullValues(Collection<?> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        LinkedHashSet<Object> distinct = new LinkedHashSet<>();
+        for (Object value : values) {
+            if (value != null) {
+                distinct.add(value);
+            }
+        }
+        return List.copyOf(distinct);
     }
 
     @Override

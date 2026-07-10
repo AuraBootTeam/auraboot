@@ -34,6 +34,8 @@ class MetaModelServiceImplSearchTest {
     private MetaModelFieldBindingMapper fieldBindingMapper;
     @Mock
     private AutoPermissionAssignmentService autoPermissionAssignmentService;
+    @Mock
+    private MetaDefinitionCacheService metaDefinitionCacheService;
 
     @Test
     void searchModelsLoadsFieldCountsInBatch() {
@@ -50,7 +52,8 @@ class MetaModelServiceImplSearchTest {
                 metaFieldMapper,
                 queryBuilderService,
                 fieldBindingMapper,
-                autoPermissionAssignmentService
+                autoPermissionAssignmentService,
+                metaDefinitionCacheService
         );
 
         PageResult<MetaModelDTO> result = service.searchModels(

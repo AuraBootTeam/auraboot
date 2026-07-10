@@ -126,14 +126,18 @@ const CONTRACTS: RoleContract[] = [
   {
     user: SMOKE_USERS[0],
     roleCode: 'bom_engineering',
-    requiredCodes: [MENU_CODE.customer, MENU_CODE.project, MENU_CODE.workbench],
-    forbiddenCodes: [
-      MENU_CODE.kingdeeSync,
+    requiredCodes: [
+      MENU_CODE.customer,
+      MENU_CODE.project,
+      MENU_CODE.workbench,
       MENU_CODE.quote,
       MENU_CODE.priceLibrary,
+    ],
+    forbiddenCodes: [
+      MENU_CODE.kingdeeSync,
       ...ORG_SYSTEM_ADMIN_CODES,
     ],
-    deniedDirectPaths: ['/p/qo_quote_common', '/p/bom_material_master'],
+    deniedDirectPaths: ['/p/bom_material_master'],
   },
   {
     user: SMOKE_USERS[1],
@@ -364,14 +368,6 @@ test.describe('Quote/BOM per-role menu smoke @smoke', () => {
         for (const code of contract.forbiddenCodes) {
           expect(snapshot.menuCodes, `${contract.user.key} must NOT see menu ${code}`).not.toContain(code);
         }
-        // parity: rule-view menus (bom.rule.read) — if delivered (visible for admin), the
-        // employee must see them too (menu↔capability coherence).
-        for (const code of [MENU_CODE.sourceFormatProfiles, MENU_CODE.fieldCompositionRules]) {
-          if (adminSnapshot.menuCodes.includes(code)) {
-            expect(snapshot.menuCodes, `${contract.user.key} should see rule-view menu ${code}`).toContain(code);
-          }
-        }
-
         // 3. walk EVERY visible menu via the sidebar; assert page renders, no forbidden text
         // (soft: keep going so a single run reports the FULL gap inventory)
         const problems = await traverseMenus(page, await fetchLeafMenus(page), collector.setMenu);

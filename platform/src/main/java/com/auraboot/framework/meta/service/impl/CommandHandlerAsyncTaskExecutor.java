@@ -100,6 +100,7 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
 
         callback.report(1, "Starting " + (commandCode != null ? commandCode : handlerCode));
 
+        DynamicDataQueryScope queryScope = DynamicDataQueryScope.open();
         try {
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
             Map<String, Object> pluginSettings = new HashMap<>(handlerParams);
@@ -149,6 +150,8 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             // the message. This is a terminal boundary catch, not a self-heal/fallback.
             log.error("Async command handler {} failed", handlerCode, ex);
             return AsyncTaskResult.fail(ex.getMessage() != null ? ex.getMessage() : ex.toString());
+        } finally {
+            queryScope.close();
         }
     }
 

@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.entity.FieldMaskConfig;
+import com.auraboot.framework.meta.mapper.FieldMaskConfigMapper;
 import com.auraboot.framework.meta.service.FieldMaskService;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterAll;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -23,6 +25,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * Real-stack coverage IT for {@link FieldMaskServiceImpl} config CRUD + list/detail masking.
@@ -44,6 +48,8 @@ class FieldMaskServiceImplCoverageIT {
     private FieldMaskService fieldMaskService;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @SpyBean
+    private FieldMaskConfigMapper fieldMaskConfigMapper;
 
     private String model;
 
@@ -90,9 +96,11 @@ class FieldMaskServiceImplCoverageIT {
         FieldMaskConfig updated = fieldMaskService.saveConfig(update);
         assertEquals(saved.getId(), updated.getId());
         assertEquals("id_card", fieldMaskService.listConfigs(model).get(0).getMaskType());
+        assertEquals("id_card", fieldMaskService.getEnabledConfigs(model).get(0).getMaskType());
 
         fieldMaskService.deleteConfig(saved.getId());
         assertTrue(fieldMaskService.listConfigs(model).isEmpty());
+        assertTrue(fieldMaskService.getEnabledConfigs(model).isEmpty());
     }
 
     @Test
@@ -126,5 +134,18 @@ class FieldMaskServiceImplCoverageIT {
         List<Map<String, Object>> result =
                 fieldMaskService.applyMaskingForList(model, List.of(row), 990_000_002L);
         assertEquals("13812345678", result.get(0).get("phone"));
+    }
+
+    @Test
+    @DisplayName("runtime masking reuses enabled config cache through the facade")
+    void runtimeMaskingReusesEnabledConfigCache() {
+        Map<String, Object> row = Map.of("phone", "13812345678");
+
+        fieldMaskService.applyMaskingForList(model, List.of(row), 990_000_002L);
+        clearInvocations(fieldMaskConfigMapper);
+
+        fieldMaskService.applyMaskingForList(model, List.of(row), 990_000_002L);
+
+        verifyNoInteractions(fieldMaskConfigMapper);
     }
 }
