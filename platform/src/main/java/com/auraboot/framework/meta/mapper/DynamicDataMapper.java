@@ -72,6 +72,14 @@ public interface DynamicDataMapper {
                         @Param("jsonbColumns") Set<String> jsonbColumns);
 
     /**
+     * Execute a fully composed UPDATE with bound params.
+     * Use only when the WHERE clause needs raw platform-generated guards
+     * such as DataScope SQL fragments.
+     */
+    @UpdateProvider(type = DynamicSqlProvider.class, method = "updateByQuery")
+    int updateByQuery(@Param("sql") String sql, @Param("params") Map<String, Object> params);
+
+    /**
      * Atomic counter increment via UPDATE … RETURNING. A NEW seam: the existing
      * raw-SQL methods (selectByQuery/countByQuery/executeCustomSql) enforce
      * SELECT-only and would reject this. Bypasses the tenant interceptor because

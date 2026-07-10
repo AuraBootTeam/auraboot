@@ -138,6 +138,10 @@ type DataSourceFetchPolicy = DataSourceConfig & {
   rateLimitBackoffMs?: number;
 };
 
+type DataSourceFetchOptions = {
+  force?: boolean;
+};
+
 function readNonNegativeNumber(value: unknown, fallback: number): number {
   const numeric = Number(value);
   return Number.isFinite(numeric) && numeric >= 0 ? numeric : fallback;
@@ -527,7 +531,11 @@ export class DataSourceManager {
   /**
    * 获取数据 (with request dedup — stale responses are discarded)
    */
-  async fetch(id: string, extraParams?: Record<string, any>): Promise<any> {
+  async fetch(
+    id: string,
+    extraParams?: Record<string, any>,
+    options?: DataSourceFetchOptions,
+  ): Promise<any> {
     const config = this.dataSources.get(id);
     if (!config) {
       return null;
@@ -539,12 +547,13 @@ export class DataSourceManager {
     }
 
     const fetchKey = this.buildFetchKey(id, config, extraParams);
-    const inFlightFetch = this.inFlightFetches.get(fetchKey);
+    const force = options?.force === true;
+    const inFlightFetch = force ? undefined : this.inFlightFetches.get(fetchKey);
     if (inFlightFetch) {
       return inFlightFetch;
     }
 
-    if (this.shouldSkipForRateLimitBackoff(id)) {
+    if (!force && this.shouldSkipForRateLimitBackoff(id)) {
       const cachedData = this.dataSourceStates.get(id)?.data;
       if (cachedData !== undefined && cachedData !== null) {
         return this.keepExistingData(id);
@@ -552,7 +561,7 @@ export class DataSourceManager {
       return cachedData ?? null;
     }
 
-    if (this.shouldSkipForMinInterval(fetchKey, config, id)) {
+    if (!force && this.shouldSkipForMinInterval(fetchKey, config, id)) {
       return this.keepExistingData(id);
     }
 
@@ -793,7 +802,7 @@ export class DataSourceManager {
   async reload(id: string | string[]): Promise<void> {
     const ids = Array.from(new Set(Array.isArray(id) ? id : [id]));
 
-    await Promise.all(ids.map((dsId) => this.fetch(dsId)));
+    await Promise.all(ids.map((dsId) => this.fetch(dsId, undefined, { force: true })));
   }
 
   async notifyStateChanged(key: string): Promise<void> {

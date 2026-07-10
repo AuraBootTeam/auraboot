@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
@@ -7,14 +8,16 @@ import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.entity.payload.DocumentFlowConfig;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.service.DataDomainService;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.DocumentFlowService;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.expression.EvaluationContext;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -22,6 +25,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -36,7 +40,6 @@ import java.util.Set;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class CommandSideEffectExecutor {
 
     private static final String LEGACY_RECORD_ID_PLACEHOLDER = "record" + "Id";
@@ -47,6 +50,39 @@ public class CommandSideEffectExecutor {
     private final CommandSpelEvaluator spelEvaluator;
     private final DocumentFlowService documentFlowService;
     private final ObjectMapper objectMapper;
+    private final DataPermissionEngine dataPermissionEngine;
+    private final DataDomainService dataDomainService;
+
+    @Autowired
+    public CommandSideEffectExecutor(
+            DynamicDataMapper dynamicDataMapper,
+            DynamicDataService dynamicDataService,
+            MetaModelService metaModelService,
+            CommandSpelEvaluator spelEvaluator,
+            DocumentFlowService documentFlowService,
+            ObjectMapper objectMapper,
+            DataPermissionEngine dataPermissionEngine,
+            DataDomainService dataDomainService) {
+        this.dynamicDataMapper = dynamicDataMapper;
+        this.dynamicDataService = dynamicDataService;
+        this.metaModelService = metaModelService;
+        this.spelEvaluator = spelEvaluator;
+        this.documentFlowService = documentFlowService;
+        this.objectMapper = objectMapper;
+        this.dataPermissionEngine = dataPermissionEngine;
+        this.dataDomainService = dataDomainService;
+    }
+
+    CommandSideEffectExecutor(
+            DynamicDataMapper dynamicDataMapper,
+            DynamicDataService dynamicDataService,
+            MetaModelService metaModelService,
+            CommandSpelEvaluator spelEvaluator,
+            DocumentFlowService documentFlowService,
+            ObjectMapper objectMapper) {
+        this(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator,
+                documentFlowService, objectMapper, null, null);
+    }
 
     /**
      * Execute side effect phase based on executionConfig.sideEffects configuration.
@@ -283,9 +319,8 @@ public class CommandSideEffectExecutor {
             // column is of PostgreSQL type jsonb (BUG-2: side-effect path was the only
             // command-pipeline path that still called plain update without ::jsonb cast).
             Set<String> jsonbCols = resolveJsonbColumns(targetModel, tableName);
-            int updated = jsonbCols.isEmpty()
-                    ? dynamicDataMapper.update(tableName, data, conditions)
-                    : dynamicDataMapper.updateWithJsonb(tableName, data, conditions, jsonbCols);
+            int updated = executeScopedUpdate(
+                    tableName, targetModel, idEntry, data, tenantId, jsonbCols, conditions);
             if (updated == 0) {
                 log.warn("SIDE_EFFECT UPDATE_RECORD: no record found to update in {} with {}={}", targetModel, idEntry.getKey(), recordIdVal);
             }
@@ -311,6 +346,111 @@ public class CommandSideEffectExecutor {
             return null;
         }
         return rows.get(0);
+    }
+
+    private int executeScopedUpdate(
+            String tableName,
+            String modelCode,
+            Map.Entry<String, Object> idEntry,
+            Map<String, Object> data,
+            Long tenantId,
+            Set<String> jsonbColumns,
+            Map<String, Object> legacyConditions) {
+        if (!shouldUseScopedWrite()) {
+            return jsonbColumns == null || jsonbColumns.isEmpty()
+                    ? dynamicDataMapper.update(tableName, data, legacyConditions)
+                    : dynamicDataMapper.updateWithJsonb(tableName, data, legacyConditions, jsonbColumns);
+        }
+        if (data == null || data.isEmpty()) {
+            return 0;
+        }
+        CommandExecutorUtils.validateSqlIdentifier(tableName, "SIDE_EFFECT update table");
+        CommandExecutorUtils.validateSqlIdentifier(idEntry.getKey(), "SIDE_EFFECT update id column");
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        StringBuilder sql = new StringBuilder("UPDATE ")
+                .append(tableName)
+                .append(" SET ");
+        int index = 0;
+        for (Map.Entry<String, Object> entry : data.entrySet()) {
+            CommandExecutorUtils.validateSqlIdentifier(entry.getKey(), "SIDE_EFFECT update column");
+            if (index > 0) {
+                sql.append(", ");
+            }
+            String paramName = "set" + index;
+            sql.append(entry.getKey()).append(" = #{params.").append(paramName).append("}");
+            if (jsonbColumns != null && jsonbColumns.contains(entry.getKey())) {
+                sql.append("::jsonb");
+            }
+            params.put(paramName, entry.getValue());
+            index++;
+        }
+
+        params.put("recordId", idEntry.getValue());
+        params.put("tenantId", tenantId);
+        sql.append(" WHERE ")
+                .append(idEntry.getKey())
+                .append(" = #{params.recordId}")
+                .append(" AND tenant_id = #{params.tenantId}");
+        appendScopedWriteGuards(sql, tenantId, modelCode, "update");
+
+        return dynamicDataMapper.updateByQuery(sql.toString(), params);
+    }
+
+    private boolean shouldUseScopedWrite() {
+        return dataPermissionEngine != null
+                && dataDomainService != null
+                && MetaContext.exists()
+                && !MetaContext.isDataPermissionBypassed()
+                && MetaContext.getCurrentUserId() != null;
+    }
+
+    private void appendScopedWriteGuards(StringBuilder sql, Long tenantId, String modelCode, String operation) {
+        Long userId = MetaContext.getCurrentUserId();
+        try {
+            String rowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
+                    () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+            appendScopedFilter(sql, rowFilter);
+        } catch (Exception e) {
+            log.error("Failed to apply row-level data permission for SIDE_EFFECT {} on model {}",
+                    operation, modelCode, e);
+            throw new BusinessException(ResponseCode.FORBIDDEN,
+                    "Data permission evaluation failed for model: " + modelCode);
+        }
+
+        try {
+            String domainFilter = DynamicDataQueryScope.domainFilter(tenantId, modelCode, userId,
+                    () -> dataDomainService.buildDomainFilter(modelCode, userId));
+            appendScopedFilter(sql, domainFilter);
+        } catch (Exception e) {
+            log.error("Failed to apply domain filter for SIDE_EFFECT {} on model {}",
+                    operation, modelCode, e);
+            throw new BusinessException(ResponseCode.FORBIDDEN,
+                    "Data domain filter evaluation failed for model: " + modelCode);
+        }
+    }
+
+    private void appendScopedFilter(StringBuilder sql, String filter) {
+        if (filter == null || filter.isBlank()) {
+            return;
+        }
+        String normalized = filter.trim();
+        if (normalized.regionMatches(true, 0, "AND ", 0, 4)) {
+            normalized = normalized.substring(4).trim();
+        } else if (normalized.regionMatches(true, 0, "WHERE ", 0, 6)) {
+            normalized = normalized.substring(6).trim();
+        }
+        if (normalized.isBlank()) {
+            return;
+        }
+        rejectStatementInjectionMarkers(normalized);
+        sql.append(" AND ").append(normalized);
+    }
+
+    private void rejectStatementInjectionMarkers(String filter) {
+        if (filter.contains(";") || filter.contains("--") || filter.contains("/*") || filter.contains("*/")) {
+            throw new BusinessException(ResponseCode.BadParam, "Unsafe DataScope filter for SIDE_EFFECT write");
+        }
     }
 
     /**
@@ -448,8 +588,8 @@ public class CommandSideEffectExecutor {
         // Update parent record
         String parentTable = metaModelService.getTableName(targetModel);
         var idEntry = CommandExecutorUtils.resolveRecordIdColumn(parentId);
-        dynamicDataMapper.update(parentTable, Map.of(parentField, result),
-                Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue()));
+        executeScopedUpdate(parentTable, targetModel, idEntry, Map.of(parentField, result),
+                tenantId, Set.of(), Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue()));
 
         log.info("AGGREGATE {}({}.{}) where {}={} = {} -> {}.{}",
                 function, childModel, childField, parentFk, parentId, result, targetModel, parentField);
@@ -563,9 +703,8 @@ public class CommandSideEffectExecutor {
                 String recordIdVal = targetRecordIdObj.toString();
                 var idEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdVal);
                 Map<String, Object> conditions = Map.of("tenant_id", tenantId, idEntry.getKey(), idEntry.getValue());
-                int count = jsonbCols.isEmpty()
-                        ? dynamicDataMapper.update(tableName, data, conditions)
-                        : dynamicDataMapper.updateWithJsonb(tableName, data, conditions, jsonbCols);
+                int count = executeScopedUpdate(
+                        tableName, targetModel, idEntry, data, tenantId, jsonbCols, conditions);
                 if (count == 0) {
                     log.warn("BATCH_UPDATE_RECORD: no record found in {} with {}={} at index {}",
                             targetModel, idEntry.getKey(), recordIdVal, i);

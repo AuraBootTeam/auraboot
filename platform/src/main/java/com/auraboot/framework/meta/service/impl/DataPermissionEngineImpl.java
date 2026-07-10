@@ -140,7 +140,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
      * Build row filter from legacy DataPermissionPolicy table.
      */
     private String buildPolicyRowFilter(Long tenantId, String modelCode, Long userId, Long memberId) {
-        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, memberId);
+        List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
 
         List<DataPermissionPolicy> rowPolicies = policies.stream()
                 .filter(p -> "row".equals(p.getPolicyType()))
@@ -187,7 +187,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         if (memberId == null) {
             return records;
         }
-        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, memberId);
+        List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
         List<DataPermissionPolicy> rowPolicies = policies.stream()
                 .filter(p -> "row".equals(p.getPolicyType()))
                 .collect(Collectors.toList());
@@ -227,7 +227,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         if (memberId == null) {
             return true; // No member context = allow (backward compat)
         }
-        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, memberId);
+        List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
         List<DataPermissionPolicy> rowPolicies = policies.stream()
                 .filter(p -> "row".equals(p.getPolicyType()))
                 .collect(Collectors.toList());
@@ -256,7 +256,7 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
         if (memberId == null) {
             return Collections.emptyList();
         }
-        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, memberId);
+        List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
 
         return policies.stream()
                 .filter(p -> "column".equals(p.getPolicyType()))
@@ -270,20 +270,37 @@ public class DataPermissionEngineImpl implements DataPermissionEngine {
 
     @Override
     public Set<String> getNonWritableFields(Long tenantId, String modelCode, Long userId) {
-        // Intentionally NOT @Cacheable: writes are not the hot path, and a fresh
-        // read avoids stale enforcement when policies change (the mask-rule cache
-        // is evicted on policy CRUD; a separate write cache would need the same
-        // eviction wiring — simpler and safer to query each write).
+        return DynamicDataQueryScope.nonWritableFields(
+                tenantId,
+                modelCode,
+                userId,
+                () -> loadNonWritableFields(tenantId, modelCode));
+    }
+
+    private Set<String> loadNonWritableFields(Long tenantId, String modelCode) {
+        // Keep this command-local rather than globally cached so policy changes
+        // are visible to the next command without additional eviction wiring.
         Long memberId = MetaContext.exists() ? MetaContext.getCurrentMemberId() : null;
         if (memberId == null) {
             return Collections.emptySet();
         }
-        List<DataPermissionPolicy> policies = policyMapper.findEffectivePolicies(tenantId, modelCode, memberId);
+        List<DataPermissionPolicy> policies = getEffectivePolicies(tenantId, modelCode, memberId);
         return policies.stream()
                 .filter(p -> "field_write".equals(p.getPolicyType()))
                 .map(DataPermissionPolicy::getFieldCode)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+    }
+
+    private List<DataPermissionPolicy> getEffectivePolicies(
+            Long tenantId,
+            String modelCode,
+            Long memberId) {
+        return DynamicDataQueryScope.effectivePolicies(
+                tenantId,
+                modelCode,
+                memberId,
+                () -> policyMapper.findEffectivePolicies(tenantId, modelCode, memberId));
     }
 
     @Override

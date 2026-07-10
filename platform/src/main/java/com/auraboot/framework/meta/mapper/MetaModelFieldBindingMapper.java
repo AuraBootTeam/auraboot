@@ -97,6 +97,17 @@ public interface MetaModelFieldBindingMapper extends BaseMapper<ModelFieldBindin
     @Delete("DELETE FROM ab_meta_model_field_binding WHERE field_id = #{fieldId}")
     int deleteByFieldId(@Param("fieldId") Long fieldId);
 
+    @Update("""
+        UPDATE ab_meta_model_field_binding
+        SET field_id = #{newFieldId}, updated_at = NOW()
+        WHERE tenant_id = #{tenantId}
+          AND field_id = #{oldFieldId}
+          AND deleted_flag = false
+        """)
+    int updateFieldIdForBindings(@Param("tenantId") Long tenantId,
+                                 @Param("oldFieldId") Long oldFieldId,
+                                 @Param("newFieldId") Long newFieldId);
+
     @Delete("DELETE FROM ab_meta_model_field_binding WHERE model_id = #{modelId} AND field_id = #{fieldId}")
     int deleteByModelAndField(@Param("modelId") Long modelId, @Param("fieldId") Long fieldId);
 

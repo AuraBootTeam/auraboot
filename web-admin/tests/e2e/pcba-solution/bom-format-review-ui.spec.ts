@@ -41,6 +41,60 @@ async function post(page: Page, code: string, payload: any) {
 }
 const pid = (b: any) => b?.data?.data?.recordPid || b?.data?.recordPid || b?.data?.recordId;
 
+async function listConversionTasks(page: Page): Promise<any[]> {
+  const list = await page.request.get('/api/dynamic/bom_conversion_task_pcba/list?pageNum=1&pageSize=10&sortField=created_at&sortOrder=desc');
+  const lb = await list.json().catch(() => ({} as any));
+  const recs = lb?.data?.records || lb?.data?.data?.records || lb?.data || [];
+  return Array.isArray(recs) ? recs : [];
+}
+
+function findTask(recs: any[], projId: string, fileId: string): any | undefined {
+  return recs.find((r: any) => String(r.bom_task_project_id || '') === String(projId) || String(r.bom_task_raw_file_id || '') === String(fileId));
+}
+
+async function listStandardLines(page: Page, task: string): Promise<any[]> {
+  const r = await page.request.get('/api/dynamic/bom_standard_line_pcba/list?pageNum=1&pageSize=500&sortField=created_at&sortOrder=desc');
+  const b = await r.json().catch(() => ({} as any));
+  const recs = b?.data?.records || b?.data?.data?.records || b?.data || [];
+  return (Array.isArray(recs) ? recs : []).filter((l: any) => String(l.bom_std_task_id || '') === String(task));
+}
+
+async function waitForTaskReady(page: Page, projId: string, fileId: string): Promise<string> {
+  let found: any;
+  await expect.poll(async () => {
+    found = findTask(await listConversionTasks(page), projId, fileId);
+    const id = found?.pid || found?.id || '';
+    return id ? (await listStandardLines(page, id)).length : 0;
+  }, { timeout: 150_000, intervals: [1_000, 2_000, 5_000] }).toBeGreaterThan(0);
+  return found?.pid || found?.id || '';
+}
+
+type ReviewSurface = {
+  main: string;
+  hasMetrics: boolean;
+  hasTable: boolean;
+  hasTabsOrBanner: boolean;
+};
+
+async function readReviewSurface(page: Page): Promise<ReviewSurface> {
+  const main = await page.locator('main').innerText().catch(() => '');
+  const hasMetrics = await page.locator('[data-testid*="metric"], [class*="metric"]').count() > 0
+    || /行|条|数量|总数|匹配|待确认|候选|count/i.test(main);
+  const hasTable = await page.locator('table tbody tr').count() > 0;
+  const hasTabsOrBanner = await page.locator('[role="tab"], [data-testid*="status-banner"], [class*="banner"], [role="tablist"]').count() > 0
+    || /状态|进度|已完成|转换|review|格式/i.test(main);
+  return { main, hasMetrics, hasTable, hasTabsOrBanner };
+}
+
+async function waitForReviewSurface(page: Page): Promise<ReviewSurface> {
+  let surface: ReviewSurface = { main: '', hasMetrics: false, hasTable: false, hasTabsOrBanner: false };
+  await expect.poll(async () => {
+    surface = await readReviewSurface(page);
+    return surface.hasMetrics || surface.hasTable;
+  }, { timeout: 30_000, intervals: [500, 1_000, 2_000] }).toBeTruthy();
+  return surface;
+}
+
 test.describe('BOM LLM format-review UI (BOM-09/10 UI counterpart) @smoke', () => {
   test.describe.configure({ mode: 'serial', timeout: 300_000 });
 
@@ -55,7 +109,10 @@ test.describe('BOM LLM format-review UI (BOM-09/10 UI counterpart) @smoke', () =
   // heavy conversion lives in a test (300s describe timeout), not beforeAll (15s hook timeout)
   test('provision + convert a BOM for the workbench', async ({ browser }) => {
     const bom = findSampleBom();
-    test.skip(!bom, 'sample BOM fixture absent');
+    expect(
+      bom,
+      'sample BOM fixture must exist; set QUOTE_BOM_SAMPLES_DIR or keep aura-quote/docs/ref/10款GERBER加坐标 available',
+    ).toBeTruthy();
     const s = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const sp = await s.newPage();
     try {
@@ -64,48 +121,35 @@ test.describe('BOM LLM format-review UI (BOM-09/10 UI counterpart) @smoke', () =
       const up = await sp.request.post('/api/file/upload', { multipart: { file: { name: 'bom.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: fs.readFileSync(bom!) } } });
       const fileId = (await up.json())?.data?.fileId;
       await post(sp, 'bom:start_conversion', { bom_task_project_id: projId, bom_task_source_package: 'fmt_review', bom_task_raw_file_id: fileId });
-      for (let i = 0; i < 30; i++) {
-        await sp.waitForTimeout(5000);
-        const list = await sp.request.get('/api/dynamic/bom_conversion_task_pcba/list?pageNum=1&pageSize=10&sortField=created_at&sortOrder=desc');
-        const lb = await list.json().catch(() => ({} as any));
-        const recs = lb?.data?.records || lb?.data?.data?.records || lb?.data || [];
-        const mine = (Array.isArray(recs) ? recs : []).find((r: any) => String(r.bom_task_project_id || '') === String(projId) || String(r.bom_task_raw_file_id || '') === String(fileId));
-        if (mine) { taskId = mine.pid || mine.id || ''; const st = String(mine.bom_task_status || ''); if (/done|complet|succeed|success|ready|review|pending/i.test(st)) break; }
-      }
+      taskId = await waitForTaskReady(sp, projId, fileId);
       expect(taskId, 'conversion produced a task').toBeTruthy();
     } finally { await s.close(); }
   });
 
   test('BOM-09/10-UI workbench reflects the LLM format-review result + interaction changes UI', async ({ browser }) => {
-    test.skip(!taskId, 'no converted task (sample BOM fixture absent)');
+    expect(taskId, 'previous conversion test must produce a task; fixture/setup failures must fail fast').toBeTruthy();
     const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
       // open the workbench list, find the task, open its detail (format-review surface)
       await page.goto(WORKBENCH, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3500);
+      await expect(page.locator('main')).toBeVisible({ timeout: 5_000 });
       // open task detail: direct detail route, else click the row
       await page.goto(`${WORKBENCH}/view/${taskId}`, { waitUntil: 'domcontentloaded' }).catch(() => {});
-      await page.waitForTimeout(3500);
-      let main = await page.locator('main').innerText().catch(() => '');
-      if (!main || main.length < 30) {
+      let surface = await waitForReviewSurface(page).catch(() => undefined);
+      if (!surface) {
         await page.goto(WORKBENCH, { waitUntil: 'domcontentloaded' });
-        await page.waitForTimeout(3000);
+        await expect(page.locator('main')).toBeVisible({ timeout: 5_000 });
         const row = page.locator('table tbody tr').first();
         const link = row.locator('a').first();
-        if (await link.count() > 0) await link.click({ timeout: 8000 }).catch(() => {});
-        else await row.locator('td').first().click({ timeout: 6000 }).catch(() => {});
-        await page.waitForTimeout(3500);
-        main = await page.locator('main').innerText().catch(() => '');
+        if (await link.count() > 0) await link.click({ timeout: 5_000 }).catch(() => {});
+        else await row.locator('td').first().click({ timeout: 5_000 }).catch(() => {});
+        surface = await waitForReviewSurface(page);
       }
       // UI reflects the format review: the workbench detail renders parse-result surfaces
+      const { main, hasMetrics, hasTable, hasTabsOrBanner } = surface;
       expect(main.length, 'workbench detail renders content').toBeGreaterThan(30);
       // metric-strip (counts) OR a lines table present — the parsed BOM is surfaced in the UI
-      const hasMetrics = await page.locator('[data-testid*="metric"], [class*="metric"]').count() > 0
-        || /行|条|数量|总数|匹配|待确认|候选|count/i.test(main);
-      const hasTable = await page.locator('table tbody tr').count() > 0;
-      const hasTabsOrBanner = await page.locator('[role="tab"], [data-testid*="status-banner"], [class*="banner"], [role="tablist"]').count() > 0
-        || /状态|进度|已完成|转换|review|格式/i.test(main);
       test.info().annotations.push({ type: 'note', description: `metrics=${hasMetrics} table=${hasTable} tabs/banner=${hasTabsOrBanner}` });
       expect(hasMetrics || hasTable, 'BOM-09/10-UI: workbench surfaces the LLM-parsed result (metrics or line table)').toBeTruthy();
       expect(hasTabsOrBanner, 'BOM-09/10-UI: workbench shows status/review surface').toBeTruthy();
@@ -115,8 +159,12 @@ test.describe('BOM LLM format-review UI (BOM-09/10 UI counterpart) @smoke', () =
       const reviewBtn = page.getByRole('button', { name: /复核|评审|查看|详情|review|确认/i }).first()
         .or(page.locator('[data-testid*="review"], [data-testid="row-action-more"]').first());
       if (await reviewBtn.count() > 0) {
-        await reviewBtn.click({ timeout: 6000 }).catch(() => {});
-        await page.waitForTimeout(1500);
+        await reviewBtn.click({ timeout: 5_000 }).catch(() => {});
+        await expect.poll(async () => {
+          const drawerOpenNow = await page.locator('[role="dialog"], .ant-drawer, [data-testid*="review-drawer"], [data-testid*="drawer"]').count() > 0;
+          const afterLength = (await page.locator('body').innerText().catch(() => '')).length;
+          return drawerOpenNow || afterLength !== before;
+        }, { timeout: 5_000, intervals: [250, 500, 1_000] }).toBeTruthy();
         const drawerOpen = await page.locator('[role="dialog"], .ant-drawer, [data-testid*="review-drawer"], [data-testid*="drawer"]').count() > 0;
         const after = (await page.locator('body').innerText().catch(() => '')).length;
         test.info().annotations.push({ type: 'note', description: `interaction: drawerOpen=${drawerOpen} textBefore=${before} textAfter=${after}` });

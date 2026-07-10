@@ -263,6 +263,88 @@ describe('DataSourceManager', () => {
     ]);
   });
 
+  it('bypasses min fetch interval for explicit reloads', async () => {
+    mockedFetchResult
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { records: [{ pid: 'line-1', status: 'pending' }], total: 1 },
+      } as any)
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { records: [{ pid: 'line-1', status: 'confirmed' }], total: 1 },
+      } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { pid: 'quote-1' },
+      } as any),
+    );
+    manager.register('bomPriceWaterfall', {
+      type: 'namedQuery',
+      queryCode: 'qo_quote_bom_price_waterfall',
+      format: 'records',
+      adaptor: 'table',
+      autoFetch: false,
+      minFetchIntervalMs: 1500,
+      params: {
+        quoteId: '${form.pid}',
+      },
+    } as any);
+
+    await manager.fetch('bomPriceWaterfall');
+    await manager.reload('bomPriceWaterfall');
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(2);
+    expect(manager.getData('bomPriceWaterfall')?.records).toEqual([
+      { pid: 'line-1', status: 'confirmed' },
+    ]);
+  });
+
+  it('starts a fresh reload when a matching request is still in flight', async () => {
+    let resolveInitial: ((value: any) => void) | undefined;
+    const initialFetch = new Promise<any>((resolve) => {
+      resolveInitial = resolve;
+    });
+    mockedFetchResult.mockReturnValueOnce(initialFetch).mockResolvedValueOnce({
+      code: '0',
+      data: { records: [{ pid: 'line-1', status: 'confirmed' }], total: 1 },
+    } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { pid: 'quote-1' },
+      } as any),
+    );
+    manager.register('bomPriceWaterfall', {
+      type: 'namedQuery',
+      queryCode: 'qo_quote_bom_price_waterfall',
+      format: 'records',
+      adaptor: 'table',
+      autoFetch: false,
+      params: {
+        quoteId: '${form.pid}',
+      },
+    });
+
+    const staleFetch = manager.fetch('bomPriceWaterfall');
+    await manager.reload('bomPriceWaterfall');
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(2);
+    expect(manager.getData('bomPriceWaterfall')?.records).toEqual([
+      { pid: 'line-1', status: 'confirmed' },
+    ]);
+
+    resolveInitial?.({
+      code: '0',
+      data: { records: [{ pid: 'line-1', status: 'pending' }], total: 1 },
+    });
+    await staleFetch;
+
+    expect(manager.getData('bomPriceWaterfall')?.records).toEqual([
+      { pid: 'line-1', status: 'confirmed' },
+    ]);
+  });
+
   it('keeps cached namedQuery data during rate-limit backoff', async () => {
     mockedFetchResult
       .mockResolvedValueOnce({
