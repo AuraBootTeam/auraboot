@@ -71,6 +71,13 @@ async function upload(page: Page, filePath: string, name: string) {
   return (await r.json())?.data?.fileId;
 }
 
+async function countQuoteLines(page: Page, quoteId: string): Promise<number> {
+  const r = await page.request.get('/api/dynamic/qo_quote_line_common/list?pageNum=1&pageSize=500&sortField=created_at&sortOrder=desc');
+  const b = await r.json().catch(() => ({} as any));
+  const recs = b?.data?.records || b?.data?.data?.records || b?.data || [];
+  return (Array.isArray(recs) ? recs : []).filter((line: any) => String(line.qo_ql_quote_id || '') === String(quoteId)).length;
+}
+
 test.describe('Quote actions deep — upload/process-fee/gerber/deepseek/source-prices (QO-03/05/06/08/09) @smoke', () => {
   test.describe.configure({ mode: 'serial', timeout: 300_000 });
   let quoteId = '';
@@ -107,14 +114,10 @@ test.describe('Quote actions deep — upload/process-fee/gerber/deepseek/source-
       });
       // wait for quote lines to exist (pricing precondition)
       let lines = 0;
-      for (let i = 0; i < 30; i++) {
-        await page.waitForTimeout(5000);
-        const r = await page.request.get(`/api/dynamic/qo_quote_line_common/list?pageNum=1&pageSize=5&filters=${encodeURIComponent(JSON.stringify({ qo_ql_quote_id: quoteId }))}`);
-        const b = await r.json().catch(() => ({} as any));
-        const recs = b?.data?.records || b?.data?.data?.records || b?.data || [];
-        lines = Array.isArray(recs) ? recs.length : 0;
-        if (lines > 0) break;
-      }
+      await expect.poll(async () => {
+        lines = await countQuoteLines(page, quoteId);
+        return lines;
+      }, { timeout: 150_000, intervals: [1_000, 2_000, 5_000] }).toBeGreaterThan(0);
       test.info().annotations.push({ type: 'note', description: `quote ${quoteId} lines=${lines}` });
     } finally {
       await context.close();

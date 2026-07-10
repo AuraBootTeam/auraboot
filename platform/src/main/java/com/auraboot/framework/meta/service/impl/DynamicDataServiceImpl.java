@@ -183,13 +183,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         Long tenantId = getCurrentTenantId();
         queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
 
+        String scopedRowFilter = null;
+        String scopedDomainFilter = null;
         if (!MetaContext.isDataPermissionBypassed()) {
             // 添加数据权限行级过滤 — fail-secure: exception = deny all
             try {
                 Long userId = getCurrentUserId();
-                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
-                if (rowFilter != null && !rowFilter.isBlank()) {
-                    queryBuilder.addRawCondition(rowFilter);
+                scopedRowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
+                        () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+                if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
+                    queryBuilder.addRawCondition(scopedRowFilter);
                 }
             } catch (Exception e) {
                 // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
@@ -202,9 +205,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // Apply data domain isolation filter (D5) — fail-secure
             try {
                 Long userId = getCurrentUserId();
-                String domainFilter = dataDomainService.buildDomainFilter(modelCode, userId);
-                if (domainFilter != null && !domainFilter.isBlank()) {
-                    queryBuilder.addRawCondition(domainFilter);
+                scopedDomainFilter = DynamicDataQueryScope.domainFilter(tenantId, modelCode, userId,
+                        () -> dataDomainService.buildDomainFilter(modelCode, userId));
+                if (scopedDomainFilter != null && !scopedDomainFilter.isBlank()) {
+                    queryBuilder.addRawCondition(scopedDomainFilter);
                 }
             } catch (Exception e) {
                 // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
@@ -254,32 +258,18 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         countBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
 
         if (!MetaContext.isDataPermissionBypassed()) {
-            // Apply the same row-level filter to count query for consistency — fail-secure
-            try {
-                Long countUserId = getCurrentUserId();
-                String countRowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, countUserId);
-                if (countRowFilter != null && !countRowFilter.isBlank()) {
-                    countBuilder.addRawCondition(countRowFilter);
-                }
-            } catch (Exception e) {
-                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-                log.error("Failed to apply row-level data permission to count query for model {} — denying access", logSafe(modelCode), e);
-                throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
+            // Reuse the exact row-level filter from the data query so count cannot drift and
+            // the same request does not re-run permission lookup for the count builder.
+            if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
+                countBuilder.addRawCondition(scopedRowFilter);
             }
         }
 
         if (!MetaContext.isDataPermissionBypassed()) {
-            // Apply the same domain filter to count query for consistency (D5) — fail-secure
-            try {
-                Long countUserId = getCurrentUserId();
-                String countDomainFilter = dataDomainService.buildDomainFilter(modelCode, countUserId);
-                if (countDomainFilter != null && !countDomainFilter.isBlank()) {
-                    countBuilder.addRawCondition(countDomainFilter);
-                }
-            } catch (Exception e) {
-                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-                log.error("Failed to apply domain filter to count query for model {} — denying access", logSafe(modelCode), e);
-                throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
+            // Reuse the exact domain filter from the data query for count consistency and to
+            // avoid duplicate domain metadata lookup in one list request.
+            if (scopedDomainFilter != null && !scopedDomainFilter.isBlank()) {
+                countBuilder.addRawCondition(scopedDomainFilter);
             }
         }
 
@@ -1282,25 +1272,19 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // Use JSONB-merge-aware toColumnData for UPDATE to preserve unmodified JSONB keys
             Map<String, Object> columnData = toColumnDataForUpdate(model, enrichedData, existingRecord);
             FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-            Long tenantId = getCurrentTenantId();
-            String primaryKeyColumn = primaryKey.getColumnName();
-
-            // Build update conditions
-            Map<String, Object> conditions = new HashMap<>();
-            conditions.put(primaryKeyColumn, recordId);
-            conditions.put("tenant_id", tenantId);
+            String primaryKeyColumn = primaryKey.getColumnName() != null
+                    ? primaryKey.getColumnName()
+                    : primaryKey.getCode();
 
             // If expectedVersion provided, add optimistic lock condition
             if (expectedVersion != null) {
-                conditions.put("row_version", expectedVersion);
                 columnData.put("row_version", ((Number) expectedVersion).intValue() + 1);
             }
 
-            // Execute update with JSONB awareness
+            // Execute update with tenant and DataScope guards in the write SQL itself.
             Set<String> jsonbColumns = JsonbFieldHelper.getJsonbHostColumns(model);
-            int result = jsonbColumns.isEmpty()
-                    ? dynamicDataMapper.update(model.getTableName(), columnData, conditions)
-                    : dynamicDataMapper.updateWithJsonb(model.getTableName(), columnData, conditions, jsonbColumns);
+            int result = executeScopedUpdate(
+                    model, modelCode, primaryKeyColumn, recordId, columnData, jsonbColumns, expectedVersion);
             if (result <= 0) {
                 if (expectedVersion != null) {
                     throw new MetaServiceException("Update failed: version conflict (expected version " + expectedVersion + ")");
@@ -1366,9 +1350,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // 构建删除条件
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-        Map<String, Object> conditions = new java.util.HashMap<>();
-        conditions.put(primaryKey.getColumnName(), recordId);
-        conditions.put("tenant_id", getCurrentTenantId());
+        String primaryKeyColumn = primaryKey.getColumnName() != null
+                ? primaryKey.getColumnName()
+                : primaryKey.getCode();
 
         int result;
         if (model.isSoftDelete()) {
@@ -1377,10 +1361,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             updateData.put("deleted_flag", true);
             updateData.put("updated_at", java.time.Instant.now());
             updateData.put("updated_by", getCurrentUserId());
-            result = dynamicDataMapper.update(model.getTableName(), updateData, conditions);
+            result = executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, updateData, Set.of(), null);
         } else {
             // Hard delete: DELETE FROM (default behavior)
-            result = dynamicDataMapper.delete(model.getTableName(), conditions);
+            result = executeScopedDelete(model, modelCode, primaryKeyColumn, recordId);
         }
         if (result <= 0) {
             throw new MetaServiceException("Failed to delete record");
@@ -1400,6 +1384,112 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         } catch (Exception e) {
             log.error("Failed to record change log for delete: model={}, id={}: {}",
                     logSafe(modelCode), logSafe(recordId), logSafe(e.getMessage()), e);
+        }
+    }
+
+    private int executeScopedUpdate(
+            ModelDefinition model,
+            String modelCode,
+            String primaryKeyColumn,
+            String recordId,
+            Map<String, Object> columnData,
+            Set<String> jsonbColumns,
+            Object expectedVersion) {
+        if (columnData == null || columnData.isEmpty()) {
+            throw new MetaServiceException("Update data cannot be empty");
+        }
+
+        String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
+        String pkColumn = SqlSafetyUtils.requireIdentifier(primaryKeyColumn, "primary key column");
+        Long tenantId = getCurrentTenantId();
+        Long userId = getCurrentUserId();
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        StringBuilder sql = new StringBuilder("UPDATE ")
+                .append(tableName)
+                .append(" SET ");
+        int index = 0;
+        for (Map.Entry<String, Object> entry : columnData.entrySet()) {
+            String columnName = SqlSafetyUtils.requireIdentifier(entry.getKey(), "column name");
+            if (index > 0) {
+                sql.append(", ");
+            }
+            String paramName = "set" + index;
+            sql.append(columnName).append(" = #{params.").append(paramName).append("}");
+            if (jsonbColumns != null && jsonbColumns.contains(columnName)) {
+                sql.append("::jsonb");
+            }
+            params.put(paramName, entry.getValue());
+            index++;
+        }
+
+        params.put("recordId", recordId);
+        params.put("tenantId", tenantId);
+        sql.append(" WHERE ")
+                .append(pkColumn)
+                .append(" = #{params.recordId}")
+                .append(" AND tenant_id = #{params.tenantId}");
+        if (expectedVersion != null) {
+            params.put("expectedVersion", expectedVersion);
+            sql.append(" AND row_version = #{params.expectedVersion}");
+        }
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "update");
+
+        return dynamicDataMapper.updateByQuery(sql.toString(), params);
+    }
+
+    private int executeScopedDelete(
+            ModelDefinition model,
+            String modelCode,
+            String primaryKeyColumn,
+            String recordId) {
+        String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
+        String pkColumn = SqlSafetyUtils.requireIdentifier(primaryKeyColumn, "primary key column");
+        Long tenantId = getCurrentTenantId();
+        Long userId = getCurrentUserId();
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("recordId", recordId);
+        params.put("tenantId", tenantId);
+
+        StringBuilder sql = new StringBuilder("DELETE FROM ")
+                .append(tableName)
+                .append(" WHERE ")
+                .append(pkColumn)
+                .append(" = #{params.recordId}")
+                .append(" AND tenant_id = #{params.tenantId}");
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete");
+
+        return dynamicDataMapper.deleteByQuery(sql.toString(), params);
+    }
+
+    private void appendScopedWriteGuards(
+            StringBuilder sql,
+            Long tenantId,
+            String modelCode,
+            Long userId,
+            String operation) {
+        if (MetaContext.isDataPermissionBypassed()) {
+            return;
+        }
+
+        try {
+            String rowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
+                    () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+            appendScopedBulkFilter(sql, rowFilter);
+        } catch (Exception e) {
+            log.error("Failed to apply row-level data permission for {} on model {} — denying access",
+                    operation, logSafe(modelCode), e);
+            throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
+        }
+
+        try {
+            String domainFilter = DynamicDataQueryScope.domainFilter(tenantId, modelCode, userId,
+                    () -> dataDomainService.buildDomainFilter(modelCode, userId));
+            appendScopedBulkFilter(sql, domainFilter);
+        } catch (Exception e) {
+            log.error("Failed to apply domain filter for {} on model {} — denying access",
+                    operation, logSafe(modelCode), e);
+            throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
         }
     }
 
@@ -1438,8 +1528,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                             successCount++;
                             continue;
                         }
-                    } catch (Exception e) {
-                        // Record doesn't exist, proceed with creation
+                    } catch (MetaServiceException e) {
+                        if (!isRecordNotFound(e)) {
+                            throw e;
+                        }
+                        // Record does not exist, proceed with creation.
                     }
                 }
 
@@ -1461,6 +1554,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         response.setErrors(errors);
 
         return response;
+    }
+
+    private boolean isRecordNotFound(MetaServiceException e) {
+        String message = e.getMessage();
+        return message != null && message.startsWith("Record not found:");
     }
 
     @Override

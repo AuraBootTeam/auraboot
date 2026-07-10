@@ -1,10 +1,14 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.service.DataDomainService;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.DocumentFlowService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +41,10 @@ class AggregateSideEffectTest {
     private CommandSpelEvaluator spelEvaluator;
     @Mock
     private DocumentFlowService documentFlowService;
+    @Mock
+    private DataPermissionEngine dataPermissionEngine;
+    @Mock
+    private DataDomainService dataDomainService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -53,6 +61,11 @@ class AggregateSideEffectTest {
     @BeforeEach
     void setUp() {
         executor = new CommandSideEffectExecutor(dynamicDataMapper, dynamicDataService, metaModelService, spelEvaluator, documentFlowService, objectMapper);
+    }
+
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
     }
 
     /**
@@ -101,6 +114,56 @@ class AggregateSideEffectTest {
 
         Map<String, Object> updateData = dataCaptor.getValue();
         assertEquals(new BigDecimal("600"), updateData.get("total_amount"));
+    }
+
+    @Test
+    void aggregateParentUpdateUsesScopedSqlGuardsWhenUserContextExists() {
+        MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
+        executor = new CommandSideEffectExecutor(
+                dynamicDataMapper,
+                dynamicDataService,
+                metaModelService,
+                spelEvaluator,
+                documentFlowService,
+                objectMapper,
+                dataPermissionEngine,
+                dataDomainService);
+        when(metaModelService.getTableName("pm_order_line")).thenReturn("mt_pm_order_line");
+        when(metaModelService.getTableName("pm_order")).thenReturn("mt_pm_order");
+        when(dynamicDataMapper.selectByQuery(anyString(), anyMap()))
+                .thenReturn(List.of(Map.of("amount", new BigDecimal("100"))));
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, "pm_order", USER_ID))
+                .thenReturn("AND owner_id = 100");
+        when(dataDomainService.buildDomainFilter("pm_order", USER_ID))
+                .thenReturn("AND domain_id = 7");
+        when(dynamicDataMapper.updateByQuery(anyString(), anyMap())).thenReturn(1);
+
+        Map<String, Object> currentRecord = new HashMap<>();
+        currentRecord.put("order_id", "order-001");
+        Map<String, Object> effect = new HashMap<>();
+        effect.put("action", "aggregate");
+        effect.put("targetModel", "pm_order");
+        effect.put("childModel", "pm_order_line");
+        effect.put("childField", "amount");
+        effect.put("parentField", "total_amount");
+        effect.put("parentFk", "order_id");
+        effect.put("function", "sum");
+
+        executor.executeSideEffectPhase(Map.of("sideEffects", List.of(effect)), currentRecord,
+                TENANT_ID, USER_ID, null, null, null);
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Map<String, Object>> paramsCaptor = mapCaptor();
+        verify(dynamicDataMapper).updateByQuery(sqlCaptor.capture(), paramsCaptor.capture());
+        verify(dynamicDataMapper, never()).update(eq("mt_pm_order"), anyMap(), anyMap());
+
+        assertTrue(sqlCaptor.getValue().contains("UPDATE mt_pm_order SET"));
+        assertTrue(sqlCaptor.getValue().contains("WHERE pid = #{params.recordId}"));
+        assertTrue(sqlCaptor.getValue().contains("tenant_id = #{params.tenantId}"));
+        assertTrue(sqlCaptor.getValue().contains("owner_id = 100"));
+        assertTrue(sqlCaptor.getValue().contains("domain_id = 7"));
+        assertEquals("order-001", paramsCaptor.getValue().get("recordId"));
+        assertEquals(TENANT_ID, paramsCaptor.getValue().get("tenantId"));
     }
 
     @Test

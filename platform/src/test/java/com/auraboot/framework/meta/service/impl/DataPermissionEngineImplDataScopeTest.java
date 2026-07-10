@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -97,6 +99,33 @@ class DataPermissionEngineImplDataScopeTest {
                 List.of(own, other));
 
         assertThat(filtered).containsExactly(own);
+    }
+
+    @Test
+    @DisplayName("non-writable fields are loaded once per command query scope")
+    void nonWritableFields_reusesCommandQueryScope() {
+        when(policyMapper.findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID)).thenReturn(List.of());
+
+        try (DynamicDataQueryScope ignored = DynamicDataQueryScope.open()) {
+            assertThat(engine.getNonWritableFields(TENANT_ID, MODEL_CODE, USER_ID)).isEmpty();
+            assertThat(engine.getNonWritableFields(TENANT_ID, MODEL_CODE, USER_ID)).isEmpty();
+        }
+
+        verify(policyMapper, times(1)).findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID);
+    }
+
+    @Test
+    @DisplayName("effective policies are shared across record access and write guards in one command")
+    void effectivePoliciesAreSharedAcrossPermissionOperations() {
+        when(policyMapper.findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID)).thenReturn(List.of());
+        Map<String, Object> record = Map.of("pid", "record-1", "created_by", USER_ID);
+
+        try (DynamicDataQueryScope ignored = DynamicDataQueryScope.open()) {
+            assertThat(engine.canAccessRecord(TENANT_ID, MODEL_CODE, USER_ID, record)).isTrue();
+            assertThat(engine.getNonWritableFields(TENANT_ID, MODEL_CODE, USER_ID)).isEmpty();
+        }
+
+        verify(policyMapper, times(1)).findEffectivePolicies(TENANT_ID, MODEL_CODE, MEMBER_ID);
     }
 
     // ---- data-scope SQL identifier validation (deep-review DR-20260701 W1-C-1) ----

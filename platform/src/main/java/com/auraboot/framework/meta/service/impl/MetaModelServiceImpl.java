@@ -66,6 +66,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private final QueryBuilderService queryBuilderService;
     private final MetaModelFieldBindingMapper fieldBindingMapper;
     private final com.auraboot.framework.permission.service.AutoPermissionAssignmentService autoPermissionAssignmentService;
+    private final MetaDefinitionCacheService metaDefinitionCacheService;
 
     @Autowired
     @Lazy
@@ -95,29 +96,34 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     private com.auraboot.framework.environment.service.EnvironmentService environmentService;
 
     @Override
-    @Cacheable(value = "modelDefinitions", key = "#modelCode + '_' + T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix()", unless = "#result == null")
     public Optional<ModelDefinition> getModelDefinition(String modelCode) {
         validateModelCode(modelCode);
+        return metaDefinitionCacheService.getModelDefinition(
+                modelCode,
+                () -> loadModelDefinition(modelCode));
+    }
+
+    private Optional<ModelDefinition> loadModelDefinition(String modelCode) {
         logOperation("getModelDefinition", modelCode);
-        
+
         // 直接使用 findCurrentByCode 方法，租户拦截器会自动添加 tenant_id 条件
         Model model = metaModelMapper.findCurrentByCode(modelCode);
-        
+
         if (model != null) {
             // 转换Entity为DTO
             ModelDefinition modelDefinition = convertToModelDefinition(model);
-            
+
             // 加载字段定义
             List<FieldDefinition> fields = loadFieldDefinitions(model.getId());
             modelDefinition.setFields(fields);
-            
+
             // 加载关联关系
             List<RelationDefinition> relations = loadModelRelations(model.getId());
             modelDefinition.setRelations(relations);
-            
+
             return Optional.of(modelDefinition);
         }
-        
+
         return Optional.empty();
     }
 
@@ -323,7 +329,18 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     }
 
     @Override
-    @CacheEvict(value = {"modelDefinitions", "viewModelFields", "viewModelSummary"}, allEntries = true)
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "fieldDefinitions",
+            "relationDefinitions",
+            "modelExists",
+            "modelFieldBindings",
+            "fieldBindings",
+            "metaField",
+            "metaFieldByKey",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public void clearAllCache() {
         log.info("Clearing all metadata cache for tenant: {}", getCurrentTenantId());
     }
@@ -707,6 +724,18 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     }
 
     @Override
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "fieldDefinitions",
+            "relationDefinitions",
+            "modelExists",
+            "modelFieldBindings",
+            "fieldBindings",
+            "metaField",
+            "metaFieldByKey",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public void delete(String pid) {
         if (!StringUtils.hasText(pid)) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "PID不能为空");
@@ -872,6 +901,18 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     @Override
     @Transactional
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "fieldDefinitions",
+            "relationDefinitions",
+            "modelExists",
+            "modelFieldBindings",
+            "fieldBindings",
+            "metaField",
+            "metaFieldByKey",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public ModelDefinition saveDefinition(ModelDefinition def) {
         if (def == null || !StringUtils.hasText(def.getCode())) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "ModelDefinition.code must not be blank");
@@ -1652,7 +1693,18 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     @Override
     @Transactional
-    @CacheEvict(value = {"modelFieldBindings", "fieldBindings", "viewModelFields", "viewModelSummary"}, allEntries = true)
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "fieldDefinitions",
+            "relationDefinitions",
+            "modelExists",
+            "modelFieldBindings",
+            "fieldBindings",
+            "metaField",
+            "metaFieldByKey",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public ModelFieldBinding bindFieldToModel(Long modelId, Long fieldId, Integer fieldOrder,
                                               Boolean required, Boolean visible, Boolean editable, String defaultValue,
                                               String validationRules, String displayConfig, String remarks) {
@@ -1719,7 +1771,18 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     @Override
     @Transactional
-    @CacheEvict(value = {"modelFieldBindings", "fieldBindings", "viewModelFields", "viewModelSummary"}, allEntries = true)
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "fieldDefinitions",
+            "relationDefinitions",
+            "modelExists",
+            "modelFieldBindings",
+            "fieldBindings",
+            "metaField",
+            "metaFieldByKey",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public boolean unbindFieldFromModel(Long modelId, Long fieldId) {
         logMetaOperation("unbindFieldFromModel", "modelId=" + modelId + ", fieldId=" + fieldId);
 
@@ -1797,7 +1860,18 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     @Override
     @Transactional
-    @CacheEvict(value = {"modelFieldBindings", "fieldBindings", "viewModelFields", "viewModelSummary"}, allEntries = true)
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "fieldDefinitions",
+            "relationDefinitions",
+            "modelExists",
+            "modelFieldBindings",
+            "fieldBindings",
+            "metaField",
+            "metaFieldByKey",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public ModelFieldBinding updateFieldBinding(ModelFieldBinding binding) {
         logMetaOperation("updateFieldBinding", "bindingId=" + binding.getId());
         
@@ -1927,6 +2001,18 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
     @Override
     @Transactional
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "fieldDefinitions",
+            "relationDefinitions",
+            "modelExists",
+            "modelFieldBindings",
+            "fieldBindings",
+            "metaField",
+            "metaFieldByKey",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public MetaModelDTO rollbackToVersion(String code, Integer version) {
         log.info("回滚模型到指定版本: code={}, version={}", logSafe(code), version);
 

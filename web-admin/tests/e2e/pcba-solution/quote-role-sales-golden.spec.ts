@@ -53,6 +53,13 @@ const MANUAL_VALID_UNTIL = '2026-12-31';
 
 type ForbiddenHit = { step: string; url: string; status: number };
 
+async function fillDialogField(page: Page, field: string, value: string): Promise<void> {
+  const input = page.getByTestId(`form-dialog-field-${field}`);
+  await input.fill('');
+  await input.pressSequentially(value, { delay: 10 });
+  await expect(input).toHaveValue(value);
+}
+
 function sheetRows(workbook: XLSX.WorkBook, sheetName: string): unknown[][] {
   const sheet = workbook.Sheets[sheetName];
   expect(sheet, `sheet ${sheetName} exists`).toBeTruthy();
@@ -241,11 +248,11 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       await page.getByTestId('review-drawer-candidate-action-record_manual_price').click();
       // manual price collects via the platform FormDialog (standard DSL inputFields sugar)
       await expect(page.getByTestId('form-dialog')).toBeVisible({ timeout: 15_000 });
-      await page.getByTestId('form-dialog-field-unitPrice').fill(String(MANUAL_UNIT_PRICE));
-      await page.getByTestId('form-dialog-field-supplierName').fill(MANUAL_SUPPLIER);
-      await page.getByTestId('form-dialog-field-reason').fill(MANUAL_REASON);
-      await page.getByTestId('form-dialog-field-validUntil').fill(MANUAL_VALID_UNTIL);
-      await page.getByTestId('form-dialog-field-sourceNote').fill('smoke sales golden');
+      await fillDialogField(page, 'unitPrice', String(MANUAL_UNIT_PRICE));
+      await fillDialogField(page, 'supplierName', MANUAL_SUPPLIER);
+      await fillDialogField(page, 'reason', MANUAL_REASON);
+      await fillDialogField(page, 'validUntil', MANUAL_VALID_UNTIL);
+      await fillDialogField(page, 'sourceNote', 'smoke sales golden');
       const manualResponsePromise = page.waitForResponse(
         (response) =>
           response.url().includes('/api/meta/commands/execute/qo_quote_line_common:record_manual_price') &&

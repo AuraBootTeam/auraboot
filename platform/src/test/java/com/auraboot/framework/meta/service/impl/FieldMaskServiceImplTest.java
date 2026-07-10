@@ -20,7 +20,8 @@ import static org.mockito.Mockito.when;
 
 class FieldMaskServiceImplTest {
 
-    private final FieldMaskServiceImpl service = new FieldMaskServiceImpl(null, null, null);
+    private final FieldMaskServiceImpl service = new FieldMaskServiceImpl(
+            null, null, null, new FieldMaskConfigCacheService());
 
     @AfterEach
     void clearContext() {
@@ -102,7 +103,8 @@ class FieldMaskServiceImplTest {
         // tenant context required by getEnabledConfigs; memberId left null so the user has no
         // roles (isolates the permission-exemption path from the role-exemption path).
         MetaContext.setContext(1L, 1L, "test-user", "test-user");
-        return new FieldMaskServiceImpl(maskConfigMapper, null, userPermissionService);
+        return new FieldMaskServiceImpl(
+                maskConfigMapper, null, userPermissionService, new FieldMaskConfigCacheService());
     }
 
     private FieldMaskConfig phoneMaskExemptByPermission() {
