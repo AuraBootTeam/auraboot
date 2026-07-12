@@ -139,8 +139,8 @@ test.describe('CRM Agent UI smoke', () => {
   });
 
   test('CRM-AGENT-UI-01 @smoke: Lead list row opens detail page', async ({ page }) => {
-    await navigateToCrmPage(page, '线索', 'crm_lead_common');
-    await searchList(page, 'crm_lead_common', leadCompany);
+    await navigateToCrmPage(page, '线索', 'crm_lead');
+    await searchList(page, 'crm_lead', leadCompany);
 
     const row = page
       .locator('tbody tr, [role="button"], button', { hasText: leadCompany })
@@ -148,7 +148,7 @@ test.describe('CRM Agent UI smoke', () => {
     await expect(row).toContainText(leadContact);
     await clickRowActionByLocator(page, row, 'view', 'detail');
 
-    await expect(page).toHaveURL(new RegExp(`/p/crm_lead_common/view/${leadId}(?:\\?.*)?$`), {
+    await expect(page).toHaveURL(new RegExp(`/p/crm_lead/view/${leadId}(?:\\?.*)?$`), {
       timeout: 10_000,
     });
     await expect(page.getByText(leadCompany).first()).toBeVisible({ timeout: 8_000 });

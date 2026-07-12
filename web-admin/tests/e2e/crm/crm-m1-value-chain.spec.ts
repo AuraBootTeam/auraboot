@@ -112,7 +112,7 @@ test.describe('CRM M1 Value Chain (L4 UI)', () => {
     // --- Step 2: navigate to Opportunities via menu click ---
     await clickSidebarMenu(page, '商机');
     await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    await expect(page).toHaveURL(/crm_opportunity_common|opportunit/i, { timeout: 10000 });
+    await expect(page).toHaveURL(/crm_opportunity|opportunit/i, { timeout: 10000 });
     await page.screenshot({ path: `${SHOT}/j1-1-opp-list.png`, fullPage: true });
 
     // Assert the seeded opportunity is visible in the list (by name).

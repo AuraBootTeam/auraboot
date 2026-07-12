@@ -18,8 +18,8 @@
  *   crm_assignment_rule   list   [B1] path nav + localized columns + seeded data row + no leak
  *   crm_assignment_rule   form   [B2] create form full-field render + required markers + no leak
  *   crm_assignment_rule   detail [B3] open row -> read-only fields + toolbar + no leak
- *   crm_lead_common              detail [C1] rescore command from toolbar -> score updates in UI
- *   crm_lead_common              detail [C2] auto_assign command from toolbar -> assigned_to updates in UI
+ *   crm_lead              detail [C1] rescore command from toolbar -> score updates in UI
+ *   crm_lead              detail [C2] auto_assign command from toolbar -> assigned_to updates in UI
  */
 import { test, expect, type Page, type Locator } from '@playwright/test';
 
@@ -264,7 +264,7 @@ test.describe('CRM M4 lead engine (L4 UI golden)', () => {
 
   /** Open a lead's detail page by searching the list for its company and clicking the row. */
   async function openLeadDetail(page: Page, company: string): Promise<void> {
-    await gotoPage(page, '/p/crm_lead_common');
+    await gotoPage(page, '/p/crm_lead');
     const search = page.locator('[data-testid="list-search-input"], input[placeholder*="搜索"], input[type="search"]').first();
     if (await search.isVisible({ timeout: 3000 }).catch(() => false)) {
       await search.fill(company);

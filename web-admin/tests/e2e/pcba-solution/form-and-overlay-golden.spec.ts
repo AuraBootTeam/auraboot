@@ -127,7 +127,7 @@ test.describe('QuoteOps form submit + loading overlay golden', () => {
         accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '',
       );
       expect(accountId, 'crm:create_account should return recordId').toBeTruthy();
-      created.rows.push({ model: 'crm_account_common', pid: accountId });
+      created.rows.push({ model: 'crm_account', pid: accountId });
 
       const projectResult = await executeCommand(
         page,

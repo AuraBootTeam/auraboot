@@ -84,10 +84,10 @@ const PAGE_KEYS = {
 const DEMO_ENTRIES = {
   customer: {
     id: 'customer',
-    href: '/p/crm_account_common',
+    href: '/p/crm_account',
     label: /1\.\s*(客户|Customer)/i,
-    route: /\/p\/crm_account_common(?:$|[?#])/,
-    modelCode: 'crm_account_common',
+    route: /\/p\/crm_account(?:$|[?#])/,
+    modelCode: 'crm_account',
   },
   rfq: {
     // A2-S2: legacy RFQ page is dead; the PCBA RFQ sidecar list lives under the
