@@ -70,7 +70,7 @@ async function getModelFieldDataType(page: any, modelCode: string, fieldCode: st
 async function opportunityCloseDateValue(page: any, date: string): Promise<string> {
   opportunityCloseDateType ??= await getModelFieldDataType(
     page,
-    'crm_opportunity_common',
+    'crm_opportunity',
     'crm_opp_expected_close_date',
   );
   return opportunityCloseDateType === 'datetime' ? `${date}T09:00:00+08:00` : date;
