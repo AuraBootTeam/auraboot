@@ -239,7 +239,7 @@ test.describe('CRM Dashboard @smoke', () => {
     // Wait for leads data response specifically
     const leadsLoaded = page
       .waitForResponse(
-        (resp) => resp.url().includes('/api/dynamic/crm_lead_common/list') && resp.status() === 200,
+        (resp) => resp.url().includes('/api/dynamic/crm_lead/list') && resp.status() === 200,
         { timeout: 10000 },
       )
       .catch(() => null);
@@ -260,7 +260,7 @@ test.describe('CRM Dashboard @smoke', () => {
     if (!isVisible) {
       // Fallback: verify data exists via API with keyword filter and larger pageSize
       const resp = await page.request.get(
-        `/api/dynamic/crm_lead_common/list?pageSize=500&keyword=${encodeURIComponent(`DashLead_${uid}`)}`,
+        `/api/dynamic/crm_lead/list?pageSize=500&keyword=${encodeURIComponent(`DashLead_${uid}`)}`,
       );
       expect(resp.ok()).toBe(true);
       const body = await resp.json();
@@ -318,7 +318,7 @@ test.describe('CRM Dashboard @smoke', () => {
     if (!isVisible) {
       // Fallback: verify data exists via API with keyword filter
       const resp = await page.request.get(
-        `/api/dynamic/crm_opportunity_common/list?pageSize=500&keyword=${encodeURIComponent(`DashOpp_${uid}`)}`,
+        `/api/dynamic/crm_opportunity/list?pageSize=500&keyword=${encodeURIComponent(`DashOpp_${uid}`)}`,
       );
       expect(resp.ok()).toBe(true);
       const body = await resp.json();

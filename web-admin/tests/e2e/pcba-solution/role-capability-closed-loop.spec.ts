@@ -41,7 +41,7 @@ import {
  *   Verified green 2026-06-28 (slot 40): 3/3 role tests pass.
  */
 const MENU = {
-  customer: '/p/crm_account_common',
+  customer: '/p/crm_account',
   project: '/p/req_requirement_set_pcba_bom',
   quote: '/p/qo_quote_common',
 };
