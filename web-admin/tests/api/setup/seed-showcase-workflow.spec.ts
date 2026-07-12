@@ -266,7 +266,7 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
         name: '新线索自动分配给销售',
         description: '新线索创建后，根据行业自动分配给对应销售代表，并发送站内通知。',
         triggerType: 'on_record_create',
-        modelCode: 'crm_lead_common',
+        modelCode: 'crm_lead',
         actions: [
           {
             type: 'send_notification',
@@ -292,7 +292,7 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
         name: '商机阶段变更通知团队',
         description: '商机阶段发生变化时，自动通知销售总监和相关团队成员。',
         triggerType: 'on_state_change',
-        modelCode: 'crm_opportunity_common',
+        modelCode: 'crm_opportunity',
         triggerConfig: {
           stateField: 'crm_opp_stage',
           fromStates: ['discovery', 'qualification', 'proposal', 'negotiation'],
@@ -362,7 +362,7 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
         name: '商机阶段变更外部通知',
         targetUrl: 'https://httpbin.org/post',
         eventType: 'record_updated',
-        modelCode: 'crm_opportunity_common',
+        modelCode: 'crm_opportunity',
         filterExpression: 'crm_opp_stage != null',
         secret: 'showcase-webhook-secret-2025',
         headers: JSON.stringify({ 'X-Source': 'auraboot-showcase' }),
@@ -393,7 +393,7 @@ test.describe.serial('Showcase Seed — Workflow & Automation', () => {
         triggerType: 'EVENT',
         triggerConfig: JSON.stringify({
           eventTypes: ['record_updated'],
-          modelCode: 'crm_opportunity_common',
+          modelCode: 'crm_opportunity',
         }),
         actionChannel: 'IN_APP',
         recipientType: 'RECORD_OWNER',
