@@ -107,7 +107,7 @@ test.describe('CRM M4 forecast + win/loss + stale (L4 UI golden)', () => {
 
   // ---- E4: opportunity form exposes the new dimensions ----
   test('E4 opportunity form exposes forecast-category + competitor', async ({ page }) => {
-    await gotoPage(page, '/p/crm_opportunity_common');
+    await gotoPage(page, '/p/crm_opportunity');
     await page.getByRole('button', { name: /新建|新增|创建|Create/ }).first().click();
     await page.waitForTimeout(1500);
     await expect(page.getByText('预测类别', { exact: false }).first()).toBeVisible({ timeout: 10000 });

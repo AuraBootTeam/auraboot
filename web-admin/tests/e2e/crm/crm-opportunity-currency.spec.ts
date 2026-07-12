@@ -15,7 +15,7 @@
  *     submits, and verifies record appears in detail view with readonly currency fields visible.
  *
  * Prerequisites:
- *   - CRM plugin imported and crm_opportunity_common model published
+ *   - CRM plugin imported and crm_opportunity model published
  *   - An exchange rate USD→CNY and EUR→CNY must exist in ab_exchange_rate
  *     (the integration test suite inserts them; in production they must be
  *      manually configured via the Currency management page)
@@ -33,8 +33,8 @@ import {
   waitForFormReady,
 } from '../helpers/index';
 
-const MODEL_CODE = 'crm_opportunity_common';
-const PAGE_KEY = 'crm_opportunity_common';
+const MODEL_CODE = 'crm_opportunity';
+const PAGE_KEY = 'crm_opportunity';
 
 const UID = uniqueId('OppCur');
 const USD_OPP_NAME = `USD_Opp_${UID}`;
@@ -244,7 +244,7 @@ test.describe('CRM Opportunity Multi-Currency @smoke', () => {
       )
       .catch(() => null);
 
-    await page.goto('/p/crm_opportunity_common', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/crm_opportunity', { waitUntil: 'domcontentloaded' });
     await listResponsePromise;
     await forceDefaultTableView(page, PAGE_KEY, MODEL_CODE);
 

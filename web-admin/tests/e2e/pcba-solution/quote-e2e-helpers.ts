@@ -757,7 +757,7 @@ async function seedQuoteScaffold(
     );
     const accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
     expect(accountId, 'crm:create_account should return account id').toBeTruthy();
-    created.rows.push({ model: 'crm_account_common', pid: accountId });
+    created.rows.push({ model: 'crm_account', pid: accountId });
 
     const projectId = await dynamicCreate(
       page,
@@ -1012,7 +1012,7 @@ export async function seedBomWorkbench(
     );
     const accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
     expect(accountId, 'crm:create_account should return account id').toBeTruthy();
-    created.rows.push({ model: 'crm_account_common', pid: accountId });
+    created.rows.push({ model: 'crm_account', pid: accountId });
 
     created.projectId = await dynamicCreate(
       page,
@@ -1240,7 +1240,7 @@ export async function seedBomWorkbench(
         [
           { model: 'bom_conversion_task_pcba', pid: created.taskId },
           { model: 'req_requirement_set_pcba_bom', pid: created.projectId },
-          { model: 'crm_account_common', pid: accountId },
+          { model: 'crm_account', pid: accountId },
         ],
         opts.ownerEmail,
       );
