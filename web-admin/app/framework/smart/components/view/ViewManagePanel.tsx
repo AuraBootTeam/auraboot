@@ -1363,17 +1363,28 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                                 <Copy className="h-4 w-4" aria-hidden="true" />
                               </button>
 
-                              <button
-                                type="button"
-                                onClick={() => handleShareStart(view)}
-                                disabled={isViewLoading(view.pid) || !canShareSavedView(view)}
-                                className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
-                                data-testid={`saved-view-action-share-${view.pid}`}
-                                aria-label={tx('common.saved_view_action_share', '生成分享链接')}
-                                title={tx('common.saved_view_action_share', '生成分享链接')}
-                              >
-                                <Link2 className="h-4 w-4" aria-hidden="true" />
-                              </button>
+                              {/*
+                                Rendered only when this view can actually be shared, not rendered
+                                disabled. The backend offers the `share` action for team and global
+                                views alone (SavedViewServiceImpl.resolveActions) while this panel
+                                lists personal views, so a button rendered unconditionally is a
+                                greyed-out icon on every row that nobody can ever click and nothing
+                                explains. The plumbing below it is complete: the day a view becomes
+                                shareable, canShareSavedView says so and the button appears.
+                              */}
+                              {canShareSavedView(view) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareStart(view)}
+                                  disabled={isViewLoading(view.pid)}
+                                  className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                  data-testid={`saved-view-action-share-${view.pid}`}
+                                  aria-label={tx('common.saved_view_action_share', '生成分享链接')}
+                                  title={tx('common.saved_view_action_share', '生成分享链接')}
+                                >
+                                  <Link2 className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                              )}
 
                               <button
                                 type="button"

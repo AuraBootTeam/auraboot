@@ -383,7 +383,7 @@ describe('ViewManagePanel public share link', () => {
     expect(shareBtn).toBeEnabled();
   });
 
-  it('disables the share affordance when canShareSavedView() is false (locked preset)', () => {
+  it('shows no share affordance at all when canShareSavedView() is false (locked preset)', () => {
     renderPanel({
       views: [
         makeView({
@@ -394,15 +394,33 @@ describe('ViewManagePanel public share link', () => {
       ],
     });
 
-    expect(screen.getByTestId('saved-view-action-share-personal-view')).toBeDisabled();
+    // Absent, not disabled. A greyed-out icon nobody can ever click and nothing explains is worse
+    // than no icon: it advertises a capability the user does not have.
+    expect(screen.queryByTestId('saved-view-action-share-personal-view')).not.toBeInTheDocument();
   });
 
-  it('disables the share affordance when the backend denies the share action', () => {
+  it('shows no share affordance when the backend denies the share action', () => {
     renderPanel({
       views: [makeView({ pid: 'personal-view', scope: 'personal', actions: ['view', 'copy'] })],
     });
 
-    expect(screen.getByTestId('saved-view-action-share-personal-view')).toBeDisabled();
+    expect(screen.queryByTestId('saved-view-action-share-personal-view')).not.toBeInTheDocument();
+  });
+
+  it('shows the share affordance when the backend allows it', () => {
+    renderPanel({
+      views: [
+        makeView({
+          pid: 'personal-view',
+          scope: 'personal',
+          actions: ['view', 'copy', 'manage', 'share'],
+        }),
+      ],
+    });
+
+    // The plumbing is complete and waiting. The day a view becomes shareable — whether because the
+    // policy opens up or because team/global views get surfaced here — the button appears on its own.
+    expect(screen.getByTestId('saved-view-action-share-personal-view')).toBeEnabled();
   });
 
   it('opening the share panel reads current status from the status endpoint', async () => {
