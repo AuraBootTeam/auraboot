@@ -486,6 +486,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const contextRecord = resolveRuntimeValue(runtime, contextExpression);
   const compareConfig = (block as any).compare || {};
   const candidatesConfig = (block as any).candidates || {};
+  const hasCandidatesConfig = Boolean((block as any).candidates);
   const exportConfig = (block as any).exportImpact || {};
   const sourceConfig = (block as any).source || {};
   const sourceRecordConfig = sourceConfig.record || {};
@@ -1098,6 +1099,11 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             </div>
           )}
 
+          {/* The candidates panel is BOM's: it talks about 候选物料 and 标准编码 and writing a
+              chosen code back. Rendering it for a page that never configured `candidates` puts one
+              domain's vocabulary in front of another domain's users — a FAQ reviewer has no idea
+              what a 标准编码 is, and nothing on the panel does anything. Show it when it is asked for. */}
+          {hasCandidatesConfig && (
           <aside
             data-testid="review-drawer-tab-candidates"
             className="rounded-card border-border bg-panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden border"
@@ -1356,6 +1362,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               )}
             </section>
           </aside>
+          )}
         </div>
       </div>
 

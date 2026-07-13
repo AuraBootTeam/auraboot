@@ -16,6 +16,7 @@ import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { useTreeData } from '~/framework/meta/hooks/useTreeData';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
@@ -356,6 +357,24 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       }
     }
 
+    // renderType 渲染 —— 交给共享的 cell renderer registry。
+    //
+    // Without this, a table block understands exactly one renderType (status-pill) and drops every
+    // other on the floor: `progress`, `currency`, `rating`, `owner` and the rest render as bare
+    // text. The same column config, on a kind:list page, goes through ListTable and renders
+    // properly — so the same DSL means two different things depending on which page kind it
+    // happens to sit in, and the version that does nothing does it silently.
+    // has() first: an unknown renderType must fall through to the existing valueType handling
+    // rather than be silently swallowed by the registry's `default` renderer.
+    if (column.renderType && column.renderType !== 'status-pill'
+        && cellRendererRegistry.has(column.renderType)) {
+      return cellRendererRegistry.render(column.renderType, {
+        value,
+        record: row,
+        column: column as any,
+      } as any);
+    }
+
     // valueType 渲染
     switch (column.valueType) {
       case 'date':
@@ -523,7 +542,15 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                 colSpan={columns.length + (rowActions.length > 0 ? 1 : 0)}
                 className="text-text-2 px-6 py-4 text-center"
               >
-                {t('common.noData') !== 'common.noData' ? t('common.noData') : 'No data'}
+                {/* A table that only fills in once you select something upstream should say so.
+                    "No data" on an empty transcript reads as "this conversation has no messages"
+                    when what it means is "you have not picked one yet" — the same two words for
+                    two different situations, and the user cannot tell which they are in. */}
+                {(block as any).empty?.title
+                  ? getLocalizedText((block as any).empty.title, locale, t)
+                  : t('common.noData') !== 'common.noData'
+                    ? t('common.noData')
+                    : 'No data'}
               </td>
             </tr>
           ) : (

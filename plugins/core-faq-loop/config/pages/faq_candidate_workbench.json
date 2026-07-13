@@ -161,13 +161,15 @@
         {
           "field": "faq_question",
           "component": "SmartInput",
-          "bindState": "searchKeyword"
-        },
-        {
-          "field": "faq_status",
-          "component": "SmartSelect",
-          "dictCode": "faq_candidate_status",
-          "bindState": "statusFilter"
+          "bindState": "searchKeyword",
+          "label": {
+            "zh-CN": "搜索问题/答案",
+            "en": "Search question or answer"
+          },
+          "placeholder": {
+            "zh-CN": "输入关键词",
+            "en": "Type a keyword"
+          }
         }
       ]
     },
@@ -239,7 +241,7 @@
       "columns": [
         {
           "field": "faq_question",
-          "width": 300,
+          "width": 260,
           "label": {
             "zh-CN": "问题",
             "en": "Question"
@@ -247,7 +249,7 @@
         },
         {
           "field": "faq_answer",
-          "width": 320,
+          "width": 300,
           "label": {
             "zh-CN": "答案",
             "en": "Answer"
@@ -269,14 +271,22 @@
           "label": {
             "zh-CN": "置信度",
             "en": "Confidence"
-          }
-        },
-        {
-          "field": "faq_reviewed_by",
-          "width": 120,
-          "label": {
-            "zh-CN": "审核人",
-            "en": "Reviewed By"
+          },
+          "renderType": "progress",
+          "render": {
+            "thresholds": [
+              {
+                "max": 60,
+                "tone": "gray"
+              },
+              {
+                "max": 85,
+                "tone": "amber"
+              },
+              {
+                "tone": "green"
+              }
+            ]
           }
         }
       ],
@@ -404,30 +414,46 @@
       ]
     },
     {
-      "id": "faq_review_drawer",
-      "blockType": "review-drawer",
+      "id": "faq_evidence",
+      "blockType": "evidence-panel",
       "context": "${state.selectedFaq}",
-      "contextDataSource": "selectedFaqDetail",
-      "contextKeyField": "pid",
-      "titleTemplate": "${record.faq_question}",
-      "empty": {
-        "title": {
-          "zh-CN": "请选择一条候选查看问答与溯源",
-          "en": "Select a candidate to review its Q&A and provenance"
-        }
+      "dataSource": "selectedFaqDetail",
+      "title": {
+        "zh-CN": "问答内容与溯源",
+        "en": "Q&A and provenance"
       },
-      "summaryBadges": [
+      "description": {
+        "zh-CN": "批准前先读完整答案，并对照下方来源对话。",
+        "en": "Read the full answer, and check it against the conversation below, before approving."
+      },
+      "sections": [
+        {
+          "key": "question",
+          "label": {
+            "zh-CN": "问题",
+            "en": "Question"
+          },
+          "field": "faq_question"
+        },
+        {
+          "key": "answer",
+          "label": {
+            "zh-CN": "答案",
+            "en": "Answer"
+          },
+          "field": "faq_answer"
+        },
         {
           "key": "status",
           "label": {
             "zh-CN": "状态",
             "en": "Status"
           },
-          "valueField": "faq_status",
+          "field": "faq_status",
           "valueMap": {
             "draft": {
               "zh-CN": "待审核",
-              "en": "Pending Review"
+              "en": "Pending review"
             },
             "approved": {
               "zh-CN": "已批准",
@@ -442,108 +468,65 @@
               "en": "Rejected"
             },
             "__empty": {
-              "zh-CN": "未知",
-              "en": "Unknown"
+              "zh-CN": "—",
+              "en": "—"
             }
-          },
-          "tone": "blue"
+          }
         },
         {
           "key": "confidence",
           "label": {
-            "zh-CN": "置信度",
-            "en": "Confidence"
+            "zh-CN": "模型置信度",
+            "en": "Model confidence"
           },
-          "valueField": "faq_confidence",
-          "tone": "purple"
+          "field": "faq_confidence",
+          "format": "percent"
+        },
+        {
+          "key": "conversation",
+          "label": {
+            "zh-CN": "来源会话",
+            "en": "Source conversation"
+          },
+          "field": "faq_source_conversation_pid"
+        },
+        {
+          "key": "seq",
+          "label": {
+            "zh-CN": "来源消息区间",
+            "en": "Source messages"
+          },
+          "field": "faq_source_seq_range"
+        },
+        {
+          "key": "reviewer",
+          "label": {
+            "zh-CN": "审核人",
+            "en": "Reviewed by"
+          },
+          "field": "faq_reviewed_by"
+        },
+        {
+          "key": "reject",
+          "label": {
+            "zh-CN": "驳回原因",
+            "en": "Reject reason"
+          },
+          "field": "faq_reject_reason"
+        },
+        {
+          "key": "doc",
+          "label": {
+            "zh-CN": "知识库文档",
+            "en": "KB document"
+          },
+          "field": "faq_kb_document_pid"
         }
       ],
-      "source": {
-        "record": {
-          "dataSource": "selectedFaqDetail",
-          "recordField": "rows[0]",
-          "matchField": "pid"
-        },
-        "summary": {
-          "title": {
-            "zh-CN": "问答与溯源",
-            "en": "Q&A and Provenance"
-          },
-          "description": "",
-          "items": [
-            {
-              "key": "question",
-              "label": {
-                "zh-CN": "问题",
-                "en": "Question"
-              },
-              "field": "faq_question"
-            },
-            {
-              "key": "answer",
-              "label": {
-                "zh-CN": "答案",
-                "en": "Answer"
-              },
-              "field": "faq_answer"
-            },
-            {
-              "key": "confidence",
-              "label": {
-                "zh-CN": "置信度",
-                "en": "Confidence"
-              },
-              "field": "faq_confidence"
-            },
-            {
-              "key": "conversation",
-              "label": {
-                "zh-CN": "来源会话",
-                "en": "Source Conversation"
-              },
-              "field": "faq_source_conversation_pid"
-            },
-            {
-              "key": "seq",
-              "label": {
-                "zh-CN": "来源消息区间",
-                "en": "Source Messages"
-              },
-              "field": "faq_source_seq_range"
-            },
-            {
-              "key": "kb",
-              "label": {
-                "zh-CN": "目标知识库",
-                "en": "Target KB"
-              },
-              "field": "faq_target_kb_id"
-            },
-            {
-              "key": "doc",
-              "label": {
-                "zh-CN": "知识库文档",
-                "en": "KB Document"
-              },
-              "field": "faq_kb_document_pid"
-            },
-            {
-              "key": "reviewer",
-              "label": {
-                "zh-CN": "审核人",
-                "en": "Reviewed By"
-              },
-              "field": "faq_reviewed_by"
-            },
-            {
-              "key": "reject",
-              "label": {
-                "zh-CN": "驳回原因",
-                "en": "Reject Reason"
-              },
-              "field": "faq_reject_reason"
-            }
-          ]
+      "empty": {
+        "title": {
+          "zh-CN": "选择上方一条候选，查看它的完整问答与溯源",
+          "en": "Pick a candidate above to see its full Q&A and where it came from"
         }
       }
     },
@@ -552,8 +535,8 @@
       "blockType": "table",
       "dataSource": "sourceTranscript",
       "title": {
-        "zh-CN": "来源对话",
-        "en": "Source Conversation"
+        "zh-CN": "来源对话原文",
+        "en": "Source conversation"
       },
       "columns": [
         {
@@ -570,7 +553,9 @@
           "label": {
             "zh-CN": "说话人",
             "en": "Speaker"
-          }
+          },
+          "renderType": "tag",
+          "dictCode": "faq_message_sender"
         },
         {
           "field": "content",
@@ -579,7 +564,13 @@
             "en": "Content"
           }
         }
-      ]
+      ],
+      "empty": {
+        "title": {
+          "zh-CN": "选择上方一条候选，查看它的来源对话",
+          "en": "Pick a candidate above to see the conversation it came from"
+        }
+      }
     }
   ],
   "title": {

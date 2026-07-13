@@ -187,5 +187,26 @@
     "en-US": "Distilled",
     "source": "import",
     "refType": "field"
+  },
+  {
+    "key": "dict.faq_conversation_type.group",
+    "zh-CN": "群聊",
+    "en-US": "Group",
+    "source": "import",
+    "refType": "dict"
+  },
+  {
+    "key": "dict.faq_message_sender.customer",
+    "zh-CN": "客户",
+    "en-US": "Customer",
+    "source": "import",
+    "refType": "dict"
+  },
+  {
+    "key": "dict.faq_message_sender.support",
+    "zh-CN": "客服",
+    "en-US": "Support",
+    "source": "import",
+    "refType": "dict"
   }
 ]
