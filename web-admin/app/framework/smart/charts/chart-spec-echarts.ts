@@ -35,6 +35,33 @@ function dimField(spec: ChartSpec, role: 'category' | 'name'): string | undefine
   return spec.dimensions.find((d) => d.role === role)?.field ?? spec.dimensions[0]?.field;
 }
 
+/**
+ * Display text for a category cell: the dimension's `valueLabels` entry when the
+ * value is a known dict code, else the raw value.
+ *
+ * Absent `valueLabels` reproduces the pre-label behaviour exactly, which is what
+ * keeps the legacy-equivalence gates byte-identical.
+ */
+function categoryLabels(spec: ChartSpec, rows: Record<string, unknown>[], field: string | undefined): string[] {
+  const valueLabels = spec.dimensions.find((d) => d.field === field)?.valueLabels;
+  return rows.map((row) => {
+    const raw = String(row[field as string] ?? '');
+    return valueLabels?.[raw] ?? raw;
+  });
+}
+
+/**
+ * Series name for a measure: its `label` when the widget supplied one, else the
+ * field.
+ *
+ * Metric aliases are constrained to ASCII identifiers by the backend, so without a
+ * label the legend reads `pipeline_amount` rather than 商机总额 — there is nothing
+ * to derive the display name from, the widget has to say.
+ */
+function measureLabel(spec: ChartSpec, field: string): string {
+  return spec.measures.find((m) => m.field === field)?.label ?? field;
+}
+
 function titleText(spec: ChartSpec): string | undefined {
   if (!spec.title) return undefined;
   return typeof spec.title === 'string' ? spec.title : Object.values(spec.title)[0];
@@ -65,10 +92,10 @@ function barOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOpt
   }
 
   const dimensionKey = dimField(spec, 'category');
-  const categories = rows.map((row) => String(row[dimensionKey as string] ?? ''));
+  const categories = categoryLabels(spec, rows, dimensionKey);
 
   const series = metrics.map((metricKey) => ({
-    name: metricKey,
+    name: measureLabel(spec, metricKey),
     type: 'bar' as const,
     stack: stacked ? 'total' : undefined,
     data: rows.map((row) => Number(row[metricKey]) || 0),
@@ -184,10 +211,10 @@ function lineOption(spec: ChartSpec, rows: Record<string, unknown>[]): EChartsOp
   }
 
   const dimensionKey = dimField(spec, 'category');
-  const categories = rows.map((row) => String(row[dimensionKey as string] ?? ''));
+  const categories = categoryLabels(spec, rows, dimensionKey);
 
   const series = metrics.map((metricKey, index) => ({
-    name: metricKey,
+    name: measureLabel(spec, metricKey),
     type: 'line' as const,
     data: rows.map((row) => Number(row[metricKey]) || 0),
     smooth,
@@ -379,7 +406,7 @@ export function chartSpecToEChartsOption(
 
   const labelField = dimField(spec, spec.type === 'pie' ? 'name' : 'category');
   const valueField = spec.measures[0]?.field;
-  const labels = rows.map((r) => (labelField ? String(r[labelField] ?? '') : ''));
+  const labels = labelField ? categoryLabels(spec, rows, labelField) : rows.map(() => '');
   const values = rows.map((r) => (valueField ? Number(r[valueField] ?? 0) || 0 : 0));
 
   const opt: EChartsOption = {};

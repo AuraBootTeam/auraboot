@@ -83,14 +83,18 @@ export const AiPagePanel: React.FC<AiPagePanelProps> = ({
   useEffect(() => {
     if (modelFields?.length || !modelCode) return;
     let cancelled = false;
-    get<Array<{ code: string; name: string; fieldType: string }>>(`/api/meta/models/code/${modelCode}/fields`)
+    // `/api/meta/models/code/{code}/fields` does not exist (404) — the field list
+    // silently stayed empty here too. field-meta is the one-call equivalent.
+    get<Array<{ code: string; dataType: string; displayName?: string }>>(
+      `/api/dynamic/${modelCode}/field-meta`,
+    )
       .then((res) => {
         if (cancelled || !res?.data) return;
         setAutoFields(
           res.data.map((f) => ({
             code: f.code,
-            name: f.name || f.code,
-            type: f.fieldType || 'text',
+            name: f.displayName || f.code,
+            type: f.dataType || 'text',
           })),
         );
       })
