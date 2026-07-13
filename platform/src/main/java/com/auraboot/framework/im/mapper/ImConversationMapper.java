@@ -4,10 +4,19 @@ import com.auraboot.framework.im.model.ImConversation;
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface ImConversationMapper extends BaseMapper<ImConversation> {
+
+    /** Resolve a conversation by its public record pid, scoped to the tenant. */
+    @Select("""
+        SELECT * FROM ab_im_conversation
+        WHERE pid = #{pid} AND tenant_id = #{tenantId}
+        LIMIT 1
+        """)
+    ImConversation findByPid(@Param("pid") String pid, @Param("tenantId") Long tenantId);
 
     /**
      * Atomically increment max_seq and return the new value.

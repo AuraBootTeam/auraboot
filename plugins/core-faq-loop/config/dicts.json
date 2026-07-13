@@ -1,0 +1,46 @@
+[
+  {
+    "code": "faq_candidate_status",
+    "name": "FAQ Candidate Status",
+    "name:zh-CN": "FAQ 候选状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Pending Review",
+        "label:zh-CN": "待审核",
+        "sortNo": 10,
+        "color": "#fa8c16",
+        "status": "enabled",
+        "extension": { "color": "amber" }
+      },
+      {
+        "value": "approved",
+        "label": "Approved",
+        "label:zh-CN": "已批准",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": { "color": "blue" }
+      },
+      {
+        "value": "published",
+        "label": "Published",
+        "label:zh-CN": "已发布",
+        "sortNo": 30,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": { "color": "green" }
+      },
+      {
+        "value": "rejected",
+        "label": "Rejected",
+        "label:zh-CN": "已驳回",
+        "sortNo": 40,
+        "color": "#8c8c8c",
+        "status": "enabled",
+        "extension": { "color": "gray" }
+      }
+    ]
+  }
+]

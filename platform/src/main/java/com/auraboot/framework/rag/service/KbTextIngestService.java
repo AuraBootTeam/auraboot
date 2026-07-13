@@ -50,8 +50,18 @@ public class KbTextIngestService {
 
     private TransactionTemplate tx;
 
-    /** DB-allowed ab_kb_document.source_type values (chk_doc_source); other logical sources map to internal_doc. */
-    private static final Set<String> DB_SOURCE_TYPES = Set.of("file", "entity", "internal_doc");
+    /**
+     * DB-allowed {@code ab_kb_document.source_type} values (chk_doc_source); other logical
+     * sources map to internal_doc.
+     *
+     * <p><b>Must stay in lockstep with the chk_doc_source CHECK constraint.</b> A source type
+     * that is legal in the DB but missing here is silently rewritten to {@code internal_doc}
+     * by {@link #ingestText}: no exception, the document is still stored, retrieval still
+     * recalls it, E2E still passes — but {@code source_type} is never what the caller asked
+     * for. Adding a value to the CHECK constraint without adding it here is a no-op.
+     */
+    private static final Set<String> DB_SOURCE_TYPES =
+            Set.of("file", "entity", "internal_doc", "conversation");
 
     @PostConstruct
     void initTx() {

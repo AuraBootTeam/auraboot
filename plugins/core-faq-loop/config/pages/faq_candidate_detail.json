@@ -1,0 +1,79 @@
+{
+  "pageKey": "faq_candidate_detail",
+  "modelCode": "faq_candidate",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "blocks": [
+    {
+      "id": "faq_candidate_detail_toolbar",
+      "blockType": "toolbar",
+      "buttons": [
+        {
+          "code": "update_qa",
+          "permissionCode": "faq.candidate.review",
+          "label": { "zh-CN": "编辑问答", "en": "Edit Q&A" },
+          "action": { "type": "navigate", "to": "faq_candidate_form" }
+        },
+        {
+          "code": "approve",
+          "primary": true,
+          "permissionCode": "faq.candidate.review",
+          "label": { "zh-CN": "批准", "en": "Approve" },
+          "action": { "type": "command", "command": "faq:approve" }
+        },
+        {
+          "code": "reject",
+          "danger": true,
+          "permissionCode": "faq.candidate.review",
+          "label": { "zh-CN": "驳回", "en": "Reject" },
+          "action": { "type": "command", "command": "faq:reject" }
+        },
+        {
+          "code": "publish",
+          "permissionCode": "faq.candidate.publish",
+          "label": { "zh-CN": "发布到知识库", "en": "Publish to KB" },
+          "action": { "type": "command", "command": "faq:publish" }
+        }
+      ]
+    },
+    {
+      "id": "section_qa",
+      "blockType": "form-section",
+      "title": { "zh-CN": "问答内容", "en": "Question & Answer" },
+      "columns": 1,
+      "fields": [
+        { "field": "faq_question", "readOnly": true },
+        { "field": "faq_answer", "readOnly": true }
+      ]
+    },
+    {
+      "id": "section_review",
+      "blockType": "form-section",
+      "title": { "zh-CN": "审核", "en": "Review" },
+      "columns": 2,
+      "fields": [
+        { "field": "faq_status", "readOnly": true },
+        { "field": "faq_confidence", "readOnly": true },
+        { "field": "faq_reviewed_by", "readOnly": true },
+        { "field": "faq_reviewed_at", "readOnly": true },
+        { "field": "faq_reject_reason", "span": 2, "readOnly": true }
+      ]
+    },
+    {
+      "id": "section_trace",
+      "blockType": "form-section",
+      "title": { "zh-CN": "溯源", "en": "Provenance" },
+      "columns": 2,
+      "fields": [
+        { "field": "faq_source_conversation_pid", "readOnly": true },
+        { "field": "faq_source_seq_range", "readOnly": true },
+        { "field": "faq_target_kb_id", "readOnly": true },
+        { "field": "faq_kb_document_pid", "readOnly": true }
+      ]
+    }
+  ],
+  "name:zh-CN": "FAQ 候选详情",
+  "name:en": "FAQ Candidate Detail",
+  "title": { "zh-CN": "FAQ 候选详情", "en": "FAQ Candidate Detail" }
+}

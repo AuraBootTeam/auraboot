@@ -112,7 +112,7 @@ class KbTextIngestServiceTest {
 
     @Test
     void normalizesLogicalSourceType_toInternalDoc_forDbConstraint() {
-        // "crawler" is not in ab_kb_document.chk_doc_source {file,entity,internal_doc};
+        // "crawler" is not in ab_kb_document.chk_doc_source {file,entity,internal_doc,conversation};
         // it must be persisted as internal_doc so the INSERT does not violate the constraint.
         stubKb("KB1", "openai");
         when(docMapper.selectList(any())).thenReturn(List.of());
@@ -141,6 +141,32 @@ class KbTextIngestServiceTest {
         ArgumentCaptor<KbDocument> cap = ArgumentCaptor.forClass(KbDocument.class);
         verify(docMapper).insert(cap.capture());
         org.junit.jupiter.api.Assertions.assertEquals("entity", cap.getValue().getSourceType());
+    }
+
+    /**
+     * The FAQ loop's provenance depends on this and nothing else guards it.
+     *
+     * <p>Widening chk_doc_source to accept 'conversation' does not, on its own, make a
+     * conversation-sourced document land as 'conversation'. DB_SOURCE_TYPES gates the value
+     * independently, and anything it does not list is quietly rewritten to internal_doc:
+     * no exception, the document is still stored, retrieval still recalls it, an end-to-end
+     * test still goes green — and source_type is silently wrong forever. Asserting on the
+     * captured entity is the only cheap way to catch that.
+     */
+    @Test
+    void preservesAllowedSourceType_conversation() {
+        stubKb("KB1", "openai");
+        when(docMapper.selectList(any())).thenReturn(List.of());
+        when(chunkingService.chunk(any(), anyInt(), anyInt())).thenReturn(List.of(chunk(0, "x")));
+        when(embeddingService.embedBatch(anyLong(), any(), anyString())).thenReturn(List.of(new float[]{0.1f}));
+
+        svc.ingestText(1L, "KB1", "conversation", "faq-cand-1", "Q: ...", "Q: ...\n\nA: ...");
+
+        ArgumentCaptor<KbDocument> cap = ArgumentCaptor.forClass(KbDocument.class);
+        verify(docMapper).insert(cap.capture());
+        org.junit.jupiter.api.Assertions.assertEquals("conversation", cap.getValue().getSourceType(),
+                "conversation must survive as-is — if this says internal_doc, DB_SOURCE_TYPES is missing it");
+        org.junit.jupiter.api.Assertions.assertEquals("faq-cand-1", cap.getValue().getSourceEntityId());
     }
 
     @Test

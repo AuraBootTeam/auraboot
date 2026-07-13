@@ -14,6 +14,10 @@ public class ImConversation {
     @TableId(value = "id", type = IdType.AUTO)
     private Long id;
 
+    /** Public record id. Set explicitly on insert — no MetaObjectHandler fills it. */
+    @TableField("pid")
+    private String pid;
+
     @TableField("tenant_id")
     private Long tenantId;
 

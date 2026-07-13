@@ -165,7 +165,24 @@ cmd_up() {
   local sd; sd="$(state_dir "$name")"; mkdir -p "$sd"
 
   log "1/9 allocate runtime '$name' (slot $slot) + ensure infra"
-  "$DEV" runtime allocate auraboot "$name" --slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" >/dev/null
+  # Re-running `up` after a mid-way failure (a plugin the validator rejects, say) must not
+  # trip over its own allocation from the first attempt — every later step here is already
+  # idempotent. Reuse an existing allocation only when it is on the slot being asked for;
+  # a name pinned to a different slot is a real conflict and still stops the run.
+  # Read the slot straight off the env file rather than through runtime_env(), which die()s
+  # when the file is absent — and absent is the normal case on a first run.
+  local allocated_slot=""
+  local env_file="$WORKSPACE/.workspace/env/$name.env"
+  if [ -f "$env_file" ]; then
+    allocated_slot="$(grep -E '^AURA_WORKSPACE_SLOT=' "$env_file" | head -1 | cut -d= -f2- || true)"
+  fi
+  if [ -n "$allocated_slot" ]; then
+    [ "$allocated_slot" = "$slot" ] \
+      || die "runtime '$name' is already allocated on slot $allocated_slot, not $slot — pick another name, or: $DEV runtime destroy $name"
+    log "    reusing existing allocation (slot $slot)"
+  else
+    "$DEV" runtime allocate auraboot "$name" --slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" >/dev/null
+  fi
   "$DEV" infra ensure "$name" --yes >/dev/null
 
   local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass

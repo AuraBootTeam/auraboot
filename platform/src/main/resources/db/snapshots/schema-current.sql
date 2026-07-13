@@ -7758,7 +7758,8 @@ CREATE TABLE public.ab_im_conversation (
     bound_model_code character varying(100),
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    bound_record_pid character varying(64)
+    bound_record_pid character varying(64),
+    pid character varying(26) NOT NULL
 );
 
 
@@ -8373,7 +8374,7 @@ CREATE TABLE public.ab_kb_document (
     created_by bigint,
     deleted_flag boolean DEFAULT false,
     process_retry_count integer DEFAULT 0 NOT NULL,
-    CONSTRAINT chk_doc_source CHECK (((source_type)::text = ANY ((ARRAY['file'::character varying, 'entity'::character varying, 'internal_doc'::character varying])::text[]))),
+    CONSTRAINT chk_doc_source CHECK (((source_type)::text = ANY ((ARRAY['file'::character varying, 'entity'::character varying, 'internal_doc'::character varying, 'conversation'::character varying])::text[]))),
     CONSTRAINT chk_doc_status CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
     CONSTRAINT chk_doc_type CHECK (((doc_type)::text = ANY ((ARRAY['pdf'::character varying, 'docx'::character varying, 'md'::character varying, 'txt'::character varying, 'csv'::character varying, 'html'::character varying, 'pptx'::character varying, 'xlsx'::character varying])::text[])))
 );
@@ -25394,6 +25395,13 @@ CREATE UNIQUE INDEX uq_user_soul_profile_active ON public.ab_agent_user_soul_pro
 --
 
 CREATE UNIQUE INDEX user_name_idx ON public.ab_user USING btree (user_name) WHERE (deleted_flag = false);
+
+
+--
+-- Name: ux_ab_im_conversation_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_ab_im_conversation_pid ON public.ab_im_conversation USING btree (pid);
 
 
 --

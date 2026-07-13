@@ -1,0 +1,41 @@
+[
+  {
+    "code": "faq_root",
+    "parentCode": null,
+    "name:zh-CN": "知识闭环",
+    "name:en": "Knowledge Loop",
+    "path": null,
+    "component": null,
+    "icon": "IconMessageCircleQuestion",
+    "type": 0,
+    "permissionCode": null,
+    "orderNo": 820,
+    "visible": true
+  },
+  {
+    "code": "faq_review_workbench",
+    "parentCode": "faq_root",
+    "name:zh-CN": "FAQ 审核台",
+    "name:en": "FAQ Review",
+    "path": "/p/c/faq_candidate_workbench",
+    "component": null,
+    "icon": "IconClipboardCheck",
+    "type": 1,
+    "permissionCode": "faq.candidate.read",
+    "orderNo": 10,
+    "visible": true
+  },
+  {
+    "code": "faq_candidates",
+    "parentCode": "faq_root",
+    "name:zh-CN": "FAQ 候选",
+    "name:en": "FAQ Candidates",
+    "path": "/p/faq_candidate",
+    "component": null,
+    "icon": "IconList",
+    "type": 1,
+    "permissionCode": "faq.candidate.read",
+    "orderNo": 20,
+    "visible": true
+  }
+]

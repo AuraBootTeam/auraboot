@@ -1,0 +1,13 @@
+[
+  { "modelCode": "faq_candidate", "fieldCode": "faq_question", "sequence": 1, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "faq_candidate", "fieldCode": "faq_answer", "sequence": 2, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "faq_candidate", "fieldCode": "faq_status", "sequence": 3, "required": false, "visible": true, "editable": false, "displayConfig": { "searchable": true, "sortable": true } },
+  { "modelCode": "faq_candidate", "fieldCode": "faq_confidence", "sequence": 4, "required": false, "visible": true, "editable": false, "displayConfig": { "sortable": true } },
+  { "modelCode": "faq_candidate", "fieldCode": "faq_target_kb_id", "sequence": 5, "required": true, "visible": true, "editable": true, "displayConfig": { "searchable": true } },
+  { "modelCode": "faq_candidate", "fieldCode": "faq_source_conversation_pid", "sequence": 6, "required": true, "visible": true, "editable": false, "displayConfig": { "searchable": true } },
+  { "modelCode": "faq_candidate", "fieldCode": "faq_source_seq_range", "sequence": 7, "required": false, "visible": true, "editable": false },
+  { "modelCode": "faq_candidate", "fieldCode": "faq_kb_document_pid", "sequence": 8, "required": false, "visible": true, "editable": false },
+  { "modelCode": "faq_candidate", "fieldCode": "faq_reviewed_by", "sequence": 9, "required": false, "visible": true, "editable": false },
+  { "modelCode": "faq_candidate", "fieldCode": "faq_reviewed_at", "sequence": 10, "required": false, "visible": true, "editable": false, "displayConfig": { "sortable": true } },
+  { "modelCode": "faq_candidate", "fieldCode": "faq_reject_reason", "sequence": 11, "required": false, "visible": true, "editable": false }
+]
