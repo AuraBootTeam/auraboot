@@ -62,6 +62,10 @@ let kbPid: string;
 test.describe('S2 knowledge ingestion — URL fetch', () => {
   test.describe.configure({ mode: 'serial' });
 
+  // The backend fetches the page, extracts it and embeds it inside the request — a remote round
+  // trip the 15s default does not budget for once the suite is running in parallel.
+  test.setTimeout(120_000);
+
   test.skip(
     !LOOPBACK_FETCH_ENABLED,
     'needs AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1 on the backend — SsrfValidator refuses ' +

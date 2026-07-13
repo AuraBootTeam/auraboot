@@ -54,7 +54,6 @@ interface CreateKbForm {
 const DEFAULT_EMBEDDING_MODELS: Record<string, string> = {
   openai: 'text-embedding-3-small',
   qianwen: 'text-embedding-v4',
-  zhipu: 'embedding-3',
 };
 
 const DEFAULT_FORM: CreateKbForm = {
@@ -398,9 +397,19 @@ function KbForm({
             }}
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
+            {/*
+              Only providers whose default model produces a 1536-wide vector belong here — that is
+              the width of ab_kb_chunk.embedding, and anything else cannot be stored at all.
+
+              Zhipu is deliberately absent: embedding-3 answers with 2048 dimensions, so a knowledge
+              base created on it would fail to embed every single chunk. An option that is guaranteed
+              to fail is worse than no option — the user only finds out long after the dialog closed,
+              from a knowledge base that quietly returns nothing. The provider stays seeded (disabled,
+              keyless); put it back here once its config pins dimensions=1536 and that has been
+              verified against the live API.
+            */}
             <option value="openai">OpenAI</option>
             <option value="qianwen">通义千问 (DashScope)</option>
-            <option value="zhipu">Zhipu</option>
           </select>
         </div>
         <div>
