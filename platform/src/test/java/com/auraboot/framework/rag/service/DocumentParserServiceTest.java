@@ -5,6 +5,9 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.poi.sl.usermodel.Placeholder;
+import org.apache.poi.sl.usermodel.PictureData;
+import org.apache.poi.util.Units;
+import org.apache.poi.xslf.usermodel.XSLFPictureData;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xslf.usermodel.XSLFNotes;
 import org.apache.poi.xslf.usermodel.XSLFShape;
@@ -17,11 +20,18 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
+import javax.imageio.ImageIO;
+
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.geom.Rectangle2D;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -392,6 +402,117 @@ class DocumentParserServiceTest {
         @DisplayName("throws IOException for non-XLSX input (incl. legacy binary .xls)")
         void parseXlsxBadFile() {
             assertThrows(IOException.class, () -> service.parse(stream("not a xlsx"), "xlsx"));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Pictures inside documents — the chart the slide is actually about
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("embedded images")
+    class EmbeddedImages {
+
+        /** A PNG of the given size. 400x300 stands in for a chart; 64x64 for a logo. */
+        private byte[] png(int width, int height) throws IOException {
+            BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = img.createGraphics();
+            g.setColor(Color.WHITE);
+            g.fillRect(0, 0, width, height);
+            g.setColor(Color.BLUE);
+            g.fillRect(10, 10, Math.max(1, width / 3), Math.max(1, height / 2));
+            g.dispose();
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            ImageIO.write(img, "png", out);
+            return out.toByteArray();
+        }
+
+        @Test
+        @DisplayName("PPTX: the chart on the slide is extracted, the logo on it is not")
+        void pptxPicturesAreExtractedAndFiltered() throws IOException {
+            byte[] pptx;
+            try (XMLSlideShow ppt = new XMLSlideShow()) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+
+                XSLFSlide slide = ppt.createSlide();
+                slide.createTextBox().setText("Q3 regional performance");
+
+                // The chart the slide exists for.
+                XSLFPictureData chart = ppt.addPicture(png(400, 300), PictureData.PictureType.PNG);
+                slide.createPicture(chart).setAnchor(new Rectangle2D.Double(50, 50, 400, 300));
+
+                // The company logo, in the corner of every slide ever made.
+                XSLFPictureData logo = ppt.addPicture(png(64, 64), PictureData.PictureType.PNG);
+                slide.createPicture(logo).setAnchor(new Rectangle2D.Double(600, 20, 64, 64));
+
+                ppt.write(out);
+                pptx = out.toByteArray();
+            }
+
+            var images = service.extractEmbeddedImages(new ByteArrayInputStream(pptx), "pptx");
+
+            // Two pictures went in. Only the one that could be content comes out — describing the
+            // logo would cost a vision call per slide and bury the deck under its own letterhead.
+            assertEquals(1, images.size(),
+                    "expected only the chart, got: " + images.stream().map(i -> i.location()).toList());
+            assertEquals("image/png", images.get(0).mediaType());
+            assertEquals("Slide 1", images.get(0).location(),
+                    "the location is what tells the reader which slide the chart was on");
+            assertTrue(images.get(0).data().length > 0);
+        }
+
+        @Test
+        @DisplayName("PPTX: slide numbers are carried through, so a description can be placed")
+        void pptxLocationsTrackSlides() throws IOException {
+            byte[] pptx;
+            try (XMLSlideShow ppt = new XMLSlideShow()) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                for (int i = 0; i < 3; i++) {
+                    XSLFSlide slide = ppt.createSlide();
+                    XSLFPictureData pic = ppt.addPicture(png(400, 300), PictureData.PictureType.PNG);
+                    slide.createPicture(pic).setAnchor(new Rectangle2D.Double(50, 50, 400, 300));
+                }
+                ppt.write(out);
+                pptx = out.toByteArray();
+            }
+
+            var images = service.extractEmbeddedImages(new ByteArrayInputStream(pptx), "pptx");
+
+            assertEquals(3, images.size());
+            assertEquals(List.of("Slide 1", "Slide 2", "Slide 3"),
+                    images.stream().map(i -> i.location()).toList());
+        }
+
+        @Test
+        @DisplayName("DOCX: pictures are extracted, small ones filtered")
+        void docxPicturesAreExtracted() throws Exception {
+            byte[] docx;
+            try (XWPFDocument doc = new XWPFDocument()) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                var run = doc.createParagraph().createRun();
+                run.addPicture(new ByteArrayInputStream(png(400, 300)),
+                        org.apache.poi.xwpf.usermodel.Document.PICTURE_TYPE_PNG, "chart.png",
+                        Units.toEMU(400), Units.toEMU(300));
+                run.addPicture(new ByteArrayInputStream(png(48, 48)),
+                        org.apache.poi.xwpf.usermodel.Document.PICTURE_TYPE_PNG, "icon.png",
+                        Units.toEMU(48), Units.toEMU(48));
+                doc.write(out);
+                docx = out.toByteArray();
+            }
+
+            var images = service.extractEmbeddedImages(new ByteArrayInputStream(docx), "docx");
+
+            assertEquals(1, images.size(), "the 48x48 icon should have been filtered out");
+            assertEquals("image/png", images.get(0).mediaType());
+        }
+
+        @Test
+        @DisplayName("formats with no pictures yield none, rather than failing")
+        void formatsWithoutPicturesYieldNothing() throws IOException {
+            assertTrue(service.extractEmbeddedImages(stream("plain text"), "txt").isEmpty());
+            assertTrue(service.extractEmbeddedImages(stream("a,b"), "csv").isEmpty());
+            assertTrue(service.extractEmbeddedImages(stream("<p>hi</p>"), "html").isEmpty());
         }
     }
 }
