@@ -2,8 +2,14 @@ package com.auraboot.framework.rag.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.openxml4j.exceptions.NotOfficeXmlFileException;
+import org.apache.poi.common.usermodel.PictureType;
 import org.apache.poi.ooxml.POIXMLException;
 import org.apache.poi.sl.usermodel.Placeholder;
 import org.apache.poi.ss.usermodel.Cell;
@@ -12,12 +18,15 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xslf.usermodel.XSLFNotes;
+import org.apache.poi.xslf.usermodel.XSLFPictureData;
+import org.apache.poi.xslf.usermodel.XSLFPictureShape;
 import org.apache.poi.xslf.usermodel.XSLFShape;
 import org.apache.poi.xslf.usermodel.XSLFSlide;
 import org.apache.poi.xslf.usermodel.XSLFTextShape;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
+import org.apache.poi.xwpf.usermodel.XWPFPictureData;
 import org.apache.poi.xwpf.usermodel.XWPFTable;
 import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
@@ -26,9 +35,19 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -56,6 +75,46 @@ public class DocumentParserService {
      */
     public static final Set<String> SUPPORTED_DOC_TYPES =
             Set.of("pdf", "docx", "pptx", "xlsx", "md", "txt", "csv", "html", "image");
+
+    /** A picture found inside a document — typically the chart the slide is actually about. */
+    public record EmbeddedImage(String mediaType, byte[] data, String location) {}
+
+    /** What a vision model will accept. A deck can also embed EMF/WMF/TIFF; those are skipped. */
+    private static final Set<String> VISION_MEDIA_TYPES =
+            Set.of("image/png", "image/jpeg", "image/gif", "image/webp");
+
+    /**
+     * Below this, on either side, a picture is chrome: a logo, an icon, a bullet glyph, the divider
+     * on the master slide. Describing those would spend a vision call each and then bury the deck's
+     * actual content under thirty descriptions of the company logo.
+     */
+    private static final int MIN_IMAGE_DIMENSION_PX = 200;
+
+    /** A hard ceiling on vision calls per document — each one is a paid, multi-second round trip. */
+    private static final int MAX_EMBEDDED_IMAGES = 20;
+
+    /**
+     * Pull the pictures out of a document, so a caller with a vision model can read them.
+     *
+     * <p>This is what makes "upload the quarterly deck" work as a user means it. A slide's whole
+     * point is often a chart, and a chart is a picture — extracting only the text frames returns the
+     * title and the footer and silently drops the thing the slide was made to show.
+     *
+     * <p>Understanding is deliberately not done here: this class stays a pure parser with no LLM
+     * dependency, so it can be unit-tested against real containers without a provider. The caller
+     * ({@code DocumentProcessingService}) owns the vision model and decides what to do with these.
+     *
+     * @return the images worth looking at, in document order; empty for formats with no pictures
+     */
+    public List<EmbeddedImage> extractEmbeddedImages(InputStream content, String docType)
+            throws IOException {
+        return switch (docType.toLowerCase()) {
+            case "pptx" -> pptxImages(content);
+            case "docx" -> docxImages(content);
+            case "pdf" -> pdfImages(content);
+            default -> List.of();
+        };
+    }
 
     /**
      * Extract text content from a document stream.
@@ -263,6 +322,146 @@ public class DocumentParserService {
                 .replaceAll(" ?\\n ?", "\n")
                 .replaceAll("\\n{3,}", "\n\n")
                 .strip();
+    }
+
+    // =========================================================================
+    // Embedded pictures
+    // =========================================================================
+
+    private List<EmbeddedImage> pptxImages(InputStream content) throws IOException {
+        try (XMLSlideShow ppt = new XMLSlideShow(content)) {
+            List<EmbeddedImage> images = new ArrayList<>();
+            int slideNo = 0;
+            for (XSLFSlide slide : ppt.getSlides()) {
+                slideNo++;
+                for (XSLFShape shape : slide.getShapes()) {
+                    if (!(shape instanceof XSLFPictureShape picture)) {
+                        continue;
+                    }
+                    XSLFPictureData data = picture.getPictureData();
+                    addIfWorthReading(images, data.getContentType(), data.getData(),
+                            "Slide " + slideNo);
+                    if (images.size() >= MAX_EMBEDDED_IMAGES) {
+                        log.info("Deck has more than {} pictures — reading the first {}",
+                                MAX_EMBEDDED_IMAGES, MAX_EMBEDDED_IMAGES);
+                        return images;
+                    }
+                }
+            }
+            return images;
+        } catch (NotOfficeXmlFileException | POIXMLException e) {
+            throw new IOException("Failed to read pictures from PPTX", e);
+        }
+    }
+
+    private List<EmbeddedImage> docxImages(InputStream content) throws IOException {
+        try (XWPFDocument doc = new XWPFDocument(content)) {
+            List<EmbeddedImage> images = new ArrayList<>();
+            int index = 0;
+            for (XWPFPictureData data : doc.getAllPictures()) {
+                index++;
+                // A Word document has no slide numbers to anchor to; the ordinal is what we have.
+                addIfWorthReading(images, mediaTypeOf(data.getPictureTypeEnum()), data.getData(),
+                        "Image " + index);
+                if (images.size() >= MAX_EMBEDDED_IMAGES) {
+                    return images;
+                }
+            }
+            return images;
+        } catch (NotOfficeXmlFileException | POIXMLException e) {
+            throw new IOException("Failed to read pictures from DOCX", e);
+        }
+    }
+
+    private List<EmbeddedImage> pdfImages(InputStream content) throws IOException {
+        try (PDDocument doc = PDDocument.load(content)) {
+            List<EmbeddedImage> images = new ArrayList<>();
+            int pageNo = 0;
+            for (PDPage page : doc.getPages()) {
+                pageNo++;
+                PDResources resources = page.getResources();
+                if (resources == null) {
+                    continue;
+                }
+                for (COSName name : resources.getXObjectNames()) {
+                    PDXObject xObject;
+                    try {
+                        xObject = resources.getXObject(name);
+                    } catch (IOException e) {
+                        log.debug("Skipping unreadable XObject on page {}: {}", pageNo, e.getMessage());
+                        continue;
+                    }
+                    if (!(xObject instanceof PDImageXObject image)) {
+                        continue;
+                    }
+                    // A PDF image is a raw raster in the file's own colour space, not a PNG — it has
+                    // to be re-encoded before a vision API will take it.
+                    ByteArrayOutputStream png = new ByteArrayOutputStream();
+                    if (!ImageIO.write(image.getImage(), "png", png)) {
+                        continue;
+                    }
+                    addIfWorthReading(images, "image/png", png.toByteArray(), "Page " + pageNo);
+                    if (images.size() >= MAX_EMBEDDED_IMAGES) {
+                        return images;
+                    }
+                }
+            }
+            return images;
+        }
+    }
+
+    /** Keep a picture only if a vision model can read it and it is big enough to be content. */
+    private void addIfWorthReading(List<EmbeddedImage> images, String mediaType, byte[] data,
+                                     String location) {
+        if (mediaType == null || !VISION_MEDIA_TYPES.contains(mediaType.toLowerCase(Locale.ROOT))) {
+            return;
+        }
+        if (data == null || data.length == 0) {
+            return;
+        }
+        int[] size = readImageSize(data);
+        if (size == null || size[0] < MIN_IMAGE_DIMENSION_PX || size[1] < MIN_IMAGE_DIMENSION_PX) {
+            return;
+        }
+        images.add(new EmbeddedImage(mediaType.toLowerCase(Locale.ROOT), data, location));
+    }
+
+    /**
+     * Width and height from the image header alone. Decoding the whole raster just to learn that a
+     * 32×32 icon is an icon would be the expensive way to throw it away.
+     */
+    private int[] readImageSize(byte[] data) {
+        try (ImageInputStream in = ImageIO.createImageInputStream(new ByteArrayInputStream(data))) {
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(in);
+            if (!readers.hasNext()) {
+                return null;
+            }
+            ImageReader reader = readers.next();
+            try {
+                reader.setInput(in);
+                return new int[]{reader.getWidth(0), reader.getHeight(0)};
+            } finally {
+                reader.dispose();
+            }
+        } catch (IOException e) {
+            return null;
+        }
+    }
+
+    /**
+     * POI's {@code Document.PICTURE_TYPE_*} ints look like constants but carry no ConstantValue, so
+     * they cannot be switch labels. The enum is what they are anyway.
+     */
+    private String mediaTypeOf(PictureType type) {
+        if (type == null) {
+            return "";
+        }
+        return switch (type) {
+            case PNG -> "image/png";
+            case JPEG -> "image/jpeg";
+            case GIF -> "image/gif";
+            default -> "";  // EMF / WMF / PICT / DIB / TIFF — no vision API takes these
+        };
     }
 
     private void appendLine(StringBuilder sb, String text) {
