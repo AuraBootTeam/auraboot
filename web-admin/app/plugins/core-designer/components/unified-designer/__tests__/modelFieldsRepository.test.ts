@@ -131,6 +131,59 @@ describe('modelFieldsRepository', () => {
     );
   });
 
+  it('captures extension.renderComponent as the component and surfaces extension props', async () => {
+    const fetcherMock = vi.fn(async (url: string) => {
+      if (url === '/api/meta/models/code/showcase') {
+        return { data: { pid: 'showcase_pid' } };
+      }
+      if (url === '/api/meta/models/showcase_pid/fields') {
+        return {
+          data: [
+            {
+              code: 'sc_color',
+              dataType: 'string',
+              displayName: '颜色标记',
+              uiSchema: {},
+              extension: { renderComponent: 'colorpicker', displayName: '颜色标记' },
+            },
+            {
+              code: 'sc_budget',
+              dataType: 'decimal',
+              displayName: '预算金额',
+              extension: { renderComponent: 'moneyinput', currencySymbol: '¥', precision: 2 },
+            },
+          ],
+        };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+    const fetcher = fetcherMock as unknown as ModelFieldFetcher;
+
+    const result = await loadModelFieldsByModelCodes(['showcase'], fetcher);
+
+    // renderComponent wins over the (empty) uiSchema; the displayName-only extension
+    // yields no leftover extension props.
+    expect(result.showcase[0]).toEqual({
+      modelCode: 'showcase',
+      code: 'sc_color',
+      label: '颜色标记',
+      type: 'string',
+      component: 'colorpicker',
+      required: false,
+    });
+    // Component-shaping extension props (currencySymbol/precision) are surfaced for the
+    // WYSIWYG preview; renderComponent/displayName are stripped from the bag.
+    expect(result.showcase[1]).toEqual({
+      modelCode: 'showcase',
+      code: 'sc_budget',
+      label: '预算金额',
+      type: 'decimal',
+      component: 'moneyinput',
+      required: false,
+      extensionProps: { currencySymbol: '¥', precision: 2 },
+    });
+  });
+
   it('loads view-model resolved fields after management model lookup misses', async () => {
     const fetcherMock = vi.fn(async (url: string) => {
       if (url === '/api/meta/models/code/customer_view') {
