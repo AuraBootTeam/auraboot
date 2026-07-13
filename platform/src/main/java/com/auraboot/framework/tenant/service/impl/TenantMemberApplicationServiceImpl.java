@@ -7,6 +7,9 @@ import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.rbac.service.UserRoleService;
+import com.auraboot.framework.tenant.dto.TenantMemberCreateRequest;
+import com.auraboot.framework.tenant.dto.TenantMemberCreateResult;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -91,6 +94,9 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
 
     @Autowired
     private DynamicDataService dynamicDataService;
+
+    @Autowired
+    private UserRoleService userRoleService;
     
     @Override
     public PaginationResult<MemberResponse> searchMembers(MemberQueryRequest request, Long userId) {
@@ -385,6 +391,71 @@ public class TenantMemberApplicationServiceImpl implements TenantMemberApplicati
         }
     }
     
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public TenantMemberCreateResult createMember(TenantMemberCreateRequest request, Long operatorId) {
+        if (request == null || isBlank(request.getName())) {
+            throw new BusinessException(ResponseCode.BadParam, "name is required");
+        }
+        if (isBlank(request.getEmail())) {
+            throw new BusinessException(ResponseCode.BadParam, "email is required");
+        }
+        // MetaContext.get() throws when there is no context, so a null-check here
+        // would be dead code — the platform refuses before we ever see a null.
+        Long tenantId = MetaContext.getCurrentTenantId();
+
+        String email = request.getEmail().trim();
+        String password = request.getPassword();
+        boolean generated = isBlank(password);
+        if (generated) {
+            password = generateTemporaryPassword(16);
+        }
+
+        User user = userService.findByEmail(email);
+        if (user == null) {
+            user = userService.signUp(email, password, request.getName().trim());
+            if (!isBlank(request.getPhone())) {
+                user.setMobile(request.getPhone().trim());
+                userService.update(user);
+            }
+        } else if (!generated) {
+            // The email already has an account on the platform. Creating a member
+            // for it is fine; silently resetting its password because this caller
+            // supplied one is not — that account may belong to another tenant.
+            throw new BusinessException(ResponseCode.BadParam,
+                    "A user with this email already exists; omit `password` to add them as a member");
+        }
+
+        if (tenantMemberService.findByTenantIdAndUserId(tenantId, user.getId()) != null) {
+            throw new BusinessException(ResponseCode.BadParam, "This email is already a member of the tenant");
+        }
+
+        // ACTIVE, not PENDING: an admin creating an account on purpose is a
+        // different act from an invitation the invitee still has to accept.
+        TenantMember member = tenantMemberService.addMember(user.getId(), tenantId, StatusConstants.ACTIVE);
+
+        List<String> assigned = request.getRoleCodes() == null ? List.of() : request.getRoleCodes();
+        if (!assigned.isEmpty()) {
+            userRoleService.assignRolesToMemberByRoleCodes(member.getPid(), assigned, tenantId, operatorId);
+        }
+
+        log.info("Member created by admin: email={}, memberPid={}, roles={}, operator={}",
+                email, member.getPid(), assigned, operatorId);
+
+        return TenantMemberCreateResult.builder()
+                .memberPid(member.getPid())
+                .userPid(user.getPid())
+                .email(email)
+                .password(password)
+                .passwordGenerated(generated)
+                .assignedRoles(assigned)
+                .build();
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
     @Override
     public boolean batchRemoveMembers(List<String> memberPids, Long userId) {
         try {

@@ -5,13 +5,17 @@ import com.auraboot.framework.meta.service.CommandHandler;
 import com.auraboot.framework.meta.service.CommandHandlerContext;
 import com.auraboot.framework.organization.dto.EmployeeAccountProvisionResponse;
 import com.auraboot.framework.organization.service.OrgEmployeeService;
+import com.auraboot.framework.tenant.dto.TenantMemberCreateRequest;
+import com.auraboot.framework.tenant.dto.TenantMemberCreateResult;
 import com.auraboot.framework.tenant.service.TenantMemberApplicationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import com.auraboot.framework.common.constant.StatusConstants;
 
 /**
@@ -63,6 +67,7 @@ public class TenantMemberCommandHandler implements CommandHandler {
                 case "admin:leave_member" -> handleLeave(extractMemberPid(context), userId, result);
                 case "admin:delete_member" -> handleDelete(extractMemberPid(context), userId, result);
                 case "admin:reset_member_password" -> handleResetPassword(extractMemberPid(context), userId, result);
+                case "admin:create_member" -> handleCreateMember(context.getPayload(), userId, result);
                 case "admin:provision_member_from_employee" -> handleProvisionMemberFromEmployee(context.getPayload(), result);
                 default -> {
                     log.warn("Unknown command code for TenantMemberCommandHandler: {}", commandCode);
@@ -133,6 +138,34 @@ public class TenantMemberCommandHandler implements CommandHandler {
         result.put("action", "reset_password");
         result.put("tempPassword", tempPassword);
         result.put("adminManaged", true);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void handleCreateMember(Map<String, Object> payload, Long userId, Map<String, Object> result) {
+        TenantMemberCreateRequest request = new TenantMemberCreateRequest();
+        request.setName(extractString(payload, "name"));
+        request.setEmail(extractString(payload, "email"));
+        request.setPhone(extractString(payload, "phone"));
+        request.setPassword(extractString(payload, "password"));
+
+        Object roles = payload == null ? null : payload.get("roleCodes");
+        if (roles instanceof List<?> list) {
+            request.setRoleCodes(list.stream().filter(Objects::nonNull).map(Object::toString).toList());
+        } else if (roles instanceof String single && !single.isBlank()) {
+            request.setRoleCodes(List.of(single));
+        }
+
+        TenantMemberCreateResult created = tenantMemberApplicationService.createMember(request, userId);
+        result.put("action", "create_member");
+        result.put("memberPid", created.getMemberPid());
+        result.put("userPid", created.getUserPid());
+        result.put("email", created.getEmail());
+        result.put("assignedRoles", created.getAssignedRoles());
+        // Echoed back on purpose: an admin who creates an account and is not told
+        // the password has not created a usable account. It is generated unless the
+        // caller supplied one, and this is the only place it is ever shown.
+        result.put("password", created.getPassword());
+        result.put("passwordGenerated", created.isPasswordGenerated());
     }
 
     private void handleProvisionMemberFromEmployee(Map<String, Object> payload, Map<String, Object> result) {
