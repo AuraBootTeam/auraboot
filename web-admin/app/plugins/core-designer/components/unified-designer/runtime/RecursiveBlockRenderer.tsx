@@ -8,6 +8,7 @@ import { createExpressionContext } from '~/framework/meta/runtime/expression/con
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
 import { buildPreviewFieldConfig } from './platformFieldPreview';
+import { DesignerPageModelCodeContext, PreviewListTable } from './platformTablePreview';
 import type { DslBlockV3, ModelFieldDefinition, PageSchemaV3 } from '../types';
 import { getCustomBlockRenderer } from './customBlockRendererRegistry';
 import {
@@ -62,6 +63,7 @@ export function RecursiveBlockRenderer({
   const tree = (
     <RuntimeLocaleContext.Provider value={locale}>
       <RuntimeModelFieldsContext.Provider value={modelFieldList}>
+        <DesignerPageModelCodeContext.Provider value={schema.modelCode}>
         <RuntimePermissionContext.Provider value={evaluatePermission}>
           <div
             className="grid grid-cols-12 gap-4"
@@ -79,6 +81,7 @@ export function RecursiveBlockRenderer({
             ))}
           </div>
         </RuntimePermissionContext.Provider>
+        </DesignerPageModelCodeContext.Provider>
       </RuntimeModelFieldsContext.Provider>
     </RuntimeLocaleContext.Provider>
   );
@@ -3983,6 +3986,9 @@ function getRuntimeRepeaterFieldKey(block: DslBlockV3): string {
 function RuntimeTable({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
   const selectionContext = React.useContext(RuntimeListSelectionContext);
   const hasPermission = React.useContext(RuntimePermissionContext);
+  const modelFields = React.useContext(RuntimeModelFieldsContext);
+  const pageModelCode = React.useContext(DesignerPageModelCodeContext);
+  const locale = React.useContext(RuntimeLocaleContext);
   const t = useRuntimeText();
   const rows = applyRuntimeListFilters(getRuntimeTableRows(block), selectionContext);
   const configuredColumnBlocks = getRuntimeTableColumnBlocks(block);
@@ -3991,6 +3997,29 @@ function RuntimeTable({ block, runtimeServices, pageContext, blockPath }: Runtim
   );
   const rowActionBlocks = getRuntimeTableRowActionBlocks(block);
   const columns = getRuntimeTableColumns(block, rows, columnBlocks, configuredColumnBlocks.length > 0);
+
+  // True WYSIWYG: for a page `table` with real columns and no author-supplied
+  // representative rows, render the live data table (RecordListView fetches a small page
+  // and resolves dict/reference/typed cells). Gated on model metadata being present, so
+  // the schematic path (and its tests, which pass no modelFields) is unaffected.
+  if (
+    block.blockType === 'table' &&
+    modelFields.length > 0 &&
+    Boolean(pageModelCode) &&
+    configuredColumnBlocks.length > 0 &&
+    getRuntimeTableRows(block).length === 0
+  ) {
+    return (
+      <div data-testid={`runtime-block-${block.id}`}>
+        <PreviewListTable
+          modelCode={pageModelCode}
+          tableBlock={block}
+          modelFields={modelFields}
+          locale={locale}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-md border border-slate-200" data-testid={`runtime-block-${block.id}`}>
