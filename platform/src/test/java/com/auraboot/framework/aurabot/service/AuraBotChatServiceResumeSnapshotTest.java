@@ -307,7 +307,7 @@ class AuraBotChatServiceResumeSnapshotTest {
         assertThat(requestCaptor.getValue().getTools())
                 .extracting(LlmChatRequest.Tool::getName)
                 .containsExactly("cmd_pe_create_procurement_comparison_draft");
-        verify(chatToolResolver, never()).resolveTools(any(), any(), any());
+        verify(chatToolResolver, never()).resolveTools(any(), any(), any(), any());
     }
 
     @Test

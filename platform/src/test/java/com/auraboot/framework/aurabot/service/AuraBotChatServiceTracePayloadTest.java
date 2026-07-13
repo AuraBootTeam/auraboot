@@ -97,7 +97,7 @@ class AuraBotChatServiceTracePayloadTest {
                         .defaultModel("MiniMax-M2.5")
                         .maxTokens(128)
                         .build());
-        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null)))
+        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
         when(factory.getProvider(eq("openai"))).thenReturn(provider);
         when(provider.streamChat(any(), eq("test-key"), eq("stub://local")))

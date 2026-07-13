@@ -78,7 +78,7 @@ class ChatToolResolverIsReadOnlyTest {
         ToolDiscoveryPort toolDiscoveryPort = new ToolDiscoveryPort() {
             @Override
             public List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills,
-                                               String modelHint, String intentHint, int maxTools) {
+                                               String modelHint, String intentHint, int maxTools, String channel) {
                 return List.of(new ToolDef(
                         "cmd:crm:list_leads",
                         "List Leads",
@@ -93,7 +93,7 @@ class ChatToolResolverIsReadOnlyTest {
         MetaContext.setSystemTenantContext(1L);
         ChatToolResolver.ResolvedTools resolved;
         try {
-            resolved = mappedResolver.resolveTools("list leads", "crm_lead", null);
+            resolved = mappedResolver.resolveTools("list leads", "crm_lead", null, null);
         } finally {
             MetaContext.clear();
         }
@@ -112,7 +112,7 @@ class ChatToolResolverIsReadOnlyTest {
         ToolDiscoveryPort toolDiscoveryPort = new ToolDiscoveryPort() {
             @Override
             public List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills,
-                                               String modelHint, String intentHint, int maxTools) {
+                                               String modelHint, String intentHint, int maxTools, String channel) {
                 return List.of(
                         new ToolDef("list:crm_lead", "List Leads", "Query CRM leads", Map.of("type", "object"), true),
                         new ToolDef("platform.execute_sql", "Execute SQL", "SQL fallback", Map.of("type", "object"), true)
@@ -124,7 +124,7 @@ class ChatToolResolverIsReadOnlyTest {
         MetaContext.setSystemTenantContext(1L);
         ChatToolResolver.ResolvedTools resolved;
         try {
-            resolved = mappedResolver.resolveTools("list leads", "crm_lead", null);
+            resolved = mappedResolver.resolveTools("list leads", "crm_lead", null, null);
         } finally {
             MetaContext.clear();
         }
@@ -139,13 +139,13 @@ class ChatToolResolverIsReadOnlyTest {
         GroundingPort groundingPort = (tenantId, userMessage, pageModel, recordId) -> {
             throw new IllegalStateException("grounding unavailable");
         };
-        ToolDiscoveryPort toolDiscoveryPort = (tenantId, candidateSkills, modelHint, intentHint, maxTools) ->
+        ToolDiscoveryPort toolDiscoveryPort = (tenantId, candidateSkills, modelHint, intentHint, maxTools, channel) ->
                 List.of();
         ChatToolResolver mappedResolver = new ChatToolResolver(groundingPort, toolDiscoveryPort, null);
 
         MetaContext.setSystemTenantContext(1L);
         try {
-            assertThatThrownBy(() -> mappedResolver.resolveTools("list leads", "crm_lead", null))
+            assertThatThrownBy(() -> mappedResolver.resolveTools("list leads", "crm_lead", null, null))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("AuraBot tool resolution failed")
                     .hasRootCauseMessage("grounding unavailable");
@@ -158,14 +158,14 @@ class ChatToolResolverIsReadOnlyTest {
     void resolveTools_propagatesToolDiscoveryFailureInsteadOfReturningEmptyTools() {
         GroundingPort groundingPort = (tenantId, userMessage, pageModel, recordId) ->
                 new GroundingPort.GroundingResult("query", "crm_lead", 0.9, List.of("list:crm_lead"), true);
-        ToolDiscoveryPort toolDiscoveryPort = (tenantId, candidateSkills, modelHint, intentHint, maxTools) -> {
+        ToolDiscoveryPort toolDiscoveryPort = (tenantId, candidateSkills, modelHint, intentHint, maxTools, channel) -> {
             throw new IllegalStateException("tool registry unavailable");
         };
         ChatToolResolver mappedResolver = new ChatToolResolver(groundingPort, toolDiscoveryPort, null);
 
         MetaContext.setSystemTenantContext(1L);
         try {
-            assertThatThrownBy(() -> mappedResolver.resolveTools("list leads", "crm_lead", null))
+            assertThatThrownBy(() -> mappedResolver.resolveTools("list leads", "crm_lead", null, null))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("AuraBot tool resolution failed")
                     .hasRootCauseMessage("tool registry unavailable");

@@ -22,9 +22,14 @@ public interface ToolDiscoveryPort {
      * @param modelHint       target model code hint (nullable)
      * @param intentHint      resolved intent hint (nullable, e.g., "create", "query")
      * @param maxTools        maximum number of tools to return
-     * @return list of matching tool definitions, ordered by relevance
+     * @param channel         request channel (e.g. {@code cs_widget}, {@code web}); lets a provider
+     *                        contribute always-on tools for its own channel. Nullable.
+     * @return list of matching tool definitions, ordered by relevance. Always-on tools
+     *         ({@link com.auraboot.framework.agent.provider.ToolProvider#discoverAlwaysOn}) come
+     *         first and are exempt from both the grounding and the read-intent filters.
      */
-    List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills, String modelHint, String intentHint, int maxTools);
+    List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills, String modelHint, String intentHint,
+                                int maxTools, String channel);
 
     /**
      * Definition of a discoverable tool.
