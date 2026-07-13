@@ -6112,7 +6112,7 @@ CREATE TABLE IF NOT EXISTS ab_kb_document (
     created_by            BIGINT,
     deleted_flag          BOOLEAN DEFAULT FALSE,
 
-    CONSTRAINT chk_doc_type CHECK (doc_type IN ('pdf', 'docx', 'md', 'txt', 'csv', 'html', 'pptx', 'xlsx')),
+    CONSTRAINT chk_doc_type CHECK (doc_type IN ('pdf', 'docx', 'md', 'txt', 'csv', 'html', 'pptx', 'xlsx', 'image')),
     CONSTRAINT chk_doc_status CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
     -- 'conversation': a FAQ distilled from an IM conversation and published by faq:publish.
     -- Keep in lockstep with V20260713300000 and with KbTextIngestService.DB_SOURCE_TYPES.

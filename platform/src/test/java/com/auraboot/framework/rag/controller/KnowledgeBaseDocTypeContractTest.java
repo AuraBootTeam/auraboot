@@ -33,7 +33,7 @@ class KnowledgeBaseDocTypeContractTest {
 
     /** Extensions the upload UI offers — keep in step with the accept list in knowledge.$kbPid.tsx. */
     private static final List<String> ACCEPTED_EXTENSIONS =
-            List.of("pdf", "docx", "pptx", "xlsx", "md", "txt", "csv", "html");
+            List.of("pdf", "docx", "pptx", "xlsx", "md", "txt", "csv", "html", "png", "jpg", "jpeg", "gif", "webp");
 
     @Test
     @DisplayName("every extension the UI offers resolves to a type the parser can actually handle")
