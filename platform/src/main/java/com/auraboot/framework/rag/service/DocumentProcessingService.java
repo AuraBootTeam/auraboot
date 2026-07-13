@@ -27,6 +27,7 @@ public class DocumentProcessingService {
     private final KnowledgeBaseService kbService;
     private final DocumentParserService parserService;
     private final KbChunkIngestPipeline ingestPipeline;
+    private final KbImageUnderstandingService imageUnderstandingService;
     private final FileService fileService;
     private final StorageProvider storageProvider;
     private final JdbcTemplate jdbcTemplate;
@@ -137,6 +138,14 @@ public class DocumentProcessingService {
         }
 
         try (InputStream content = storageProvider.download(storageKey)) {
+            // An image has no text to extract — it has to be understood. What gets indexed is the
+            // vision model's description of it, which is what makes a chart findable by what it
+            // shows rather than by its file name.
+            if ("image".equals(doc.getDocType())) {
+                return imageUnderstandingService.describe(
+                        doc.getTenantId(), content.readAllBytes(),
+                        KbImageUnderstandingService.mediaTypeForFile(doc.getDocName()));
+            }
             return parserService.parse(content, doc.getDocType());
         }
     }

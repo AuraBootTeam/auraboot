@@ -46,9 +46,16 @@ import java.util.Set;
 @Service
 public class DocumentParserService {
 
-    /** Doc types this parser can handle. Must stay in sync with the {@code chk_doc_type} CHECK constraint. */
+    /**
+     * Doc types a knowledge base accepts. Must stay in sync with the {@code chk_doc_type} CHECK
+     * constraint and with {@code KnowledgeBaseController.resolveDocType}.
+     *
+     * <p>{@code image} is in the set but is not handled here: an image carries no text to extract,
+     * it is described by {@code KbImageUnderstandingService} and the description is what gets
+     * indexed. {@link #parse} says so explicitly rather than letting it fall through.
+     */
     public static final Set<String> SUPPORTED_DOC_TYPES =
-            Set.of("pdf", "docx", "pptx", "xlsx", "md", "txt", "csv", "html");
+            Set.of("pdf", "docx", "pptx", "xlsx", "md", "txt", "csv", "html", "image");
 
     /**
      * Extract text content from a document stream.
@@ -65,6 +72,9 @@ public class DocumentParserService {
             case "xlsx" -> parseXlsx(content);
             case "md", "txt", "csv" -> new String(content.readAllBytes(), StandardCharsets.UTF_8);
             case "html" -> parseHtml(new String(content.readAllBytes(), StandardCharsets.UTF_8));
+            case "image" -> throw new IllegalArgumentException(
+                    "images are not parsed as text — they are described by KbImageUnderstandingService; "
+                            + "DocumentProcessingService routes them there before reaching this parser");
             default -> throw new IllegalArgumentException("Unsupported document type: " + docType);
         };
     }
