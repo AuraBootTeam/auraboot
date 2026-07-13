@@ -54,7 +54,7 @@ cleanup() {
 trap cleanup EXIT
 
 # ---- 1. stack + plugin -------------------------------------------------------------------
-log "1/4 host-first stack up (slot $SLOT) + import core-faq-loop"
+log "1/5 host-first stack up (slot $SLOT) + import core-faq-loop"
 bash "$STACK" up "$NAME" --slot "$SLOT" --plugin core-faq-loop
 
 eval "$(bash "$STACK" env "$NAME" | grep '^export')"
@@ -73,7 +73,7 @@ print(json.loads(base64.urlsafe_b64decode(s))['tenantId'])")"
 log "    tenant=$TENANT"
 
 # ---- 2. reset + seed ---------------------------------------------------------------------
-log "2/4 reset faq_candidate + conversation-sourced KB documents, seed conversations"
+log "2/5 reset faq_candidate + conversation-sourced KB documents, seed conversations"
 psql -h "${PG_HOST:-127.0.0.1}" -p "${PG_PORT:-5432}" -U "${PG_USER:-auraboot}" -d "$PG_DB" -q <<'SQL'
 DELETE FROM ab_kb_chunk WHERE doc_id IN (SELECT pid FROM ab_kb_document WHERE source_type = 'conversation');
 DELETE FROM ab_kb_document WHERE source_type = 'conversation';
@@ -95,7 +95,7 @@ rc=0
 # ---- 3. distil, from the browser ---------------------------------------------------------
 # Creates the candidates step 4 reviews, and carries the fabrication gate: pointing the distiller
 # at the chit-chat conversation must yield nothing.
-log "3/4 browser: queue → transcript → distil (live DeepSeek) → nothing from chit-chat"
+log "3/5 browser: queue → transcript → distil (live DeepSeek) → nothing from chit-chat"
 npx playwright test -c playwright.gt5.config.ts \
   tests/e2e/faq-loop-conversation-queue.spec.ts --project=chromium --reporter=line || rc=$?
 
@@ -105,13 +105,27 @@ if [ "$rc" -ne 0 ]; then
 fi
 
 # ---- 4. review, from the browser ---------------------------------------------------------
-log "4/4 browser: review → approve → publish → retrievable"
+log "4/5 browser: review → edit → reject → approve → publish → retrievable"
 npx playwright test -c playwright.gt5.config.ts \
   tests/e2e/faq-loop-review-workbench.spec.ts --project=chromium --reporter=line || rc=$?
 
-if [ "$rc" -eq 0 ]; then
-  log "✅ conversation → FAQ loop golden PASSED (queue → distil → review → publish → retrievable)"
-else
+if [ "$rc" -ne 0 ]; then
   log "❌ conversation → FAQ loop golden FAILED at review (rc=$rc)"
+  exit "$rc"
+fi
+
+# ---- 5. the pages and the menu ------------------------------------------------------------
+# The sidebar, the model's list/detail/form pages, and the detail toolbar — a second execution
+# path for the same commands the row actions use, and one that has already diverged once. This
+# segment distils its own conversation from the queue, because the review segment works its
+# candidates down to nothing.
+log "5/5 browser: sidebar reachability + list/detail/form + detail-toolbar command path"
+npx playwright test -c playwright.gt5.config.ts \
+  tests/e2e/faq-loop-pages-and-menu.spec.ts --project=chromium --reporter=line || rc=$?
+
+if [ "$rc" -eq 0 ]; then
+  log "✅ conversation → FAQ loop golden PASSED (queue → distil → review → publish → retrievable → pages/menu)"
+else
+  log "❌ conversation → FAQ loop golden FAILED at pages/menu (rc=$rc)"
 fi
 exit "$rc"
