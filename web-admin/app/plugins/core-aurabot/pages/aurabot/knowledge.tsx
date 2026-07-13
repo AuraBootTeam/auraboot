@@ -47,11 +47,21 @@ interface CreateKbForm {
   chunkOverlap: number;
 }
 
+/**
+ * The model each embedding provider is seeded with. These must produce 1536-dimension vectors —
+ * that is the width of ab_kb_chunk.embedding, and a vector of any other width cannot be stored.
+ */
+const DEFAULT_EMBEDDING_MODELS: Record<string, string> = {
+  openai: 'text-embedding-3-small',
+  qianwen: 'text-embedding-v4',
+  zhipu: 'embedding-3',
+};
+
 const DEFAULT_FORM: CreateKbForm = {
   name: '',
   description: '',
   embeddingProvider: 'openai',
-  embeddingModel: 'text-embedding-3-small',
+  embeddingModel: DEFAULT_EMBEDDING_MODELS.openai,
   chunkSize: 500,
   chunkOverlap: 50,
 };
@@ -369,11 +379,21 @@ function KbForm({
             Provider
           </label>
           <select
+            data-testid="kb-provider-select"
             value={form.embeddingProvider}
-            onChange={(e) => update('embeddingProvider', e.target.value)}
+            onChange={(e) => {
+              const provider = e.target.value;
+              update('embeddingProvider', provider);
+              // Carry the provider's default model across. Leaving the previous provider's model
+              // behind silently produces a "model not found" at the first embed, long after the
+              // dialog is gone.
+              const model = DEFAULT_EMBEDDING_MODELS[provider];
+              if (model) update('embeddingModel', model);
+            }}
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
             <option value="openai">OpenAI</option>
+            <option value="qianwen">通义千问 (DashScope)</option>
             <option value="zhipu">Zhipu</option>
           </select>
         </div>

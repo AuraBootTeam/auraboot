@@ -60,7 +60,7 @@ public class RagRetrievalService {
                                             List<String> kbPids, Integer topK, Double threshold) {
         List<String> warnings = new ArrayList<>();
         long startedAt = System.currentTimeMillis();
-        if (query == null || query.isBlank()) return new RetrievalOutcome(List.of(), warnings);
+        if (query == null || query.isBlank()) return new RetrievalOutcome(List.of(), warnings, "none");
 
         // Query expansion for short/domain-specific queries
         QueryRewriteService.QueryRewriteResult rewrite = queryRewriteService.rewrite(query);
@@ -73,7 +73,7 @@ public class RagRetrievalService {
         List<String> targetKbs = resolveTargetKbs(tenantId, kbPids);
         if (targetKbs.isEmpty()) {
             log.debug("No active knowledge bases found for tenant {}", tenantId);
-            return new RetrievalOutcome(List.of(), warnings);
+            return new RetrievalOutcome(List.of(), warnings, "none");
         }
 
         // Get embedding provider from the first KB.
@@ -86,7 +86,7 @@ public class RagRetrievalService {
         // behavior was zero results or confusing SQL error. Per deep-review
         // P3-1: drop incompatible KBs + log.
         KnowledgeBase firstKb = kbService.findKbByPid(targetKbs.get(0));
-        if (firstKb == null) return new RetrievalOutcome(List.of(), warnings);
+        if (firstKb == null) return new RetrievalOutcome(List.of(), warnings, "none");
         if (targetKbs.size() > 1) {
             String firstProvider = firstKb.getEmbeddingProvider();
             List<String> compatibleKbs = new ArrayList<>();
@@ -109,7 +109,7 @@ public class RagRetrievalService {
                         + "provider differs from '" + firstProvider + "' (vector dimension mismatch): "
                         + incompatibleKbs + ". Search them separately or re-embed with one provider.");
                 targetKbs = compatibleKbs;
-                if (targetKbs.isEmpty()) return new RetrievalOutcome(List.of(), warnings);
+                if (targetKbs.isEmpty()) return new RetrievalOutcome(List.of(), warnings, "none");
             }
         }
 
@@ -120,6 +120,14 @@ public class RagRetrievalService {
         } catch (Exception e) {
             log.warn("Embedding failed, falling back to keyword search: {}", e.getMessage());
             metrics.recordDegraded("embedding_failed");
+        }
+        if (queryEmbedding == null) {
+            // Half the search just disappeared and the caller would never know: keyword results
+            // still come back, so nothing looks broken — the answers are simply worse. That is
+            // exactly the silent degradation G8 exists to surface.
+            warnings.add("Semantic search is unavailable (the query could not be embedded) — "
+                    + "results came from keyword matching only, so recall is reduced. "
+                    + "Check the knowledge base's embedding provider configuration.");
         }
 
         List<RetrievalResult> results;
@@ -134,7 +142,7 @@ public class RagRetrievalService {
         // G10: drop results below the relevance floor so off-topic queries return empty.
         results = applyRejectionFloor(results, query);
         metrics.recordRetrieval(path, System.currentTimeMillis() - startedAt, results.size());
-        return new RetrievalOutcome(results, warnings);
+        return new RetrievalOutcome(results, warnings, path);
     }
 
     /**
