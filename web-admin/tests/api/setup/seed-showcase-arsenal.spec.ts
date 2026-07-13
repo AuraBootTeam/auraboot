@@ -802,6 +802,11 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '月度商机与赢单',
         config: {
           title: '月度商机与赢单',
+          // Metric aliases are ASCII-only (the backend validates them against an
+          // identifier pattern), so the legend needs an explicit display name.
+          visualization: {
+            metricLabels: { pipeline_amount: '商机总额', won_amount: '赢单金额' },
+          },
           dataSource: {
             type: 'namedQuery',
             queryCode: 'sc_arsenal_monthly_pipeline',
@@ -823,6 +828,9 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '月度商机趋势',
         config: {
           title: '月度商机趋势',
+          visualization: {
+            metricLabels: { opp_count: '商机数', won_count: '赢单数' },
+          },
           dataSource: {
             type: 'namedQuery',
             queryCode: 'sc_arsenal_monthly_trend',
@@ -884,6 +892,13 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '销售团队能力',
         config: {
           title: '销售团队能力',
+          visualization: {
+            metricLabels: {
+              deal_count: '商机数',
+              total_amount: '商机总额',
+              avg_probability: '平均赢率',
+            },
+          },
           dataSource: {
             type: 'aggregate',
             modelCode: 'crm_opportunity',
@@ -908,6 +923,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '累计赢单收入',
         config: {
           title: '累计赢单收入',
+          visualization: { metricLabels: { cumulative_amount: '累计赢单金额' } },
           dataSource: {
             type: 'namedQuery',
             queryCode: 'sc_arsenal_cumulative_revenue',
@@ -975,7 +991,11 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '商机金额 vs 赢单概率',
         config: {
           title: '商机金额 vs 赢单概率',
-          visualization: { xAxisLabel: '预计金额', yAxisLabel: '赢单概率' },
+          visualization: {
+            xAxisLabel: '预计金额',
+            yAxisLabel: '赢单概率',
+            metricLabels: { amount: '预计金额', probability: '赢单概率' },
+          },
           dataSource: {
             type: 'aggregate',
             modelCode: 'crm_opportunity',
@@ -1187,6 +1207,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         config: {
           title: '各阶段商机数与均价',
           visualization: {
+            metricLabels: { deal_count: '商机数', avg_amount: '平均金额' },
             seriesConfig: [
               { metricIndex: 0, chartType: 'bar', yAxisIndex: 0 },
               { metricIndex: 1, chartType: 'line', yAxisIndex: 1 },
@@ -1234,6 +1255,13 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
           dataSource: {
             type: 'namedQuery',
             queryCode: 'sc_arsenal_opportunity_board',
+            // A namedQuery column is a SQL alias with no field behind it, so the
+            // dict binding cannot be discovered from field metadata the way an
+            // aggregate source's can — name it explicitly.
+            // (No `dimensions` here: this query is an identity passthrough — adding a
+            // dimension would make the backend GROUP BY and collapse the detail rows
+            // the kanban needs into one row per stage.)
+            dimensionDicts: { opp_stage: 'crm_opp_stage' },
           },
         },
       },

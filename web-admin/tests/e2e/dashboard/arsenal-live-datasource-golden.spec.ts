@@ -189,6 +189,34 @@ test.describe('Arsenal dashboard — every widget on a live data source', () => 
     expect(namedRows, 'leaderboard has no named sales reps').toBeTruthy();
   });
 
+  test('A4b: DOM-rendered widgets show dict labels, not stored codes', async ({ page }) => {
+    await openArsenalDashboard(page);
+
+    // SCOPE, and why it is what it is: ECharts draws legends and axis labels INTO the
+    // canvas, so a pie's `negotiation` legend is not in the DOM and `toContainText`
+    // cannot see it — an assertion over the whole board would pass while every chart
+    // still showed raw codes (the first version of this test did exactly that).
+    // Canvas label mapping is pinned by unit tests instead
+    // (charts/__tests__/chart-spec-echarts-labels.test.ts, utils/__tests__/chartLabels.test.ts)
+    // plus screenshot review. What IS assertable here are the widgets that render real
+    // DOM — kanban column headers and the leaderboard/table rows.
+    const kanban = page.locator('[data-widget-id="w_kanban"]');
+    const kanbanText = await kanban.innerText();
+
+    // Stage headers must be the dict labels…
+    for (const label of ['发现', '资质审查', '提案', '谈判', '赢单']) {
+      expect(kanbanText, `kanban is missing the "${label}" column`).toContain(label);
+    }
+    // …and never the stored codes they replace.
+    for (const code of ['discovery', 'qualification', 'proposal', 'negotiation', 'closed_won']) {
+      expect(kanbanText, `kanban leaked the raw stage code "${code}"`).not.toContain(code);
+    }
+
+    // The leaderboard renders dimension values as DOM rows — real rep names, not ids.
+    const leaderboard = await page.locator('[data-widget-id="w_leaderboard"]').innerText();
+    expect(leaderboard).toMatch(/[一-龥]{2,4}/);
+  });
+
   test('A5: no console errors while resolving data sources', async ({ page }) => {
     const errors: string[] = [];
     page.on('console', (msg) => {

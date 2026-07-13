@@ -16,6 +16,7 @@ import type {
   FilterConfig,
 } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
+import { dimensionLabel, metricLabel, type MetricLabels } from '~/framework/smart/utils/chartLabels';
 
 interface SeriesConfig {
   metricIndex: number;
@@ -33,6 +34,13 @@ interface YAxisConfig {
 }
 
 export interface SmartComboChartProps {
+  /**
+   * Metric alias -> series display name: `{ won_amount: '赢单金额' }`.
+   *
+   * Aliases are constrained to ASCII identifiers by the backend, so without this
+   * the legend shows the raw column name.
+   */
+  metricLabels?: MetricLabels;
   title?: string;
   dataSource: ChartDataSource;
   seriesConfig?: SeriesConfig[];
@@ -87,6 +95,7 @@ export const SmartComboChart: React.FC<SmartComboChartProps> = ({
   title,
   dataSource,
   seriesConfig,
+  metricLabels,
   yAxisLeft,
   yAxisRight,
   showDataZoom = false,
@@ -139,7 +148,9 @@ export const SmartComboChart: React.FC<SmartComboChartProps> = ({
     const metrics = data.meta?.metrics || [];
     const dimensionKey = dimensions[0];
 
-    const categories = data.rows.map((row) => String(row[dimensionKey] ?? ''));
+    const categories = data.rows.map((row) =>
+      dimensionLabel(data.meta, dimensionKey, row[dimensionKey]),
+    );
     const hasRightAxis = seriesConfig?.some((s) => s.yAxisIndex === 1) ?? false;
 
     const series = metrics.map((metricKey, idx) => {
@@ -153,7 +164,7 @@ export const SmartComboChart: React.FC<SmartComboChartProps> = ({
       const color = cfg.color || DEFAULT_COLORS[idx % DEFAULT_COLORS.length];
 
       const baseSeries: any = {
-        name: metricKey,
+        name: metricLabel(metricLabels, metricKey),
         type: cfg.chartType === 'area' ? 'line' : cfg.chartType,
         yAxisIndex: cfg.yAxisIndex,
         data: seriesData,
@@ -190,7 +201,18 @@ export const SmartComboChart: React.FC<SmartComboChartProps> = ({
     };
 
     return chartOptions ? { ...baseOptions, ...chartOptions } : baseOptions;
-  }, [data, title, seriesConfig, yAxisLeft, yAxisRight, showDataZoom, smooth, stack, chartOptions]);
+  }, [
+    data,
+    title,
+    seriesConfig,
+    metricLabels,
+    yAxisLeft,
+    yAxisRight,
+    showDataZoom,
+    smooth,
+    stack,
+    chartOptions,
+  ]);
 
   const onEvents = useMemo(() => ({ click: handleChartClick }), [handleChartClick]);
 

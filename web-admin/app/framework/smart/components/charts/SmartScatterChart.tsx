@@ -16,10 +16,18 @@ import type {
   FilterConfig,
 } from '~/framework/smart/types/chart';
 import type { ChartSpec } from '~/framework/smart/charts/chart-spec';
+import type { MetricLabels } from '~/framework/smart/utils/chartLabels';
 import { chartSpecToEChartsOption } from '~/framework/smart/charts/chart-spec-echarts';
 import { cn } from '~/utils/cn';
 
 export interface SmartScatterChartProps {
+  /**
+   * Metric alias -> series display name: `{ won_amount: '赢单金额' }`.
+   *
+   * Aliases are constrained to ASCII identifiers by the backend, so without this
+   * the legend shows the raw column name.
+   */
+  metricLabels?: MetricLabels;
   title?: string;
   dataSource: ChartDataSource;
   /** X-axis label */
@@ -50,11 +58,20 @@ export interface ScatterChartData {
   meta?: {
     dimensions?: string[];
     metrics?: string[];
+    /** Dict labels for dimension values, resolved by useChartData. */
+    dimensionLabels?: Record<string, Record<string, string>>;
   };
 }
 
 /** Visual props that influence option building (subset of SmartScatterChartProps). */
 export interface ScatterOptionProps {
+  /**
+   * Metric alias -> series display name: `{ won_amount: '赢单金额' }`.
+   *
+   * Aliases are constrained to ASCII identifiers by the backend, so without
+   * this the legend shows the raw column name.
+   */
+  metricLabels?: MetricLabels;
   title?: string;
   xAxisLabel?: string;
   yAxisLabel?: string;
@@ -98,8 +115,9 @@ function specFromScatterChartData(
     dimensions: dimensions.map((field, i) => ({
       field,
       role: i === 0 ? 'category' : 'series',
+      valueLabels: data?.meta?.dimensionLabels?.[field],
     })),
-    measures: metrics.map((field) => ({ field })),
+    measures: metrics.map((field) => ({ field, label: props.metricLabels?.[field] })),
     scatter: { xAxisLabel, yAxisLabel, bubbleMode, symbolSizeRange },
   };
 }
@@ -223,6 +241,7 @@ function isDataSourceConfigured(ds: ChartDataSource): boolean {
 export const SmartScatterChart: React.FC<SmartScatterChartProps> = ({
   title,
   dataSource,
+  metricLabels,
   xAxisLabel,
   yAxisLabel,
   bubbleMode = false,
@@ -282,6 +301,7 @@ export const SmartScatterChart: React.FC<SmartScatterChartProps> = ({
    */
   const options: EChartsOption = useMemo(() => {
     const spec = specFromScatterChartData(data, {
+      metricLabels,
       title,
       xAxisLabel,
       yAxisLabel,
@@ -290,7 +310,7 @@ export const SmartScatterChart: React.FC<SmartScatterChartProps> = ({
     });
     const adapterOption = chartSpecToEChartsOption(spec, data?.rows ?? []) as EChartsOption;
     return chartOptions ? { ...adapterOption, ...chartOptions } : adapterOption;
-  }, [data, title, xAxisLabel, yAxisLabel, bubbleMode, symbolSizeRange, chartOptions]);
+  }, [data, title, xAxisLabel, yAxisLabel, bubbleMode, symbolSizeRange, metricLabels, chartOptions]);
 
   const onEvents = useMemo(() => ({ click: handleChartClick }), [handleChartClick]);
 
