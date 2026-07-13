@@ -77,6 +77,7 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
     private String modelCode;
     private String nameField;
     private String configField;
+    private String stampField;
     private boolean modelReady = false;
     private final List<String> createdPids = Collections.synchronizedList(new ArrayList<>());
 
@@ -88,6 +89,7 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         modelCode = "jb_upd_" + suffix;
         nameField = "jb_name_" + suffix;
         configField = "jb_config_" + suffix;
+        stampField = "jb_stamp_" + suffix;
     }
 
     @BeforeEach
@@ -294,11 +296,59 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         metaModelMapper.insert(m);
     }
 
+    /**
+     * A caller may hand {@code update} an immutable map — {@code Map.of(...)} is the obvious way
+     * to express a two-field patch, and {@code SiteKeyCommandHandler} already does exactly that.
+     *
+     * <p>It used to work only by luck. {@code payloadTemporalNormalizer.normalize()} rewrites
+     * temporal values in the payload <em>in place</em>, so the moment a patch happened to carry a
+     * date or time, the immutable map threw {@link UnsupportedOperationException} — with no
+     * message, from deep inside the service, and only for that one shape of payload. That is how
+     * {@code faq:publish} failed: it patched a status, a document pid, and a review timestamp.
+     *
+     * <p>update() now copies its argument before touching it. The point of this test is the
+     * combination — immutable map AND a temporal field. Either alone passes even without the fix.
+     */
+    @Test
+    @Order(5)
+    @DisplayName("update with an immutable payload carrying a datetime — no UnsupportedOperationException")
+    void update_with_immutable_payload_containing_temporal_value_succeeds() {
+        Map<String, Object> initial = new HashMap<>();
+        initial.put(nameField, "immutable-payload-test");
+        Map<String, Object> created = dynamicDataService.create(modelCode, initial);
+        String pid = Objects.toString(created.get("pid"));
+        createdPids.add(pid);
+
+        String stamp = Instant.now().toString();
+        // Map.of is deliberate: the caller's map must survive being handed to the service.
+        Map<String, Object> immutablePatch = Map.of(nameField, "patched", stampField, stamp);
+
+        assertThatCode(() -> dynamicDataService.update(modelCode, pid, immutablePatch))
+                .as("update must not mutate the caller's map — an immutable patch with a "
+                        + "temporal field previously threw a message-less UnsupportedOperationException")
+                .doesNotThrowAnyException();
+
+        Map<String, Object> reloaded = dynamicDataService.getById(modelCode, pid);
+        assertThat(reloaded).isNotNull();
+        assertThat(Objects.toString(reloaded.get(nameField))).isEqualTo("patched");
+        assertThat(reloaded.get(stampField))
+                .as("the timestamp must actually persist, not merely fail to throw")
+                .isNotNull();
+
+        // And the caller's map is still exactly what it handed over.
+        assertThat(immutablePatch.get(stampField))
+                .as("the service must not have rewritten the caller's payload")
+                .isEqualTo(stamp);
+    }
+
     private void createFields() {
         // Plain string field
         bindField(nameField, "string", false, false, 1);
         // JSONB host column — this is the bug target
         bindField(configField, "jsonb", false, false, 2);
+        // Temporal column — the immutable-payload regression above needs one: the temporal
+        // normalizer only rewrites the payload when it actually contains a date/time value.
+        bindField(stampField, "datetime", false, false, 3);
     }
 
     private void bindField(String code, String dataType, boolean primaryKey, boolean required, int order) {
