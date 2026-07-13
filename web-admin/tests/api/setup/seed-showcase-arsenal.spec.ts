@@ -693,6 +693,8 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
   // 2. 19-Widget Dashboard
   // ═════════════════════════════════════════════════════════════════════════
 
+  const DASHBOARD_CODE = 'arsenal_capability_dashboard';
+
   test('Arsenal 2: Dashboard — 24 widgets on live data sources', async ({ page }) => {
     // Every widget below is driven by a live data source — `aggregate` against a
     // real model, or a `namedQuery` where aggregate cannot reach (time bucketing,
@@ -923,10 +925,10 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         w: 4,
         h: 4,
         type: 'smart-gauge-chart',
-        title: '年度赢单金额达成 (目标 500 万)',
+        title: '年度赢单金额达成 (目标 2000 万)',
         config: {
-          title: '年度赢单金额达成 (目标 500 万)',
-          max: 5000000,
+          title: '年度赢单金额达成 (目标 2000 万)',
+          visualization: { max: 20000000 },
           dataSource: {
             type: 'aggregate',
             modelCode: 'crm_opportunity',
@@ -948,8 +950,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '年度赢单数进度 (目标 30 单)',
         config: {
           title: '年度赢单数进度 (目标 30 单)',
-          target: 30,
-          format: 'fraction',
+          visualization: { target: 30, format: 'fraction' },
           dataSource: {
             type: 'aggregate',
             modelCode: 'crm_opportunity',
@@ -974,8 +975,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '商机金额 vs 赢单概率',
         config: {
           title: '商机金额 vs 赢单概率',
-          xAxisLabel: '预计金额',
-          yAxisLabel: '赢单概率',
+          visualization: { xAxisLabel: '预计金额', yAxisLabel: '赢单概率' },
           dataSource: {
             type: 'aggregate',
             modelCode: 'crm_opportunity',
@@ -1031,9 +1031,11 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '团队活跃度热力图',
         config: {
           title: '团队活跃度热力图',
-          xField: 'crm_act_owner',
-          yField: 'crm_act_type',
-          valueField: 'activity_count',
+          visualization: {
+            xField: 'crm_act_owner',
+            yField: 'crm_act_type',
+            valueField: 'activity_count',
+          },
           dataSource: {
             type: 'aggregate',
             modelCode: 'crm_activity',
@@ -1057,8 +1059,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '行业客户分布',
         config: {
           title: '行业客户分布',
-          nameField: 'crm_acc_industry',
-          valueField: 'account_count',
+          visualization: { nameField: 'crm_acc_industry', valueField: 'account_count' },
           dataSource: {
             type: 'aggregate',
             modelCode: 'crm_account',
@@ -1078,12 +1079,14 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '季度公告',
         config: {
           title: '季度公告',
-          format: 'html',
-          content:
-            '<h3>军火展 — 全能力报表</h3><p>本看板的每个组件都由<strong>真实数据源</strong>驱动：'
-            + '<code>aggregate</code> 直连模型，<code>namedQuery</code> 覆盖聚合查询够不到的场景'
-            + '（时间分桶、比率指标、明细行）。</p>'
-            + '<p>标注 <em>GAP</em> 的组件表示 CRM 演示模型缺少可绑定的字段。</p>',
+          visualization: {
+            format: 'html',
+            content:
+              '<h3>军火展 — 全能力报表</h3><p>本看板的每个组件都由<strong>真实数据源</strong>驱动：'
+              + '<code>aggregate</code> 直连模型，<code>namedQuery</code> 覆盖聚合查询够不到的场景'
+              + '（时间分桶、比率指标、明细行）。</p>'
+              + '<p>标注 <em>GAP</em> 的组件表示 CRM 演示模型缺少可绑定的字段。</p>',
+          },
         },
       },
       {
@@ -1097,7 +1100,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: 'Q2 结束倒计时',
         config: {
           title: 'Q2 结束倒计时',
-          targetDate: `${new Date().getFullYear()}-06-30T23:59:59`,
+          visualization: { targetDate: `${new Date().getFullYear()}-06-30T23:59:59` },
         },
       },
       {
@@ -1113,9 +1116,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '销售冠军榜',
         config: {
           title: '销售冠军榜',
-          rankField: 'crm_opp_owner',
-          valueField: 'total_amount',
-          maxItems: 8,
+          visualization: { rankField: 'crm_opp_owner', valueField: 'total_amount', maxItems: 8 },
           dataSource: {
             type: 'aggregate',
             modelCode: 'crm_opportunity',
@@ -1162,7 +1163,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '客户满意度 NPS (示例数据 — 模型无 NPS 字段)',
         config: {
           title: '客户满意度 NPS (示例数据 — 模型无 NPS 字段)',
-          scoreField: 'score',
+          visualization: { scoreField: 'score' },
           dataSource: {
             type: 'static',
             staticData: [
@@ -1185,10 +1186,12 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '各阶段商机数与均价',
         config: {
           title: '各阶段商机数与均价',
-          seriesConfig: [
-            { metricIndex: 0, chartType: 'bar', yAxisIndex: 0 },
-            { metricIndex: 1, chartType: 'line', yAxisIndex: 1 },
-          ],
+          visualization: {
+            seriesConfig: [
+              { metricIndex: 0, chartType: 'bar', yAxisIndex: 0 },
+              { metricIndex: 1, chartType: 'line', yAxisIndex: 1 },
+            ],
+          },
           dataSource: {
             type: 'aggregate',
             modelCode: 'crm_opportunity',
@@ -1215,17 +1218,19 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '商机看板',
         config: {
           title: '商机看板',
-          groupField: 'opp_stage',
-          titleField: 'opp_name',
-          descriptionField: 'opp_owner',
-          columnOrder: [
-            'discovery',
-            'qualification',
-            'proposal',
-            'negotiation',
-            'closed_won',
-            'closed_lost',
-          ],
+          visualization: {
+            groupField: 'opp_stage',
+            titleField: 'opp_name',
+            descriptionField: 'opp_owner',
+            columnOrder: [
+              'discovery',
+              'qualification',
+              'proposal',
+              'negotiation',
+              'closed_won',
+              'closed_lost',
+            ],
+          },
           dataSource: {
             type: 'namedQuery',
             queryCode: 'sc_arsenal_opportunity_board',
@@ -1246,50 +1251,58 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '产品图库 (示例数据 — 模型无图片字段)',
         config: {
           title: '产品图库 (示例数据 — 模型无图片字段)',
-          imageField: 'image_url',
-          titleField: 'name',
-          columns: 3,
-          dataSource: {
-            type: 'static',
-            staticData: [
-              { name: 'MCU 模组', image_url: 'https://picsum.photos/seed/mcu/400/300' },
-              { name: 'LDO 芯片', image_url: 'https://picsum.photos/seed/ldo/400/300' },
-              { name: 'PCBA 成品', image_url: 'https://picsum.photos/seed/pcba/400/300' },
-              { name: '传感器模块', image_url: 'https://picsum.photos/seed/sensor/400/300' },
-              { name: 'IoT 网关', image_url: 'https://picsum.photos/seed/iot/400/300' },
-              { name: '工控主板', image_url: 'https://picsum.photos/seed/board/400/300' },
+          // SmartGallery's static path does not read dataSource.staticData: with
+          // type 'static' it disables the query entirely and renders `staticItems`
+          // (SmartGallery.tsx:79-85), whose shape is {image, title, description, link}.
+          visualization: {
+            columns: 3,
+            staticItems: [
+              { image: 'https://picsum.photos/seed/mcu/400/300', title: 'MCU 模组' },
+              { image: 'https://picsum.photos/seed/ldo/400/300', title: 'LDO 芯片' },
+              { image: 'https://picsum.photos/seed/pcba/400/300', title: 'PCBA 成品' },
+              { image: 'https://picsum.photos/seed/sensor/400/300', title: '传感器模块' },
+              { image: 'https://picsum.photos/seed/iot/400/300', title: 'IoT 网关' },
+              { image: 'https://picsum.photos/seed/board/400/300', title: '工控主板' },
             ],
-            dimensions: ['name'],
-            metrics: [{ field: 'image_url', aggregation: 'count', alias: 'image_url' }],
           },
+          dataSource: { type: 'static' },
         },
       },
     ];
 
-    const resp = await page.request.post('/api/dashboards', {
-      data: {
-        code: 'arsenal_capability_dashboard',
-        title: '军火展 — 组件仪表盘',
-        description:
-          '展示 AuraBoot Dashboard Designer 支持的全部 24 种 Widget 类型，全部由真实数据源驱动',
-        scope: 'global',
-        layoutConfig: { columns: 12, rowHeight: 80, gap: 12 },
-        widgets,
-        isDefault: false,
-        sortOrder: 1,
-      },
-    });
+    const payload = {
+      code: DASHBOARD_CODE,
+      title: '军火展 — 组件仪表盘',
+      description:
+        '展示 AuraBoot Dashboard Designer 支持的全部 24 种 Widget 类型，全部由真实数据源驱动',
+      scope: 'global',
+      layoutConfig: { columns: 12, rowHeight: 80, gap: 12 },
+      widgets,
+      isDefault: false,
+      sortOrder: 1,
+    };
+
+    // Upsert: the seed has to be re-runnable against an existing environment, and
+    // POST rejects a duplicate code. Swallowing that error (the previous
+    // warn-and-continue) would leave the old widgets in place while still
+    // reporting success — the dashboard would silently stay on whatever config
+    // was seeded first.
+    const existing = await page.request.get(`/api/dashboards/code/${DASHBOARD_CODE}`);
+    const existingPid = existing.ok() ? (await existing.json())?.data?.pid : undefined;
+
+    const resp = existingPid
+      ? await page.request.put(`/api/dashboards/${existingPid}`, { data: payload })
+      : await page.request.post('/api/dashboards', { data: payload });
+
     const body = await resp.json();
-    // A warn-and-continue here is how a dashboard silently fails to exist while
-    // the seed still reports success — fail loudly instead.
     expect(
       resp.ok(),
-      `Dashboard creation failed: ${resp.status()} ${JSON.stringify(body).slice(0, 300)}`,
+      `Dashboard ${existingPid ? 'update' : 'creation'} failed: ${resp.status()} ${JSON.stringify(body).slice(0, 300)}`,
     ).toBeTruthy();
 
-    const pid = body.data?.pid || body.data?.id;
-    expect(pid, 'Dashboard created but no pid returned').toBeTruthy();
-    console.log(`  Created Dashboard: 24 组件全覆盖仪表盘 (${pid})`);
+    const pid = existingPid || body.data?.pid || body.data?.id;
+    expect(pid, 'Dashboard saved but no pid returned').toBeTruthy();
+    console.log(`  ${existingPid ? 'Updated' : 'Created'} Dashboard: 24 组件全覆盖仪表盘 (${pid})`);
 
     const publishResp = await page.request.post(`/api/dashboards/${pid}/publish`);
     expect(publishResp.ok(), `Dashboard publish failed: ${publishResp.status()}`).toBeTruthy();

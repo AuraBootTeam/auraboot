@@ -47,17 +47,33 @@ interface DynamicRecord {
   [key: string]: unknown;
 }
 
+/** DynamicController caps pageSize at 500 (@Max(500)), so paginate rather than ask for everything. */
+const PAGE_SIZE = 500;
+
 /**
  * Fetch every record of a dynamic model, sorted by pid so assignment is stable
  * across runs (ULIDs are creation-ordered).
  */
 async function listAll(page: any, modelCode: string): Promise<DynamicRecord[]> {
-  const resp = await page.request.get(
-    `/api/dynamic/${modelCode}/list?pageNum=1&pageSize=1000`,
-  );
-  expect(resp.ok(), `list ${modelCode} failed: ${resp.status()}`).toBeTruthy();
-  const body = await resp.json();
-  const records: DynamicRecord[] = body?.data?.records ?? [];
+  const records: DynamicRecord[] = [];
+
+  for (let pageNum = 1; ; pageNum += 1) {
+    const resp = await page.request.get(
+      `/api/dynamic/${modelCode}/list?pageNum=${pageNum}&pageSize=${PAGE_SIZE}`,
+    );
+    expect(
+      resp.ok(),
+      `list ${modelCode} page ${pageNum} failed: ${resp.status()} ${(await resp.text()).slice(0, 200)}`,
+    ).toBeTruthy();
+
+    const body = await resp.json();
+    const batch: DynamicRecord[] = body?.data?.records ?? [];
+    records.push(...batch);
+
+    const total = Number(body?.data?.total ?? records.length);
+    if (batch.length < PAGE_SIZE || records.length >= total) break;
+  }
+
   return records
     .filter((r) => typeof r.pid === 'string' && r.pid)
     .sort((a, b) => String(a.pid).localeCompare(String(b.pid)));
