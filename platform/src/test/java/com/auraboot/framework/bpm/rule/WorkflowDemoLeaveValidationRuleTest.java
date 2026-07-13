@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -15,16 +16,61 @@ class WorkflowDemoLeaveValidationRuleTest {
     private final DroolsEngineService droolsEngineService = new DroolsEngineService(null);
 
     @Test
-    void annualLeaveWithoutBalanceFailsClosed() throws IOException {
+    void annualLeaveWithoutBalanceRecordReportsBalanceNotFound() throws IOException {
+        // contextLookup found no wd_leave_balance row for the applicant, so the platform
+        // resolves balanceRemaining to null. That is "no balance on file", not "0 days left".
+        Map<String, Object> facts = new HashMap<>();
+        facts.put("type", "annual");
+        facts.put("days", 1);
+        facts.put("balanceRemaining", null);
+        facts.put("attachmentCount", 0);
+
+        Map<String, Object> result = droolsEngineService.evaluateRule(rule(), facts);
+
+        assertThat(result)
+                .containsEntry("valid", false)
+                .containsEntry("reason", "annual_balance_not_found");
+    }
+
+    @Test
+    void annualLeaveWithZeroRemainingIsInsufficientNotMissing() throws IOException {
         Map<String, Object> result = droolsEngineService.evaluateRule(rule(), Map.of(
                 "type", "annual",
-                "days", 64,
+                "days", 1,
+                "balanceRemaining", 0,
                 "attachmentCount", 0
         ));
 
         assertThat(result)
                 .containsEntry("valid", false)
                 .containsEntry("reason", "annual_leave_insufficient");
+    }
+
+    @Test
+    void annualLeaveExceedingRemainingBalanceIsRejected() throws IOException {
+        Map<String, Object> result = droolsEngineService.evaluateRule(rule(), Map.of(
+                "type", "annual",
+                "days", 64,
+                "balanceRemaining", 18,
+                "attachmentCount", 0
+        ));
+
+        assertThat(result)
+                .containsEntry("valid", false)
+                .containsEntry("reason", "annual_leave_insufficient");
+    }
+
+    @Test
+    void annualLeaveWithinRemainingBalanceIsAccepted() throws IOException {
+        Map<String, Object> result = droolsEngineService.evaluateRule(rule(), Map.of(
+                "type", "annual",
+                "days", 4.5,
+                "balanceRemaining", 18,
+                "attachmentCount", 0
+        ));
+
+        assertThat(result).doesNotContainKey("reason");
+        assertThat(result.get("valid")).isNotEqualTo(false);
     }
 
     @Test
