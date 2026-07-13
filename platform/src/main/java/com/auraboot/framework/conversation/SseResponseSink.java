@@ -2,6 +2,7 @@ package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.dto.ResultContract;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.HashMap;
@@ -30,6 +31,7 @@ import java.util.Map;
  * {@code docs/plans/2026-04/sse-baseline-2026-04-26.sha256}) is the contract this
  * adapter must preserve exactly.
  */
+@Slf4j
 public class SseResponseSink implements ResponseSink {
 
     private final SseEmitter emitter;
@@ -143,7 +145,7 @@ public class SseResponseSink implements ResponseSink {
         try {
             emitter.send(SseEmitter.event().name(name).data(data));
         } catch (Exception e) {
-            // mirror existing send* helper: swallow disconnects / IO errors
+            logDroppedFrame(name, e);
         }
     }
 
@@ -151,7 +153,24 @@ public class SseResponseSink implements ResponseSink {
         try {
             emitter.send(SseEmitter.event().name(name).data(objectMapper.writeValueAsString(data)));
         } catch (Exception e) {
-            // mirror existing sendEvent helper
+            logDroppedFrame(name, e);
+        }
+    }
+
+    /**
+     * A dropped frame used to vanish without trace, which is the worst possible failure for a
+     * transport: the turn runs, the answer is generated and persisted, and the browser is left
+     * staring at an empty bubble with nothing in any log to explain it. A visitor hanging up
+     * mid-answer is routine and stays at debug; anything else means the stream is broken and the
+     * user is getting silence, so it is a warning.
+     */
+    private void logDroppedFrame(String name, Exception e) {
+        boolean clientWentAway = e instanceof java.io.IOException;
+        if (clientWentAway) {
+            log.debug("SSE frame '{}' dropped, client disconnected: {}", name, e.getMessage());
+        } else {
+            log.warn("SSE frame '{}' dropped ({}): {} — the answer will never reach the client",
+                    name, e.getClass().getSimpleName(), e.getMessage());
         }
     }
 

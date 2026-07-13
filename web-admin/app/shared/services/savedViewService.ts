@@ -14,6 +14,9 @@ import type {
   SavedViewCapabilityCheckResponse,
   SavedViewCreateRequest,
   SavedViewCopyToPersonalRequest,
+  SavedViewShareRequest,
+  SavedViewShareResult,
+  SavedViewShareStatus,
   SavedViewTeamOption,
   SavedViewUserOption,
   SavedViewUpdateRequest,
@@ -295,6 +298,48 @@ export class SavedViewService {
       request,
     );
     return handleResponse(result, 'Failed to check saved view capability');
+  }
+
+  /**
+   * Generate a public share link for a view (ViewShareController POST /{viewPid}/share).
+   * The public page is served at /share/{token}; `shareUrl` in the response is the
+   * API path, not the user-facing page.
+   */
+  async shareView(
+    pid: string,
+    options: SavedViewShareRequest = {},
+    request?: Request,
+  ): Promise<SavedViewShareResult> {
+    const result = await post<SavedViewShareResult>(
+      `${BASE_URL}/${pid}/share`,
+      options,
+      undefined,
+      request,
+    );
+    return handleResponse(result, 'Failed to create share link');
+  }
+
+  /**
+   * Revoke the public share link of a view (ViewShareController DELETE /{viewPid}/share).
+   */
+  async revokeShare(pid: string, request?: Request): Promise<void> {
+    const result = await del<boolean>(`${BASE_URL}/${pid}/share`, undefined, undefined, request);
+    if (!ResultHelper.isSuccess(result)) {
+      throw new Error(result.desc || 'Failed to revoke share link');
+    }
+  }
+
+  /**
+   * Current share status of a view (ViewShareController GET /{viewPid}/share/status).
+   */
+  async getShareStatus(pid: string, request?: Request): Promise<SavedViewShareStatus> {
+    const result = await get<SavedViewShareStatus>(
+      `${BASE_URL}/${pid}/share/status`,
+      undefined,
+      undefined,
+      request,
+    );
+    return handleResponse(result, 'Failed to fetch share status');
   }
 
   /**

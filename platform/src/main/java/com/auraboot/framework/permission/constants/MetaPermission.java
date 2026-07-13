@@ -398,6 +398,18 @@ public final class MetaPermission {
      */
     public static final String QR_MANAGE = "meta.qr.manage";
 
+    // ==================== CS (embeddable customer service) permissions ====================
+
+    /**
+     * Manage embeddable customer-service sites: create / edit / rotate the identity secret.
+     *
+     * <p>Not a cosmetic setting. A site carries the origin allowlist that decides which websites
+     * may speak for the tenant, the knowledge bases its AI is allowed to answer from, and the HMAC
+     * key the host site signs its users with — so this gates the whole trust boundary of the
+     * widget, and every ordinary tenant member must NOT have it by default.
+     */
+    public static final String CS_MANAGE = "meta.cs.manage";
+
     // ==================== DASHBOARD permissions ====================
 
     /**

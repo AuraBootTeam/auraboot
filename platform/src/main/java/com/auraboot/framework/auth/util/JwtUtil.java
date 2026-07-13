@@ -219,6 +219,48 @@ public class JwtUtil {
                 .compact();
     }
 
+    /**
+     * The {@code scope} claim, or null when the token does not carry one.
+     *
+     * <p>A token without a scope is an ordinary user token and gets the full authenticated
+     * surface. A token with a scope is confined to whatever {@code TokenScopePolicy} declares
+     * for it — see {@code ScopeRestrictionFilter}.
+     */
+    public String extractScope(String token) {
+        return extractClaim(token, claims -> {
+            Object scope = claims.get("scope");
+            return scope != null ? scope.toString() : null;
+        });
+    }
+
+    /**
+     * Mint a scoped token for a subject that is <em>not</em> a platform user — an embedded-widget
+     * visitor, say. Such a subject cannot be resolved by {@code UnifiedUserDetailsService}, so a
+     * scoped token must never reach {@code JwtAuthenticationFilter}; {@code ScopeRestrictionFilter}
+     * confines it to the paths its policy allows.
+     *
+     * <p>TTL is explicit rather than the global {@code security.jwt.expiration} (24h): a token
+     * handed to an anonymous browser on a third-party origin should live minutes, not a day.
+     */
+    public String generateScopedToken(String subject, String scope, Map<String, Object> extraClaims, long ttlSeconds) {
+        if (scope == null || scope.isBlank()) {
+            throw new IllegalArgumentException("scope is required for a scoped token");
+        }
+        Map<String, Object> claims = new HashMap<>();
+        if (extraClaims != null) {
+            claims.putAll(extraClaims);
+        }
+        claims.put("scope", scope);
+        return Jwts.builder()
+                .header().keyId(kid).and()
+                .claims(claims)
+                .subject(subject)
+                .issuedAt(Date.from(Instant.now()))
+                .expiration(Date.from(Instant.now().plusSeconds(ttlSeconds)))
+                .signWith(currentKey)
+                .compact();
+    }
+
     public String generateTokenWithTenantId(UserDetails userDetails, String userPid, Long tenantId) {
         return generateTokenWithTenantId(userDetails, userPid, tenantId, null, 0);
     }

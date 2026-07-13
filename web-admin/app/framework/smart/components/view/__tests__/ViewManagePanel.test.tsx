@@ -13,6 +13,14 @@ vi.mock('~/shared/services/savedViewService', () => ({
     getAuditEvents: vi.fn(async () => []),
     searchUsers: vi.fn(async () => []),
     updateView: vi.fn(),
+    getShareStatus: vi.fn(async () => ({ shared: false })),
+    shareView: vi.fn(async () => ({
+      token: 'tok123',
+      shareUrl: '/api/views/shared/tok123',
+      expiresAt: null,
+      passwordProtected: false,
+    })),
+    revokeShare: vi.fn(async () => undefined),
   },
 }));
 
@@ -308,6 +316,10 @@ describe('ViewManagePanel personal-only release', () => {
       ),
     );
 
+    // The row actions only come back once the rename form has closed, and that happens after
+    // onEditView resolves. Locally the state settles before the next line runs; on a slower machine
+    // it does not, and the copy button is simply not in the DOM yet.
+    await waitFor(() => expect(screen.getByLabelText('复制视图')).toBeInTheDocument());
     fireEvent.click(screen.getByLabelText('复制视图'));
     expect(screen.getByText('复制个人视图')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('新视图名称'), { target: { value: '我的订单副本' } });
@@ -328,5 +340,207 @@ describe('ViewManagePanel personal-only release', () => {
       ),
     );
     await waitFor(() => expect(props.onDeleteView).toHaveBeenCalledWith('personal-view'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GAP-121 producer half: generate / copy / revoke a public share link.
+// The consumer (/share/{token}) already existed; before this there was no UI
+// that could ever create a link (canShareSavedView had zero call sites).
+// ---------------------------------------------------------------------------
+
+describe('ViewManagePanel public share link', () => {
+  let writeText: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(confirmDialog).mockResolvedValue(true);
+    vi.mocked(savedViewService.getShareStatus).mockResolvedValue({ shared: false });
+    vi.mocked(savedViewService.shareView).mockResolvedValue({
+      token: 'tok123',
+      shareUrl: '/api/views/shared/tok123',
+      expiresAt: null,
+      passwordProtected: false,
+    });
+    vi.mocked(savedViewService.revokeShare).mockResolvedValue(undefined);
+
+    writeText = vi.fn(async () => undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+      writable: true,
+    });
+  });
+
+  const shareableView = () =>
+    makeView({ pid: 'personal-view', name: '我的默认视图', scope: 'personal' });
+
+  it('exposes a share affordance on a shareable personal view', () => {
+    renderPanel({ views: [shareableView()] });
+
+    const shareBtn = screen.getByTestId('saved-view-action-share-personal-view');
+    expect(shareBtn).toBeInTheDocument();
+    expect(shareBtn).toBeEnabled();
+  });
+
+  it('shows no share affordance at all when canShareSavedView() is false (locked preset)', () => {
+    renderPanel({
+      views: [
+        makeView({
+          pid: 'personal-view',
+          scope: 'personal',
+          viewConfig: { meta: { locked: true } },
+        }),
+      ],
+    });
+
+    // Absent, not disabled. A greyed-out icon nobody can ever click and nothing explains is worse
+    // than no icon: it advertises a capability the user does not have.
+    expect(screen.queryByTestId('saved-view-action-share-personal-view')).not.toBeInTheDocument();
+  });
+
+  it('shows no share affordance when the backend denies the share action', () => {
+    renderPanel({
+      views: [makeView({ pid: 'personal-view', scope: 'personal', actions: ['view', 'copy'] })],
+    });
+
+    expect(screen.queryByTestId('saved-view-action-share-personal-view')).not.toBeInTheDocument();
+  });
+
+  it('shows the share affordance when the backend allows it', () => {
+    renderPanel({
+      views: [
+        makeView({
+          pid: 'personal-view',
+          scope: 'personal',
+          actions: ['view', 'copy', 'manage', 'share'],
+        }),
+      ],
+    });
+
+    // The plumbing is complete and waiting. The day a view becomes shareable — whether because the
+    // policy opens up or because team/global views get surfaced here — the button appears on its own.
+    expect(screen.getByTestId('saved-view-action-share-personal-view')).toBeEnabled();
+  });
+
+  it('opening the share panel reads current status from the status endpoint', async () => {
+    renderPanel({ views: [shareableView()] });
+
+    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+
+    await waitFor(() =>
+      expect(savedViewService.getShareStatus).toHaveBeenCalledWith('personal-view'),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('saved-view-share-generate-personal-view')).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('saved-view-share-link-personal-view')).toBeNull();
+  });
+
+  it('generating a link calls POST .../share and shows the public /share/{token} URL', async () => {
+    renderPanel({ views: [shareableView()] });
+
+    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+    await waitFor(() =>
+      expect(screen.getByTestId('saved-view-share-generate-personal-view')).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByTestId('saved-view-share-generate-personal-view'));
+
+    await waitFor(() => expect(savedViewService.shareView).toHaveBeenCalledWith('personal-view'));
+
+    const link = await screen.findByTestId('saved-view-share-link-personal-view');
+    // Public page is the /share/{token} route, NOT the API path the backend returns.
+    expect((link as HTMLInputElement).value).toBe(`${window.location.origin}/share/tok123`);
+    expect((link as HTMLInputElement).value).not.toContain('/api/views/shared/');
+    expect(link).toHaveAttribute('readonly');
+  });
+
+  it('copies the generated link to the clipboard and confirms', async () => {
+    renderPanel({ views: [shareableView()] });
+
+    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+    await waitFor(() =>
+      expect(screen.getByTestId('saved-view-share-generate-personal-view')).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByTestId('saved-view-share-generate-personal-view'));
+    await screen.findByTestId('saved-view-share-link-personal-view');
+
+    fireEvent.click(screen.getByTestId('saved-view-share-copy-personal-view'));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    expect(writeText.mock.calls[0][0]).toBe(`${window.location.origin}/share/tok123`);
+    expect(await screen.findByText('已复制')).toBeInTheDocument();
+  });
+
+  it('shows the existing link when the view is already shared', async () => {
+    vi.mocked(savedViewService.getShareStatus).mockResolvedValue({
+      shared: true,
+      token: 'existing-tok',
+      expiresAt: '2026-08-01T00:00:00Z',
+      passwordProtected: false,
+    });
+    renderPanel({ views: [shareableView()] });
+
+    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+
+    const link = await screen.findByTestId('saved-view-share-link-personal-view');
+    expect((link as HTMLInputElement).value).toContain('/share/existing-tok');
+    expect(screen.getByTestId('saved-view-share-expires-personal-view')).toBeInTheDocument();
+    expect(savedViewService.shareView).not.toHaveBeenCalled();
+  });
+
+  it('revoking calls DELETE .../share after confirmation and drops back to the empty state', async () => {
+    vi.mocked(savedViewService.getShareStatus).mockResolvedValue({
+      shared: true,
+      token: 'existing-tok',
+    });
+    renderPanel({ views: [shareableView()] });
+
+    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+    await screen.findByTestId('saved-view-share-link-personal-view');
+
+    fireEvent.click(screen.getByTestId('saved-view-share-revoke-personal-view'));
+
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
+    await waitFor(() => expect(savedViewService.revokeShare).toHaveBeenCalledWith('personal-view'));
+    await waitFor(() =>
+      expect(screen.getByTestId('saved-view-share-generate-personal-view')).toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId('saved-view-share-link-personal-view')).toBeNull();
+  });
+
+  it('does not revoke when the confirmation is cancelled', async () => {
+    vi.mocked(savedViewService.getShareStatus).mockResolvedValue({
+      shared: true,
+      token: 'existing-tok',
+    });
+    vi.mocked(confirmDialog).mockResolvedValue(false);
+    renderPanel({ views: [shareableView()] });
+
+    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+    await screen.findByTestId('saved-view-share-link-personal-view');
+
+    fireEvent.click(screen.getByTestId('saved-view-share-revoke-personal-view'));
+
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
+    expect(savedViewService.revokeShare).not.toHaveBeenCalled();
+    expect(screen.getByTestId('saved-view-share-link-personal-view')).toBeInTheDocument();
+  });
+
+  it('surfaces a backend failure instead of silently showing an empty link box', async () => {
+    vi.mocked(savedViewService.shareView).mockRejectedValue(new Error('share denied'));
+    renderPanel({ views: [shareableView()] });
+
+    fireEvent.click(screen.getByTestId('saved-view-action-share-personal-view'));
+    await waitFor(() =>
+      expect(screen.getByTestId('saved-view-share-generate-personal-view')).toBeInTheDocument(),
+    );
+
+    fireEvent.click(screen.getByTestId('saved-view-share-generate-personal-view'));
+
+    const alert = await screen.findByTestId('saved-view-share-error-personal-view');
+    expect(alert).toHaveTextContent('share denied');
+    expect(screen.queryByTestId('saved-view-share-link-personal-view')).toBeNull();
   });
 });

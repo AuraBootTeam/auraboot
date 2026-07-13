@@ -38,6 +38,7 @@ export const BLOCK_TYPES = [
   'artifact-timeline',
   'review-drawer',
   'status-banner',
+  'code-snippet',
   'custom',
 ] as const;
 
