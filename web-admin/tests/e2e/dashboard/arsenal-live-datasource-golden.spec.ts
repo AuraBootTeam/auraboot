@@ -33,7 +33,7 @@ const DASHBOARD_CODE = 'arsenal_capability_dashboard';
  * visibly broken.
  */
 const UNBOUND_PATTERN =
-  /请配置数据源|Please configure (the )?data source|Configure a data source|Please configure group field/;
+  /请配置数据源|Please configure (the )?data source|Configure a data source|Please configure group field|请在右侧配置/;
 
 /** What a widget renders when it resolved a data source but got nothing back. */
 const EMPTY_PATTERN = /No items|No data available/;
@@ -65,11 +65,25 @@ const LIVE_WIDGETS = [
   'w_kanban',
 ];
 
+interface ChartCall {
+  status: number;
+  request: string;
+  body: string;
+}
+
+/** chart-data calls made by the board on the most recent open. */
+let chartCalls: ChartCall[] = [];
+
 async function openArsenalDashboard(page: Page): Promise<void> {
-  const chartData: Array<{ status: number; body: string }> = [];
+  const chartData: ChartCall[] = [];
+  chartCalls = chartData;
   page.on('response', async (r) => {
     if (r.url().includes('/api/meta/chart-data')) {
-      chartData.push({ status: r.status(), body: await r.text().catch(() => '') });
+      chartData.push({
+        status: r.status(),
+        request: r.request().postData() ?? '',
+        body: await r.text().catch(() => ''),
+      });
     }
   });
 
@@ -154,17 +168,24 @@ test.describe('Arsenal dashboard — every widget on a live data source', () => 
   test('A3: KPI cards show real aggregates, not the old hardcoded snapshot', async ({ page }) => {
     await openArsenalDashboard(page);
 
-    // 客户总数 must equal the live crm_account count, which the API can confirm
-    // independently. The old seed hardcoded 60; asserting "matches the API" keeps
-    // this honest even when the seed volume changes.
-    const listResp = await page.request.get('/api/dynamic/crm_account/list?pageNum=1&pageSize=1');
-    expect(listResp.ok()).toBeTruthy();
-    const total = (await listResp.json())?.data?.total;
-    expect(typeof total, 'crm_account total from API').toBe('number');
-    expect(total).toBeGreaterThan(0);
+    // 客户总数 must render whatever ITS OWN query returned — the old seed hardcoded 60,
+    // so a card that ignores its data source shows a number its query does not.
+    //
+    // Compare against the widget's own captured response, not a freshly-issued query:
+    // aggregate results are server-cached for 30 minutes keyed on the request hash, so
+    // a probe with a slightly different request shape lands on a different (fresher)
+    // cache entry. Asserting across the two reported a working card as broken.
+    const accountCall = chartCalls.find(
+      (c) => c.request.includes('crm_account') && c.request.includes('account_count'),
+    );
+    expect(accountCall, 'the customer-count card never queried chart-data').toBeTruthy();
+
+    const count = JSON.parse(accountCall!.body)?.data?.rows?.[0]?.account_count;
+    expect(typeof count, 'account count returned to the card').toBe('number');
+    expect(count).toBeGreaterThan(0);
 
     const card = page.locator('[data-widget-id="w_num_customers"]');
-    await expect(card).toContainText(String(total), { timeout: 15_000 });
+    await expect(card).toContainText(String(count), { timeout: 15_000 });
 
     // 赢单率 comes from a namedQuery ratio — it must be a real percentage, and it
     // must not be the 73 that used to be typed into the seed by hand.

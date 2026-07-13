@@ -20,6 +20,25 @@ import type { QueryMeta } from '~/framework/smart/types/chart';
 /** Metric alias -> display label, supplied by widget config (`visualization.metricLabels`). */
 export type MetricLabels = Record<string, string>;
 
+/** Dimension field -> (raw value -> display label). */
+export type DimensionLabels = Record<string, Record<string, string>>;
+
+/**
+ * Display text for a value in a dict-coded column, given the resolved label map.
+ *
+ * Use this where there is no `QueryMeta` to hand — the table chart's model-list
+ * branch fetches rows directly and never builds one.
+ */
+export function valueLabel(
+  labels: DimensionLabels | undefined,
+  field: string | undefined,
+  value: unknown,
+): string {
+  const raw = value == null ? '' : String(value);
+  if (!field || !raw) return raw;
+  return labels?.[field]?.[raw] ?? raw;
+}
+
 /**
  * Display text for a dimension value.
  *
@@ -31,9 +50,7 @@ export function dimensionLabel(
   field: string | undefined,
   value: unknown,
 ): string {
-  const raw = value == null ? '' : String(value);
-  if (!field || !raw) return raw;
-  return meta?.dimensionLabels?.[field]?.[raw] ?? raw;
+  return valueLabel(meta?.dimensionLabels, field, value);
 }
 
 /** Display text for a metric (series) name. Returns the configured label, else the alias. */

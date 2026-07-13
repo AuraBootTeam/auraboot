@@ -1099,6 +1099,12 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: '季度公告',
         config: {
           title: '季度公告',
+          // mapWidget only forwards `visualization` when the widget carries a
+          // dataSource; without one it falls back to the legacy inline adapter, which
+          // reads `content` off the top level and rebuilds visualization itself —
+          // silently dropping what we authored. Designer-created widgets always have a
+          // dataSource (createWidgetDraft adds one), so this is the canonical shape.
+          dataSource: { type: 'static', staticData: [] },
           visualization: {
             format: 'html',
             content:
@@ -1120,6 +1126,7 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         title: 'Q2 结束倒计时',
         config: {
           title: 'Q2 结束倒计时',
+          dataSource: { type: 'static', staticData: [] },
           visualization: { targetDate: `${new Date().getFullYear()}-06-30T23:59:59` },
         },
       },

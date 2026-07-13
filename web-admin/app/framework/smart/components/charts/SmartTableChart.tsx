@@ -7,6 +7,7 @@
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
+import { useDimensionLabels } from '~/framework/smart/hooks/useDimensionLabels';
 import type {
   ChartDataSource,
   DrillDownConfig,
@@ -278,6 +279,15 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
     return keys.map((k) => ({ field: k, label: k }));
   }, [data, tableColumns, locale]);
 
+  // Dict labels for the columns. The table renders stored values verbatim, so a
+  // stage column showed `proposal` and an activity type `call`. The model-list branch
+  // never builds a QueryMeta, hence resolving straight from the column fields.
+  const columnFields = useMemo(() => columns.map((c) => c.field), [columns]);
+  const cellLabels = useDimensionLabels(
+    modelCode ? { type: 'aggregate', modelCode } : dataSource,
+    columnFields,
+  );
+
   const sortedRows = useMemo(() => {
     if (!data?.rows) return [];
     const rows = [...data.rows];
@@ -443,7 +453,7 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
                       col.align === 'center' && 'text-center',
                     )}
                   >
-                    {formatCellValue(row[col.field])}
+                    {formatCell(cellLabels, col.field, row[col.field])}
                   </td>
                 ))}
               </tr>
@@ -488,6 +498,22 @@ export const SmartTableChart: React.FC<SmartTableChartProps> = ({
     </div>
   );
 };
+
+/**
+ * Render a cell: the dict label when the column is dict-coded, else the formatted raw
+ * value.
+ *
+ * Kept separate from `formatCellValue` on purpose — routing every cell through the
+ * label lookup would stringify numbers and lose the decimal formatting below.
+ */
+function formatCell(
+  labels: Record<string, Record<string, string>>,
+  field: string,
+  value: unknown,
+): string {
+  const label = value == null ? undefined : labels[field]?.[String(value)];
+  return label ?? formatCellValue(value);
+}
 
 function formatCellValue(value: unknown): string {
   if (value === null || value === undefined) return '-';

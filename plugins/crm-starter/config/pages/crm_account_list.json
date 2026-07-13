@@ -81,7 +81,9 @@
         },
         {
           "field": "crm_acc_industry",
-          "width": 120
+          "width": 120,
+          "valueType": "tag",
+          "dictCode": "crm_industry"
         },
         {
           "field": "crm_acc_phone",

@@ -11,7 +11,9 @@
         "label:zh-CN": "用户",
         "sortNo": 10,
         "status": "enabled",
-        "extension": { "icon": "User" }
+        "extension": {
+          "icon": "User"
+        }
       },
       {
         "value": "team",
@@ -19,7 +21,9 @@
         "label:zh-CN": "团队",
         "sortNo": 20,
         "status": "enabled",
-        "extension": { "icon": "Users" }
+        "extension": {
+          "icon": "Users"
+        }
       }
     ]
   },
@@ -505,6 +509,133 @@
           "color": "#ef4444",
           "terminal": "lost"
         }
+      }
+    ]
+  },
+  {
+    "code": "crm_industry",
+    "name": "Industry",
+    "name:zh-CN": "行业",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "electronics",
+        "label": "Electronics",
+        "label:zh-CN": "电子",
+        "sortNo": 10,
+        "status": "enabled"
+      },
+      {
+        "value": "consumer_electronics",
+        "label": "Consumer Electronics",
+        "label:zh-CN": "消费电子",
+        "sortNo": 20,
+        "status": "enabled"
+      },
+      {
+        "value": "semiconductor",
+        "label": "Semiconductor",
+        "label:zh-CN": "半导体",
+        "sortNo": 30,
+        "status": "enabled"
+      },
+      {
+        "value": "optoelectronics",
+        "label": "Optoelectronics",
+        "label:zh-CN": "光电",
+        "sortNo": 40,
+        "status": "enabled"
+      },
+      {
+        "value": "manufacturing",
+        "label": "Manufacturing",
+        "label:zh-CN": "制造",
+        "sortNo": 50,
+        "status": "enabled"
+      },
+      {
+        "value": "precision",
+        "label": "Precision Machining",
+        "label:zh-CN": "精密加工",
+        "sortNo": 60,
+        "status": "enabled"
+      },
+      {
+        "value": "automotive",
+        "label": "Automotive",
+        "label:zh-CN": "汽车",
+        "sortNo": 70,
+        "status": "enabled"
+      },
+      {
+        "value": "power_equipment",
+        "label": "Power Equipment",
+        "label:zh-CN": "电力设备",
+        "sortNo": 80,
+        "status": "enabled"
+      },
+      {
+        "value": "energy",
+        "label": "Energy",
+        "label:zh-CN": "能源",
+        "sortNo": 90,
+        "status": "enabled"
+      },
+      {
+        "value": "materials",
+        "label": "Materials",
+        "label:zh-CN": "材料",
+        "sortNo": 100,
+        "status": "enabled"
+      },
+      {
+        "value": "instruments",
+        "label": "Instruments",
+        "label:zh-CN": "仪器仪表",
+        "sortNo": 110,
+        "status": "enabled"
+      },
+      {
+        "value": "telecom",
+        "label": "Telecom",
+        "label:zh-CN": "通信",
+        "sortNo": 120,
+        "status": "enabled"
+      },
+      {
+        "value": "technology",
+        "label": "Technology",
+        "label:zh-CN": "科技",
+        "sortNo": 130,
+        "status": "enabled"
+      },
+      {
+        "value": "building_tech",
+        "label": "Building Technology",
+        "label:zh-CN": "建筑科技",
+        "sortNo": 140,
+        "status": "enabled"
+      },
+      {
+        "value": "mining",
+        "label": "Mining",
+        "label:zh-CN": "矿业",
+        "sortNo": 150,
+        "status": "enabled"
+      },
+      {
+        "value": "aerospace",
+        "label": "Aerospace",
+        "label:zh-CN": "航空航天",
+        "sortNo": 160,
+        "status": "enabled"
+      },
+      {
+        "value": "trading",
+        "label": "Trading",
+        "label:zh-CN": "贸易",
+        "sortNo": 170,
+        "status": "enabled"
       }
     ]
   }
