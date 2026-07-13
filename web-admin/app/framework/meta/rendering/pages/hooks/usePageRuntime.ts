@@ -13,7 +13,7 @@
  */
 
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { useI18n } from '~/contexts/I18nContext';
 import { useDataSync } from '~/framework/meta/hooks/useDataSync';
 import { usePageDataSources } from '~/framework/meta/hooks/usePageDataSources';
@@ -43,6 +43,26 @@ export interface UsePageRuntimeResult {
   navigate: ReturnType<typeof useNavigate>;
 }
 
+export function decodeRouteContextFromSearch(search: string): Record<string, any> | null {
+  const raw = new URLSearchParams(search).get('routeContext');
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildRouteContextState(routeContext: Record<string, any>): Record<string, any> {
+  return {
+    routeContext,
+    routeContextSource: routeContext.source,
+    routeContextDeviceCode: routeContext.deviceCode,
+    routeContextAssetCode: routeContext.assetCode,
+  };
+}
+
 /**
  * Create runtime environment from an already-loaded schema.
  *
@@ -56,14 +76,38 @@ export function usePageRuntime(
   const { additionalContext = {}, disableRuntime = false, showToast } = options || {};
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { t, locale } = useI18n();
 
+  const routeContext = useMemo(
+    () => decodeRouteContextFromSearch(location.search),
+    [location.search],
+  );
+
+  const effectiveAdditionalContext = useMemo(() => {
+    if (!routeContext) return additionalContext;
+    return {
+      ...additionalContext,
+      state: {
+        ...((additionalContext.state as Record<string, any> | undefined) || {}),
+        ...buildRouteContextState(routeContext),
+      },
+      $page: {
+        ...((additionalContext as any).$page || {}),
+        routeContext,
+      },
+    };
+  }, [additionalContext, routeContext]);
+
   // Build $page metadata from schema
-  const pageMetadata = useMemo(() => ({
-    kind: (schema as any)?.kind,
-    modelCode: (schema as any)?.modelCode,
-    pageKey: (schema as any)?.pageKey,
-  }), [schema]);
+  const pageMetadata = useMemo(
+    () => ({
+      kind: (schema as any)?.kind,
+      modelCode: (schema as any)?.modelCode,
+      pageKey: (schema as any)?.pageKey,
+    }),
+    [schema],
+  );
 
   // Build expression context
   const expressionContext = useMemo(() => {
@@ -78,10 +122,13 @@ export function usePageRuntime(
       },
       t,
       fetchResult,
-      $page: pageMetadata,
-      ...additionalContext,
+      ...effectiveAdditionalContext,
+      $page: {
+        ...pageMetadata,
+        ...((effectiveAdditionalContext as any).$page || {}),
+      },
     });
-  }, [locale, t, pageMetadata, additionalContext]);
+  }, [locale, t, pageMetadata, effectiveAdditionalContext]);
 
   // Initialize DataSourceManager
   const { manager: dataSourceManager } = usePageDataSources({
@@ -102,7 +149,7 @@ export function usePageRuntime(
           t,
           disableAutoFetch: false,
           skipDataSourceRegistration: true,
-          initialContext: additionalContext,
+          initialContext: effectiveAdditionalContext,
         },
   );
 
