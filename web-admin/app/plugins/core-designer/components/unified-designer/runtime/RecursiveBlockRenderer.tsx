@@ -2656,6 +2656,28 @@ const FIELD_CONFIG_RESERVED_KEYS = new Set([
   'validation',
 ]);
 
+/**
+ * dataType → default control, mirroring the live form's `DATA_TYPE_TO_COMPONENT`
+ * (framework/meta/rendering/pages/FormPageContent). Applied only when the field has
+ * no explicit renderComponent, so number/date/boolean fields preview as
+ * stepper/date-picker/switch instead of a plain input — matching the published page.
+ */
+const PREVIEW_DATA_TYPE_COMPONENT: Record<string, string> = {
+  string: 'SmartInput',
+  text: 'SmartTextarea',
+  decimal: 'SmartNumberInput',
+  integer: 'SmartNumberInput',
+  enum: 'SmartSelect',
+  date: 'SmartDatePicker',
+  datetime: 'SmartDatePicker',
+  boolean: 'SmartSwitch',
+  reference: 'SmartSelect',
+  json: 'SmartJsonEditor',
+  jsonb: 'SmartJsonEditor',
+  file: 'SmartUpload',
+  money: 'SmartMoneyInput',
+};
+
 /** Build a platform {@link FieldConfig} from a designer block + resolved model field. */
 function buildPreviewFieldConfig(block: DslBlockV3, modelField: ModelFieldDefinition): FieldConfig {
   const blockProps = (block.props ?? {}) as Record<string, unknown>;
@@ -2676,11 +2698,16 @@ function buildPreviewFieldConfig(block: DslBlockV3, modelField: ModelFieldDefini
       ? (blockProps.required as boolean)
       : Boolean(modelField.required);
   const visibleWhen = blockProps.visibleWhen ?? extensionProps.visibleWhen;
+  const dataType = (blockProps.dataType as string | undefined) ?? modelField.type;
+  const explicitComponent = (blockProps.component as string | undefined) ?? modelField.component;
+  const component =
+    explicitComponent ??
+    (dataType ? PREVIEW_DATA_TYPE_COMPONENT[dataType.toLowerCase()] : undefined);
   return {
     field: block.field ?? modelField.code,
     label: (blockProps.label ?? block.title ?? modelField.label) as FieldConfig['label'],
-    component: (blockProps.component as string | undefined) ?? modelField.component,
-    type: (blockProps.dataType as string | undefined) ?? modelField.type,
+    component,
+    type: dataType,
     dictCode: (blockProps.dictCode as string | undefined) ?? modelField.dictCode,
     required,
     ...(visibleWhen != null ? { visibleWhen } : {}),

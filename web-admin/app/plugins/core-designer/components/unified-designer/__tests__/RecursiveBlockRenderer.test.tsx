@@ -74,6 +74,31 @@ describe('RecursiveBlockRenderer', () => {
     expect(control).toHaveAttribute('data-label', '颜色标记');
   });
 
+  it('applies the dataType default control when the field has no explicit renderComponent', () => {
+    const schema: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'wysiwyg_dt_page',
+      modelCode: 'demo_model',
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [{ id: 'field_date', blockType: 'field', field: 'demo_date' }],
+        },
+      ],
+    };
+    const modelFields: ModelFieldDefinition[] = [
+      { modelCode: 'demo_model', code: 'demo_date', label: '开始日期', type: 'date' },
+    ];
+    render(<RecursiveBlockRenderer schema={schema} modelFields={modelFields} />);
+
+    // integer/decimal -> SmartNumberInput, date/datetime -> SmartDatePicker, etc.,
+    // mirroring the live form's DATA_TYPE_TO_COMPONENT map.
+    const control = screen.getByTestId('controlled-field-demo_date');
+    expect(control).toHaveAttribute('data-component', 'SmartDatePicker');
+  });
+
   it('falls back to the representative preview when model metadata is absent (backward compatible)', () => {
     render(<RecursiveBlockRenderer schema={wysiwygSchema()} />);
 
