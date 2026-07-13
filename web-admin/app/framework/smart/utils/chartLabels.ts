@@ -39,60 +39,22 @@ export function valueLabel(
   return labels?.[field]?.[raw] ?? raw;
 }
 
-/** Grains a dimension may be bucketed by (mirrors the backend's ALLOWED_GRAINS). */
-const GRAINS = new Set(['day', 'week', 'month', 'quarter', 'year']);
-
-/**
- * Format a time-bucketed value for display.
- *
- * Aggregate time bucketing returns the raw DATE_TRUNC timestamp
- * (`2025-04-01 00:00:00+08`), which is unreadable on an axis. The grain lives in the
- * dimension name (`col__month`), so no extra metadata is needed to know how to
- * shorten it: month/quarter/year collapse to `YYYY-MM` / `YYYY-Qn` / `YYYY`, finer
- * grains to the date. Non-timestamp values pass through untouched.
- */
-export function formatBucketValue(field: string, value: unknown): string {
-  const raw = value == null ? '' : String(value);
-  const sep = field.indexOf('__');
-  if (sep < 0) return raw;
-  const grain = field.slice(sep + 2).toLowerCase();
-  if (!GRAINS.has(grain) || !raw) return raw;
-
-  // Parse the leading YYYY-MM-DD; the value is a DATE_TRUNC boundary, so day/time
-  // components below the grain are already zeroed.
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw);
-  if (!m) return raw;
-  const [, year, month, day] = m;
-  switch (grain) {
-    case 'year':
-      return year;
-    case 'quarter':
-      return `${year}-Q${Math.floor((Number(month) - 1) / 3) + 1}`;
-    case 'month':
-      return `${year}-${month}`;
-    default:
-      return `${year}-${month}-${day}`;
-  }
-}
-
 /**
  * Display text for a dimension value.
  *
- * `field` is the dimension's column name; `value` is the raw cell. Resolves, in
- * order: a dict label, a formatted time bucket (for `col__grain` dimensions), else
- * the value as-is.
+ * `field` is the dimension's column name; `value` is the raw cell. Returns the
+ * dict label when one is known, else the value as-is.
+ *
+ * Time-bucketed dimensions (`col__month`) are formatted server-side into a stable
+ * `YYYY-MM` label via to_char — not here — because only the DB knows the session
+ * zone, and a raw DATE_TRUNC timestamp rendered client-side lands a month early.
  */
 export function dimensionLabel(
   meta: QueryMeta | undefined,
   field: string | undefined,
   value: unknown,
 ): string {
-  const dict = valueLabel(meta?.dimensionLabels, field, value);
-  // If a dict label applied it wins; otherwise try time-bucket formatting.
-  if (field && dict === (value == null ? '' : String(value))) {
-    return formatBucketValue(field, value);
-  }
-  return dict;
+  return valueLabel(meta?.dimensionLabels, field, value);
 }
 
 /** Display text for a metric (series) name. Returns the configured label, else the alias. */

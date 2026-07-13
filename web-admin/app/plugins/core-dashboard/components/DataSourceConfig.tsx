@@ -27,8 +27,8 @@ import {
   type FilterCondition,
   type MetricConfig,
   type SortOption,
+  type SortCondition,
 } from '~/shared/designer/datasource';
-import type { SortCondition } from '~/shared/designer/datasource';
 
 interface DataSourceConfigProps {
   value: ChartDataSource;

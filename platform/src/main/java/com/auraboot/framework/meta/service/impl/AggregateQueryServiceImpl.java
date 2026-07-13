@@ -567,9 +567,26 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         if (!ALLOWED_GRAINS.contains(grain)) {
             throw new MetaServiceException("Unsupported time grain: " + grain);
         }
-        // The alias keeps the `__grain` form so the frontend can recognise it as a
-        // bucketed column and the output column name is stable across the query.
-        return new ResolvedDimension("DATE_TRUNC('" + grain + "', " + column + ")", dimension);
+        // Return a formatted STRING label, not the raw DATE_TRUNC timestamp. A
+        // timestamp renders in the JDBC session's zone (a +08 month boundary comes back
+        // as `...-31T16:00Z`), so the frontend cannot recover the calendar month without
+        // knowing the zone — and a naive `YYYY-MM` slice lands a month early. to_char on
+        // the truncated value formats in the DB session zone, giving a stable label.
+        // The alias keeps the `__grain` form so the frontend still recognises the column.
+        String bucket = "DATE_TRUNC('" + grain + "', " + column + ")";
+        String expr = "to_char(" + bucket + ", '" + grainFormat(grain) + "')";
+        return new ResolvedDimension(expr, dimension);
+    }
+
+    /** to_char format for each grain, yielding a sortable, zone-stable label. */
+    private String grainFormat(String grain) {
+        return switch (grain) {
+            case "year" -> "YYYY";
+            case "quarter" -> "YYYY\"-Q\"Q";
+            case "month" -> "YYYY-MM";
+            case "week" -> "IYYY\"-W\"IW";
+            default -> "YYYY-MM-DD";
+        };
     }
 
     /** Aliases the request exposes for ordering: an explicit alias, else the default {@code field_agg}. */

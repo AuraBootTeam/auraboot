@@ -604,9 +604,10 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         // Then: rows are keyed by the bucketed column, and each bucket is a real month boundary
         assertThat(response.getRows()).isNotEmpty();
         assertThat(response.getRows().get(0)).containsKeys("created_at__month", "cnt");
-        // DATE_TRUNC('month', ...) lands every value on the first of a month at 00:00.
+        // The bucket is formatted server-side to a stable YYYY-MM label (to_char),
+        // not a zone-dependent timestamp.
         assertThat(String.valueOf(response.getRows().get(0).get("created_at__month")))
-                .contains("-01 00:00");
+                .matches("\\d{4}-\\d{2}");
     }
 
     @Test
