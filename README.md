@@ -18,10 +18,10 @@
   <a href="#quick-start">Quick Start</a> •
   <a href="#key-features">Features</a> •
   <a href="#architecture">Architecture</a> •
-  <a href="https://docs.auraboot.com">Docs</a> •
-  <a href="https://www.auraboot.com/demo">Demo</a> •
-  <a href="https://www.auraboot.com/trust">Trust</a> •
-  <a href="https://www.auraboot.com/contact?interest=feedback">Feedback</a> •
+  <a href="https://auraboot.com/docs">Docs</a> •
+  <a href="https://auraboot.com/demo">Demo</a> •
+  <a href="https://auraboot.com/trust">Trust</a> •
+  <a href="https://auraboot.com/contact?interest=feedback">Feedback</a> •
   <a href="#community">Community</a>
 </p>
 
@@ -39,7 +39,7 @@ You declare your business in six first-class concepts: **Model**, **Page**, **Co
 | **A packaged business suite** | You want a working ERP/CRM out of the box and your processes fit its defaults | Deep non-standard processes, custom verticals, runtime-level AI execution |
 | **AuraBoot** | The business is complex, the lifecycle is years, and operations must be governed and AI-callable | Higher learning curve than a pure form builder; not a same-quarter accounting replacement |
 
-Full positioning rationale: [docs.auraboot.com](https://docs.auraboot.com). Architecture: [`ARCHITECTURE.md`](ARCHITECTURE.md).
+Full positioning rationale: [auraboot.com/docs/positioning](https://auraboot.com/docs/positioning/). Architecture: [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ### The six concepts (one card each)
 
@@ -62,9 +62,9 @@ Full positioning rationale: [docs.auraboot.com](https://docs.auraboot.com). Arch
 
 ## Public Demo Path
 
-- **Website walkthrough:** [auraboot.com/demo](https://www.auraboot.com/demo) shows the core model -> page -> command loop.
+- **Website walkthrough:** [auraboot.com/demo](https://auraboot.com/demo) shows the core model -> page -> command loop.
 - **PCBA Pilot package:** the PCBA manufacturing package is available for scoped design-partner pilots. It is not GA and should not be described as a full ERP replacement.
-- **Trust posture:** [auraboot.com/trust](https://www.auraboot.com/trust) documents the current source-available license posture, security contact, and SOC 2 readiness position. AuraBoot does not claim SOC 2 Type I or Type II certification today.
+- **Trust posture:** [auraboot.com/trust](https://auraboot.com/trust) documents the current source-available license posture, security contact, and SOC 2 readiness position. AuraBoot does not claim SOC 2 Type I or Type II certification today.
 
 ## Key Features
 
@@ -131,7 +131,7 @@ POSTGRES_PORT=15432 docker compose --profile full up --build -d
 |---|---|
 | macOS (Homebrew) | `brew services start postgresql@16 redis` |
 | Linux (systemd) | `sudo systemctl start postgresql redis` |
-| Windows | See the [installation guide](https://docs.auraboot.com) |
+| Windows | See the [installation guide](https://auraboot.com/docs/getting-started/installation/) |
 
 The script preflights both endpoints and aborts with a clear message if either is unreachable.
 
@@ -254,7 +254,7 @@ auraboot/
 │   ├── sales/                #   Sales management
 │   ├── procurement/          #   Procurement
 │   └── ...
-├── docs/                     # Code-coupled fixtures only; user docs at docs.auraboot.com
+├── docs/                     # Code-coupled fixtures only; user docs at auraboot.com/docs
 ├── scripts/                  # Build, seed, and CI scripts
 ├── docker/                   # Docker configuration
 └── docker-compose.yml        # One-command infrastructure
@@ -262,7 +262,7 @@ auraboot/
 
 ## Documentation
 
-Full user documentation lives at **[docs.auraboot.com](https://docs.auraboot.com)** —
+Full user documentation lives at **[auraboot.com/docs](https://auraboot.com/docs)** —
 getting started, core concepts, guides, use cases & industry solutions, API
 reference, plugin development, and deployment.
 
@@ -286,11 +286,11 @@ docs. A high-level system overview lives in [`ARCHITECTURE.md`](ARCHITECTURE.md)
 | Mobile Apps (iOS + Android) | — | ✓ |
 | Priority Support + SLA | — | ✓ |
 
-For enterprise licensing, use the [AuraBoot contact form](https://www.auraboot.com/contact).
+For enterprise licensing, use the [AuraBoot contact form](https://auraboot.com/contact).
 
 ## Community
 
-- [Website feedback form](https://www.auraboot.com/contact?interest=feedback) — Product feedback, beta issues, licensing questions, and private notes
+- [Website feedback form](https://auraboot.com/contact?interest=feedback) — Product feedback, beta issues, licensing questions, and private notes
 - [GitHub Discussions](https://github.com/AuraBootTeam/auraboot/discussions) — Ask questions and share ideas
 - [GitHub Issues](https://github.com/AuraBootTeam/auraboot/issues) — Report bugs or request features
 - [Discord](https://discord.gg/p2fW5A2MW6) — Community chat only; use the website form for feedback that needs follow-up
@@ -314,7 +314,7 @@ AuraBoot is released under the [AuraBoot License v1.3](LICENSE.txt), a source-av
 
 📖 **See the [License FAQ (中文)](LICENSE-FAQ.md) / [License FAQ (English)](LICENSE-FAQ-en.md)** for common questions about commercial use, modification, redistribution, and SaaS boundaries.
 
-For commercial licensing (multi-tenant low-code SaaS, white-labeling, or removing branding), use the [AuraBoot contact form](https://www.auraboot.com/contact).
+For commercial licensing (multi-tenant low-code SaaS, white-labeling, or removing branding), use the [AuraBoot contact form](https://auraboot.com/contact).
 
 ---
 
