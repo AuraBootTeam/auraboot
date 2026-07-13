@@ -4,7 +4,13 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.poi.sl.usermodel.Placeholder;
+import org.apache.poi.hslf.usermodel.HSLFSlide;
+import org.apache.poi.hslf.usermodel.HSLFSlideShow;
+import org.apache.poi.hslf.usermodel.HSLFTextBox;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.sl.usermodel.PictureData;
 import org.apache.poi.util.Units;
 import org.apache.poi.xslf.usermodel.XSLFPictureData;
@@ -23,6 +29,7 @@ import org.junit.jupiter.api.Test;
 import javax.imageio.ImageIO;
 
 import java.awt.Color;
+import java.awt.Font;
 import java.awt.Graphics2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
@@ -513,6 +520,190 @@ class DocumentParserServiceTest {
             assertTrue(service.extractEmbeddedImages(stream("plain text"), "txt").isEmpty());
             assertTrue(service.extractEmbeddedImages(stream("a,b"), "csv").isEmpty());
             assertTrue(service.extractEmbeddedImages(stream("<p>hi</p>"), "html").isEmpty());
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Legacy binary formats — the files people actually still have
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("legacy Office")
+    class Legacy {
+
+        @Test
+        @DisplayName("PPT (PowerPoint 97): slide text and speaker notes come out")
+        void parsePptContent() throws IOException {
+            byte[] ppt;
+            try (HSLFSlideShow show = new HSLFSlideShow()) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                HSLFSlide slide = show.createSlide();
+                HSLFTextBox box = slide.createTextBox();
+                box.setText("Legacy deck: Q3 East China fell 12 percent");
+                show.write(out);
+                ppt = out.toByteArray();
+            }
+
+            String text = service.parse(new ByteArrayInputStream(ppt), "ppt");
+
+            assertTrue(text.contains("Legacy deck: Q3 East China fell 12 percent"),
+                    "the slide text did not come out of the .ppt: " + text);
+            assertTrue(text.contains("# Slide 1"), "slides should stay separable: " + text);
+        }
+
+        @Test
+        @DisplayName("XLS (Excel 97): sheets flatten the same way xlsx does")
+        void parseXlsContent() throws IOException {
+            byte[] xls;
+            try (HSSFWorkbook wb = new HSSFWorkbook()) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                var sheet = wb.createSheet("SLA");
+                var header = sheet.createRow(0);
+                header.createCell(0).setCellValue("Tier");
+                header.createCell(1).setCellValue("Response time");
+                var row = sheet.createRow(1);
+                row.createCell(0).setCellValue("Enterprise");
+                row.createCell(1).setCellValue("4 hours");
+                wb.write(out);
+                xls = out.toByteArray();
+            }
+
+            String text = service.parse(new ByteArrayInputStream(xls), "xls");
+
+            assertTrue(text.contains("# Sheet: SLA"), "sheet name gives the chunk context: " + text);
+            assertTrue(text.contains("Enterprise"), "missing data cell: " + text);
+            assertTrue(text.contains("4 hours"), "missing data cell: " + text);
+        }
+
+        @Test
+        @DisplayName("XLS numbers render as displayed, not as raw doubles")
+        void xlsFormatsNumbers() throws IOException {
+            byte[] xls;
+            try (HSSFWorkbook wb = new HSSFWorkbook()) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                wb.createSheet("Prices").createRow(0).createCell(0).setCellValue(1500);
+                wb.write(out);
+                xls = out.toByteArray();
+            }
+
+            String text = service.parse(new ByteArrayInputStream(xls), "xls");
+
+            assertTrue(text.contains("1500"), text);
+            assertFalse(text.contains("1500.0"), "raw double leaked into the index: " + text);
+        }
+
+        @Test
+        @DisplayName("a .pptx handed in as .ppt is refused rather than silently mangled")
+        void wrongContainerForPpt() {
+            assertThrows(IOException.class, () -> service.parse(stream("not a ppt"), "ppt"));
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Scanned PDFs — a page that is a picture of text
+    // -------------------------------------------------------------------------
+
+    @Nested
+    @DisplayName("scanned PDF")
+    class ScannedPdf {
+
+        /** A page of text, as an image — what a scanner produces. */
+        private BufferedImage scanOfAPage() {
+            BufferedImage img = new BufferedImage(800, 400, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = img.createGraphics();
+            g.setColor(Color.WHITE);
+            g.fillRect(0, 0, 800, 400);
+            g.setColor(Color.BLACK);
+            g.setFont(new Font("SansSerif", Font.PLAIN, 28));
+            g.drawString("INVOICE 2026-0042", 60, 80);
+            g.drawString("Total due: 8750 CNY", 60, 140);
+            g.dispose();
+            return img;
+        }
+
+        @Test
+        @DisplayName("a scan embedded as an image is extracted for the vision model")
+        void scanAsXObjectIsExtracted() throws IOException {
+            byte[] pdf;
+            try (PDDocument doc = new PDDocument()) {
+                PDPage page = new PDPage();
+                doc.addPage(page);
+                PDImageXObject img = LosslessFactory.createFromImage(doc, scanOfAPage());
+                try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+                    cs.drawImage(img, 20, 300, 560, 280);
+                }
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                doc.save(out);
+                pdf = out.toByteArray();
+            }
+
+            // No text layer at all — this is the defining property of a scan.
+            assertTrue(service.parse(new ByteArrayInputStream(pdf), "pdf").isBlank(),
+                    "a scan has no text layer; if this has one the fixture is wrong");
+
+            var images = service.extractEmbeddedImages(new ByteArrayInputStream(pdf), "pdf");
+
+            assertEquals(1, images.size(), "the scanned page was not extracted");
+            assertEquals("Page 1", images.get(0).location());
+            assertEquals("image/png", images.get(0).mediaType());
+        }
+
+        @Test
+        @DisplayName("a scan drawn as vectors, with nothing to extract, is rendered instead")
+        void scanWithNoExtractableImageIsRendered() throws IOException {
+            // No text, no image XObject — the page is strokes. Nothing to pull out; the only way to
+            // read it is to rasterise the page and look at it.
+            byte[] pdf;
+            try (PDDocument doc = new PDDocument()) {
+                PDPage page = new PDPage();
+                doc.addPage(page);
+                try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+                    cs.setStrokingColor(Color.BLACK);
+                    for (int i = 0; i < 12; i++) {
+                        cs.moveTo(60, 700 - i * 20);
+                        cs.lineTo(500, 700 - i * 20);
+                    }
+                    cs.stroke();
+                }
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                doc.save(out);
+                pdf = out.toByteArray();
+            }
+
+            assertTrue(service.parse(new ByteArrayInputStream(pdf), "pdf").isBlank());
+
+            var images = service.extractEmbeddedImages(new ByteArrayInputStream(pdf), "pdf");
+
+            assertEquals(1, images.size(),
+                    "a page with nothing extractable must be rendered, or the document ingests as empty");
+            assertEquals("Page 1", images.get(0).location());
+            assertTrue(images.get(0).data().length > 1000, "the rendered page looks empty");
+        }
+
+        @Test
+        @DisplayName("an ordinary text PDF is not rendered — that would be paying to read what we can already read")
+        void textPdfIsNotRendered() throws IOException {
+            byte[] pdf;
+            try (PDDocument doc = new PDDocument()) {
+                PDPage page = new PDPage();
+                doc.addPage(page);
+                try (PDPageContentStream cs = new PDPageContentStream(doc, page)) {
+                    cs.beginText();
+                    cs.setFont(PDType1Font.HELVETICA, 12);
+                    cs.newLineAtOffset(72, 700);
+                    cs.showText("This page has a perfectly good text layer");
+                    cs.endText();
+                }
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                doc.save(out);
+                pdf = out.toByteArray();
+            }
+
+            var images = service.extractEmbeddedImages(new ByteArrayInputStream(pdf), "pdf");
+
+            assertTrue(images.isEmpty(),
+                    "a text PDF with no pictures must not be rasterised — that is a vision call per page, "
+                            + "paid, to read text we already have");
         }
     }
 }

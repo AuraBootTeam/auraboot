@@ -15,6 +15,8 @@
 #   - a deck whose charts are pictures — the scenario "upload the quarterly deck"  [needs DASHSCOPE_API_KEY]
 #   - URL ingestion, and the SSRF refusals that guard it
 #   - the embedding provider being selectable from the dialog
+#   - legacy .ppt / .xls — the files people still have on disk
+#   - a document that stored but did not embed says so       [runs only WITHOUT a key]
 #   - vector retrieval, and chart understanding          [need DASHSCOPE_API_KEY]
 #   - AuraBot answering from a document uploaded seconds earlier — "takes effect", end to end
 #
@@ -47,6 +49,8 @@ SPECS=(
   tests/e2e/ai/knowledge-ingestion-golden.spec.ts
   tests/e2e/ai/knowledge-url-ingestion-golden.spec.ts
   tests/e2e/ai/knowledge-provider-select-golden.spec.ts
+  tests/e2e/ai/knowledge-legacy-office-golden.spec.ts
+  tests/e2e/ai/knowledge-embedding-visibility-golden.spec.ts
   tests/e2e/ai/knowledge-vector-retrieval-golden.spec.ts
   tests/e2e/ai/knowledge-chart-vision-golden.spec.ts
   tests/e2e/ai/knowledge-deck-with-charts-golden.spec.ts

@@ -42,6 +42,8 @@ interface KbDocument {
   fileSize: number;
   charCount: number;
   chunkCount: number;
+  /** How many chunks carry a vector. Zero, with chunks present, means semantic search is dead. */
+  embeddedChunkCount?: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   errorMessage?: string;
   createdAt: string;
@@ -322,7 +324,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.docx,.pptx,.xlsx,.md,.txt,.csv,.html,.png,.jpg,.jpeg,.gif,.webp"
+            accept=".pdf,.docx,.pptx,.xlsx,.ppt,.xls,.md,.txt,.csv,.html,.png,.jpg,.jpeg,.gif,.webp"
             onChange={handleUpload}
             className="hidden"
             disabled={uploading}
@@ -402,7 +404,9 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
                     {doc.docName}
                   </td>
                   <td className="px-4 py-3 text-gray-500">{doc.docType}</td>
-                  <td className="px-4 py-3 text-right text-gray-500">{doc.chunkCount}</td>
+                  <td className="px-4 py-3 text-right text-gray-500">
+                    <EmbeddingState doc={doc} />
+                  </td>
                   <td className="px-4 py-3 text-right text-gray-500">
                     {doc.charCount?.toLocaleString()}
                   </td>
@@ -455,6 +459,46 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * What the chunk count leaves out.
+ *
+ * A document goes "completed" once its text is chunked and stored. Embedding is a separate remote
+ * step, and it can fail on every single chunk while the document still shows green — leaving a
+ * knowledge base that looks perfect and answers nothing, because retrieval silently drops to
+ * keyword matching. The row said "3 chunks" and told you nothing about that.
+ */
+function EmbeddingState({ doc }: { doc: KbDocument }) {
+  const total = doc.chunkCount ?? 0;
+  const embedded = doc.embeddedChunkCount ?? 0;
+
+  if (total === 0) {
+    return <span>0</span>;
+  }
+
+  if (embedded === total) {
+    return <span data-testid={`doc-chunks-${doc.pid}`}>{total}</span>;
+  }
+
+  const none = embedded === 0;
+  return (
+    <span
+      data-testid={`doc-chunks-${doc.pid}`}
+      title={
+        none
+          ? 'Stored, but not embedded — this document cannot be found by meaning, only by keyword. Check the knowledge base\'s embedding provider.'
+          : `Only ${embedded} of ${total} chunks were embedded; the rest are searchable by keyword only.`
+      }
+      className={`rounded px-1.5 py-0.5 text-xs ${
+        none
+          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+      }`}
+    >
+      {embedded}/{total} embedded
+    </span>
   );
 }
 
