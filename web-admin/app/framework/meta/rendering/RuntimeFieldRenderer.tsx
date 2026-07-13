@@ -28,6 +28,25 @@ export interface RuntimeFieldRendererProps {
   runtime: SchemaRuntime;
 }
 
+function resolveCreateInitialValues(
+  configured: Record<string, unknown> | undefined,
+  context: Record<string, any>,
+): Record<string, unknown> | undefined {
+  if (!configured) return undefined;
+  return Object.fromEntries(
+    Object.entries(configured).map(([key, value]) => {
+      if (typeof value !== 'string') return [key, value];
+      const match = value.trim().match(/^\$\{form\.([^}]+)\}$/);
+      return [
+        key,
+        match
+          ? match[1].split('.').reduce((current, part) => current?.[part], context.form)
+          : value,
+      ];
+    }),
+  );
+}
+
 /**
  * Platform-provided reference models that are NOT stored in ab_meta_model and therefore cannot
  * be resolved via the generic /api/dynamic/{code}/list route. Each entry maps a system model
@@ -430,6 +449,10 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
           createPageKey={field.createPageKey}
           createCommand={createCommandCode}
           displayField={refDisplayField}
+          initialValues={resolveCreateInitialValues(
+            field.createInitialValues,
+            runtime.getContext(),
+          )}
           executeCommand={executeCommand}
           onCreated={handleCreated}
           onClose={() => setCreateOpen(false)}

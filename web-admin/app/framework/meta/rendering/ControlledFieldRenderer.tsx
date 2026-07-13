@@ -51,6 +51,25 @@ const SYSTEM_MODEL_ENDPOINTS: Record<
 
 const MAX_DYNAMIC_REFERENCE_PAGE_SIZE = 500;
 
+function resolveCreateInitialValues(
+  configured: Record<string, unknown> | undefined,
+  context: ExpressionContext,
+): Record<string, unknown> | undefined {
+  if (!configured) return undefined;
+  return Object.fromEntries(
+    Object.entries(configured).map(([key, value]) => {
+      if (typeof value !== 'string') return [key, value];
+      const match = value.trim().match(/^\$\{form\.([^}]+)\}$/);
+      return [
+        key,
+        match
+          ? match[1].split('.').reduce((current, part) => current?.[part], context.form)
+          : value,
+      ];
+    }),
+  );
+}
+
 function isJsonLikeField(field: FieldConfig): boolean {
   return ['json', 'jsonb'].includes(
     String((field as any).dataType || field.type || '').toLowerCase(),
@@ -525,6 +544,7 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
           createPageKey={field.createPageKey}
           createCommand={createCommandCode}
           displayField={refDisplayField}
+          initialValues={resolveCreateInitialValues(field.createInitialValues, context)}
           executeCommand={executeCommand}
           onCreated={handleCreated}
           onClose={() => setCreateOpen(false)}

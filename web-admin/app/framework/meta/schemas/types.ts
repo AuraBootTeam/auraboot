@@ -179,6 +179,8 @@ export interface FieldConfig {
   createPageKey?: string;
   /** Override the permission code used to show inline-create. Defaults to createCommand. */
   createPermission?: string;
+  /** Initial values for inline-create. Exact `${form.<field>}` expressions resolve from the parent form. */
+  createInitialValues?: Record<string, unknown>;
   /** Reserved (deferred): restrict the create form to a subset of fields. Not yet honored — full target-model form is rendered. */
   createFields?: string[];
 }
