@@ -82,6 +82,45 @@ describe('BffProxyService', () => {
     expect(headers['sec-fetch-mode']).toBeUndefined();
   });
 
+  // Every consumer of sanitizeHeaders (the axios JSON proxy, the binary-download fetch,
+  // the SSE fetch) rebuilds the request body from the *parsed* req.body, so the byte
+  // length it puts on the wire is its own — never the client's. Forwarding the client's
+  // framing headers therefore lets `Content-Length` disagree with the bytes actually
+  // written, which desyncs the pooled keep-alive socket to Spring: Tomcat reads only the
+  // declared number of body bytes and then parses the leftovers as the next request line
+  // ("Invalid character found in method name [{}...]"), corrupting an unrelated request.
+  //
+  // The sharpest case is a body-less POST to a no-@RequestBody endpoint: express.json()
+  // turns the empty body into `{}`, axios serializes those 2 bytes, and the forwarded
+  // `content-length: 0` leaves `{}` stranded in the socket buffer.
+  it('does not forward client framing headers, which would desync the backend socket', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const headers = await (
+      service as unknown as {
+        sanitizeHeaders(req: {
+          headers: Record<string, string>;
+          originalUrl: string;
+          url: string;
+        }): Promise<Record<string, string>>;
+      }
+    ).sanitizeHeaders({
+      originalUrl: '/api/decision/versions/01ABC/validate',
+      url: '/api/decision/versions/01ABC/validate',
+      headers: {
+        authorization: 'Bearer test-token',
+        'content-type': 'application/json',
+        'content-length': '0',
+        'transfer-encoding': 'chunked',
+      },
+    });
+
+    expect(headers['content-length']).toBeUndefined();
+    expect(headers['transfer-encoding']).toBeUndefined();
+    // …while the headers that describe the payload itself still go through.
+    expect(headers['content-type']).toBe('application/json');
+    expect(headers.authorization).toBe('Bearer test-token');
+  });
+
   it('proxies large binary downloads without JSON reserialization', async () => {
     const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
     const svgBytes = Buffer.concat([
