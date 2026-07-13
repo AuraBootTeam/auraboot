@@ -819,26 +819,31 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         },
       },
       {
+        // Pure aggregate + time grain — no namedQuery. This is the same "opportunities
+        // per month" that used to require a hand-written DATE_TRUNC query; it is now
+        // expressible from the designer (dimension `col__month`), which is exactly what
+        // G1 unblocks. The bucketed timestamp is formatted to `YYYY-MM` on the axis by
+        // the chart label layer. (The bar chart beside it keeps its namedQuery: its
+        // "won" series is a conditional aggregate, which plain aggregate still cannot
+        // express.)
         id: 'w_line_trend',
         x: 6,
         y: 2,
         w: 6,
         h: 4,
         type: 'smart-line-chart',
-        title: '月度商机趋势',
+        title: '月度商机数趋势',
         config: {
-          title: '月度商机趋势',
+          title: '月度商机数趋势',
           visualization: {
-            metricLabels: { opp_count: '商机数', won_count: '赢单数' },
+            metricLabels: { opp_count: '商机数' },
           },
           dataSource: {
-            type: 'namedQuery',
-            queryCode: 'sc_arsenal_monthly_trend',
-            dimensions: ['month'],
-            metrics: [
-              { field: 'opp_count', aggregation: 'sum', alias: 'opp_count' },
-              { field: 'won_count', aggregation: 'sum', alias: 'won_count' },
-            ],
+            type: 'aggregate',
+            modelCode: 'crm_opportunity',
+            dimensions: ['crm_opp_expected_close_date__month'],
+            metrics: [{ field: 'pid', aggregation: 'count', alias: 'opp_count' }],
+            orderBy: [{ field: 'crm_opp_expected_close_date__month', direction: 'asc' }],
           },
         },
       },
@@ -1131,9 +1136,10 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
         },
       },
       {
-        // Leaderboard sorts and truncates client-side (SmartLeaderboard.tsx:106-113),
-        // which is why top-N works even though the aggregate data source cannot
-        // send an orderBy (gap G2).
+        // Top-N is now honest at the data layer: orderBy + limit sort and truncate in
+        // SQL. The component still sorts client-side as a fallback, but the query no
+        // longer over-fetches every owner and hope the client trims the right ones —
+        // which is what G2 (orderBy unreachable from the data source) forced before.
         id: 'w_leaderboard',
         x: 8,
         y: 20,
@@ -1151,6 +1157,8 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
             metrics: [
               { field: 'crm_opp_expected_amount', aggregation: 'sum', alias: 'total_amount' },
             ],
+            orderBy: [{ field: 'total_amount', direction: 'desc' }],
+            limit: 8,
           },
         },
       },

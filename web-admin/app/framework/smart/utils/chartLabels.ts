@@ -44,6 +44,10 @@ export function valueLabel(
  *
  * `field` is the dimension's column name; `value` is the raw cell. Returns the
  * dict label when one is known, else the value as-is.
+ *
+ * Time-bucketed dimensions (`col__month`) are formatted server-side into a stable
+ * `YYYY-MM` label via to_char — not here — because only the DB knows the session
+ * zone, and a raw DATE_TRUNC timestamp rendered client-side lands a month early.
  */
 export function dimensionLabel(
   meta: QueryMeta | undefined,

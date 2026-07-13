@@ -294,6 +294,7 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
         metrics: currentDataSource.metrics,
         filters: [...(currentDataSource.filters || []), ...(currentLinkageFilters || [])],
         parameters: currentDataSource.parameters,
+        orderBy: currentDataSource.orderBy,
         limit: currentDataSource.limit,
         drillFilters: currentDrillFilters,
         // When a semantic model is configured, pass it through so the backend
