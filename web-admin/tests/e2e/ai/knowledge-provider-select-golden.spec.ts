@@ -42,6 +42,16 @@ test.describe('S2 — the embedding provider is selectable from the UI', () => {
 
     // The option must actually be there — the seeded provider is unusable otherwise.
     await expect(provider.locator('option[value="qianwen"]')).toHaveCount(1);
+
+    // And an option that cannot work must NOT be there. Zhipu's embedding-3 returns 2048
+    // dimensions; ab_kb_chunk.embedding is vector(1536), so a knowledge base created on it fails to
+    // embed every chunk — and the user only finds out much later, from a base that quietly returns
+    // nothing. Offering it is worse than not offering it.
+    await expect(
+      provider.locator('option[value="zhipu"]'),
+      'zhipu cannot produce 1536-wide vectors — offering it is offering a guaranteed failure',
+    ).toHaveCount(0);
+
     await provider.selectOption('qianwen');
 
     // Switching providers must bring its model with it. text-embedding-v4 is the one that yields

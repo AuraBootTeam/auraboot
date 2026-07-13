@@ -28,6 +28,12 @@ let chartPng: Buffer;
 test.describe('S2 knowledge ingestion — charts', () => {
   test.describe.configure({ mode: 'serial' });
 
+  // A vision model reads the chart, and that takes seconds, not milliseconds — measured at 8-10s
+  // end to end. The suite-wide default of 15s covers that only when nothing else is running; under
+  // the parallel load of a full golden run the test is killed mid-ingest and reports the document
+  // as stuck in 'processing' when it is merely still working.
+  test.setTimeout(120_000);
+
   test.skip(
     !process.env.DASHSCOPE_API_KEY,
     'needs DASHSCOPE_API_KEY — nothing can understand the image without a vision model',

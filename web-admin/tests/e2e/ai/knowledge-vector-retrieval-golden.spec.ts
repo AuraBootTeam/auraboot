@@ -37,6 +37,9 @@ let kbPid: string;
 test.describe('S2 — real embeddings and vector retrieval', () => {
   test.describe.configure({ mode: 'serial' });
 
+  // Embedding is a remote call; the 15s default is not a budget for one.
+  test.setTimeout(120_000);
+
   test.skip(
     !process.env.DASHSCOPE_API_KEY,
     'needs DASHSCOPE_API_KEY — without it the stack cannot embed, and a green run would be a lie',
