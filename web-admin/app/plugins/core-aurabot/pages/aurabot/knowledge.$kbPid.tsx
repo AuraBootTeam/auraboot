@@ -584,13 +584,14 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
   const toast = useToastContext();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<RetrievalResult[]>([]);
+  const [path, setPath] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
     setSearching(true);
     try {
-      const res = await post<{ results: RetrievalResult[]; warnings: string[] }>(
+      const res = await post<{ results: RetrievalResult[]; warnings: string[]; path: string }>(
         '/api/ai/knowledge/retrieve',
         {
           query,
@@ -599,6 +600,7 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
         },
       );
       setResults(res?.data?.results ?? []);
+      setPath(res?.data?.path ?? null);
       for (const w of res?.data?.warnings ?? []) {
         toast.showErrorToast(w);
       }
@@ -632,9 +634,28 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
 
       {results.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            {results.length} result(s) found
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {results.length} result(s) found
+            </h3>
+            {path && (
+              <span
+                data-testid="retrieval-path"
+                title={
+                  path === 'hybrid'
+                    ? 'Vector similarity combined with keyword matching'
+                    : 'Keyword matching only — semantic search was unavailable'
+                }
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  path === 'hybrid'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                }`}
+              >
+                {path === 'hybrid' ? 'hybrid (vector + keyword)' : `${path} only`}
+              </span>
+            )}
+          </div>
           {results.map((r, i) => (
             <div
               key={r.chunkPid || i}
