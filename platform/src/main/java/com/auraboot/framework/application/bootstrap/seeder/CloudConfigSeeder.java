@@ -44,7 +44,7 @@ public class CloudConfigSeeder {
     );
 
     /** Default (keyless, disabled) config for an env-provisionable LLM provider. */
-    private record LlmProviderSeed(String providerCode, int priority, String config) {}
+    private record ProviderSeed(String providerCode, int priority, String config) {}
 
     /**
      * Default config for the OpenAI-compatible / messages-format LLM providers whose
@@ -56,21 +56,21 @@ public class CloudConfigSeeder {
      * during a credential cleanup). All entries are keyless: keys only ever come
      * from the environment, never from source.
      */
-    private static final Map<String, LlmProviderSeed> LLM_PROVIDER_SEEDS = buildLlmProviderSeeds();
+    private static final Map<String, ProviderSeed> LLM_PROVIDER_SEEDS = buildLlmProviderSeeds();
 
-    private static Map<String, LlmProviderSeed> buildLlmProviderSeeds() {
-        Map<String, LlmProviderSeed> m = new LinkedHashMap<>();
-        m.put("seed_llm_anthropic", new LlmProviderSeed("anthropic", 10,
+    private static Map<String, ProviderSeed> buildLlmProviderSeeds() {
+        Map<String, ProviderSeed> m = new LinkedHashMap<>();
+        m.put("seed_llm_anthropic", new ProviderSeed("anthropic", 10,
                 "{\"displayName\":\"Anthropic (Claude)\",\"apiFormat\":\"messages\",\"baseUrl\":\"https://api.anthropic.com\",\"defaultModel\":\"claude-sonnet-4-6\",\"maxTokens\":4096,\"models\":[\"claude-opus\",\"claude-sonnet\",\"claude-haiku\"]}"));
-        m.put("seed_llm_openai", new LlmProviderSeed("openai", 20,
+        m.put("seed_llm_openai", new ProviderSeed("openai", 20,
                 "{\"displayName\":\"OpenAI\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.openai.com\",\"defaultModel\":\"gpt-4o\",\"maxTokens\":4096,\"models\":[\"gpt-4\",\"gpt-3.5\",\"o1-\",\"o3-\",\"o4-\"]}"));
-        m.put("seed_llm_deepseek", new LlmProviderSeed("deepseek", 30,
+        m.put("seed_llm_deepseek", new ProviderSeed("deepseek", 30,
                 "{\"displayName\":\"DeepSeek\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.deepseek.com\",\"defaultModel\":\"deepseek-chat\",\"maxTokens\":4096,\"models\":[\"deepseek\"]}"));
-        m.put("seed_llm_qianwen", new LlmProviderSeed("qianwen", 50,
+        m.put("seed_llm_qianwen", new ProviderSeed("qianwen", 50,
                 "{\"displayName\":\"通义千问 (Qwen)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://dashscope.aliyuncs.com/compatible-mode\",\"defaultModel\":\"qwen-plus\",\"maxTokens\":4096,\"models\":[\"qwen\"]}"));
-        m.put("seed_llm_zhipu", new LlmProviderSeed("zhipu", 60,
+        m.put("seed_llm_zhipu", new ProviderSeed("zhipu", 60,
                 "{\"displayName\":\"智谱 (Zhipu)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://open.bigmodel.cn/api/paas\",\"defaultModel\":\"glm-4\",\"maxTokens\":4096,\"models\":[\"glm\"]}"));
-        m.put("seed_llm_moonshot", new LlmProviderSeed("moonshot", 70,
+        m.put("seed_llm_moonshot", new ProviderSeed("moonshot", 70,
                 "{\"displayName\":\"月之暗面 (Moonshot)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.moonshot.cn\",\"defaultModel\":\"moonshot-v1-8k\",\"maxTokens\":4096,\"models\":[\"moonshot\"]}"));
         return m;
     }
@@ -84,6 +84,43 @@ public class CloudConfigSeeder {
             "seed_llm_zhipu", "ZHIPU_API_KEY",
             "seed_llm_moonshot", "MOONSHOT_API_KEY");
 
+    /**
+     * Embedding providers, seeded keyless + disabled and provisioned from the environment exactly
+     * like the LLM providers above.
+     *
+     * <p>⚠️ The dimension field is {@code dimensions} (plural) — that is the key
+     * {@code EmbeddingService.resolveConfig} reads. Spelling it {@code dimension} means the value is
+     * silently ignored, the request goes out without a dimension, and the provider answers with its
+     * own default. That is not cosmetic: {@code text-embedding-v4} defaults to <b>1024</b> dims,
+     * while {@code ab_kb_chunk.embedding} is {@code vector(1536)} — every chunk would fail to
+     * insert with "expected 1536 dimensions, not 1024", and the whole knowledge base would embed
+     * into nothing.
+     */
+    private static final Map<String, ProviderSeed> EMBEDDING_PROVIDER_SEEDS = Map.of(
+            "seed_emb_openai", new ProviderSeed("openai", 10,
+                    "{\"displayName\":\"OpenAI Embeddings\",\"baseUrl\":\"https://api.openai.com\","
+                            + "\"defaultModel\":\"text-embedding-3-small\",\"dimensions\":1536,\"maxBatchSize\":20}"),
+            // DashScope speaks the OpenAI-compatible /v1/embeddings dialect, so EmbeddingService
+            // needs no provider-specific code. Batch limit measured against the live API: 10 passes,
+            // 25 is rejected with InvalidParameter.
+            "seed_emb_qianwen", new ProviderSeed("qianwen", 15,
+                    "{\"displayName\":\"通义千问 Embedding (DashScope)\","
+                            + "\"baseUrl\":\"https://dashscope.aliyuncs.com/compatible-mode\","
+                            + "\"defaultModel\":\"text-embedding-v4\",\"dimensions\":1536,\"maxBatchSize\":10}"),
+            // Left exactly as it was on main: "dimension" (ignored) + a 2048-dim default model that
+            // cannot fit vector(1536). That combination is already broken today, but fixing it means
+            // guessing at Zhipu's dimensions parameter without a key to verify against — so it is
+            // flagged rather than silently changed.
+            "seed_emb_zhipu", new ProviderSeed("zhipu", 20,
+                    "{\"displayName\":\"智谱 Embedding\",\"baseUrl\":\"https://open.bigmodel.cn/api/paas\","
+                            + "\"defaultModel\":\"embedding-3\",\"dimension\":2048,\"maxBatchSize\":20}"));
+
+    /** seed_ pid → environment variable holding that embedding provider's apiKey. */
+    private static final Map<String, String> EMBEDDING_PROVIDER_ENV_KEYS = Map.of(
+            "seed_emb_openai", "OPENAI_API_KEY",
+            "seed_emb_qianwen", "DASHSCOPE_API_KEY",
+            "seed_emb_zhipu", "ZHIPU_API_KEY");
+
     public void seed() {
         // Check if already seeded by looking for any seed_ prefixed pid
         Integer existing = jdbcTemplate.queryForObject(
@@ -93,34 +130,20 @@ public class CloudConfigSeeder {
         } else {
             seedDefaults();
         }
-        // Always (idempotent): provision/override LLM provider apiKeys from environment
+        // Always (idempotent): provision/override provider apiKeys from environment
         // variables (<PROVIDER>_API_KEY). Keeps secrets in the environment — never
         // hardcoded in source, never pasted into chat — and re-applies on every boot.
-        provisionLlmApiKeysFromEnv();
+        provisionApiKeysFromEnv();
     }
 
     private void seedDefaults() {
         int count = 0;
 
-        // Env-provisionable LLM providers — keyless + disabled until a key is supplied.
-        for (Map.Entry<String, LlmProviderSeed> e : LLM_PROVIDER_SEEDS.entrySet()) {
-            LlmProviderSeed seed = e.getValue();
-            count += jdbcTemplate.update(INSERT_SQL, e.getKey(), "platform", "llm",
-                    seed.providerCode(), encryptSensitiveFields(seed.config()), false, seed.priority());
-        }
+        // Env-provisionable providers — keyless + disabled until a key is supplied.
+        count += seedProviders(LLM_PROVIDER_SEEDS, "llm");
+        count += seedProviders(EMBEDDING_PROVIDER_SEEDS, "embedding");
 
         Object[][] rows = {
-            // Embedding Providers
-            {
-                "seed_emb_openai", "platform", "embedding", "openai",
-                "{\"displayName\":\"OpenAI Embeddings\",\"baseUrl\":\"https://api.openai.com\",\"defaultModel\":\"text-embedding-3-small\",\"dimension\":1536,\"maxBatchSize\":20}",
-                false, 10
-            },
-            {
-                "seed_emb_zhipu", "platform", "embedding", "zhipu",
-                "{\"displayName\":\"智谱 Embedding\",\"baseUrl\":\"https://open.bigmodel.cn/api/paas\",\"defaultModel\":\"embedding-3\",\"dimension\":2048,\"maxBatchSize\":20}",
-                false, 20
-            },
             // Prompt Templates
             {
                 "seed_tpl_aurabot_system", "platform", "prompt_template", "aurabot_system",
@@ -144,8 +167,18 @@ public class CloudConfigSeeder {
             String encryptedConfigJson = encryptSensitiveFields(configJson);
             count += jdbcTemplate.update(INSERT_SQL, row[0], row[1], row[2], row[3], encryptedConfigJson, row[5], row[6]);
         }
-        int total = LLM_PROVIDER_SEEDS.size() + rows.length;
+        int total = LLM_PROVIDER_SEEDS.size() + EMBEDDING_PROVIDER_SEEDS.size() + rows.length;
         log.info("CloudConfigSeeder: seeded {} cloud configs (skipped {} existing)", count, total - count);
+    }
+
+    private int seedProviders(Map<String, ProviderSeed> seeds, String serviceType) {
+        int count = 0;
+        for (Map.Entry<String, ProviderSeed> e : seeds.entrySet()) {
+            ProviderSeed seed = e.getValue();
+            count += jdbcTemplate.update(INSERT_SQL, e.getKey(), "platform", serviceType,
+                    seed.providerCode(), encryptSensitiveFields(seed.config()), false, seed.priority());
+        }
+        return count;
     }
 
     /**
@@ -160,8 +193,14 @@ public class CloudConfigSeeder {
      * the provider work. Idempotent: runs on every boot, only writes when the env var
      * is set, never clears a key when the env var is absent, and never logs the key.
      */
-    void provisionLlmApiKeysFromEnv() {
-        for (Map.Entry<String, String> entry : LLM_PROVIDER_ENV_KEYS.entrySet()) {
+    void provisionApiKeysFromEnv() {
+        provisionFromEnv(LLM_PROVIDER_ENV_KEYS, LLM_PROVIDER_SEEDS, "llm");
+        provisionFromEnv(EMBEDDING_PROVIDER_ENV_KEYS, EMBEDDING_PROVIDER_SEEDS, "embedding");
+    }
+
+    private void provisionFromEnv(Map<String, String> envKeys, Map<String, ProviderSeed> seeds,
+                                    String serviceType) {
+        for (Map.Entry<String, String> entry : envKeys.entrySet()) {
             String pid = entry.getKey();
             String envVar = entry.getValue();
             String apiKey = readEnv(envVar);
@@ -170,7 +209,7 @@ public class CloudConfigSeeder {
             }
             List<String> existing = jdbcTemplate.queryForList(
                     "SELECT config::text FROM ab_cloud_config WHERE pid = ?", String.class, pid);
-            LlmProviderSeed seed = LLM_PROVIDER_SEEDS.get(pid);
+            ProviderSeed seed = seeds.get(pid);
             if (existing.isEmpty() && seed == null) {
                 // Absent row with no known default (e.g. an inline-only provider) —
                 // skip rather than guess a config shape.
@@ -182,7 +221,7 @@ public class CloudConfigSeeder {
                 config.put("apiKey", apiKey);
                 String encrypted = encryptSensitiveFields(objectMapper.writeValueAsString(config));
                 if (existing.isEmpty()) {
-                    jdbcTemplate.update(INSERT_SQL, pid, "platform", "llm",
+                    jdbcTemplate.update(INSERT_SQL, pid, "platform", serviceType,
                             seed.providerCode(), encrypted, true, seed.priority());
                     log.info("CloudConfigSeeder: created + provisioned {} from env {} (enabled)",
                             pid, envVar);

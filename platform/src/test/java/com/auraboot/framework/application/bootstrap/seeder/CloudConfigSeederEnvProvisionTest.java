@@ -74,7 +74,7 @@ class CloudConfigSeederEnvProvisionTest {
         when(jdbcTemplate.queryForList(eq(SELECT_SQL), eq(String.class), eq("seed_llm_deepseek")))
                 .thenReturn(List.of(DEEPSEEK_CONFIG));
 
-        seeder.provisionLlmApiKeysFromEnv();
+        seeder.provisionApiKeysFromEnv();
 
         ArgumentCaptor<String> configCaptor = ArgumentCaptor.forClass(String.class);
         verify(jdbcTemplate, times(1))
@@ -86,10 +86,42 @@ class CloudConfigSeederEnvProvisionTest {
     }
 
     @Test
+    @DisplayName("DASHSCOPE_API_KEY provisions the DashScope embedding provider, pinned to 1536 dimensions")
+    void provisionsEmbeddingProviderFromEnv() {
+        env.put("DASHSCOPE_API_KEY", "sk-dashscope-XYZ");
+        // Neither the LLM nor the embedding row exists yet — both get created from their defaults.
+        when(jdbcTemplate.queryForList(eq(SELECT_SQL), eq(String.class), anyString()))
+                .thenReturn(List.of());
+
+        seeder.provisionApiKeysFromEnv();
+
+        ArgumentCaptor<Object> args = ArgumentCaptor.forClass(Object.class);
+        verify(jdbcTemplate, times(2)).update(anyString(), args.capture(), args.capture(),
+                args.capture(), args.capture(), args.capture(), args.capture(), args.capture());
+
+        List<Object> all = args.getAllValues();
+        String embeddingConfig = all.stream()
+                .filter(a -> a instanceof String s && s.contains("text-embedding-v4"))
+                .map(String.class::cast)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(
+                        "DASHSCOPE_API_KEY did not provision an embedding provider; captured: " + all));
+
+        assertTrue(embeddingConfig.contains("sk-dashscope-XYZ"), "the env key must reach the config");
+        // The load-bearing assertion. text-embedding-v4 answers with 1024 dimensions unless asked
+        // otherwise, and ab_kb_chunk.embedding is vector(1536) — so a config that omits this (or
+        // spells it "dimension", which EmbeddingService does not read) makes every chunk fail to
+        // insert with "expected 1536 dimensions, not 1024".
+        assertTrue(embeddingConfig.contains("\"dimensions\":1536"),
+                "embedding config must pin dimensions=1536, got: " + embeddingConfig);
+        assertTrue(all.contains("embedding"), "the row must be seeded with service_type=embedding");
+    }
+
+    @Test
     @DisplayName("env unset → no DB interaction at all (never clears a key)")
     void noOpWhenEnvUnset() {
         // env map empty → readEnv returns null for every provider
-        seeder.provisionLlmApiKeysFromEnv();
+        seeder.provisionApiKeysFromEnv();
         verifyNoInteractions(jdbcTemplate);
     }
 
@@ -97,7 +129,7 @@ class CloudConfigSeederEnvProvisionTest {
     @DisplayName("env blank → treated as unset, no DB interaction")
     void noOpWhenEnvBlank() {
         env.put("DEEPSEEK_API_KEY", "   ");
-        seeder.provisionLlmApiKeysFromEnv();
+        seeder.provisionApiKeysFromEnv();
         verifyNoInteractions(jdbcTemplate);
     }
 
@@ -108,7 +140,7 @@ class CloudConfigSeederEnvProvisionTest {
         when(jdbcTemplate.queryForList(eq(SELECT_SQL), eq(String.class), eq("seed_llm_deepseek")))
                 .thenReturn(List.of()); // row was deleted (e.g. credential cleanup)
 
-        seeder.provisionLlmApiKeysFromEnv();
+        seeder.provisionApiKeysFromEnv();
 
         // No UPDATE (nothing to update); instead an INSERT recreates the row from the
         // known default, carrying the env key + enabled=true + correct provider/priority.
@@ -130,7 +162,7 @@ class CloudConfigSeederEnvProvisionTest {
         // env var must not make the seeder guess provider rows or config shape.
         env.put("MINIMAX_API_KEY", "sk-minimax");
 
-        seeder.provisionLlmApiKeysFromEnv();
+        seeder.provisionApiKeysFromEnv();
 
         verifyNoInteractions(jdbcTemplate);
     }
@@ -145,7 +177,7 @@ class CloudConfigSeederEnvProvisionTest {
         when(jdbcTemplate.queryForList(eq(SELECT_SQL), eq(String.class), eq("seed_llm_openai")))
                 .thenReturn(List.of("{\"displayName\":\"OpenAI\",\"baseUrl\":\"https://api.openai.com\"}"));
 
-        seeder.provisionLlmApiKeysFromEnv();
+        seeder.provisionApiKeysFromEnv();
 
         verify(jdbcTemplate, times(1)).update(eq(UPDATE_SQL), anyString(), eq("seed_llm_deepseek"));
         verify(jdbcTemplate, times(1)).update(eq(UPDATE_SQL), anyString(), eq("seed_llm_openai"));
