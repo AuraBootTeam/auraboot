@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import {
   ArrowLeftIcon,
+  ArrowPathIcon,
   CloudArrowUpIcon,
   DocumentTextIcon,
   MagnifyingGlassIcon,
@@ -252,6 +253,17 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
     }
   };
 
+  const handleReprocess = async (doc: KbDocument) => {
+    try {
+      await post(`/api/ai/knowledge/${kbPid}/documents/${doc.pid}/reprocess`, {});
+      toast.showSuccessToast(`Reprocessing "${doc.docName}"`);
+      fetchDocs();
+      onUpdate();
+    } catch {
+      toast.showErrorToast('Failed to reprocess document');
+    }
+  };
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -279,7 +291,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.docx,.md,.txt,.csv,.html"
+            accept=".pdf,.docx,.pptx,.xlsx,.md,.txt,.csv,.html"
             onChange={handleUpload}
             className="hidden"
             disabled={uploading}
@@ -293,7 +305,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
       ) : docs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400">
           <DocumentTextIcon className="mb-3 h-12 w-12" />
-          <p>No documents yet. Upload PDF, DOCX, MD, TXT, or CSV files.</p>
+          <p>No documents yet. Upload PDF, DOCX, PPTX, XLSX, MD, TXT, CSV, or HTML files.</p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
@@ -336,6 +348,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span
+                      data-testid={`doc-status-${doc.pid}`}
                       className={`rounded-full px-2 py-1 text-xs ${STATUS_STYLES[doc.status] || ''}`}
                     >
                       {doc.status}
@@ -343,14 +356,37 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
                     {doc.status === 'processing' && (
                       <span className="ml-1 inline-block h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
                     )}
+                    {doc.status === 'failed' && doc.errorMessage && (
+                      <p
+                        data-testid={`doc-error-${doc.pid}`}
+                        className="mt-1 text-xs text-red-600 dark:text-red-400"
+                        title={doc.errorMessage}
+                      >
+                        {doc.errorMessage}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => handleDelete(doc)}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      {doc.status === 'failed' && (
+                        <button
+                          type="button"
+                          data-testid={`doc-reprocess-${doc.pid}`}
+                          onClick={() => handleReprocess(doc)}
+                          title="Reprocess document"
+                          className="text-gray-400 hover:text-blue-600"
+                        >
+                          <ArrowPathIcon className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        data-testid={`doc-delete-${doc.pid}`}
+                        onClick={() => handleDelete(doc)}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

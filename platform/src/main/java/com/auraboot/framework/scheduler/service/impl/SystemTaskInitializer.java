@@ -69,7 +69,12 @@ public class SystemTaskInitializer {
             new TaskDef("sys-license-validation", "License Validation Check",
                     "cron", "0 0 2 * * ?", null,
                     "licenseValidationTask", "validateLicenses",
-                    "Validates entitlement status transitions and sends expiry notifications")
+                    "Validates entitlement status transitions and sends expiry notifications"),
+            new TaskDef("sys-rag-document-reconcile", "RAG Document Parse Reconcile",
+                    "interval", null, 300000L,
+                    "documentReconcileService", "reclaimStuckDocuments",
+                    "Reclaims documents stranded in pending/processing by a worker restart "
+                            + "(max 3 attempts, then failed)")
     );
 
     @PostConstruct

@@ -6106,12 +6106,13 @@ CREATE TABLE IF NOT EXISTS ab_kb_document (
     error_message         TEXT,
     process_started_at    TIMESTAMPTZ,
     process_completed_at  TIMESTAMPTZ,
+    process_retry_count   INT NOT NULL DEFAULT 0,     -- parse attempts by the reconcile pass
 
     created_at            TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     created_by            BIGINT,
     deleted_flag          BOOLEAN DEFAULT FALSE,
 
-    CONSTRAINT chk_doc_type CHECK (doc_type IN ('pdf', 'docx', 'md', 'txt', 'csv', 'html')),
+    CONSTRAINT chk_doc_type CHECK (doc_type IN ('pdf', 'docx', 'md', 'txt', 'csv', 'html', 'pptx', 'xlsx')),
     CONSTRAINT chk_doc_status CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
     CONSTRAINT chk_doc_source CHECK (source_type IN ('file', 'entity', 'internal_doc'))
 );
