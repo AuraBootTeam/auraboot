@@ -13,7 +13,7 @@
           "code": "update_qa",
           "permissionCode": "faq.candidate.review",
           "label": { "zh-CN": "编辑问答", "en": "Edit Q&A" },
-          "action": { "type": "command", "command": "faq:update_qa" }
+          "action": { "type": "navigate", "to": "faq_candidate_form" }
         },
         {
           "code": "approve",
