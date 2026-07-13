@@ -11,7 +11,7 @@
         "label:zh-CN": "普通",
         "sortNo": 10,
         "status": "enabled",
-        "extension": { "color": "default" }
+        "extension": { "color": "gray" }
       },
       {
         "value": "high",
@@ -19,7 +19,7 @@
         "label:zh-CN": "高",
         "sortNo": 20,
         "status": "enabled",
-        "extension": { "color": "orange" }
+        "extension": { "color": "amber" }
       },
       {
         "value": "urgent",
@@ -43,7 +43,7 @@
         "label:zh-CN": "草稿",
         "sortNo": 10,
         "status": "enabled",
-        "extension": { "color": "default" }
+        "extension": { "color": "gray" }
       },
       {
         "value": "published",

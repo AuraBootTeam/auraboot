@@ -133,10 +133,18 @@ describe('ListToolbar i18n', () => {
     expect(quickFilters).toHaveClass('overflow-x-auto');
   });
 
-  it('renders Add Filter chip-bar button from common.add_filter', () => {
+  it('renders the Add Filter toolbar button from common.add_filter', () => {
+    // The entry point moved from FilterChipBar into the toolbar: an unfiltered
+    // view used to render a full-width grey strip just to host this one button.
     renderToolbar();
-    expect(screen.getByText(/\+ 添加筛选/)).toBeInTheDocument();
-    expect(screen.queryByText(/\+ Add Filter/)).toBeNull();
+    const button = screen.getByTestId('add-filter-btn');
+    expect(button).toHaveTextContent('添加筛选');
+    expect(button).not.toHaveTextContent('Add Filter');
+  });
+
+  it('hides the Add Filter button when filter chips are suppressed', () => {
+    renderToolbar({ hideFilterChips: true });
+    expect(screen.queryByTestId('add-filter-btn')).toBeNull();
   });
 
   it('can hide generic list chrome for focused workbench entry pages', () => {
