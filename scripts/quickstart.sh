@@ -24,7 +24,19 @@
 #
 # It is idempotent: run it as many times as you like.
 #
-#   BACKEND_URL     default http://localhost:6443   (the docker `full` profile)
+#   BACKEND_URL     default http://localhost:3000 — the URL you open in the
+#                   browser, NOT the backend's own port.
+#
+#                   `docker compose --profile full` publishes ONLY the frontend
+#                   (3000). The backend's 6443 is never mapped to the host; the
+#                   BFF proxies /api/* to it over the compose network. A script
+#                   pointed at localhost:6443 therefore hangs forever on a stack
+#                   that is perfectly healthy — which is exactly what the first
+#                   version of this file did, because it was tested against a
+#                   backend running directly on the host. Health is probed via
+#                   /api/bootstrap/status for the same reason: /actuator is not
+#                   proxied, /api/* is.
+#
 #   ADMIN_EMAIL     default admin@auraboot.com
 #   ADMIN_PASSWORD  default Test2026x
 #   PLUGINS_PATH    path to plugins/ AS THE BACKEND SEES IT.
@@ -34,7 +46,7 @@
 
 set -euo pipefail
 
-BACKEND_URL="${BACKEND_URL:-http://localhost:6443}"
+BACKEND_URL="${BACKEND_URL:-http://localhost:3000}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@auraboot.com}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-Test2026x}"
 ADMIN_NAME="${ADMIN_NAME:-Admin User}"
@@ -64,20 +76,26 @@ curl_() { NO_PROXY=localhost curl -sS --max-time 180 "$@"; }
 json() { python3 -c "import sys,json;d=json.load(sys.stdin);$1" 2>/dev/null || true; }
 
 # ── 1. wait for the backend ───────────────────────────────────────────────────
-say "${DIM}Waiting for the backend at ${BACKEND_URL} …${NC}"
+# Probed through /api/*, not /actuator: on the docker stack only the frontend is
+# published, and the BFF proxies /api/* — /actuator is not reachable from the host.
+say "${DIM}Waiting for AuraBoot at ${BACKEND_URL} …${NC}"
+initialized=""
 for i in $(seq 1 60); do
-  status="$(curl_ "${BACKEND_URL}/actuator/health" 2>/dev/null | json "print(d.get('status',''))")"
-  [[ "${status}" == "UP" ]] && break
+  probe="$(curl_ "${BACKEND_URL}/api/bootstrap/status" 2>/dev/null || true)"
+  if [[ -n "${probe}" ]] && echo "${probe}" | grep -q '"initialized"'; then
+    initialized="$(echo "${probe}" | json "print(d.get('data',{}).get('initialized'))")"
+    break
+  fi
   if [[ $i -eq 60 ]]; then
-    say "${RED}Backend never became healthy.${NC} Check: docker compose logs backend"
+    say "${RED}AuraBoot never answered at ${BACKEND_URL}.${NC}"
+    say "Cold start takes 2–4 minutes. If it is still failing:  docker compose logs backend"
     exit 1
   fi
   sleep 5
 done
-say "${GREEN}✓${NC} backend is up"
+say "${GREEN}✓${NC} AuraBoot is answering"
 
 # ── 2. create the admin user (idempotent) ─────────────────────────────────────
-initialized="$(curl_ "${BACKEND_URL}/api/bootstrap/status" | json "print(d.get('data',{}).get('initialized'))")"
 if [[ "${initialized}" == "True" ]]; then
   say "${GREEN}✓${NC} already bootstrapped ${DIM}(skipping admin creation)${NC}"
 else

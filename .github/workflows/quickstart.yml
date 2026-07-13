@@ -115,39 +115,37 @@ jobs:
           docker compose logs --tail 100 backend
           exit 1
 
-      - name: Ensure default bootstrap initialized
+      - name: Bootstrap + import plugins — via the script users actually run
         if: steps.changes.outputs.run == 'true'
-        # The quickstart stack starts empty. Keep the explicit setup API as the
-        # single authority for creating the default admin + tenant.
-        run: |
-          status=$(curl -fsS -m 10 http://localhost:3000/api/bootstrap/status || echo '{}')
-          if echo "$status" | grep -q '"initialized":true'; then
-            echo "bootstrap already initialized"
-            exit 0
-          fi
+        # This step used to inline its own curl to /api/bootstrap/setup. It passed,
+        # and it was validating a path no user follows: the README's steps PLUS one
+        # the README never mentioned. The onboarding was broken for months and this
+        # gate could not see it, because it silently did the missing step itself.
+        #
+        # Run what we ship. If scripts/quickstart.sh breaks, the quickstart breaks,
+        # and this goes red.
+        run: ./scripts/quickstart.sh
 
-          set +e
-          response=$(curl -sS -m 30 -w $'\n%{http_code}' -X POST http://localhost:3000/api/bootstrap/setup \
+      - name: The platform is not empty
+        if: steps.changes.outputs.run == 'true'
+        # Health is UP and login works on a platform with zero models and zero
+        # menus — which is what you get if plugin import silently fails. Assert
+        # the user lands on something usable, not just something that boots.
+        run: |
+          token=$(curl -fsS -m 10 -X POST http://localhost:3000/api/auth/login \
             -H "Content-Type: application/json" \
-            -d '{"companyName":"AuraBoot Dev","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin User","systemMode":"single"}')
-          curl_exit=$?
-          set -e
-          http_code=$(printf '%s\n' "$response" | tail -n 1)
-          body=$(printf '%s\n' "$response" | sed '$d')
-          echo "$body" | head -c 200
-          echo
-          if [ "$curl_exit" != "0" ]; then
-            echo "bootstrap setup curl failed (exit=$curl_exit http=$http_code)"
-            docker compose logs --tail 150 backend
-            docker compose logs --tail 100 frontend
+            -d '{"email":"admin@auraboot.com","password":"Test2026x"}' \
+            | sed -n 's/.*"jwt":"\([^"]*\)".*/\1/p')
+          [ -n "$token" ] || { echo "no token"; exit 1; }
+
+          menus=$(curl -fsS -m 10 -H "Authorization: Bearer $token" \
+            http://localhost:3000/api/menu/user | grep -o '"path"' | wc -l | tr -d ' ')
+          echo "menu entries: $menus"
+          [ "$menus" -ge 20 ] || {
+            echo "the sidebar would be empty or near-empty — plugin import did not land"
+            docker compose logs --tail 100 backend
             exit 1
-          fi
-          if ! printf '%s' "$body" | grep -Eq '"success":true|"code":"0"'; then
-            echo "bootstrap setup did not report success (http=$http_code)"
-            docker compose logs --tail 150 backend
-            docker compose logs --tail 100 frontend
-            exit 1
-          fi
+          }
 
       - name: Login API contract via BFF proxy
         if: steps.changes.outputs.run == 'true'
