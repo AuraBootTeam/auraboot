@@ -192,6 +192,15 @@ export function initBlockRegistry(): void {
     ),
   });
 
+  // Read-only snippet with copy-to-clipboard — record-interpolated embed code
+  // (e.g. the per-form web-form SDK <script>), so embed pages stay DSL-driven.
+  BlockRegistry.register('code-snippet', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/CodeSnippetBlockRenderer'),
+      'CodeSnippetBlockRenderer',
+    ),
+  });
+
   // Generic card grid — used by Template Marketplace gallery and any block
   // that needs a responsive grid of cards with per-card action buttons.
   BlockRegistry.register('card-grid', {

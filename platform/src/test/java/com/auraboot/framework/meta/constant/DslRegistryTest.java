@@ -132,8 +132,14 @@ class DslRegistryTest {
     }
 
     @Test
-    void blockType_has35Values() {
-        assertEquals(35, DslRegistry.BlockType.values().length);
+    void blockTypeCodes_includeCodeSnippet() {
+        assertTrue(DslRegistry.BlockType.codes().contains("code-snippet"),
+                "BlockType must include code-snippet (S-PAGE-BLOCK-TYPE whitelist for embed/snippet pages)");
+    }
+
+    @Test
+    void blockType_has36Values() {
+        assertEquals(36, DslRegistry.BlockType.values().length);
         Set<String> codes = DslRegistry.BlockType.codes();
         assertTrue(codes.containsAll(Set.of(
                 "form", "form-section", "form-buttons", "form-wizard",
