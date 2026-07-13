@@ -17,6 +17,8 @@ on:
       - 'plugins/**/config/pages/**'
       - 'plugins/**/config/commands/**'
       - 'scripts/check-dsl-command-convention.mjs'
+      - 'scripts/check-dsl-render-types.mjs'
+      - 'web-admin/app/framework/meta/runtime/renderers/CellRendererRegistry.tsx'
       - '.github/workflows/dsl-command-convention.yml'
   pull_request:
     branches: [main]
@@ -24,6 +26,8 @@ on:
       - 'plugins/**/config/pages/**'
       - 'plugins/**/config/commands/**'
       - 'scripts/check-dsl-command-convention.mjs'
+      - 'scripts/check-dsl-render-types.mjs'
+      - 'web-admin/app/framework/meta/runtime/renderers/CellRendererRegistry.tsx'
       - '.github/workflows/dsl-command-convention.yml'
   workflow_dispatch:
 
@@ -51,3 +55,6 @@ jobs:
 
       - name: Check DSL pages for redundant convention CRUD commands
         run: node scripts/check-dsl-command-convention.mjs
+
+      - name: Check DSL pages only ask for renderers that exist
+        run: node scripts/check-dsl-render-types.mjs
