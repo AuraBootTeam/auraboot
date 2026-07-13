@@ -656,6 +656,9 @@ describe('ControlledFieldRenderer', () => {
             allowCreate: true,
             createCommand: 'bom:create_project',
             createPermission: 'bom.project.manage',
+            createInitialValues: {
+              bom_project_customer_id: '${form.bom_task_customer_id}',
+            },
             refTarget: {
               modelCode: 'req_requirement_set_pcba_bom',
               displayField: 'bom_project_name',
@@ -673,7 +676,13 @@ describe('ControlledFieldRenderer', () => {
         }
         value={undefined}
         onChange={vi.fn()}
-        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+        context={
+          {
+            locale: 'zh-CN',
+            t: (key: string) => key,
+            form: { bom_task_customer_id: 'customer-pid-1' },
+          } as any
+        }
       />,
     );
 
@@ -691,6 +700,7 @@ describe('ControlledFieldRenderer', () => {
       targetModel: 'req_requirement_set_pcba_bom',
       createCommand: 'bom:create_project',
       displayField: 'bom_project_name',
+      initialValues: { bom_project_customer_id: 'customer-pid-1' },
       executeCommand,
     });
   });
