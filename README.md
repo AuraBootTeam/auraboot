@@ -105,21 +105,28 @@ Multi-channel notifications (email, in-app, webhook), event bus for cross-module
 ```bash
 git clone https://github.com/AuraBootTeam/auraboot.git
 cd auraboot
-docker compose --profile full up --build -d
+docker compose --profile full up --build -d   # 2–4 min cold start
+./scripts/quickstart.sh                       # creates the admin, imports the plugins
 ```
 
-The `full` profile builds and starts PostgreSQL + the Spring Boot backend + the Node BFF/SSR frontend. Cold start takes 2–4 minutes (the backend health check has a 120s start period). Open [http://localhost:3000](http://localhost:3000) and log in:
+The `full` profile starts PostgreSQL + the Spring Boot backend + the Node BFF/SSR frontend. Cold start takes 2–4 minutes (the backend health check has a 120s start period).
+
+**`scripts/quickstart.sh` is not optional.** `docker compose up` starts the services and nothing else: it creates no admin user and imports no plugins. Without this step the login below fails with *"Invalid username or password"*, and even past it the platform has zero models and zero menus. The script is idempotent — run it again any time.
+
+Then open [http://localhost:3000](http://localhost:3000) and log in:
+
+| | |
+|---|---|
+| **Email** | `admin@auraboot.com` |
+| **Password** | `Test2026x` (change immediately on first login) |
+
+You should land on a platform with ~41 models and ~109 menus, including a CRM (`crm_lead`, `crm_account`, `crm_opportunity`, …).
 
 If local PostgreSQL is already using port 5432, keep your local service running and start AuraBoot with a different host port:
 
 ```bash
 POSTGRES_PORT=15432 docker compose --profile full up --build -d
 ```
-
-| | |
-|---|---|
-| **Email** | `admin@auraboot.com` |
-| **Password** | `Test2026x` (change immediately on first login) |
 
 ### Manual Setup
 
