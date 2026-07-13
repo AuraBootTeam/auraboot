@@ -57,6 +57,26 @@ const BROWSER_ONLY_PROXY_HEADERS = new Set([
   'referer',
 ]);
 
+/**
+ * Headers that frame the client's request body on the wire. Every path that reuses
+ * sanitizeHeaders rebuilds the body from the already-parsed `req.body` (axios
+ * re-serializes it; the binary-download and SSE fetches JSON.stringify it), so the
+ * outgoing byte count is ours to declare — the client's is stale by construction.
+ *
+ * Forwarding them lets Content-Length disagree with the bytes actually written, which
+ * desyncs the pooled keep-alive socket to Spring: Tomcat consumes only the declared
+ * number of body bytes and parses the leftovers as the next request line, so an
+ * *unrelated* request on that socket dies with
+ * "Invalid character found in method name [{}...]".
+ *
+ * A body-less POST is enough to trigger it: express.json() turns the empty body into
+ * `{}`, which serializes to 2 bytes while the forwarded `content-length: 0` claims none.
+ *
+ * The multipart path does not go through here — it pipes the raw request stream and so
+ * must keep the client's framing headers.
+ */
+const REQUEST_FRAMING_HEADERS = new Set(['content-length', 'transfer-encoding']);
+
 function toResponseHeaderValue(value: unknown): ResponseHeaderValue | undefined {
   if (typeof value === 'string' || typeof value === 'number') {
     return value;
@@ -613,7 +633,11 @@ export class BffProxyService {
         return;
       }
 
-      if (BROWSER_ONLY_PROXY_HEADERS.has(lowerKey) || lowerKey.startsWith('sec-fetch-')) {
+      if (
+        BROWSER_ONLY_PROXY_HEADERS.has(lowerKey) ||
+        REQUEST_FRAMING_HEADERS.has(lowerKey) ||
+        lowerKey.startsWith('sec-fetch-')
+      ) {
         return;
       }
 
