@@ -71,6 +71,35 @@ describe('ListTable selection column layout', () => {
     expect(truncationWrapper).toHaveAttribute('title', longName);
   });
 
+  it('widens the action column for long labels instead of wrapping them', () => {
+    // Regression (page_schema): "统一设计器" + the "⋮" trigger needed ~130px but the
+    // column was pinned at 112px, so the label wrapped and every row grew to ~65px.
+    const { container } = renderListTable({
+      enableSelection: true,
+      columns: [
+        ...columns,
+        {
+          field: '_actions',
+          label: '操作',
+          isActionColumn: true,
+          buttons: [
+            { code: 'edit_unified', label: '统一设计器' },
+            { code: 'publish', label: '发布' },
+            { code: 'delete', label: '删除' },
+          ],
+        } as any,
+      ],
+    });
+
+    const actionCol = container.querySelectorAll('col')[3];
+    const width = Number(String((actionCol as HTMLElement).style.width).replace('px', ''));
+    expect(width).toBeGreaterThanOrEqual(130);
+
+    const actionCell = screen.getByTestId('table-cell-0-actions');
+    // The cell itself must not wrap either.
+    expect(actionCell).toHaveClass('whitespace-nowrap');
+  });
+
   it('keeps row actions in a stable fixed-width column', () => {
     const { container } = renderListTable({
       enableSelection: true,

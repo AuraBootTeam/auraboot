@@ -29,6 +29,7 @@ import {
 } from '~/framework/smart/types/savedView';
 import { DraggableColumnHeader } from './DraggableColumnHeader';
 import { RowActionButtons } from './RowActionButtons';
+import { estimateActionColumnWidth, partitionRowActions } from './actionColumnWidth';
 import { SummaryRow, hasAnyAggregate } from './SummaryRow';
 import { buildRowTree, flattenVisible, collectAllNodeIds } from './rowTree';
 import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';
@@ -44,7 +45,6 @@ interface DictItem {
 
 const DEFAULT_COLUMN_WIDTH = 160;
 const SELECTION_COLUMN_WIDTH = 40;
-const ACTION_COLUMN_WIDTH = 112;
 // Per-depth left indent (px) for tree rows (T10). Matches the SubTable /
 // TreeView indent feel; the chevron sits within this space.
 const TREE_INDENT_PX = 20;
@@ -206,9 +206,17 @@ export const ListTable = React.memo(function ListTable({
     [orderedDataColumns],
   );
 
-  const actionColumnWidth = actionColumn
-    ? getColumnWidth({ ...actionColumn, width: actionColumn.width ?? ACTION_COLUMN_WIDTH })
-    : 0;
+  // Size the action column to the labels it actually renders. A hard-coded width
+  // silently clipped longer labels ("统一设计器"), which wrapped and inflated every
+  // row. DSL `width` still wins — it is the escape hatch, not the norm.
+  const actionColumnWidth = useMemo(() => {
+    if (!actionColumn) return 0;
+    if (actionColumn.width) return getColumnWidth(actionColumn);
+    const { inline, overflow } = partitionRowActions(actionColumn.buttons ?? []);
+    return estimateActionColumnWidth(inline.map(resolveButtonLabel), {
+      hasOverflow: overflow.length > 0,
+    });
+  }, [actionColumn, resolveButtonLabel]);
 
   const baseTableWidth = useMemo(() => {
     const selectionWidth = enableSelection ? SELECTION_COLUMN_WIDTH : 0;
@@ -704,7 +712,7 @@ export const ListTable = React.memo(function ListTable({
                         {actionColumn && (
                           <td
                             data-testid={`table-cell-${index}-actions`}
-                            className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
+                            className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l whitespace-nowrap shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
                             style={{
                               width: `${actionColumnWidth}px`,
                               maxWidth: `${actionColumnWidth}px`,
@@ -819,7 +827,7 @@ export const ListTable = React.memo(function ListTable({
                         {actionColumn && (
                           <td
                             data-testid={`table-cell-${index}-actions`}
-                            className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
+                            className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l whitespace-nowrap shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
                             style={{
                               width: `${actionColumnWidth}px`,
                               maxWidth: `${actionColumnWidth}px`,
@@ -936,7 +944,7 @@ export const ListTable = React.memo(function ListTable({
                       {actionColumn && (
                         <td
                           data-testid={`table-cell-${index}-actions`}
-                          className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
+                          className={`px-2 ${rowHeightCfg.pyClass} border-border bg-panel group-hover:bg-hover sticky right-0 z-10 border-l whitespace-nowrap shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.2)]`}
                           style={{
                             width: `${actionColumnWidth}px`,
                             maxWidth: `${actionColumnWidth}px`,

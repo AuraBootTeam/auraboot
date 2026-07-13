@@ -240,7 +240,7 @@
         "color": "#faad14",
         "status": "enabled",
         "extension": {
-          "color": "orange"
+          "color": "amber"
         }
       },
       {
@@ -520,7 +520,7 @@
         "color": "#d9d9d9",
         "status": "enabled",
         "extension": {
-          "color": "orange"
+          "color": "amber"
         }
       }
     ]
@@ -630,7 +630,7 @@
         "color": "#d9d9d9",
         "status": "enabled",
         "extension": {
-          "color": "orange"
+          "color": "amber"
         }
       },
       {
@@ -917,7 +917,7 @@
         "color": "#faad14",
         "status": "enabled",
         "extension": {
-          "color": "orange"
+          "color": "amber"
         }
       },
       {

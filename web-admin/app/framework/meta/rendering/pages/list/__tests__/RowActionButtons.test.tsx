@@ -98,4 +98,42 @@ describe('RowActionButtons — More actions dropdown', () => {
     expect(screen.getByTestId('row-action-view')).toBeInTheDocument();
     expect(screen.queryByTestId('row-action-more')).not.toBeInTheDocument();
   });
+
+  it('lays out every `inline: true` button in the row, not just the first', () => {
+    // ux-design-system.md §3 — up to 3 row actions render inline, rest collapse.
+    setup({
+      buttons: [
+        { code: 'view', label: 'View', inline: true } as ButtonConfig,
+        { code: 'edit', label: 'Edit' } as ButtonConfig,
+        { code: 'publish', label: 'Publish', inline: true } as ButtonConfig,
+      ],
+    });
+    expect(screen.getByTestId('row-action-view')).toBeInTheDocument();
+    expect(screen.getByTestId('row-action-publish')).toBeInTheDocument();
+    // The non-opted-in button stays behind the overflow trigger.
+    expect(screen.queryByTestId('row-action-edit')).not.toBeInTheDocument();
+    expect(screen.getByTestId('row-action-more')).toBeInTheDocument();
+  });
+
+  it('drops the overflow trigger when every button is inline', () => {
+    setup({
+      buttons: [
+        { code: 'view', label: 'View', inline: true } as ButtonConfig,
+        { code: 'edit', label: 'Edit', inline: true } as ButtonConfig,
+      ],
+    });
+    expect(screen.getByTestId('row-action-view')).toBeInTheDocument();
+    expect(screen.getByTestId('row-action-edit')).toBeInTheDocument();
+    expect(screen.queryByTestId('row-action-more')).not.toBeInTheDocument();
+  });
+
+  it('makes inline labels physically unable to wrap', () => {
+    // Root cause of the 65px-tall rows: "统一设计器" wrapped onto a second line
+    // inside a 112px column. `truncate` implies whitespace-nowrap, so the worst
+    // case is now an ellipsis, never a taller row.
+    setup({ buttons: [{ code: 'edit_unified', label: '统一设计器' } as ButtonConfig] });
+    const button = screen.getByTestId('row-action-edit_unified');
+    expect(button.className).toContain('truncate');
+    expect(button).toHaveAttribute('title', '统一设计器');
+  });
 });

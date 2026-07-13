@@ -123,6 +123,7 @@ export function ListToolbar({
     !hideSort ||
     !hideColumnSettings ||
     Boolean(hasFilterBlock && onFilterFormToggle) ||
+    !hideFilterChips ||
     !hideQuickFilters ||
     !hideRowHeight;
 
@@ -257,6 +258,27 @@ export function ListToolbar({
                 d="M19 9l-7 7-7-7"
               />
             </svg>
+          </button>
+        )}
+
+        {/* Add-filter entry point. Lives here rather than in FilterChipBar so an
+            unfiltered view does not render an otherwise-empty chip strip. */}
+        {!hideFilterChips && (
+          <button
+            type="button"
+            onClick={(e) => onAddFilter(e)}
+            className="rounded-control border-border text-text-2 hover:bg-hover hover:text-text-2 flex h-9 items-center gap-1.5 border px-3 text-sm font-medium transition-colors"
+            data-testid="add-filter-btn"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6v12m6-6H6"
+              />
+            </svg>
+            {t('common.add_filter', undefined, 'Add Filter')}
           </button>
         )}
 

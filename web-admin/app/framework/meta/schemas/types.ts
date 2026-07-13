@@ -335,6 +335,13 @@ export interface ButtonConfig {
   danger?: boolean;
   variant?: 'default' | 'primary' | 'danger';
   icon?: string;
+  /**
+   * Row actions only — render this button inline in the action column instead of
+   * collapsing it into the "⋮" overflow menu. At most 3 buttons are laid out
+   * inline (ux-design-system.md §3). When no button opts in, the first visible
+   * one is rendered inline, preserving the historical behaviour.
+   */
+  inline?: boolean;
   visibleWhen?: string;
   enableWhen?: string;
   disableWhen?: string;
