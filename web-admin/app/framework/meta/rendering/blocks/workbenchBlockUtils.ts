@@ -126,6 +126,34 @@ function resolveWorkbenchNavigatePath(args: any): string | undefined {
   return `/p/c/${target}`;
 }
 
+function pruneRouteContext(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => pruneRouteContext(item)).filter((item) => item !== undefined);
+  }
+  if (!value || typeof value !== 'object') {
+    if (value === undefined || value === null || value === '') return undefined;
+    return value;
+  }
+
+  const entries = Object.entries(value)
+    .map(([key, child]) => [key, pruneRouteContext(child)] as const)
+    .filter(([, child]) => child !== undefined);
+  if (entries.length === 0) return undefined;
+  return Object.fromEntries(entries);
+}
+
+function appendRouteContext(path: string, context: unknown): string {
+  const routeContext = pruneRouteContext(context);
+  if (routeContext === undefined) return path;
+  if (/^(https?:)?\/\//.test(path) || path.startsWith('/api/')) return path;
+
+  const hashIndex = path.indexOf('#');
+  const base = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
+  const hash = hashIndex >= 0 ? path.slice(hashIndex) : '';
+  const separator = base.includes('?') ? '&' : '?';
+  return `${base}${separator}routeContext=${encodeURIComponent(JSON.stringify(routeContext))}${hash}`;
+}
+
 async function reloadDataSources(runtime: SchemaRuntime, ids: string | string[] | undefined) {
   if (!ids || (Array.isArray(ids) && ids.length === 0)) return;
   const manager = runtime.getDataSourceManager?.();
@@ -391,7 +419,7 @@ export async function executeSimpleWorkbenchAction(
     if (!path) {
       throw new Error('[workbench] navigate requires args.path or args.to');
     }
-    runtime.navigateTo(path);
+    runtime.navigateTo(appendRouteContext(path, args.context));
     return;
   }
 
