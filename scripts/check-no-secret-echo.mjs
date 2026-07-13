@@ -31,6 +31,13 @@ import { fileURLToPath } from 'node:url';
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ALLOW_FILE = join(HERE, 'check-no-secret-echo.allow.json');
 
+// Anchor to the repo this script lives in, NOT to the caller's cwd.
+// `git ls-files` is relative to cwd: invoked from scripts/ it would scan only scripts/ (and the
+// allow-list paths, which are repo-relative, would stop matching → false red); invoked from an
+// outer repo it would scan that repo instead and report a cheerful green having read nothing.
+// A gate whose coverage depends on where you stood when you called it is not a gate.
+const REPO_ROOT = execSync('git rev-parse --show-toplevel', { cwd: HERE, encoding: 'utf8' }).trim();
+
 // A variable is secret-shaped if its name carries one of these words...
 const SECRET_WORD = /(API_?KEY|SECRET_?KEY|ACCESS_?KEY|PRIVATE_?KEY|SECRET|TOKEN|PASSWORD|PASSWD|CREDENTIALS?)/;
 // ...unless the name is plainly *about* the secret rather than being it.
@@ -69,7 +76,7 @@ function varsIn(text) {
 
 function scan(file) {
   const findings = [];
-  readFileSync(file, 'utf8')
+  readFileSync(join(REPO_ROOT, file), 'utf8')
     .split('\n')
     .forEach((raw, i) => {
       const line = raw.replace(/#.*$/, '');
@@ -93,7 +100,9 @@ function scan(file) {
 const allow = existsSync(ALLOW_FILE) ? JSON.parse(readFileSync(ALLOW_FILE, 'utf8')) : { exemptions: [] };
 const exempt = new Map(allow.exemptions.map((e) => [e.file, e.reason]));
 
-const files = execSync("git ls-files -- '*.sh' '*.bash'", { encoding: 'utf8' }).split('\n').filter(Boolean);
+const files = execSync("git ls-files -- '*.sh' '*.bash'", { cwd: REPO_ROOT, encoding: 'utf8' })
+  .split('\n')
+  .filter(Boolean);
 const findings = files.flatMap(scan).filter((f) => !exempt.has(f.file));
 
 if (findings.length === 0) {
