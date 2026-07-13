@@ -39,6 +39,7 @@ export const BLOCK_TYPES = [
   'review-drawer',
   'status-banner',
   'code-snippet',
+  'conversation-panel',
   'custom',
 ] as const;
 
