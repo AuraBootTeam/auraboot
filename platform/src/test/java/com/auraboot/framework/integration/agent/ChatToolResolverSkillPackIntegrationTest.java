@@ -84,13 +84,13 @@ class ChatToolResolverSkillPackIntegrationTest extends BaseIntegrationTest {
                 List.of("crm.lead.list", "dsl.query", "crm.lead.update", "hr.delete_user"),
                 true);
         when(groundingPort.ground(anyLong(), any(), any(), any())).thenReturn(grounding);
-        when(toolDiscoveryPort.discoverTools(anyLong(), any(), any(), any(), anyInt()))
+        when(toolDiscoveryPort.discoverTools(anyLong(), any(), any(), any(), anyInt(), any()))
                 .thenReturn(List.of());
 
         // ChatToolResolver reads MetaContext — seed via ThreadLocal for this call.
         com.auraboot.framework.application.tenant.MetaContext.setCurrentTenantId(tenantId);
         try {
-            resolver.resolveTools("list my leads", "crm_lead", null);
+            resolver.resolveTools("list my leads", "crm_lead", null, null);
         } finally {
             com.auraboot.framework.application.tenant.MetaContext.clear();
         }
@@ -98,7 +98,7 @@ class ChatToolResolverSkillPackIntegrationTest extends BaseIntegrationTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> captor = ArgumentCaptor.forClass(List.class);
         org.mockito.Mockito.verify(toolDiscoveryPort).discoverTools(
-                eq(tenantId), captor.capture(), any(), any(), anyInt());
+                eq(tenantId), captor.capture(), any(), any(), anyInt(), any());
         assertThat(captor.getValue()).containsExactlyInAnyOrder("crm.lead.list", "dsl.query");
     }
 
@@ -110,12 +110,12 @@ class ChatToolResolverSkillPackIntegrationTest extends BaseIntegrationTest {
                 List.of("crm.lead.list", "hr.delete_user"),
                 true);
         when(groundingPort.ground(anyLong(), any(), any(), any())).thenReturn(grounding);
-        when(toolDiscoveryPort.discoverTools(anyLong(), any(), any(), any(), anyInt()))
+        when(toolDiscoveryPort.discoverTools(anyLong(), any(), any(), any(), anyInt(), any()))
                 .thenReturn(List.of());
 
         com.auraboot.framework.application.tenant.MetaContext.setCurrentTenantId(tenantId);
         try {
-            resolver.resolveTools("anything", "crm_lead", null);
+            resolver.resolveTools("anything", "crm_lead", null, null);
         } finally {
             com.auraboot.framework.application.tenant.MetaContext.clear();
         }
@@ -123,7 +123,7 @@ class ChatToolResolverSkillPackIntegrationTest extends BaseIntegrationTest {
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> captor = ArgumentCaptor.forClass(List.class);
         org.mockito.Mockito.verify(toolDiscoveryPort).discoverTools(
-                eq(tenantId), captor.capture(), any(), any(), anyInt());
+                eq(tenantId), captor.capture(), any(), any(), anyInt(), any());
         assertThat(captor.getValue()).containsExactly("crm.lead.list", "hr.delete_user");
     }
 }

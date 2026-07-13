@@ -201,6 +201,15 @@ export function initBlockRegistry(): void {
     ),
   });
 
+  // Live two-way conversation — transcript + SSE stream + reply box. The only block that renders
+  // something arriving on its own, which is why a seat console cannot be a table alone.
+  BlockRegistry.register('conversation-panel', {
+    component: lazy(
+      () => import('~/framework/meta/rendering/blocks/ConversationPanelBlockRenderer'),
+      'ConversationPanelBlockRenderer',
+    ),
+  });
+
   // Generic card grid — used by Template Marketplace gallery and any block
   // that needs a responsive grid of cards with per-card action buttons.
   BlockRegistry.register('card-grid', {

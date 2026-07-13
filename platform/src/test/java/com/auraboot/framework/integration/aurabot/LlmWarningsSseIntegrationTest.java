@@ -132,7 +132,7 @@ class LlmWarningsSseIntegrationTest {
 
         // --- Stub ChatToolResolver / Executor / SessionStore / Trace ---
         ChatToolResolver toolResolver = mock(ChatToolResolver.class);
-        when(toolResolver.resolveTools(any(), any(), any()))
+        when(toolResolver.resolveTools(any(), any(), any(), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
         ChatToolExecutor toolExecutor = mock(ChatToolExecutor.class);
         when(toolExecutor.executeConfirmed(anyString(), any(), any(), any(), any(), any()))
@@ -231,7 +231,7 @@ class LlmWarningsSseIntegrationTest {
         when(llmProviderFactory.getProvider("anthropic")).thenReturn(stubProvider);
 
         ChatToolResolver toolResolver = mock(ChatToolResolver.class);
-        when(toolResolver.resolveTools(any(), any(), any()))
+        when(toolResolver.resolveTools(any(), any(), any(), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
         ChatToolExecutor toolExecutor = mock(ChatToolExecutor.class);
         when(toolExecutor.executeConfirmed(anyString(), any(), any(), any(), any(), any()))

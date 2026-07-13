@@ -186,3 +186,118 @@ describe('CsClient.send — SSE frames', () => {
     expect(h.onDone).toHaveBeenCalledWith('fine');
   });
 });
+
+// ---------------------------------------------------------------------------
+// M2 — asking for a human, and hearing one
+// ---------------------------------------------------------------------------
+
+describe('CsClient.escalate', () => {
+  it('asks for a human without going through the AI', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ state: 'pending_handoff', seatsAvailable: 2 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const client = new CsClient('https://api.example.com', 'csk_1', memoryStorage());
+    await openSession(client, fetchMock);
+
+    const result = await client.escalate('refund on order 12345');
+
+    expect(result).toEqual({ state: 'pending_handoff', seatsAvailable: 2 });
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).toBe('https://api.example.com/api/public/cs/escalate');
+    expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe('Bearer jwt-token');
+    expect(JSON.parse(init.body)).toMatchObject({
+      conversationPid: 'conv-1',
+      reason: 'refund on order 12345',
+    });
+  });
+
+  it('refuses before a session is open rather than posting a request with no identity', async () => {
+    const client = new CsClient('https://api.example.com', 'csk_1', memoryStorage());
+    await expect(client.escalate()).rejects.toThrow('session not open');
+  });
+});
+
+describe('CsClient.listen — hearing a seat', () => {
+  it('🚨 delivers a seat reply the visitor never asked for', async () => {
+    const sse =
+      'event: state\ndata: {"type":"state","state":"human_active"}\n\n' +
+      'event: message\ndata: {"type":"message","seq":4,"senderType":"human",' +
+      '"senderName":"Alice","content":"I can refund that for you."}\n\n';
+
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new CsClient('https://api.example.com', 'csk_1', memoryStorage());
+    await openSession(client, fetchMock);
+    fetchMock.mockImplementation(streamingFetch(sse));
+
+    const messages: any[] = [];
+    const states: any[] = [];
+    const stop = client.listen({
+      onMessage: (m) => messages.push(m),
+      onState: (s) => states.push(s),
+    });
+
+    await vi.waitFor(() => expect(messages).toHaveLength(1));
+    stop();
+
+    expect(states[0].state).toBe('human_active');
+    expect(messages[0]).toMatchObject({
+      seq: 4,
+      senderType: 'human',
+      senderName: 'Alice',
+      content: 'I can refund that for you.',
+    });
+  });
+
+  it('sends the token in a header, never in the URL — it grants access to a person’s history', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new CsClient('https://api.example.com', 'csk_1', memoryStorage());
+    await openSession(client, fetchMock);
+    fetchMock.mockImplementation(streamingFetch(''));
+
+    const stop = client.listen({ onMessage: () => {} });
+    await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(1));
+    stop();
+
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).not.toContain('jwt-token');           // not in the query string
+    expect(url).toContain('conversationPid=conv-1');
+    expect(init.headers.Authorization).toBe('Bearer jwt-token');
+    expect(init.headers.Accept).toBe('text/event-stream');
+  });
+
+  it('stops listening when told to, instead of reconnecting forever', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new CsClient('https://api.example.com', 'csk_1', memoryStorage());
+    await openSession(client, fetchMock);
+    fetchMock.mockImplementation(streamingFetch(''));
+
+    const stop = client.listen({ onMessage: () => {} });
+    await vi.waitFor(() => expect(fetchMock.mock.calls.length).toBeGreaterThan(1));
+    const callsWhenStopped = fetchMock.mock.calls.length;
+    stop();
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fetchMock.mock.calls.length).toBe(callsWhenStopped);
+  });
+});
+
+/** Open a session so the client has a token and a conversation to work with. */
+async function openSession(client: CsClient, fetchMock: any): Promise<void> {
+  fetchMock.mockResolvedValueOnce({
+    ok: true,
+    json: async () => ({
+      visitorToken: 'vt-1',
+      token: 'jwt-token',
+      conversationPid: 'conv-1',
+      handoffEnabled: true,
+    }),
+  });
+  await client.open();
+}

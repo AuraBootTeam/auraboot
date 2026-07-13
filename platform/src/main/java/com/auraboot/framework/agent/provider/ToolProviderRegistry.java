@@ -91,6 +91,30 @@ public class ToolProviderRegistry {
     }
 
     /**
+     * Tools every provider requires to be offered on this turn regardless of what the user said.
+     *
+     * <p>See {@link ToolProvider#discoverAlwaysOn}. Deliberately <b>not</b> limited by
+     * {@code maxResults}: the caller merges these ahead of the discovered tools precisely so they
+     * cannot be truncated away, and a provider that returns a long list here is a provider bug, not
+     * something to silently trim.
+     *
+     * <p>A failing provider is logged and skipped, as in {@link #discoverAll}: one broken provider
+     * must not cost the others their tools.
+     */
+    public List<ToolDefinition> discoverAlwaysOn(ToolDiscoveryContext ctx) {
+        return providers.stream()
+                .flatMap(p -> {
+                    try {
+                        return p.discoverAlwaysOn(ctx).stream();
+                    } catch (Exception e) {
+                        log.warn("Provider {} always-on discovery failed: {}", p.providerCode(), e.getMessage());
+                        return java.util.stream.Stream.empty();
+                    }
+                })
+                .toList();
+    }
+
+    /**
      * Discover tools from a specific provider identified by {@code providerCode}.
      *
      * @param providerCode the provider to query (e.g. {@code "dsl"}, {@code "platform"})
