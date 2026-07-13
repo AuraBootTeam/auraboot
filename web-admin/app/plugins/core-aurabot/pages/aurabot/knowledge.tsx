@@ -383,12 +383,18 @@ function KbForm({
             value={form.embeddingProvider}
             onChange={(e) => {
               const provider = e.target.value;
-              update('embeddingProvider', provider);
-              // Carry the provider's default model across. Leaving the previous provider's model
-              // behind silently produces a "model not found" at the first embed, long after the
-              // dialog is gone.
-              const model = DEFAULT_EMBEDDING_MODELS[provider];
-              if (model) update('embeddingModel', model);
+              // Both fields in ONE update. `update` spreads the current `form` prop, and within a
+              // single handler that prop has not re-rendered — so calling it twice makes the second
+              // call overwrite the first, and the provider silently stays on its old value while
+              // the model changes underneath it.
+              //
+              // Carrying the model across matters: leaving the previous provider's model behind
+              // produces a "model not found" at the first embed, long after the dialog is gone.
+              onChange({
+                ...form,
+                embeddingProvider: provider,
+                embeddingModel: DEFAULT_EMBEDDING_MODELS[provider] ?? form.embeddingModel,
+              });
             }}
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
