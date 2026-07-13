@@ -11,6 +11,7 @@ import com.auraboot.framework.rag.entity.KbDocument;
 import com.auraboot.framework.rag.service.DocumentProcessingService;
 import com.auraboot.framework.rag.service.DocGenerationService;
 import com.auraboot.framework.rag.service.InternalDocImportService;
+import com.auraboot.framework.rag.service.KbUrlIngestService;
 import com.auraboot.framework.rag.service.KnowledgeBaseService;
 import com.auraboot.framework.rag.service.RagRetrievalService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -35,6 +36,7 @@ public class KnowledgeBaseController {
 
     private final KnowledgeBaseService kbService;
     private final DocumentProcessingService docProcessingService;
+    private final KbUrlIngestService urlIngestService;
     private final RagRetrievalService ragRetrievalService;
     private final DocGenerationService docGenerationService;
     private final InternalDocImportService internalDocImportService;
@@ -158,6 +160,40 @@ public class KnowledgeBaseController {
     public ApiResponse<Boolean> deleteDocument(@PathVariable String kbPid,
                                                  @PathVariable String docPid) {
         return ApiResponse.success(kbService.deleteDocument(kbPid, docPid));
+    }
+
+    /**
+     * Add a web page to the knowledge base by URL.
+     *
+     * <p>This makes the backend fetch a URL the caller chose, so it is an SSRF sink: the fetch is
+     * gated by {@code SsrfValidator} and sent with the resolved IP pinned. A rejected URL comes back
+     * as a plain error the user can act on, not a 500.
+     *
+     * <p>One page, fetched now. Crawling a site is the crawler plugin's job.
+     */
+    @PostMapping("/{kbPid}/documents/from-url")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
+    public ApiResponse<KbDocumentDTO> addDocumentFromUrl(@PathVariable String kbPid,
+                                                           @RequestBody Map<String, String> request) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String url = request.get("url");
+
+        String docPid;
+        try {
+            docPid = urlIngestService.ingestUrl(tenantId, kbPid, url);
+        } catch (IllegalArgumentException e) {
+            // The URL was refused (unsafe target, unreachable host, not an HTML page, no text).
+            // This is the user's input being wrong, not the server failing.
+            return ApiResponse.error(e.getMessage());
+        } catch (java.io.IOException e) {
+            log.warn("Fetching {} for kb {} failed: {}", url, kbPid, e.getMessage());
+            return ApiResponse.error("Could not fetch the URL: " + e.getMessage());
+        }
+
+        return ApiResponse.success(kbService.listDocuments(kbPid).stream()
+                .filter(d -> docPid.equals(d.getPid()))
+                .findFirst()
+                .orElse(null));
     }
 
     /**
