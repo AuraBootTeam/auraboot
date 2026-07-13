@@ -316,6 +316,10 @@ describe('ViewManagePanel personal-only release', () => {
       ),
     );
 
+    // The row actions only come back once the rename form has closed, and that happens after
+    // onEditView resolves. Locally the state settles before the next line runs; on a slower machine
+    // it does not, and the copy button is simply not in the DOM yet.
+    await waitFor(() => expect(screen.getByLabelText('复制视图')).toBeInTheDocument());
     fireEvent.click(screen.getByLabelText('复制视图'));
     expect(screen.getByText('复制个人视图')).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('新视图名称'), { target: { value: '我的订单副本' } });
