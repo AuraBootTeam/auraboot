@@ -6114,7 +6114,9 @@ CREATE TABLE IF NOT EXISTS ab_kb_document (
 
     CONSTRAINT chk_doc_type CHECK (doc_type IN ('pdf', 'docx', 'md', 'txt', 'csv', 'html', 'pptx', 'xlsx')),
     CONSTRAINT chk_doc_status CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
-    CONSTRAINT chk_doc_source CHECK (source_type IN ('file', 'entity', 'internal_doc'))
+    -- 'conversation': a FAQ distilled from an IM conversation and published by faq:publish.
+    -- Keep in lockstep with V20260713300000 and with KbTextIngestService.DB_SOURCE_TYPES.
+    CONSTRAINT chk_doc_source CHECK (source_type IN ('file', 'entity', 'internal_doc', 'conversation'))
 );
 CREATE INDEX IF NOT EXISTS idx_kb_doc_kb ON ab_kb_document (kb_id) WHERE deleted_flag = FALSE;
 CREATE INDEX IF NOT EXISTS idx_kb_doc_tenant ON ab_kb_document (tenant_id) WHERE deleted_flag = FALSE;
