@@ -33,7 +33,7 @@ class KnowledgeBaseDocTypeContractTest {
 
     /** Extensions the upload UI offers — keep in step with the accept list in knowledge.$kbPid.tsx. */
     private static final List<String> ACCEPTED_EXTENSIONS =
-            List.of("pdf", "docx", "pptx", "xlsx", "md", "txt", "csv", "html", "png", "jpg", "jpeg", "gif", "webp");
+            List.of("pdf", "docx", "pptx", "xlsx", "ppt", "xls", "md", "txt", "csv", "html", "png", "jpg", "jpeg", "gif", "webp");
 
     @Test
     @DisplayName("every extension the UI offers resolves to a type the parser can actually handle")
@@ -73,10 +73,18 @@ class KnowledgeBaseDocTypeContractTest {
     }
 
     @Test
-    @DisplayName("legacy binary Office formats are rejected (poi-scratchpad is not a dependency)")
-    void legacyBinaryFormatsAreRejected() {
-        assertNull(KnowledgeBaseController.resolveDocType("ppt"));
-        assertNull(KnowledgeBaseController.resolveDocType("xls"));
+    @DisplayName("legacy .ppt and .xls are accepted now that poi-scratchpad is a dependency")
+    void legacyPptAndXlsAreAccepted() {
+        assertEquals("ppt", KnowledgeBaseController.resolveDocType("ppt"));
+        assertEquals("xls", KnowledgeBaseController.resolveDocType("xls"));
+    }
+
+    @Test
+    @DisplayName(".doc is still refused — POI cannot create one, so the parser cannot be tested")
+    void legacyDocIsStillRefused() {
+        // POI reads .doc but cannot write one, so no fixture can be synthesised for it. Shipping an
+        // untested binary parser is worse than a clear rejection at upload: the user would get a
+        // document that ingests, reports completed, and contains whatever HWPF made of it.
         assertNull(KnowledgeBaseController.resolveDocType("doc"));
     }
 

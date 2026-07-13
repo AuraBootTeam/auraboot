@@ -18,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -126,7 +127,32 @@ public class KnowledgeBaseService {
                 new LambdaQueryWrapper<KbDocument>()
                         .eq(KbDocument::getKbId, kbPid)
                         .orderByDesc(KbDocument::getCreatedAt));
-        return docs.stream().map(this::toDocDTO).toList();
+
+        // How many of each document's chunks actually carry a vector.
+        //
+        // A document reports "completed" once its text is chunked and stored — embedding is a
+        // separate, remote step that can fail on every single chunk while the document still goes
+        // green. The user then has a knowledge base that looks perfect and cannot answer anything:
+        // retrieval quietly falls back to keyword matching. The count is what makes that visible.
+        //
+        // Computed on read, never stored: the embedding retry pass repairs failed chunks in the
+        // background, so a column written at ingest time would start lying within minutes.
+        Map<String, Integer> embeddedByDoc = new HashMap<>();
+        jdbcTemplate.query(
+                "SELECT doc_id, COUNT(*) AS embedded FROM ab_kb_chunk "
+                + "WHERE kb_id = ? AND embedding_status = 'completed' GROUP BY doc_id",
+                rs -> {
+                    embeddedByDoc.put(rs.getString("doc_id"), rs.getInt("embedded"));
+                },
+                kbPid);
+
+        return docs.stream()
+                .map(doc -> {
+                    KbDocumentDTO dto = toDocDTO(doc);
+                    dto.setEmbeddedChunkCount(embeddedByDoc.getOrDefault(doc.getPid(), 0));
+                    return dto;
+                })
+                .toList();
     }
 
     public KbDocument createDocument(Long tenantId, Long userId, String kbPid,

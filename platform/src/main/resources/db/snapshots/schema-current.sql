@@ -8376,7 +8376,7 @@ CREATE TABLE public.ab_kb_document (
     process_retry_count integer DEFAULT 0 NOT NULL,
     CONSTRAINT chk_doc_source CHECK (((source_type)::text = ANY ((ARRAY['file'::character varying, 'entity'::character varying, 'internal_doc'::character varying, 'conversation'::character varying])::text[]))),
     CONSTRAINT chk_doc_status CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
-    CONSTRAINT chk_doc_type CHECK (((doc_type)::text = ANY ((ARRAY['pdf'::character varying, 'docx'::character varying, 'md'::character varying, 'txt'::character varying, 'csv'::character varying, 'html'::character varying, 'pptx'::character varying, 'xlsx'::character varying, 'image'::character varying])::text[])))
+    CONSTRAINT chk_doc_type CHECK (((doc_type)::text = ANY ((ARRAY['pdf'::character varying, 'docx'::character varying, 'md'::character varying, 'txt'::character varying, 'csv'::character varying, 'html'::character varying, 'pptx'::character varying, 'xlsx'::character varying, 'image'::character varying, 'ppt'::character varying, 'xls'::character varying])::text[])))
 );
 
 

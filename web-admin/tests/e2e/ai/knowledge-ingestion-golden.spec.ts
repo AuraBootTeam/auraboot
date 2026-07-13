@@ -125,9 +125,18 @@ test.describe('S2 knowledge ingestion — PPTX / XLSX', () => {
     // but the picker filters out is unreachable for the user.
     expect(accept).toContain('.pptx');
     expect(accept).toContain('.xlsx');
-    // Legacy binary formats need poi-scratchpad, which is not a dependency — do not offer them.
-    expect(accept).not.toContain('.ppt,');
-    expect(accept).not.toContain('.xls,');
+
+    // Legacy binary .ppt / .xls are offered too, now that poi-scratchpad is a dependency. They are
+    // what a lot of people actually have on disk, and refusing them was a consequence of a missing
+    // jar, not a product decision.
+    expect(accept).toContain('.ppt,');
+    expect(accept).toContain('.xls,');
+
+    // .doc is still absent, and that is deliberate: POI reads one but cannot create one, so no
+    // fixture can be built and the parser cannot be tested. An untested binary parser would ingest
+    // a document, report completed, and index whatever HWPF made of it.
+    expect(accept).not.toContain('.doc,');
+    expect(accept).not.toContain('.doc"');
 
     await page.screenshot({ path: 'test-results/s2-01-upload-accept.png', fullPage: true });
   });

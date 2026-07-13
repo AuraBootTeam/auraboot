@@ -430,7 +430,14 @@ public class AuraBotChatService {
 
         // --- Trace: render prompt span ---
         SpanContext promptSpan = aiTraceService.startSpan(trace, null, "span", "render_prompt", null);
-        AgentContextBundle contextBundle = buildAgentContextBundle(tenantId, request);
+        List<String> contextWarnings = new ArrayList<>();
+        AgentContextBundle contextBundle = buildAgentContextBundle(tenantId, request, contextWarnings);
+        // A knowledge base that could not be searched is not a detail to log and move on from: the
+        // user is about to read a confident answer that was built without it, and nothing else on
+        // screen would tell them apart.
+        if (!contextWarnings.isEmpty()) {
+            sink.onWarnings(contextWarnings);
+        }
         String systemPrompt = buildSystemPrompt(tenantId, request, effectiveResolved, contextBundle);
         if (bif != null) {
             systemPrompt = systemPrompt + buildBifContextHint(bif);
@@ -573,9 +580,14 @@ public class AuraBotChatService {
     }
 
     private AgentContextBundle buildAgentContextBundle(Long tenantId, ChatRequest request) {
+        return buildAgentContextBundle(tenantId, request, new ArrayList<>());
+    }
+
+    private AgentContextBundle buildAgentContextBundle(Long tenantId, ChatRequest request,
+                                                        List<String> warnings) {
         ChatRequest.PageContext ctx = request != null ? request.getPageContext() : null;
         String modelSchemaText = ctx != null ? buildModelSchemaText(ctx.getModelCode()) : "";
-        String ragContext = request != null ? resolveRagContext(tenantId, request) : "";
+        String ragContext = request != null ? resolveRagContext(tenantId, request, warnings) : "";
         AgentContextBundle contextBundle = contextAssembler.assemble(
                 new AgentContextAssembler.Request(
                         tenantId,
@@ -631,6 +643,14 @@ public class AuraBotChatService {
      * Uses the optional RagContextProvider from the core AI runtime.
      */
     private String resolveRagContext(Long tenantId, ChatRequest request) {
+        return resolveRagContext(tenantId, request, new ArrayList<>());
+    }
+
+    /**
+     * @param warnings collector for a failure the user needs to know about; the caller forwards it
+     *                 to the response sink
+     */
+    private String resolveRagContext(Long tenantId, ChatRequest request, List<String> warnings) {
         if (ragContextProvider == null) return "";
         try {
             List<String> kbIds = request.getKnowledgeBaseIds();
@@ -644,7 +664,14 @@ public class AuraBotChatService {
             String context = ragContextProvider.retrieveContext(tenantId, request.getMessage(), kbIds);
             return context != null ? context : "";
         } catch (Exception e) {
-            log.debug("RAG context resolution failed: {}", e.getMessage());
+            // The turn must survive a broken knowledge base — but the user must not be left thinking
+            // the answer was informed by it. Without this they get a fluent, confident reply built on
+            // nothing, and no way to tell it apart from a real one. log.debug meant even the operator
+            // could not see it.
+            log.warn("RAG context resolution failed for tenant {} — answering without the knowledge "
+                    + "base: {}", tenantId, e.getMessage());
+            warnings.add("The knowledge base could not be searched, so this answer does not use it. "
+                    + "Try again, or check the knowledge base's embedding provider.");
             return "";
         }
     }

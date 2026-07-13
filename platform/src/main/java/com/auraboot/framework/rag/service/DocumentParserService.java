@@ -7,15 +7,23 @@ import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDResources;
 import org.apache.pdfbox.pdmodel.graphics.PDXObject;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.openxml4j.exceptions.NotOfficeXmlFileException;
 import org.apache.poi.common.usermodel.PictureType;
+import org.apache.poi.hslf.usermodel.HSLFNotes;
+import org.apache.poi.hslf.usermodel.HSLFShape;
+import org.apache.poi.hslf.usermodel.HSLFSlide;
+import org.apache.poi.hslf.usermodel.HSLFSlideShow;
+import org.apache.poi.hslf.usermodel.HSLFTextShape;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.ooxml.POIXMLException;
 import org.apache.poi.sl.usermodel.Placeholder;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xslf.usermodel.XSLFNotes;
 import org.apache.poi.xslf.usermodel.XSLFPictureData;
@@ -58,8 +66,10 @@ import java.util.Set;
  * file entity is a remote object key, not something {@code FileInputStream} can open. Callers
  * obtain the stream from {@code StorageProvider.download(key)}.
  *
- * <p>Legacy binary formats ({@code .ppt}, {@code .xls}, {@code .doc}) are <b>not</b> supported —
- * they need {@code poi-scratchpad}, which is not on the classpath. Only OOXML is accepted.
+ * <p>Legacy binary {@code .ppt} and {@code .xls} are supported (poi-scratchpad). {@code .doc} is
+ * not: POI can read one but cannot create one, so there is no way to build a fixture for it, and an
+ * untested binary parser is worse than a clear rejection at upload. Hand us a real .doc and it is a
+ * few minutes' work.
  */
 @Slf4j
 @Service
@@ -74,7 +84,7 @@ public class DocumentParserService {
      * indexed. {@link #parse} says so explicitly rather than letting it fall through.
      */
     public static final Set<String> SUPPORTED_DOC_TYPES =
-            Set.of("pdf", "docx", "pptx", "xlsx", "md", "txt", "csv", "html", "image");
+            Set.of("pdf", "docx", "pptx", "xlsx", "ppt", "xls", "md", "txt", "csv", "html", "image");
 
     /** A picture found inside a document — typically the chart the slide is actually about. */
     public record EmbeddedImage(String mediaType, byte[] data, String location) {}
@@ -92,6 +102,9 @@ public class DocumentParserService {
 
     /** A hard ceiling on vision calls per document — each one is a paid, multi-second round trip. */
     private static final int MAX_EMBEDDED_IMAGES = 20;
+
+    /** Pages of a scan we will rasterise and read. Beyond this a document is a book, not a file. */
+    private static final int MAX_RENDERED_PDF_PAGES = 10;
 
     /**
      * Pull the pictures out of a document, so a caller with a vision model can read them.
@@ -129,6 +142,8 @@ public class DocumentParserService {
             case "docx" -> parseDocx(content);
             case "pptx" -> parsePptx(content);
             case "xlsx" -> parseXlsx(content);
+            case "ppt" -> parsePpt(content);
+            case "xls" -> parseXls(content);
             case "md", "txt", "csv" -> new String(content.readAllBytes(), StandardCharsets.UTF_8);
             case "html" -> parseHtml(new String(content.readAllBytes(), StandardCharsets.UTF_8));
             case "image" -> throw new IllegalArgumentException(
@@ -237,29 +252,80 @@ public class DocumentParserService {
      */
     private String parseXlsx(InputStream content) throws IOException {
         try (XSSFWorkbook workbook = new XSSFWorkbook(content)) {
-            DataFormatter formatter = new DataFormatter();
-            StringBuilder sb = new StringBuilder();
+            return parseWorkbook(workbook);
+        } catch (NotOfficeXmlFileException | POIXMLException e) {
+            throw new IOException("Failed to parse XLSX", e);
+        }
+    }
 
-            for (Sheet sheet : workbook) {
-                sb.append("# Sheet: ").append(sheet.getSheetName()).append('\n');
-                for (Row row : sheet) {
-                    StringBuilder line = new StringBuilder();
-                    for (Cell cell : row) {
-                        String value = formatter.formatCellValue(cell);
-                        if (!value.isBlank()) {
-                            if (!line.isEmpty()) {
-                                line.append('\t');
-                            }
-                            line.append(value.strip());
+    /** The Excel 97 binary format. Same shape once POI has it open — Sheet/Row/Cell are shared. */
+    private String parseXls(InputStream content) throws IOException {
+        try (HSSFWorkbook workbook = new HSSFWorkbook(content)) {
+            return parseWorkbook(workbook);
+        }
+    }
+
+    /**
+     * Flatten a workbook to text. Each sheet's rows are prefixed with the sheet name so a chunk torn
+     * out of the middle of a large sheet still carries the context of where it came from.
+     */
+    private String parseWorkbook(Workbook workbook) {
+        DataFormatter formatter = new DataFormatter();
+        StringBuilder sb = new StringBuilder();
+
+        for (Sheet sheet : workbook) {
+            sb.append("# Sheet: ").append(sheet.getSheetName()).append('\n');
+            for (Row row : sheet) {
+                StringBuilder line = new StringBuilder();
+                for (Cell cell : row) {
+                    String value = formatter.formatCellValue(cell);
+                    if (!value.isBlank()) {
+                        if (!line.isEmpty()) {
+                            line.append('\t');
+                        }
+                        line.append(value.strip());
+                    }
+                }
+                appendLine(sb, line.toString());
+            }
+            sb.append('\n');
+        }
+        return sb.toString();
+    }
+
+    /**
+     * The PowerPoint 97 binary format. Same idea as the OOXML path — slide text plus speaker notes —
+     * but a different object model: HSLF, not XSLF.
+     */
+    private String parsePpt(InputStream content) throws IOException {
+        try (HSLFSlideShow ppt = new HSLFSlideShow(content)) {
+            StringBuilder sb = new StringBuilder();
+            int slideNo = 0;
+            for (HSLFSlide slide : ppt.getSlides()) {
+                slideNo++;
+                sb.append("# Slide ").append(slideNo).append('\n');
+
+                for (HSLFShape shape : slide.getShapes()) {
+                    if (shape instanceof HSLFTextShape textShape) {
+                        appendLine(sb, textShape.getText());
+                    }
+                }
+
+                HSLFNotes notes = slide.getNotes();
+                if (notes != null) {
+                    StringBuilder notesText = new StringBuilder();
+                    for (HSLFShape shape : notes.getShapes()) {
+                        if (shape instanceof HSLFTextShape textShape) {
+                            appendLine(notesText, textShape.getText());
                         }
                     }
-                    appendLine(sb, line.toString());
+                    if (!notesText.isEmpty()) {
+                        sb.append("Notes: ").append(notesText);
+                    }
                 }
                 sb.append('\n');
             }
             return sb.toString();
-        } catch (NotOfficeXmlFileException | POIXMLException e) {
-            throw new IOException("Failed to parse XLSX", e);
         }
     }
 
@@ -375,39 +441,78 @@ public class DocumentParserService {
 
     private List<EmbeddedImage> pdfImages(InputStream content) throws IOException {
         try (PDDocument doc = PDDocument.load(content)) {
-            List<EmbeddedImage> images = new ArrayList<>();
-            int pageNo = 0;
-            for (PDPage page : doc.getPages()) {
-                pageNo++;
-                PDResources resources = page.getResources();
-                if (resources == null) {
+            List<EmbeddedImage> images = collectPdfXObjectImages(doc);
+            if (!images.isEmpty()) {
+                return images;
+            }
+
+            // Nothing is embedded as an XObject. If the document has no text layer either, it is a
+            // scan: the page *is* the content — drawn as inline image data or vector strokes that no
+            // extraction reaches. Render the pages and let the vision model read them, which is the
+            // only thing that turns a photographed invoice into something searchable.
+            //
+            // Rendering is expensive, so it happens only here, when there is provably nothing else.
+            if (!new PDFTextStripper().getText(doc).isBlank()) {
+                return images;  // an ordinary text PDF that simply has no pictures
+            }
+            return renderPdfPages(doc);
+        }
+    }
+
+    /** Rasterise the pages of a scan so a vision model can read them. */
+    private List<EmbeddedImage> renderPdfPages(PDDocument doc) throws IOException {
+        PDFRenderer renderer = new PDFRenderer(doc);
+        List<EmbeddedImage> pages = new ArrayList<>();
+
+        int limit = Math.min(doc.getNumberOfPages(), MAX_RENDERED_PDF_PAGES);
+        for (int i = 0; i < limit; i++) {
+            ByteArrayOutputStream png = new ByteArrayOutputStream();
+            // 150 DPI: enough for a model to read body text, without producing megabytes per page.
+            if (!ImageIO.write(renderer.renderImageWithDPI(i, 150), "png", png)) {
+                continue;
+            }
+            pages.add(new EmbeddedImage("image/png", png.toByteArray(), "Page " + (i + 1)));
+        }
+        if (doc.getNumberOfPages() > limit) {
+            log.info("Scanned PDF has {} pages — reading the first {}",
+                    doc.getNumberOfPages(), limit);
+        }
+        return pages;
+    }
+
+    private List<EmbeddedImage> collectPdfXObjectImages(PDDocument doc) throws IOException {
+        List<EmbeddedImage> images = new ArrayList<>();
+        int pageNo = 0;
+        for (PDPage page : doc.getPages()) {
+            pageNo++;
+            PDResources resources = page.getResources();
+            if (resources == null) {
+                continue;
+            }
+            for (COSName name : resources.getXObjectNames()) {
+                PDXObject xObject;
+                try {
+                    xObject = resources.getXObject(name);
+                } catch (IOException e) {
+                    log.debug("Skipping unreadable XObject on page {}: {}", pageNo, e.getMessage());
                     continue;
                 }
-                for (COSName name : resources.getXObjectNames()) {
-                    PDXObject xObject;
-                    try {
-                        xObject = resources.getXObject(name);
-                    } catch (IOException e) {
-                        log.debug("Skipping unreadable XObject on page {}: {}", pageNo, e.getMessage());
-                        continue;
-                    }
-                    if (!(xObject instanceof PDImageXObject image)) {
-                        continue;
-                    }
-                    // A PDF image is a raw raster in the file's own colour space, not a PNG — it has
-                    // to be re-encoded before a vision API will take it.
-                    ByteArrayOutputStream png = new ByteArrayOutputStream();
-                    if (!ImageIO.write(image.getImage(), "png", png)) {
-                        continue;
-                    }
-                    addIfWorthReading(images, "image/png", png.toByteArray(), "Page " + pageNo);
-                    if (images.size() >= MAX_EMBEDDED_IMAGES) {
-                        return images;
-                    }
+                if (!(xObject instanceof PDImageXObject image)) {
+                    continue;
+                }
+                // A PDF image is a raw raster in the file's own colour space, not a PNG — it has
+                // to be re-encoded before a vision API will take it.
+                ByteArrayOutputStream png = new ByteArrayOutputStream();
+                if (!ImageIO.write(image.getImage(), "png", png)) {
+                    continue;
+                }
+                addIfWorthReading(images, "image/png", png.toByteArray(), "Page " + pageNo);
+                if (images.size() >= MAX_EMBEDDED_IMAGES) {
+                    return images;
                 }
             }
-            return images;
         }
+        return images;
     }
 
     /** Keep a picture only if a vision model can read it and it is big enough to be content. */
