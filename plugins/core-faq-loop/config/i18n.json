@@ -1,25 +1,191 @@
 [
-  { "key": "model.faq_candidate._meta.label", "zh-CN": "FAQ 候选", "en-US": "FAQ Candidate", "source": "import", "refType": "model" },
-  { "key": "model.faq_candidate.faq_question.label", "zh-CN": "问题", "en-US": "Question", "source": "import", "refType": "field" },
-  { "key": "model.faq_candidate.faq_answer.label", "zh-CN": "答案", "en-US": "Answer", "source": "import", "refType": "field" },
-  { "key": "model.faq_candidate.faq_confidence.label", "zh-CN": "置信度", "en-US": "Confidence", "source": "import", "refType": "field" },
-  { "key": "model.faq_candidate.faq_status.label", "zh-CN": "状态", "en-US": "Status", "source": "import", "refType": "field" },
-  { "key": "model.faq_candidate.faq_source_conversation_pid.label", "zh-CN": "来源会话", "en-US": "Source Conversation", "source": "import", "refType": "field" },
-  { "key": "model.faq_candidate.faq_source_seq_range.label", "zh-CN": "来源消息区间", "en-US": "Source Message Range", "source": "import", "refType": "field" },
-  { "key": "model.faq_candidate.faq_target_kb_id.label", "zh-CN": "目标知识库", "en-US": "Target Knowledge Base", "source": "import", "refType": "field" },
-  { "key": "model.faq_candidate.faq_kb_document_pid.label", "zh-CN": "知识库文档", "en-US": "KB Document", "source": "import", "refType": "field" },
-  { "key": "model.faq_candidate.faq_reviewed_by.label", "zh-CN": "审核人", "en-US": "Reviewed By", "source": "import", "refType": "field" },
-  { "key": "model.faq_candidate.faq_reviewed_at.label", "zh-CN": "审核时间", "en-US": "Reviewed At", "source": "import", "refType": "field" },
-  { "key": "model.faq_candidate.faq_reject_reason.label", "zh-CN": "驳回原因", "en-US": "Reject Reason", "source": "import", "refType": "field" },
-
-  { "key": "faq.action.update_qa", "zh-CN": "编辑问答", "en-US": "Edit Q&A", "source": "import", "refType": "action" },
-  { "key": "faq.action.approve", "zh-CN": "批准", "en-US": "Approve", "source": "import", "refType": "action" },
-  { "key": "faq.action.reject", "zh-CN": "驳回", "en-US": "Reject", "source": "import", "refType": "action" },
-  { "key": "faq.action.publish", "zh-CN": "发布到知识库", "en-US": "Publish to Knowledge Base", "source": "import", "refType": "action" },
-  { "key": "faq.action.extract", "zh-CN": "提炼 FAQ", "en-US": "Distil FAQ", "source": "import", "refType": "action" },
-
-  { "key": "faq.candidate.publish.confirm", "zh-CN": "确认将该问答发布到知识库？发布后智能体检索时即可召回。", "en-US": "Publish this Q&A into the knowledge base? The agent will start recalling it.", "source": "import", "refType": "action" },
-  { "key": "faq.candidate.reject.confirm", "zh-CN": "确认驳回该候选？驳回后不会写入知识库。", "en-US": "Reject this candidate? It will never be written to the knowledge base.", "source": "import", "refType": "action" },
-  { "key": "faq.candidate.extract.empty", "zh-CN": "该会话中没有可复用的问答对。", "en-US": "This conversation contains no reusable Q&A pair.", "source": "import", "refType": "action" },
-  { "key": "faq.candidate.extract.done", "zh-CN": "已从会话中提炼出 {count} 条 FAQ 候选，请在审核台确认。", "en-US": "Distilled {count} FAQ candidate(s) from the conversation — review them in the FAQ Review console.", "source": "import", "refType": "action" }
+  {
+    "key": "model.faq_candidate._meta.label",
+    "zh-CN": "FAQ 候选",
+    "en-US": "FAQ Candidate",
+    "source": "import",
+    "refType": "model"
+  },
+  {
+    "key": "model.faq_candidate.faq_question.label",
+    "zh-CN": "问题",
+    "en-US": "Question",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_candidate.faq_answer.label",
+    "zh-CN": "答案",
+    "en-US": "Answer",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_candidate.faq_confidence.label",
+    "zh-CN": "置信度",
+    "en-US": "Confidence",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_candidate.faq_status.label",
+    "zh-CN": "状态",
+    "en-US": "Status",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_candidate.faq_source_conversation_pid.label",
+    "zh-CN": "来源会话",
+    "en-US": "Source Conversation",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_candidate.faq_source_seq_range.label",
+    "zh-CN": "来源消息区间",
+    "en-US": "Source Message Range",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_candidate.faq_target_kb_id.label",
+    "zh-CN": "目标知识库",
+    "en-US": "Target Knowledge Base",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_candidate.faq_kb_document_pid.label",
+    "zh-CN": "知识库文档",
+    "en-US": "KB Document",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_candidate.faq_reviewed_by.label",
+    "zh-CN": "审核人",
+    "en-US": "Reviewed By",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_candidate.faq_reviewed_at.label",
+    "zh-CN": "审核时间",
+    "en-US": "Reviewed At",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_candidate.faq_reject_reason.label",
+    "zh-CN": "驳回原因",
+    "en-US": "Reject Reason",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "faq.action.update_qa",
+    "zh-CN": "编辑问答",
+    "en-US": "Edit Q&A",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "faq.action.approve",
+    "zh-CN": "批准",
+    "en-US": "Approve",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "faq.action.reject",
+    "zh-CN": "驳回",
+    "en-US": "Reject",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "faq.action.publish",
+    "zh-CN": "发布到知识库",
+    "en-US": "Publish to Knowledge Base",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "faq.action.extract",
+    "zh-CN": "提炼 FAQ",
+    "en-US": "Distil FAQ",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "faq.candidate.publish.confirm",
+    "zh-CN": "确认将该问答发布到知识库？发布后智能体检索时即可召回。",
+    "en-US": "Publish this Q&A into the knowledge base? The agent will start recalling it.",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "faq.candidate.reject.confirm",
+    "zh-CN": "确认驳回该候选？驳回后不会写入知识库。",
+    "en-US": "Reject this candidate? It will never be written to the knowledge base.",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "faq.candidate.extract.empty",
+    "zh-CN": "该会话中没有可复用的问答对。",
+    "en-US": "This conversation contains no reusable Q&A pair.",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "faq.candidate.extract.done",
+    "zh-CN": "已从会话中提炼出 {count} 条 FAQ 候选，请在审核台确认。",
+    "en-US": "Distilled {count} FAQ candidate(s) from the conversation — review them in the FAQ Review console.",
+    "source": "import",
+    "refType": "action"
+  },
+  {
+    "key": "model.faq_source_conversation._meta.label",
+    "zh-CN": "可提炼会话",
+    "en-US": "Distillable Conversation",
+    "source": "import",
+    "refType": "model"
+  },
+  {
+    "key": "model.faq_source_conversation.faq_conv_name.label",
+    "zh-CN": "会话",
+    "en-US": "Conversation",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_source_conversation.faq_conv_type.label",
+    "zh-CN": "类型",
+    "en-US": "Type",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_source_conversation.faq_conv_message_count.label",
+    "zh-CN": "消息数",
+    "en-US": "Messages",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_source_conversation.faq_conv_last_message_at.label",
+    "zh-CN": "最后活动",
+    "en-US": "Last Activity",
+    "source": "import",
+    "refType": "field"
+  },
+  {
+    "key": "model.faq_source_conversation.faq_conv_candidate_count.label",
+    "zh-CN": "已提炼",
+    "en-US": "Distilled",
+    "source": "import",
+    "refType": "field"
+  }
 ]
