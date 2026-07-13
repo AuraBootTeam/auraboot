@@ -127,3 +127,23 @@ describe('StatusDot — icon mode (category dims like lead source)', () => {
     expect(container.querySelector('svg')).toBeFalsy();
   });
 });
+
+describe('CellRendererRegistry rating renderer', () => {
+  it('renders a numeric rating as filled stars out of five', () => {
+    const result = cellRendererRegistry.render('rating', {
+      value: 3,
+      record: {},
+      column: { field: 'score', valueType: 'rating' },
+      locale: 'en-US',
+      t: (key) => key,
+    });
+    const { container } = render(<>{result}</>);
+    const stars = container.querySelectorAll('svg');
+    expect(stars).toHaveLength(5);
+    const filled = [...stars].filter((s) =>
+      (s.getAttribute('class') || '').includes('fill-amber-500'),
+    ).length;
+    expect(filled).toBe(3);
+    expect(container.querySelector('[aria-label="3/5"]')).toBeTruthy();
+  });
+});

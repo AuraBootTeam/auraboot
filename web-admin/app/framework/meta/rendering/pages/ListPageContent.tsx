@@ -386,6 +386,49 @@ export function resolveFieldMetaDataType(
   );
 }
 
+/**
+ * A field's visual control lives in `extension.renderComponent` (colorpicker / progress /
+ * rating / moneyinput / ...), NOT in its dataType. List cell-type resolution used to ignore
+ * it, so those columns fell back to raw text/number. Surface it so the cell renderer can
+ * pick the right presentation. Mirrors the designer's `platformTablePreview.inferColumnValueType`.
+ */
+export function resolveFieldMetaRenderComponent(
+  fieldCode: string,
+  modelFieldMap: Map<string, any> | undefined,
+): string | undefined {
+  if (!fieldCode || !modelFieldMap) return undefined;
+  const meta = modelFieldMap.get(fieldCode);
+  if (!meta) return undefined;
+  const raw =
+    meta.extension?.renderComponent ??
+    meta.renderComponent ??
+    meta.extension?.component ??
+    meta.uiSchema?.component;
+  return typeof raw === 'string' && raw.trim() ? raw.trim().toLowerCase() : undefined;
+}
+
+/** Map a renderComponent / DSL renderType to a list cell valueType (undefined = no override). */
+export function renderComponentToValueType(
+  component: string | undefined,
+): ColumnConfig['valueType'] | undefined {
+  switch (component) {
+    case 'colorpicker':
+    case 'color':
+      return 'color';
+    case 'progress':
+    case 'progressfield':
+      return 'progress';
+    case 'rating':
+    case 'ratingfield':
+      return 'rating';
+    case 'moneyinput':
+    case 'money':
+      return 'currency';
+    default:
+      return undefined;
+  }
+}
+
 export function resolveColumnCapabilityDataType(
   column: { field?: string; dataType?: unknown; valueType?: unknown; sorter?: unknown },
   modelFieldMap: Map<string, any> | undefined,
@@ -2270,6 +2313,19 @@ function ListPageContentInner(props: PageContentProps) {
         return column.valueType;
       }
       const field = column.field || '';
+      // renderComponent-driven visual type (colorpicker/progress/rating/money): the field's
+      // control comes from extension.renderComponent, not its dataType, so the name-suffix
+      // heuristics below miss it. Also honor the DSL column `renderType` key as a fallback.
+      const byRenderComponent =
+        renderComponentToValueType(resolveFieldMetaRenderComponent(field, modelFieldMap)) ??
+        renderComponentToValueType(
+          typeof (column as any).renderType === 'string'
+            ? (column as any).renderType.toLowerCase()
+            : undefined,
+        );
+      if (byRenderComponent) {
+        return byRenderComponent;
+      }
       // REFERENCE field: either ends with _id, or has a {field}_display sibling in the record
       if (field.endsWith('_id') || (record && record[`${field}_display`] !== undefined)) {
         return 'reference';
@@ -2292,7 +2348,7 @@ function ListPageContentInner(props: PageContentProps) {
       }
       return undefined;
     },
-    [],
+    [modelFieldMap],
   );
 
   // Render cell content using CellRendererRegistry

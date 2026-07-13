@@ -244,6 +244,7 @@ export interface ColumnConfig {
     | 'currency'
     | 'tag'
     | 'progress'
+    | 'rating'
     | 'image'
     | 'user_identity'
     | 'reference'

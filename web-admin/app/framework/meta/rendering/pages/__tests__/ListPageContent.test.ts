@@ -7,9 +7,11 @@ import {
   findPersonalPresetSavedView,
   getListFieldValueWithAlias,
   pruneNoopViewConfigPatch,
+  renderComponentToValueType,
   resolveColumnCapabilityDataType,
   resolveFieldMetaDataType,
   resolveFieldMetaDisplayName,
+  resolveFieldMetaRenderComponent,
   resolveListSystemReferenceDisplayConfig,
   resolveListSavedViewPageKey,
   resolveListMiscBlocksPosition,
@@ -18,6 +20,33 @@ import {
   shouldSkipModelFieldMeta,
   useRestoreSavedViewFromUrl,
 } from '../ListPageContent';
+
+describe('renderComponentToValueType', () => {
+  it('maps renderComponent (and DSL renderType) to a list cell valueType', () => {
+    expect(renderComponentToValueType('colorpicker')).toBe('color');
+    expect(renderComponentToValueType('progress')).toBe('progress');
+    expect(renderComponentToValueType('rating')).toBe('rating');
+    expect(renderComponentToValueType('moneyinput')).toBe('currency');
+    expect(renderComponentToValueType('input')).toBeUndefined();
+    expect(renderComponentToValueType(undefined)).toBeUndefined();
+  });
+});
+
+describe('resolveFieldMetaRenderComponent', () => {
+  it('reads extension.renderComponent from the field-meta map, normalized to lower case', () => {
+    const map = new Map<string, any>([
+      [
+        'sc_color',
+        { code: 'sc_color', dataType: 'string', extension: { renderComponent: 'ColorPicker' } },
+      ],
+      ['sc_name', { code: 'sc_name', dataType: 'string' }],
+    ]);
+    expect(resolveFieldMetaRenderComponent('sc_color', map)).toBe('colorpicker');
+    expect(resolveFieldMetaRenderComponent('sc_name', map)).toBeUndefined();
+    expect(resolveFieldMetaRenderComponent('missing', map)).toBeUndefined();
+    expect(resolveFieldMetaRenderComponent('sc_color', undefined)).toBeUndefined();
+  });
+});
 
 describe('getListFieldValueWithAlias', () => {
   it('reads camelCase API fields for snake_case DSL table columns', () => {
