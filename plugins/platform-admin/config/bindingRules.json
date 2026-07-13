@@ -1,5 +1,12 @@
 [
   {
+    "commandCode": "admin:create_member",
+    "ruleType": "handler",
+    "handlerClass": "tenantMemberCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
     "commandCode": "admin:approve_member",
     "ruleType": "handler",
     "handlerClass": "tenantMemberCommandHandler",

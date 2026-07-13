@@ -3,6 +3,8 @@ package com.auraboot.framework.tenant.service;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.tenant.dto.MemberQueryRequest;
 import com.auraboot.framework.tenant.dto.MemberResponse;
+import com.auraboot.framework.tenant.dto.TenantMemberCreateRequest;
+import com.auraboot.framework.tenant.dto.TenantMemberCreateResult;
 import com.auraboot.framework.tenant.dto.TenantMemberImportResult;
 import com.auraboot.framework.tenant.dto.TenantMemberImportRow;
 import org.springframework.core.io.Resource;
@@ -76,6 +78,21 @@ public interface TenantMemberApplicationService {
      * Reset a member password using the administrator-managed temporary password flow.
      */
     String resetMemberPasswordByAdmin(String memberPid, Long userId);
+
+    /**
+     * Create a tenant member directly — the admin-creates-an-account path.
+     *
+     * <p>Creates the {@code User} if the email is new, adds the tenant member as
+     * ACTIVE, and grants the requested roles. Idempotency is deliberately NOT
+     * offered: a second call with the same email fails rather than silently
+     * rebinding somebody, because "create a user" is not an operation anyone
+     * should be able to run twice by accident.
+     *
+     * @param request  name + email required; password and roles optional
+     * @param operatorId the admin performing this
+     * @return the member, and the password they can log in with
+     */
+    TenantMemberCreateResult createMember(TenantMemberCreateRequest request, Long operatorId);
 
     /**
      * Get team memberships for a specific member
