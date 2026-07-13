@@ -59,18 +59,34 @@ test.describe('Conversation → FAQ loop — menu reachability and the remaining
   test.setTimeout(120_000);
 
   test('P1 every FAQ menu entry opens its page from the sidebar', async ({ page }) => {
-    const errors = captureConsole(page);
+    // Let the first paint settle before listening. Vite's first-load dependency optimize can
+    // briefly serve two copies of React and spray "Invalid hook call" — a dev-server artifact that
+    // has nothing to do with what this test is about, which is whether the menu goes anywhere.
     await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle').catch(() => null);
 
-    // The group has to expand before its children are clickable.
-    await page.getByText('知识闭环', { exact: false }).first().click();
+    const errors = captureConsole(page);
+
+    // Scope to the sidebar. The home page also renders shortcut cards pointing at the same routes,
+    // so an unscoped by-name lookup finds three of each — and a shortcut card working proves
+    // nothing about menu reachability. This test is about the menu, so it clicks the menu.
+    const sidebar = page.locator('nav').filter({ hasText: '知识闭环' }).first();
+
+    // The group renders expanded. Only toggle it if it is not — an unconditional click *collapses*
+    // it, which leaves the links in the DOM but clipped by the scroll container, and then every
+    // click on them is swallowed by the nav.
+    const firstLink = sidebar.getByRole('link', { name: '可提炼会话' });
+    if (!(await firstLink.isVisible().catch(() => false))) {
+      await sidebar.getByRole('button', { name: /知识闭环/ }).click();
+      await expect(firstLink, 'the menu group expands').toBeVisible({ timeout: 10000 });
+    }
 
     for (const [label, expected] of [
       ['可提炼会话', /可提炼会话|Distillable/],
       ['FAQ 审核台', /FAQ 审核台|FAQ Review/],
       ['FAQ 候选', /FAQ 候选|FAQ Candidate/],
     ] as const) {
-      await page.getByRole('link', { name: label }).click();
+      await sidebar.getByRole('link', { name: label }).click();
       // The page must actually render its own content — a menu path pointing at /p/{key} for a
       // standalone page resolves as a model, appends _list, and lands on "Page not found".
       await expect(main(page), `${label} renders its page`).toContainText(expected, {
@@ -141,7 +157,22 @@ test.describe('Conversation → FAQ loop — menu reachability and the remaining
     expect(draft, 'a draft candidate to open').toBeTruthy();
     const pid = draft!.pid as string;
 
-    await page.goto(`/p/faq_candidate/view/${pid}`, { waitUntil: 'domcontentloaded' });
+    // Reach the detail page the way a user does — by clicking the row's 详情 action, not by typing
+    // its URL. A detail page that only opens when you already know its URL is not reachable.
+    //
+    // The row is located by its text, not by pid: a kind:list page renders through ListTable,
+    // which keys rows by DOM *index* (table-row-0, table-row-1), while a table block inside a
+    // kind:detail page renders through TableBlockRenderer, which keys them by pid. Same testid
+    // prefix, different identity — a locator written for one silently finds nothing on the other.
+    const listRow = page
+      .locator('[data-testid^="table-row-"]')
+      .filter({ hasText: String(draft!.faq_question).slice(0, 10) });
+    await expect(listRow, 'the candidate is in the list').toHaveCount(1);
+    await listRow.getByTestId('row-action-view').click();
+    await expect(page, 'the list row navigates to the detail page').toHaveURL(
+      new RegExp(`/p/faq_candidate.*${pid}`),
+      { timeout: 15000 },
+    );
 
     // Provenance and review fields must render — the detail page is the only place that shows the
     // full answer and where it came from.
