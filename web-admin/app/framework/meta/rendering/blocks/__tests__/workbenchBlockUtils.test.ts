@@ -87,6 +87,30 @@ describe('workbenchBlockUtils action runner', () => {
     expect(navigateTo).toHaveBeenNthCalledWith(2, '/p/c/iot_remote_diagnosis_workbench');
   });
 
+  it('encodes resolved navigate context as routeContext query state', async () => {
+    const navigateTo = vi.fn();
+    const runtime = makeRuntime({ navigateTo }) as any;
+
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'navigate',
+      args: {
+        to: 'iot_remote_diagnosis_workbench',
+        context: {
+          source: 'FLEET',
+          deviceCode: '${state.selectedLine.pid}',
+          emptyValue: '',
+        },
+      },
+    });
+
+    const target = new URL(navigateTo.mock.calls[0][0], 'http://auraboot.local');
+    expect(target.pathname).toBe('/p/c/iot_remote_diagnosis_workbench');
+    expect(JSON.parse(target.searchParams.get('routeContext') || '{}')).toEqual({
+      source: 'FLEET',
+      deviceCode: 'LINE-1',
+    });
+  });
+
   it('notifies data source dependents after writing runtime state', () => {
     const runtime = makeRuntime() as any;
 
