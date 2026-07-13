@@ -107,10 +107,14 @@ public class CloudConfigSeeder {
                     "{\"displayName\":\"通义千问 Embedding (DashScope)\","
                             + "\"baseUrl\":\"https://dashscope.aliyuncs.com/compatible-mode\","
                             + "\"defaultModel\":\"text-embedding-v4\",\"dimensions\":1536,\"maxBatchSize\":10}"),
-            // Left exactly as it was on main: "dimension" (ignored) + a 2048-dim default model that
-            // cannot fit vector(1536). That combination is already broken today, but fixing it means
-            // guessing at Zhipu's dimensions parameter without a key to verify against — so it is
-            // flagged rather than silently changed.
+            // Seeded but NOT offered in the knowledge-base dialog, and that is deliberate:
+            // embedding-3 answers with 2048 dimensions while ab_kb_chunk.embedding is vector(1536),
+            // so a knowledge base created on it could not embed a single chunk. The config is left
+            // exactly as it was — "dimension" (a key EmbeddingService does not read) and a 2048-dim
+            // model — because correcting it means guessing at Zhipu's dimensions parameter with no
+            // key to verify against, and a plausible guess that is wrong is worse than a documented
+            // gap. To bring it back: pin dimensions=1536, verify against the live API, then restore
+            // the option in knowledge.tsx.
             "seed_emb_zhipu", new ProviderSeed("zhipu", 20,
                     "{\"displayName\":\"智谱 Embedding\",\"baseUrl\":\"https://open.bigmodel.cn/api/paas\","
                             + "\"defaultModel\":\"embedding-3\",\"dimension\":2048,\"maxBatchSize\":20}"));
