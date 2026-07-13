@@ -27,11 +27,11 @@
         {
           "name": "auraboot-core-1.0.0-SNAPSHOT.jar",
           "url": "auraboot-core-1.0.0-SNAPSHOT.jar",
-          "size": 13604902,
-          "sha512": "47b5b8b5e16cef189f011060cdcc0d8bee73d18be50657bafefac2150fda840722c856a6af520bb08f0a03d04aaf80a8c1e195acd6e51cd3f2bbaea0f37b7b1e",
-          "sha256": "1308eaf9a221f5d021e0dd8fba31c98fa554675f1d39b572b9687a8b616c2a96",
-          "sha1": "7e4eff6d8cf09935c446d0651c56ade375b45992",
-          "md5": "280bb98796f35d13c0a73d517ab7efa8"
+          "size": 13605120,
+          "sha512": "8e27322d7a13f4c094c361372e1fbea077b8e2c3449b58b635dbe5a0e179d95391b51d14bd2d14008bb9de034e4157bf8877985d5b3b7b3f225634198b1c32bb",
+          "sha256": "eb82904ba36788b13ff8b2b0a20a3bbb68ea8d844c482125e143ba08afe2b6d0",
+          "sha1": "58242460a9c9a654cdbee8506705a09335a4638e",
+          "md5": "4630edf9234d4c8035346ccaea81b641"
         }
       ]
     },
@@ -1291,11 +1291,11 @@
         {
           "name": "auraboot-core-1.0.0-SNAPSHOT.jar",
           "url": "auraboot-core-1.0.0-SNAPSHOT.jar",
-          "size": 13604902,
-          "sha512": "47b5b8b5e16cef189f011060cdcc0d8bee73d18be50657bafefac2150fda840722c856a6af520bb08f0a03d04aaf80a8c1e195acd6e51cd3f2bbaea0f37b7b1e",
-          "sha256": "1308eaf9a221f5d021e0dd8fba31c98fa554675f1d39b572b9687a8b616c2a96",
-          "sha1": "7e4eff6d8cf09935c446d0651c56ade375b45992",
-          "md5": "280bb98796f35d13c0a73d517ab7efa8"
+          "size": 13605120,
+          "sha512": "8e27322d7a13f4c094c361372e1fbea077b8e2c3449b58b635dbe5a0e179d95391b51d14bd2d14008bb9de034e4157bf8877985d5b3b7b3f225634198b1c32bb",
+          "sha256": "eb82904ba36788b13ff8b2b0a20a3bbb68ea8d844c482125e143ba08afe2b6d0",
+          "sha1": "58242460a9c9a654cdbee8506705a09335a4638e",
+          "md5": "4630edf9234d4c8035346ccaea81b641"
         }
       ]
     }
