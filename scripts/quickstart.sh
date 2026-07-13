@@ -115,11 +115,21 @@ else
 fi
 
 # ── 3. log in ─────────────────────────────────────────────────────────────────
-JWT="$(curl_ -X POST "${BACKEND_URL}/api/auth/login" -H 'Content-Type: application/json' \
-  -d "{\"email\":\"${ADMIN_EMAIL}\",\"password\":\"${ADMIN_PASSWORD}\"}" \
-  | json "print(d.get('data',{}).get('jwt',''))")"
+# Retried: bootstrap returns as soon as its own transaction commits, and the
+# first login right behind it can arrive before the admin's tenant membership is
+# readable. A bare single attempt failed in CI while the very same request
+# succeeded moments later.
+JWT=""
+for attempt in 1 2 3 4 5; do
+  login_resp="$(curl_ -X POST "${BACKEND_URL}/api/auth/login" -H 'Content-Type: application/json' \
+    -d "{\"email\":\"${ADMIN_EMAIL}\",\"password\":\"${ADMIN_PASSWORD}\"}" || true)"
+  JWT="$(echo "${login_resp}" | json "print(d.get('data',{}).get('jwt') or '')")"
+  [[ -n "${JWT}" ]] && break
+  sleep 3
+done
 if [[ -z "${JWT}" ]]; then
-  say "${RED}✗ could not log in as ${ADMIN_EMAIL}.${NC}"
+  say "${RED}✗ could not log in as ${ADMIN_EMAIL} after 5 attempts.${NC}"
+  say "The server said:\n${login_resp}"
   exit 1
 fi
 say "${GREEN}✓${NC} logged in"
