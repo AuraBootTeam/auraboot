@@ -34,7 +34,8 @@
       "crm_act_type",
       "crm_act_subject",
       "crm_act_content",
-      "crm_act_date"
+      "crm_act_date",
+      "crm_act_owner"
     ],
     "permissions": [
       "crm.activity.manage"

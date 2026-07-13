@@ -45,7 +45,8 @@
       "crm_opp_expected_amount",
       "crm_opp_expected_close_date",
       "crm_opp_probability",
-      "crm_opp_notes"
+      "crm_opp_notes",
+      "crm_opp_owner"
     ],
     "permissions": [
       "crm.opportunity.manage"

@@ -14,6 +14,7 @@ export const PHASES = [
   ['arsenal', 'tests/api/setup/seed-showcase-arsenal.spec.ts'],
   ['supplement', 'tests/api/setup/seed-showcase-supplement.spec.ts'],
   ['commercial', 'tests/api/setup/seed-showcase-commercial.spec.ts'],
+  ['ownership', 'tests/api/setup/seed-showcase-ownership.spec.ts'],
   ['dashboard-default', 'tests/api/setup/seed-showcase-dashboard-default.spec.ts'],
   ['invariants', 'tests/api/setup/seed-showcase-invariants.spec.ts'],
 ].map(([name, spec]) => ({ name, spec }));
@@ -26,6 +27,9 @@ export const DEFAULT_PHASE_ORDER = [
   'ai',
   'arsenal',
   'supplement',
+  // Ownership runs after every phase that creates CRM records — it rewrites the
+  // auto-assigned single owner into a real sales-team spread.
+  'ownership',
   'dashboard-default',
   'invariants',
 ];

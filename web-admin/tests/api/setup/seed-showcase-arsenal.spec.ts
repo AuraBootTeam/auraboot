@@ -693,448 +693,575 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
   // 2. 19-Widget Dashboard
   // ═════════════════════════════════════════════════════════════════════════
 
-  test('Arsenal 2: Dashboard — 19 widget types', async ({ page }) => {
+  test('Arsenal 2: Dashboard — 24 widgets on live data sources', async ({ page }) => {
+    // Every widget below is driven by a live data source — `aggregate` against a
+    // real model, or a `namedQuery` where aggregate cannot reach (time bucketing,
+    // ratio metrics, detail rows). The two exceptions (NPS, Gallery) are marked
+    // GAP: the CRM demo model has no field to bind them to, and inventing one just
+    // to fill the grid would be worse than saying so.
+    //
+    // Count aggregations use `pid` as the counted column, matching the platform's
+    // own reference dashboard (crm_lead_analytics).
     const widgets = [
-      // Row 1: 4 Number Cards (h=2 at rowHeight 80 = ~170px, good for cards)
+      // ── Row 1: KPI cards ────────────────────────────────────────────────────
       {
-        i: 'w_num_customers',
+        id: 'w_num_customers',
         x: 0,
         y: 0,
         w: 3,
         h: 2,
-        type: 'NumberCard',
+        type: 'smart-number-card',
         title: '客户总数',
-        config: { value: 60, icon: '🏢' },
+        config: {
+          title: '客户总数',
+          icon: '🏢',
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_account',
+            metrics: [{ field: 'pid', aggregation: 'count', alias: 'account_count' }],
+          },
+        },
       },
       {
-        i: 'w_num_pipeline',
+        id: 'w_num_pipeline',
         x: 3,
         y: 0,
         w: 3,
         h: 2,
-        type: 'NumberCard',
+        type: 'smart-number-card',
         title: 'Pipeline 金额',
-        config: { value: 580, icon: '💰' },
+        config: {
+          title: 'Pipeline 金额',
+          icon: '💰',
+          format: 'currency',
+          precision: 0,
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_opportunity',
+            metrics: [
+              { field: 'crm_opp_expected_amount', aggregation: 'sum', alias: 'pipeline_amount' },
+            ],
+          },
+        },
       },
       {
-        i: 'w_num_winrate',
+        // Win rate is a ratio (won / closed). The aggregate data source has a
+        // closed aggregation set (count/count_distinct/sum/avg/max/min) and no
+        // computed-metric support, so this has to go through a namedQuery.
+        id: 'w_num_winrate',
         x: 6,
         y: 0,
         w: 3,
         h: 2,
-        type: 'NumberCard',
+        type: 'smart-number-card',
         title: '赢单率',
-        config: { value: 73, icon: '🎯' },
+        config: {
+          title: '赢单率',
+          icon: '🎯',
+          suffix: '%',
+          precision: 1,
+          metricField: 'win_rate',
+          dataSource: {
+            type: 'namedQuery',
+            queryCode: 'sc_arsenal_win_rate',
+          },
+        },
       },
       {
-        i: 'w_num_leads',
+        // GAP (was "本月新线索"): crm_lead has no business date field, and the
+        // aggregate data source only supports static filter values — there is no
+        // relative-time filter ("this month"). Bound to the honest total instead.
+        id: 'w_num_leads',
         x: 9,
         y: 0,
         w: 3,
         h: 2,
-        type: 'NumberCard',
-        title: '本月新线索',
-        config: { value: 28, icon: '📋' },
+        type: 'smart-number-card',
+        title: '线索总数',
+        config: {
+          title: '线索总数',
+          icon: '📋',
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_lead',
+            metrics: [{ field: 'pid', aggregation: 'count', alias: 'lead_count' }],
+          },
+        },
       },
-      // Row 2: Bar + Line (h=4 at rowHeight 80 = ~350px, enough for ECharts)
+
+      // ── Row 2: monthly series (namedQuery — aggregate cannot bucket time) ────
       {
-        i: 'w_bar_monthly',
+        id: 'w_bar_monthly',
         x: 0,
         y: 2,
         w: 6,
         h: 4,
-        type: 'BarChart',
-        title: '月度销售对比',
+        type: 'smart-bar-chart',
+        title: '月度商机与赢单',
         config: {
-          xAxis: [
-            '2025/07',
-            '2025/08',
-            '2025/09',
-            '2025/10',
-            '2025/11',
-            '2025/12',
-            '2026/01',
-            '2026/02',
-            '2026/03',
-          ],
-          series: [
-            { name: '目标(万)', data: [80, 80, 100, 100, 100, 120, 120, 80, 120] },
-            { name: '实际(万)', data: [45, 68, 175, 92, 58, 138, 460, 72, 96] },
-          ],
+          title: '月度商机与赢单',
+          dataSource: {
+            type: 'namedQuery',
+            queryCode: 'sc_arsenal_monthly_pipeline',
+            dimensions: ['month'],
+            metrics: [
+              { field: 'pipeline_amount', aggregation: 'sum', alias: 'pipeline_amount' },
+              { field: 'won_amount', aggregation: 'sum', alias: 'won_amount' },
+            ],
+          },
         },
       },
       {
-        i: 'w_line_trend',
+        id: 'w_line_trend',
         x: 6,
         y: 2,
         w: 6,
         h: 4,
-        type: 'LineChart',
-        title: '销售趋势',
+        type: 'smart-line-chart',
+        title: '月度商机趋势',
         config: {
-          xAxis: [
-            '2025/07',
-            '2025/08',
-            '2025/09',
-            '2025/10',
-            '2025/11',
-            '2025/12',
-            '2026/01',
-            '2026/02',
-            '2026/03',
-          ],
-          series: [
-            { name: '新客户', data: [6, 8, 12, 9, 7, 11, 15, 8, 10] },
-            { name: '新商机', data: [5, 7, 14, 10, 8, 13, 18, 9, 12] },
-            { name: '赢单数', data: [2, 3, 8, 5, 3, 6, 12, 4, 5] },
-          ],
+          title: '月度商机趋势',
+          dataSource: {
+            type: 'namedQuery',
+            queryCode: 'sc_arsenal_monthly_trend',
+            dimensions: ['month'],
+            metrics: [
+              { field: 'opp_count', aggregation: 'sum', alias: 'opp_count' },
+              { field: 'won_count', aggregation: 'sum', alias: 'won_count' },
+            ],
+          },
         },
       },
-      // Row 3: Pie + Funnel + Radar (h=4)
+
+      // ── Row 3: stage / team distributions ───────────────────────────────────
       {
-        i: 'w_pie_stage',
+        id: 'w_pie_stage',
         x: 0,
         y: 6,
         w: 4,
         h: 4,
-        type: 'PieChart',
+        type: 'smart-pie-chart',
         title: '商机阶段分布',
         config: {
-          data: [
-            { name: '初步接触', value: 15 },
-            { name: '需求确认', value: 12 },
-            { name: '方案报价', value: 18 },
-            { name: '商务谈判', value: 8 },
-            { name: '赢单', value: 22 },
-            { name: '输单', value: 6 },
-          ],
+          title: '商机阶段分布',
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_opportunity',
+            dimensions: ['crm_opp_stage'],
+            metrics: [{ field: 'pid', aggregation: 'count', alias: 'deal_count' }],
+          },
         },
       },
       {
-        i: 'w_funnel',
+        id: 'w_funnel',
         x: 4,
         y: 6,
         w: 4,
         h: 4,
-        type: 'FunnelChart',
+        type: 'smart-funnel-chart',
         title: '销售漏斗',
         config: {
-          data: [
-            { name: '线索', value: 120 },
-            { name: '合格线索', value: 68 },
-            { name: '需求确认', value: 42 },
-            { name: '方案报价', value: 28 },
-            { name: '商务谈判', value: 18 },
-            { name: '赢单', value: 12 },
-          ],
+          title: '销售漏斗',
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_opportunity',
+            dimensions: ['crm_opp_stage'],
+            metrics: [{ field: 'pid', aggregation: 'count', alias: 'deal_count' }],
+          },
         },
       },
       {
-        i: 'w_radar',
+        // Radar's multi-metric mode: one dimension row per series line, one axis
+        // per metric (SmartRadarChart.tsx:105-112).
+        id: 'w_radar',
         x: 8,
         y: 6,
         w: 4,
         h: 4,
-        type: 'RadarChart',
+        type: 'smart-radar-chart',
         title: '销售团队能力',
         config: {
-          categories: ['客户开发', '方案能力', '谈判技巧', '交付管理', '客户维护'],
-          series: [
-            { name: '陈志豪', data: [92, 85, 88, 75, 95] },
-            { name: '张雨晴', data: [78, 95, 72, 88, 82] },
-            { name: '林伟杰', data: [85, 78, 90, 82, 76] },
-          ],
+          title: '销售团队能力',
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_opportunity',
+            dimensions: ['crm_opp_owner'],
+            metrics: [
+              { field: 'pid', aggregation: 'count', alias: 'deal_count' },
+              { field: 'crm_opp_expected_amount', aggregation: 'sum', alias: 'total_amount' },
+              { field: 'crm_opp_probability', aggregation: 'avg', alias: 'avg_probability' },
+            ],
+          },
         },
       },
-      // Row 4: Area + Gauge + Progress
+
+      // ── Row 4: cumulative / targets ─────────────────────────────────────────
       {
-        i: 'w_area',
+        id: 'w_area',
         x: 0,
         y: 10,
         w: 4,
         h: 4,
-        type: 'AreaChart',
-        title: '累计收入趋势',
+        type: 'smart-area-chart',
+        title: '累计赢单收入',
         config: {
-          xAxis: ['Q1-2025', 'Q2-2025', 'Q3-2025', 'Q4-2025', 'Q1-2026'],
-          series: [{ name: '累计收入(万)', data: [120, 380, 720, 1200, 1560] }],
+          title: '累计赢单收入',
+          dataSource: {
+            type: 'namedQuery',
+            queryCode: 'sc_arsenal_cumulative_revenue',
+            dimensions: ['month'],
+            metrics: [{ field: 'cumulative_amount', aggregation: 'max', alias: 'cumulative_amount' }],
+          },
         },
       },
       {
-        i: 'w_gauge',
+        // The gauge's target is a config constant (`max`) — the component has no
+        // targetField, so a target cannot come from the data (gap G6).
+        id: 'w_gauge',
         x: 4,
         y: 10,
         w: 4,
         h: 4,
-        type: 'GaugeChart',
-        title: 'Q1 目标完成率',
-        config: { value: 78, max: 100 },
+        type: 'smart-gauge-chart',
+        title: '年度赢单金额达成 (目标 500 万)',
+        config: {
+          title: '年度赢单金额达成 (目标 500 万)',
+          max: 5000000,
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_opportunity',
+            filters: [{ field: 'crm_opp_stage', operator: 'eq', value: 'closed_won' }],
+            metrics: [
+              { field: 'crm_opp_expected_amount', aggregation: 'sum', alias: 'won_amount' },
+            ],
+          },
+        },
       },
       {
-        i: 'w_progress',
+        // Same story: `target` is a config constant (SmartProgress.tsx:138).
+        id: 'w_progress',
         x: 8,
         y: 10,
         w: 4,
         h: 2,
-        type: 'Progress',
-        title: '年度KPI进度',
-        config: { value: 68, target: 100 },
+        type: 'smart-progress',
+        title: '年度赢单数进度 (目标 30 单)',
+        config: {
+          title: '年度赢单数进度 (目标 30 单)',
+          target: 30,
+          format: 'fraction',
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_opportunity',
+            filters: [{ field: 'crm_opp_stage', operator: 'eq', value: 'closed_won' }],
+            metrics: [{ field: 'pid', aggregation: 'count', alias: 'won_count' }],
+          },
+        },
       },
-      // Row 4 continued: Scatter
       {
-        i: 'w_scatter',
+        // Was "客户规模 vs 商机金额" — crm_account has no numeric size field (only a
+        // varchar rating), so the original pairing was unbindable. Amount vs
+        // probability is two real numeric columns on the same row.
+        // Scatter reads x = metrics[0], y = metrics[1], label = dimensions[0]
+        // (SmartScatterChart.tsx:146-163), so metric order is the contract.
+        // Grouping by name yields one row per opportunity (names are unique).
+        id: 'w_scatter',
         x: 8,
         y: 12,
         w: 4,
         h: 2,
-        type: 'ScatterChart',
-        title: '客户规模 vs 商机金额',
+        type: 'smart-scatter-chart',
+        title: '商机金额 vs 赢单概率',
         config: {
-          data: [
-            { x: 50, y: 120 },
-            { x: 100, y: 280 },
-            { x: 200, y: 580 },
-            { x: 80, y: 175 },
-            { x: 150, y: 460 },
-            { x: 30, y: 65 },
-            { x: 250, y: 720 },
-            { x: 120, y: 340 },
-          ],
+          title: '商机金额 vs 赢单概率',
+          xAxisLabel: '预计金额',
+          yAxisLabel: '赢单概率',
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_opportunity',
+            dimensions: ['crm_opp_name'],
+            metrics: [
+              { field: 'crm_opp_expected_amount', aggregation: 'avg', alias: 'amount' },
+              { field: 'crm_opp_probability', aggregation: 'avg', alias: 'probability' },
+            ],
+          },
         },
       },
-      // Row 5: Table + Heatmap
+
+      // ── Row 5: team performance ─────────────────────────────────────────────
       {
-        i: 'w_table',
+        // Columns live under config.table.columns, not a top-level `columns`
+        // (SmartTableChart.tsx:262-279).
+        id: 'w_table',
         x: 0,
         y: 14,
         w: 5,
         h: 4,
-        type: 'TableChart',
+        type: 'smart-table-chart',
         title: '销售排行榜',
         config: {
-          columns: ['排名', '姓名', '赢单额(万)', '赢单数'],
-          data: [
-            ['1', '陈志豪', '680', '12'],
-            ['2', '张雨晴', '520', '9'],
-            ['3', '林伟杰', '380', '8'],
-            ['4', '王小明', '260', '6'],
-            ['5', '李佳慧', '210', '5'],
-          ],
+          title: '销售排行榜',
+          table: {
+            columns: [
+              { field: 'crm_opp_owner', label: '负责人' },
+              { field: 'deal_count', label: '商机数', align: 'right' },
+              { field: 'total_amount', label: '商机总额', align: 'right' },
+            ],
+          },
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_opportunity',
+            dimensions: ['crm_opp_owner'],
+            metrics: [
+              { field: 'pid', aggregation: 'count', alias: 'deal_count' },
+              { field: 'crm_opp_expected_amount', aggregation: 'sum', alias: 'total_amount' },
+            ],
+          },
         },
       },
       {
-        i: 'w_heatmap',
+        // Heatmap is the one component with real field props, and it needs two
+        // dimensions — aggregate supports N dimensions, so this binds directly.
+        id: 'w_heatmap',
         x: 5,
         y: 14,
         w: 7,
         h: 4,
-        type: 'HeatmapChart',
+        type: 'smart-heatmap-chart',
         title: '团队活跃度热力图',
         config: {
-          xAxis: ['周一', '周二', '周三', '周四', '周五'],
-          yAxis: ['上午', '下午', '晚间'],
-          data: [
-            [0, 0, 8],
-            [0, 1, 12],
-            [0, 2, 3],
-            [1, 0, 10],
-            [1, 1, 15],
-            [1, 2, 5],
-            [2, 0, 9],
-            [2, 1, 11],
-            [2, 2, 2],
-            [3, 0, 13],
-            [3, 1, 14],
-            [3, 2, 6],
-            [4, 0, 7],
-            [4, 1, 9],
-            [4, 2, 1],
-          ],
+          title: '团队活跃度热力图',
+          xField: 'crm_act_owner',
+          yField: 'crm_act_type',
+          valueField: 'activity_count',
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_activity',
+            dimensions: ['crm_act_owner', 'crm_act_type'],
+            metrics: [{ field: 'pid', aggregation: 'count', alias: 'activity_count' }],
+          },
         },
       },
-      // Row 6: Treemap + Rich Text + Countdown
+
+      // ── Row 6: industry / static content ────────────────────────────────────
       {
-        i: 'w_treemap',
+        // Was "行业收入分布" — revenue by industry would need a join from account to
+        // opportunity, which the single-table aggregate cannot do. Account count
+        // by industry is the same question this data can honestly answer.
+        id: 'w_treemap',
         x: 0,
         y: 18,
         w: 4,
         h: 4,
-        type: 'TreemapChart',
-        title: '行业收入分布',
+        type: 'smart-treemap-chart',
+        title: '行业客户分布',
         config: {
-          data: [
-            { name: '汽车电子', value: 600 },
-            { name: '工业自动化', value: 360 },
-            { name: '智能硬件', value: 310 },
-            { name: '消费电子', value: 280 },
-            { name: '通信设备', value: 180 },
-          ],
+          title: '行业客户分布',
+          nameField: 'crm_acc_industry',
+          valueField: 'account_count',
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_account',
+            dimensions: ['crm_acc_industry'],
+            metrics: [{ field: 'pid', aggregation: 'count', alias: 'account_count' }],
+          },
         },
       },
       {
-        i: 'w_richtext',
+        // Config-driven by design: SmartRichText does not consume a data source.
+        id: 'w_richtext',
         x: 4,
         y: 18,
         w: 4,
         h: 4,
-        type: 'RichText',
+        type: 'smart-rich-text',
         title: '季度公告',
         config: {
+          title: '季度公告',
+          format: 'html',
           content:
-            '<h3 style="margin:0 0 8px 0;color:#1e40af">📊 Q1 销售总结</h3><p style="margin:0 0 6px 0">本季度完成销售额 <strong style="color:#059669">¥1,560万</strong>，同比增长 <strong style="color:#059669">32%</strong>，超额完成目标。</p><ul style="margin:4px 0;padding-left:18px"><li>新增客户 <b>28</b> 家，重点客户 <b>5</b> 家</li><li>赢单 <b>12</b> 笔，平均客单价 <b>¥130万</b></li><li>重点项目：宁波鑫越年度框架 ¥460万</li><li>销冠：陈志豪 ¥680万（连续3个月第一）</li></ul>',
+            '<h3>军火展 — 全能力报表</h3><p>本看板的每个组件都由<strong>真实数据源</strong>驱动：'
+            + '<code>aggregate</code> 直连模型，<code>namedQuery</code> 覆盖聚合查询够不到的场景'
+            + '（时间分桶、比率指标、明细行）。</p>'
+            + '<p>标注 <em>GAP</em> 的组件表示 CRM 演示模型缺少可绑定的字段。</p>',
         },
       },
       {
-        i: 'w_countdown',
+        // Config-driven by design: SmartCountdown does not consume a data source.
+        id: 'w_countdown',
         x: 8,
         y: 18,
         w: 4,
         h: 2,
-        type: 'Countdown',
+        type: 'smart-countdown',
         title: 'Q2 结束倒计时',
-        config: { targetDate: '2026-06-30T23:59:59Z', label: '距离 Q2 结束' },
+        config: {
+          title: 'Q2 结束倒计时',
+          targetDate: `${new Date().getFullYear()}-06-30T23:59:59`,
+        },
       },
-      // Row 6 continued: Leaderboard
       {
-        i: 'w_leaderboard',
+        // Leaderboard sorts and truncates client-side (SmartLeaderboard.tsx:106-113),
+        // which is why top-N works even though the aggregate data source cannot
+        // send an orderBy (gap G2).
+        id: 'w_leaderboard',
         x: 8,
         y: 20,
         w: 4,
         h: 2,
-        type: 'Leaderboard',
+        type: 'smart-leaderboard',
         title: '销售冠军榜',
         config: {
-          items: [
-            { rank: 1, name: '陈志豪', value: 680 },
-            { rank: 2, name: '张雨晴', value: 520 },
-            { rank: 3, name: '林伟杰', value: 380 },
-            { rank: 4, name: '王小明', value: 260 },
-            { rank: 5, name: '李佳慧', value: 210 },
-          ],
+          title: '销售冠军榜',
+          rankField: 'crm_opp_owner',
+          valueField: 'total_amount',
+          maxItems: 8,
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_opportunity',
+            dimensions: ['crm_opp_owner'],
+            metrics: [
+              { field: 'crm_opp_expected_amount', aggregation: 'sum', alias: 'total_amount' },
+            ],
+          },
         },
       },
-      // Row 7: WordCloud + NPS + Combo
+
+      // ── Row 7: wordcloud / NPS / combo ──────────────────────────────────────
       {
-        i: 'w_wordcloud',
+        id: 'w_wordcloud',
         x: 0,
         y: 22,
         w: 4,
         h: 4,
-        type: 'WordCloudChart',
-        title: '行业关键词',
+        type: 'smart-wordcloud-chart',
+        title: '线索行业分布',
         config: {
-          data: [
-            { name: '汽车电子', value: 120 },
-            { name: '工业自动化', value: 95 },
-            { name: '智能硬件', value: 85 },
-            { name: '消费电子', value: 72 },
-            { name: '通信设备', value: 65 },
-            { name: '医疗器械', value: 58 },
-            { name: '新能源', value: 52 },
-            { name: '物联网', value: 48 },
-            { name: '半导体', value: 42 },
-            { name: '机器人', value: 38 },
-            { name: 'AI芯片', value: 35 },
-            { name: '传感器', value: 30 },
-          ],
-          wordField: 'name',
-          weightField: 'value',
+          title: '线索行业分布',
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_lead',
+            dimensions: ['crm_lead_industry'],
+            metrics: [{ field: 'pid', aggregation: 'count', alias: 'lead_count' }],
+          },
         },
       },
       {
-        i: 'w_nps',
+        // GAP: the CRM demo model has no NPS field (crm_lead_score is a 0-100 lead
+        // score, not a 0-10 NPS response), and SmartNpsChart hard-codes its
+        // promoter/passive thresholds and counts one respondent per row — so it
+        // needs detail rows an aggregate cannot produce. Left on a static data
+        // source (a first-class type, unlike the old inline config) rather than
+        // inventing an NPS column on a business model to fill the grid.
+        id: 'w_nps',
         x: 4,
         y: 22,
         w: 4,
         h: 4,
-        type: 'NpsChart',
-        title: '客户满意度 NPS',
+        type: 'smart-nps-chart',
+        title: '客户满意度 NPS (示例数据 — 模型无 NPS 字段)',
         config: {
-          data: [
-            { score: 1, count: 2 },
-            { score: 2, count: 3 },
-            { score: 3, count: 8 },
-            { score: 4, count: 15 },
-            { score: 5, count: 32 },
-          ],
+          title: '客户满意度 NPS (示例数据 — 模型无 NPS 字段)',
           scoreField: 'score',
-          countField: 'count',
-          promoterThreshold: 5,
-          passiveThreshold: 4,
-          scoreRange: [1, 5],
+          dataSource: {
+            type: 'static',
+            staticData: [
+              10, 10, 9, 9, 9, 10, 8, 7, 9, 10, 6, 9, 10, 8, 3, 9, 10, 7, 9, 5,
+              10, 9, 8, 10, 9, 4, 9, 10, 8, 9,
+            ].map((score) => ({ score })),
+            metrics: [{ field: 'score', aggregation: 'count', alias: 'score' }],
+          },
         },
       },
       {
-        i: 'w_combo',
+        // seriesConfig matches metrics by index, not by field name
+        // (SmartComboChart.tsx:146).
+        id: 'w_combo',
         x: 8,
         y: 22,
         w: 4,
         h: 4,
-        type: 'ComboChart',
-        title: '销量与均价组合',
+        type: 'smart-combo-chart',
+        title: '各阶段商机数与均价',
         config: {
-          xAxis: ['Q1', 'Q2', 'Q3', 'Q4'],
+          title: '各阶段商机数与均价',
           seriesConfig: [
-            {
-              field: 'quantity',
-              type: 'bar',
-              yAxisIndex: 0,
-              label: '销量(台)',
-              data: [320, 480, 560, 420],
-            },
-            {
-              field: 'avgPrice',
-              type: 'line',
-              yAxisIndex: 1,
-              label: '均价(万)',
-              data: [12.5, 11.8, 13.2, 14.1],
-            },
+            { metricIndex: 0, chartType: 'bar', yAxisIndex: 0 },
+            { metricIndex: 1, chartType: 'line', yAxisIndex: 1 },
           ],
+          dataSource: {
+            type: 'aggregate',
+            modelCode: 'crm_opportunity',
+            dimensions: ['crm_opp_stage'],
+            metrics: [
+              { field: 'pid', aggregation: 'count', alias: 'deal_count' },
+              { field: 'crm_opp_expected_amount', aggregation: 'avg', alias: 'avg_amount' },
+            ],
+          },
         },
       },
-      // Row 8: Kanban + Gallery
+
+      // ── Row 8: kanban / gallery ─────────────────────────────────────────────
       {
-        i: 'w_kanban',
+        // Kanban needs one card per record. The aggregate data source always
+        // GROUP BYs and rejects a request with neither metric nor dimension, so
+        // detail rows only come from a namedQuery (identity passthrough).
+        id: 'w_kanban',
         x: 0,
         y: 26,
         w: 6,
         h: 4,
-        type: 'Kanban',
-        title: '项目看板',
+        type: 'smart-kanban',
+        title: '商机看板',
         config: {
-          columns: [
-            { value: 'todo', label: '待办', color: '#94a3b8' },
-            { value: 'doing', label: '进行中', color: '#3b82f6' },
-            { value: 'done', label: '已完成', color: '#10b981' },
+          title: '商机看板',
+          groupField: 'opp_stage',
+          titleField: 'opp_name',
+          descriptionField: 'opp_owner',
+          columnOrder: [
+            'discovery',
+            'qualification',
+            'proposal',
+            'negotiation',
+            'closed_won',
+            'closed_lost',
           ],
-          items: [
-            { id: '1', title: '客户需求分析', column: 'doing' },
-            { id: '2', title: '方案设计', column: 'todo' },
-            { id: '3', title: '样品测试', column: 'doing' },
-            { id: '4', title: '报价审批', column: 'done' },
-            { id: '5', title: '合同签订', column: 'todo' },
-            { id: '6', title: '生产排期', column: 'done' },
-          ],
+          dataSource: {
+            type: 'namedQuery',
+            queryCode: 'sc_arsenal_opportunity_board',
+          },
         },
       },
       {
-        i: 'w_gallery',
+        // GAP: no image field anywhere in the CRM demo model. Kept on a static
+        // data source with the component's real contract (imageField over rows),
+        // instead of the old `items[]` / `colCount` keys, which SmartGallery never
+        // read — the widget was silently rendering nothing.
+        id: 'w_gallery',
         x: 6,
         y: 26,
         w: 6,
         h: 4,
-        type: 'Gallery',
-        title: '产品图库',
+        type: 'smart-gallery',
+        title: '产品图库 (示例数据 — 模型无图片字段)',
         config: {
-          items: [
-            { id: '1', title: 'MCU 模组', imageUrl: 'https://picsum.photos/seed/mcu/400/300' },
-            { id: '2', title: 'LDO 芯片', imageUrl: 'https://picsum.photos/seed/ldo/400/300' },
-            { id: '3', title: 'PCBA 成品', imageUrl: 'https://picsum.photos/seed/pcba/400/300' },
-            { id: '4', title: '传感器模块', imageUrl: 'https://picsum.photos/seed/sensor/400/300' },
-            { id: '5', title: 'IoT 网关', imageUrl: 'https://picsum.photos/seed/iot/400/300' },
-            { id: '6', title: '工控主板', imageUrl: 'https://picsum.photos/seed/board/400/300' },
-          ],
-          colCount: 3,
+          title: '产品图库 (示例数据 — 模型无图片字段)',
+          imageField: 'image_url',
+          titleField: 'name',
+          columns: 3,
+          dataSource: {
+            type: 'static',
+            staticData: [
+              { name: 'MCU 模组', image_url: 'https://picsum.photos/seed/mcu/400/300' },
+              { name: 'LDO 芯片', image_url: 'https://picsum.photos/seed/ldo/400/300' },
+              { name: 'PCBA 成品', image_url: 'https://picsum.photos/seed/pcba/400/300' },
+              { name: '传感器模块', image_url: 'https://picsum.photos/seed/sensor/400/300' },
+              { name: 'IoT 网关', image_url: 'https://picsum.photos/seed/iot/400/300' },
+              { name: '工控主板', image_url: 'https://picsum.photos/seed/board/400/300' },
+            ],
+            dimensions: ['name'],
+            metrics: [{ field: 'image_url', aggregation: 'count', alias: 'image_url' }],
+          },
         },
       },
     ];
@@ -1143,7 +1270,8 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
       data: {
         code: 'arsenal_capability_dashboard',
         title: '军火展 — 组件仪表盘',
-        description: '展示 AuraBoot Dashboard Designer 支持的全部 24 种 Widget 类型',
+        description:
+          '展示 AuraBoot Dashboard Designer 支持的全部 24 种 Widget 类型，全部由真实数据源驱动',
         scope: 'global',
         layoutConfig: { columns: 12, rowHeight: 80, gap: 12 },
         widgets,
@@ -1152,15 +1280,19 @@ test.describe.serial('Showcase Arsenal — Full Capability Demo', () => {
       },
     });
     const body = await resp.json();
-    if (body.code === '0' || resp.ok()) {
-      console.log('  Created Dashboard: 24 组件全覆盖仪表盘');
-      const pid = body.data?.pid || body.data?.id;
-      if (pid) {
-        await page.request.post(`/api/dashboards/${pid}/publish`).catch(() => {});
-      }
-    } else {
-      console.warn(`  Dashboard creation warning: ${JSON.stringify(body).slice(0, 200)}`);
-    }
+    // A warn-and-continue here is how a dashboard silently fails to exist while
+    // the seed still reports success — fail loudly instead.
+    expect(
+      resp.ok(),
+      `Dashboard creation failed: ${resp.status()} ${JSON.stringify(body).slice(0, 300)}`,
+    ).toBeTruthy();
+
+    const pid = body.data?.pid || body.data?.id;
+    expect(pid, 'Dashboard created but no pid returned').toBeTruthy();
+    console.log(`  Created Dashboard: 24 组件全覆盖仪表盘 (${pid})`);
+
+    const publishResp = await page.request.post(`/api/dashboards/${pid}/publish`);
+    expect(publishResp.ok(), `Dashboard publish failed: ${publishResp.status()}`).toBeTruthy();
   });
 
   // ═════════════════════════════════════════════════════════════════════════

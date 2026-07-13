@@ -7,11 +7,168 @@
     "status": "published",
     "fromSql": "SELECT pid, sc_name, sc_code, sc_status FROM mt_showcase_all_fields WHERE tenant_id = #{params.tenantId} ORDER BY pid DESC LIMIT 100",
     "outputFields": [
-      { "fieldCode": "pid", "columnExpr": "pid", "dataType": "string", "sortable": true },
-      { "fieldCode": "sc_name", "columnExpr": "sc_name", "dataType": "string", "sortable": true, "searchable": true },
-      { "fieldCode": "sc_code", "columnExpr": "sc_code", "dataType": "string", "sortable": true, "searchable": true },
-      { "fieldCode": "sc_status", "columnExpr": "sc_status", "dataType": "string", "sortable": false }
+      {
+        "fieldCode": "pid",
+        "columnExpr": "pid",
+        "dataType": "string",
+        "sortable": true
+      },
+      {
+        "fieldCode": "sc_name",
+        "columnExpr": "sc_name",
+        "dataType": "string",
+        "sortable": true,
+        "searchable": true
+      },
+      {
+        "fieldCode": "sc_code",
+        "columnExpr": "sc_code",
+        "dataType": "string",
+        "sortable": true,
+        "searchable": true
+      },
+      {
+        "fieldCode": "sc_status",
+        "columnExpr": "sc_status",
+        "dataType": "string",
+        "sortable": false
+      }
     ],
-    "tags": ["showcase", "virtual-model-seed"]
+    "tags": [
+      "showcase",
+      "virtual-model-seed"
+    ]
+  },
+  {
+    "code": "sc_arsenal_monthly_pipeline",
+    "title:zh-CN": "军火展 — 月度商机与赢单",
+    "title:en": "Arsenal — Monthly Pipeline vs Won",
+    "description": "Monthly opportunity value against won value, bucketed by expected close date. Exists because the aggregate data source cannot bucket time (dimensions must be bare identifiers, so date_trunc is unreachable).",
+    "purpose": "Drives the arsenal dashboard's monthly bar chart with real opportunity data.",
+    "status": "published",
+    "fromSql": "SELECT to_char(date_trunc('month', crm_opp_expected_close_date), 'YYYY-MM') AS month, COALESCE(SUM(crm_opp_expected_amount), 0) AS pipeline_amount, COALESCE(SUM(CASE WHEN crm_opp_stage = 'closed_won' THEN crm_opp_expected_amount ELSE 0 END), 0) AS won_amount FROM mt_crm_opportunity WHERE tenant_id = #{params.tenantId} AND crm_opp_expected_close_date IS NOT NULL GROUP BY 1 ORDER BY 1",
+    "outputFields": [
+      {
+        "fieldCode": "month",
+        "columnExpr": "month",
+        "dataType": "string",
+        "sortable": true
+      },
+      {
+        "fieldCode": "pipeline_amount",
+        "columnExpr": "pipeline_amount",
+        "dataType": "number",
+        "sortable": true
+      },
+      {
+        "fieldCode": "won_amount",
+        "columnExpr": "won_amount",
+        "dataType": "number",
+        "sortable": true
+      }
+    ]
+  },
+  {
+    "code": "sc_arsenal_monthly_trend",
+    "title:zh-CN": "军火展 — 月度商机趋势",
+    "title:en": "Arsenal — Monthly Opportunity Trend",
+    "description": "Opportunity count vs won count per month. Same time-bucketing constraint as sc_arsenal_monthly_pipeline.",
+    "purpose": "Drives the arsenal dashboard's trend line chart.",
+    "status": "published",
+    "fromSql": "SELECT to_char(date_trunc('month', crm_opp_expected_close_date), 'YYYY-MM') AS month, COUNT(*) AS opp_count, COUNT(*) FILTER (WHERE crm_opp_stage = 'closed_won') AS won_count FROM mt_crm_opportunity WHERE tenant_id = #{params.tenantId} AND crm_opp_expected_close_date IS NOT NULL GROUP BY 1 ORDER BY 1",
+    "outputFields": [
+      {
+        "fieldCode": "month",
+        "columnExpr": "month",
+        "dataType": "string",
+        "sortable": true
+      },
+      {
+        "fieldCode": "opp_count",
+        "columnExpr": "opp_count",
+        "dataType": "number",
+        "sortable": true
+      },
+      {
+        "fieldCode": "won_count",
+        "columnExpr": "won_count",
+        "dataType": "number",
+        "sortable": true
+      }
+    ]
+  },
+  {
+    "code": "sc_arsenal_cumulative_revenue",
+    "title:zh-CN": "军火展 — 累计赢单收入",
+    "title:en": "Arsenal — Cumulative Won Revenue",
+    "description": "Running total of won amount by month, via a window function. Unreachable from the aggregate data source, which has no window/cumulative support.",
+    "purpose": "Drives the arsenal dashboard's cumulative area chart.",
+    "status": "published",
+    "fromSql": "SELECT month, SUM(won_amount) OVER (ORDER BY month) AS cumulative_amount FROM (SELECT to_char(date_trunc('month', crm_opp_expected_close_date), 'YYYY-MM') AS month, COALESCE(SUM(CASE WHEN crm_opp_stage = 'closed_won' THEN crm_opp_expected_amount ELSE 0 END), 0) AS won_amount FROM mt_crm_opportunity WHERE tenant_id = #{params.tenantId} AND crm_opp_expected_close_date IS NOT NULL GROUP BY 1) monthly ORDER BY month",
+    "outputFields": [
+      {
+        "fieldCode": "month",
+        "columnExpr": "month",
+        "dataType": "string",
+        "sortable": true
+      },
+      {
+        "fieldCode": "cumulative_amount",
+        "columnExpr": "cumulative_amount",
+        "dataType": "number",
+        "sortable": true
+      }
+    ]
+  },
+  {
+    "code": "sc_arsenal_win_rate",
+    "title:zh-CN": "军火展 — 赢单率",
+    "title:en": "Arsenal — Win Rate",
+    "description": "Won deals as a percentage of closed deals. A ratio metric (a/b), which the aggregate data source cannot express — its aggregation set is closed at count/count_distinct/sum/avg/max/min.",
+    "purpose": "Drives the arsenal dashboard's win-rate KPI card.",
+    "status": "published",
+    "fromSql": "SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE crm_opp_stage = 'closed_won') / NULLIF(COUNT(*) FILTER (WHERE crm_opp_stage IN ('closed_won', 'closed_lost')), 0), 1) AS win_rate FROM mt_crm_opportunity WHERE tenant_id = #{params.tenantId}",
+    "outputFields": [
+      {
+        "fieldCode": "win_rate",
+        "columnExpr": "win_rate",
+        "dataType": "number"
+      }
+    ]
+  },
+  {
+    "code": "sc_arsenal_opportunity_board",
+    "title:zh-CN": "军火展 — 商机看板明细",
+    "title:en": "Arsenal — Opportunity Board",
+    "description": "Per-opportunity detail rows for the kanban widget. The aggregate data source always GROUP BYs and rejects a request with no metric or dimension, so it cannot return detail rows.",
+    "purpose": "Drives the arsenal dashboard's kanban board (one card per opportunity, grouped by stage).",
+    "status": "published",
+    "fromSql": "SELECT crm_opp_name AS opp_name, crm_opp_stage AS opp_stage, COALESCE(crm_opp_expected_amount, 0) AS opp_amount, COALESCE(crm_opp_owner, '') AS opp_owner FROM mt_crm_opportunity WHERE tenant_id = #{params.tenantId} ORDER BY crm_opp_expected_amount DESC NULLS LAST LIMIT 60",
+    "outputFields": [
+      {
+        "fieldCode": "opp_name",
+        "columnExpr": "opp_name",
+        "dataType": "string",
+        "searchable": true
+      },
+      {
+        "fieldCode": "opp_stage",
+        "columnExpr": "opp_stage",
+        "dataType": "string",
+        "searchable": true
+      },
+      {
+        "fieldCode": "opp_amount",
+        "columnExpr": "opp_amount",
+        "dataType": "number",
+        "sortable": true
+      },
+      {
+        "fieldCode": "opp_owner",
+        "columnExpr": "opp_owner",
+        "dataType": "string",
+        "searchable": true
+      }
+    ]
   }
 ]
