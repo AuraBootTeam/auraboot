@@ -497,6 +497,31 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return new String[] { target, display };
     }
 
+    /**
+     * Resolve the display-name enrichment target for a list field, covering both `reference`
+     * fields (via {@link #resolveCanonicalRefTarget}) and renderComponent-driven picker fields
+     * whose visual control implies a target: {@code userselect → sys_user},
+     * {@code organizationselect → org_department}. Returns {@code {targetModelCode, displayField}}
+     * or {@code null} when the field needs no {@code <field>_display} enrichment.
+     *
+     * <p>{@code memberpicker} is intentionally excluded — it stores a multi-value list, not a
+     * single id, so scalar id→name resolution does not apply.
+     */
+    private String[] resolveEnrichmentTarget(FieldDefinition field) {
+        if (field == null) return null;
+        String[] canonical = resolveCanonicalRefTarget(field);
+        if (canonical != null) return canonical;
+        Map<String, Object> extra = field.getExtraProps();
+        Object rc = extra == null ? null : extra.get("renderComponent");
+        String renderComponent = rc instanceof String s ? s.trim().toLowerCase() : null;
+        if (renderComponent == null) return null;
+        return switch (renderComponent) {
+            case "userselect" -> new String[] { "sys_user", null };
+            case "organizationselect" -> new String[] { "org_department", "org_dept_name" };
+            default -> null;
+        };
+    }
+
     /** True when {@code displayField} on {@code targetModelCode} is masked for this user (sensitive). */
     private boolean isDisplayFieldMasked(Long tenantId, Long userId, String targetModelCode, String displayField) {
         if (tenantId == null || userId == null) return false;
@@ -521,9 +546,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (modelOpt.isEmpty()) return;
 
         ModelDefinition model = modelOpt.get();
+        // Enrich `reference` fields AND renderComponent-driven picker fields (userselect /
+        // organizationselect) with a resolved `<field>_display` name — see resolveEnrichmentTarget.
         List<FieldDefinition> refFields = model.getFields().stream()
-                .filter(f -> "reference".equals(f.getDataType()))
-                .filter(f -> resolveCanonicalRefTarget(f) != null)
+                .filter(f -> resolveEnrichmentTarget(f) != null)
                 .toList();
 
         if (refFields.isEmpty()) return;
@@ -535,7 +561,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             String fieldCode = refField.getCode();
             String columnName = refField.getColumnName() != null ? refField.getColumnName() : fieldCode;
 
-            String[] canonical = resolveCanonicalRefTarget(refField);
+            String[] canonical = resolveEnrichmentTarget(refField);
             if (canonical == null) continue;
             String targetModelCode = canonical[0];
             String displayField = canonical[1];
@@ -620,7 +646,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     private static final Map<String, String> SYSTEM_TABLE_MAP = Map.of(
             "ns_user", "ab_user",
-            "ab_user", "ab_user"
+            "ab_user", "ab_user",
+            // Canonical user model code used across config/frontend (userselect targets,
+            // sc_owner_user refTarget) — physically the ab_user table.
+            "sys_user", "ab_user"
     );
 
     private String resolveSystemTable(String modelCode) {
@@ -736,7 +765,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      */
     private static final Map<String, String> SYSTEM_TABLE_DISPLAY_EXPRESSIONS = Map.of(
             "ab_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)",
-            "ns_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)"
+            "ns_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)",
+            "sys_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)"
     );
 
     @Override
