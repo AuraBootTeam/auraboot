@@ -1,0 +1,23 @@
+[
+  {
+    "code": "faq_candidate_review_stats",
+    "name:zh-CN": "FAQ 候选审核统计",
+    "name:en": "FAQ Candidate Review Stats",
+    "description": "One-row aggregate of FAQ candidate counts per review status.",
+    "purpose": "Feeds the metric strip on the FAQ review workbench. Deliberately returns a single row: metric-strip reads only the first row of its data source, so a GROUP BY shape would render as dashes.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": { "type": "string", "description": "Tenant ID (auto-injected)" }
+      },
+      "required": ["tenantId"]
+    },
+    "fromSql": "SELECT COUNT(*) FILTER (WHERE faq_status = 'draft') AS draft_count, COUNT(*) FILTER (WHERE faq_status = 'approved') AS approved_count, COUNT(*) FILTER (WHERE faq_status = 'published') AS published_count, COUNT(*) FILTER (WHERE faq_status = 'rejected') AS rejected_count FROM mt_faq_candidate WHERE tenant_id = #{params.tenantId}",
+    "outputFields": [
+      { "code": "draft_count", "columnExpr": "draft_count", "dataType": "number", "sortable": false },
+      { "code": "approved_count", "columnExpr": "approved_count", "dataType": "number", "sortable": false },
+      { "code": "published_count", "columnExpr": "published_count", "dataType": "number", "sortable": false },
+      { "code": "rejected_count", "columnExpr": "rejected_count", "dataType": "number", "sortable": false }
+    ]
+  }
+]

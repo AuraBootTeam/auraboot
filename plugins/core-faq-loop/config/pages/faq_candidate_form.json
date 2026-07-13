@@ -1,0 +1,45 @@
+{
+  "pageKey": "faq_candidate_form",
+  "modelCode": "faq_candidate",
+  "kind": "form",
+  "schemaVersion": 4,
+  "layout": { "type": "stack" },
+  "blocks": [
+    {
+      "id": "qa",
+      "blockType": "form-section",
+      "title": { "zh-CN": "问答内容", "en": "Question & Answer" },
+      "fields": [
+        { "field": "faq_question", "colSpan": 12, "required": true },
+        { "field": "faq_answer", "colSpan": 12, "required": true }
+      ]
+    },
+    {
+      "id": "target",
+      "blockType": "form-section",
+      "title": { "zh-CN": "发布目标", "en": "Publish Target" },
+      "fields": [
+        { "field": "faq_target_kb_id", "colSpan": 12, "required": true }
+      ]
+    },
+    {
+      "id": "buttons",
+      "blockType": "form-buttons",
+      "buttons": [
+        {
+          "code": "submit",
+          "primary": true,
+          "label": { "zh-CN": "保存", "en": "Save" },
+          "action": { "type": "command" }
+        },
+        {
+          "code": "cancel",
+          "label": { "zh-CN": "取消", "en": "Cancel" }
+        }
+      ]
+    }
+  ],
+  "name:zh-CN": "编辑 FAQ 候选",
+  "name:en": "Edit FAQ Candidate",
+  "title": { "zh-CN": "编辑 FAQ 候选", "en": "Edit FAQ Candidate" }
+}

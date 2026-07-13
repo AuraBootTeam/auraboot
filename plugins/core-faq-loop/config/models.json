@@ -1,0 +1,20 @@
+[
+  {
+    "code": "faq_candidate",
+    "displayName:zh-CN": "FAQ 候选",
+    "displayName:en": "FAQ Candidate",
+    "description": "A question/answer pair an LLM distilled from a support conversation, pending human review before it is written back into a knowledge base.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "A candidate FAQ entry extracted from a customer-service conversation. Carries the proposed question and answer, the model's confidence, and a link back to the conversation it came from. A reviewer approves, edits or rejects it; approved candidates are published into a knowledge base and become retrievable by the agent.",
+    "domain_category": "knowledge",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "draft → approved → published (also draft → rejected)",
+    "extension": {
+      "icon": "MessageSquareQuote",
+      "category": "faq-loop",
+      "titleField": "faq_question",
+      "subtitleField": "faq_status"
+    }
+  }
+]

@@ -1,0 +1,92 @@
+[
+  {
+    "code": "faq:update_qa",
+    "displayName:zh-CN": "编辑问答",
+    "displayName:en": "Edit Q&A",
+    "type": "update",
+    "modelCode": "faq_candidate",
+    "inputFields": [
+      "faq_question",
+      "faq_answer"
+    ],
+    "permissions": [
+      "faq.candidate.review"
+    ],
+    "agent_hint": "Correct the question or answer text of a FAQ candidate before it is approved. Does not change the review status.",
+    "precondition_description": "Candidate must still be in draft status.",
+    "output_description": "Returns the updated candidate record.",
+    "cmd_risk_level": "L1",
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "faq:approve",
+    "displayName:zh-CN": "批准",
+    "displayName:en": "Approve",
+    "type": "state_transition",
+    "modelCode": "faq_candidate",
+    "stateField": "faq_status",
+    "fromStates": ["draft"],
+    "toState": "approved",
+    "autoSetFields": {
+      "faq_reviewed_by": { "strategy": "current_username" },
+      "faq_reviewed_at": { "strategy": "current_datetime" }
+    },
+    "permissions": [
+      "faq.candidate.review"
+    ],
+    "agent_hint": "Approve a FAQ candidate. Transitions draft to approved and stamps the reviewer and review time. Approving does NOT write to the knowledge base — run faq:publish for that.",
+    "precondition_description": "Candidate must be in draft status.",
+    "output_description": "Returns the updated candidate with approved status.",
+    "cmd_risk_level": "L2",
+    "idempotent": true,
+    "reversible": false
+  },
+  {
+    "code": "faq:reject",
+    "displayName:zh-CN": "驳回",
+    "displayName:en": "Reject",
+    "type": "state_transition",
+    "modelCode": "faq_candidate",
+    "stateField": "faq_status",
+    "fromStates": ["draft"],
+    "toState": "rejected",
+    "inputFields": [
+      "faq_reject_reason"
+    ],
+    "autoSetFields": {
+      "faq_reviewed_by": { "strategy": "current_username" },
+      "faq_reviewed_at": { "strategy": "current_datetime" }
+    },
+    "permissions": [
+      "faq.candidate.review"
+    ],
+    "agent_hint": "Reject a FAQ candidate with a reason. Transitions draft to rejected. The candidate is never written to the knowledge base.",
+    "precondition_description": "Candidate must be in draft status.",
+    "output_description": "Returns the updated candidate with rejected status and the reason recorded.",
+    "cmd_risk_level": "L2",
+    "idempotent": true,
+    "reversible": false
+  },
+  {
+    "code": "faq:publish",
+    "displayName:zh-CN": "发布到知识库",
+    "displayName:en": "Publish to Knowledge Base",
+    "type": "custom",
+    "modelCode": "faq_candidate",
+    "permissions": [
+      "faq.candidate.publish"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认将该问答发布到知识库？发布后智能体检索时即可召回。",
+      "confirmMessage:en": "Publish this Q&A into the knowledge base? The agent will start recalling it."
+    },
+    "agent_hint": "Publish an approved FAQ candidate into its target knowledge base. Writes an ab_kb_document with source_type=conversation, stores the resulting document pid back on the candidate, and moves it to published. Idempotent: re-publishing the same candidate replaces its document rather than creating a second one. Persistence is owned by the platform FaqCandidateCommandHandler.",
+    "precondition_description": "Candidate must be in approved status and carry a target knowledge base.",
+    "side_effect_description": "Creates (or replaces) a document in the target knowledge base and embeds its chunks, making the FAQ retrievable by the agent.",
+    "output_description": "Returns the updated candidate with published status and the kb document pid filled in.",
+    "cmd_risk_level": "L3",
+    "idempotent": true,
+    "reversible": false
+  }
+]
