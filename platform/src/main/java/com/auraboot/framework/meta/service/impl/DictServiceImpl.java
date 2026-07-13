@@ -23,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +47,22 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @Slf4j
 @Service
 @RequiredArgsConstructor
+/**
+ * Every write path below carries {@code @CacheEvict("dictData")}.
+ *
+ * <p>Reads resolve through {@link DictVersionServiceImpl#loadDictByStrategy}, which is
+ * {@code @Cacheable("dictData")} behind a 30-minute in-process Caffeine cache. Until
+ * 2026-07-13 nothing evicted it — {@code clearDictCache}/{@code clearAllDictCache} existed
+ * with zero production callers — so an edit (admin CRUD or plugin import) reached the
+ * database while readers kept being served the stale projection until the backend
+ * restarted or the TTL lapsed.
+ *
+ * <p>{@code allEntries} because a single dict spans several cache keys
+ * (tenant x code x strategy x pinned version); this matches
+ * {@code MetaModelServiceImpl#clearAllCache} and {@code CommandMetadataCacheService#evictAll}.
+ * Note {@code batchDelete} calls {@code delete} internally — self-invocation skips the
+ * proxy, so each public write method must be annotated in its own right.
+ */
 public class DictServiceImpl implements DictService {
 
     private final DictMapper dictMapper;
@@ -67,6 +84,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dictData", allEntries = true)
     public DictDTO create(DictCreateRequest request) {
         if (request == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "创建请求不能为空");
@@ -185,6 +203,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dictData", allEntries = true)
     public DictDTO update(String pid, DictUpdateRequest request) {
         log.info("更新字典: {}", logSafe(pid));
 
@@ -219,6 +238,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dictData", allEntries = true)
     public void delete(String pid) {
         log.info("删除字典: {}", logSafe(pid));
 
@@ -581,6 +601,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dictData", allEntries = true)
     public int batchUpdateStatus(List<String> pids, String status) {
         log.info("批量更新字典状态: pids={}, status={}", pids.size(), logSafe(status));
 
@@ -614,6 +635,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dictData", allEntries = true)
     public int batchDelete(List<String> pids) {
         log.info("批量删除字典: pids={}", pids.size());
         
@@ -635,6 +657,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dictData", allEntries = true)
     public DictImportResult importDicts(List<DictCreateRequest> dictData) {
         // 验证租户上下文
           
@@ -1003,6 +1026,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dictData", allEntries = true)
     public DictDTO replaceItems(String dictPid, List<DictCreateRequest.DictItemCreateRequest> items) {
         log.info("替换字典项: dictPid={}, itemCount={}", logSafe(dictPid), items != null ? items.size() : 0);
 
@@ -1032,6 +1056,7 @@ public class DictServiceImpl implements DictService {
 
     @Override
     @Transactional
+    @CacheEvict(value = "dictData", allEntries = true)
     public DictDTO replacePluginItems(String dictPid, List<DictCreateRequest.DictItemCreateRequest> items) {
         log.info("Replacing plugin-owned dict items: dictPid={}, itemCount={}", logSafe(dictPid), items != null ? items.size() : 0);
 
