@@ -5,7 +5,7 @@ Every row below is backed by a test that has actually run, not a plan. The runne
 seeds conversations, drives a real browser against a **live LLM** (no stub), and tears the stack
 down. Its exit code is the result.
 
-Last full run: **22 + 22 + 21 passed, 0 skipped, exit 0.**
+Last full run: **22 + 22 + 22 passed, 0 skipped, exit 0.**
 
 Test paths refer to `web-admin/tests/e2e/faq-loop-{conversation-queue,review-workbench,pages-and-menu}.spec.ts`.
 
@@ -33,7 +33,7 @@ Test paths refer to `web-admin/tests/e2e/faq-loop-{conversation-queue,review-wor
 | `faq_candidate_list` | `faq_candidate_table` | question / answer / status / confidence | table columns | The plain list view of the same data | P2 | Columns show semantic labels; no raw record `id` is exposed | Golden PASS |
 | `faq_candidate_detail` | `faq_candidate_detail_toolbar` | approve / reject / update_qa / publish | toolbar actions | The second command path — detail page, not the workbench | P3, P4 | Buttons are state-aware (`visibleWhen`): review actions only while `draft`, publish only once `approved`. Approving here persists exactly as the row action does | Golden PASS |
 | `faq_candidate_detail` | `section_qa` / `section_review` / `section_trace` | all fields | form-section (read-only) | Inspect one candidate in full | P3 | Detail renders the candidate; confidence uses the `progress` renderer | Golden PASS |
-| `faq_candidate_form` | `qa` / `target` / `buttons` | question / answer / target KB | form + form-buttons | Hand-write a FAQ candidate | P2 (page loads) | Required fields are declared; the form is reachable | Golden PASS (form submit not exercised — see gaps) |
+| `faq_candidate_form` | `qa` / `target` / `buttons` | question / answer + Save | form + form-buttons | Fix the wording on the full page, reached from the detail page's 编辑问答 | P3, P5 | Prefills from the record (a blank form would invite you to retype an answer you cannot see); an empty required question is refused **and persists nothing**; a real edit reaches the database and leaves the candidate `draft` | Golden PASS |
 | Sidebar | `faq_root` → 3 leaves | 可提炼会话 / FAQ 审核台 / FAQ 候选 | menus | Every page is reachable by clicking, not just by URL | P1 | Each menu entry opens its page **from the sidebar**; standalone DSL pages use `/p/c/{pageKey}` | Golden PASS |
 
 ## Field coverage
@@ -66,11 +66,19 @@ the candidate leaves `draft`; publish hidden until `approved`).
 
 ## Known gaps
 
-- **`faq_candidate_form` submit is not exercised.** The page loads (P2) but hand-writing a candidate
-  end-to-end is untested. The form is a secondary path — every candidate in the product flow is
-  created by `faq:extract` — but this row is honestly "loads, not driven".
 - **Auto-trigger on conversation close is not implemented.** It is blocked on S1: `ab_im_conversation`
   has no `status` column yet, so there is no close event to hook. Extraction is manual (queue row
   action) until then. This is a scope boundary, not a defect.
 - **Confidence is advisory and may be absent.** A model that reports no confidence shows `-`, not
   `0%`. Nothing gates on it; a human always approves.
+
+## A note on the form's Save button
+
+`faq_candidate_form` declares `action: { type: "command" }` on its Save button. **That declaration is
+not what makes it save.** Verified by mutation: delete the `action` entirely and the golden still
+passes — `FormPageContent` runs its own submit path, driven by the button being the primary/submit
+button, and never consults `button.action`. The config is inert, not load-bearing.
+
+It is left in place because it states the intent correctly, but do not reason from it: if you need a
+form button to fire a *specific* command, prove it fires — the mechanism that would carry it is not
+the one running here.
