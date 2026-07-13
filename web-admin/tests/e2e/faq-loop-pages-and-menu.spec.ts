@@ -194,6 +194,80 @@ test.describe('Conversation → FAQ loop — menu reachability and the remaining
     expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
   });
 
+  test('P5 the form reached from Edit Q&A prefills, refuses an empty question, and saves', async ({
+    page,
+  }) => {
+    const errors = captureConsole(page);
+
+    // The one page the goldens had only ever *opened*. P3 clicks Edit Q&A, watches the URL become
+    // the form, and stops — so nothing had ever pressed its Save button.
+    //
+    // That button is `action: { type: 'command' }` with no command code. The platform resolves it
+    // by convention: no delete/create/update word in the label or code, but a targetRecordPid in
+    // context → operationType 'update' → the model's CRUD update command. Whether that convention
+    // actually fires here is not something you can settle by reading it. Press the button.
+    const draft = (await (async () => {
+      await page.goto('/p/faq_candidate', { waitUntil: 'domcontentloaded' });
+      return fetchCandidates(page);
+    })()).find((c) => c.faq_status === 'draft' && c.faq_source_conversation_pid === OWN_CONV_PID);
+    expect(draft, 'a draft candidate to edit').toBeTruthy();
+    const pid = draft!.pid as string;
+    const originalQuestion = String(draft!.faq_question);
+    const originalAnswer = String(draft!.faq_answer);
+
+    const listRow = page
+      .locator('[data-testid^="table-row-"]')
+      .filter({ hasText: originalQuestion.slice(0, 10) });
+    await listRow.getByTestId('row-action-view').click();
+    await expect(page).toHaveURL(new RegExp(`/p/faq_candidate.*${pid}`), { timeout: 15000 });
+    await page.getByTestId('toolbar-btn-update_qa').click();
+    await expect(page, 'Edit Q&A reaches the form').toHaveURL(/\/p\/faq_candidate.*(edit|new)/i, {
+      timeout: 15000,
+    });
+
+    // 1. It prefills. A form that opens blank does not "let you edit" — it silently invites you to
+    //    retype an answer you cannot see, and Save would then wipe the one the model wrote.
+    const questionField = page.getByTestId('form-field-faq_question').locator('textarea, input').first();
+    const answerField = page.getByTestId('form-field-faq_answer').locator('textarea, input').first();
+    await expect(questionField, 'the question is prefilled, not blank').toHaveValue(
+      originalQuestion,
+      { timeout: 20000 },
+    );
+    await expect(answerField, 'the answer is prefilled, not blank').toHaveValue(originalAnswer);
+
+    // 2. Required is enforced. Clearing a required field and saving must not persist an empty
+    //    question — a FAQ with no question is not a FAQ.
+    await questionField.fill('');
+    await page.getByTestId('form-btn-submit').click();
+    await expect(
+      main(page),
+      'an empty required question is refused, and the form stays put',
+    ).toContainText(/必填|不能为空|required|cannot be empty/i, { timeout: 10000 });
+    const afterEmpty = (await fetchCandidates(page)).find((c) => c.pid === pid);
+    expect(afterEmpty?.faq_question, 'the empty submit persisted nothing').toBe(originalQuestion);
+
+    // 3. It saves. Assert on the record the server returns, not on a toast: a toast is the UI
+    //    telling you it thinks it succeeded.
+    const editedQuestion = `${originalQuestion} (edited via form)`;
+    await questionField.fill(editedQuestion);
+    await page.getByTestId('form-btn-submit').click();
+
+    await expect
+      .poll(
+        async () => (await fetchCandidates(page)).find((c) => c.pid === pid)?.faq_question,
+        { timeout: 20000, message: 'the edit reaches the database' },
+      )
+      .toBe(editedQuestion);
+
+    // Editing the wording is not a review decision — the candidate is still waiting for one.
+    const saved = (await fetchCandidates(page)).find((c) => c.pid === pid);
+    expect(saved?.faq_status, 'editing the Q&A does not approve it').toBe('draft');
+    expect(saved?.faq_answer, 'the untouched answer survives the save').toBe(originalAnswer);
+
+    await page.screenshot({ path: `${SHOTS}/P5-form-save.png` });
+    expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
+  });
+
   test('P4 approving from the detail toolbar persists, exactly like the row action does', async ({
     page,
   }) => {
