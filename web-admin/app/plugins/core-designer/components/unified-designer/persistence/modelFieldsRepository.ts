@@ -19,6 +19,9 @@ interface BackendModelFieldRecord {
     displayName?: string;
     refTarget?: unknown;
     reference?: unknown;
+    /** Platform render component (colorpicker/rating/progress/moneyinput/...). */
+    renderComponent?: string;
+    [key: string]: unknown;
   };
   uiSchema?: {
     component?: string;
@@ -44,6 +47,8 @@ interface BackendResolvedFieldRecord {
   extension?: {
     refTarget?: unknown;
     reference?: unknown;
+    renderComponent?: string;
+    [key: string]: unknown;
   };
   uiHint?: {
     component?: string;
@@ -175,15 +180,24 @@ function mapBackendField(
   const refTarget = normalizeFieldRefTarget(
     field.refTarget ?? field.extension?.refTarget ?? field.extension?.reference,
   );
+  const extensionProps = extractExtensionProps(field.extension);
   return {
     modelCode,
     code,
     label: field.displayName || field.extension?.displayName || field.name || code,
     type: field.dataType || field.fieldType || field.type,
-    component: field.uiSchema?.component || field.uiSchema?.widget || field.uiSchema?.widgetType,
+    // The live /p/ form derives the control from `extension.renderComponent`; the
+    // legacy `uiSchema.*` is usually empty. Prefer renderComponent so the designer
+    // preview reproduces colorpicker/rating/progress/moneyinput/... faithfully.
+    component:
+      field.extension?.renderComponent ||
+      field.uiSchema?.component ||
+      field.uiSchema?.widget ||
+      field.uiSchema?.widgetType,
     dictCode: field.dictCode,
     required: Boolean(field.required),
     ...(refTarget ? { refTarget } : {}),
+    ...(extensionProps ? { extensionProps } : {}),
   };
 }
 
@@ -200,12 +214,14 @@ function mapResolvedField(
     Boolean(field.computeExpression?.trim()) ||
     field.sourceType === 'computed_only' ||
     field.sourceType === 'computed';
+  const extensionProps = extractExtensionProps(field.extension);
   return {
     modelCode,
     code,
     label: field.displayName || code,
     type: field.dataType || field.returnType,
     component:
+      field.extension?.renderComponent ||
       field.uiHint?.component ||
       field.uiHint?.widget ||
       field.uiHint?.widgetType ||
@@ -215,7 +231,28 @@ function mapResolvedField(
     ...(virtual ? { virtual: true } : {}),
     ...(field.semanticType ? { semanticType: field.semanticType } : {}),
     ...(refTarget ? { refTarget } : {}),
+    ...(extensionProps ? { extensionProps } : {}),
   };
+}
+
+/**
+ * Extract the backend field `extension` bag into component-facing props for the
+ * WYSIWYG preview, dropping keys that are surfaced as first-class fields
+ * (renderComponent/displayName) or resolved separately (refTarget/reference).
+ */
+function extractExtensionProps(
+  extension: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!extension || typeof extension !== 'object') return undefined;
+  const { renderComponent, displayName, refTarget, reference, ...rest } = extension as Record<
+    string,
+    unknown
+  >;
+  void renderComponent;
+  void displayName;
+  void refTarget;
+  void reference;
+  return Object.keys(rest).length > 0 ? rest : undefined;
 }
 
 function normalizeFieldRefTarget(
