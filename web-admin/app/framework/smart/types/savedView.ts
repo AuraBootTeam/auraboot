@@ -693,3 +693,38 @@ export interface SavedViewQueryParams {
   /** Page key to filter by (optional) */
   pageKey?: string;
 }
+
+/**
+ * Options accepted by POST /api/views/{viewPid}/share (ViewShareController).
+ */
+export interface SavedViewShareRequest {
+  /** Optional password gate for the public link */
+  password?: string;
+  /** Optional expiry, in hours from now. Omit for a link that never expires. */
+  expireHours?: number;
+}
+
+/**
+ * Result of POST /api/views/{viewPid}/share (ViewShareService.createShareLink).
+ */
+export interface SavedViewShareResult {
+  /** Opaque share token; the public page lives at /share/{token} */
+  token: string;
+  /** API path of the shared-view endpoint, e.g. /api/views/shared/{token} */
+  shareUrl: string;
+  /** ISO timestamp, or null when the link never expires */
+  expiresAt?: string | null;
+  passwordProtected?: boolean;
+}
+
+/**
+ * Result of GET /api/views/{viewPid}/share/status (ViewShareService.getShareStatus).
+ * `token` / `expiresAt` / `passwordProtected` are only present once a link exists.
+ */
+export interface SavedViewShareStatus {
+  /** True only when a share link exists AND is active */
+  shared: boolean;
+  token?: string | null;
+  expiresAt?: string | null;
+  passwordProtected?: boolean;
+}

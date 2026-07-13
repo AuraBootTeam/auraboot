@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { get, post } from '~/shared/services/http-client';
+import { del, get, post } from '~/shared/services/http-client';
 import { SavedViewService } from '../savedViewService';
 import type { SavedView, SavedViewCapabilityCheckResponse } from '~/framework/smart/types/savedView';
 
@@ -12,6 +12,7 @@ vi.mock('~/shared/services/http-client', () => ({
 
 const mockedGet = vi.mocked(get);
 const mockedPost = vi.mocked(post);
+const mockedDel = vi.mocked(del);
 
 function makeView(overrides: Partial<SavedView> = {}): SavedView {
   return {
@@ -135,6 +136,105 @@ describe('SavedViewService', () => {
       undefined,
     );
     expect(result).toBe(response);
+  });
+
+  // ── Public share link (GAP-121 producer half) ─────────────────────────────
+  // Backend: ViewShareController POST/DELETE /{viewPid}/share, GET /{viewPid}/share/status.
+
+  it('shareView posts to the share endpoint and returns the token', async () => {
+    const service = new SavedViewService();
+    mockedPost.mockResolvedValue({
+      code: '0',
+      desc: 'ok',
+      data: {
+        token: 'tok123',
+        shareUrl: '/api/views/shared/tok123',
+        expiresAt: null,
+        passwordProtected: false,
+      },
+    });
+
+    const result = await service.shareView('view-1');
+
+    expect(mockedPost).toHaveBeenCalledWith('/api/views/view-1/share', {}, undefined, undefined);
+    expect(result.token).toBe('tok123');
+    expect(result.shareUrl).toBe('/api/views/shared/tok123');
+  });
+
+  it('shareView forwards password and expireHours options', async () => {
+    const service = new SavedViewService();
+    mockedPost.mockResolvedValue({
+      code: '0',
+      desc: 'ok',
+      data: { token: 't', shareUrl: '/api/views/shared/t', passwordProtected: true },
+    });
+
+    await service.shareView('view-1', { password: 's3cret', expireHours: 24 });
+
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/api/views/view-1/share',
+      { password: 's3cret', expireHours: 24 },
+      undefined,
+      undefined,
+    );
+  });
+
+  it('shareView throws when the backend reports failure', async () => {
+    const service = new SavedViewService();
+    mockedPost.mockResolvedValue({ code: '500', desc: 'boom', data: null });
+
+    await expect(service.shareView('view-1')).rejects.toThrow('boom');
+  });
+
+  it('revokeShare deletes the share link', async () => {
+    const service = new SavedViewService();
+    mockedDel.mockResolvedValue({ code: '0', desc: 'ok', data: true });
+
+    await service.revokeShare('view-1');
+
+    expect(mockedDel).toHaveBeenCalledWith(
+      '/api/views/view-1/share',
+      undefined,
+      undefined,
+      undefined,
+    );
+  });
+
+  it('revokeShare throws when the backend reports failure', async () => {
+    const service = new SavedViewService();
+    mockedDel.mockResolvedValue({ code: '500', desc: 'revoke failed', data: null });
+
+    await expect(service.revokeShare('view-1')).rejects.toThrow('revoke failed');
+  });
+
+  it('getShareStatus reads the share status endpoint', async () => {
+    const service = new SavedViewService();
+    mockedGet.mockResolvedValue({
+      code: '0',
+      desc: 'ok',
+      data: { shared: true, token: 'tok123', expiresAt: null, passwordProtected: false },
+    });
+
+    const result = await service.getShareStatus('view-1');
+
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/api/views/view-1/share/status',
+      undefined,
+      undefined,
+      undefined,
+    );
+    expect(result.shared).toBe(true);
+    expect(result.token).toBe('tok123');
+  });
+
+  it('getShareStatus reports an unshared view', async () => {
+    const service = new SavedViewService();
+    mockedGet.mockResolvedValue({ code: '0', desc: 'ok', data: { shared: false } });
+
+    const result = await service.getShareStatus('view-1');
+
+    expect(result.shared).toBe(false);
+    expect(result.token).toBeUndefined();
   });
 
   it('searchUsers calls tenant member search for collaborator picker', async () => {
