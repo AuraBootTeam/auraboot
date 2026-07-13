@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.bpm.rule.DroolsEngineService;
+import com.auraboot.framework.bpm.rule.RuleReasonMessages;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
@@ -138,7 +139,7 @@ public class PreActionsPhase implements CommandPhase {
                                 Map<String, Object> currentRecord) {
         String ruleCode = asString(action.get("ruleCode"));
         if (ruleCode == null) {
-            throw new BusinessException("bpm.rule.rule_code_required");
+            throw new BusinessException(RuleReasonMessages.i18nKey("bpm.rule.rule_code_required"));
         }
 
         // Resolve contextLookup first, building scope map for placeholders.
@@ -193,15 +194,13 @@ public class PreActionsPhase implements CommandPhase {
         } catch (Exception e) {
             log.error("preAction bpm:run-rule failed: ruleCode={}, error={}",
                     ruleCode, e.getMessage(), e);
-            throw new BusinessException(FALLBACK_REASON_KEY);
+            throw new BusinessException(RuleReasonMessages.i18nKey(FALLBACK_REASON_KEY));
         }
 
         if (ruleResult != null && Boolean.FALSE.equals(ruleResult.get(RULE_RESULT_KEY_VALID))) {
             Object reason = ruleResult.get(RULE_RESULT_KEY_REASON);
-            String messageKey = (reason != null && !reason.toString().isBlank())
-                    ? reason.toString()
-                    : FALLBACK_REASON_KEY;
-            throw new BusinessException(messageKey);
+            throw new BusinessException(
+                    RuleReasonMessages.reasonKey(ruleCode, reason, FALLBACK_REASON_KEY));
         }
     }
 

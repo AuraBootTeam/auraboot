@@ -24,16 +24,30 @@ function int intValue(Object value) {
 // Fact is a java.util.Map<String, Object> with the following keys:
 //   - type             : String  ("annual" | "sick" | "personal" | "comp")
 //   - days             : Number
-//   - balanceRemaining : Number  (annual leave remaining)
+//   - balanceRemaining : Number  (annual leave remaining; null when the caller's
+//                                 contextLookup found no wd_leave_balance row for the
+//                                 applicant, or the row leaves the field unset)
 //   - attachmentCount  : Number
 //   - _ruleResult      : Map     (output channel)
 // The rule writes into _ruleResult:
 //   - valid  : Boolean
 //   - reason : String  (i18n error code)
+//
+// The two annual-leave rules below are mutually exclusive on balanceRemaining being
+// null, so "no balance on file" is never reported as "not enough days left".
+
+rule "reject_annual_without_balance_record"
+    when
+        $req: Map(this["type"] == "annual", this["balanceRemaining"] == null)
+    then
+        Map result = (Map) $req.get("_ruleResult");
+        result.put("valid", Boolean.FALSE);
+        result.put("reason", "annual_balance_not_found");
+end
 
 rule "reject_insufficient_annual_balance"
     when
-        $req: Map(this["type"] == "annual")
+        $req: Map(this["type"] == "annual", this["balanceRemaining"] != null)
         eval(numberValue($req.get("days")) > numberValue($req.get("balanceRemaining")))
     then
         Map result = (Map) $req.get("_ruleResult");

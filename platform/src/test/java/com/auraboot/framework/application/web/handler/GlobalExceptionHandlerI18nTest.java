@@ -8,6 +8,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.Map;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -117,5 +119,44 @@ class GlobalExceptionHandlerI18nTest {
 
         assertThat(handler.localizeBusinessMessage(ex, request))
                 .isEqualTo("User is already a member of this tenant");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void devEnvironmentDetailCarriesLocalizedTextNotTheRawKey() {
+        // The frontend toasts context.detail. On a dev stack that field used to carry the raw
+        // exception message, so rule reason keys leaked into the UI (workflow-demo submit showed
+        // "annual_leave_insufficient"). Dev must show the same localized text as production.
+        ReflectionTestUtils.setField(handler, "activeProfile", "dev");
+        when(localeResolver.resolveLocale(request)).thenReturn("zh-CN");
+        when(i18nService.getValue("zh-CN", "error.wd_leave_validation.annual_balance_not_found"))
+                .thenReturn("未找到该员工的年假余额记录");
+
+        BusinessException ex =
+                new BusinessException("$i18n:error.wd_leave_validation.annual_balance_not_found");
+
+        var response = handler.handleBusinessException(ex, request);
+
+        Map<String, String> context =
+                (Map<String, String>) response.getBody().getContext();
+        assertThat(context).containsEntry("detail", "未找到该员工的年假余额记录");
+        assertThat(context)
+                .containsEntry("messageKey", "$i18n:error.wd_leave_validation.annual_balance_not_found");
+        assertThat(context).containsEntry("exception", "BusinessException");
+    }
+
+    @Test
+    void productionDetailIsTheLocalizedStringOnly() {
+        ReflectionTestUtils.setField(handler, "activeProfile", "prod");
+        when(localeResolver.resolveLocale(request)).thenReturn("zh-CN");
+        when(i18nService.getValue("zh-CN", "error.wd_leave_validation.annual_leave_insufficient"))
+                .thenReturn("剩余年假不足，无法提交该申请");
+
+        BusinessException ex =
+                new BusinessException("$i18n:error.wd_leave_validation.annual_leave_insufficient");
+
+        var response = handler.handleBusinessException(ex, request);
+
+        assertThat(response.getBody().getContext()).isEqualTo("剩余年假不足，无法提交该申请");
     }
 }

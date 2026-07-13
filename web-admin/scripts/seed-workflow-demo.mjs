@@ -3,6 +3,8 @@ import { request } from '@playwright/test';
 const DEFAULT_BASE_URL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:5173';
 const DEFAULT_STORAGE_STATE = process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json';
 const DEFAULT_MIN_REQUESTS = 12;
+const BALANCE_YEAR = 2026;
+const ANNUAL_REMAINING_DAYS = 18;
 
 function parseArgs(argv) {
   const options = {
@@ -115,18 +117,46 @@ async function getCurrentUser(api) {
   };
 }
 
-async function ensureBalance(api, userPid) {
-  const existing = await countDynamic(api, 'wd_leave_balance');
-  if (existing >= 1) {
-    return false;
+async function listDynamic(api, modelCode, pageSize = 200) {
+  const body = await getJson(api, `/api/dynamic/${modelCode}/list?pageNum=1&pageSize=${pageSize}`);
+  return body?.data?.records ?? [];
+}
+
+/**
+ * Every user the applicant memberpicker can offer, so a demo submit works no matter who
+ * is picked — wd_req_applicant is a reference to sys_user, and wd_leave_validation rejects
+ * annual leave for an applicant with no balance row.
+ */
+async function listPickableUsers(api) {
+  const body = await getJson(api, '/api/admin/users/search?keyword=&size=100');
+  return (body?.data ?? [])
+    .filter((user) => user?.pid)
+    .map((user) => ({
+      pid: String(user.pid),
+      label: String(user.displayName ?? user.email ?? user.pid),
+    }));
+}
+
+async function ensureBalances(api, users) {
+  const onFile = new Set(
+    (await listDynamic(api, 'wd_leave_balance'))
+      .map((row) => String(row?.wd_bal_employee ?? ''))
+      .filter(Boolean),
+  );
+
+  const created = [];
+  for (const user of users) {
+    if (onFile.has(user.pid)) continue;
+    await executeCommand(api, 'wd:create_leave_balance', {
+      wd_bal_employee: user.pid,
+      wd_bal_year: BALANCE_YEAR,
+      wd_bal_annual_remaining: ANNUAL_REMAINING_DAYS,
+      wd_bal_sick_used: 0,
+    });
+    created.push(user.label);
+    console.log(`[workflow-demo-seed] created leave balance for ${user.label}`);
   }
-  await executeCommand(api, 'wd:create_leave_balance', {
-    wd_bal_employee: userPid,
-    wd_bal_year: 2026,
-    wd_bal_annual_remaining: 18,
-    wd_bal_sick_used: 0,
-  });
-  return true;
+  return created;
 }
 
 async function seedRequests(api, userPid, needed) {
@@ -221,7 +251,11 @@ export async function main(argv = process.argv.slice(2)) {
 
   try {
     const user = await getCurrentUser(api);
-    await ensureBalance(api, user.pid);
+    const pickable = await listPickableUsers(api);
+    const applicants = pickable.some((candidate) => candidate.pid === user.pid)
+      ? pickable
+      : [user, ...pickable];
+    await ensureBalances(api, applicants);
     const existingRequests = await countDynamic(api, 'wd_leave_request');
     const needed = Math.max(0, options.minRequests - existingRequests);
     console.log(

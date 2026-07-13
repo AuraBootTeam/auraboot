@@ -18,7 +18,10 @@ import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRu
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
-import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import {
+  useActionHandler,
+  resolveCommandErrorMessage,
+} from '~/framework/meta/hooks/useActionHandler';
 import { useComputedFields } from '~/framework/meta/hooks/useComputedFields';
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
@@ -1760,7 +1763,9 @@ export function FormPageContent(props: PageContentProps) {
                 setSummaryErrors(parseValidationSummaryMessages(contextError));
                 return;
               }
-              throw new Error(result.desc || result.message || 'Command execution failed');
+              // result.desc / result.message are the generic envelope ("Business error").
+              // The reason a command refused the submit lives in context.detail.
+              throw new Error(resolveCommandErrorMessage(result, effectiveCommandCode));
             }
             const asyncDispatch = resolveAsyncCommandDispatch(result.data);
             const responseData = asyncDispatch

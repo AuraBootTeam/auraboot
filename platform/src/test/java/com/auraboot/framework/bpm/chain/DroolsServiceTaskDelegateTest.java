@@ -63,7 +63,7 @@ class DroolsServiceTaskDelegateTest {
         ExecutionContext ctx = mockContext(props, new HashMap<>());
         assertThatThrownBy(() -> delegate.execute(ctx))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("annual_leave_insufficient");
+                .hasMessage("$i18n:error.wd_leave_validation.annual_leave_insufficient");
     }
 
     @Test
