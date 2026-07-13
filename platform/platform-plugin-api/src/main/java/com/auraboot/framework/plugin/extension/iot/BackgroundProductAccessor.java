@@ -54,6 +54,8 @@ public interface BackgroundProductAccessor {
      * @param nodeType        one of {@code DEVICE / GATEWAY / SUBDEVICE}
      * @param dataFormat      one of {@code JSON / BINARY / CUSTOM}
      * @param transportType   one of {@code MQTT / COAP / HTTP / MODBUS}
+     * @param provisionType   optional product provisioning strategy, such as
+     *                        {@code DISABLED / ALLOW_CREATE / CHECK_PRE}; may be null on older data
      * @param tenantId        owning tenant
      */
     record ProductView(
@@ -62,7 +64,18 @@ public interface BackgroundProductAccessor {
             String nodeType,
             String dataFormat,
             String transportType,
+            String provisionType,
             long tenantId) {
+
+        public ProductView(
+                String productKey,
+                Map<String, String> name,
+                String nodeType,
+                String dataFormat,
+                String transportType,
+                long tenantId) {
+            this(productKey, name, nodeType, dataFormat, transportType, null, tenantId);
+        }
     }
 
     /**

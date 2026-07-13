@@ -31,6 +31,7 @@ class BackgroundProductAccessorContractTest {
                 "DEVICE",
                 "JSON",
                 "MQTT",
+                "ALLOW_CREATE",
                 100L));
         accessor.putProduct(new ProductView(
                 "gw-product",
@@ -38,6 +39,7 @@ class BackgroundProductAccessorContractTest {
                 "GATEWAY",
                 "JSON",
                 "MQTT",
+                "CHECK_PRE",
                 200L));
         accessor.putSchema("temp-product", new ProductSchema(
                 List.of(new PropertyDef("temperature", "float", true, "°C",
@@ -53,6 +55,7 @@ class BackgroundProductAccessorContractTest {
 
         assertThat(result).isPresent();
         assertThat(result.get().nodeType()).isEqualTo("DEVICE");
+        assertThat(result.get().provisionType()).isEqualTo("ALLOW_CREATE");
         assertThat(result.get().name()).containsEntry("en-US", "Temperature Product");
     }
 
