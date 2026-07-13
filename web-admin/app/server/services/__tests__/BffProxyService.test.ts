@@ -73,7 +73,10 @@ describe('BffProxyService', () => {
 
     expect(headers.authorization).toBe('Bearer test-token');
     expect(headers['content-type']).toBe('application/json');
-    expect(headers.accept).toBe('application/json');
+    // `*/*` is passed through, not narrowed. Rewriting it to application/json made every endpoint
+    // that produces something else answer 406 — including the scripts customers embed on their own
+    // websites, which a browser fetches with exactly this Accept.
+    expect(headers.accept).toBe('*/*');
     expect(headers.origin).toBeUndefined();
     expect(headers.referer).toBeUndefined();
     expect(headers.host).toBeUndefined();
@@ -192,5 +195,47 @@ describe('BffProxyService', () => {
     expect(responseHeaders.get('Content-Disposition')).toBe('inline; filename="board-top.svg"');
     expect(res.body).toEqual(svgBytes);
     expect(res.json).not.toHaveBeenCalled();
+  });
+
+  it('does not narrow Accept: */* — a <script src> must be able to fetch a script', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const headers = await (
+      service as unknown as {
+        sanitizeHeaders(req: {
+          headers: Record<string, string>;
+          originalUrl: string;
+          url: string;
+        }): Promise<Record<string, string>>;
+      }
+    ).sanitizeHeaders({
+      originalUrl: '/api/crm/forms/abc/sdk.js',
+      url: '/api/crm/forms/abc/sdk.js',
+      headers: { accept: '*/*' },
+    });
+
+    // A browser fetching <script src="…/sdk.js"> sends exactly this. Rewriting it to
+    // application/json narrows what the client said it would take, and the endpoint — which
+    // produces application/javascript — answers 406. The customer pastes the snippet and gets
+    // nothing, with nothing anywhere saying why.
+    expect(headers.accept).toBe('*/*');
+  });
+
+  it('supplies */* when the request carries no Accept at all', async () => {
+    const service = new BffProxyService({ target: 'http://127.0.0.1:6443' });
+    const headers = await (
+      service as unknown as {
+        sanitizeHeaders(req: {
+          headers: Record<string, string>;
+          originalUrl: string;
+          url: string;
+        }): Promise<Record<string, string>>;
+      }
+    ).sanitizeHeaders({
+      originalUrl: '/api/pages/page_1',
+      url: '/api/pages/page_1',
+      headers: {},
+    });
+
+    expect(headers.accept).toBe('*/*');
   });
 });

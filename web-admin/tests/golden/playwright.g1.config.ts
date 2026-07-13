@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { BASE_URL } from '../helpers/environments';
 
 /**
  * Golden for the two G1 gap fixes. Host stack must already be up (backend ← BFF ← vite).
@@ -11,7 +12,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
-    baseURL: process.env.G1_GOLDEN_BASE ?? 'http://localhost:5173',
+    baseURL: process.env.G1_GOLDEN_BASE ?? BASE_URL,
     headless: true,
     screenshot: 'on',
     trace: 'retain-on-failure',

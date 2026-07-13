@@ -1,4 +1,5 @@
 import { test, expect, type Page, type APIRequestContext } from '@playwright/test';
+import { BASE_URL } from '../helpers/environments';
 
 /**
  * Browser golden for the two gap fixes this branch carries alongside the CS channel.
@@ -16,7 +17,7 @@ import { test, expect, type Page, type APIRequestContext } from '@playwright/tes
  * canShareSavedView() had zero call sites, so a user could open a share link but never create one.
  * This drives generate → link → revoke through the panel.
  */
-const BASE = process.env.G1_GOLDEN_BASE ?? 'http://localhost:5173';
+const BASE = process.env.G1_GOLDEN_BASE ?? BASE_URL;
 const ADMIN_EMAIL = process.env.G1_ADMIN_EMAIL ?? 'admin@cs.test';
 const ADMIN_PW = process.env.G1_ADMIN_PW ?? 'Admin@12345';
 
