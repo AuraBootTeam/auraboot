@@ -5,6 +5,7 @@
     "name:en": "CRM Starter Administrator",
     "description": "Full access to all CRM Starter modules (Accounts, Contacts, Leads)",
     "permissions": [
+      "meta.command.execute",
       "crm.account.manage",
       "crm.account.read",
       "crm.contact.manage",
@@ -19,6 +20,7 @@
     "name:en": "Sales Representative",
     "description": "Manage accounts, contacts, and leads",
     "permissions": [
+      "meta.command.execute",
       "crm.account.manage",
       "crm.account.read",
       "crm.contact.manage",
