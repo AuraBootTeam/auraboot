@@ -66,6 +66,15 @@
       "dependOn": [
         "state.selectedFaq.pid"
       ]
+    },
+    "sourceTranscript": {
+      "type": "api",
+      "method": "get",
+      "endpoint": "/api/faq/conversations/${state.selectedFaq.faq_source_conversation_pid}/messages",
+      "adaptor": "table",
+      "dependOn": [
+        "state.selectedFaq.faq_source_conversation_pid"
+      ]
     }
   },
   "blocks": [
@@ -288,7 +297,31 @@
               "faqStats",
               "faqList",
               "selectedFaqDetail"
-            ]
+            ],
+            "inputFields": [
+              {
+                "field": "faq_question",
+                "label": {
+                  "zh-CN": "问题",
+                  "en-US": "Question"
+                },
+                "type": "textarea",
+                "required": true
+              },
+              {
+                "field": "faq_answer",
+                "label": {
+                  "zh-CN": "答案",
+                  "en-US": "Answer"
+                },
+                "type": "textarea",
+                "required": true
+              }
+            ],
+            "inputFieldsTitle": {
+              "zh-CN": "编辑问答",
+              "en": "Edit Q&A"
+            }
           }
         },
         {
@@ -327,7 +360,26 @@
               "faqStats",
               "faqList",
               "selectedFaqDetail"
-            ]
+            ],
+            "inputFields": [
+              {
+                "field": "faq_reject_reason",
+                "label": {
+                  "zh-CN": "驳回原因",
+                  "en-US": "Reject reason"
+                },
+                "type": "textarea",
+                "required": true,
+                "placeholder": {
+                  "zh-CN": "为什么这条不该进知识库？",
+                  "en-US": "Why should this not reach customers?"
+                }
+              }
+            ],
+            "inputFieldsTitle": {
+              "zh-CN": "驳回原因",
+              "en": "Reject reason"
+            }
           }
         },
         {
@@ -494,6 +546,40 @@
           ]
         }
       }
+    },
+    {
+      "id": "faq_source_transcript",
+      "blockType": "table",
+      "dataSource": "sourceTranscript",
+      "title": {
+        "zh-CN": "来源对话",
+        "en": "Source Conversation"
+      },
+      "columns": [
+        {
+          "field": "seq",
+          "width": 70,
+          "label": {
+            "zh-CN": "#",
+            "en": "#"
+          }
+        },
+        {
+          "field": "sender",
+          "width": 110,
+          "label": {
+            "zh-CN": "说话人",
+            "en": "Speaker"
+          }
+        },
+        {
+          "field": "content",
+          "label": {
+            "zh-CN": "内容",
+            "en": "Content"
+          }
+        }
+      ]
     }
   ],
   "title": {

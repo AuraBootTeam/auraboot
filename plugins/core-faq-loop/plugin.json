@@ -13,11 +13,34 @@
   "minPlatformVersion": "1.0.0",
   "dependencies": [],
   "provides": [
-    {"type": "model", "code": "faq_candidate"},
-    {"type": "command", "code": "faq:approve"},
-    {"type": "command", "code": "faq:reject"},
-    {"type": "command", "code": "faq:update_qa"},
-    {"type": "command", "code": "faq:publish"}
+    {
+      "type": "model",
+      "code": "faq_candidate"
+    },
+    {
+      "type": "model",
+      "code": "faq_source_conversation"
+    },
+    {
+      "type": "command",
+      "code": "faq:approve"
+    },
+    {
+      "type": "command",
+      "code": "faq:reject"
+    },
+    {
+      "type": "command",
+      "code": "faq:update_qa"
+    },
+    {
+      "type": "command",
+      "code": "faq:publish"
+    },
+    {
+      "type": "command",
+      "code": "faq:extract"
+    }
   ],
   "requires": [],
   "resourceDirs": {

@@ -16,5 +16,25 @@
       "titleField": "faq_question",
       "subtitleField": "faq_status"
     }
+  },
+  {
+    "code": "faq_source_conversation",
+    "displayName:zh-CN": "可提炼会话",
+    "displayName:en": "Distillable Conversation",
+    "description": "Metadata-only view over ab_im_conversation, so the FAQ console can browse conversations and distil one. Read through GET /api/faq/conversations; nothing is ever written back to the conversation.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "A support conversation that FAQ pairs can be distilled from. Carries how many candidates it has already produced, so a reviewer can see what has and has not been mined.",
+    "domain_category": "knowledge",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "read-only; the only action is to distil FAQ candidates from it",
+    "extension": {
+      "icon": "MessagesSquare",
+      "category": "faq-loop",
+      "titleField": "faq_conv_name",
+      "subtitleField": "faq_conv_type",
+      "tableName": "ab_im_conversation",
+      "skipTableCreation": true
+    }
   }
 ]
