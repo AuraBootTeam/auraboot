@@ -111,6 +111,54 @@ class DocumentParserServiceTest {
         }
 
         @Test
+        @DisplayName("web page: drops site chrome and prefers the marked-up main content")
+        void parseWebPageDropsChrome() {
+            String html = """
+                    <html><head><title>Refund policy — Acme</title></head>
+                    <body>
+                      <nav><a href="/">Home</a><a href="/pricing">Pricing</a></nav>
+                      <header>Acme Corp</header>
+                      <aside>Subscribe to our newsletter</aside>
+                      <main><p>Refunds are issued within 30 days of purchase.</p></main>
+                      <footer>Copyright 2026 Acme. All rights reserved.</footer>
+                    </body></html>
+                    """;
+
+            var page = service.parseWebPage(html, "http://acme.test/refunds");
+
+            assertEquals("Refund policy — Acme", page.title());
+            assertTrue(page.text().contains("Refunds are issued within 30 days"),
+                    "the actual content went missing: " + page.text());
+            // Chrome is identical on every page of a site. Indexing it once per URL would bury the
+            // content under navigation links and copyright notices.
+            assertFalse(page.text().contains("Pricing"), "nav leaked in: " + page.text());
+            assertFalse(page.text().contains("newsletter"), "aside leaked in: " + page.text());
+            assertFalse(page.text().contains("All rights reserved"), "footer leaked in: " + page.text());
+        }
+
+        @Test
+        @DisplayName("web page: falls back to the body when the page marks no main content")
+        void parseWebPageFallsBackToBody() {
+            String html = "<html><head><title>Notes</title></head>"
+                    + "<body><div><p>Server maintenance is scheduled for Sunday.</p></div></body></html>";
+
+            var page = service.parseWebPage(html, "http://acme.test/notes");
+
+            assertEquals("Notes", page.title());
+            assertTrue(page.text().contains("Server maintenance is scheduled for Sunday"), page.text());
+        }
+
+        @Test
+        @DisplayName("web page: falls back to the URL when the page has no title")
+        void parseWebPageFallsBackToUrlAsTitle() {
+            var page = service.parseWebPage("<html><body><p>Body only</p></body></html>",
+                    "http://acme.test/untitled");
+
+            assertEquals("http://acme.test/untitled", page.title());
+            assertTrue(page.text().contains("Body only"));
+        }
+
+        @Test
         @DisplayName("keeps block boundaries as newlines so chunks do not run sentences together")
         void keepsBlockBoundaries() throws IOException {
             String html = "<body><h1>Title</h1><p>First para</p><p>Second para</p>"

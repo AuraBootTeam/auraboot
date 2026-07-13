@@ -9,6 +9,7 @@ import { useParams, useNavigate } from 'react-router';
 import {
   ArrowLeftIcon,
   ArrowPathIcon,
+  LinkIcon,
   CloudArrowUpIcon,
   DocumentTextIcon,
   MagnifyingGlassIcon,
@@ -253,6 +254,36 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
     }
   };
 
+  const [url, setUrl] = useState('');
+  const [addingUrl, setAddingUrl] = useState(false);
+
+  const handleAddUrl = async () => {
+    const target = url.trim();
+    if (!target) return;
+
+    setAddingUrl(true);
+    try {
+      const res = await post<KbDocument>(`/api/ai/knowledge/${kbPid}/documents/from-url`, {
+        url: target,
+      });
+      // A refused URL (unsafe target, not an HTML page, no readable text) comes back as a normal
+      // response with success=false — it does not throw. Show the server's reason: "failed" alone
+      // leaves the user with no idea whether to fix the URL or give up.
+      if (res?.success === false || !res?.data) {
+        toast.showErrorToast(res?.message || 'Could not add that URL');
+        return;
+      }
+      toast.showSuccessToast(`Added "${res.data.docName}"`);
+      setUrl('');
+      fetchDocs();
+      onUpdate();
+    } catch {
+      toast.showErrorToast('Could not add that URL');
+    } finally {
+      setAddingUrl(false);
+    }
+  };
+
   const handleReprocess = async (doc: KbDocument) => {
     try {
       await post(`/api/ai/knowledge/${kbPid}/documents/${doc.pid}/reprocess`, {});
@@ -298,6 +329,35 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
           />
         </label>
         </div>
+      </div>
+
+      <div className="mb-4 flex items-center gap-2">
+        <LinkIcon className="h-5 w-5 shrink-0 text-gray-400" />
+        <input
+          type="url"
+          data-testid="kb-url-input"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleAddUrl();
+          }}
+          placeholder="Paste a page URL to add it to this knowledge base"
+          disabled={addingUrl}
+          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-700"
+        />
+        <button
+          type="button"
+          data-testid="kb-url-add-button"
+          onClick={handleAddUrl}
+          disabled={addingUrl || !url.trim()}
+          className={`rounded-lg px-4 py-2 text-sm text-white transition-colors ${
+            addingUrl || !url.trim()
+              ? 'cursor-not-allowed bg-gray-400'
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+        >
+          {addingUrl ? 'Fetching...' : 'Add URL'}
+        </button>
       </div>
 
       {loading ? (
