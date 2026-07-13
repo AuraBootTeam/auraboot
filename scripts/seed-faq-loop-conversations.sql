@@ -47,4 +47,22 @@ FROM ab_im_conversation c,
      ) AS s(seq, sender_id, sender_type, content)
 WHERE c.pid = 'faqseedchitchat0000000001';
 
+-- ---- 3. a second support thread, owned by the pages/menu golden ------------------------
+-- The review golden works its two drafts down to nothing (edit, reject, approve+publish), so a
+-- spec that runs after it would find an empty queue. This thread is its own material: it distils
+-- from the queue UI like everything else, and nothing else touches it.
+INSERT INTO ab_im_conversation (pid, tenant_id, type, name, owner_id, max_seq, created_at, updated_at)
+VALUES ('faqseedsupport0000000002', :tenant, 'group', '客服会话 — 配送与保修', 1, 4, NOW(), NOW());
+
+INSERT INTO ab_im_message (conversation_id, tenant_id, sender_id, sender_type, seq, message_type, content, created_at)
+SELECT c.id, :tenant, s.sender_id, s.sender_type, s.seq, 'text', s.content, NOW()
+FROM ab_im_conversation c,
+     (VALUES
+        (1, 1::bigint, 'human', '下单后一般多久发货？'),
+        (2, 0::bigint, 'agent', '现货商品在您付款后 48 小时内发出，预售商品以商品页标注的发货时间为准。'),
+        (3, 1::bigint, 'human', '保修期是多久？'),
+        (4, 0::bigint, 'agent', '整机保修 12 个月，配件保修 6 个月，自签收之日起算。')
+     ) AS s(seq, sender_id, sender_type, content)
+WHERE c.pid = 'faqseedsupport0000000002';
+
 SELECT pid, name, max_seq FROM ab_im_conversation WHERE pid LIKE 'faqseed%' ORDER BY pid;
