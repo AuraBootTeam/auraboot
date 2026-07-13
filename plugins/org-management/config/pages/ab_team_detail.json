@@ -35,8 +35,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "/organization/teams/{pid}/edit",
-            "command": "org:update_team"
+            "to": "/organization/teams/{pid}/edit"
           }
         }
       ]

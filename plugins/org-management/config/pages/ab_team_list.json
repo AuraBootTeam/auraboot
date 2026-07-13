@@ -62,8 +62,7 @@
           },
           "action": {
             "type": "navigate",
-            "to": "/organization/teams/new",
-            "command": "org:create_team"
+            "to": "/organization/teams/new"
           }
         }
       ]
@@ -165,8 +164,7 @@
               },
               "action": {
                 "type": "navigate",
-                "to": "/organization/teams/{pid}/edit",
-                "command": "org:update_team"
+                "to": "/organization/teams/{pid}/edit"
               }
             },
             {
@@ -183,8 +181,7 @@
                 "en-US": "Delete this team?"
               },
               "action": {
-                "type": "command",
-                "command": "org:delete_team"
+                "type": "command"
               }
             }
           ]
