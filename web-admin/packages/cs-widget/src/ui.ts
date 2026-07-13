@@ -125,9 +125,12 @@ export class CsWidget {
       if (session.themeColor) this.retheme(session.themeColor);
       if (session.welcomeMessage) this.append('agent', session.welcomeMessage);
     } catch (error) {
-      // A failure here is nearly always a misconfiguration the site owner can fix — an origin that
-      // is not on the allowlist, a bad key, an identity hash that does not verify. Say which.
-      this.append('system', error instanceof Error ? error.message : 'could not start chat');
+      // Two audiences, two messages. The visitor is a customer of someone else's shop and must not
+      // be shown "origin_not_allowed"; they get a sentence. The site owner is the one who can
+      // actually fix it, and they are looking at the console, so the raw reason goes there.
+      const reason = error instanceof Error ? error.message : 'unknown';
+      console.error(`[AuraCS] could not start chat: ${reason}`);
+      this.append('system', humanize(reason));
       this.started = false;
     }
   }
@@ -157,19 +160,20 @@ export class CsWidget {
     await this.client.send(text, {
       onChunk: (chunk) => {
         streamed += chunk;
-        bubble.textContent = streamed;
+        this.setText(bubble, streamed);
         this.scrollToEnd();
       },
       onDone: (full) => {
         // The final frame carries the whole answer. Prefer it over the accumulated chunks so a
         // dropped chunk cannot leave a silently truncated reply on screen.
-        bubble.textContent = full || streamed;
+        this.setText(bubble, full || streamed);
         this.setBusy(false);
         this.scrollToEnd();
       },
       onError: (message) => {
+        console.error(`[AuraCS] message failed: ${message}`);
         bubble.remove();
-        this.append('system', message);
+        this.append('system', humanize(message));
         this.setBusy(false);
       },
     });
@@ -185,15 +189,47 @@ export class CsWidget {
     element.className = 'msg';
     element.dataset.from = from;
     element.setAttribute('data-testid', `cs-msg-${from}`);
-    element.textContent = text;
+    this.setText(element, text);
     this.messages.appendChild(element);
     this.scrollToEnd();
     return element;
   }
 
+  /**
+   * Models answer in markdown, so a bubble that renders plain text shows a visitor literal
+   * asterisks around the very words the model was trying to emphasise. Only **bold** is rendered,
+   * and the text is HTML-escaped first — this content comes from a language model quoting a
+   * knowledge base, which is exactly the kind of input you do not hand to innerHTML unescaped.
+   */
+  private setText(element: HTMLElement, text: string): void {
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+    element.innerHTML = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  }
+
   private scrollToEnd(): void {
     this.messages.scrollTop = this.messages.scrollHeight;
   }
+}
+
+/**
+ * Turn a server reason code into something a shopper can read. Anything unmapped falls back to a
+ * neutral sentence rather than leaking an internal code onto a customer's website.
+ */
+function humanize(reason: string): string {
+  const messages: Record<string, string> = {
+    origin_not_allowed: 'Chat is not enabled for this website yet.',
+    site_key_invalid: 'Chat is not available right now.',
+    identity_hash_required: 'Chat is not available right now.',
+    identity_hash_invalid: 'We could not verify your sign-in. Please reload the page.',
+    rate_limited: 'Too many messages just now — please try again in a moment.',
+    session_closed: 'This conversation has ended. Reload the page to start a new one.',
+    no_response_from_assistant: 'The assistant did not respond. Please try again.',
+  };
+  return messages[reason] ?? 'Sorry, something went wrong. Please try again.';
 }
 
 /** Storage throws in some embedded/privacy contexts; a widget that cannot remember still works. */

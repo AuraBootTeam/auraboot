@@ -3,37 +3,37 @@
   <groupId>com.auraboot</groupId>
   <artifactId>platform-plugin-api</artifactId>
   <versioning>
-    <lastUpdated>20260713063436</lastUpdated>
+    <lastUpdated>20260713070714</lastUpdated>
     <snapshot>
       <localCopy>true</localCopy>
     </snapshot>
     <snapshotVersions>
       <snapshotVersion>
-        <classifier>javadoc</classifier>
-        <extension>jar</extension>
-        <value>1.0.0-SNAPSHOT</value>
-        <updated>20260713063436</updated>
-      </snapshotVersion>
-      <snapshotVersion>
-        <extension>jar</extension>
-        <value>1.0.0-SNAPSHOT</value>
-        <updated>20260713063436</updated>
-      </snapshotVersion>
-      <snapshotVersion>
         <classifier>sources</classifier>
         <extension>jar</extension>
         <value>1.0.0-SNAPSHOT</value>
-        <updated>20260713063436</updated>
+        <updated>20260713070714</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <classifier>javadoc</classifier>
+        <extension>jar</extension>
+        <value>1.0.0-SNAPSHOT</value>
+        <updated>20260713070714</updated>
       </snapshotVersion>
       <snapshotVersion>
         <extension>pom</extension>
         <value>1.0.0-SNAPSHOT</value>
-        <updated>20260713063436</updated>
+        <updated>20260713070714</updated>
       </snapshotVersion>
       <snapshotVersion>
         <extension>module</extension>
         <value>1.0.0-SNAPSHOT</value>
-        <updated>20260713063436</updated>
+        <updated>20260713070714</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <extension>jar</extension>
+        <value>1.0.0-SNAPSHOT</value>
+        <updated>20260713070714</updated>
       </snapshotVersion>
     </snapshotVersions>
   </versioning>

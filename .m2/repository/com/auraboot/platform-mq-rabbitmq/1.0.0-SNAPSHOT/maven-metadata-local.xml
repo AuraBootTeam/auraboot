@@ -3,25 +3,25 @@
   <groupId>com.auraboot</groupId>
   <artifactId>platform-mq-rabbitmq</artifactId>
   <versioning>
-    <lastUpdated>20260713063447</lastUpdated>
+    <lastUpdated>20260713070716</lastUpdated>
     <snapshot>
       <localCopy>true</localCopy>
     </snapshot>
     <snapshotVersions>
       <snapshotVersion>
-        <extension>module</extension>
-        <value>1.0.0-SNAPSHOT</value>
-        <updated>20260713063447</updated>
-      </snapshotVersion>
-      <snapshotVersion>
         <extension>jar</extension>
         <value>1.0.0-SNAPSHOT</value>
-        <updated>20260713063447</updated>
+        <updated>20260713070716</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <extension>module</extension>
+        <value>1.0.0-SNAPSHOT</value>
+        <updated>20260713070716</updated>
       </snapshotVersion>
       <snapshotVersion>
         <extension>pom</extension>
         <value>1.0.0-SNAPSHOT</value>
-        <updated>20260713063447</updated>
+        <updated>20260713070716</updated>
       </snapshotVersion>
     </snapshotVersions>
   </versioning>

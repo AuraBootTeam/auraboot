@@ -85,6 +85,9 @@ export class CsClient {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        // fetch() does not add this on its own the way EventSource does, and the server uses it to
+        // recognise a stream. Without it the response gets buffered and arrives empty.
+        Accept: 'text/event-stream',
         Authorization: `Bearer ${this.session.token}`,
       },
       body: JSON.stringify({
@@ -102,6 +105,7 @@ export class CsClient {
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let sawAnything = false;
 
     for (;;) {
       const { done, value } = await reader.read();
@@ -113,12 +117,20 @@ export class CsClient {
       buffer = frames.pop() ?? '';
 
       for (const frame of frames) {
-        this.dispatch(frame, handlers);
+        if (this.dispatch(frame, handlers)) sawAnything = true;
       }
+    }
+
+    // A 200 that streams nothing at all. It happens when the turn cannot resolve an LLM provider:
+    // the server completes the emitter without ever emitting, and the visitor is left watching an
+    // empty bubble forever. Say something rather than hang.
+    if (!sawAnything) {
+      handlers.onError('no_response_from_assistant');
     }
   }
 
-  private dispatch(frame: string, handlers: StreamHandlers): void {
+  /** @returns true when the frame was one we understood and acted on. */
+  private dispatch(frame: string, handlers: StreamHandlers): boolean {
     let event = 'message';
     const dataLines: string[] = [];
 
@@ -126,22 +138,28 @@ export class CsClient {
       if (line.startsWith('event:')) event = line.slice(6).trim();
       else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
     }
-    if (dataLines.length === 0) return;
+    if (dataLines.length === 0) return false;
 
     let payload: Record<string, unknown>;
     try {
       payload = JSON.parse(dataLines.join('\n'));
     } catch {
-      return; // A frame we cannot read is not a frame we should act on.
+      return false; // A frame we cannot read is not a frame we should act on.
     }
 
     if (event === 'chunk' && typeof payload.content === 'string') {
       handlers.onChunk(payload.content);
-    } else if (event === 'done') {
-      handlers.onDone(typeof payload.content === 'string' ? payload.content : '');
-    } else if (event === 'error') {
-      handlers.onError(typeof payload.error === 'string' ? payload.error : 'unknown error');
+      return true;
     }
+    if (event === 'done') {
+      handlers.onDone(typeof payload.content === 'string' ? payload.content : '');
+      return true;
+    }
+    if (event === 'error') {
+      handlers.onError(typeof payload.error === 'string' ? payload.error : 'unknown error');
+      return true;
+    }
+    return false;
   }
 
   private async describeFailure(response: Response): Promise<string> {
@@ -150,6 +168,11 @@ export class CsClient {
     // because every one of them is an integration mistake the site owner can actually fix.
     try {
       const text = await response.text();
+      // The platform wraps errors as {code, message, context}. The stable machine-readable reason
+      // (origin_not_allowed, site_key_invalid, identity_hash_invalid, rate_limited) lands in
+      // `context`; `message` is the generic "Business error". Prefer the one that says something.
+      const contextual = /"context"\s*:\s*"([^"]+)"/.exec(text);
+      if (contextual) return contextual[1];
       const match = /"(?:message|error|reason)"\s*:\s*"([^"]+)"/.exec(text);
       if (match) return match[1];
       if (text) return text.slice(0, 200);
