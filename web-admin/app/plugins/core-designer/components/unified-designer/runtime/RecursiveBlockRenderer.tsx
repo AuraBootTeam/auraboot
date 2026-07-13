@@ -7,7 +7,7 @@ import { ControlledFieldRenderer } from '~/framework/meta/rendering/ControlledFi
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
 import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
-import type { FieldConfig } from '~/framework/meta/schemas/types';
+import { buildPreviewFieldConfig } from './platformFieldPreview';
 import type { DslBlockV3, ModelFieldDefinition, PageSchemaV3 } from '../types';
 import { getCustomBlockRenderer } from './customBlockRendererRegistry';
 import {
@@ -2635,84 +2635,6 @@ function RuntimePlatformField({
       />
     </div>
   );
-}
-
-/**
- * FieldConfig keys that live at the top level, not inside `field.props`. Keeping them
- * out of the props bag avoids leaking them onto DOM elements (e.g. the `visibleWhen`
- * unknown-DOM-attribute React warning) when smart components spread `props`.
- */
-const FIELD_CONFIG_RESERVED_KEYS = new Set([
-  'field',
-  'label',
-  'component',
-  'type',
-  'dataType',
-  'dictCode',
-  'required',
-  'visibleWhen',
-  'readOnly',
-  'readonly',
-  'validation',
-]);
-
-/**
- * dataType → default control, mirroring the live form's `DATA_TYPE_TO_COMPONENT`
- * (framework/meta/rendering/pages/FormPageContent). Applied only when the field has
- * no explicit renderComponent, so number/date/boolean fields preview as
- * stepper/date-picker/switch instead of a plain input — matching the published page.
- */
-const PREVIEW_DATA_TYPE_COMPONENT: Record<string, string> = {
-  string: 'SmartInput',
-  text: 'SmartTextarea',
-  decimal: 'SmartNumberInput',
-  integer: 'SmartNumberInput',
-  enum: 'SmartSelect',
-  date: 'SmartDatePicker',
-  datetime: 'SmartDatePicker',
-  boolean: 'SmartSwitch',
-  reference: 'SmartSelect',
-  json: 'SmartJsonEditor',
-  jsonb: 'SmartJsonEditor',
-  file: 'SmartUpload',
-  money: 'SmartMoneyInput',
-};
-
-/** Build a platform {@link FieldConfig} from a designer block + resolved model field. */
-function buildPreviewFieldConfig(block: DslBlockV3, modelField: ModelFieldDefinition): FieldConfig {
-  const blockProps = (block.props ?? {}) as Record<string, unknown>;
-  const extensionProps = modelField.extensionProps ?? {};
-  const merged: Record<string, unknown> = {
-    ...extensionProps,
-    ...(modelField.refTarget ? { refTarget: modelField.refTarget } : {}),
-    ...blockProps,
-  };
-  // Component-facing props only: strip FieldConfig top-level keys so they are not
-  // spread onto DOM nodes by leaf smart components.
-  const componentProps: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(merged)) {
-    if (!FIELD_CONFIG_RESERVED_KEYS.has(key)) componentProps[key] = value;
-  }
-  const required =
-    typeof blockProps.required === 'boolean'
-      ? (blockProps.required as boolean)
-      : Boolean(modelField.required);
-  const visibleWhen = blockProps.visibleWhen ?? extensionProps.visibleWhen;
-  const dataType = (blockProps.dataType as string | undefined) ?? modelField.type;
-  const explicitComponent = (blockProps.component as string | undefined) ?? modelField.component;
-  const component =
-    explicitComponent ??
-    (dataType ? PREVIEW_DATA_TYPE_COMPONENT[dataType.toLowerCase()] : undefined);
-  return {
-    field: block.field ?? modelField.code,
-    label: (blockProps.label ?? block.title ?? modelField.label) as FieldConfig['label'],
-    component,
-    type: dataType,
-    dictCode: (blockProps.dictCode as string | undefined) ?? modelField.dictCode,
-    required,
-    ...(visibleWhen != null ? { visibleWhen } : {}),
-    props: componentProps,
-  } as FieldConfig;
 }
 
 function renderRuntimeFieldControl({

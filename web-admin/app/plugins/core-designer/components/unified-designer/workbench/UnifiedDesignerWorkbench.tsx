@@ -1017,6 +1017,9 @@ export function UnifiedDesignerWorkbench({
               canDeleteBlock={canDeleteBlock}
               onDeleteBlock={handleDeleteBlock}
               onMarqueeSelect={handleMarqueeSelect}
+              modelFields={
+                document.modelCode ? modelFieldsByModel[document.modelCode] ?? [] : []
+              }
             />
             <InspectorHost
               selectedBlock={selectedBlock}

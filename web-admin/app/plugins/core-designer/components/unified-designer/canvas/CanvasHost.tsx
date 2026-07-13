@@ -3,7 +3,11 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { ArrowDown, ArrowUp, GripVertical, Lock, Maximize2, Trash2 } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
-import type { DesignerMode, DslBlockV3, PageSchemaV3 } from '../types';
+import type { DesignerMode, DslBlockV3, ModelFieldDefinition, PageSchemaV3 } from '../types';
+import {
+  DesignerModelFieldsContext,
+  EditCanvasFieldPreview,
+} from '../runtime/platformFieldPreview';
 import {
   ROOT_DROPPABLE_ID,
   blockDroppableId,
@@ -24,6 +28,9 @@ const SPAN_PRESETS = [3, 4, 6, 8, 12] as const;
 // so a plain click on the empty canvas (which clears selection) is never
 // mistaken for a marquee.
 const MARQUEE_START_THRESHOLD_PX = 6;
+
+/** Stable empty reference so the default context value never triggers re-renders. */
+const EMPTY_CANVAS_MODEL_FIELDS: ModelFieldDefinition[] = [];
 
 export type ActiveDropIntent = { blockId: string; intent: DropIntent } | null;
 
@@ -56,6 +63,12 @@ interface CanvasHostProps {
    * marquee hit nothing (the caller may clear or leave the selection intact).
    */
   onMarqueeSelect?: (blockIds: string[]) => void;
+  /**
+   * Model field metadata for the page's primary model. When provided, `field` blocks on
+   * the canvas render the real platform control (true WYSIWYG) instead of the field-code
+   * placeholder. Absent → legacy placeholder, so nothing changes for callers that omit it.
+   */
+  modelFields?: ModelFieldDefinition[];
 }
 
 export function CanvasHost({
@@ -72,6 +85,7 @@ export function CanvasHost({
   canDeleteBlock,
   onDeleteBlock,
   onMarqueeSelect,
+  modelFields,
 }: CanvasHostProps) {
   const { locale } = useI18n();
   const hostRef = React.useRef<HTMLElement | null>(null);
@@ -100,7 +114,7 @@ export function CanvasHost({
     }));
   };
 
-  return (
+  const canvas = (
     <main
       ref={hostRef}
       className="relative min-h-[420px] flex-1 overflow-auto bg-slate-100 p-3 lg:p-6 xl:overflow-auto"
@@ -155,6 +169,12 @@ export function CanvasHost({
         </div>
       </div>
     </main>
+  );
+
+  return (
+    <DesignerModelFieldsContext.Provider value={modelFields ?? EMPTY_CANVAS_MODEL_FIELDS}>
+      {canvas}
+    </DesignerModelFieldsContext.Provider>
   );
 }
 
@@ -611,6 +631,9 @@ function BlockContent(props: BlockContentProps) {
   if (block.blocks?.length) {
     return <NestedBlocks {...props} />;
   }
+  if (block.blockType === 'field') {
+    return <CanvasFieldLeaf block={block} locale={props.locale} />;
+  }
   return <LeafBlock block={block} locale={props.locale} />;
 }
 
@@ -695,6 +718,22 @@ function LeafBlock({ block, locale }: { block: DslBlockV3; locale: string }) {
       </div>
     </div>
   );
+}
+
+/**
+ * Field card body on the edit canvas. When the page's model metadata resolves the bound
+ * field, render the real platform control (true WYSIWYG, non-interactive) via
+ * {@link EditCanvasFieldPreview}; otherwise fall back to the field-code placeholder.
+ */
+function CanvasFieldLeaf({ block, locale }: { block: DslBlockV3; locale: string }) {
+  const modelFields = React.useContext(DesignerModelFieldsContext);
+  const modelField = block.field
+    ? modelFields.find((candidate) => candidate.code === block.field)
+    : undefined;
+  if (modelField) {
+    return <EditCanvasFieldPreview block={block} modelField={modelField} locale={locale} />;
+  }
+  return <LeafBlock block={block} locale={locale} />;
 }
 
 function clampColumnCount(value: unknown): number {
