@@ -115,6 +115,17 @@ function resolveReloadIds(args: any): string | string[] | undefined {
   return args.ids ?? args.id ?? args.dataSourceId ?? args.dataSourceIds ?? args.reload;
 }
 
+function resolveWorkbenchNavigatePath(args: any): string | undefined {
+  const rawTarget = args?.path ?? args?.to ?? args?.url ?? args?.href;
+  if (typeof rawTarget !== 'string') return undefined;
+  const target = rawTarget.trim();
+  if (!target) return undefined;
+  if (/^(https?:)?\/\//.test(target) || target.startsWith('/')) {
+    return target;
+  }
+  return `/p/c/${target}`;
+}
+
 async function reloadDataSources(runtime: SchemaRuntime, ids: string | string[] | undefined) {
   if (!ids || (Array.isArray(ids) && ids.length === 0)) return;
   const manager = runtime.getDataSourceManager?.();
@@ -371,6 +382,16 @@ export async function executeSimpleWorkbenchAction(
   if (config.action === 'dataSource.reload') {
     const args = resolveRuntimeValue(runtime, config.args);
     await reloadDataSources(runtime, resolveReloadIds(args));
+    return;
+  }
+
+  if (config.action === 'navigate') {
+    const args = resolveRuntimeValue(runtime, config.args || {});
+    const path = resolveWorkbenchNavigatePath(args);
+    if (!path) {
+      throw new Error('[workbench] navigate requires args.path or args.to');
+    }
+    runtime.navigateTo(path);
     return;
   }
 

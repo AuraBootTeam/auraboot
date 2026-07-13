@@ -335,6 +335,16 @@ export class SchemaRuntime {
   }
 
   /**
+   * Navigate through the page-level router bridge configured by useSchemaRuntime.
+   */
+  navigateTo(path: string): void {
+    if (!this.navigate) {
+      throw new Error('[SchemaRuntime] navigate function not configured');
+    }
+    this.navigate(path);
+  }
+
+  /**
    * Get the page-level toast bridge configured by useSchemaRuntime.
    * Block renderers can use this indirectly via action hooks so DSL actions
    * have the same feedback surface as page-level actions.
