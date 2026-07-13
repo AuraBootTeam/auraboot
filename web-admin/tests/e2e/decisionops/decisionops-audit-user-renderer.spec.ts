@@ -15,16 +15,85 @@ const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 type ApiEnvelope<T> = { code?: number | string; success?: boolean; data?: T };
 type DecisionDefinition = { pid: string; decisionCode: string; createdBy?: string; updatedBy?: string };
+type DecisionVersion = { pid: string; version?: number };
+type DecisionRollout = { pid: string; startedBy?: string; endedBy?: string };
 type UserRecord = { pid?: string; displayName?: string; name?: string; email?: string };
 
+function amountGtAst(threshold: number) {
+  return {
+    type: 'compare',
+    left: { type: 'path', scope: 'record', path: 'data.amount', dataType: 'decimal' },
+    operator: 'GT',
+    right: { type: 'literal', value: threshold, dataType: 'decimal' },
+  };
+}
+
 async function readApi<T>(response: APIResponse): Promise<T> {
-  expect(response.ok(), `${response.url()} -> ${response.status()}`).toBeTruthy();
+  if (!response.ok()) {
+    const text = await response.text().catch(() => '<unreadable body>');
+    expect(response.ok(), `${response.url()} -> ${response.status()}\n${text}`).toBeTruthy();
+  }
   const body = (await response.json()) as ApiEnvelope<T>;
   return body.data as T;
 }
 
 async function getApi<T>(page: Page, endpoint: string): Promise<T> {
   return readApi<T>(await page.request.get(endpoint));
+}
+
+async function postApi<T>(page: Page, endpoint: string, data?: unknown): Promise<T> {
+  return readApi<T>(await page.request.post(endpoint, { data }));
+}
+
+/**
+ * A rollout whose startedBy AND endedBy are both populated: `activate` stamps startedBy,
+ * `rollback` stamps endedBy (`pause` does not — see DecisionRolloutServiceImpl).
+ */
+async function seedEndedRollout(page: Page, suffix: string): Promise<DecisionRollout> {
+  const decisionCode = `audit_renderer_${suffix}`;
+  await postApi(page, '/api/decision/definitions', {
+    decisionCode,
+    decisionName: `Audit renderer rollout ${suffix}`,
+    description: 'Fixture for the audit-block user-renderer golden',
+    scopeType: 'GOVERNANCE',
+    ownerModule: 'decision',
+    enabled: true,
+  });
+
+  for (const [tag, threshold] of [
+    ['baseline', 10_000],
+    ['candidate', 5_000],
+  ] as const) {
+    const draft = await postApi<DecisionVersion>(
+      page,
+      `/api/decision/definitions/${encodeURIComponent(decisionCode)}/versions`,
+      {
+        kind: 'SIMPLE_CONDITION',
+        runtimeAdapter: 'AST_EVALUATOR',
+        versionTag: `${tag}-${suffix}`,
+        contentJson: amountGtAst(threshold),
+      },
+    );
+    await postApi(page, `/api/decision/versions/${encodeURIComponent(draft.pid)}/validate`);
+    await postApi(page, `/api/decision/versions/${encodeURIComponent(draft.pid)}/publish`, {
+      impactAcknowledged: true,
+      note: `Publish ${tag} for the audit-renderer golden`,
+    });
+  }
+
+  const rollout = await postApi<DecisionRollout>(
+    page,
+    `/api/decision/definitions/${encodeURIComponent(decisionCode)}/rollouts`,
+    { baselineVersion: 1, candidateVersion: 2, percentage: 10 },
+  );
+  await postApi(page, `/api/decision/rollouts/${encodeURIComponent(rollout.pid)}/activate`, {
+    note: 'audit-renderer golden: stamp startedBy',
+  });
+  return postApi<DecisionRollout>(
+    page,
+    `/api/decision/rollouts/${encodeURIComponent(rollout.pid)}/rollback`,
+    { note: 'audit-renderer golden: stamp endedBy' },
+  );
 }
 
 async function capture(page: Page, testInfo: TestInfo, name: string): Promise<void> {
@@ -87,5 +156,37 @@ test.describe('DecisionOps audit block renders user names, not pids', () => {
     // reach the audit section — bring it into view before capturing the evidence shot.
     await createdBy.scrollIntoViewIfNeeded();
     await capture(page, testInfo, 'decisionops-definition-audit-createdby');
+  });
+
+  test('rollout detail resolves startedBy / endedBy to a display name', async ({
+    page,
+  }, testInfo) => {
+    const rollout = await seedEndedRollout(page, `${Date.now()}`);
+
+    const startedByPid = String(rollout.startedBy ?? '');
+    const endedByPid = String(rollout.endedBy ?? '');
+    expect(startedByPid, 'activate must stamp startedBy').toMatch(ULID_RE);
+    expect(endedByPid, 'rollback must stamp endedBy').toMatch(ULID_RE);
+
+    const user = await getApi<UserRecord>(page, `/api/admin/users/${encodeURIComponent(startedByPid)}`);
+    const displayName = String(user.displayName || user.name || user.email || '');
+    expect(displayName).not.toEqual('');
+    expect(displayName).not.toMatch(ULID_RE);
+
+    await page.goto(`/p/decisionops_rollouts/view/${encodeURIComponent(rollout.pid)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await waitForDynamicPageLoad(page);
+
+    const startedBy = page.getByTestId('form-field-startedBy');
+    const endedBy = page.getByTestId('form-field-endedBy');
+    await expect(startedBy.getByTestId('member-picker-readonly')).toBeVisible({ timeout: 10000 });
+    await expect(startedBy).toContainText(displayName, { timeout: 10000 });
+    await expect(endedBy).toContainText(displayName, { timeout: 10000 });
+    await expect(startedBy).not.toContainText(startedByPid);
+    await expect(endedBy).not.toContainText(endedByPid);
+
+    await startedBy.scrollIntoViewIfNeeded();
+    await capture(page, testInfo, 'decisionops-rollout-audit-startedby');
   });
 });

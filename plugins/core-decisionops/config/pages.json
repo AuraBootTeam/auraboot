@@ -1917,7 +1917,8 @@
             "label": {
               "zh-CN": "启动人",
               "en-US": "Started By"
-            }
+            },
+            "component": "memberpicker"
           },
           {
             "field": "startedAt",
@@ -1932,7 +1933,8 @@
             "label": {
               "zh-CN": "结束人",
               "en-US": "Ended By"
-            }
+            },
+            "component": "memberpicker"
           },
           {
             "field": "endedAt",
