@@ -5,8 +5,13 @@
     "displayName:en": "Question",
     "description": "The customer's question, normalized into a standalone FAQ question. Editable by the reviewer before approval.",
     "dataType": "text",
-    "constraints": { "required": true, "maxLength": 500 },
-    "feature": { "searchable": true }
+    "constraints": {
+      "required": true,
+      "maxLength": 500
+    },
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "faq_answer",
@@ -14,17 +19,29 @@
     "displayName:en": "Answer",
     "description": "The answer as actually given in the conversation. Editable by the reviewer before approval.",
     "dataType": "text",
-    "constraints": { "required": true, "maxLength": 4000 },
-    "feature": { "searchable": true }
+    "constraints": {
+      "required": true,
+      "maxLength": 4000
+    },
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "faq_confidence",
     "displayName:zh-CN": "置信度",
     "displayName:en": "Confidence",
-    "description": "Model confidence (0-1) that this is a reusable FAQ. Advisory only — approval is always human.",
+    "description": "Model confidence (0-100) that this is a reusable FAQ. Advisory only — approval is always human.",
     "dataType": "decimal",
-    "constraints": { "min": 0, "max": 1, "precision": 5, "scale": 4 },
-    "feature": { "sortable": true }
+    "constraints": {
+      "min": 0,
+      "max": 100,
+      "precision": 5,
+      "scale": 2
+    },
+    "feature": {
+      "sortable": true
+    }
   },
   {
     "code": "faq_status",
@@ -34,8 +51,13 @@
     "dataType": "enum",
     "dictCode": "faq_candidate_status",
     "defaultValue": "draft",
-    "feature": { "searchable": true, "sortable": true },
-    "extension": { "readOnly": true }
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    },
+    "extension": {
+      "readOnly": true
+    }
   },
   {
     "code": "faq_source_conversation_pid",
@@ -43,9 +65,16 @@
     "displayName:en": "Source Conversation",
     "description": "Public record pid of the ab_im_conversation this FAQ was distilled from. Plain string, not a reference field: ab_im_conversation is a platform table, not a dynamic model.",
     "dataType": "string",
-    "constraints": { "required": true, "maxLength": 26 },
-    "feature": { "searchable": true },
-    "extension": { "readOnly": true }
+    "constraints": {
+      "required": true,
+      "maxLength": 26
+    },
+    "feature": {
+      "searchable": true
+    },
+    "extension": {
+      "readOnly": true
+    }
   },
   {
     "code": "faq_source_seq_range",
@@ -53,8 +82,12 @@
     "displayName:en": "Source Message Range",
     "description": "The ab_im_message.seq range this pair was distilled from, as 'first-last'. Lets a reviewer jump back to the exact turns.",
     "dataType": "string",
-    "constraints": { "maxLength": 64 },
-    "extension": { "readOnly": true }
+    "constraints": {
+      "maxLength": 64
+    },
+    "extension": {
+      "readOnly": true
+    }
   },
   {
     "code": "faq_target_kb_id",
@@ -62,8 +95,13 @@
     "displayName:en": "Target Knowledge Base",
     "description": "Pid of the knowledge base this candidate will be published into.",
     "dataType": "string",
-    "constraints": { "required": true, "maxLength": 64 },
-    "feature": { "searchable": true }
+    "constraints": {
+      "required": true,
+      "maxLength": 64
+    },
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "faq_kb_document_pid",
@@ -71,8 +109,12 @@
     "displayName:en": "KB Document",
     "description": "Pid of the ab_kb_document created on publish. Back-link for two-way traceability; empty until published.",
     "dataType": "string",
-    "constraints": { "maxLength": 64 },
-    "extension": { "readOnly": true }
+    "constraints": {
+      "maxLength": 64
+    },
+    "extension": {
+      "readOnly": true
+    }
   },
   {
     "code": "faq_reviewed_by",
@@ -80,8 +122,12 @@
     "displayName:en": "Reviewed By",
     "description": "Username of the reviewer who approved or rejected this candidate. Set automatically by the command.",
     "dataType": "string",
-    "constraints": { "maxLength": 100 },
-    "extension": { "readOnly": true }
+    "constraints": {
+      "maxLength": 100
+    },
+    "extension": {
+      "readOnly": true
+    }
   },
   {
     "code": "faq_reviewed_at",
@@ -89,8 +135,12 @@
     "displayName:en": "Reviewed At",
     "description": "When the candidate was approved or rejected. Set automatically by the command.",
     "dataType": "datetime",
-    "feature": { "sortable": true },
-    "extension": { "readOnly": true }
+    "feature": {
+      "sortable": true
+    },
+    "extension": {
+      "readOnly": true
+    }
   },
   {
     "code": "faq_reject_reason",
@@ -98,6 +148,8 @@
     "displayName:en": "Reject Reason",
     "description": "Why the reviewer rejected this candidate. Supplied when running faq:reject.",
     "dataType": "text",
-    "constraints": { "maxLength": 500 }
+    "constraints": {
+      "maxLength": 500
+    }
   }
 ]

@@ -71,7 +71,9 @@ public class ConversationFaqExtractionService {
                                                             + "If nobody answered the question, omit the pair entirely."),
                                             "confidence", Map.of("type", "number",
                                                     "description", "0.0-1.0 confidence that this is a reusable FAQ."))),
-                                    "required", List.of("question", "answer"),
+                                    // confidence is required: asking for it and then accepting its
+                                    // absence just means we invent a value for it downstream.
+                                    "required", List.of("question", "answer", "confidence"),
                                     "additionalProperties", false)))),
             List.of("faqs"));
 
@@ -187,10 +189,15 @@ public class ConversationFaqExtractionService {
         return value == null ? "" : value.toString().trim();
     }
 
-    /** Clamped to 0-1: the model occasionally reports a percentage or omits the field entirely. */
-    private static double confidence(Object value) {
+    /**
+     * Clamped to 0-1, and null when the model did not report one.
+     *
+     * <p>Not zero. Zero is a confidence — it says "this is worthless" — and a model that stayed
+     * silent has said no such thing. A reviewer reading 0% would draw exactly the wrong conclusion.
+     */
+    private static Double confidence(Object value) {
         if (!(value instanceof Number number)) {
-            return 0d;
+            return null;
         }
         return Math.max(0d, Math.min(1d, number.doubleValue()));
     }
