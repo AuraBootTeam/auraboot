@@ -169,8 +169,13 @@ cmd_up() {
   # trip over its own allocation from the first attempt — every later step here is already
   # idempotent. Reuse an existing allocation only when it is on the slot being asked for;
   # a name pinned to a different slot is a real conflict and still stops the run.
-  local allocated_slot
-  allocated_slot="$(runtime_env "$name" AURA_WORKSPACE_SLOT 2>/dev/null || true)"
+  # Read the slot straight off the env file rather than through runtime_env(), which die()s
+  # when the file is absent — and absent is the normal case on a first run.
+  local allocated_slot=""
+  local env_file="$WORKSPACE/.workspace/env/$name.env"
+  if [ -f "$env_file" ]; then
+    allocated_slot="$(grep -E '^AURA_WORKSPACE_SLOT=' "$env_file" | head -1 | cut -d= -f2- || true)"
+  fi
   if [ -n "$allocated_slot" ]; then
     [ "$allocated_slot" = "$slot" ] \
       || die "runtime '$name' is already allocated on slot $allocated_slot, not $slot — pick another name, or: $DEV runtime destroy $name"
