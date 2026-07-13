@@ -1,5 +1,6 @@
 package com.auraboot.framework.conversation;
 
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -83,11 +84,12 @@ class D5SenderTypeBackfillTest extends BaseIntegrationTest {
         agentlessTenantId = aurabotTenantId + 1;
 
         Long convId = jdbcTemplate.queryForObject(
-                "INSERT INTO ab_im_conversation (tenant_id, type, name) VALUES (?, 'group', ?) RETURNING id",
-                Long.class, aurabotTenantId, "d5-test-conv-" + testRunId);
+                "INSERT INTO ab_im_conversation (pid, tenant_id, type, name) VALUES (?, ?, 'group', ?) RETURNING id",
+                Long.class, UniqueIdGenerator.generate(), aurabotTenantId, "d5-test-conv-" + testRunId);
         Long agentlessConvId = jdbcTemplate.queryForObject(
-                "INSERT INTO ab_im_conversation (tenant_id, type, name) VALUES (?, 'group', ?) RETURNING id",
-                Long.class, agentlessTenantId, "d5-test-conv-agentless-" + testRunId);
+                "INSERT INTO ab_im_conversation (pid, tenant_id, type, name) VALUES (?, ?, 'group', ?) RETURNING id",
+                Long.class, UniqueIdGenerator.generate(), agentlessTenantId,
+                "d5-test-conv-agentless-" + testRunId);
 
         String aurabotPid = "ad-d5-" + testRunId;
         aurabotAgentDefId = jdbcTemplate.queryForObject(

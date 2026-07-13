@@ -2,6 +2,7 @@ package com.auraboot.framework.aurabot.service;
 
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.aurabot.dto.AuraBotConversationItem;
 import com.auraboot.framework.aurabot.dto.AuraBotConversationMessage;
 import com.auraboot.framework.im.dto.SendMessageRequest;
@@ -83,6 +84,7 @@ public class AuraBotConversationService {
         }
 
         ImConversation conversation = new ImConversation();
+        conversation.setPid(UniqueIdGenerator.generate());
         conversation.setTenantId(tenantId);
         conversation.setType(ImConstants.TYPE_BOT);
         conversation.setOwnerId(memberId);
