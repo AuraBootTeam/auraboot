@@ -13,7 +13,10 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 
 /**
  * Async document processing pipeline: parse → chunk → embed → store.
@@ -137,17 +140,61 @@ public class DocumentProcessingService {
             throw new IllegalStateException("File has no storage key: " + doc.getFilePid());
         }
 
+        byte[] bytes;
         try (InputStream content = storageProvider.download(storageKey)) {
-            // An image has no text to extract — it has to be understood. What gets indexed is the
-            // vision model's description of it, which is what makes a chart findable by what it
-            // shows rather than by its file name.
-            if ("image".equals(doc.getDocType())) {
-                return imageUnderstandingService.describe(
-                        doc.getTenantId(), content.readAllBytes(),
-                        KbImageUnderstandingService.mediaTypeForFile(doc.getDocName()));
-            }
-            return parserService.parse(content, doc.getDocType());
+            bytes = content.readAllBytes();
         }
+
+        // An image has no text to extract — it has to be understood. What gets indexed is the
+        // vision model's description of it, which is what makes a chart findable by what it
+        // shows rather than by its file name.
+        if ("image".equals(doc.getDocType())) {
+            return imageUnderstandingService.describe(doc.getTenantId(), bytes,
+                    KbImageUnderstandingService.mediaTypeForFile(doc.getDocName()));
+        }
+
+        String text = parserService.parse(new ByteArrayInputStream(bytes), doc.getDocType());
+        return text + describeEmbeddedImages(doc, bytes);
+    }
+
+    /**
+     * Read the pictures inside a document and append what they show to its indexed text.
+     *
+     * <p>This is the difference between "we support PPT" and "we support the deck you actually have".
+     * A quarterly review is charts; the text frames hold the title and the footer. Extracting only
+     * the text and dropping the pictures indexes the packaging and throws away the contents.
+     *
+     * <p>What this must never do is fail the document. A deck of pure text ingests fine without a
+     * vision provider today, and it must keep doing so — but the loss is <b>recorded in the indexed
+     * text</b> rather than swallowed, so a user searching the deck can see that its charts were not
+     * read, instead of quietly getting nothing back.
+     */
+    private String describeEmbeddedImages(KbDocument doc, byte[] bytes) throws IOException {
+        List<DocumentParserService.EmbeddedImage> images =
+                parserService.extractEmbeddedImages(new ByteArrayInputStream(bytes), doc.getDocType());
+        if (images.isEmpty()) {
+            return "";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        int described = 0;
+        for (DocumentParserService.EmbeddedImage image : images) {
+            try {
+                String description = imageUnderstandingService.describe(
+                        doc.getTenantId(), image.data(), image.mediaType());
+                sb.append("\n\n## ").append(image.location()).append(" — image\n").append(description);
+                described++;
+            } catch (Exception e) {
+                // One unreadable picture, or no vision provider at all, must not cost the document
+                // its text. Say so in the index instead of dropping it on the floor.
+                log.warn("Could not read the image at {} in doc {}: {}",
+                        image.location(), doc.getPid(), e.getMessage());
+                sb.append("\n\n## ").append(image.location())
+                        .append(" — image could not be read: ").append(e.getMessage());
+            }
+        }
+        log.info("Doc {}: described {} of {} embedded image(s)", doc.getPid(), described, images.size());
+        return sb.toString();
     }
 
     private void markFailed(String docPid, String error) {

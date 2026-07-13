@@ -12,9 +12,11 @@
 #
 # What it covers (web-admin/tests/e2e/ai/knowledge-*-golden.spec.ts):
 #   - PPTX / XLSX ingestion, including speaker notes and the reprocess path
+#   - a deck whose charts are pictures — the scenario "upload the quarterly deck"  [needs DASHSCOPE_API_KEY]
 #   - URL ingestion, and the SSRF refusals that guard it
 #   - the embedding provider being selectable from the dialog
 #   - vector retrieval, and chart understanding          [need DASHSCOPE_API_KEY]
+#   - AuraBot answering from a document uploaded seconds earlier — "takes effect", end to end
 #
 # Optional environment — supply these and the suite covers more; leave them out and the tests that
 # need them SKIP rather than fail, so a bare run is still a meaningful green:
@@ -47,6 +49,8 @@ SPECS=(
   tests/e2e/ai/knowledge-provider-select-golden.spec.ts
   tests/e2e/ai/knowledge-vector-retrieval-golden.spec.ts
   tests/e2e/ai/knowledge-chart-vision-golden.spec.ts
+  tests/e2e/ai/knowledge-deck-with-charts-golden.spec.ts
+  tests/e2e/ai/knowledge-aurabot-answers-golden.spec.ts
 )
 
 teardown() {
