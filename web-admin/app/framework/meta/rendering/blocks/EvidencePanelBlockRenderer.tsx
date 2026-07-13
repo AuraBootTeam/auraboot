@@ -66,6 +66,13 @@ function formatValue(
   const mapped = mappedValue(value, valueMap, locale, t);
   if (mapped !== null) return mapped;
   if (value === undefined || value === null || value === '') return '-';
+  if (format === 'percent' && typeof value === 'number') {
+    // Accepts both scales: a 0-1 ratio and an already-scaled 0-100 number. Without this, a
+    // `format: "percent"` in a plain section was silently ignored (only the semantic-item path
+    // honoured it) and the reader got a bare number with no unit — "100" meaning nothing.
+    const percent = value <= 1 ? value * 100 : value;
+    return `${Number.isInteger(percent) ? percent : percent.toFixed(1)}%`;
+  }
   if (format === 'json') {
     return JSON.stringify(parseJsonValue(value), null, 2);
   }

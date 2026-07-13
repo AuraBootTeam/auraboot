@@ -20,7 +20,7 @@
     "displayName:zh-CN": "类型",
     "displayName:en": "Type",
     "description": "private / group / bot / object.",
-    "dataType": "string",
+    "dataType": "enum",
     "constraints": {
       "maxLength": 16
     },
@@ -29,7 +29,8 @@
     },
     "extension": {
       "readOnly": true
-    }
+    },
+    "dictCode": "faq_conversation_type"
   },
   {
     "code": "faq_conv_message_count",

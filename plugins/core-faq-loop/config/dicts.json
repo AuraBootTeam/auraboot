@@ -12,7 +12,9 @@
         "sortNo": 10,
         "color": "#fa8c16",
         "status": "enabled",
-        "extension": { "color": "amber" }
+        "extension": {
+          "color": "amber"
+        }
       },
       {
         "value": "approved",
@@ -21,7 +23,9 @@
         "sortNo": 20,
         "color": "#1890ff",
         "status": "enabled",
-        "extension": { "color": "blue" }
+        "extension": {
+          "color": "blue"
+        }
       },
       {
         "value": "published",
@@ -30,7 +34,9 @@
         "sortNo": 30,
         "color": "#52c41a",
         "status": "enabled",
-        "extension": { "color": "green" }
+        "extension": {
+          "color": "green"
+        }
       },
       {
         "value": "rejected",
@@ -39,7 +45,85 @@
         "sortNo": 40,
         "color": "#8c8c8c",
         "status": "enabled",
-        "extension": { "color": "gray" }
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "faq_conversation_type",
+    "name": "Conversation Type",
+    "name:zh-CN": "会话类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "group",
+        "label": "Group",
+        "label:zh-CN": "群聊",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "private",
+        "label": "Direct",
+        "label:zh-CN": "单聊",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "bot",
+        "label": "Bot",
+        "label:zh-CN": "机器人",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": {
+          "color": "purple"
+        }
+      },
+      {
+        "value": "object",
+        "label": "Object",
+        "label:zh-CN": "业务对象",
+        "sortNo": 40,
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      }
+    ]
+  },
+  {
+    "code": "faq_message_sender",
+    "name": "Speaker",
+    "name:zh-CN": "说话人",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "customer",
+        "label": "Customer",
+        "label:zh-CN": "客户",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "support",
+        "label": "Support",
+        "label:zh-CN": "客服",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
       }
     ]
   }

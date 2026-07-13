@@ -60,7 +60,9 @@
           "label": {
             "zh-CN": "类型",
             "en": "Type"
-          }
+          },
+          "renderType": "tag",
+          "dictCode": "faq_conversation_type"
         },
         {
           "field": "messageCount",
@@ -84,7 +86,8 @@
           "label": {
             "zh-CN": "最后活动",
             "en": "Last Activity"
-          }
+          },
+          "renderType": "datetime"
         }
       ],
       "rowActions": [
@@ -155,7 +158,9 @@
           "label": {
             "zh-CN": "说话人",
             "en": "Speaker"
-          }
+          },
+          "renderType": "tag",
+          "dictCode": "faq_message_sender"
         },
         {
           "field": "content",
@@ -164,7 +169,13 @@
             "en": "Content"
           }
         }
-      ]
+      ],
+      "empty": {
+        "title": {
+          "zh-CN": "选择上方一条会话，查看它的对话内容",
+          "en": "Pick a conversation above to read it"
+        }
+      }
     }
   ],
   "title": {

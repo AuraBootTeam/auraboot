@@ -27,6 +27,7 @@ public class CommandAutoSetExecutor {
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
     private final TenantClock tenantClock;
+    private final com.auraboot.framework.user.mapper.UserMapper userMapper;
 
     @SuppressWarnings("unchecked")
     public void executeAutoSetPhase(Map<String, Object> execConfig, Map<String, Object> payload,
@@ -56,7 +57,7 @@ public class CommandAutoSetExecutor {
                 case "auto_generate" -> generateAutoCode(command.getModelCode(), fieldCode, config);
                 case "current_user" -> userId != null ? String.valueOf(userId) : null;
                 case "current_user_pid" -> MetaContext.getCurrentUserPid();
-                case "current_username" -> MetaContext.getCurrentUsername();
+                case "current_username" -> resolveCurrentUserDisplayName();
                 case "current_date" -> tenantClock.businessDate(MetaContext.getCurrentTenantId());
                 case "current_datetime" -> Instant.now();
                 case "fixed_value", "default_value" -> config.get("value");
@@ -140,5 +141,45 @@ public class CommandAutoSetExecutor {
         String[] parts = fieldCode.split("_");
         String lastPart = parts[parts.length - 1];
         return lastPart.substring(0, Math.min(3, lastPart.length())).toUpperCase();
+    }
+
+    /**
+     * The display name of whoever is acting — a person's name, which is what a field called
+     * "reviewed by" or "owner" is for.
+     *
+     * <p>{@code MetaContext.getCurrentUsername()} does not give you that. It carries whatever
+     * identifier the request authenticated with, and for a JWT-authenticated call that is the
+     * user's pid: every field ever filled by this strategy has been showing a 26-character ULID
+     * to a human. The strategy is called current_<b>username</b>; it should behave like one.
+     *
+     * <p>Falls back to the pid when the user cannot be resolved — an unresolvable actor is better
+     * recorded opaquely than not at all.
+     */
+    private String resolveCurrentUserDisplayName() {
+        String principal = MetaContext.getCurrentUsername();
+        String pid = MetaContext.getCurrentUserPid();
+        String lookup = pid != null ? pid : principal;
+        if (lookup == null) {
+            return null;
+        }
+        try {
+            com.auraboot.framework.user.dao.entity.User user = userMapper.selectOne(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<
+                            com.auraboot.framework.user.dao.entity.User>()
+                            .eq(com.auraboot.framework.user.dao.entity.User::getPid, lookup)
+                            .last("LIMIT 1"));
+            if (user != null) {
+                if (user.getNickName() != null && !user.getNickName().isBlank()) {
+                    return user.getNickName();
+                }
+                if (user.getUserName() != null && !user.getUserName().isBlank()) {
+                    return user.getUserName();
+                }
+            }
+        } catch (org.springframework.dao.DataAccessException e) {
+            log.warn("AUTO_SET: could not resolve a display name for {} — falling back to the identifier",
+                    lookup);
+        }
+        return lookup;
     }
 }

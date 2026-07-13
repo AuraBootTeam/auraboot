@@ -151,23 +151,66 @@ test.describe('Conversation → FAQ loop — review workbench golden', () => {
     expect(errors.filter(isProductError), 'no product console errors while filtering').toEqual([]);
   });
 
-  test('F3 selecting a candidate shows its Q&A and provenance', async ({ page }) => {
+  test('F3 selecting a candidate shows the whole answer and where it came from', async ({ page }) => {
     const errors = captureConsole(page);
     await gotoWorkbench(page);
 
-    await expect(page.getByTestId('review-drawer-empty')).toBeVisible();
-    await page.locator('[data-testid^="table-row-"]').first().click();
+    // Read the candidate off the row we are about to click, not off the API's first record: the
+    // table sorts by confidence and the API does not, so "the first row" and "the first record"
+    // are different candidates, and comparing one against the other fails for a reason that has
+    // nothing to do with the product.
+    const firstRow = page.locator('[data-testid^="table-row-"]').first();
+    const rowPid = (await firstRow.getAttribute('data-testid'))!.replace('table-row-', '');
+    const target = (await fetchCandidates(page)).find((c) => c.pid === rowPid);
+    expect(target, 'a candidate to inspect').toBeTruthy();
 
-    const drawer = page.getByTestId('review-drawer');
-    await expect(drawer).toBeVisible({ timeout: 10000 });
-    await expect(page.getByTestId('review-drawer-empty')).toHaveCount(0);
+    await firstRow.click();
 
-    // The reviewer must be able to see WHERE this came from — a Q&A with no provenance is
-    // not reviewable, it is just a suggestion.
-    await expect(drawer).toContainText(/来源会话|Source Conversation/);
-    await expect(drawer).toContainText('faqseedsupport0000000001');
+    const evidence = page.getByTestId('evidence-panel');
+    await expect(evidence).toBeVisible({ timeout: 10000 });
 
-    await page.screenshot({ path: `${SHOTS}/F3-candidate-detail.png`, fullPage: true });
+    // The answer must be shown in FULL. This is the whole job of this panel: a reviewer approving
+    // a Q&A that reaches customers has to read all of it. The floating drawer this replaced
+    // truncated it mid-sentence — and a test that only asserted "the panel is visible" was happy
+    // to let that ship.
+    await expect(evidence, 'the whole answer is on screen, not an ellipsis').toContainText(
+      String(target!.faq_answer),
+    );
+
+    // And the status reads as a status, not as a database value. evidence-panel does not consume
+    // dictCode — leave it unmapped and it prints "rejected" at a reviewer.
+    await expect(evidence, 'the status is a label, not a raw code').not.toContainText(
+      /\b(draft|approved|published|rejected)\b/,
+    );
+
+    // The confidence carries its unit. It is stored 0-100, and a bare "100" next to a "100%" in the
+    // table is the same number claiming two different scales — the reader has to guess which.
+    // .first(), not .last(): hasText matches ancestors too, so .last() is the innermost node — the
+    // label <div> alone, which never contains the value.
+    const confidenceCell = evidence
+      .locator('div')
+      .filter({ hasText: /^(模型置信度|Model confidence)/ })
+      .first();
+    await expect(confidenceCell, 'confidence is a percentage or an honest dash, never a bare number').toContainText(
+      /(\d+(\.\d+)?%|-)/,
+    );
+    await expect(confidenceCell).not.toHaveText(/(模型置信度|Model confidence)\s*\d+(\.\d+)?$/);
+
+    // Provenance, and the conversation itself — both on the same screen as the answer. The drawer
+    // was an overlay: opening it covered the transcript it was supposed to be checked against.
+    await expect(evidence).toContainText(/来源会话|Source conversation/);
+    const transcript = page.getByTestId('table-block').last();
+    await expect(transcript, 'the source conversation is readable at the same time').toContainText(
+      /客服|Support/,
+      { timeout: 15000 },
+    );
+
+    // Scroll it into view before capturing. The app scrolls an inner container, not the document,
+    // so fullPage screenshots stop at the viewport — every shot taken so far showed the top of the
+    // page and nothing of the panel underneath. A screenshot that cannot show the thing under
+    // review is not evidence of it.
+    await evidence.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${SHOTS}/F3-candidate-detail.png` });
     expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
   });
 

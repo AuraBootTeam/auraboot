@@ -91,8 +91,9 @@ public class FaqConversationQueryService {
         for (ImMessage m : messages) {
             out.add(new FaqConversationView.Message(
                     m.getSeq() == null ? 0L : m.getSeq(),
-                    // Same labelling the distiller sees, so the reviewer is reading what the model read.
-                    "agent".equals(m.getSenderType()) ? "Support" : "Customer",
+                    // A stable code, not a label. Handing "Support" straight to a Chinese UI is how
+                    // English ends up on a Chinese screen; the dictionary decides what a code reads as.
+                    "agent".equals(m.getSenderType()) ? "support" : "customer",
                     m.getContent(),
                     m.getCreatedAt()));
         }

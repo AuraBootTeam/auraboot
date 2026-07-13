@@ -227,8 +227,11 @@ class ConversationFaqExtractionLiveIT extends BaseIntegrationTest {
                     c.id(), faqs.size(), c.minPairs(), enough ? "y" : "n",
                     c.mustContain(), grounded ? "y" : "n"));
             for (ExtractedFaq f : faqs) {
-                rows.append(String.format("      Q: %s%n      A: %s  (conf=%.2f)%n",
-                        f.question(), f.answer(), f.confidence()));
+                rows.append(String.format("      Q: %s%n      A: %s  (conf=%s)%n",
+                        f.question(), f.answer(),
+                        // null means the model reported none — printing 0.00 would misreport silence
+                        // as a verdict, the same way storing 0 would.
+                        f.confidence() == null ? "not reported" : String.format("%.2f", f.confidence())));
             }
         }
 

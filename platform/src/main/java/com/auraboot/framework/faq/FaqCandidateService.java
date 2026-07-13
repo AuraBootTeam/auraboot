@@ -105,7 +105,12 @@ public class FaqCandidateService {
             Map<String, Object> data = new LinkedHashMap<>();
             data.put("faq_question", faq.question());
             data.put("faq_answer", faq.answer());
-            data.put("faq_confidence", faq.confidence());
+            // Stored as a percentage: the model speaks in 0-1, but a reviewer reads a column, and a
+            // column showing "1" is not a confidence, it is a riddle. Left absent when the model did
+            // not report one — the column then shows "—" rather than claiming 0%.
+            if (faq.confidence() != null) {
+                data.put("faq_confidence", Math.round(faq.confidence() * 100.0));
+            }
             data.put("faq_status", STATUS_DRAFT);
             data.put("faq_source_conversation_pid", conversationPid);
             data.put("faq_source_seq_range", seqRange);

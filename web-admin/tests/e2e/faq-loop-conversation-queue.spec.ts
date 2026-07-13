@@ -136,10 +136,11 @@ test.describe('Conversation → FAQ loop — queue, distil, provenance', () => {
     // worth distilling by reading it, not by its title.
     const transcript = page.getByTestId('table-block').last();
     await expect(transcript).toContainText('3-5 个工作日', { timeout: 15000 });
-    await expect(transcript).toContainText('Support');
-    await expect(transcript).toContainText('Customer');
+    await expect(transcript).toContainText(/客服|Support/);
+    await expect(transcript).toContainText(/客户|Customer/);
 
-    await page.screenshot({ path: `${SHOTS}/M2-2-transcript.png`, fullPage: true });
+    await transcript.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${SHOTS}/M2-2-transcript.png` });
     expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
   });
 
@@ -193,10 +194,11 @@ test.describe('Conversation → FAQ loop — queue, distil, provenance', () => {
     // Provenance is the point: a reviewer approving a Q&A must be able to see the turns it was
     // distilled from, or they are rubber-stamping the model.
     const transcript = page.getByTestId('table-block').last();
-    await expect(transcript).toContainText('Support', { timeout: 15000 });
+    await expect(transcript).toContainText(/客服|Support/, { timeout: 15000 });
     await expect(transcript).toContainText(/3-5 个工作日|30 天内/);
 
-    await page.screenshot({ path: `${SHOTS}/M2-5-candidate-provenance.png`, fullPage: true });
+    await transcript.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${SHOTS}/M2-5-candidate-provenance.png` });
     expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
   });
   test('M2-6 distilling the same conversation twice does not pile up a second copy', async ({ page }) => {

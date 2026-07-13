@@ -17,7 +17,8 @@ DELETE FROM ab_im_conversation WHERE pid IN ('faqseedsupport0000000001', 'faqsee
 
 -- ---- 1. a real support thread: three questions, three answers ----------------------------
 INSERT INTO ab_im_conversation (pid, tenant_id, type, name, owner_id, max_seq, created_at, updated_at)
-VALUES ('faqseedsupport0000000001', :tenant, 'group', '客服会话 — 退款与发票', 1, 6, NOW(), NOW());
+VALUES ('faqseedsupport0000000001', :tenant, 'group', '客服会话 — 退款与发票', 1, 6, NOW() - INTERVAL '2 hours', NOW());
+UPDATE ab_im_conversation SET last_message_at = NOW() - INTERVAL '90 minutes' WHERE pid = 'faqseedsupport0000000001';
 
 INSERT INTO ab_im_message (conversation_id, tenant_id, sender_id, sender_type, seq, message_type, content, created_at)
 SELECT c.id, :tenant, s.sender_id, s.sender_type, s.seq, 'text', s.content, NOW()
@@ -34,7 +35,8 @@ WHERE c.pid = 'faqseedsupport0000000001';
 
 -- ---- 2. the control: pleasantries, no question, nothing to distil ------------------------
 INSERT INTO ab_im_conversation (pid, tenant_id, type, name, owner_id, max_seq, created_at, updated_at)
-VALUES ('faqseedchitchat0000000001', :tenant, 'group', '客服会话 — 闲聊', 1, 4, NOW(), NOW());
+VALUES ('faqseedchitchat0000000001', :tenant, 'group', '客服会话 — 闲聊', 1, 4, NOW() - INTERVAL '5 hours', NOW());
+UPDATE ab_im_conversation SET last_message_at = NOW() - INTERVAL '4 hours' WHERE pid = 'faqseedchitchat0000000001';
 
 INSERT INTO ab_im_message (conversation_id, tenant_id, sender_id, sender_type, seq, message_type, content, created_at)
 SELECT c.id, :tenant, s.sender_id, s.sender_type, s.seq, 'text', s.content, NOW()
@@ -52,7 +54,8 @@ WHERE c.pid = 'faqseedchitchat0000000001';
 -- spec that runs after it would find an empty queue. This thread is its own material: it distils
 -- from the queue UI like everything else, and nothing else touches it.
 INSERT INTO ab_im_conversation (pid, tenant_id, type, name, owner_id, max_seq, created_at, updated_at)
-VALUES ('faqseedsupport0000000002', :tenant, 'group', '客服会话 — 配送与保修', 1, 4, NOW(), NOW());
+VALUES ('faqseedsupport0000000002', :tenant, 'group', '客服会话 — 配送与保修', 1, 4, NOW() - INTERVAL '30 minutes', NOW());
+UPDATE ab_im_conversation SET last_message_at = NOW() - INTERVAL '20 minutes' WHERE pid = 'faqseedsupport0000000002';
 
 INSERT INTO ab_im_message (conversation_id, tenant_id, sender_id, sender_type, seq, message_type, content, created_at)
 SELECT c.id, :tenant, s.sender_id, s.sender_type, s.seq, 'text', s.content, NOW()
