@@ -178,6 +178,28 @@ public class KnowledgeBaseService {
     }
 
     /**
+     * Reset a document so it can be parsed again (manual retry of a failed or stranded document).
+     * Clears the previous error and the reconcile attempt counter; the chunks left behind by the
+     * failed run are cleared by the processing pipeline itself.
+     *
+     * @return false if no such document exists in this knowledge base
+     */
+    public boolean resetDocumentForReprocess(String kbPid, String docPid) {
+        KbDocument doc = docMapper.selectOne(
+                new LambdaQueryWrapper<KbDocument>()
+                        .eq(KbDocument::getPid, docPid)
+                        .eq(KbDocument::getKbId, kbPid));
+        if (doc == null) return false;
+
+        jdbcTemplate.update(
+                "UPDATE ab_kb_document SET status = 'pending', error_message = NULL, "
+                + "process_retry_count = 0, process_started_at = NULL, process_completed_at = NULL "
+                + "WHERE pid = ?",
+                docPid);
+        return true;
+    }
+
+    /**
      * Update document status and counters after processing.
      */
     public void updateDocumentAfterProcessing(String docPid, String status, int charCount,

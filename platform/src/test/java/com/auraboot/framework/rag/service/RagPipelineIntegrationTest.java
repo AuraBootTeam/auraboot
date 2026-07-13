@@ -15,6 +15,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.io.IOException;
+import java.io.ByteArrayInputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -69,7 +70,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
     void parseTxt() throws Exception {
         Path tmpFile = createTempFile("test.txt", "Hello, this is a test document.\nLine 2.\nLine 3.");
         try {
-            String result = parserService.parse(tmpFile.toString(), "txt");
+            String result = parserService.parse(new ByteArrayInputStream(Files.readAllBytes(tmpFile)), "txt");
             assertThat(result).contains("Hello, this is a test document.");
             assertThat(result).contains("Line 2.");
         } finally {
@@ -83,7 +84,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
     void parseMd() throws Exception {
         Path tmpFile = createTempFile("test.md", "# Title\n\nParagraph content here.\n\n## Section 2\n\nMore text.");
         try {
-            String result = parserService.parse(tmpFile.toString(), "MD");
+            String result = parserService.parse(new ByteArrayInputStream(Files.readAllBytes(tmpFile)), "MD");
             assertThat(result).contains("# Title");
             assertThat(result).contains("Paragraph content here.");
             assertThat(result).contains("## Section 2");
@@ -98,7 +99,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
     void parseCsv() throws Exception {
         Path tmpFile = createTempFile("test.csv", "name,age,city\nAlice,30,Beijing\nBob,25,Shanghai");
         try {
-            String result = parserService.parse(tmpFile.toString(), "csv");
+            String result = parserService.parse(new ByteArrayInputStream(Files.readAllBytes(tmpFile)), "csv");
             assertThat(result).contains("Alice,30,Beijing");
             assertThat(result).contains("Bob,25,Shanghai");
         } finally {
@@ -113,7 +114,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
         Path tmpFile = createTempFile("test.html",
                 "<html><body><h1>Title</h1><p>Paragraph &amp; content</p></body></html>");
         try {
-            String result = parserService.parse(tmpFile.toString(), "html");
+            String result = parserService.parse(new ByteArrayInputStream(Files.readAllBytes(tmpFile)), "html");
             assertThat(result).contains("Title");
             assertThat(result).contains("Paragraph & content");
             assertThat(result).doesNotContain("<html>");
@@ -129,7 +130,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
     void parseUnsupported() throws Exception {
         Path tmpFile = createTempFile("test.xyz", "some content");
         try {
-            assertThatThrownBy(() -> parserService.parse(tmpFile.toString(), "xyz"))
+            assertThatThrownBy(() -> parserService.parse(new ByteArrayInputStream(Files.readAllBytes(tmpFile)), "xyz"))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("Unsupported document type");
         } finally {
