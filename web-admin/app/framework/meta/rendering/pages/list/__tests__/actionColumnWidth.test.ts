@@ -95,4 +95,20 @@ describe('estimateActionColumnWidth', () => {
     expect(estimateActionColumnWidth([], { hasOverflow: false })).toBe(ACTION_COLUMN_MIN_WIDTH);
     expect(estimateActionColumnWidth([''], { hasOverflow: true })).toBe(ACTION_COLUMN_MIN_WIDTH);
   });
+
+  // Every label below is the real first row-action of a shipped DSL page that overflowed
+  // the old hard-coded 112px column. A repo scan (plugins/**/config/**/*.json) found
+  // exactly these three; they are pinned here so the regression cannot come back through
+  // any of them, and so a future long label is caught by a unit test rather than by a user.
+  it.each([
+    ['统一设计器', 'page-manager / page_schema'],
+    ['标记已联系', 'crm-starter / crm_lead_workbench'],
+    ['编辑问答', 'core-faq-loop / faq_candidate_workbench'],
+  ])('gives "%s" (%s) a column wide enough to render it unclipped', (label) => {
+    const width = estimateActionColumnWidth([label], { hasOverflow: true });
+    // Wider than the old fixed 112px — that is precisely what made the label wrap.
+    expect(width).toBeGreaterThan(ACTION_COLUMN_MIN_WIDTH);
+    // And not so long that it hits the ceiling and gets truncated.
+    expect(width).toBeLessThan(ACTION_COLUMN_MAX_WIDTH);
+  });
 });
