@@ -23,6 +23,7 @@ import org.apache.poi.xwpf.usermodel.XWPFTableCell;
 import org.apache.poi.xwpf.usermodel.XWPFTableRow;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -200,11 +201,53 @@ public class DocumentParserService {
     private String parseHtml(String html) {
         Document doc = Jsoup.parse(html);
         doc.select("script, style, noscript").remove();
-        doc.outputSettings().prettyPrint(false);
-        doc.select("br, p, div, li, tr, section, article, h1, h2, h3, h4, h5, h6, blockquote")
+        return blockAwareText(doc);
+    }
+
+    /** The readable part of a fetched web page. */
+    public record WebPageContent(String title, String text) {}
+
+    /**
+     * Extract the readable body of a fetched web page.
+     *
+     * <p>Goes further than {@link #parseHtml}: a live page also carries site chrome \u2014 the nav bar,
+     * the cookie banner, the footer links \u2014 which is identical on every page of the site and would
+     * be indexed once per URL, drowning the actual content in boilerplate. So the chrome is dropped,
+     * and when the page marks its content with {@code <main>} / {@code <article>} we index that
+     * rather than the whole body.
+     *
+     * @param html    the fetched document
+     * @param fallbackTitle used as the title when the page has no {@code <title>}
+     */
+    public WebPageContent parseWebPage(String html, String fallbackTitle) {
+        Document doc = Jsoup.parse(html);
+        doc.select("script, style, noscript, nav, header, footer, aside, form, iframe, svg, template")
+                .remove();
+
+        String title = doc.title();
+        if (title == null || title.isBlank()) {
+            title = fallbackTitle;
+        }
+
+        Element content = doc.selectFirst("main, article, [role=main]");
+        Element root = content != null ? content : doc.body();
+        if (root == null) {
+            return new WebPageContent(title, "");
+        }
+        return new WebPageContent(title.strip(), blockAwareText(root));
+    }
+
+    /**
+     * Flatten an element to text, turning block boundaries into newlines. Jsoup's own {@code text()}
+     * collapses everything onto one line, which would glue the end of one paragraph to the start of
+     * the next and give the chunker nothing to split on.
+     */
+    private String blockAwareText(Element root) {
+        root.ownerDocument().outputSettings().prettyPrint(false);
+        root.select("br, p, div, li, tr, section, article, h1, h2, h3, h4, h5, h6, blockquote")
                 .append("\n");
 
-        return doc.wholeText()
+        return root.wholeText()
                 .replace('\u00a0', ' ')
                 .replaceAll("[ \\t\\x0B\\f\\r]+", " ")
                 .replaceAll(" ?\\n ?", "\n")
