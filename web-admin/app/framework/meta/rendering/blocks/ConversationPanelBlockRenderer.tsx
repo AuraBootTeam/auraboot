@@ -31,7 +31,8 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, Send } from 'lucide-react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
-import { useI18n } from '~/shared/i18n';
+import { useI18n } from '~/contexts/I18nContext';
+import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 
 export interface ConversationPanelBlockRendererProps {
   block: BlockConfig;
@@ -44,6 +45,18 @@ interface TranscriptLine {
   senderName?: string | null;
   content: string;
   at?: string;
+}
+
+/**
+ * Read a dotted path out of page state.
+ *
+ * `sessionKey` is usually `selectedSession.sessionPid` and not a bare key, because a table's
+ * `selection.bind` writes the whole selected ROW into state, not one field of it. A renderer that
+ * only understood top-level keys would read the row object, hand it to the endpoint template, and
+ * fetch `/api/…/[object Object]/messages`.
+ */
+function readPath(state: any, path: string): any {
+  return path.split('.').reduce((acc, key) => (acc == null ? undefined : acc[key]), state);
 }
 
 /** A line the server sent us but that we have already got. Keyed on seq, which is per-conversation. */
@@ -62,17 +75,24 @@ function dedupe(lines: TranscriptLine[]): TranscriptLine[] {
 }
 
 export function ConversationPanelBlockRenderer({ block, runtime }: ConversationPanelBlockRendererProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const cfg = block as unknown as Record<string, any>;
 
+  // title/emptyText arrive as LocalizedText ({ "zh-CN": …, en: … }) from the DSL. Rendering the
+  // object straight into JSX throws "Objects are not valid as a React child" and takes the whole
+  // block down — which is exactly what it did, and no static gate saw it.
+  const title = cfg.title ? getLocalizedText(cfg.title, locale, t) : '';
+
   const sessionKey: string = cfg.sessionKey || 'selectedSession';
-  const emptyText: string = cfg.emptyText || t('cs.panel.empty', '选择一个会话查看内容');
+  const emptyText: string = cfg.emptyText
+    ? getLocalizedText(cfg.emptyText, locale, t)
+    : t('cs.panel.empty', undefined, '选择一个会话查看内容');
 
   const stateManager = runtime.getStateManager();
   const scopeId = runtime.getScopeId();
 
   const [session, setSession] = useState<string | null>(
-    () => stateManager.getContext(scopeId)?.state?.[sessionKey] ?? null,
+    () => readPath(stateManager.getContext(scopeId)?.state, sessionKey) ?? null,
   );
   const [lines, setLines] = useState<TranscriptLine[]>([]);
   const [loading, setLoading] = useState(false);
@@ -83,12 +103,14 @@ export function ConversationPanelBlockRenderer({ block, runtime }: ConversationP
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   // Follow the page's selection. The queue table writes the pid into page state; this reads it.
+  // Subscribed with a selector rather than to the whole scope: every keystroke in a filter box
+  // changes the scope, and re-opening a live stream on each one would be a new socket per character.
   useEffect(() => {
-    const unsubscribe = stateManager.subscribe(scopeId, () => {
-      const next = stateManager.getContext(scopeId)?.state?.[sessionKey] ?? null;
-      setSession((current) => (current === next ? current : next));
-    });
-    return unsubscribe;
+    return stateManager.subscribe(
+      scopeId,
+      (state: any) => readPath(state?.state, sessionKey) ?? null,
+      (next: string | null) => setSession((current) => (current === next ? current : next)),
+    );
   }, [stateManager, scopeId, sessionKey]);
 
   const url = useCallback(
@@ -231,21 +253,21 @@ export function ConversationPanelBlockRenderer({ block, runtime }: ConversationP
       data-testid="conversation-panel"
       className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-lg border border-border bg-background"
     >
-      {cfg.title && (
-        <div className="border-b border-border px-4 py-2 text-sm font-medium">{cfg.title}</div>
+      {title && (
+        <div className="border-b border-border px-4 py-2 text-sm font-medium">{title}</div>
       )}
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4" data-testid="conversation-panel-messages">
         {loading && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            {t('common.loading', '加载中')}
+            {t('common.loading', undefined, '加载中')}
           </div>
         )}
 
         {!loading && lines.length === 0 && (
           <div className="text-sm text-muted-foreground" data-testid="conversation-panel-no-messages">
-            {t('cs.panel.noMessages', '还没有消息')}
+            {t('cs.panel.noMessages', undefined, '还没有消息')}
           </div>
         )}
 
@@ -268,10 +290,10 @@ export function ConversationPanelBlockRenderer({ block, runtime }: ConversationP
               >
                 <div className="mb-0.5 text-[11px] opacity-70">
                   {line.senderType === 'visitor'
-                    ? t('cs.panel.visitor', '访客')
+                    ? t('cs.panel.visitor', undefined, '访客')
                     : line.senderType === 'human'
-                      ? line.senderName || t('cs.panel.agent', '客服')
-                      : t('cs.panel.ai', 'AI')}
+                      ? line.senderName || t('cs.panel.agent', undefined, '客服')
+                      : t('cs.panel.ai', undefined, 'AI')}
                 </div>
                 <div className="whitespace-pre-wrap break-words">{line.content}</div>
               </div>
@@ -303,8 +325,8 @@ export function ConversationPanelBlockRenderer({ block, runtime }: ConversationP
           data-testid="conversation-panel-input"
           placeholder={
             canReply
-              ? t('cs.panel.placeholder', '输入回复,回车发送')
-              : t('cs.panel.cannotReply', '接单后才能回复')
+              ? t('cs.panel.placeholder', undefined, '输入回复,回车发送')
+              : t('cs.panel.cannotReply', undefined, '接单后才能回复')
           }
           className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         />
@@ -320,7 +342,7 @@ export function ConversationPanelBlockRenderer({ block, runtime }: ConversationP
           ) : (
             <Send className="h-4 w-4" aria-hidden="true" />
           )}
-          {t('cs.panel.send', '发送')}
+          {t('cs.panel.send', undefined, '发送')}
         </button>
       </div>
     </div>

@@ -166,8 +166,10 @@ export class CsClient {
           }
 
           await this.readFrames(response.body.getReader(), (event, payload) => {
-            if (event === 'message') handlers.onMessage(payload as LiveMessage);
-            else if (event === 'state') handlers.onState?.(payload as LiveState);
+            // The server is the only writer of these frames and its shape is pinned by CsLiveEvent;
+            // the parser hands us a bag of unknowns, so the narrowing is ours to state.
+            if (event === 'message') handlers.onMessage(payload as unknown as LiveMessage);
+            else if (event === 'state') handlers.onState?.(payload as unknown as LiveState);
           });
         } catch {
           if (stopped) return;

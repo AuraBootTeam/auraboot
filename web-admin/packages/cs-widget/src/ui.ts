@@ -110,7 +110,12 @@ export class CsWidget {
         .msg { padding: 8px 12px; border-radius: 10px; max-width: 80%; white-space: pre-wrap; word-break: break-word; }
         .msg[data-from="visitor"] { align-self: flex-end; background: ${accent}; color: #fff; }
         .msg[data-from="agent"] { align-self: flex-start; background: #f3f4f6; color: #111827; }
+        /* An error. Red, because something went wrong and the visitor is stuck. */
         .msg[data-from="system"] { align-self: center; background: #fef2f2; color: #991b1b; font-size: 12px; }
+        /* A notice: queued, a person joined, the chat ended. Nothing is wrong — so nothing is red.
+           These used to reuse the error bubble, and a visitor being told their agent had arrived was
+           being told it in the colour of a failure. */
+        .msg[data-from="notice"] { align-self: center; background: #f1f5f9; color: #475569; font-size: 12px; }
         .composer { display: flex; gap: 8px; padding: 12px; border-top: 1px solid #e5e7eb; }
         textarea {
           flex: 1; resize: none; height: 40px; padding: 8px 10px; font: inherit; color: inherit;
@@ -193,7 +198,7 @@ export class CsWidget {
     this.handoffButton.disabled = true;
     try {
       const result = await this.client.escalate();
-      this.append('system', result.seatsAvailable > 0
+      this.append('notice', result.seatsAvailable > 0
         ? this.text.handoffQueued
         : this.text.handoffQueuedNoSeats);
     } catch (error) {
@@ -230,9 +235,9 @@ export class CsWidget {
         if (state.state === 'human_active') {
           this.handedOver = true;
           this.handoffButton.hidden = true;
-          this.append('system', this.text.handoffTaken);
+          this.append('notice', this.text.handoffTaken);
         } else if (state.state === 'closed') {
-          this.append('system', this.text.closed);
+          this.append('notice', this.text.closed);
         }
         this.scrollToEnd();
       },

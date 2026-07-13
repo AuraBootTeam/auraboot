@@ -110,7 +110,21 @@ export class BffProxyService {
   /**
    * Check if the request is an SSE request based on path and method
    */
-  private isSSERequest(path: string, method: string): boolean {
+  private isSSERequest(path: string, method: string, accept?: string): boolean {
+    // What the client asked for, first. A client that wants an event stream says so, and a hardcoded
+    // list of paths is a list that is wrong the moment someone adds an endpoint to it — which is what
+    // happened: the customer-service live stream was proxied as an ordinary request, axios waited for
+    // a body that by definition never ends, and the visitor's browser got ERR_BAD_RESPONSE while the
+    // seat's reply sat on the other side of it.
+    //
+    // (The backend made the same mistake in the other direction: SqlCountFilter decided what was a
+    // stream by looking for "/stream" in the URI, so the one SSE endpoint that worked, worked because
+    // of its name. Same lesson, same fix — believe the Accept header.)
+    if (accept?.includes('text/event-stream')) {
+      return true;
+    }
+
+    // Fallback for clients that do not send Accept — kept so nothing that works today stops working.
     const upperMethod = method.toUpperCase();
     return this.sseEndpoints.some(
       (endpoint) =>
@@ -171,8 +185,8 @@ export class BffProxyService {
       }
 
       // Check if this is an SSE request using unified detection
-      if (this.isSSERequest(originalPath, req.method)) {
-        const sseMethod = this.getSSEMethod(originalPath);
+      if (this.isSSERequest(originalPath, req.method, String(req.headers.accept ?? ''))) {
+        const sseMethod = this.getSSEMethod(originalPath) ?? (req.method.toLowerCase() as 'get' | 'post');
         logger.info(
           `[${requestId}] Detected SSE request (method: ${sseMethod}), using streaming proxy`,
         );
@@ -625,11 +639,25 @@ export class BffProxyService {
     // 检查是否已有Authorization header（来自前端SSR）
     let hasAuthHeader = false;
 
+    // On most paths the backend never looks at Origin, and forwarding it would only invite its CORS
+    // filter to start judging requests it currently waves through — a regression waiting to happen
+    // across the whole admin app. On the keyed public paths the backend uses Origin as an
+    // application-level allowlist (which website may speak for this tenant), so stripping it there
+    // does not protect anything; it just makes every request look like it came from nowhere and get
+    // refused. Forwarded exactly where it is load-bearing, and nowhere else.
+    const path = req.originalUrl || req.url || '';
+    const originIsSecurityInput = path.startsWith('/api/public/') || path.startsWith('/api/collect/');
+
     Object.entries(req.headers).forEach(([key, value]) => {
       const lowerKey = key.toLowerCase();
 
       // 跳过 cookie 头，我们会单独处理
       if (lowerKey === 'cookie') {
+        return;
+      }
+
+      if (lowerKey === 'origin' && originIsSecurityInput) {
+        if (typeof value === 'string') sanitized.origin = value;
         return;
       }
 
@@ -907,11 +935,26 @@ export class BffProxyService {
     res.status(response.status);
 
     try {
-      // 设置JSON响应头
-      this.setJsonResponseHeaders(res, response.headers);
+      // What the backend actually said it was sending. Most of the time it is JSON; when it is not,
+      // re-serialising the body as JSON destroys it.
+      //
+      // This is the other half of a bug we half-fixed once already. The Accept header used to be
+      // narrowed to application/json, so an embeddable `<script src>` got a 406 and never reached
+      // this method at all. Widening Accept let the request through — and then this method wrapped
+      // the JavaScript in quotes and labelled it JSON, so the customer's script tag loaded a string
+      // literal and the widget never started. Both halves are on the customer's real path: browser →
+      // BFF → backend. Neither shows up if you only ever curl the backend directly.
+      const upstreamType = String(response.headers?.['content-type'] ?? '');
+      const isJson = upstreamType === '' || upstreamType.includes('json');
 
-      // 直接转发JSON响应
-      res.json(response.data);
+      this.setJsonResponseHeaders(res, response.headers, isJson ? undefined : upstreamType);
+
+      if (isJson) {
+        res.json(response.data);
+      } else {
+        // axios hands us a string for a text/* or application/javascript body. Send it as it came.
+        res.send(response.data);
+      }
 
       // 记录响应转发日志
       if (!skipLogging) {
@@ -940,11 +983,14 @@ export class BffProxyService {
   /**
    * 设置JSON响应头
    */
-  private setJsonResponseHeaders(res: Response, originalHeaders: any): void {
+  private setJsonResponseHeaders(res: Response, originalHeaders: any, contentType?: string): void {
     // 清除可能冲突的响应头
     res.removeHeader('Content-Length');
     res.removeHeader('Transfer-Encoding');
-    res.set('Content-Type', 'application/json; charset=utf-8');
+    // Not everything the backend returns is JSON. An embeddable SDK is JavaScript, and stamping
+    // application/json on it — then re-serialising the body — hands the customer's <script> tag a
+    // quoted string instead of a program.
+    res.set('Content-Type', contentType || 'application/json; charset=utf-8');
 
     // 转发其他响应头（排除可能冲突的头）
     Object.entries(originalHeaders).forEach(([key, value]) => {
