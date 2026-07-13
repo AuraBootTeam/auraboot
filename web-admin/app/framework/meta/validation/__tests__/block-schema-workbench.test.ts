@@ -16,6 +16,10 @@ describe('block schema workbench block types', () => {
     expect(BLOCK_TYPES).toContain('text');
     expect(BLOCK_TYPES).toContain('chart-card');
     expect(BLOCK_TYPES).toContain('selection-info');
+    // code-snippet: without this the best-practice linter warns "unknown blockType"
+    // on every page that mounts a valid, registered code-snippet block.
+    expect(BLOCK_TYPES).toContain('code-snippet');
+    expect(blockTypeEnum.safeParse('code-snippet').success).toBe(true);
 
     expect(blockTypeEnum.safeParse('metric-strip').success).toBe(true);
     expect(blockTypeEnum.safeParse('record-inspector').success).toBe(true);

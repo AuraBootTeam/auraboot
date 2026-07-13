@@ -20,6 +20,7 @@ import {
   CheckIcon,
 } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
+import { buildWebFormEmbedSnippet } from './webFormEmbed';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -241,7 +242,7 @@ export default function WebFormEditorPage() {
   };
 
   const handleCopyEmbed = () => {
-    const embedCode = `<script src="${window.location.origin}/sdk/web-form.js" data-form-id="${pid}" async></script>`;
+    const embedCode = buildWebFormEmbedSnippet(window.location.origin, pid ?? '');
     navigator.clipboard.writeText(embedCode).then(() => {
       setCopied(true);
       showToast('Embed code copied to clipboard', 'success');

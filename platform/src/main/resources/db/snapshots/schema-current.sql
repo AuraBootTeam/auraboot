@@ -7759,7 +7759,7 @@ CREATE TABLE public.ab_im_conversation (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     bound_record_pid character varying(64),
-    pid character varying(26) NOT NULL
+    pid character varying(26) DEFAULT "substring"(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 26) NOT NULL
 );
 
 

@@ -7,6 +7,8 @@ public final class ImConstants {
     public static final String TYPE_GROUP = "group";
     public static final String TYPE_BOT = "bot";
     public static final String TYPE_OBJECT = "object";
+    /** A conversation between an anonymous website visitor and the customer-service AI or a seat. */
+    public static final String TYPE_VISITOR = "visitor";
 
     public static final String ROLE_OWNER = "owner";
     public static final String ROLE_MEMBER = "member";
@@ -15,11 +17,19 @@ public final class ImConstants {
     // Member types (polymorphic: human user vs AI agent)
     public static final String MEMBER_TYPE_HUMAN = "human";
     public static final String MEMBER_TYPE_AGENT = "agent";
+    /**
+     * An anonymous website visitor. Note that {@code ImConversationMemberMapper.findHumanMemberIds}
+     * deliberately does not return these: a visitor reads its own conversation over SSE, and the
+     * broadcast is meant for the internal members (the seats), so filtering to humans is correct.
+     */
+    public static final String MEMBER_TYPE_VISITOR = "visitor";
 
     // Sender types (message sender classification)
     public static final String SENDER_TYPE_HUMAN = "human";
     public static final String SENDER_TYPE_AGENT = "agent";
     public static final String SENDER_TYPE_SYSTEM = "system";
+    /** Sent by an anonymous website visitor; sender_id is ab_cs_visitor.id, not ab_user.id. */
+    public static final String SENDER_TYPE_VISITOR = "visitor";
 
     // WebSocket event types for group management
     public static final String WS_CONVERSATION_DELETED = "conversation_deleted";

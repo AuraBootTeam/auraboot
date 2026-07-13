@@ -1195,6 +1195,13 @@
       "resourceType": "function"
     },
     {
+      "code": "meta.cs.manage",
+      "name": "Meta CS manage",
+      "description": "Manage embeddable customer-service sites — origins, knowledge bases, identity secret",
+      "type": "function",
+      "resourceType": "function"
+    },
+    {
       "code": "meta.qr.manage",
       "name": "Meta QR manage",
       "description": "Manage AuraQR live codes — create/list/bind/publish/status",

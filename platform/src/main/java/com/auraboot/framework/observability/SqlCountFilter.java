@@ -12,6 +12,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.springframework.http.MediaType;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
@@ -58,14 +59,23 @@ public class SqlCountFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         SqlCountHolder.reset();
 
-        // SSE (text/event-stream) endpoints use async streaming — ContentCachingResponseWrapper
-        // would buffer the empty initial response, set Content-Length: 0, and close the connection
-        // before the async thread can send any events. Skip wrapping for SSE endpoints.
+        // SSE endpoints stream asynchronously. ContentCachingResponseWrapper buffers the body, so
+        // wrapping one produces an empty 200 with Content-Length: 0 while the events are written
+        // into a buffer nobody ever flushes — no exception, no log, just a client that receives
+        // nothing.
+        //
+        // Detection is best-effort and deliberately generous, because getting it wrong is silent.
+        // An SSE client SHOULD send Accept: text/event-stream, and EventSource does — but fetch()
+        // does not add it on its own, so a POST-based stream can arrive with no hint in the
+        // headers at all. The old check also keyed off "/stream" appearing in the URI, which meant
+        // an endpoint's streaming worked or broke depending on what it happened to be called.
         String accept = request.getHeader("Accept");
-        boolean isSse = accept != null && accept.contains("text/event-stream");
-        boolean isStreamProducer = "text/event-stream".equals(request.getContentType())
-                || request.getRequestURI().contains("/stream");
-        boolean skipWrapping = isSse || isStreamProducer;
+        boolean acceptsEventStream = accept != null && accept.contains(MediaType.TEXT_EVENT_STREAM_VALUE);
+        String uri = request.getRequestURI();
+        // The URI check is a legacy fallback for clients that send no Accept header. It is kept
+        // because removing it would break them, not because it is a good way to identify a stream.
+        boolean looksLikeStream = uri.contains("/stream") || uri.contains("/sse");
+        boolean skipWrapping = acceptsEventStream || looksLikeStream;
 
         // Wrap response to buffer output, allowing header injection after chain completes
         ContentCachingResponseWrapper wrappedResponse = (headerEnabled && !skipWrapping)
@@ -78,6 +88,16 @@ public class SqlCountFilter extends OncePerRequestFilter {
             int count = SqlCountHolder.get();
 
             if (wrappedResponse != null) {
+                // The guess was wrong: this response IS a stream, and by wrapping it we have just
+                // swallowed it. Nothing can be recovered here — but say so loudly, because the
+                // symptom (an empty 200) points nowhere near this filter.
+                if (MediaType.TEXT_EVENT_STREAM_VALUE.equals(wrappedResponse.getContentType())
+                        || request.isAsyncStarted()) {
+                    log.error("SQL-count wrapper buffered a streaming response for {} — the client will "
+                                    + "receive an empty body. Have the client send 'Accept: {}', or extend the "
+                                    + "skip check in SqlCountFilter.",
+                            uri, MediaType.TEXT_EVENT_STREAM_VALUE);
+                }
                 wrappedResponse.setIntHeader(HEADER_SQL_COUNT, count);
                 wrappedResponse.copyBodyToResponse();
             } else if (headerEnabled && !skipWrapping) {
