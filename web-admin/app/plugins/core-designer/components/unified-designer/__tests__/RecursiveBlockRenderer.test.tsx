@@ -3,6 +3,22 @@ import { describe, expect, it, vi } from 'vitest';
 import { samplePageSchemaV3 } from '../fixtures/samplePageSchemaV3';
 import { RecursiveBlockRenderer } from '../runtime/RecursiveBlockRenderer';
 import type { RuntimeExecutionServices } from '../runtime/runtimeExecution';
+import type { PageSchemaV3, ModelFieldDefinition } from '../types';
+
+// Isolate the WYSIWYG wiring from the real platform field renderer internals
+// (ComponentLoader / smart controls / data sources). We only assert that the
+// designer feeds the correct FieldConfig into the platform renderer.
+vi.mock('~/framework/meta/rendering/ControlledFieldRenderer', () => ({
+  ControlledFieldRenderer: ({ field }: { field: { field: string; label: unknown; component?: string } }) => (
+    <div
+      data-testid={`controlled-field-${field.field}`}
+      data-component={field.component ?? ''}
+      data-label={typeof field.label === 'string' ? field.label : JSON.stringify(field.label)}
+    >
+      controlled-field
+    </div>
+  ),
+}));
 
 describe('RecursiveBlockRenderer', () => {
   it('renders a PageSchema V3 composite page directly', () => {
@@ -12,6 +28,58 @@ describe('RecursiveBlockRenderer', () => {
     expect(screen.getByTestId('runtime-block-form_customer')).toBeInTheDocument();
     expect(screen.getByTestId('runtime-block-list_customer')).toBeInTheDocument();
     expect(screen.getByTestId('runtime-block-dashboard_sales')).toBeInTheDocument();
+  });
+
+  const wysiwygSchema = (): PageSchemaV3 => ({
+    schemaVersion: 3,
+    kind: 'form',
+    id: 'wysiwyg_page',
+    modelCode: 'demo_model',
+    blocks: [
+      {
+        id: 'form_root',
+        blockType: 'form',
+        blocks: [
+          {
+            id: 'section_basic',
+            blockType: 'form-section',
+            blocks: [{ id: 'field_color', blockType: 'field', field: 'demo_color' }],
+          },
+        ],
+      },
+    ],
+  });
+
+  const demoModelFields: ModelFieldDefinition[] = [
+    {
+      modelCode: 'demo_model',
+      code: 'demo_color',
+      label: '颜色标记',
+      type: 'string',
+      component: 'colorpicker',
+    },
+  ];
+
+  it('renders the real platform control for field blocks when model metadata is supplied (WYSIWYG)', () => {
+    render(<RecursiveBlockRenderer schema={wysiwygSchema()} modelFields={demoModelFields} />);
+
+    const wrapper = screen.getByTestId('runtime-field-field_color');
+    expect(wrapper).toHaveAttribute('data-wysiwyg', 'platform');
+    expect(wrapper).toHaveAttribute('data-field-component', 'colorpicker');
+
+    // The platform renderer receives the resolved display label + real component,
+    // not the raw field code or a collapsed generic input.
+    const control = screen.getByTestId('controlled-field-demo_color');
+    expect(control).toHaveAttribute('data-component', 'colorpicker');
+    expect(control).toHaveAttribute('data-label', '颜色标记');
+  });
+
+  it('falls back to the representative preview when model metadata is absent (backward compatible)', () => {
+    render(<RecursiveBlockRenderer schema={wysiwygSchema()} />);
+
+    const wrapper = screen.getByTestId('runtime-field-field_color');
+    expect(wrapper).not.toHaveAttribute('data-wysiwyg');
+    expect(screen.queryByTestId('controlled-field-demo_color')).not.toBeInTheDocument();
   });
 
   it('renders fields, columns, actions, and dashboard widgets from recursive blocks', () => {

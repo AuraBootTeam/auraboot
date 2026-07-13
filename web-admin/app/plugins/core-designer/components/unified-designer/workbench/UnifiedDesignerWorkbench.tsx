@@ -919,6 +919,9 @@ export function UnifiedDesignerWorkbench({
             <RecursiveBlockRenderer
               schema={document}
               runtimeServices={defaultRuntimeExecutionServices}
+              modelFields={
+                document.modelCode ? modelFieldsByModel[document.modelCode] ?? [] : []
+              }
             />
           </div>
         </div>
