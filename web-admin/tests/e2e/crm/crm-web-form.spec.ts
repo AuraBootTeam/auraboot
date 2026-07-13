@@ -6,7 +6,7 @@
  * - wf-02: Create a new form (requires a WEB_FORM channel)
  * - wf-03: Form editor shows field management (Add Field, field cards)
  * - wf-04: Style settings panel (color picker, button text, success message)
- * - wf-05: Copy Embed Code button changes state or shows toast
+ * - wf-05: Copy Embed Code copies a working snippet (path + container + no data-form-id)
  * - wf-06: Save form changes
  * - wf-07: Form appears in list after creation
  *
@@ -269,7 +269,7 @@ test.describe('CRM Web Form Designer @critical', () => {
   // wf-05: Copy Embed Code button
   // -------------------------------------------------------------------------
 
-  test('wf-05: Copy Embed Code button exists and responds to click', async ({ page }) => {
+  test('wf-05: Copy Embed Code copies a snippet that actually works', async ({ page }) => {
     if (!createdFormPid) {
       test.skip(true, 'No form was created in wf-02');
       return;
@@ -287,13 +287,41 @@ test.describe('CRM Web Form Designer @critical', () => {
     // Initial state shows "Copy Embed Code"
     await expect(copyEmbedBtn).toContainText('Copy Embed Code');
 
-    // Click the button — clipboard API in headless requires override
-    // Grant clipboard write permission if possible, then click
-    await page.context().grantPermissions(['clipboard-write']);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await copyEmbedBtn.click();
 
     // After clicking, button text should change to "Copied!" for 2 seconds
     await expect(copyEmbedBtn).toContainText('Copied!', { timeout: 3000 });
+
+    // ── G1-3 regression ──────────────────────────────────────────────────────
+    // Asserting only "a toast appeared" is what let a 404-on-paste snippet ship.
+    // Assert the CONTENT the customer actually pastes.
+    const embedCode = await page.evaluate(() => navigator.clipboard.readText());
+
+    // 1. Path: the SDK is served by GET /api/crm/forms/{formPid}/sdk.js.
+    expect(embedCode).toContain(`/api/crm/forms/${createdFormPid}/sdk.js`);
+    expect(embedCode).not.toContain('/sdk/web-form.js');
+
+    // 2. Identity: pid is baked in server-side; the SDK reads no data-form-id.
+    expect(embedCode).not.toContain('data-form-id');
+
+    // 3. Container: the SDK bails out unless #auraboot-form exists.
+    expect(embedCode).toContain('<div id="auraboot-form"></div>');
+
+    // Container must precede the script tag.
+    expect(embedCode.indexOf('<div id="auraboot-form">')).toBeLessThan(
+      embedCode.indexOf('<script'),
+    );
+
+    // The copied URL must be fetchable — prove the endpoint exists (no 404).
+    const sdkUrl = embedCode.match(/src="([^"]+)"/)?.[1] ?? '';
+    expect(sdkUrl).toBeTruthy();
+    const sdkResp = await page.request.get(sdkUrl);
+    expect(sdkResp.status(), `SDK endpoint ${sdkUrl} must serve the script`).toBe(200);
+    const sdkBody = await sdkResp.text();
+    // Server-side substitution must have happened (no placeholder left).
+    expect(sdkBody).not.toContain('__FORM_PID__');
+    expect(sdkBody).toContain(createdFormPid);
   });
 
   // -------------------------------------------------------------------------
