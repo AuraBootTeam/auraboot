@@ -218,10 +218,16 @@ export const FilterChipBar = React.memo<FilterChipBarProps>(function FilterChipB
   const hasFilters = filters.length > 0;
   const hasSorts = sorts.length > 0;
 
-  // Always render — "Add Filter" button must be accessible even when no filters/sorts active
+  // Nothing pinned to this view yet → no bar. The "Add filter" entry point lives in
+  // the toolbar (ListToolbar), so an empty view no longer pays for a full-width
+  // grey strip that holds a single dashed button.
+  if (!hasFilters && !hasSorts) return null;
 
   return (
-    <div className="border-border bg-subtle flex flex-wrap items-center gap-2 border-b px-6 py-2">
+    <div
+      className="border-border bg-subtle flex flex-wrap items-center gap-2 border-b px-6 py-2"
+      data-testid="filter-chip-bar"
+    >
       {/* Filter chips */}
       {filters.map((f, idx) => (
         <span

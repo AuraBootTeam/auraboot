@@ -19,7 +19,7 @@
         "label:zh-CN": "病假",
         "sortNo": 20,
         "status": "enabled",
-        "extension": { "color": "orange", "limit_by_balance": false, "require_attachment_gt": 2 }
+        "extension": { "color": "amber", "limit_by_balance": false, "require_attachment_gt": 2 }
       },
       {
         "value": "personal",
@@ -67,7 +67,7 @@
         "label:zh-CN": "审批中",
         "sortNo": 30,
         "status": "enabled",
-        "extension": { "color": "orange" }
+        "extension": { "color": "amber" }
       },
       {
         "value": "approved",
