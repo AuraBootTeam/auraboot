@@ -70,6 +70,36 @@ async function goto(page: Page, path: string, readyTestId: string): Promise<void
 /** The conversation queue row, keyed by conversation pid. */
 const convRow = (page: Page, pid: string) => page.locator(`[data-testid="table-row-${pid}"]`);
 
+/**
+ * Run "Distil FAQ" on a row and wait until the command has actually finished.
+ *
+ * The waiting matters more than it looks. Two of the assertions below are assertions of
+ * *absence* — chit-chat must produce nothing, and a second distillation must not double the
+ * count — and you cannot poll for absence: the poll passes on its first tick. A fixed sleep
+ * would "pass" every time the LLM happened to be slower than the sleep, for exactly the wrong
+ * reason. So wait on the command's own response instead: that is the only signal that says the
+ * distillation ran to completion rather than that it had not started yet.
+ */
+async function distil(page: Page, convPid: string): Promise<void> {
+  const done = page.waitForResponse(
+    (r) => r.url().includes('/api/meta/commands/execute/faq:extract') && r.request().method() === 'POST',
+    { timeout: 120_000 },
+  );
+
+  await convRow(page, convPid).getByTestId('row-action-extract').click();
+  const dialog = page.getByTestId('form-dialog');
+  await expect(dialog, 'the command asks where to publish before running').toBeVisible({
+    timeout: 10000,
+  });
+  await dialog.getByTestId('form-dialog-field-faq_target_kb_id').selectOption(process.env.FAQ_TARGET_KB_PID!);
+  await dialog.getByTestId('form-dialog-submit').click();
+
+  const res = await done;
+  expect(res.ok(), `faq:extract completed (HTTP ${res.status()})`).toBe(true);
+  const body = await res.json();
+  expect(String(body?.code), 'faq:extract returned success').toBe('0');
+}
+
 async function candidateCount(page: Page): Promise<number> {
   const res = await page.request.get('/api/faq/conversations?pageNum=1&pageSize=50');
   expect(res.ok(), `conversation queue API responds (${res.status()})`).toBe(true);
@@ -119,28 +149,14 @@ test.describe('Conversation → FAQ loop — queue, distil, provenance', () => {
 
     expect(await candidateCount(page), 'nothing distilled yet').toBe(0);
 
-    await convRow(page, SUPPORT_PID).getByTestId('row-action-extract').click();
+    expect(process.env.FAQ_TARGET_KB_PID, 'FAQ_TARGET_KB_PID is set by the runner').toBeTruthy();
+    await distil(page, SUPPORT_PID);
 
-    // faq:extract declares inputFields, so the platform asks for the target knowledge base.
-    const dialog = page.getByTestId('form-dialog');
-    await expect(dialog, 'the command asks where to publish before running').toBeVisible({
-      timeout: 10000,
-    });
-    // The target KB is a native <select> populated from /api/ai/knowledge (FormDialog renders a
-    // real <select> for type:select) — a reviewer picks a knowledge base, they do not type a ULID.
-    const kbPid = process.env.FAQ_TARGET_KB_PID;
-    expect(kbPid, 'FAQ_TARGET_KB_PID is set by the runner').toBeTruthy();
-    await dialog.getByTestId('form-dialog-field-faq_target_kb_id').selectOption(kbPid!);
-    await page.screenshot({ path: `${SHOTS}/M2-3a-distil-dialog.png`, fullPage: true });
-    await dialog.getByTestId('form-dialog-submit').click();
-
-    // The LLM call is real, so give it room. What we assert is the persisted effect, not a toast.
-    await expect
-      .poll(() => candidateCount(page), {
-        timeout: 90_000,
-        message: 'the distiller produced candidates from a conversation that plainly has two',
-      })
-      .toBeGreaterThan(0);
+    // Asserted on the persisted effect, not on a toast.
+    expect(
+      await candidateCount(page),
+      'the distiller produced candidates from a conversation that plainly has two',
+    ).toBeGreaterThan(0);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(convRow(page, SUPPORT_PID)).toContainText(/[1-9]/, { timeout: 15000 });
@@ -152,16 +168,13 @@ test.describe('Conversation → FAQ loop — queue, distil, provenance', () => {
   test('M2-4 distilling the chit-chat conversation invents nothing', async ({ page }) => {
     await goto(page, QUEUE, 'table-row-');
 
-    await convRow(page, CHITCHAT_PID).getByTestId('row-action-extract').click();
-    const dialog = page.getByTestId('form-dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
-    await dialog.getByTestId('form-dialog-field-faq_target_kb_id').selectOption(process.env.FAQ_TARGET_KB_PID!);
-    await dialog.getByTestId('form-dialog-submit').click();
+    // distil() returns only once faq:extract has actually completed. A fixed sleep here would
+    // pass whenever the model happened to be slower than the sleep — the assertion would be
+    // reading a distillation that had not finished, and calling the emptiness a virtue.
+    await distil(page, CHITCHAT_PID);
 
-    // Give the command time to actually run, then assert nothing appeared. This is the
-    // fabrication gate driven the way a reviewer would trip it: pointing the distiller at a
-    // conversation that has nothing in it.
-    await page.waitForTimeout(20_000);
+    // The fabrication gate, driven the way a reviewer would trip it: point the distiller at a
+    // conversation that has nothing in it, and demand nothing back.
     const res = await page.request.get('/api/faq/conversations?pageNum=1&pageSize=50');
     const rows = (await res.json())?.data?.records ?? [];
     const chitchat = rows.find((r: any) => r.pid === CHITCHAT_PID);
@@ -196,15 +209,11 @@ test.describe('Conversation → FAQ loop — queue, distil, provenance', () => {
     // Nothing stops a reviewer pressing the button twice — and the M2 auto-trigger, once
     // conversations have a closed state, would fire on every close. A second run must replace
     // this service's own drafts, not hand the reviewer two copies of every pair to decide twice.
-    await convRow(page, SUPPORT_PID).getByTestId('row-action-extract').click();
-    const dialog = page.getByTestId('form-dialog');
-    await expect(dialog).toBeVisible({ timeout: 10000 });
-    await dialog.getByTestId('form-dialog-field-faq_target_kb_id').selectOption(process.env.FAQ_TARGET_KB_PID!);
-    await dialog.getByTestId('form-dialog-submit').click();
+    // Same reason as the fabrication gate: this asserts an absence (the count did not move), and
+    // an absence read from a distillation that has not finished is worthless. distil() returns on
+    // the command's own response, so by here the second run has genuinely completed.
+    await distil(page, SUPPORT_PID);
 
-    // Wait for the second distillation to actually land, then assert the count held. Polling for
-    // "unchanged" would pass instantly, so wait out the LLM call first.
-    await page.waitForTimeout(45_000);
     const after = await candidateCount(page);
     expect(after, 'a second distillation must replace the drafts, not double them').toBe(before);
 
