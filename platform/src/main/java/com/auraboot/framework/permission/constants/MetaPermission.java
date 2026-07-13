@@ -410,6 +410,16 @@ public final class MetaPermission {
      */
     public static final String CS_MANAGE = "meta.cs.manage";
 
+    /**
+     * Work the customer-service queue: go online, claim a waiting visitor, reply, close.
+     *
+     * <p>Separate from {@link #CS_MANAGE} because a seat and a site administrator are different
+     * jobs. A seat talks to visitors all day and must not thereby be able to rotate the site's HMAC
+     * key or re-point its knowledge bases; an administrator configures the site and typically never
+     * answers a chat. Granting one should not grant the other.
+     */
+    public static final String CS_SEAT = "meta.cs.seat";
+
     // ==================== DASHBOARD permissions ====================
 
     /**

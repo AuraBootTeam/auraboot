@@ -98,7 +98,7 @@ class AuraBotChatServiceThinkingIntegrationTest {
                         .defaultModel("claude-sonnet-4-6")
                         .maxTokens(4096)
                         .build());
-        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null)))
+        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
         when(factory.getProvider(eq("anthropic"))).thenReturn(provider);
         when(provider.streamChat(any(), eq("test-key"), eq("stub://local")))

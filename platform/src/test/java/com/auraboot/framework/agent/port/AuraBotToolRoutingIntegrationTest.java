@@ -143,7 +143,7 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void discoverTools_withEmptySkills_usesProviderRegistry() {
-        var tools = toolDiscoveryPort.discoverTools(tenantId, List.of(), null, "query", 10);
+        var tools = toolDiscoveryPort.discoverTools(tenantId, List.of(), null, "query", 10, null);
 
         // ToolProviderRegistry should return platform tools at minimum
         assertThat(tools).isNotNull();
@@ -152,7 +152,7 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
 
     @Test
     void discoverTools_withModelHint_returnsRelevantTools() {
-        var tools = toolDiscoveryPort.discoverTools(tenantId, List.of(), "crm_lead", "query", 10);
+        var tools = toolDiscoveryPort.discoverTools(tenantId, List.of(), "crm_lead", "query", 10, null);
 
         assertThat(tools).isNotNull();
         // With a model hint, DSL provider should discover list/nq tools if CRM models are published
@@ -168,7 +168,7 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
     @Test
     void discoverTools_respectsMaxToolsLimit() {
         int maxTools = 3;
-        var tools = toolDiscoveryPort.discoverTools(tenantId, List.of(), null, "query", maxTools);
+        var tools = toolDiscoveryPort.discoverTools(tenantId, List.of(), null, "query", maxTools, null);
 
         assertThat(tools).isNotNull();
         assertThat(tools).hasSizeLessThanOrEqualTo(maxTools);
@@ -216,7 +216,8 @@ class AuraBotToolRoutingIntegrationTest extends BaseIntegrationTest {
                 groundResult.candidateSkills(),
                 groundResult.object(),
                 groundResult.intent(),
-                5
+                5,
+                null
         );
         assertThat(tools).isNotNull();
 

@@ -1202,6 +1202,13 @@
       "resourceType": "function"
     },
     {
+      "code": "meta.cs.seat",
+      "name": "Meta CS seat",
+      "description": "Work the customer-service queue — go online, claim a visitor, reply, close",
+      "type": "function",
+      "resourceType": "function"
+    },
+    {
       "code": "meta.qr.manage",
       "name": "Meta QR manage",
       "description": "Manage AuraQR live codes — create/list/bind/publish/status",

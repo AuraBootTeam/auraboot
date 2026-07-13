@@ -31,8 +31,25 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
 
     @Override
     public List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills,
-                                       String modelHint, String intentHint, int maxTools) {
+                                       String modelHint, String intentHint, int maxTools, String channel) {
         boolean queryOnly = isReadIntent(intentHint);
+
+        // Phase 0: tools a provider requires on every turn of this channel. They bypass the two
+        // filters below on purpose. A "hand this visitor to a human" tool is needed exactly when the
+        // visitor asked something the model cannot answer — a read intent, which is when the
+        // queryOnly filter would have removed it. Gathered first, and merged first, so that the
+        // maxTools cut can never be what drops them.
+        ToolDiscoveryContext alwaysOnCtx = ToolDiscoveryContext.builder()
+                .tenantId(tenantId)
+                .userId(MetaContext.exists() ? MetaContext.getCurrentUserId() : null)
+                .modelHint(modelHint)
+                .intentHint(intentHint)
+                .channel(channel)
+                .maxResults(maxTools)
+                .build();
+        List<ToolDef> alwaysOnTools = toolProviderRegistry.discoverAlwaysOn(alwaysOnCtx).stream()
+                .map(this::toToolDef)
+                .toList();
 
         // Phase 1: Try skill-based discovery for each candidate skill.
         List<ToolDef> skillTools = new ArrayList<>();
@@ -63,7 +80,7 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
 
         if (!skillTools.isEmpty() && (modelHint == null || modelHint.isBlank())) {
             log.debug("ToolDiscoveryPort: found {} tools from skill resolution", skillTools.size());
-            List<ToolDef> result = limitTools(skillTools, maxTools);
+            List<ToolDef> result = mergeAlwaysOn(alwaysOnTools, limitTools(skillTools, maxTools), maxTools);
             recordDiscovery("skill", queryOnly, result.size());
             return result;
         }
@@ -74,43 +91,66 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
                 .userId(MetaContext.exists() ? MetaContext.getCurrentUserId() : null)
                 .modelHint(modelHint)
                 .intentHint(intentHint)
+                .channel(channel)
                 .maxResults(maxTools * 2) // over-fetch, then filter
                 .build();
 
         List<ToolDefinition> discovered = toolProviderRegistry.discoverAll(ctx);
         List<ToolDef> providerTools = discovered.stream()
-                .map(td -> new ToolDef(
-                        td.getToolCode(),
-                        td.getToolName(),
-                        enhanceDescription(td.getToolCode(), td.getDescription()),
-                        td.getParameterSchema() != null ? td.getParameterSchema() : Map.of(),
-                        isReadOnlyToolDefinition(td),
-                        td.getToolType(),
-                        td.getSourceCode(),
-                        td.isRequiresApproval(),
-                        td.isRequiresConfirmation(),
-                        td.getRiskLevel(),
-                        td.getConfirmationPolicy()
-                ))
+                .map(this::toToolDef)
                 // For query intent: only keep read-only tools (nq, list, get, platform.execute_sql, platform.list_models)
                 .filter(td -> !queryOnly || td.readOnly())
                 .limit(maxTools)
                 .toList();
 
         if (skillTools.isEmpty()) {
-            log.debug("ToolDiscoveryPort: found {} tools from provider registry (queryOnly={})",
-                    providerTools.size(), queryOnly);
-            recordDiscovery("provider", queryOnly, providerTools.size());
-            return providerTools;
+            List<ToolDef> result = mergeAlwaysOn(alwaysOnTools, providerTools, maxTools);
+            log.debug("ToolDiscoveryPort: found {} tools from provider registry (queryOnly={}, alwaysOn={})",
+                    providerTools.size(), queryOnly, alwaysOnTools.size());
+            recordDiscovery("provider", queryOnly, result.size());
+            return result;
         }
 
-        List<ToolDef> result = new ArrayList<>();
-        addUnique(result, providerTools, maxTools);
-        addUnique(result, skillTools, maxTools);
+        List<ToolDef> merged = new ArrayList<>();
+        addUnique(merged, providerTools, maxTools);
+        addUnique(merged, skillTools, maxTools);
+        List<ToolDef> result = mergeAlwaysOn(alwaysOnTools, merged, maxTools);
 
-        log.debug("ToolDiscoveryPort: merged {} provider tools with {} skill tools (queryOnly={})",
-                providerTools.size(), skillTools.size(), queryOnly);
+        log.debug("ToolDiscoveryPort: merged {} provider tools with {} skill tools (queryOnly={}, alwaysOn={})",
+                providerTools.size(), skillTools.size(), queryOnly, alwaysOnTools.size());
         recordDiscovery("mixed", queryOnly, result.size());
+        return result;
+    }
+
+    private ToolDef toToolDef(ToolDefinition td) {
+        return new ToolDef(
+                td.getToolCode(),
+                td.getToolName(),
+                enhanceDescription(td.getToolCode(), td.getDescription()),
+                td.getParameterSchema() != null ? td.getParameterSchema() : Map.of(),
+                isReadOnlyToolDefinition(td),
+                td.getToolType(),
+                td.getSourceCode(),
+                td.isRequiresApproval(),
+                td.isRequiresConfirmation(),
+                td.getRiskLevel(),
+                td.getConfirmationPolicy()
+        );
+    }
+
+    /**
+     * Put the always-on tools in front of what discovery found.
+     *
+     * <p>They lead the list and do not spend the {@code maxTools} budget: a tool that is only offered
+     * when the budget happens to be underspent is not "always on". A discovered tool sharing a code
+     * with an always-on one loses — the provider that declared it always-on owns that definition.
+     */
+    private List<ToolDef> mergeAlwaysOn(List<ToolDef> alwaysOn, List<ToolDef> discovered, int maxTools) {
+        if (alwaysOn.isEmpty()) {
+            return discovered;
+        }
+        List<ToolDef> result = new ArrayList<>(alwaysOn);
+        addUnique(result, discovered, alwaysOn.size() + maxTools);
         return result;
     }
 

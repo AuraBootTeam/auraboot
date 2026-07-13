@@ -82,7 +82,7 @@ public class ChatToolResolver {
      * @param recordPid   optional current record PID
      * @return resolved tools with optional grounding metadata
      */
-    public ResolvedTools resolveTools(String userMessage, String modelCode, String recordPid) {
+    public ResolvedTools resolveTools(String userMessage, String modelCode, String recordPid, String channel) {
         if (groundingPort == null || toolDiscoveryPort == null) {
             log.error("AuraBot D1: GroundingPort or ToolDiscoveryPort not available — no tools will be provided");
             return new ResolvedTools(List.of(), null, null, true);
@@ -119,7 +119,7 @@ public class ChatToolResolver {
 
             var toolDefs = toolDiscoveryPort.discoverTools(
                     tenantId, candidates,
-                    grounding.object(), grounding.intent(), MAX_TOOLS);
+                    grounding.object(), grounding.intent(), MAX_TOOLS, channel);
 
             List<LlmChatRequest.Tool> llmTools = new ArrayList<>(toolDefs.stream()
                     .map(this::convertToolDef)

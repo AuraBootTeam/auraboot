@@ -22,6 +22,27 @@ export interface CsIdentity {
   userHash: string;
 }
 
+/** A line someone else said. `seq` is its position in this conversation, not a row id. */
+export interface LiveMessage {
+  seq: number | null;
+  senderType: 'visitor' | 'agent' | 'human';
+  senderName?: string | null;
+  content: string;
+  at?: string;
+}
+
+/** The conversation changed hands. */
+export interface LiveState {
+  state: 'ai_active' | 'pending_handoff' | 'human_active' | 'closed';
+  handoffReason?: string | null;
+}
+
+export interface LiveHandlers {
+  onMessage: (message: LiveMessage) => void;
+  onState?: (state: LiveState) => void;
+  onError?: (message: string) => void;
+}
+
 export interface StreamHandlers {
   onChunk: (text: string) => void;
   onDone: (fullContent: string) => void;
@@ -29,6 +50,9 @@ export interface StreamHandlers {
 }
 
 const TOKEN_STORAGE_KEY = 'aura-cs-visitor-token';
+
+/** Long enough not to hammer a server that is down; short enough that a reply is not left waiting. */
+const RECONNECT_DELAY_MS = 3000;
 
 export class CsClient {
   private session: CsSession | null = null;
@@ -70,6 +94,133 @@ export class CsClient {
     this.storage?.setItem(TOKEN_STORAGE_KEY, session.visitorToken);
     this.session = session;
     return session;
+  }
+
+  /**
+   * Ask for a person.
+   *
+   * <p>Deliberately independent of the AI. The model has its own way of handing over, but a visitor
+   * who has given up on the bot must not have to persuade it to let them go.
+   */
+  async escalate(reason?: string): Promise<{ state: string; seatsAvailable: number }> {
+    if (!this.session) throw new Error('session not open');
+
+    const response = await fetch(`${this.apiBase}/api/public/cs/escalate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.session.token}`,
+      },
+      body: JSON.stringify({
+        conversationPid: this.session.conversationPid,
+        reason: reason || undefined,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await this.describeFailure(response));
+    }
+    return response.json();
+  }
+
+  /**
+   * Listen for everything the visitor did not ask for: a seat's reply, a change of state.
+   *
+   * <p>The AI only ever spoke on the response to a question, so M1 needed nothing like this. A
+   * person answers minutes later on a request of their own, and the only way the browser hears about
+   * it is a stream it is already holding.
+   *
+   * <p><b>Not `EventSource`, despite this being a plain GET.</b> EventSource cannot set headers, so
+   * the visitor's bearer token would have to ride in the query string — where it lands in the
+   * server's access log, in any proxy in between, and in the Referer of anything the page loads
+   * next. A token that grants access to a person's conversation history is not a thing to leave in a
+   * URL. The cost is that reconnection is ours to do, which is the loop below.
+   *
+   * @returns a function that stops listening
+   */
+  listen(handlers: LiveHandlers): () => void {
+    if (!this.session) throw new Error('session not open');
+
+    let stopped = false;
+    let controller: AbortController | null = null;
+
+    const pump = async (): Promise<void> => {
+      while (!stopped) {
+        controller = new AbortController();
+        try {
+          const response = await fetch(
+            `${this.apiBase}/api/public/cs/stream?conversationPid=` +
+              encodeURIComponent(this.session!.conversationPid),
+            {
+              headers: {
+                Accept: 'text/event-stream',
+                Authorization: `Bearer ${this.session!.token}`,
+              },
+              signal: controller.signal,
+            },
+          );
+
+          if (!response.ok || !response.body) {
+            handlers.onError?.(await this.describeFailure(response));
+            return; // A refusal will be refused again. Retrying it is a loop, not a recovery.
+          }
+
+          await this.readFrames(response.body.getReader(), (event, payload) => {
+            // The server is the only writer of these frames and its shape is pinned by CsLiveEvent;
+            // the parser hands us a bag of unknowns, so the narrowing is ours to state.
+            if (event === 'message') handlers.onMessage(payload as unknown as LiveMessage);
+            else if (event === 'state') handlers.onState?.(payload as unknown as LiveState);
+          });
+        } catch {
+          if (stopped) return;
+          // The stream ended the way a long stream ends: a timeout, a sleeping laptop, a proxy
+          // deciding it had been quiet too long. Reconnecting is the normal case, not the error one.
+        }
+
+        if (stopped) return;
+        await new Promise((resolve) => setTimeout(resolve, RECONNECT_DELAY_MS));
+      }
+    };
+
+    void pump();
+
+    return () => {
+      stopped = true;
+      controller?.abort();
+    };
+  }
+
+  /** Read SSE frames off a body until it ends, handing each parsed one to the caller. */
+  private async readFrames(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    onEvent: (event: string, payload: Record<string, unknown>) => void,
+  ): Promise<void> {
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return;
+      buffer += decoder.decode(value, { stream: true });
+
+      const frames = buffer.split('\n\n');
+      buffer = frames.pop() ?? '';
+
+      for (const frame of frames) {
+        let event = 'message';
+        const dataLines: string[] = [];
+        for (const line of frame.split('\n')) {
+          if (line.startsWith('event:')) event = line.slice(6).trim();
+          else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
+        }
+        if (dataLines.length === 0) continue;
+        try {
+          onEvent(event, JSON.parse(dataLines.join('\n')));
+        } catch {
+          /* a frame we cannot read is a frame we drop */
+        }
+      }
+    }
   }
 
   /**

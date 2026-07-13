@@ -119,7 +119,7 @@ class AuraBotChatServiceGroundingTest {
         verify(sink).onError(
                 eq("D1 grounding failed: semantic store unavailable"),
                 eq(null));
-        verify(chatToolResolver, never()).resolveTools(any(), any(), any());
+        verify(chatToolResolver, never()).resolveTools(any(), any(), any(), any());
     }
 
     @Test
@@ -153,7 +153,7 @@ class AuraBotChatServiceGroundingTest {
                         .defaultModel("stub-model")
                         .maxTokens(4096)
                         .build());
-        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null)))
+        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
         when(llmProviderFactory.getProvider(eq(StubLlmProvider.PROVIDER_CODE)))
                 .thenReturn(stubProvider);
@@ -213,7 +213,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("hello from openai"), eq(null), eq(null)))
+        when(chatToolResolver.resolveTools(eq("hello from openai"), eq(null), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
         when(llmProviderFactory.getProvider(eq("openai"))).thenReturn(openAiProvider);
         when(openAiProvider.streamChat(any(), eq("test-key"), eq("stub://local")))
@@ -281,7 +281,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq("crm_customer"), eq(null)))
+        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq("crm_customer"), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(
                         List.of(statsTool),
                         "stats",
@@ -376,7 +376,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq(null), eq(null)))
+        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq(null), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(
                         List.of(statsTool),
                         "stats",
@@ -475,7 +475,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq("crm_customer"), eq(null)))
+        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq("crm_customer"), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(
                         List.of(statsTool),
                         "stats",
@@ -569,7 +569,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("创建客户"), eq("crm_customer"), eq(null)))
+        when(chatToolResolver.resolveTools(eq("创建客户"), eq("crm_customer"), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(
                         List.of(createTool),
                         "create",
@@ -670,7 +670,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("查询客户统计"), eq(null), eq(null)))
+        when(chatToolResolver.resolveTools(eq("查询客户统计"), eq(null), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(
                         List.of(statsTool),
                         "query",

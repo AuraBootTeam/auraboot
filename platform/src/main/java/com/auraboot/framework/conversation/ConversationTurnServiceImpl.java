@@ -141,6 +141,19 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
     @Override
     public TurnOutcome runTurn(TurnRequest request, ResponseSink sink) {
+        // Publish which conversation this turn is about, so a tool whose subject IS the conversation
+        // (escalate to a human, summarise the thread) can act on it — the LLM cannot supply an id it
+        // has never seen. Cleared in the finally: a leaked scope would become the next pooled
+        // request's conversation.
+        TurnScopeContext.set(request.conversationId(), request.channel());
+        try {
+            return runTurnDispatch(request, sink);
+        } finally {
+            TurnScopeContext.clear();
+        }
+    }
+
+    private TurnOutcome runTurnDispatch(TurnRequest request, ResponseSink sink) {
         TurnContext ctx = beginTurn(request);
         sideEffects.metricsRecorder().recordTurnBegin(ctx);
         sink.onTurnBegin(ctx.turnId(), null, request.conversationId(),

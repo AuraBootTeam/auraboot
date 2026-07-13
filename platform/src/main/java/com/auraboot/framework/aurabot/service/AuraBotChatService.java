@@ -417,7 +417,7 @@ public class AuraBotChatService {
         SpanContext resolveSpan = aiTraceService.startSpan(
                 trace, null, "span", "resolve_tools",
                 buildResolveToolsSpanInput(request.getMessage(), modelCode, recordPid));
-        var resolved = chatToolResolver.resolveTools(request.getMessage(), modelCode, recordPid);
+        var resolved = chatToolResolver.resolveTools(request.getMessage(), modelCode, recordPid, ctx.channel());
         List<LlmChatRequest.Tool> tools = resolved.tools();
         if (bif != null) {
             tools = applyCandidateSkillsMode(tools, bif);
