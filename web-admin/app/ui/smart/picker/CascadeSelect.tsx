@@ -8,6 +8,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { cn } from '~/utils/cn';
+import { useSmartText } from '~/utils/i18n';
 import { useDictTree } from './useDictTree';
 
 /**
@@ -86,6 +87,7 @@ const CascadeDropdown: React.FC<CascadeDropdownProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const st = useSmartText();
 
   // Close on click outside
   useEffect(() => {
@@ -176,12 +178,14 @@ const CascadeDropdown: React.FC<CascadeDropdownProps> = ({
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                 />
               </svg>
-              <span className="text-text-3">Loading...</span>
+              <span className="text-text-3">
+                {st({ 'zh-CN': '加载中…', 'en-US': 'Loading...' })}
+              </span>
             </span>
           ) : selectedOption ? (
             selectedOption.label
           ) : (
-            `Select ${levelLabel}`
+            st({ 'zh-CN': `选择${levelLabel}`, 'en-US': `Select ${levelLabel}` })
           )}
         </span>
 

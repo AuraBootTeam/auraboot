@@ -22,16 +22,25 @@
         {
           "field": "sc_name",
           "colSpan": 6,
-          "required": true
+          "required": true,
+          "props": {
+            "placeholder": "请输入展示项名称"
+          }
         },
         {
           "field": "sc_code",
           "colSpan": 6,
-          "readOnly": true
+          "readOnly": true,
+          "props": {
+            "placeholder": "保存后自动生成"
+          }
         },
         {
           "field": "sc_description",
-          "colSpan": 12
+          "colSpan": 12,
+          "props": {
+            "placeholder": "简要描述该展示项的用途、特性或说明"
+          }
         }
       ]
     },
@@ -45,23 +54,32 @@
       "fields": [
         {
           "field": "sc_quantity",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "placeholder": "请输入数量"
+          }
         },
         {
           "field": "sc_price",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "placeholder": "0.00"
+          }
         },
         {
           "field": "sc_budget",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "placeholder": "0.00"
+          }
         },
         {
           "field": "sc_progress",
-          "colSpan": 4
+          "colSpan": 6
         },
         {
           "field": "sc_rating",
-          "colSpan": 4
+          "colSpan": 6
         }
       ]
     },
@@ -75,19 +93,31 @@
       "fields": [
         {
           "field": "sc_status",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "placeholder": "选择状态"
+          }
         },
         {
           "field": "sc_priority",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "placeholder": "选择优先级"
+          }
         },
         {
           "field": "sc_category",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "placeholder": "选择分类"
+          }
         },
         {
           "field": "sc_tags",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": "输入标签后回车，多个用逗号分隔"
+          }
         },
         {
           "field": "sc_is_active",
@@ -96,7 +126,10 @@
         {
           "field": "sc_advanced_settings",
           "colSpan": 12,
-          "visibleWhen": "record.sc_status === 'active'"
+          "visibleWhen": "record.sc_status === 'active'",
+          "props": {
+            "placeholder": "状态为「进行中」时填写高级配置（JSON 或说明）"
+          }
         }
       ]
     },
@@ -127,11 +160,11 @@
         },
         {
           "field": "sc_date_range",
-          "colSpan": 6
+          "colSpan": 4
         },
         {
           "field": "sc_working_hours",
-          "colSpan": 6
+          "colSpan": 4
         }
       ]
     },
@@ -145,11 +178,17 @@
       "fields": [
         {
           "field": "sc_cascade_category",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": "逐级选择分类"
+          }
         },
         {
           "field": "sc_tree_node",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": "搜索并选择节点"
+          }
         }
       ]
     },
@@ -163,33 +202,31 @@
       "fields": [
         {
           "field": "sc_assignee",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "placeholder": "选择负责人"
+          }
         },
         {
           "field": "sc_team_members",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "placeholder": "选择团队成员（可多选）"
+          }
         },
         {
           "field": "sc_department",
-          "colSpan": 4
+          "colSpan": 4,
+          "props": {
+            "placeholder": "选择所属部门"
+          }
         },
         {
           "field": "sc_owner_user",
-          "colSpan": 6
-        }
-      ]
-    },
-    {
-      "id": "section_geo",
-      "blockType": "form-section",
-      "title": {
-        "zh-CN": "地理信息",
-        "en-US": "Geographic"
-      },
-      "fields": [
-        {
-          "field": "sc_address",
-          "colSpan": 12
+          "colSpan": 6,
+          "props": {
+            "placeholder": "搜索并选择所有者"
+          }
         }
       ]
     },
@@ -197,25 +234,41 @@
       "id": "section_contact",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "联系信息",
-        "en-US": "Contact Information"
+        "zh-CN": "联系与地址",
+        "en-US": "Contact & Address"
       },
       "fields": [
         {
           "field": "sc_website",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": "https://example.com"
+          }
         },
         {
           "field": "sc_email",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": "name@example.com"
+          }
         },
         {
           "field": "sc_phone",
-          "colSpan": 6
+          "colSpan": 6,
+          "props": {
+            "placeholder": "如 021-58769300 或 138-0000-0000"
+          }
         },
         {
           "field": "sc_color",
           "colSpan": 6
+        },
+        {
+          "field": "sc_address",
+          "colSpan": 12,
+          "props": {
+            "placeholder": "请输入详细地址（省 / 市 / 区 / 街道门牌）"
+          }
         }
       ]
     },
@@ -223,13 +276,16 @@
       "id": "section_rich",
       "blockType": "form-section",
       "title": {
-        "zh-CN": "富内容",
-        "en-US": "Rich Content"
+        "zh-CN": "富内容与附件",
+        "en-US": "Rich Content & Attachments"
       },
       "fields": [
         {
           "field": "sc_richtext_content",
-          "colSpan": 12
+          "colSpan": 12,
+          "props": {
+            "placeholder": "输入图文富文本内容…"
+          }
         },
         {
           "field": "sc_attachment",
@@ -241,11 +297,17 @@
         },
         {
           "field": "sc_ai_summary",
-          "colSpan": 12
+          "colSpan": 12,
+          "props": {
+            "placeholder": "AI 将根据内容自动生成摘要"
+          }
         },
         {
           "field": "sc_remark",
-          "colSpan": 12
+          "colSpan": 12,
+          "props": {
+            "placeholder": "补充说明（选填）"
+          }
         }
       ]
     },
