@@ -53,6 +53,7 @@ class IotProductAccessorImplTest {
         r.put(IotProductAccessorImpl.COL_P_NODE_TYPE, "DEVICE");
         r.put(IotProductAccessorImpl.COL_P_DATA_FORMAT, "JSON");
         r.put(IotProductAccessorImpl.COL_P_TRANSPORT_TYPE, "MQTT");
+        r.put(IotProductAccessorImpl.COL_P_PROVISION_TYPE, "CHECK_PRE");
         return r;
     }
 
@@ -78,6 +79,7 @@ class IotProductAccessorImplTest {
         assertThat(got.get().name()).containsEntry("zh-CN", "空调").containsEntry("en-US", "AC");
         assertThat(got.get().nodeType()).isEqualTo("DEVICE");
         assertThat(got.get().transportType()).isEqualTo("MQTT");
+        assertThat(got.get().provisionType()).isEqualTo("CHECK_PRE");
     }
 
     @Test
