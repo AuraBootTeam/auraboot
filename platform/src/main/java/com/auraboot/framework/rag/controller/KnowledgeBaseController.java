@@ -160,6 +160,21 @@ public class KnowledgeBaseController {
         return ApiResponse.success(kbService.deleteDocument(kbPid, docPid));
     }
 
+    /**
+     * Parse a document again — for one that failed, or that a worker restart left stranded.
+     * Without this the only way out of a failed parse is to delete the document and re-upload it.
+     */
+    @PostMapping("/{kbPid}/documents/{docPid}/reprocess")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
+    public ApiResponse<Boolean> reprocessDocument(@PathVariable String kbPid,
+                                                    @PathVariable String docPid) {
+        if (!kbService.resetDocumentForReprocess(kbPid, docPid)) {
+            return ApiResponse.error("Document not found: " + docPid);
+        }
+        docProcessingService.processDocument(kbPid, docPid);
+        return ApiResponse.success(true);
+    }
+
     // =========================================================================
     // Chunk preview
     // =========================================================================
@@ -220,11 +235,24 @@ public class KnowledgeBaseController {
     // Helpers
     // =========================================================================
 
-    private String resolveDocType(String extension) {
+    /**
+     * Map an uploaded file's extension to a doc_type, or null if we cannot parse it.
+     *
+     * <p>This gate runs <b>before</b> the document row is created, so a format missing here is
+     * rejected outright no matter what the parser and the CHECK constraint allow. Adding a format
+     * means touching four places in lockstep: the {@code chk_doc_type} constraint, this switch,
+     * {@link DocumentParserService#SUPPORTED_DOC_TYPES}, and the accept list in the upload UI.
+     *
+     * <p>Legacy binary Office formats (.ppt/.xls/.doc) are deliberately absent — parsing them
+     * needs poi-scratchpad, which is not a dependency. Only OOXML is accepted.
+     */
+    static String resolveDocType(String extension) {
         if (extension == null) return null;
         return switch (extension.toLowerCase().replaceFirst("^\\.", "")) {
             case "pdf" -> "pdf";
             case "docx" -> "docx";
+            case "pptx" -> "pptx";
+            case "xlsx" -> "xlsx";
             case "md", "markdown" -> "md";
             case "txt" -> "txt";
             case "csv" -> "csv";

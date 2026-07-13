@@ -8372,9 +8372,10 @@ CREATE TABLE public.ab_kb_document (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     deleted_flag boolean DEFAULT false,
+    process_retry_count integer DEFAULT 0 NOT NULL,
     CONSTRAINT chk_doc_source CHECK (((source_type)::text = ANY ((ARRAY['file'::character varying, 'entity'::character varying, 'internal_doc'::character varying])::text[]))),
     CONSTRAINT chk_doc_status CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
-    CONSTRAINT chk_doc_type CHECK (((doc_type)::text = ANY ((ARRAY['pdf'::character varying, 'docx'::character varying, 'md'::character varying, 'txt'::character varying, 'csv'::character varying, 'html'::character varying])::text[])))
+    CONSTRAINT chk_doc_type CHECK (((doc_type)::text = ANY ((ARRAY['pdf'::character varying, 'docx'::character varying, 'md'::character varying, 'txt'::character varying, 'csv'::character varying, 'html'::character varying, 'pptx'::character varying, 'xlsx'::character varying])::text[])))
 );
 
 
@@ -8383,6 +8384,13 @@ CREATE TABLE public.ab_kb_document (
 --
 
 COMMENT ON TABLE public.ab_kb_document IS 'RAG document — file or entity content indexed into a knowledge base';
+
+
+--
+-- Name: COLUMN ab_kb_document.process_retry_count; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_kb_document.process_retry_count IS 'Parse attempts made by the reconcile pass after a worker restart stranded the document';
 
 
 --

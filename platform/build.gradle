@@ -353,10 +353,13 @@ dependencies {
     implementation 'org.postgresql:postgresql:42.7.11'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
-    // Apache POI for Excel export
+    // Apache POI for Excel export + RAG document parsing (docx / pptx / xlsx)
     implementation 'org.apache.poi:poi:5.5.1'
     implementation 'org.apache.poi:poi-ooxml:5.5.1'
     implementation 'org.apache.pdfbox:pdfbox:2.0.36'
+
+    // HTML parsing for RAG document ingestion (DocumentParserService)
+    implementation 'org.jsoup:jsoup:1.17.2'
 
     // Firebase Admin SDK for FCM push notifications (APNs + FCM unified)
     implementation('com.google.firebase:firebase-admin:9.9.0') {
