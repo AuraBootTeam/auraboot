@@ -16,13 +16,19 @@ import {
   FieldSelector,
   FilterBuilder,
   MetricEditor,
+  SortEditor,
+  TimeGrainPicker,
   SemanticMetricPicker,
   SemanticDimensionPicker,
+  isDateField,
+  parseGrainDimension,
   useModelFields,
   useSemanticModels,
   type FilterCondition,
   type MetricConfig,
+  type SortOption,
 } from '~/shared/designer/datasource';
+import type { SortCondition } from '~/shared/designer/datasource';
 
 interface DataSourceConfigProps {
   value: ChartDataSource;
@@ -69,6 +75,51 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
   const handleDimensionsChange = useCallback(
     (dimensions: string[]) => {
       onChange({ ...value, dimensions });
+    },
+    [value, onChange],
+  );
+
+  // ---- G1: time bucketing --------------------------------------------------
+  // A bucketed dimension lives in `dimensions` as `field__grain`. The grain picker
+  // owns at most one; plain dimensions come from the FieldSelector alongside it.
+  const dateFields = fields.filter(isDateField);
+  const bucketedDim = (value.dimensions || []).find((d) => d.includes('__'));
+  const parsedGrain = bucketedDim
+    ? parseGrainDimension(bucketedDim)
+    : { field: '', grain: '' };
+
+  const handleGrainChange = useCallback(
+    (field: string, grain: string) => {
+      const plain = (value.dimensions || []).filter((d) => !d.includes('__'));
+      const next = field ? [...plain, `${field}__${grain}`] : plain;
+      onChange({ ...value, dimensions: next });
+    },
+    [value, onChange],
+  );
+
+  // ---- G2: ordering --------------------------------------------------------
+  // Sort keys are the columns the query returns: its dimensions and its metric
+  // aliases. Ordering by a metric alias is what turns a `limit` into a real top-N.
+  const sortOptions: SortOption[] = [
+    ...(value.dimensions || []).map((d) => ({ value: d, label: d })),
+    ...(value.metrics || []).map((m) => {
+      const alias = m.alias || `${m.field}_${m.aggregation}`;
+      return { value: alias, label: `${alias} (指标)` };
+    }),
+  ];
+  const sortValue: SortCondition[] = (value.orderBy || []).map((o) => ({
+    field: o.field,
+    order: o.direction,
+  }));
+
+  const handleSortChange = useCallback(
+    (sorts: SortCondition[]) => {
+      onChange({
+        ...value,
+        orderBy: sorts.length
+          ? sorts.map((s) => ({ field: s.field, direction: s.order }))
+          : undefined,
+      });
     },
     [value, onChange],
   );
@@ -209,6 +260,16 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
                 />
               )}
 
+              {value.modelCode && dateFields.length > 0 && (
+                <TimeGrainPicker
+                  dateFields={dateFields}
+                  field={parsedGrain.field}
+                  grain={parsedGrain.grain || 'month'}
+                  onChange={handleGrainChange}
+                  label="时间分桶"
+                />
+              )}
+
               {value.modelCode && (
                 <MetricEditor
                   metrics={value.metrics || []}
@@ -216,6 +277,15 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
                   modelCode={value.modelCode}
                   label="聚合指标"
                   required
+                />
+              )}
+
+              {value.modelCode && sortOptions.length > 0 && (
+                <SortEditor
+                  value={sortValue}
+                  onChange={handleSortChange}
+                  options={sortOptions}
+                  label="排序"
                 />
               )}
             </>

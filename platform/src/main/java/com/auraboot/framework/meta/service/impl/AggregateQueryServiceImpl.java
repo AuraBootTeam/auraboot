@@ -63,6 +63,13 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     private static final Pattern IDENTIFIER_PATTERN = Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
 
     /**
+     * Time-bucketing grains a dimension may request via a {@code col__grain} suffix
+     * (e.g. {@code crm_opp_expected_close_date__month}). Mirrors the semantic layer's
+     * {@code ALLOWED_GRAIN} so the two query paths bucket time identically.
+     */
+    private static final Set<String> ALLOWED_GRAINS = Set.of("day", "week", "month", "quarter", "year");
+
+    /**
      * Supported aggregation functions.
      */
     private static final Set<String> SUPPORTED_AGGREGATIONS = Set.of(
@@ -487,14 +494,98 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
             }
         }
 
-        // Validate dimensions
+        // Validate dimensions — a dimension may carry a `col__grain` time-bucketing
+        // suffix (validated inside resolveDimension), otherwise it must be a bare column.
         if (request.getDimensions() != null) {
             for (String dimension : request.getDimensions()) {
-                if (!IDENTIFIER_PATTERN.matcher(dimension).matches()) {
-                    throw new MetaServiceException("Invalid dimension field: " + dimension);
+                resolveDimension(dimension);
+            }
+        }
+
+        // Validate groupBy / orderBy — these were previously unchecked and
+        // concatenated straight into the SQL, so a caller could inject through
+        // either. Every referenced field must be a bare identifier; orderBy fields
+        // may also be a declared metric alias (ordering by an aggregate column).
+        // The namedQuery path already guards these; the aggregate path did not.
+        if (request.getGroupBy() != null) {
+            for (String field : request.getGroupBy()) {
+                if (!IDENTIFIER_PATTERN.matcher(field).matches()) {
+                    throw new MetaServiceException("Invalid group by field: " + field);
                 }
             }
         }
+        if (request.getOrderBy() != null) {
+            Set<String> metricAliases = collectMetricAliases(request);
+            for (AggregateQueryRequest.OrderByConfig order : request.getOrderBy()) {
+                String field = order.getField();
+                if (field == null || (!IDENTIFIER_PATTERN.matcher(field).matches()
+                        && !metricAliases.contains(field))) {
+                    throw new MetaServiceException("Invalid order by field: " + field);
+                }
+            }
+        }
+    }
+
+    /**
+     * A dimension resolved into its SQL SELECT expression and the output column it
+     * lands in. For a plain dimension the two are the same bare column; for a
+     * time-bucketed one ({@code col__month}) the expression is a {@code DATE_TRUNC}
+     * and the column is the suffixed alias, so GROUP BY / ORDER BY can reference it.
+     */
+    private record ResolvedDimension(String selectExpr, String outputColumn) {
+        boolean isBucketed() {
+            return !selectExpr.equals(outputColumn);
+        }
+    }
+
+    /**
+     * Parse a dimension, honouring an optional {@code col__grain} time-bucketing suffix.
+     *
+     * Without a suffix the dimension must be a bare identifier (unchanged behaviour).
+     * With one, the base column must be a bare identifier and the grain must be in
+     * {@link #ALLOWED_GRAINS}; the result buckets via {@code DATE_TRUNC(grain, col)}
+     * aliased to {@code col__grain}. This is the aggregate-path equivalent of the
+     * semantic layer's grain handling — the aggregate DTO carries no field metadata,
+     * so the grain travels in the dimension string itself.
+     */
+    private ResolvedDimension resolveDimension(String dimension) {
+        if (dimension == null) {
+            throw new MetaServiceException("Dimension field is required");
+        }
+        int sep = dimension.indexOf("__");
+        if (sep < 0) {
+            if (!IDENTIFIER_PATTERN.matcher(dimension).matches()) {
+                throw new MetaServiceException("Invalid dimension field: " + dimension);
+            }
+            return new ResolvedDimension(dimension, dimension);
+        }
+        String column = dimension.substring(0, sep);
+        String grain = dimension.substring(sep + 2).toLowerCase(Locale.ROOT);
+        if (!IDENTIFIER_PATTERN.matcher(column).matches()) {
+            throw new MetaServiceException("Invalid dimension field: " + dimension);
+        }
+        if (!ALLOWED_GRAINS.contains(grain)) {
+            throw new MetaServiceException("Unsupported time grain: " + grain);
+        }
+        // The alias keeps the `__grain` form so the frontend can recognise it as a
+        // bucketed column and the output column name is stable across the query.
+        return new ResolvedDimension("DATE_TRUNC('" + grain + "', " + column + ")", dimension);
+    }
+
+    /** Aliases the request exposes for ordering: an explicit alias, else the default {@code field_agg}. */
+    private Set<String> collectMetricAliases(AggregateQueryRequest request) {
+        if (request.getMetrics() == null) {
+            return Collections.emptySet();
+        }
+        Set<String> aliases = new HashSet<>();
+        for (MetricConfig metric : request.getMetrics()) {
+            String alias = trimToNull(metric.getAlias());
+            // Mirror buildAggregationClause's default alias exactly: `field_agg`, agg lower-cased.
+            aliases.add(alias != null
+                    ? alias
+                    : metric.getField() + "_" + metric.getAggregation().toLowerCase());
+        }
+        return aliases;
     }
 
     /**
@@ -619,9 +710,20 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
         List<String> selectClauses = new ArrayList<>();
 
+        // Resolve dimensions once — a bucketed one (`col__grain`) selects a DATE_TRUNC
+        // aliased to `col__grain`, which GROUP BY reuses below.
+        List<ResolvedDimension> resolvedDimensions = new ArrayList<>();
+        if (request.getDimensions() != null) {
+            for (String dimension : request.getDimensions()) {
+                resolvedDimensions.add(resolveDimension(dimension));
+            }
+        }
+
         // Add dimensions to SELECT
-        if (request.getDimensions() != null && !request.getDimensions().isEmpty()) {
-            selectClauses.addAll(request.getDimensions());
+        for (ResolvedDimension dim : resolvedDimensions) {
+            selectClauses.add(dim.isBucketed()
+                    ? dim.selectExpr() + " AS " + dim.outputColumn()
+                    : dim.selectExpr());
         }
 
         // Add metrics to SELECT
@@ -671,14 +773,21 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
             sql.append(" WHERE ").append(String.join(" AND ", whereClauses));
         }
 
-        // GROUP BY clause
-        List<String> groupByFields = request.getGroupBy();
-        if (groupByFields == null || groupByFields.isEmpty()) {
-            groupByFields = request.getDimensions();
+        // GROUP BY clause. When it defaults to the dimensions, group by the SELECT
+        // expression (the DATE_TRUNC for bucketed dims), not the raw `col__grain`
+        // string — that is an output alias, not a real column. An explicit groupBy is
+        // a list of bare columns (validated), so it is used as-is.
+        List<String> groupByClauses;
+        if (request.getGroupBy() != null && !request.getGroupBy().isEmpty()) {
+            groupByClauses = request.getGroupBy();
+        } else {
+            groupByClauses = resolvedDimensions.stream()
+                    .map(ResolvedDimension::selectExpr)
+                    .collect(Collectors.toList());
         }
 
-        if (groupByFields != null && !groupByFields.isEmpty()) {
-            sql.append(" GROUP BY ").append(String.join(", ", groupByFields));
+        if (!groupByClauses.isEmpty()) {
+            sql.append(" GROUP BY ").append(String.join(", ", groupByClauses));
         }
 
         // ORDER BY clause

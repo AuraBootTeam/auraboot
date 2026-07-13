@@ -582,4 +582,120 @@ class AggregateQueryServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(String.valueOf(response.getRows().get(0).get("uid")))
                 .isEqualTo(String.valueOf(testUser.getId()));
     }
+
+    // ==================== G1: time bucketing (grain) ====================
+
+    @Test
+    void shouldBucketDimensionByMonth() {
+        // Given: group tenants by the month of their created_at, via a `col__month` grain suffix
+        MetricConfig countMetric = new MetricConfig();
+        countMetric.setField("id");
+        countMetric.setAggregation("count");
+        countMetric.setAlias("cnt");
+
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setModelCode("ab_tenant");
+        request.setDimensions(List.of("created_at__month"));
+        request.setMetrics(List.of(countMetric));
+
+        // When
+        AggregateQueryResponse response = aggregateQueryService.execute(request);
+
+        // Then: rows are keyed by the bucketed column, and each bucket is a real month boundary
+        assertThat(response.getRows()).isNotEmpty();
+        assertThat(response.getRows().get(0)).containsKeys("created_at__month", "cnt");
+        // DATE_TRUNC('month', ...) lands every value on the first of a month at 00:00.
+        assertThat(String.valueOf(response.getRows().get(0).get("created_at__month")))
+                .contains("-01 00:00");
+    }
+
+    @Test
+    void shouldRejectUnsupportedGrain() {
+        MetricConfig countMetric = new MetricConfig();
+        countMetric.setField("id");
+        countMetric.setAggregation("count");
+        countMetric.setAlias("cnt");
+
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setModelCode("ab_tenant");
+        request.setDimensions(List.of("created_at__fortnight"));
+        request.setMetrics(List.of(countMetric));
+
+        assertThatThrownBy(() -> aggregateQueryService.execute(request))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("Unsupported time grain");
+    }
+
+    // ==================== G2: orderBy + injection guard ====================
+
+    @Test
+    void shouldOrderByMetricAliasDescending() {
+        // Given: count tenants by status, ordered by the count descending (top-N ordering)
+        MetricConfig countMetric = new MetricConfig();
+        countMetric.setField("id");
+        countMetric.setAggregation("count");
+        countMetric.setAlias("cnt");
+
+        AggregateQueryRequest.OrderByConfig order = new AggregateQueryRequest.OrderByConfig();
+        order.setField("cnt");
+        order.setDirection("desc");
+
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setModelCode("ab_tenant");
+        request.setDimensions(List.of("status"));
+        request.setMetrics(List.of(countMetric));
+        request.setOrderBy(List.of(order));
+
+        // When
+        AggregateQueryResponse response = aggregateQueryService.execute(request);
+
+        // Then: rows come back in non-increasing count order
+        assertThat(response.getRows()).isNotEmpty();
+        long prev = Long.MAX_VALUE;
+        for (var row : response.getRows()) {
+            long cnt = ((Number) row.get("cnt")).longValue();
+            assertThat(cnt).isLessThanOrEqualTo(prev);
+            prev = cnt;
+        }
+    }
+
+    @Test
+    void shouldRejectOrderByInjection() {
+        // An orderBy field is concatenated into ORDER BY — before validation it let a
+        // caller inject arbitrary SQL. It must be rejected as bad input, not run.
+        MetricConfig countMetric = new MetricConfig();
+        countMetric.setField("id");
+        countMetric.setAggregation("count");
+        countMetric.setAlias("cnt");
+
+        AggregateQueryRequest.OrderByConfig order = new AggregateQueryRequest.OrderByConfig();
+        order.setField("1) UNION SELECT version() --");
+        order.setDirection("asc");
+
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setModelCode("ab_tenant");
+        request.setMetrics(List.of(countMetric));
+        request.setOrderBy(List.of(order));
+
+        assertThatThrownBy(() -> aggregateQueryService.execute(request))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("Invalid order by field");
+    }
+
+    @Test
+    void shouldRejectGroupByInjection() {
+        MetricConfig countMetric = new MetricConfig();
+        countMetric.setField("id");
+        countMetric.setAggregation("count");
+        countMetric.setAlias("cnt");
+
+        AggregateQueryRequest request = new AggregateQueryRequest();
+        request.setModelCode("ab_tenant");
+        request.setMetrics(List.of(countMetric));
+        request.setGroupBy(List.of("status) --"));
+
+        assertThatThrownBy(() -> aggregateQueryService.execute(request))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("Invalid group by field");
+    }
 }

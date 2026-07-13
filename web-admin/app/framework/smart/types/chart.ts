@@ -149,6 +149,12 @@ export interface ChartDataSource {
    * and static sources, whose columns are SQL aliases with no field behind them.
    */
   dimensionDicts?: Record<string, string>;
+  /**
+   * Sort order for the result. The backend has always supported this, but the
+   * field was missing from ChartDataSource, so `limit` degraded from top-N to
+   * "any N rows". Ordering by a metric alias gives a real leaderboard.
+   */
+  orderBy?: OrderByConfig[];
 }
 
 /**

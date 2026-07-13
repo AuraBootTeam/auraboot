@@ -40,6 +40,35 @@ describe('dimensionLabel', () => {
   });
 });
 
+describe('formatBucketValue (via dimensionLabel)', () => {
+  const meta = { dimensions: ['crm_opp_close__month'], metrics: [] };
+
+  it('formats a month bucket to YYYY-MM', () => {
+    expect(dimensionLabel(meta, 'crm_opp_close__month', '2025-04-01 00:00:00+08')).toBe('2025-04');
+  });
+
+  it('formats a quarter bucket to YYYY-Qn', () => {
+    expect(dimensionLabel(meta, 'x__quarter', '2025-07-01 00:00:00+08')).toBe('2025-Q3');
+  });
+
+  it('formats a year bucket to YYYY', () => {
+    expect(dimensionLabel(meta, 'x__year', '2025-01-01 00:00:00+08')).toBe('2025');
+  });
+
+  it('formats a day bucket to YYYY-MM-DD', () => {
+    expect(dimensionLabel(meta, 'x__day', '2025-04-09 00:00:00+08')).toBe('2025-04-09');
+  });
+
+  it('leaves a plain (non-bucketed) dimension untouched', () => {
+    expect(dimensionLabel(meta, 'crm_opp_stage', 'closed_won')).toBe('closed_won');
+  });
+
+  it('a dict label wins over bucket formatting', () => {
+    const withDict = { dimensions: [], metrics: [], dimensionLabels: { s__month: { '2025-04-01 00:00:00+08': '四月' } } };
+    expect(dimensionLabel(withDict, 's__month', '2025-04-01 00:00:00+08')).toBe('四月');
+  });
+});
+
 describe('metricLabel', () => {
   it('resolves a metric alias to its configured display name', () => {
     expect(metricLabel({ won_amount: '赢单金额' }, 'won_amount')).toBe('赢单金额');
