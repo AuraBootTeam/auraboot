@@ -279,9 +279,28 @@ public class GlobalExceptionHandler {
         ResponseCode responseCode = ex.getResponseCode() != null
                 ? ex.getResponseCode()
                 : ResponseCode.BUSINESS_ERROR;
-        Object detail = isDevEnvironment() ? buildDevDetail(ex) : localizeBusinessMessage(ex, request);
+        String userMessage = localizeBusinessMessage(ex, request);
+        Object detail = isDevEnvironment() ? buildBusinessDevDetail(ex, userMessage) : userMessage;
         ApiResponse<Object> response = ApiResponse.errorWithContext(responseCode, detail);
         return ResponseEntity.status(mapResponseCodeToStatus(responseCode)).body(response);
+    }
+
+    /**
+     * Dev-environment detail for a BusinessException. {@code detail} carries the same localized
+     * text the UI shows in production — the frontend toasts {@code context.detail}, so leaving the
+     * raw {@code $i18n:} key there would leak message keys into the UI on every dev stack. The
+     * untranslated key stays available to developers under {@code messageKey}.
+     */
+    private Map<String, String> buildBusinessDevDetail(BusinessException ex, String userMessage) {
+        Map<String, String> detail = buildDevDetail(ex);
+        if (detail == null) {
+            return null;
+        }
+        detail.put("detail", userMessage);
+        if (ex.getMessage() != null) {
+            detail.put("messageKey", ex.getMessage());
+        }
+        return detail;
     }
 
     /**

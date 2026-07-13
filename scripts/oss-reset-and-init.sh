@@ -653,6 +653,16 @@ WHERE u.email = 'admin@auraboot.com'
             node scripts/run-showcase-seed-sequence.mjs --config="$SEED_CONFIG" \
                 --output-prefix="$SEED_LOG_DIR/showcase" "${seed_phases[@]}"
 
+        # workflow-demo carries its own business data (leave balances + requests + approval
+        # tasks). Without a balance row, wd_leave_validation rejects every annual leave
+        # request the demo can submit, so this is part of a usable demo, not an extra.
+        if command_definition_exists "wd:create_leave_balance"; then
+            run_seed_step "Workflow-demo seed (leave balances + requests)" "$SEED_LOG_DIR/workflow-demo-seed.log" \
+                node scripts/seed-workflow-demo.mjs --base-url="$AURA_VITE_BASE"
+        else
+            echo -e "${YELLOW}   Workflow-demo seed skipped: workflow-demo plugin is not imported.${NC}"
+        fi
+
         select_default_showcase_dashboard
         export SHOWCASE_DEFAULT_DASHBOARD_CODE
         echo "   Demo default dashboard target: ${SHOWCASE_DEFAULT_DASHBOARD_CODE}"

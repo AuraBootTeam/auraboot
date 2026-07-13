@@ -85,7 +85,9 @@ class PreActionsPhaseTest {
 
         assertThatThrownBy(() -> phase.execute(ctx))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("annual_leave_insufficient");
+                // The rule reports a bare reason; the phase must throw the i18n key so the
+                // handler can localize it instead of leaking the raw code to the UI.
+                .hasMessage("$i18n:error.wd_leave_validation.annual_leave_insufficient");
 
         ArgumentCaptor<Map<String, Object>> factsCaptor = ArgumentCaptor.forClass((Class) Map.class);
         org.mockito.Mockito.verify(droolsEngineService).evaluate(any(), factsCaptor.capture());

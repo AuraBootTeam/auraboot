@@ -72,6 +72,7 @@
   { "key": "process.wd_leave_approval.edge.gw_result_approved", "zh-CN": "通过", "en-US": "Approved", "source": "import", "refType": "process" },
   { "key": "process.wd_leave_approval.edge.gw_result_rejected", "zh-CN": "驳回", "en-US": "Rejected", "source": "import", "refType": "process" },
 
+  { "key": "error.wd_leave_validation.annual_balance_not_found", "zh-CN": "未找到该员工的年假余额记录（或剩余年假未维护），请先在「年假余额」中登记后再提交", "en-US": "No annual leave balance on file for this employee (or the remaining days are unset). Record one under Leave Balances before submitting.", "source": "import", "refType": "error" },
   { "key": "error.wd_leave_validation.annual_leave_insufficient", "zh-CN": "剩余年假不足，无法提交该申请", "en-US": "Insufficient annual leave balance; cannot submit this request", "source": "import", "refType": "error" },
   { "key": "error.wd_leave_validation.sick_attachment_required", "zh-CN": "病假超过 2 天必须上传附件", "en-US": "Sick leave exceeding 2 days requires an attachment", "source": "import", "refType": "error" },
 

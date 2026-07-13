@@ -1,6 +1,7 @@
 package com.auraboot.framework.bpm.chain;
 
 import com.auraboot.framework.bpm.rule.DroolsEngineService;
+import com.auraboot.framework.bpm.rule.RuleReasonMessages;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.smart.framework.engine.context.ExecutionContext;
 import com.auraboot.smart.framework.engine.delegation.JavaDelegation;
@@ -64,7 +65,7 @@ public class DroolsServiceTaskDelegate implements JavaDelegation {
         Map<String, String> properties = resolveProperties(executionContext);
         String ruleCode = properties.get(BpmServiceTaskConstants.ATTR_RULE_CODE);
         if (ruleCode == null || ruleCode.isBlank()) {
-            throw new BusinessException(ERR_RULE_CODE_REQUIRED);
+            throw new BusinessException(RuleReasonMessages.i18nKey(ERR_RULE_CODE_REQUIRED));
         }
 
         Map<String, Object> facts = buildFacts(properties.get(BpmServiceTaskConstants.ATTR_FACTS_VARS),
@@ -78,7 +79,7 @@ public class DroolsServiceTaskDelegate implements JavaDelegation {
         } catch (Exception e) {
             log.error("Drools serviceTask evaluation failed: ruleCode={}, error={}",
                     ruleCode, e.getMessage(), e);
-            throw new BusinessException(ERR_EXECUTION_FAILED);
+            throw new BusinessException(RuleReasonMessages.i18nKey(ERR_EXECUTION_FAILED));
         }
 
         if (ruleResult == null) {
@@ -88,10 +89,8 @@ public class DroolsServiceTaskDelegate implements JavaDelegation {
         Object validFlag = ruleResult.get(RESULT_VALID);
         if (Boolean.FALSE.equals(validFlag)) {
             Object reason = ruleResult.get(RESULT_REASON);
-            String messageKey = (reason != null && !reason.toString().isBlank())
-                    ? reason.toString()
-                    : ERR_EXECUTION_FAILED;
-            throw new BusinessException(messageKey);
+            throw new BusinessException(
+                    RuleReasonMessages.reasonKey(ruleCode, reason, ERR_EXECUTION_FAILED));
         }
 
         // Merge result keys back into process variables so gateway conditions
