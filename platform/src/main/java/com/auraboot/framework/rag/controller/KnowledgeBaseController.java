@@ -288,7 +288,9 @@ public class KnowledgeBaseController {
             case "pdf" -> "pdf";
             case "docx" -> "docx";
             case "pptx" -> "pptx";
+            case "ppt" -> "ppt";
             case "xlsx" -> "xlsx";
+            case "xls" -> "xls";
             case "md", "markdown" -> "md";
             case "txt" -> "txt";
             case "csv" -> "csv";
