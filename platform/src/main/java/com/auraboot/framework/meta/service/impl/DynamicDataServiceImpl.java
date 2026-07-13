@@ -1210,15 +1210,21 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     @Override
     @Transactional
-    public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> data) {
+    public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> inputData) {
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (recordId == null || recordId.trim().isEmpty()) {
             throw new MetaServiceException("Record ID cannot be null or empty");
         }
-        if (data == null || data.isEmpty()) {
+        if (inputData == null || inputData.isEmpty()) {
             throw new MetaServiceException("Data cannot be null or empty");
         }
+        // Work on a copy. payloadTemporalNormalizer.normalize() rewrites temporal values in
+        // place, so an immutable argument — Map.of(...), which is the natural thing to write
+        // for a small update — throws a message-less UnsupportedOperationException from deep
+        // inside, and only when the payload happens to carry a date/time field. Copying also
+        // means we no longer mutate a caller's map behind its back.
+        Map<String, Object> data = new LinkedHashMap<>(inputData);
         
         // Field-level write permission (gap #1): strip fields the current user may not write
         stripNonWritableFields(modelCode, data);

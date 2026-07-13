@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -121,10 +122,11 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
                     "Knowledge base " + kbPid + " rejected the FAQ document (unknown kb, or empty text)");
         }
 
-        Map<String, Object> updated = data.update(FaqCandidateService.MODEL, candidatePid, Map.of(
-                "faq_status", STATUS_PUBLISHED,
-                "faq_kb_document_pid", docPid,
-                "faq_reviewed_at", Instant.now().toString()));
+        Map<String, Object> patch = new LinkedHashMap<>();
+        patch.put("faq_status", STATUS_PUBLISHED);
+        patch.put("faq_kb_document_pid", docPid);
+        patch.put("faq_reviewed_at", Instant.now().toString());
+        Map<String, Object> updated = data.update(FaqCandidateService.MODEL, candidatePid, patch);
 
         log.info("[faq-publish] tenant={} candidate={} -> kb={} doc={}",
                 context.tenantId(), candidatePid, kbPid, docPid);
