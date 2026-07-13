@@ -1,0 +1,69 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.auraboot",
+    "module": "platform-storage-minio",
+    "version": "1.0.0-SNAPSHOT",
+    "attributes": {
+      "org.gradle.status": "integration"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.14.5"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "files": [
+        {
+          "name": "platform-storage-minio-1.0.0-SNAPSHOT.jar",
+          "url": "platform-storage-minio-1.0.0-SNAPSHOT.jar",
+          "size": 5382,
+          "sha512": "dd02b6b24b8aad7b12cea21f98c1f34313cf049d8eb1567f08c24a8e07dffa3668683782e27daf4bb40510ad0894489f8947a6f985b50d8ea672a57e8e43a84e",
+          "sha256": "0d7ecbb078d44e53a707a0ff3dcc3efdb19753f7f2564ed01733bde8b000b38d",
+          "sha1": "18183b063dc6f6971f0e6167951a6a8e6e2b1b73",
+          "md5": "2f5538fa28534030c31b9778af4a9f83"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "io.minio",
+          "module": "minio",
+          "version": {
+            "requires": "8.5.7"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "platform-storage-minio-1.0.0-SNAPSHOT.jar",
+          "url": "platform-storage-minio-1.0.0-SNAPSHOT.jar",
+          "size": 5382,
+          "sha512": "dd02b6b24b8aad7b12cea21f98c1f34313cf049d8eb1567f08c24a8e07dffa3668683782e27daf4bb40510ad0894489f8947a6f985b50d8ea672a57e8e43a84e",
+          "sha256": "0d7ecbb078d44e53a707a0ff3dcc3efdb19753f7f2564ed01733bde8b000b38d",
+          "sha1": "18183b063dc6f6971f0e6167951a6a8e6e2b1b73",
+          "md5": "2f5538fa28534030c31b9778af4a9f83"
+        }
+      ]
+    }
+  ]
+}

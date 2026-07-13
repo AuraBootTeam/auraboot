@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata>
+  <groupId>com.auraboot</groupId>
+  <artifactId>platform-storage-oss</artifactId>
+  <versioning>
+    <latest>1.0.0-SNAPSHOT</latest>
+    <versions>
+      <version>1.0.0-SNAPSHOT</version>
+    </versions>
+    <lastUpdated>20260713063447</lastUpdated>
+  </versioning>
+</metadata>

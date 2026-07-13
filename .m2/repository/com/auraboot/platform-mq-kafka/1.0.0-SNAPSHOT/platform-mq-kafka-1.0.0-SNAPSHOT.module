@@ -1,0 +1,69 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.auraboot",
+    "module": "platform-mq-kafka",
+    "version": "1.0.0-SNAPSHOT",
+    "attributes": {
+      "org.gradle.status": "integration"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.14.5"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "files": [
+        {
+          "name": "platform-mq-kafka-1.0.0-SNAPSHOT.jar",
+          "url": "platform-mq-kafka-1.0.0-SNAPSHOT.jar",
+          "size": 17932,
+          "sha512": "22cafb68b309d973c6bb30a003ee50070162f6125871e2afab8522a1015070ab314a3230a5498dc4fdba86fcc38aa6d94d7fa0efcafca5d51e9afa57cc414029",
+          "sha256": "2109eb69e30d5d6cd0bf30345be004052a0910aa4d28d3263a8c29ef8f23cbe5",
+          "sha1": "e7a70d0d0ea018b7fac856a7d6b3c0ad2ebdcd3f",
+          "md5": "045964c55b9afa93ee3c64d69d70005b"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 21,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "dependencies": [
+        {
+          "group": "org.apache.kafka",
+          "module": "kafka-clients",
+          "version": {
+            "requires": "3.7.0"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "platform-mq-kafka-1.0.0-SNAPSHOT.jar",
+          "url": "platform-mq-kafka-1.0.0-SNAPSHOT.jar",
+          "size": 17932,
+          "sha512": "22cafb68b309d973c6bb30a003ee50070162f6125871e2afab8522a1015070ab314a3230a5498dc4fdba86fcc38aa6d94d7fa0efcafca5d51e9afa57cc414029",
+          "sha256": "2109eb69e30d5d6cd0bf30345be004052a0910aa4d28d3263a8c29ef8f23cbe5",
+          "sha1": "e7a70d0d0ea018b7fac856a7d6b3c0ad2ebdcd3f",
+          "md5": "045964c55b9afa93ee3c64d69d70005b"
+        }
+      ]
+    }
+  ]
+}
