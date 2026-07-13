@@ -35,6 +35,12 @@ export type { FilterBuilderProps } from './FilterBuilder';
 export { MetricEditor } from './MetricEditor';
 export type { MetricConfig, MetricEditorProps } from './MetricEditor';
 
+export { SortEditor } from './SortEditor';
+export type { SortEditorProps, SortOption } from './SortEditor';
+
+export { TimeGrainPicker, TIME_GRAINS, isDateField, parseGrainDimension } from './TimeGrainPicker';
+export type { TimeGrainPickerProps } from './TimeGrainPicker';
+
 export { SemanticMetricPicker } from './SemanticMetricPicker';
 export type { SemanticMetricPickerProps } from './SemanticMetricPicker';
 
