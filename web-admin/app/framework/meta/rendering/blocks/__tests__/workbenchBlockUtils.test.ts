@@ -69,6 +69,24 @@ describe('workbenchBlockUtils action runner', () => {
     expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
   });
 
+  it('navigates workbench actions to an explicit path or custom page key', async () => {
+    const navigateTo = vi.fn();
+    const runtime = makeRuntime({ navigateTo }) as any;
+
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'navigate',
+      args: { path: '/p/c/iot_alarm_console_workbench' },
+    });
+
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'navigate',
+      args: { to: 'iot_remote_diagnosis_workbench' },
+    });
+
+    expect(navigateTo).toHaveBeenNthCalledWith(1, '/p/c/iot_alarm_console_workbench');
+    expect(navigateTo).toHaveBeenNthCalledWith(2, '/p/c/iot_remote_diagnosis_workbench');
+  });
+
   it('notifies data source dependents after writing runtime state', () => {
     const runtime = makeRuntime() as any;
 
