@@ -35,6 +35,18 @@ public class SecurityConfig {
     private final UserDetailsService userDetailsService;
 
     /**
+     * Confines scoped tokens (e.g. embedded-widget visitors) to their declared paths. Runs ahead of
+     * {@link JwtAuthenticationFilter}, whose user lookup would answer 500 for a subject that is not
+     * a platform user. See {@link ScopeRestrictionFilter}.
+     */
+    @Autowired
+    private ScopeRestrictionFilter scopeRestrictionFilter;
+
+    /** CORS rules for public key-authenticated endpoints owned by other modules. */
+    @Autowired(required = false)
+    private List<PublicCorsContributor> publicCorsContributors;
+
+    /**
      * Test-only filter that allows E2E specs to override MetaContext user id
      * via {@code X-Test-Spoof-User-Id}. Bean is only registered under the
      * {@code test} Spring profile; absent in prod / dev / integration-test.
@@ -89,7 +101,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(scopeRestrictionFilter, JwtAuthenticationFilter.class);
 
         // Test-only: honor X-Test-Spoof-User-Id AFTER JwtAuthenticationFilter
         // populates MetaContext. Bean is only present when the "test" profile
@@ -175,6 +188,15 @@ public class SecurityConfig {
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/collect/keyed", keyedCollect);
+
+        // Rules contributed by modules that own their own public key-authenticated endpoint (the
+        // embeddable CS widget, for one). Registered before "/api/**" so the specific pattern wins.
+        if (publicCorsContributors != null) {
+            for (PublicCorsContributor contributor : publicCorsContributors) {
+                source.registerCorsConfiguration(contributor.pathPattern(), contributor.corsConfiguration());
+            }
+        }
+
         source.registerCorsConfiguration("/api/**", configuration);
         return source;
     }
