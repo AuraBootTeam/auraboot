@@ -15,6 +15,7 @@
  *     --backend http://localhost:6401 --site-key csk_... --shots ./artifacts
  */
 import http from 'node:http';
+import { createHmac } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium } from '@playwright/test';
@@ -31,6 +32,9 @@ const SITE_KEY = args['site-key'];
 const SHOTS = args.shots ?? './artifacts/cs-golden';
 const ALLOWED_PORT = Number(args['allowed-port'] ?? 5199);
 const BLOCKED_PORT = Number(args['blocked-port'] ?? 5197);
+// The site's HMAC key. A host site holds this on ITS SERVER and signs its own user ids with it.
+// Optional: without it the identified-visitor tier is skipped rather than silently passing.
+const IDENTITY_SECRET = args['identity-secret'];
 
 if (!SITE_KEY) {
   console.error('--site-key is required');
@@ -208,6 +212,77 @@ try {
   );
   await shot(rogue, '05-blocked-origin');
   await rogue.close();
+
+  // ---------------------------------------------------------------- identified visitor (HMAC)
+  if (IDENTITY_SECRET) {
+    const sign = (externalUserId) =>
+      createHmac('sha256', IDENTITY_SECRET).update(externalUserId).digest('hex');
+
+    // A brand-new browser context: no localStorage, nothing this person has ever left behind. The
+    // only thing tying them to their history is the identity their own site vouches for.
+    const otherDevice = await browser.newContext();
+    const devicePage = await otherDevice.newPage();
+    await devicePage.goto(`http://localhost:${ALLOWED_PORT}/`);
+    await devicePage.waitForFunction(() => Boolean(window.AuraCS));
+
+    const identified = await devicePage.evaluate(
+      async ([base, key, externalUserId, userHash]) => {
+        const response = await fetch(`${base}/api/public/cs/session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Site-Key': key },
+          body: JSON.stringify({ externalUserId, userHash }),
+        });
+        return { status: response.status, body: await response.text() };
+      },
+      [BACKEND, SITE_KEY, 'alice', sign('alice')],
+    );
+    record(
+      'a correctly signed identity is accepted on a device that has never been here',
+      identified.status === 200,
+      `HTTP ${identified.status}`,
+    );
+
+    // The attack: same claim, a signature the browser made up. This is the only thing standing
+    // between a stranger and alice's conversation history.
+    const forged = await devicePage.evaluate(
+      async ([base, key]) => {
+        const response = await fetch(`${base}/api/public/cs/session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Site-Key': key },
+          body: JSON.stringify({ externalUserId: 'alice', userHash: 'f'.repeat(64) }),
+        });
+        return { status: response.status, body: await response.text() };
+      },
+      [BACKEND, SITE_KEY],
+    );
+    record(
+      'a forged identity signature is refused — nobody can claim to be alice',
+      forged.status === 403 && forged.body.includes('identity_hash_invalid'),
+      `HTTP ${forged.status}`,
+    );
+
+    // And an unsigned claim, which is what a naive integration would send.
+    const unsigned = await devicePage.evaluate(
+      async ([base, key]) => {
+        const response = await fetch(`${base}/api/public/cs/session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Site-Key': key },
+          body: JSON.stringify({ externalUserId: 'alice' }),
+        });
+        return { status: response.status, body: await response.text() };
+      },
+      [BACKEND, SITE_KEY],
+    );
+    record(
+      'an unsigned identity claim is refused, not quietly downgraded to anonymous',
+      unsigned.status === 403 && unsigned.body.includes('identity_hash_required'),
+      `HTTP ${unsigned.status}`,
+    );
+
+    await otherDevice.close();
+  } else {
+    console.log('SKIP  identified-visitor tier (pass --identity-secret to cover it)');
+  }
 } finally {
   await browser.close();
   allowed.close();
