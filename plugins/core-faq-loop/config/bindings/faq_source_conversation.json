@@ -1,0 +1,66 @@
+[
+  {
+    "modelCode": "faq_source_conversation",
+    "fieldCode": "faq_conv_name",
+    "sequence": 1,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "faq_source_conversation",
+    "fieldCode": "faq_conv_type",
+    "sequence": 2,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "searchable": true
+    }
+  },
+  {
+    "modelCode": "faq_source_conversation",
+    "fieldCode": "faq_conv_message_count",
+    "sequence": 3,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "faq_source_conversation",
+    "fieldCode": "faq_conv_candidate_count",
+    "sequence": 4,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "faq_source_conversation",
+    "fieldCode": "faq_conv_last_message_at",
+    "sequence": 5,
+    "required": false,
+    "visible": true,
+    "editable": false,
+    "displayConfig": {
+      "sortable": true
+    }
+  },
+  {
+    "modelCode": "faq_source_conversation",
+    "fieldCode": "faq_target_kb_id",
+    "sequence": 6,
+    "required": true,
+    "visible": false,
+    "editable": true,
+    "displayConfig": {}
+  }
+]

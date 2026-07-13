@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -33,6 +34,7 @@ import java.util.Set;
 public class FaqCandidateCommandHandler implements CommandHandlerExtension {
 
     static final String PUBLISH = "faq:publish";
+    static final String EXTRACT = "faq:extract";
 
     /**
      * The logical source recorded on the knowledge-base document. This value is only honoured
@@ -46,9 +48,12 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
     private static final String STATUS_PUBLISHED = "published";
 
     private final KbTextIngestService kbTextIngestService;
+    private final FaqCandidateService faqCandidateService;
 
-    public FaqCandidateCommandHandler(KbTextIngestService kbTextIngestService) {
+    public FaqCandidateCommandHandler(KbTextIngestService kbTextIngestService,
+                                      FaqCandidateService faqCandidateService) {
         this.kbTextIngestService = kbTextIngestService;
+        this.faqCandidateService = faqCandidateService;
     }
 
     @Override
@@ -58,12 +63,12 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
 
     @Override
     public boolean supports(String commandType) {
-        return PUBLISH.equals(commandType);
+        return PUBLISH.equals(commandType) || EXTRACT.equals(commandType);
     }
 
     @Override
     public Set<String> getSupportedCommandTypes() {
-        return Set.of(PUBLISH);
+        return Set.of(PUBLISH, EXTRACT);
     }
 
     @Override
@@ -75,6 +80,9 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
 
     @Override
     public Object execute(CommandContext context) {
+        if (EXTRACT.equals(context.commandType())) {
+            return extract(context);
+        }
         if (!PUBLISH.equals(context.commandType())) {
             throw new BusinessException(ResponseCode.BadParam,
                     "Unsupported FAQ command: " + context.commandType());
@@ -131,6 +139,56 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
         log.info("[faq-publish] tenant={} candidate={} -> kb={} doc={}",
                 context.tenantId(), candidatePid, kbPid, docPid);
         return updated;
+    }
+
+    /**
+     * Distil a conversation into candidates, driven from the conversation queue's row action.
+     *
+     * <p>The record this command targets is a conversation, not a candidate: {@code faq_source_conversation}
+     * is a metadata-only model over {@code ab_im_conversation} (skipTableCreation), so {@code recordId}
+     * is the conversation pid. Nothing is written to the conversation — the command's whole effect is
+     * the candidates it creates, which is why {@link #requiresDslPersistence} is false here too.
+     */
+    private Object extract(CommandContext context) {
+        String conversationPid = context.recordId();
+        if (conversationPid == null || conversationPid.isBlank()) {
+            throw new BusinessException(ResponseCode.BadParam, "A conversation is required to distil FAQs from");
+        }
+        Map<String, Object> payload = context.payload() != null ? context.payload() : Map.of();
+        String targetKbPid = str(payload.get("faq_target_kb_id"));
+        if (targetKbPid.isBlank()) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "A target knowledge base is required — a candidate with nowhere to publish is not reviewable");
+        }
+
+        List<Map<String, Object>> created;
+        try {
+            created = faqCandidateService.extractFromConversation(context.tenantId(), conversationPid, targetKbPid);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            // The LlmProvider contract throws checked Exception; surface the provider's message rather
+            // than a bare 500, because "the model is unreachable" is the reviewer's problem to see.
+            throw new BusinessException(ResponseCode.SystemError,
+                    "FAQ distillation failed: " + e.getMessage());
+        }
+
+        log.info("[faq-extract] tenant={} conversation={} -> {} candidate(s)",
+                context.tenantId(), conversationPid, created.size());
+        // Return the count and the pids, never the rows themselves. A dynamic-model row carries
+        // tenant_id / created_by / updated_by, and this is a public response — the dual-id contract
+        // says those never cross the boundary. The console re-reads the queue anyway; it needs to
+        // know how many landed, not what is in them.
+        //
+        // Zero is a legitimate verdict ("nothing reusable in this conversation"), not a failure.
+        List<String> pids = created.stream()
+                .map(c -> c.get("pid"))
+                .filter(java.util.Objects::nonNull)
+                .map(Object::toString)
+                .toList();
+        return Map.of("conversationPid", conversationPid,
+                "createdCount", created.size(),
+                "candidatePids", pids);
     }
 
     /** What the reviewer will see in the knowledge-base document list. */

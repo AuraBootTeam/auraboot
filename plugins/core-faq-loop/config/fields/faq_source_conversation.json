@@ -1,0 +1,73 @@
+[
+  {
+    "code": "faq_conv_name",
+    "displayName:zh-CN": "会话",
+    "displayName:en": "Conversation",
+    "description": "Conversation title.",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true
+    },
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "faq_conv_type",
+    "displayName:zh-CN": "类型",
+    "displayName:en": "Type",
+    "description": "private / group / bot / object.",
+    "dataType": "string",
+    "constraints": {
+      "maxLength": 16
+    },
+    "feature": {
+      "searchable": true
+    },
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "faq_conv_message_count",
+    "displayName:zh-CN": "消息数",
+    "displayName:en": "Messages",
+    "description": "Number of turns in the conversation.",
+    "dataType": "integer",
+    "feature": {
+      "sortable": true
+    },
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "faq_conv_last_message_at",
+    "displayName:zh-CN": "最后活动",
+    "displayName:en": "Last Activity",
+    "description": "When the conversation last had a message.",
+    "dataType": "datetime",
+    "feature": {
+      "sortable": true
+    },
+    "extension": {
+      "readOnly": true
+    }
+  },
+  {
+    "code": "faq_conv_candidate_count",
+    "displayName:zh-CN": "已提炼",
+    "displayName:en": "Distilled",
+    "description": "How many FAQ candidates have already been distilled from this conversation. Zero means it has never been mined.",
+    "dataType": "integer",
+    "feature": {
+      "sortable": true
+    },
+    "extension": {
+      "readOnly": true
+    }
+  }
+]

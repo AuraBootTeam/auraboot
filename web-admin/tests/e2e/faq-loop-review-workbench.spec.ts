@@ -171,7 +171,79 @@ test.describe('Conversation → FAQ loop — review workbench golden', () => {
     expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
   });
 
-  test('F4 approve → publish → the FAQ is in the knowledge base and retrievable', async ({ page }) => {
+  test('F4 editing the Q&A actually changes it', async ({ page }) => {
+    const errors = captureConsole(page);
+    await gotoWorkbench(page);
+    await page.getByTestId('metric-strip-item-draft').click();
+    await expectRowCount(page, await metricInt(page, 'draft'), 'draft queue loaded');
+
+    const target = (await fetchCandidates(page)).find((c) => c.faq_status === 'draft');
+    expect(target, 'a draft candidate to edit').toBeTruthy();
+    const targetPid = target!.pid as string;
+    const originalAnswer = String(target!.faq_answer);
+
+    await page.locator(`[data-testid="table-row-${targetPid}"]`).getByTestId('row-action-update_qa').click();
+
+    const dialog = page.getByTestId('form-dialog');
+    await expect(dialog, 'editing asks for the new text').toBeVisible({ timeout: 10000 });
+
+    // The whole point of a review queue is that a human can correct the model before it reaches
+    // customers. An edit button that opens nothing, or submits an empty payload, is worse than no
+    // edit button — it looks like the correction was saved.
+    const correctedAnswer = originalAnswer + '（已由审核人补充：以银行到账为准。）';
+    await dialog.getByTestId('form-dialog-field-faq_question').fill(String(target!.faq_question));
+    await dialog.getByTestId('form-dialog-field-faq_answer').fill(correctedAnswer);
+    await dialog.getByTestId('form-dialog-submit').click();
+
+    await expect
+      .poll(
+        async () => (await fetchCandidates(page)).find((c) => c.pid === targetPid)?.faq_answer,
+        { timeout: 15000, message: 'the edited answer is what persists' },
+      )
+      .toBe(correctedAnswer);
+
+    await page.screenshot({ path: `${SHOTS}/F6-edited.png`, fullPage: true });
+    expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
+  });
+
+  test('F5 reject asks for a reason, and the reason is what lands', async ({ page }) => {
+    const errors = captureConsole(page);
+    await gotoWorkbench(page);
+    await page.getByTestId('metric-strip-item-draft').click();
+    await expectRowCount(page, await metricInt(page, 'draft'), 'draft queue loaded');
+
+    const target = (await fetchCandidates(page)).find((c) => c.faq_status === 'draft');
+    expect(target, 'a draft candidate to reject').toBeTruthy();
+    const targetPid = target!.pid as string;
+
+    await page.locator(`[data-testid="table-row-${targetPid}"]`).getByTestId('row-action-reject').click();
+
+    // A rejection with no reason is not a rejection, it is a deletion with extra steps. The
+    // command declares faq_reject_reason as an input, so the platform must ask for it — and
+    // whether it does depends on the DSL declaring it too, not just the backend command.
+    const dialog = page.getByTestId('form-dialog');
+    await expect(dialog, 'reject asks why before it rejects').toBeVisible({ timeout: 10000 });
+
+    const reason = 'Answer is specific to one customer, not reusable';
+    await dialog.getByTestId('form-dialog-field-faq_reject_reason').fill(reason);
+    await dialog.getByTestId('form-dialog-submit').click();
+
+    await expect
+      .poll(
+        async () => (await fetchCandidates(page)).find((c) => c.pid === targetPid)?.faq_status,
+        { timeout: 15000, message: 'reject persists draft → rejected' },
+      )
+      .toBe('rejected');
+
+    const rejected = (await fetchCandidates(page)).find((c) => c.pid === targetPid)!;
+    expect(rejected.faq_reject_reason, 'the reason the reviewer typed is the reason stored').toBe(reason);
+    expect(rejected.faq_reviewed_by, 'the reviewer is stamped').toBeTruthy();
+
+    await page.screenshot({ path: `${SHOTS}/F5-rejected.png`, fullPage: true });
+    expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
+  });
+
+  test('F6 approve → publish → the FAQ is in the knowledge base and retrievable', async ({ page }) => {
     const errors = captureConsole(page);
     await gotoWorkbench(page);
     await page.getByTestId('metric-strip-item-draft').click();
