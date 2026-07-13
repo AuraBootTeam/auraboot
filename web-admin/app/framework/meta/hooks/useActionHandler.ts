@@ -242,7 +242,13 @@ function notifyActionToast(
   }
 }
 
-function resolveCommandErrorMessage(result: unknown, commandCode: string): string {
+/**
+ * Pull the user-facing reason out of a failed command response. The backend puts it in
+ * `context.detail` (localized); `message` / `desc` are the generic envelope text
+ * ("Business error"), so they must stay last. Shared with the DSL form page so both
+ * command execution paths surface the same reason.
+ */
+export function resolveCommandErrorMessage(result: unknown, commandCode: string): string {
   const body = (result || {}) as Record<string, any>;
   return (
     firstNonBlankString(
