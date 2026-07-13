@@ -2,18 +2,20 @@
   "name": "auraboot-monorepo",
   "version": "0.0.0",
   "private": true,
-  "description": "AuraBoot OSS monorepo root \u2014 manages framework packages and web-admin",
+  "description": "AuraBoot OSS monorepo root — manages framework packages and web-admin",
   "scripts": {
     "build:packages": "pnpm -r --filter './packages/*' build",
     "typecheck:packages": "pnpm -r --filter './packages/*' typecheck",
     "agent:install-hooks": "node scripts/install-agent-git-hooks.mjs",
     "agent:write-guard": "node scripts/agent-write-guard.mjs",
     "agent:git-guard": "node scripts/agent-git-guard.mjs",
-    "validate:plugins": "node scripts/validate-plugin-i18n.mjs && node scripts/validate-plugin-dashboards.mjs && node scripts/validate-permission-codes.mjs && node scripts/check-dsl-status-colors.mjs",
+    "validate:plugins": "node scripts/validate-plugin-i18n.mjs && node scripts/validate-plugin-dashboards.mjs && node scripts/validate-permission-codes.mjs && node scripts/check-dsl-status-colors.mjs && node scripts/check-cache-eviction.mjs && node scripts/check-e2e-assertions.mjs",
     "validate:dashboards": "node scripts/validate-plugin-dashboards.mjs",
     "validate:permissions": "node scripts/validate-permission-codes.mjs",
     "validate:status-colors": "node scripts/check-dsl-status-colors.mjs",
-    "test:oee-host-golden": "bash scripts/host-oee-dashboard-golden.sh all"
+    "test:oee-host-golden": "bash scripts/host-oee-dashboard-golden.sh all",
+    "validate:cache-eviction": "node scripts/check-cache-eviction.mjs",
+    "validate:e2e-assertions": "node scripts/check-e2e-assertions.mjs"
   },
   "devDependencies": {
     "typescript": "^5.4.0"
