@@ -1,0 +1,503 @@
+{
+  "pageKey": "faq_candidate_workbench",
+  "name:zh-CN": "FAQ 审核台",
+  "name:en": "FAQ Review",
+  "modelCode": "faq_candidate",
+  "description": "FAQ review console: counts by review status, click a metric to filter the queue, select a candidate to inspect the distilled Q&A and its provenance, then edit / approve / reject it and publish it into the knowledge base.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "extension": {
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showEdit": false
+  },
+  "dataSources": {
+    "faqStats": {
+      "type": "namedQuery",
+      "queryCode": "faq_candidate_review_stats",
+      "params": {},
+      "adaptor": "table",
+      "format": "records"
+    },
+    "faqList": {
+      "type": "api",
+      "method": "get",
+      "endpoint": "/api/dynamic/faq_candidate_list/list",
+      "adaptor": "table",
+      "params": {
+        "pageNum": 1,
+        "pageSize": 50,
+        "filters": [
+          {
+            "fieldName": "faq_status",
+            "operator": "IN",
+            "value": "${state.statusFilter}"
+          }
+        ],
+        "keyword": "${state.searchKeyword}",
+        "sortField": "faq_confidence",
+        "sortOrder": "desc"
+      },
+      "dependOn": [
+        "state.statusFilter",
+        "state.searchKeyword"
+      ]
+    },
+    "selectedFaqDetail": {
+      "type": "api",
+      "method": "get",
+      "endpoint": "/api/dynamic/faq_candidate_list/list",
+      "adaptor": "table",
+      "params": {
+        "pageNum": 1,
+        "pageSize": 1,
+        "filters": [
+          {
+            "fieldName": "pid",
+            "operator": "EQ",
+            "value": "${state.selectedFaq.pid}"
+          }
+        ]
+      },
+      "dependOn": [
+        "state.selectedFaq.pid"
+      ]
+    }
+  },
+  "blocks": [
+    {
+      "id": "faq_kpi_strip",
+      "blockType": "metric-strip",
+      "dataSource": "faqStats",
+      "variant": "cards",
+      "metrics": [
+        {
+          "key": "draft",
+          "label": {
+            "zh-CN": "待审核",
+            "en": "Pending Review"
+          },
+          "valueField": "draft_count",
+          "tone": "amber",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "draft"
+              ]
+            }
+          }
+        },
+        {
+          "key": "approved",
+          "label": {
+            "zh-CN": "已批准",
+            "en": "Approved"
+          },
+          "valueField": "approved_count",
+          "tone": "blue",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "approved"
+              ]
+            }
+          }
+        },
+        {
+          "key": "published",
+          "label": {
+            "zh-CN": "已发布",
+            "en": "Published"
+          },
+          "valueField": "published_count",
+          "tone": "green",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "published"
+              ]
+            }
+          }
+        },
+        {
+          "key": "rejected",
+          "label": {
+            "zh-CN": "已驳回",
+            "en": "Rejected"
+          },
+          "valueField": "rejected_count",
+          "tone": "default",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "rejected"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "faq_filters",
+      "blockType": "filters",
+      "fields": [
+        {
+          "field": "faq_question",
+          "component": "SmartInput",
+          "bindState": "searchKeyword"
+        },
+        {
+          "field": "faq_status",
+          "component": "SmartSelect",
+          "dictCode": "faq_candidate_status",
+          "bindState": "statusFilter"
+        }
+      ]
+    },
+    {
+      "id": "faq_action_bar",
+      "blockType": "workbench-action-bar",
+      "surface": "bare",
+      "density": "compact",
+      "actions": [
+        {
+          "code": "filter_all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          },
+          "variant": "ghost",
+          "activeWhen": "state.statusFilter == null || state.statusFilter.length == 0",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": []
+            }
+          }
+        },
+        {
+          "code": "filter_draft",
+          "label": {
+            "zh-CN": "仅待审核",
+            "en": "Pending Only"
+          },
+          "variant": "ghost",
+          "activeWhen": "state.statusFilter != null && state.statusFilter.length == 1 && state.statusFilter.includes('draft')",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "draft"
+              ]
+            }
+          }
+        },
+        {
+          "code": "filter_approved",
+          "label": {
+            "zh-CN": "待发布",
+            "en": "Ready to Publish"
+          },
+          "variant": "ghost",
+          "activeWhen": "state.statusFilter != null && state.statusFilter.length == 1 && state.statusFilter.includes('approved')",
+          "onClick": {
+            "action": "state.set",
+            "args": {
+              "statusFilter": [
+                "approved"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "faq_table",
+      "blockType": "table",
+      "dataSource": "faqList",
+      "selection": {
+        "mode": "single",
+        "bind": "selectedFaq"
+      },
+      "columns": [
+        {
+          "field": "faq_question",
+          "width": 300,
+          "label": {
+            "zh-CN": "问题",
+            "en": "Question"
+          }
+        },
+        {
+          "field": "faq_answer",
+          "width": 320,
+          "label": {
+            "zh-CN": "答案",
+            "en": "Answer"
+          }
+        },
+        {
+          "field": "faq_status",
+          "width": 110,
+          "renderType": "tag",
+          "dictCode": "faq_candidate_status",
+          "label": {
+            "zh-CN": "状态",
+            "en": "Status"
+          }
+        },
+        {
+          "field": "faq_confidence",
+          "width": 100,
+          "label": {
+            "zh-CN": "置信度",
+            "en": "Confidence"
+          }
+        },
+        {
+          "field": "faq_reviewed_by",
+          "width": 120,
+          "label": {
+            "zh-CN": "审核人",
+            "en": "Reviewed By"
+          }
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "update_qa",
+          "icon": "Pencil",
+          "permissionCode": "faq.candidate.review",
+          "visibleWhen": "row.faq_status == 'draft'",
+          "label": {
+            "zh-CN": "编辑问答",
+            "en": "Edit Q&A"
+          },
+          "action": {
+            "type": "command",
+            "command": "faq:update_qa",
+            "refresh": [
+              "faqStats",
+              "faqList",
+              "selectedFaqDetail"
+            ]
+          }
+        },
+        {
+          "code": "approve",
+          "icon": "CheckCircle",
+          "primary": true,
+          "permissionCode": "faq.candidate.review",
+          "visibleWhen": "row.faq_status == 'draft'",
+          "label": {
+            "zh-CN": "批准",
+            "en": "Approve"
+          },
+          "action": {
+            "type": "command",
+            "command": "faq:approve",
+            "refresh": [
+              "faqStats",
+              "faqList",
+              "selectedFaqDetail"
+            ]
+          }
+        },
+        {
+          "code": "reject",
+          "icon": "XCircle",
+          "permissionCode": "faq.candidate.review",
+          "visibleWhen": "row.faq_status == 'draft'",
+          "label": {
+            "zh-CN": "驳回",
+            "en": "Reject"
+          },
+          "action": {
+            "type": "command",
+            "command": "faq:reject",
+            "refresh": [
+              "faqStats",
+              "faqList",
+              "selectedFaqDetail"
+            ]
+          }
+        },
+        {
+          "code": "publish",
+          "icon": "BookUp",
+          "permissionCode": "faq.candidate.publish",
+          "visibleWhen": "row.faq_status == 'approved'",
+          "label": {
+            "zh-CN": "发布到知识库",
+            "en": "Publish to KB"
+          },
+          "action": {
+            "type": "command",
+            "command": "faq:publish",
+            "refresh": [
+              "faqStats",
+              "faqList",
+              "selectedFaqDetail"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "faq_review_drawer",
+      "blockType": "review-drawer",
+      "context": "${state.selectedFaq}",
+      "contextDataSource": "selectedFaqDetail",
+      "contextKeyField": "pid",
+      "titleTemplate": "${record.faq_question}",
+      "empty": {
+        "title": {
+          "zh-CN": "请选择一条候选查看问答与溯源",
+          "en": "Select a candidate to review its Q&A and provenance"
+        }
+      },
+      "summaryBadges": [
+        {
+          "key": "status",
+          "label": {
+            "zh-CN": "状态",
+            "en": "Status"
+          },
+          "valueField": "faq_status",
+          "valueMap": {
+            "draft": {
+              "zh-CN": "待审核",
+              "en": "Pending Review"
+            },
+            "approved": {
+              "zh-CN": "已批准",
+              "en": "Approved"
+            },
+            "published": {
+              "zh-CN": "已发布",
+              "en": "Published"
+            },
+            "rejected": {
+              "zh-CN": "已驳回",
+              "en": "Rejected"
+            },
+            "__empty": {
+              "zh-CN": "未知",
+              "en": "Unknown"
+            }
+          },
+          "tone": "blue"
+        },
+        {
+          "key": "confidence",
+          "label": {
+            "zh-CN": "置信度",
+            "en": "Confidence"
+          },
+          "valueField": "faq_confidence",
+          "tone": "purple"
+        }
+      ],
+      "source": {
+        "record": {
+          "dataSource": "selectedFaqDetail",
+          "recordField": "rows[0]",
+          "matchField": "pid"
+        },
+        "summary": {
+          "title": {
+            "zh-CN": "问答与溯源",
+            "en": "Q&A and Provenance"
+          },
+          "description": "",
+          "items": [
+            {
+              "key": "question",
+              "label": {
+                "zh-CN": "问题",
+                "en": "Question"
+              },
+              "field": "faq_question"
+            },
+            {
+              "key": "answer",
+              "label": {
+                "zh-CN": "答案",
+                "en": "Answer"
+              },
+              "field": "faq_answer"
+            },
+            {
+              "key": "confidence",
+              "label": {
+                "zh-CN": "置信度",
+                "en": "Confidence"
+              },
+              "field": "faq_confidence"
+            },
+            {
+              "key": "conversation",
+              "label": {
+                "zh-CN": "来源会话",
+                "en": "Source Conversation"
+              },
+              "field": "faq_source_conversation_pid"
+            },
+            {
+              "key": "seq",
+              "label": {
+                "zh-CN": "来源消息区间",
+                "en": "Source Messages"
+              },
+              "field": "faq_source_seq_range"
+            },
+            {
+              "key": "kb",
+              "label": {
+                "zh-CN": "目标知识库",
+                "en": "Target KB"
+              },
+              "field": "faq_target_kb_id"
+            },
+            {
+              "key": "doc",
+              "label": {
+                "zh-CN": "知识库文档",
+                "en": "KB Document"
+              },
+              "field": "faq_kb_document_pid"
+            },
+            {
+              "key": "reviewer",
+              "label": {
+                "zh-CN": "审核人",
+                "en": "Reviewed By"
+              },
+              "field": "faq_reviewed_by"
+            },
+            {
+              "key": "reject",
+              "label": {
+                "zh-CN": "驳回原因",
+                "en": "Reject Reason"
+              },
+              "field": "faq_reject_reason"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "title": {
+    "zh-CN": "FAQ 审核台",
+    "en": "FAQ Review"
+  }
+}

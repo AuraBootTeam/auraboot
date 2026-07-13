@@ -1,0 +1,44 @@
+{
+  "pluginId": "com.auraboot.core-faq-loop",
+  "namespace": "faq",
+  "version": "1.0.0",
+  "dslVersion": 1,
+  "pluginType": "config",
+  "displayName": "Conversation FAQ Loop",
+  "displayName:zh-CN": "对话转知识闭环",
+  "displayName:en": "Conversation FAQ Loop",
+  "description": "Turns support conversations into knowledge. An LLM distils FAQ pairs out of a conversation into faq_candidate records; a reviewer approves, edits or rejects them in the review workbench; approved candidates are written back into a knowledge base with source_type=conversation so the agent recalls them. Management is plain DSL CRUD plus state-transition commands; the knowledge write-back is owned by the platform FaqCandidateCommandHandler (an in-platform Spring bean, not a PF4J jar — the SiteKeyCommandHandler precedent), so this stays a config-only plugin.",
+  "author": "AuraBoot Team",
+  "homepage": "https://auraboot.io/plugins/core-faq-loop",
+  "minPlatformVersion": "1.0.0",
+  "dependencies": [],
+  "provides": [
+    {"type": "model", "code": "faq_candidate"},
+    {"type": "command", "code": "faq:approve"},
+    {"type": "command", "code": "faq:reject"},
+    {"type": "command", "code": "faq:update_qa"},
+    {"type": "command", "code": "faq:publish"}
+  ],
+  "requires": [],
+  "resourceDirs": {
+    "models": "config/models.json",
+    "fields": "config/fields",
+    "modelFieldBindings": "config/bindings",
+    "commands": "config/commands",
+    "pages": "config/pages",
+    "dicts": "config/dicts.json",
+    "permissions": "config/permissions.json",
+    "menus": "config/menus.json",
+    "i18n": "config/i18n.json",
+    "namedQueries": "config/named-queries.json"
+  },
+  "importOptions": {
+    "conflictStrategy": "overwrite",
+    "validateReferences": true,
+    "autoPublishModels": true,
+    "autoPublishFields": true,
+    "autoPublishCommands": true,
+    "autoPublishPages": true,
+    "createResourcePermissions": true
+  }
+}
