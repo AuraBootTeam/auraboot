@@ -67,17 +67,14 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                     + "dropping for model={}", request.getModel());
         }
 
-        // P1 vision: this provider is the OpenAI-compat fall-through used by
-        // DeepSeek / Qwen / Zhipu / MiniMax / etc. Most of them don't accept
-        // OpenAI's image_url content blocks yet, and the few that do have
-        // diverging schemas (qwen-vl uses a different field shape). Until P1.5
-        // adds a per-provider vision matrix, we refuse image input outright
-        // rather than silently dropping it or fabricating "[image]" text —
-        // either alternative would erase the user's intent.
-        if (containsImageContent(request.getMessages())) {
+        // Vision is a per-model capability, not a per-provider one: the same OpenAI-compatible
+        // endpoint serves both blind and sighted models. Refuse rather than silently drop the image
+        // or fabricate "[image]" text — either would erase the caller's intent and produce a
+        // confident answer about a picture the model never saw.
+        if (containsImageContent(request.getMessages()) && !supportsVision(request.getModel())) {
             throw new IllegalArgumentException(
-                    "openai-compatible provider does not support vision in this build; "
-                            + "use Anthropic (Claude 3.5+) for image input.");
+                    "model '" + request.getModel() + "' does not accept image input. "
+                            + "Use a vision-capable model (e.g. qwen-vl-max, gpt-4o) or Anthropic Claude.");
         }
 
         Map<String, Object> body = buildOpenAiRequestBody(request);
@@ -277,6 +274,80 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
         return false;
     }
 
+    /**
+     * Models on OpenAI-compatible endpoints that accept image input.
+     *
+     * <p>Matched as substrings so a dated or suffixed release (qwen-vl-max-0809, gpt-4o-2024-08-06)
+     * is recognised without an entry per build. Anything not listed is refused — a model that
+     * silently ignores the image and answers anyway is worse than an error.
+     *
+     * <p>{@code qwen-vl} is verified against the live DashScope compatible-mode endpoint: it accepts
+     * standard OpenAI {@code image_url} blocks. (An earlier comment here claimed qwen-vl needed a
+     * different field shape; that is true of DashScope's *native* API, not the compatible one.)
+     */
+    private static final Set<String> VISION_CAPABLE_MODEL_PATTERNS = Set.of(
+            "qwen-vl",      // DashScope — live-verified
+            "qwen2-vl",
+            "qwen2.5-vl",
+            "gpt-4o",
+            "gpt-4.1",
+            "gpt-4-turbo",
+            "glm-4v",
+            "step-1v",
+            "moonshot-v1-vision");
+
+    /** Visible to tests. */
+    boolean supportsVision(String model) {
+        if (model == null || model.isBlank()) return false;
+        String m = model.toLowerCase(Locale.ROOT);
+        for (String pattern : VISION_CAPABLE_MODEL_PATTERNS) {
+            if (m.contains(pattern)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Translate our internal (Anthropic-shaped) image block into the OpenAI wire shape:
+     * {@code {"type":"image_url","image_url":{"url":"data:image/png;base64,..."}}}.
+     *
+     * <p>The two APIs disagree on how to carry an image, and the internal DTO follows Anthropic.
+     * Without this translation the block falls through to {@code String.valueOf(content)} and the
+     * provider posts a stringified Java object — which is why image input used to be refused
+     * outright rather than converted badly.
+     */
+    private Map<String, Object> toOpenAiContentBlock(Map<String, Object> block) {
+        String type = (String) block.get("type");
+        if ("text".equals(type)) {
+            return Map.of("type", "text", "text", String.valueOf(block.get("text")));
+        }
+        if (!"image".equals(type)) {
+            return null;
+        }
+
+        Object rawSource = block.get("source");
+        Map<?, ?> source = rawSource instanceof Map<?, ?> m ? m
+                : objectMapper.convertValue(rawSource, Map.class);
+
+        // ImageSource carries either inline bytes or a remote URL. OpenAI takes both through the
+        // same image_url field — the inline case just wears a data: URI.
+        Object url = source.get("url");
+        if (url != null && !String.valueOf(url).isBlank()) {
+            return Map.of("type", "image_url", "image_url", Map.of("url", String.valueOf(url)));
+        }
+
+        Object mediaType = source.get("mediaType") != null
+                ? source.get("mediaType") : source.get("media_type");
+        Object data = source.get("data");
+        if (mediaType == null || data == null) {
+            throw new IllegalArgumentException(
+                    "image block has neither a url nor base64 data — refusing to send a broken image");
+        }
+
+        return Map.of(
+                "type", "image_url",
+                "image_url", Map.of("url", "data:" + mediaType + ";base64," + data));
+    }
+
     // =========================================================================
     // Format conversion
     // =========================================================================
@@ -339,6 +410,22 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                 if (bMap != null && "tool_result".equals(bMap.get("type"))) {
                     return toToolMessage(bMap);
                 }
+            }
+
+            // Multimodal user message: emit OpenAI's content array. The chat() guard has already
+            // established the model can see, so anything reaching here is safe to convert.
+            List<Map<String, Object>> parts = new ArrayList<>();
+            for (Object block : blocks) {
+                Map<String, Object> bMap = toBlockMap(block);
+                if (bMap == null) continue;
+                Map<String, Object> part = toOpenAiContentBlock(bMap);
+                if (part != null) {
+                    parts.add(part);
+                }
+            }
+            if (parts.stream().anyMatch(p -> "image_url".equals(p.get("type")))) {
+                result.put("content", parts);
+                return result;
             }
         }
 
@@ -418,6 +505,15 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             result.put("tool_use_id", cb.getToolUseId());
             result.put("toolUseId", cb.getToolUseId());
             result.put("result", cb.getResult());
+            return result;
+        }
+        // Multimodal blocks are a different class from tool blocks — text/image, no tool fields.
+        // Missing this branch is why image content used to reach the wire as a Java toString.
+        if (block instanceof LlmChatRequest.MessageContentBlock mcb) {
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("type", mcb.getType());
+            result.put("text", mcb.getText());
+            result.put("source", mcb.getSource());
             return result;
         }
         return null;

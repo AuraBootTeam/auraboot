@@ -322,7 +322,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.docx,.pptx,.xlsx,.md,.txt,.csv,.html"
+            accept=".pdf,.docx,.pptx,.xlsx,.md,.txt,.csv,.html,.png,.jpg,.jpeg,.gif,.webp"
             onChange={handleUpload}
             className="hidden"
             disabled={uploading}
@@ -365,7 +365,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
       ) : docs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400">
           <DocumentTextIcon className="mb-3 h-12 w-12" />
-          <p>No documents yet. Upload PDF, DOCX, PPTX, XLSX, MD, TXT, CSV, or HTML files.</p>
+          <p>No documents yet. Upload PDF, DOCX, PPTX, XLSX, MD, TXT, CSV, HTML — or a chart image.</p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">

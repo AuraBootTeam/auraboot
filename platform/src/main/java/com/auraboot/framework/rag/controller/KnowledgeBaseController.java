@@ -293,6 +293,9 @@ public class KnowledgeBaseController {
             case "txt" -> "txt";
             case "csv" -> "csv";
             case "html", "htm" -> "html";
+            // Every raster format collapses to one doc_type: the file is not parsed, it is shown to
+            // a vision model, and the MIME type it needs is derived from the file name at that point.
+            case "png", "jpg", "jpeg", "gif", "webp" -> "image";
             default -> null;
         };
     }
