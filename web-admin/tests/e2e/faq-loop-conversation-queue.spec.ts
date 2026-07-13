@@ -186,4 +186,29 @@ test.describe('Conversation → FAQ loop — queue, distil, provenance', () => {
     await page.screenshot({ path: `${SHOTS}/M2-5-candidate-provenance.png`, fullPage: true });
     expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
   });
+  test('M2-6 distilling the same conversation twice does not pile up a second copy', async ({ page }) => {
+    const errors = captureConsole(page);
+    await goto(page, QUEUE, 'table-row-');
+
+    const before = await candidateCount(page);
+    expect(before, 'M2-3 already distilled this conversation').toBeGreaterThan(0);
+
+    // Nothing stops a reviewer pressing the button twice — and the M2 auto-trigger, once
+    // conversations have a closed state, would fire on every close. A second run must replace
+    // this service's own drafts, not hand the reviewer two copies of every pair to decide twice.
+    await convRow(page, SUPPORT_PID).getByTestId('row-action-extract').click();
+    const dialog = page.getByTestId('form-dialog');
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await dialog.getByTestId('form-dialog-field-faq_target_kb_id').selectOption(process.env.FAQ_TARGET_KB_PID!);
+    await dialog.getByTestId('form-dialog-submit').click();
+
+    // Wait for the second distillation to actually land, then assert the count held. Polling for
+    // "unchanged" would pass instantly, so wait out the LLM call first.
+    await page.waitForTimeout(45_000);
+    const after = await candidateCount(page);
+    expect(after, 'a second distillation must replace the drafts, not double them').toBe(before);
+
+    await page.screenshot({ path: `${SHOTS}/M2-6-redistilled.png`, fullPage: true });
+    expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
+  });
 });
