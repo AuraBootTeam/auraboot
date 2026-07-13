@@ -14,6 +14,7 @@ import type {
   FilterConfig,
 } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
+import { dimensionLabel } from '~/framework/smart/utils/chartLabels';
 
 interface KanbanCard {
   id: string;
@@ -118,7 +119,10 @@ export const SmartKanban: React.FC<SmartKanbanProps> = ({
       .filter((key) => groups.has(key))
       .map((key, idx) => ({
         key,
-        label: key,
+        // Group, order and colour stay keyed by the raw value (columnOrder /
+        // columnColors are authored against the dict code) — only the header text
+        // is resolved to the dict label.
+        label: dimensionLabel(data.meta, groupField, key),
         color: columnColors?.[key] || DEFAULT_COLUMN_COLORS[idx % DEFAULT_COLUMN_COLORS.length],
         cards: groups.get(key) || [],
       }));

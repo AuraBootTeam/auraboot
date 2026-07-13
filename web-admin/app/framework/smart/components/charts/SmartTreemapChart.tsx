@@ -16,6 +16,7 @@ import type {
   LinkageConfig,
 } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
+import { dimensionLabel } from '~/framework/smart/utils/chartLabels';
 
 /**
  * Props for SmartTreemapChart component
@@ -137,7 +138,7 @@ export const SmartTreemapChart: React.FC<SmartTreemapChartProps> = ({
 
     // Build treemap data
     const treemapData = data.rows.map((row) => ({
-      name: String(row[nKey] ?? ''),
+      name: dimensionLabel(data.meta, nKey, row[nKey]),
       value: Number(row[vKey]) || 0,
     }));
 

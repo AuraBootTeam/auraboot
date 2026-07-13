@@ -16,6 +16,7 @@ import type {
   FilterConfig,
 } from '~/framework/smart/types/chart';
 import type { ChartSpec } from '~/framework/smart/charts/chart-spec';
+import type { MetricLabels } from '~/framework/smart/utils/chartLabels';
 import { chartSpecToEChartsOption } from '~/framework/smart/charts/chart-spec-echarts';
 import { cn } from '~/utils/cn';
 import { ChartEmptyState } from './ChartEmptyState';
@@ -24,6 +25,13 @@ import { ChartEmptyState } from './ChartEmptyState';
  * Props for SmartLineChart component
  */
 export interface SmartLineChartProps {
+  /**
+   * Metric alias -> series display name: `{ won_amount: '赢单金额' }`.
+   *
+   * Aliases are constrained to ASCII identifiers by the backend, so without this
+   * the legend shows the raw column name.
+   */
+  metricLabels?: MetricLabels;
   /** Chart title */
   title?: string;
   /** Data source configuration */
@@ -97,11 +105,20 @@ export interface LineChartData {
   meta?: {
     dimensions?: string[];
     metrics?: string[];
+    /** Dict labels for dimension values, resolved by useChartData. */
+    dimensionLabels?: Record<string, Record<string, string>>;
   };
 }
 
 /** Visual props that influence option building (subset of SmartLineChartProps). */
 export interface LineOptionProps {
+  /**
+   * Metric alias -> series display name: `{ won_amount: '赢单金额' }`.
+   *
+   * Aliases are constrained to ASCII identifiers by the backend, so without
+   * this the legend shows the raw column name.
+   */
+  metricLabels?: MetricLabels;
   title?: string;
   smooth?: boolean;
   areaStyle?: boolean;
@@ -142,8 +159,9 @@ function specFromLineChartData(
     dimensions: dimensions.map((field, i) => ({
       field,
       role: i === 0 ? 'category' : 'series',
+      valueLabels: data?.meta?.dimensionLabels?.[field],
     })),
-    measures: metrics.map((field) => ({ field })),
+    measures: metrics.map((field) => ({ field, label: props.metricLabels?.[field] })),
     visual: { smooth, areaFill: areaStyle, showSymbol, dataLabels: showLabel },
   };
 }
@@ -275,6 +293,7 @@ function isDataSourceConfigured(dataSource: ChartDataSource): boolean {
 export const SmartLineChart: React.FC<SmartLineChartProps> = ({
   title,
   dataSource,
+  metricLabels,
   smooth = false,
   areaStyle = false,
   showSymbol = true,
@@ -340,10 +359,17 @@ export const SmartLineChart: React.FC<SmartLineChartProps> = ({
    * baked into the renderer-agnostic adapter.
    */
   const options: EChartsOption = useMemo(() => {
-    const spec = specFromLineChartData(data, { title, smooth, areaStyle, showSymbol, showLabel });
+    const spec = specFromLineChartData(data, {
+      title,
+      smooth,
+      areaStyle,
+      showSymbol,
+      showLabel,
+      metricLabels,
+    });
     const adapterOption = chartSpecToEChartsOption(spec, data?.rows ?? []) as EChartsOption;
     return chartOptions ? { ...adapterOption, ...chartOptions } : adapterOption;
-  }, [data, title, smooth, areaStyle, showSymbol, showLabel, chartOptions]);
+  }, [data, title, smooth, areaStyle, showSymbol, showLabel, metricLabels, chartOptions]);
 
   /**
    * ECharts event handlers

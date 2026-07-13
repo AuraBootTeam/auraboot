@@ -16,6 +16,7 @@ import type {
   FilterConfig,
 } from '~/framework/smart/types/chart';
 import type { ChartSpec } from '~/framework/smart/charts/chart-spec';
+import type { MetricLabels } from '~/framework/smart/utils/chartLabels';
 import { chartSpecToEChartsOption } from '~/framework/smart/charts/chart-spec-echarts';
 import { cn } from '~/utils/cn';
 
@@ -23,6 +24,13 @@ import { cn } from '~/utils/cn';
  * Props for SmartAreaChart component
  */
 export interface SmartAreaChartProps {
+  /**
+   * Metric alias -> series display name: `{ won_amount: '赢单金额' }`.
+   *
+   * Aliases are constrained to ASCII identifiers by the backend, so without this
+   * the legend shows the raw column name.
+   */
+  metricLabels?: MetricLabels;
   /** Chart title */
   title?: string;
   /** Data source configuration */
@@ -64,11 +72,20 @@ export interface AreaChartData {
   meta?: {
     dimensions?: string[];
     metrics?: string[];
+    /** Dict labels for dimension values, resolved by useChartData. */
+    dimensionLabels?: Record<string, Record<string, string>>;
   };
 }
 
 /** Visual props that influence option building (subset of SmartAreaChartProps). */
 export interface AreaOptionProps {
+  /**
+   * Metric alias -> series display name: `{ won_amount: '赢单金额' }`.
+   *
+   * Aliases are constrained to ASCII identifiers by the backend, so without
+   * this the legend shows the raw column name.
+   */
+  metricLabels?: MetricLabels;
   title?: string;
   smooth?: boolean;
   fillOpacity?: number;
@@ -111,8 +128,9 @@ function specFromAreaChartData(
     dimensions: dimensions.map((field, i) => ({
       field,
       role: i === 0 ? 'category' : 'series',
+      valueLabels: data?.meta?.dimensionLabels?.[field],
     })),
-    measures: metrics.map((field) => ({ field })),
+    measures: metrics.map((field) => ({ field, label: props.metricLabels?.[field] })),
     visual: { smooth, areaFill: true, fillOpacity, showSymbol, dataLabels: showLabel },
   };
 }
@@ -239,6 +257,7 @@ function isDataSourceConfigured(dataSource: ChartDataSource): boolean {
 export const SmartAreaChart: React.FC<SmartAreaChartProps> = ({
   title,
   dataSource,
+  metricLabels,
   smooth = true,
   fillOpacity = 0.6,
   showSymbol = true,
@@ -304,6 +323,7 @@ export const SmartAreaChart: React.FC<SmartAreaChartProps> = ({
    */
   const options: EChartsOption = useMemo(() => {
     const spec = specFromAreaChartData(data, {
+      metricLabels,
       title,
       smooth,
       fillOpacity,
@@ -312,7 +332,7 @@ export const SmartAreaChart: React.FC<SmartAreaChartProps> = ({
     });
     const adapterOption = chartSpecToEChartsOption(spec, data?.rows ?? []) as EChartsOption;
     return chartOptions ? { ...adapterOption, ...chartOptions } : adapterOption;
-  }, [data, title, smooth, fillOpacity, showSymbol, showLabel, chartOptions]);
+  }, [data, title, smooth, fillOpacity, showSymbol, showLabel, metricLabels, chartOptions]);
 
   /**
    * ECharts event handlers

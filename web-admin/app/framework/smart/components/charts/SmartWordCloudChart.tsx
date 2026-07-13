@@ -17,6 +17,7 @@ import type {
   FilterConfig,
 } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
+import { dimensionLabel } from '~/framework/smart/utils/chartLabels';
 
 export interface SmartWordCloudChartProps {
   title?: string;
@@ -108,7 +109,7 @@ export const SmartWordCloudChart: React.FC<SmartWordCloudChartProps> = ({
     const metricKey = metrics[0];
 
     const wordData = data.rows.map((row) => ({
-      name: String(row[dimensionKey] ?? ''),
+      name: dimensionLabel(data.meta, dimensionKey, row[dimensionKey]),
       value: Number(row[metricKey]) || 0,
       textStyle: {
         color: colors[Math.floor(Math.random() * colors.length)],

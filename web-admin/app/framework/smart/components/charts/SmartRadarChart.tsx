@@ -16,8 +16,16 @@ import type {
   FilterConfig,
 } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
+import { dimensionLabel, metricLabel, type MetricLabels } from '~/framework/smart/utils/chartLabels';
 
 export interface SmartRadarChartProps {
+  /**
+   * Metric alias -> series display name: `{ won_amount: '赢单金额' }`.
+   *
+   * Aliases are constrained to ASCII identifiers by the backend, so without this
+   * the legend shows the raw column name.
+   */
+  metricLabels?: MetricLabels;
   title?: string;
   dataSource: ChartDataSource;
   /** Shape of the radar: polygon or circle */
@@ -48,6 +56,7 @@ export const SmartRadarChart: React.FC<SmartRadarChartProps> = ({
   title,
   dataSource,
   shape = 'polygon',
+  metricLabels,
   showArea = true,
   areaOpacity = 0.3,
   drillDown,
@@ -105,9 +114,12 @@ export const SmartRadarChart: React.FC<SmartRadarChartProps> = ({
     if (metrics.length > 1) {
       // Multiple metrics: each metric is a radar axis
       const maxValues = metrics.map((m) => Math.max(...data.rows.map((r) => Number(r[m]) || 0), 1));
-      indicators = metrics.map((m, i) => ({ name: m, max: Math.ceil(maxValues[i] * 1.2) }));
+      indicators = metrics.map((m, i) => ({
+        name: metricLabel(metricLabels, m),
+        max: Math.ceil(maxValues[i] * 1.2),
+      }));
       seriesData = data.rows.map((row) => ({
-        name: dimensionKey ? String(row[dimensionKey] ?? '') : 'Data',
+        name: dimensionKey ? dimensionLabel(data.meta, dimensionKey, row[dimensionKey]) : 'Data',
         value: metrics.map((m) => Number(row[m]) || 0),
       }));
     } else {
@@ -115,7 +127,7 @@ export const SmartRadarChart: React.FC<SmartRadarChartProps> = ({
       const metricKey = metrics[0];
       const maxVal = Math.max(...data.rows.map((r) => Number(r[metricKey]) || 0), 1);
       indicators = data.rows.map((row) => ({
-        name: String(row[dimensionKey] ?? ''),
+        name: dimensionLabel(data.meta, dimensionKey, row[dimensionKey]),
         max: Math.ceil(maxVal * 1.2),
       }));
       seriesData = [
@@ -142,7 +154,7 @@ export const SmartRadarChart: React.FC<SmartRadarChartProps> = ({
     };
 
     return chartOptions ? { ...baseOptions, ...chartOptions } : baseOptions;
-  }, [data, title, shape, showArea, areaOpacity, chartOptions]);
+  }, [data, title, shape, showArea, areaOpacity, metricLabels, chartOptions]);
 
   const onEvents = useMemo(() => ({ click: handleChartClick }), [handleChartClick]);
 

@@ -16,6 +16,7 @@ import type {
   FilterConfig,
 } from '~/framework/smart/types/chart';
 import type { ChartSpec } from '~/framework/smart/charts/chart-spec';
+import type { MetricLabels } from '~/framework/smart/utils/chartLabels';
 import { chartSpecToEChartsOption } from '~/framework/smart/charts/chart-spec-echarts';
 import { cn } from '~/utils/cn';
 import { ChartEmptyState } from './ChartEmptyState';
@@ -24,6 +25,13 @@ import { ChartEmptyState } from './ChartEmptyState';
  * Props for SmartBarChart component
  */
 export interface SmartBarChartProps {
+  /**
+   * Metric alias -> series display name: `{ won_amount: '赢单金额' }`.
+   *
+   * Aliases are constrained to ASCII identifiers by the backend, so without this
+   * the legend shows the raw column name.
+   */
+  metricLabels?: MetricLabels;
   /** Chart title */
   title?: string;
   /** Data source configuration */
@@ -95,11 +103,20 @@ export interface BarChartData {
   meta?: {
     dimensions?: string[];
     metrics?: string[];
+    /** Dict labels for dimension values, resolved by useChartData. */
+    dimensionLabels?: Record<string, Record<string, string>>;
   };
 }
 
 /** Visual props that influence option building (subset of SmartBarChartProps). */
 export interface BarOptionProps {
+  /**
+   * Metric alias -> series display name: `{ won_amount: '赢单金额' }`.
+   *
+   * Aliases are constrained to ASCII identifiers by the backend, so without
+   * this the legend shows the raw column name.
+   */
+  metricLabels?: MetricLabels;
   title?: string;
   orientation?: 'vertical' | 'horizontal';
   stacked?: boolean;
@@ -129,8 +146,9 @@ function specFromBarChartData(
     dimensions: dimensions.map((field, i) => ({
       field,
       role: i === 0 ? 'category' : 'series',
+      valueLabels: data?.meta?.dimensionLabels?.[field],
     })),
-    measures: metrics.map((field) => ({ field })),
+    measures: metrics.map((field) => ({ field, label: props.metricLabels?.[field] })),
     visual: { orientation, stacked, dataLabels: showLabel },
   };
 }
@@ -258,6 +276,7 @@ function isDataSourceConfigured(dataSource: ChartDataSource): boolean {
 export const SmartBarChart: React.FC<SmartBarChartProps> = ({
   title,
   dataSource,
+  metricLabels,
   orientation = 'vertical',
   stacked = false,
   showLabel = false,
@@ -322,10 +341,16 @@ export const SmartBarChart: React.FC<SmartBarChartProps> = ({
    * baked into the renderer-agnostic adapter.
    */
   const options: EChartsOption = useMemo(() => {
-    const spec = specFromBarChartData(data, { title, orientation, stacked, showLabel });
+    const spec = specFromBarChartData(data, {
+      title,
+      orientation,
+      stacked,
+      showLabel,
+      metricLabels,
+    });
     const adapterOption = chartSpecToEChartsOption(spec, data?.rows ?? []) as EChartsOption;
     return chartOptions ? { ...adapterOption, ...chartOptions } : adapterOption;
-  }, [data, title, orientation, stacked, showLabel, chartOptions]);
+  }, [data, title, orientation, stacked, showLabel, metricLabels, chartOptions]);
 
   /**
    * ECharts event handlers

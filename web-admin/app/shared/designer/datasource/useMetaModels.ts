@@ -71,37 +71,65 @@ export function useMetaModels() {
   return { models, isLoading };
 }
 
+/** Shape of a row from `/api/dynamic/{modelCode}/field-meta`. */
+interface FieldMetaRow {
+  code: string;
+  dataType: string;
+  displayName?: string;
+}
+
 /**
- * Fetch fields for a specific model
+ * Fetch fields for a specific model.
+ *
+ * Backed by `/api/dynamic/{modelCode}/field-meta`. The previous endpoint
+ * (`/api/meta/models/code/{modelCode}/fields`) does not exist — it 404s, and the
+ * error was swallowed into an empty list, so the designer's data-source panel
+ * showed "No fields available" for every model and no dimension or metric could be
+ * picked at all. An empty result and a broken request must not look the same, hence
+ * `error`.
  */
 export function useModelFields(modelCode: string | undefined) {
   const [fields, setFields] = useState<FieldOption[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
     if (!modelCode) {
       setFields([]);
+      setError(null);
       return;
     }
 
     let mounted = true;
     setIsLoading(true);
+    setError(null);
 
-    fetch(`/api/meta/models/code/${modelCode}/fields`)
-      .then((res) => res.json())
+    fetch(`/api/dynamic/${modelCode}/field-meta`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`field-meta ${res.status} for model ${modelCode}`);
+        return res.json();
+      })
       .then((result) => {
         if (!mounted) return;
-        if (ResultHelper.isSuccess(result) && result.data) {
-          setFields(
-            result.data.map((f: { code: string; name: string; fieldType: string }) => ({
-              code: f.code,
-              name: f.name,
-              fieldType: f.fieldType,
-            })),
-          );
+        if (!ResultHelper.isSuccess(result) || !Array.isArray(result.data)) {
+          throw new Error(result?.message || `Malformed field-meta response for ${modelCode}`);
         }
+        setFields(
+          (result.data as FieldMetaRow[]).map((f) => ({
+            code: f.code,
+            // The picker labels fields for a human; fall back to the code so a field
+            // without a display name is still selectable rather than blank.
+            name: f.displayName || f.code,
+            fieldType: f.dataType,
+          })),
+        );
       })
-      .catch((error) => console.error('Failed to fetch fields:', error))
+      .catch((err: Error) => {
+        if (!mounted) return;
+        console.error('Failed to fetch fields:', err);
+        setFields([]);
+        setError(err);
+      })
       .finally(() => {
         if (mounted) setIsLoading(false);
       });
@@ -111,7 +139,7 @@ export function useModelFields(modelCode: string | undefined) {
     };
   }, [modelCode]);
 
-  return { fields, isLoading };
+  return { fields, isLoading, error };
 }
 
 /**

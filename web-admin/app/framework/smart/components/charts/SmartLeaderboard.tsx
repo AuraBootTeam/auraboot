@@ -9,6 +9,7 @@ import React, { useMemo } from 'react';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
 import type { ChartDataSource, FilterConfig, LinkageConfig } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
+import { dimensionLabel } from '~/framework/smart/utils/chartLabels';
 
 /**
  * Props for SmartLeaderboard component
@@ -104,7 +105,7 @@ export const SmartLeaderboard: React.FC<SmartLeaderboardProps> = ({
 
     const sorted = [...data.rows]
       .map((row) => ({
-        name: String(row[nameKey] ?? ''),
+        name: dimensionLabel(data.meta, nameKey, row[nameKey]),
         value: Number(row[valKey]) || 0,
       }))
       .sort((a, b) => b.value - a.value)

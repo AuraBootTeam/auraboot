@@ -4,38 +4,56 @@
     "displayName:zh-CN": "客户编号",
     "displayName:en": "Account Code",
     "dataType": "string",
-    "constraints": { "required": true, "maxLength": 50 },
-    "feature": { "searchable": true, "sortable": true }
+    "constraints": {
+      "required": true,
+      "maxLength": 50
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
   },
   {
     "code": "crm_acc_name",
     "displayName:zh-CN": "客户名称",
     "displayName:en": "Account Name",
     "dataType": "string",
-    "constraints": { "required": true, "maxLength": 200 },
-    "feature": { "searchable": true, "sortable": true }
+    "constraints": {
+      "required": true,
+      "maxLength": 200
+    },
+    "feature": {
+      "searchable": true,
+      "sortable": true
+    }
   },
   {
     "code": "crm_acc_industry",
     "displayName:zh-CN": "行业",
     "displayName:en": "Industry",
-    "dataType": "string",
-    "constraints": { "maxLength": 100 },
-    "feature": { "searchable": true }
+    "dataType": "enum",
+    "feature": {
+      "searchable": true
+    },
+    "dictCode": "crm_industry"
   },
   {
     "code": "crm_acc_website",
     "displayName:zh-CN": "网站",
     "displayName:en": "Website",
     "dataType": "string",
-    "constraints": { "maxLength": 200 }
+    "constraints": {
+      "maxLength": 200
+    }
   },
   {
     "code": "crm_acc_phone",
     "displayName:zh-CN": "电话",
     "displayName:en": "Phone",
     "dataType": "string",
-    "constraints": { "maxLength": 50 }
+    "constraints": {
+      "maxLength": 50
+    }
   },
   {
     "code": "crm_acc_address",
@@ -49,14 +67,18 @@
     "displayName:en": "Rating",
     "dataType": "enum",
     "dictCode": "crm_account_rating",
-    "feature": { "searchable": true }
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "crm_acc_owner",
     "displayName:zh-CN": "负责人",
     "displayName:en": "Owner",
     "dataType": "string",
-    "constraints": { "maxLength": 100 }
+    "constraints": {
+      "maxLength": 100
+    }
   },
   {
     "code": "crm_acc_status",
@@ -65,7 +87,9 @@
     "dataType": "enum",
     "dictCode": "crm_account_status",
     "defaultValue": "active",
-    "feature": { "searchable": true }
+    "feature": {
+      "searchable": true
+    }
   },
   {
     "code": "crm_acc_remark",
