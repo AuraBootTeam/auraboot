@@ -96,14 +96,21 @@ describe('estimateActionColumnWidth', () => {
     expect(estimateActionColumnWidth([''], { hasOverflow: true })).toBe(ACTION_COLUMN_MIN_WIDTH);
   });
 
-  // Every label below is the real first row-action of a shipped DSL page that overflowed
-  // the old hard-coded 112px column. A repo scan (plugins/**/config/**/*.json) found
-  // exactly these three; they are pinned here so the regression cannot come back through
-  // any of them, and so a future long label is caught by a unit test rather than by a user.
+  // `统一设计器` (page-manager / page_schema_list) is the label that actually broke: it is
+  // the first row-action of the only shipped `kind: list` page whose action column overflowed
+  // the old hard-coded 112px. Pinned so the regression cannot return through it.
+  //
+  // The other two are labels of comparable length taken from real pages, kept as guards for
+  // future long labels. They are NOT past victims: crm_lead_workbench and
+  // faq_candidate_workbench are `kind: detail` (workbench) pages, whose tables render through
+  // TableBlockRenderer, not ListPageContent — a different action-column implementation that
+  // never had the fixed width. An earlier scan of this repo missed that distinction and
+  // over-counted the blast radius as three pages; verified in a browser that both workbench
+  // pages lay their row actions out inline and have never wrapped.
   it.each([
-    ['统一设计器', 'page-manager / page_schema'],
-    ['标记已联系', 'crm-starter / crm_lead_workbench'],
-    ['编辑问答', 'core-faq-loop / faq_candidate_workbench'],
+    ['统一设计器', 'page-manager / page_schema_list — the actual regression'],
+    ['标记已联系', 'length guard (crm_lead_workbench renders via TableBlockRenderer)'],
+    ['编辑问答', 'length guard (faq_candidate_workbench renders via TableBlockRenderer)'],
   ])('gives "%s" (%s) a column wide enough to render it unclipped', (label) => {
     const width = estimateActionColumnWidth([label], { hasOverflow: true });
     // Wider than the old fixed 112px — that is precisely what made the label wrap.
