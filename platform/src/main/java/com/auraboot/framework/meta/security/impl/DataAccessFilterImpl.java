@@ -43,8 +43,29 @@ public class DataAccessFilterImpl implements DataAccessFilter {
         MASKING_PATTERNS.put("bank_card_masking", Pattern.compile("\\d{12}(\\d{4})"));
     }
 
+    /**
+     * Not cached, deliberately.
+     *
+     * <p>This used to carry {@code @Cacheable("dataFilterResult")} keyed on
+     * {@code userId + tenantId + modelCode}. Two things were wrong with that, and only one
+     * of them was fixable by adding an eviction:
+     *
+     * <ol>
+     *   <li>Nothing ever evicted it, so a permission change (revoking a field read, binding
+     *       a stricter masking policy) left the pre-change projection served for up to the
+     *       cache TTL — over-exposure in one direction, wrongful denial in the other.</li>
+     *   <li>The key did not include {@code request.getData()} — the very dataset being
+     *       filtered. Two calls for the same (user, tenant, model) with <em>different rows</em>
+     *       would return the first call's filtered/masked rows. That is a correctness bug no
+     *       eviction can repair; the key was simply not a key for this function.</li>
+     * </ol>
+     *
+     * <p>The method has no production callers today (it is reached only from its own unit
+     * test), so the cache bought nothing while carrying both defects. Filtering is recomputed
+     * per call. If this is ever wired onto a hot path and needs caching, the key must include
+     * the data (or a digest of it) and a permission version, and writes to either must evict.
+     */
     @Override
-    @Cacheable(value = "dataFilterResult", key = "#request.userId + '_' + #request.tenantId + '_' + #request.modelCode", condition = "#request != null")
     public DataFilterResult filterQueryResult(DataFilterRequest request) {
         try {
             if (request == null || request.getData() == null || request.getUserId() == null || request.getModelCode() == null) {

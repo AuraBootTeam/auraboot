@@ -82,7 +82,6 @@ public class CacheConfig {
 
             // Permission projection caches
             "schemaPermissionProjection",
-            "dataFilterResult",
             "fieldPermissionProjection",
             "fieldMaskConfig",                                // FieldMaskServiceImpl @CacheEvict; absent here = saveConfig/deleteConfig threw "Cannot find cache" in prod (caught 2026-06-19 by the cache-name audit + FieldMaskServiceImpl coverage IT)
 
