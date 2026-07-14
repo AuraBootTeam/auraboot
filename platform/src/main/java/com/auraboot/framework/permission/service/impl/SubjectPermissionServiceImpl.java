@@ -99,7 +99,6 @@ public class SubjectPermissionServiceImpl implements SubjectPermissionService {
         log.info("Subject permission added: id={}", declaration.getId());
         
         // 5. 失效缓存
-        evictSubjectEvaluationCache(request.getSubjectType(), request.getSubjectId());
         
         return subjectPermissionConverter.toDTO(declaration);
     }
@@ -169,7 +168,6 @@ public class SubjectPermissionServiceImpl implements SubjectPermissionService {
         log.info("Batch added {} subject permissions", declarations.size());
         
         // 4. 失效缓存
-        evictSubjectEvaluationCache(subjectType, subjectId);
         
         return subjectPermissionConverter.toDTOList(declarations);
     }
@@ -194,7 +192,6 @@ public class SubjectPermissionServiceImpl implements SubjectPermissionService {
         log.info("Subject permission removed: id={}", id);
         
         // 3. 失效缓存
-        evictSubjectEvaluationCache(declaration.getSubjectType(), declaration.getSubjectId());
     }
     
     /**
@@ -210,7 +207,6 @@ public class SubjectPermissionServiceImpl implements SubjectPermissionService {
         log.info("Removed {} permissions for subject: {}:{}", count, subjectType, subjectId);
         
         // 失效缓存
-        evictSubjectEvaluationCache(subjectType, subjectId);
     }
     
     /**
@@ -267,21 +263,6 @@ public class SubjectPermissionServiceImpl implements SubjectPermissionService {
         
         // 委托给Evaluator进行批量评估
         return evaluator.batchEvaluate(subjectType, subjectIds, userId);
-    }
-    
-    /**
-     * 失效Subject的所有评估缓存
-     */
-    @Override
-    public void evictSubjectEvaluations(String subjectType, Long subjectId) {
-        Cache cache = cacheManager.getCache("subject-evaluation");
-        if (cache != null) {
-            // 简化实现: 清空整个缓存
-            // 生产环境可以使用Redis SCAN遍历特定前缀的key
-            cache.clear();
-            
-            log.info("Evicted subject evaluation cache: {}:{}", subjectType, subjectId);
-        }
     }
     
     /**
@@ -351,17 +332,6 @@ public class SubjectPermissionServiceImpl implements SubjectPermissionService {
         }
 
         request.setGroupLogicType(normalizedGroupLogicType);
-    }
-    
-    /**
-     * 失效Subject评估缓存
-     */
-    private void evictSubjectEvaluationCache(String subjectType, Long subjectId) {
-        Cache cache = cacheManager.getCache("subject-evaluation");
-        if (cache != null) {
-            cache.clear();
-            log.debug("Evicted subject evaluation cache: {}:{}", subjectType, subjectId);
-        }
     }
     
     /**
