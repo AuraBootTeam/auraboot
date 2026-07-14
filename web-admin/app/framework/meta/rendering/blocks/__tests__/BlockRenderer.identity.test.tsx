@@ -27,26 +27,9 @@ vi.mock('@auraboot/runtime-kernel', async () => {
   return actual;
 });
 
-// Stub the block resolver so BlockRenderer can dispatch to a simple renderer
-// without needing the full admin BlockRegistry bootstrap.
-vi.mock(
-  '../../../../../../packages/runtime-kernel/rendering/blockResolver',
-  () => ({
-    getBlockResolver: () => ({
-      get: (_blockType: string) => ({
-        component: ({ block }: { block: any }) => (
-          <span data-testid="stub-inner">{block.id}</span>
-        ),
-      }),
-    }),
-    getCustomBlockComponent: () => null,
-    setBlockResolver: vi.fn(),
-    setCustomBlockComponent: vi.fn(),
-  }),
-);
 
 // ── SUT import (after mocks) ──────────────────────────────────────────────────
-import { BlockRenderer } from '@auraboot/runtime-kernel';
+import { BlockRenderer, setBlockResolver } from '@auraboot/runtime-kernel';
 
 // ── Runtime stub ──────────────────────────────────────────────────────────────
 
@@ -84,6 +67,27 @@ function makeRuntime(overrides: Record<string, any> = {}) {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe('BlockRenderer — telemetry identity attributes', () => {
+  // Wire a stub renderer through the kernel's own public API.
+  //
+  // This used to be a vi.mock() on the *relative path* of blockResolver. It stopped working
+  // silently: the SUT is imported from '@auraboot/runtime-kernel', which pnpm resolves through
+  // the node_modules workspace symlink, while the mock targeted the packages/ path — two module
+  // ids, so the mock never applied. BlockRenderer then fell through to its "Unknown block type"
+  // branch, which (correctly) does not stamp the telemetry attributes, and all four assertions
+  // failed on main with a null querySelector that pointed nowhere near the real cause.
+  //
+  // setBlockResolver is exported from the package entry, so this goes through the same module
+  // instance the SUT does, and cannot drift with file layout.
+  beforeEach(() => {
+    setBlockResolver({
+      get: () => ({
+        component: ({ block }: { block: any }) => (
+          <span data-testid="stub-inner">{block.id}</span>
+        ),
+      }),
+    } as any);
+  });
+
   it('stamps data-aura-element-id equal to block.id on the block wrapper', () => {
     const runtime = makeRuntime();
     const block = { id: 'blk_kpi_001', blockType: 'chart' };
