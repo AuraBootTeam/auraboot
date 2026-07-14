@@ -41,6 +41,15 @@ class RagRetrievalServiceBranchTest {
         service = new RagRetrievalService(embeddingService, kbService, queryRewriteService, jdbcTemplate,
                 new RagRetrievalMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()),
                 props);
+        // Every retrieve(…, List.of("kb1"), …) below now runs an ownership check first:
+        // resolveTargetKbs queries `... WHERE tenant_id = ? AND pid IN (?)` before searching, and
+        // refuses if the requested pid is not owned. In these unit tests kb1 IS the tenant's, so the
+        // ownership query returns it. (Two varargs — tenant + pid — so this does not collide with the
+        // single-vararg empty-list query `... AND status = 'active'` a couple of tests stub for
+        // themselves.) These branch tests are about degradation and ranking, not the boundary; the
+        // boundary itself is asserted in RagRetrievalTenantScopingIT against a real database.
+        lenient().when(jdbcTemplate.queryForList(anyString(), eq(String.class), eq(1L), eq("kb1")))
+                .thenReturn(List.of("kb1"));
     }
 
     @Test
