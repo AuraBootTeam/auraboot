@@ -140,13 +140,19 @@ try {
     `${answerText.length} chars: ${JSON.stringify(answerText.slice(0, 90))}`,
   );
 
-  // The answer must come from THIS site's knowledge base. "37 months" is a fact that exists only
-  // in the knowledge base bound to this site — a generic model would never invent that number, so
+  // The answer must come from THIS site's knowledge base. 37 months is a fact that exists only in
+  // the knowledge base bound to this site — a generic model would never invent that number, so
   // seeing it is proof the retrieval was scoped and actually reached the AI.
+  //
+  // Match the number and the noun, not one phrasing of them. The first version of this asked for
+  // /37\s*months/ and the model answered "a 37-month warranty" — grounded, correct, and scored as
+  // a failure. An assertion about whether a fact arrived must not also be an assertion about the
+  // hyphen the model chose to put in it.
+  const grounded = /37[\s-]*months?/i.test(answerText);
   record(
     "the answer is grounded in the site's own knowledge base",
-    /37\s*months/i.test(answerText),
-    answerText.includes('37') ? 'cites the site-specific fact' : 'no site-specific fact in the answer',
+    grounded,
+    grounded ? 'cites the site-specific fact (37 months)' : 'no site-specific fact in the answer',
   );
 
   // Models answer in markdown. A bubble that shows literal ** around the emphasised words is the

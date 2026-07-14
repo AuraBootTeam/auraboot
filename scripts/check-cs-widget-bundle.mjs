@@ -25,7 +25,15 @@ const fail = (m) => {
 
 if (!existsSync(served)) fail(`served bundle missing: ${served}`);
 
-execSync('npm run build', { cwd: pkgDir, stdio: 'inherit' });
+// This package is a pnpm workspace member, and a fresh checkout (or a fresh worktree) has no
+// node_modules under it — `npm run build` there exits 127 and the gate never gets to say anything
+// about the bundle. Install what the build needs, so that a gate nobody has installed for still
+// gives a verdict rather than an excuse. Takes about a second when it is already there.
+if (!existsSync(join(pkgDir, 'node_modules'))) {
+  execSync('pnpm install --filter @auraboot/cs-widget', { cwd: repo, stdio: 'inherit' });
+}
+
+execSync('pnpm run build', { cwd: pkgDir, stdio: 'inherit' });
 if (!existsSync(built)) fail('build produced no bundle');
 
 const sha = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
