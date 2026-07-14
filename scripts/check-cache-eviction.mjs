@@ -43,21 +43,26 @@ const MAIN = path.join(REPO, 'platform/src/main');
  * A reason is mandatory — "we never got around to it" is not a reason.
  */
 const ALLOWLIST = {
-  // Surfaced BY this gate on 2026-07-14; neither was a considered TTL-only design.
-  // Listed so the gate is green on introduction instead of born-red — a permanently red
-  // gate hides every real failure that comes after it. Remove each entry once it is fixed
-  // or confirmed intentional.
-  aggregateQuery:
-    'PENDING REVIEW (2026-07-14): aggregation over business records. Unclear whether up-to-30min staleness is intended for its dashboard/report consumers.',
-  dataFilterResult:
-    'PENDING REVIEW (2026-07-14): permission projection (user x tenant x model). Staleness here is a security surface, not cosmetics.',
+  // Empty, and that is the point: both entries that lived here (aggregateQuery,
+  // dataFilterResult) were found BY this gate and have since been fixed —
+  // aggregateQuery by evicting on every dynamic-data write (AggregateQueryCacheInterceptor),
+  // dataFilterResult by dropping a cache whose key could not have been correct.
+  // An allowlist entry is a promise to come back, not a place to park a defect.
 };
 
 const files = execSync(`find ${MAIN} -name '*.java'`, { encoding: 'utf8' })
   .trim()
   .split('\n')
   .filter(Boolean);
-const src = new Map(files.map((f) => [f, readFileSync(f, 'utf8')]));
+
+/**
+ * Strip comments before analysing. A javadoc explaining *why a cache was removed* legitimately
+ * mentions `@Cacheable("thatCache")`, and an earlier version of this gate read that prose as a
+ * live annotation and demanded eviction for a cache that no longer exists.
+ */
+const stripComments = (s) =>
+  s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+const src = new Map(files.map((f) => [f, stripComments(readFileSync(f, 'utf8'))]));
 
 const cacheables = new Set();
 /**
@@ -103,9 +108,25 @@ function hasProductionCaller(name, declaringFile) {
   return false;
 }
 
+/**
+ * Eviction does not have to be an annotation. A MyBatis interceptor calling
+ * `cacheManager.getCache("aggregateQuery").clear()` on every dynamic-data write is a
+ * perfectly good — and in that case, the only viable — invalidation path: the write happens
+ * from 121 call sites across 39 classes, so no annotation could have covered it.
+ * Requiring @CacheEvict specifically would push people toward the wrong design.
+ */
+function hasManualEviction(cache) {
+  for (const s of src.values()) {
+    if (!s.includes(`getCache(`) || !s.includes(`"${cache}"`)) continue;
+    if (/\.clear\(\)|\.evict\(/.test(s)) return true;
+  }
+  return false;
+}
+
 const unreachable = [];
 const allowed = [];
 for (const cache of [...cacheables].sort()) {
+  if (hasManualEviction(cache)) continue;
   const evictors = evictorsOf(cache);
   // Reachable = someone can actually trigger an eviction: either the annotation sits on a
   // method other code calls, or on a method that is itself reachable from a caller.
