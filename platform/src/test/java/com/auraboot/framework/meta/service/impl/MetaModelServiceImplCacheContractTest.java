@@ -91,13 +91,15 @@ class MetaModelServiceImplCacheContractTest {
     private static void assertProjectionEviction(CacheEvict evict) {
         assertThat(evict).isNotNull();
         assertThat(evict.allEntries()).isTrue();
+        // fieldBindings / metaFieldByKey / fieldDefinitions / relationDefinitions / modelExists
+        // used to be in this list. They were cache regions **nothing ever populated** — no
+        // @Cacheable, no cache.put, anywhere. Evicting them was a no-op that read as diligence.
+        // Removed 2026-07-14 along with the regions themselves; see scripts/check-cache-eviction.mjs.
         assertThat(Arrays.asList(evict.value()))
                 .contains(
                         "modelDefinitions",
                         "modelFieldBindings",
-                        "fieldBindings",
                         "metaField",
-                        "metaFieldByKey",
                         "viewModelFields",
                         "viewModelSummary"
                 );

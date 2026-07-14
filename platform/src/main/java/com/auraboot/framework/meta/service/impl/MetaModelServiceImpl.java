@@ -331,13 +331,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Override
     @CacheEvict(value = {
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
             "modelFieldBindings",
-            "fieldBindings",
             "metaField",
-            "metaFieldByKey",
             "viewModelFields",
             "viewModelSummary"
     }, allEntries = true)
@@ -726,13 +721,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Override
     @CacheEvict(value = {
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
             "modelFieldBindings",
-            "fieldBindings",
             "metaField",
-            "metaFieldByKey",
             "viewModelFields",
             "viewModelSummary"
     }, allEntries = true)
@@ -903,13 +893,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Transactional
     @CacheEvict(value = {
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
             "modelFieldBindings",
-            "fieldBindings",
             "metaField",
-            "metaFieldByKey",
             "viewModelFields",
             "viewModelSummary"
     }, allEntries = true)
@@ -1695,13 +1680,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Transactional
     @CacheEvict(value = {
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
             "modelFieldBindings",
-            "fieldBindings",
             "metaField",
-            "metaFieldByKey",
             "viewModelFields",
             "viewModelSummary"
     }, allEntries = true)
@@ -1773,13 +1753,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Transactional
     @CacheEvict(value = {
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
             "modelFieldBindings",
-            "fieldBindings",
             "metaField",
-            "metaFieldByKey",
             "viewModelFields",
             "viewModelSummary"
     }, allEntries = true)
@@ -1862,13 +1837,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Transactional
     @CacheEvict(value = {
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
             "modelFieldBindings",
-            "fieldBindings",
             "metaField",
-            "metaFieldByKey",
             "viewModelFields",
             "viewModelSummary"
     }, allEntries = true)
@@ -2003,13 +1973,8 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     @Transactional
     @CacheEvict(value = {
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
             "modelFieldBindings",
-            "fieldBindings",
             "metaField",
-            "metaFieldByKey",
             "viewModelFields",
             "viewModelSummary"
     }, allEntries = true)

@@ -64,20 +64,39 @@ const stripComments = (s) =>
   s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
 const src = new Map(files.map((f) => [f, stripComments(readFileSync(f, 'utf8'))]));
 
-const cacheables = new Set();
 /**
- * @Cacheable(value = SOME_CONSTANT) — the cache name is a constant, not a literal, so this
- * gate cannot see it. Reported rather than silently skipped: a blind spot you know about is
- * a different thing from one you don't. (CommandMetadataCacheService does this.)
+ * Cache names reach @Cacheable either as a literal or through a constant
+ * (`@Cacheable(value = CACHE_COMMAND_DEFS)`). Resolve the constants rather than declaring a
+ * blind spot: an earlier version just reported "2 classes I cannot analyse", which is only
+ * marginally better than not looking.
  */
-const opaque = new Set();
-for (const [f, s] of src) {
+/**
+ * Cache names reach the code three ways: as a literal, via a constant in @Cacheable/@CacheEvict
+ * (`@CacheEvict(value = CACHE_COMMAND_DEFS)`), and via a constant in a manual lookup
+ * (`cacheManager.getCache(QUERY_CACHE)`). Handling only the first two is not enough — an earlier
+ * draft did exactly that and declared `secureQuery` an unused region, which would have deleted a
+ * cache that getQueryCache() reads on every call. (The compiler caught it. The gate should have.)
+ *
+ * So inline the constants once, up front, and every rule below sees plain literals.
+ */
+const constants = new Map();
+for (const s of src.values()) {
+  for (const m of s.matchAll(/static\s+final\s+String\s+([A-Z_][A-Z0-9_]*)\s*=\s*"([^"]+)"/g)) {
+    constants.set(m[1], m[2]);
+  }
+}
+for (const [f, body] of src) {
+  let inlined = body;
+  for (const [name, value] of constants) {
+    inlined = inlined.replace(new RegExp(`\\b${name}\\b`, 'g'), `"${value}"`);
+  }
+  src.set(f, inlined);
+}
+
+const cacheables = new Set();
+for (const s of src.values()) {
   for (const m of s.matchAll(/@Cacheable\s*\(((?:[^()]|\([^()]*\))*)\)/g)) {
-    const literals = [...m[1].matchAll(/"([A-Za-z][A-Za-z0-9_]*)"/g)].map((q) => q[1]);
-    if (literals.length) literals.forEach((l) => cacheables.add(l));
-    else if (/value\s*=\s*[A-Z_]{3,}/.test(m[1]) || /^\s*[A-Z_]{3,}/.test(m[1])) {
-      opaque.add(path.basename(f));
-    }
+    for (const q of m[1].matchAll(/"([A-Za-z][A-Za-z0-9_-]*)"/g)) cacheables.add(q[1]);
   }
 }
 
@@ -123,6 +142,43 @@ function hasManualEviction(cache) {
   return false;
 }
 
+/**
+ * A cache region can be fully wired — registered in CacheConfig, evicted on every write, with
+ * an event and a listener behind it — and still have **nobody putting anything into it**.
+ * `subject-evaluation` was exactly that: the region existed, four write paths dutifully cleared
+ * it, an event class and its listener were in place... and no @Cacheable and no cache.put ever
+ * populated it. The eviction machinery was cycling over an empty box, while a comment claimed a
+ * 15-minute L2 cache that did not exist.
+ *
+ * Clearing an empty cache is harmless; the lie in the comment is not. So: a registered region
+ * must actually be READ or WRITTEN somewhere — evicting it does not count as using it.
+ */
+const registered = new Set();
+{
+  const cfg = [...src.entries()].find(([f]) => f.endsWith('CacheConfig.java'));
+  if (cfg) {
+    const names = cfg[1].match(/setCacheNames\s*\(([\s\S]*?)\)\s*;/);
+    if (names) for (const m of names[1].matchAll(/"([A-Za-z][A-Za-z0-9_-]*)"/g)) registered.add(m[1]);
+  }
+}
+
+const hollow = [];
+for (const region of registered) {
+  if (cacheables.has(region)) continue; // @Cacheable populates it
+  let populated = false;
+  for (const [f, s] of src) {
+    if (f.endsWith('CacheConfig.java') || !s.includes(`"${region}"`)) continue;
+    // Must be a put/get ON THE CACHE OBJECT. Matching a bare `.get(` would count every
+    // Map.get / List.get in the file and quietly wave the region through — which is how a
+    // first draft of this rule missed `subject-evaluation`, the very region that motivated it.
+    if (new RegExp(`getCache\\("${region}"\\)\\s*\\.(put|get)\\s*\\(`).test(s)) populated = true;
+    const bound = s.match(new RegExp(`Cache\\s+(\\w+)\\s*=\\s*[\\w.]*getCache\\("${region}"\\)`));
+    if (bound && new RegExp(`\\b${bound[1]}\\.(put|get)\\s*\\(`).test(s)) populated = true;
+    if (/@CachePut/.test(s)) populated = true;
+  }
+  if (!populated) hollow.push(region);
+}
+
 const unreachable = [];
 const allowed = [];
 for (const cache of [...cacheables].sort()) {
@@ -140,22 +196,28 @@ for (const cache of [...cacheables].sort()) {
 
 console.log(`Scanned ${files.length} java file(s); ${cacheables.size} @Cacheable cache(s).`);
 for (const { cache } of allowed) console.log(`  ~ ${cache} — allowlisted: ${ALLOWLIST[cache]}`);
-if (opaque.size) {
-  console.log(
-    `  ! blind spot: ${opaque.size} class(es) declare @Cacheable with a constant cache name ` +
-      `(${[...opaque].join(', ')}) — not analysable here, review their eviction by hand.`,
-  );
+
+
+if (hollow.length) {
+  console.error('\n❌ Cache regions nobody ever populates — the eviction machinery runs over an empty box:\n');
+  for (const r of hollow) {
+    console.error(`  ${r}`);
+    console.error(`      registered in CacheConfig, but no @Cacheable / cache.put ever writes to it.`);
+    console.error(`      → either populate it (and mean it), or delete the region and the eviction`);
+    console.error(`        code around it. A cache that is never filled is not a cache; leaving one`);
+    console.error(`        in place makes the next reader believe reads are cached when they are not.\n`);
+  }
 }
 
-if (unreachable.length === 0) {
-  console.log('✅ every @Cacheable cache has someone who evicts it.');
+if (unreachable.length === 0 && hollow.length === 0) {
+  console.log('✅ every @Cacheable cache has someone who evicts it, and every region is really used.');
   console.log(
     '   (NOTE: this does not prove your write is visible — only a read→write→read test does.)',
   );
   process.exit(0);
 }
 
-console.error('\n❌ Caches nobody evicts — writes to this data will not be visible to readers:\n');
+if (unreachable.length) console.error('\n❌ Caches nobody evicts — writes to this data will not be visible to readers:\n');
 for (const { cache, why } of unreachable) {
   console.error(`  ${cache}\n      ${why}`);
   console.error(
