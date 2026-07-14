@@ -89,6 +89,13 @@ public class ConversationFaqExtractionService {
             complaint, a question left hanging — call the tool with an empty faqs array. \
             Returning nothing is a correct and expected answer; inventing a plausible pair to \
             appear useful is a serious error, because these pairs are published to customers.
+
+            These pairs are published to every future customer, so they must contain NO personal \
+            data. Do not carry over the customer's name, account handle, order number, address, or \
+            any other identifier — rewrite the question generically ("how do I reset my password?", \
+            not "how does 张三 reset the password for account abc123?"). Phone numbers, emails, ID \
+            numbers and card numbers are stripped automatically, but names and handles are yours to \
+            leave out.
             """;
 
     /**
@@ -148,7 +155,13 @@ public class ConversationFaqExtractionService {
                 log.warn("[faq-extract] tenant={} dropped an incomplete pair from the model: {}", tenantId, raw);
                 continue;
             }
-            faqs.add(new ExtractedFaq(question, answer, confidence(raw.get("confidence"))));
+            // Redact structured PII before it becomes a candidate. The prompt already tells the model
+            // not to carry personal data, but a published FAQ is read to everyone, and "the model
+            // was told not to" is not the same as "it cannot" — a phone number the model copied
+            // through would otherwise land in the knowledge base. This runs at the earliest point the
+            // pair exists, so the reviewer sees an already-clean candidate.
+            faqs.add(new ExtractedFaq(
+                    PiiRedactor.redact(question), PiiRedactor.redact(answer), confidence(raw.get("confidence"))));
         }
 
         log.info("[faq-extract] tenant={} transcriptChars={} extracted={} (in={} out={} tokens)",
