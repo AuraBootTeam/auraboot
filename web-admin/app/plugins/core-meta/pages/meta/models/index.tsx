@@ -23,6 +23,8 @@ export default function ModelListPage() {
   const [records, setRecords] = useState<MetaModelDTO[]>([]);
   const { schema, loading, error } = useSchemaLoader({
     pageKey: 'meta_models_admin',
+    // ships without a DSL page; a missing schema is the normal case, not an error
+    optional: true,
     token: token ?? undefined,
   });
 
