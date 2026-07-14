@@ -241,8 +241,8 @@ test.describe('Permission Management Page', () => {
     // A role auto-selects → the capability editor (default right tab) mounts.
     await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 15000 });
     // The retired assignments top-tab and standalone matrix tab are gone.
-    await expect(page.getByTestId('permission-tab-assignments')).toHaveCount(0);
-    await expect(page.getByTestId('permission-right-tab-permissions')).toHaveCount(0);
+    await expect(page.getByTestId('permission-tab-assignments')).toHaveCount(0); // gate:retired
+    await expect(page.getByTestId('permission-right-tab-permissions')).toHaveCount(0); // gate:retired
 
     // Switch to members, then back to capabilities.
     await page.getByTestId('permission-right-tab-members').click();

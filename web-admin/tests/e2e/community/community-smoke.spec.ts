@@ -140,7 +140,7 @@ test.describe('Community Edition Smoke', () => {
 
     const missionControl = page.locator('[data-testid="mission-control"]');
     await expect(missionControl).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('[data-testid="enterprise-upsell"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid="enterprise-upsell"]')).toHaveCount(0); // gate:absent-by-design — enterprise-only element must not leak into OSS
   });
 
   /**

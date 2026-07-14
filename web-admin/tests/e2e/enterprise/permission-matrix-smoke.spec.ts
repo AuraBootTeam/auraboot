@@ -19,7 +19,7 @@ test.describe('Permission v2 — Smoke', () => {
     // v2 right-panel: capabilities (default) + members; the standalone matrix tab is retired.
     await expect(page.getByTestId('permission-right-tab-capabilities')).toBeVisible();
     await expect(page.getByTestId('permission-right-tab-members')).toBeVisible();
-    await expect(page.getByTestId('permission-right-tab-permissions')).toHaveCount(0);
+    await expect(page.getByTestId('permission-right-tab-permissions')).toHaveCount(0); // gate:absent-by-design — retired tab, must not come back
     await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 10000 });
   });
 
