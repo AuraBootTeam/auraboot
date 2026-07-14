@@ -200,9 +200,24 @@ log "5/6 browser: sidebar reachability + list/detail/form + detail-toolbar comma
 npx playwright test -c playwright.gt5.config.ts \
   tests/e2e/faq-loop-pages-and-menu.spec.ts --project=chromium --reporter=line || rc=$?
 
-if [ "$rc" -eq 0 ]; then
-  log "✅ conversation → FAQ loop golden PASSED (queue → distil → review → publish → retrievable → pages/menu)"
-else
+if [ "$rc" -ne 0 ]; then
   log "❌ conversation → FAQ loop golden FAILED at pages/menu (rc=$rc)"
+  exit "$rc"
+fi
+
+# ---- 6. retract, from the browser ---------------------------------------------------------
+# faq:unpublish has a real UI entry (从知识库撤回 on the workbench). This distils its own
+# conversation, publishes it, clicks 撤回, and then asks the retrieval API whether the answer is
+# still recalled — the two static gates prove the DSL is legal, only this proves the button fires
+# and that pulling actually takes the FAQ out of retrieval (not just flips a status). Uses the
+# FAQ_TARGET_KB_PID this script already exported.
+log "6/6 browser: publish → 从知识库撤回 → no longer retrievable"
+npx playwright test -c playwright.gt5.config.ts \
+  tests/e2e/faq-loop-unpublish.spec.ts --project=chromium --reporter=line || rc=$?
+
+if [ "$rc" -eq 0 ]; then
+  log "✅ conversation → FAQ loop golden PASSED (queue → distil → review → publish → retrievable → pages/menu → unpublish)"
+else
+  log "❌ conversation → FAQ loop golden FAILED at unpublish (rc=$rc)"
 fi
 exit "$rc"
