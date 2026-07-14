@@ -65,6 +65,19 @@
           },
           "visibleWhen": "record.faq_status == 'approved'",
           "primary": true
+        },
+        {
+          "code": "unpublish",
+          "permissionCode": "faq.candidate.publish",
+          "label": {
+            "zh-CN": "从知识库撤回",
+            "en": "Unpublish from KB"
+          },
+          "action": {
+            "type": "command",
+            "command": "faq:unpublish"
+          },
+          "visibleWhen": "record.faq_status == 'published'"
         }
       ]
     },

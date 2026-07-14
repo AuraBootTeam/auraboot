@@ -34,6 +34,7 @@ import java.util.Set;
 public class FaqCandidateCommandHandler implements CommandHandlerExtension {
 
     static final String PUBLISH = "faq:publish";
+    static final String UNPUBLISH = "faq:unpublish";
     static final String EXTRACT = "faq:extract";
 
     /**
@@ -63,12 +64,12 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
 
     @Override
     public boolean supports(String commandType) {
-        return PUBLISH.equals(commandType) || EXTRACT.equals(commandType);
+        return PUBLISH.equals(commandType) || UNPUBLISH.equals(commandType) || EXTRACT.equals(commandType);
     }
 
     @Override
     public Set<String> getSupportedCommandTypes() {
-        return Set.of(PUBLISH, EXTRACT);
+        return Set.of(PUBLISH, UNPUBLISH, EXTRACT);
     }
 
     @Override
@@ -82,6 +83,9 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
     public Object execute(CommandContext context) {
         if (EXTRACT.equals(context.commandType())) {
             return extract(context);
+        }
+        if (UNPUBLISH.equals(context.commandType())) {
+            return unpublish(context);
         }
         if (!PUBLISH.equals(context.commandType())) {
             throw new BusinessException(ResponseCode.BadParam,
@@ -138,6 +142,49 @@ public class FaqCandidateCommandHandler implements CommandHandlerExtension {
 
         log.info("[faq-publish] tenant={} candidate={} -> kb={} doc={}",
                 context.tenantId(), candidatePid, kbPid, docPid);
+        return updated;
+    }
+
+    /**
+     * Retract a published FAQ: remove its document from the knowledge base so it stops being
+     * recalled, and return the candidate to {@code approved} so it can be re-published later.
+     *
+     * <p>Removing the document is the load-bearing half — flipping the status alone would leave the
+     * answer live in the knowledge base while the console claimed it was pulled. The candidate pid is
+     * the ingest source id, so {@code remove} drops exactly the document {@code publish} created (or
+     * a re-publish would have replaced), by the same key.
+     */
+    private Map<String, Object> unpublish(CommandContext context) {
+        DataAccessor data = context.dataAccessor();
+        if (data == null) {
+            throw new BusinessException(ResponseCode.SystemError, "DataAccessor unavailable for faq:unpublish");
+        }
+        String candidatePid = context.recordId();
+        if (candidatePid == null || candidatePid.isBlank()) {
+            throw new BusinessException(ResponseCode.BadParam, "A FAQ candidate is required to unpublish");
+        }
+        Map<String, Object> candidate = data.getById(FaqCandidateService.MODEL, candidatePid);
+        if (candidate == null) {
+            throw new BusinessException(ResponseCode.NOT_FOUND, "FAQ candidate not found: " + candidatePid);
+        }
+        String status = str(candidate.get("faq_status"));
+        if (!STATUS_PUBLISHED.equals(status)) {
+            throw new BusinessException(ResponseCode.BadParam,
+                    "Only a published FAQ candidate can be unpublished (this one is " + status + ")");
+        }
+        String kbPid = str(candidate.get("faq_target_kb_id"));
+
+        boolean removed = kbTextIngestService.remove(context.tenantId(), kbPid, SOURCE_TYPE, candidatePid);
+
+        // Back to approved, and forget the document pid — the document is gone, so a dangling
+        // reference to it would be a lie the detail page would then render.
+        Map<String, Object> patch = new LinkedHashMap<>();
+        patch.put("faq_status", STATUS_APPROVED);
+        patch.put("faq_kb_document_pid", null);
+        Map<String, Object> updated = data.update(FaqCandidateService.MODEL, candidatePid, patch);
+
+        log.info("[faq-unpublish] tenant={} candidate={} kb={} removed={}",
+                context.tenantId(), candidatePid, kbPid, removed);
         return updated;
     }
 
