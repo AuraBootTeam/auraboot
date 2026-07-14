@@ -162,10 +162,6 @@ public interface DictVersionService {
      * 清除字典缓存
      * @param tenantId 租户ID
        
-     * @param code 字典编码
-     */
-    void clearDictCache(    String code);
-
     /**
      * 清除所有字典缓存
      * @param tenantId 租户ID
