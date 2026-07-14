@@ -14,17 +14,17 @@ export interface WorkbenchActionBarBlockRendererProps {
 }
 
 const variantClass: Record<string, string> = {
-  primary: 'bg-blue-600 text-white hover:bg-blue-700',
-  secondary: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50',
-  danger: 'bg-rose-600 text-white hover:bg-rose-700',
-  ghost: 'bg-transparent text-gray-700 hover:bg-gray-100',
+  primary: 'bg-accent text-white hover:bg-accent-hover',
+  secondary: 'border border-border bg-panel text-text-2 hover:bg-hover',
+  danger: 'bg-status-red text-white hover:opacity-90',
+  ghost: 'bg-transparent text-text-2 hover:bg-hover',
 };
 
 const activeVariantClass: Record<string, string> = {
-  primary: 'ring-2 ring-blue-300 ring-offset-1',
-  secondary: 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200 ring-offset-1',
-  danger: 'ring-2 ring-rose-300 ring-offset-1',
-  ghost: 'bg-blue-50 text-blue-700 ring-2 ring-blue-200 ring-offset-1',
+  primary: 'ring-2 ring-accent ring-offset-1',
+  secondary: 'border-accent bg-accent-weak text-accent ring-2 ring-accent ring-offset-1',
+  danger: 'ring-2 ring-status-red ring-offset-1',
+  ghost: 'bg-accent-weak text-accent ring-2 ring-accent ring-offset-1',
 };
 
 export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRendererProps> = ({

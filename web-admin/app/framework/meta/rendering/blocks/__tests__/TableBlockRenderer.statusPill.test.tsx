@@ -90,6 +90,6 @@ describe('TableBlockRenderer status-pill renderType', () => {
 
     const pill = await screen.findByTestId('table-status-pill');
     expect(pill).toHaveTextContent('多候选待选择');
-    expect(pill).toHaveClass('bg-amber-50');
+    expect(pill).toHaveClass('bg-status-amber-bg');
   });
 });

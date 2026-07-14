@@ -62,7 +62,7 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
 
   if (steps.length === 0) {
     return (
-      <div className="bg-status-amber-bg rounded border border-yellow-300 p-4">
+      <div className="bg-status-amber-bg rounded border border-status-amber p-4">
         <p className="text-status-amber">Form wizard has no steps configured</p>
       </div>
     );
@@ -81,7 +81,7 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
               <li key={step.key} className="flex items-center">
                 {index > 0 && (
                   <div
-                    className={`mx-2 h-0.5 w-12 ${isCompleted ? 'bg-blue-600' : 'bg-gray-200'}`}
+                    className={`mx-2 h-0.5 w-12 ${isCompleted ? 'bg-accent' : 'bg-border'}`}
                   />
                 )}
                 <button
@@ -89,19 +89,19 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
                   disabled={index > currentStepIndex}
                   className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                     isCurrent
-                      ? 'bg-blue-600 text-white'
+                      ? 'bg-accent text-white'
                       : isCompleted
-                        ? 'cursor-pointer bg-blue-100 text-blue-800 hover:bg-blue-200'
-                        : 'cursor-not-allowed bg-gray-100 text-gray-400'
+                        ? 'bg-accent-weak text-accent hover:bg-hover cursor-pointer'
+                        : 'bg-subtle text-text-3 cursor-not-allowed'
                   }`}
                 >
                   <span
                     className={`flex h-6 w-6 items-center justify-center rounded-full text-xs ${
                       isCurrent
-                        ? 'bg-white text-blue-600'
+                        ? 'bg-panel text-accent'
                         : isCompleted
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-300 text-gray-500'
+                          ? 'bg-accent text-white'
+                          : 'bg-hover text-text-3'
                     }`}
                   >
                     {isCompleted ? (
@@ -172,7 +172,7 @@ export const FormWizardBlockRenderer: React.FC<FormWizardBlockRendererProps> = (
               // Trigger the runtime's submit handler
               // The actual submit is handled by the form buttons block
             }}
-            className="rounded-control bg-green-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700"
+            className="rounded-control bg-status-green-bg text-status-green border-status-green px-4 py-2 text-sm font-medium border transition-colors hover:bg-hover"
           >
             Submit
           </button>

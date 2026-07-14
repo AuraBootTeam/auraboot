@@ -120,7 +120,7 @@ export const CardGridBlockRenderer: React.FC<CardGridBlockRendererProps> = ({ bl
       <div
         role="alert"
         data-testid="card-grid-error"
-        className="rounded-control bg-status-red-bg text-status-red border border-red-200 p-3 text-sm"
+        className="rounded-control bg-status-red-bg text-status-red border border-status-red p-3 text-sm"
       >
         {message || t('common.loadError')}
       </div>

@@ -83,7 +83,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
         className="text-text-3 flex items-center justify-center py-12"
         data-testid="field-history-loading"
       >
-        <div className="rounded-pill border-border-strong mr-2 h-5 w-5 animate-spin border-2 border-t-blue-500" />
+        <div className="rounded-pill border-border-strong border-t-accent mr-2 h-5 w-5 animate-spin border-2" />
         {locale === 'zh-CN' ? '加载变更历史...' : 'Loading change history...'}
       </div>
     );
@@ -111,7 +111,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
   return (
     <div className="relative" data-testid="field-history">
       {/* Timeline line */}
-      <div className="absolute top-0 bottom-0 left-4 w-px bg-gray-200" />
+      <div className="absolute top-0 bottom-0 left-4 w-px bg-border" />
 
       <div className="space-y-6 pl-10">
         {groups.map((group, gi) => (
@@ -133,7 +133,7 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
             </div>
 
             {/* Change entries */}
-            <div className="rounded-card bg-subtle divide-y divide-gray-100 border border-gray-100">
+            <div className="rounded-card bg-subtle divide-y divide-border border border-border">
               {group.entries.map((entry) => (
                 <div
                   key={entry.id}
@@ -208,11 +208,11 @@ export const FieldHistoryViewer: React.FC<FieldHistoryViewerProps> = ({
 function ChangeTypeBadge({ type, locale }: { type: string; locale: string }) {
   const labels: Record<string, [string, string, string]> = {
     // [zh, en, color]
-    ADDED: ['新增', 'Added', 'bg-green-100 text-green-700'],
-    MODIFIED: ['修改', 'Modified', 'bg-blue-100 text-blue-700'],
-    REMOVED: ['删除', 'Removed', 'bg-red-100 text-red-700'],
+    ADDED: ['新增', 'Added', 'bg-status-green-bg text-status-green'],
+    MODIFIED: ['修改', 'Modified', 'bg-status-blue-bg text-status-blue'],
+    REMOVED: ['删除', 'Removed', 'bg-status-red-bg text-status-red'],
   };
-  const [zh, en, cls] = labels[type] || ['—', '—', 'bg-gray-100 text-gray-600'];
+  const [zh, en, cls] = labels[type] || ['—', '—', 'bg-status-gray-bg text-status-gray'];
   return (
     <span
       className={`inline-block flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${cls}`}

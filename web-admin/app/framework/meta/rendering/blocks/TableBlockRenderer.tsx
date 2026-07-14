@@ -46,12 +46,14 @@ type StatusPillTone = 'gray' | 'blue' | 'amber' | 'green' | 'red';
 
 const FILE_PID_URL_PATTERN = /^\/?([0-9A-HJKMNP-TV-Z]{26})(?:\.[A-Za-z0-9]+)?$/;
 
+// Opt-in status pill (renderType:'status-pill'). Dict-coded status renders as a
+// color dot + text by default (§50); the pill is the deliberate emphasis case.
 const STATUS_PILL_CLASS: Record<StatusPillTone, string> = {
-  gray: 'border-gray-200 bg-gray-100 text-gray-700',
-  blue: 'border-blue-200 bg-blue-50 text-blue-700',
-  amber: 'border-amber-200 bg-amber-50 text-amber-700',
-  green: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  red: 'border-rose-200 bg-rose-50 text-rose-700',
+  gray: 'border-status-gray bg-status-gray-bg text-status-gray',
+  blue: 'border-status-blue bg-status-blue-bg text-status-blue',
+  amber: 'border-status-amber bg-status-amber-bg text-status-amber',
+  green: 'border-status-green bg-status-green-bg text-status-green',
+  red: 'border-status-red bg-status-red-bg text-status-red',
 };
 
 function renderStatusPill(tone: StatusPillTone, label: React.ReactNode): React.ReactNode {
@@ -123,7 +125,7 @@ function renderLinkCell(
       target={target}
       rel={target === '_blank' ? 'noreferrer' : undefined}
       onClick={(event) => event.stopPropagation()}
-      className="text-accent font-medium underline decoration-blue-300 underline-offset-2 hover:text-blue-800"
+      className="text-accent font-medium underline decoration-border underline-offset-2 hover:text-accent-hover"
     >
       {label}
     </a>
@@ -475,15 +477,15 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
       case 'tag':
         return (
-          <span className="rounded-pill inline-flex bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
+          <span className="rounded-pill bg-status-blue-bg text-status-blue inline-flex px-2 py-1 text-xs font-medium">
             {value}
           </span>
         );
 
       case 'progress':
         return (
-          <div className="rounded-pill h-2.5 w-full bg-gray-200">
-            <div className="rounded-pill h-2.5 bg-blue-600" style={{ width: `${value}%` }}></div>
+          <div className="rounded-pill bg-subtle h-2.5 w-full">
+            <div className="rounded-pill bg-accent h-2.5" style={{ width: `${value}%` }}></div>
           </div>
         );
 
@@ -543,8 +545,8 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
               }}
               className={`text-sm ${
                 button.variant === 'danger' || (button as any).danger
-                  ? 'text-status-red hover:text-red-800'
-                  : 'text-accent hover:text-blue-800'
+                  ? 'text-status-red hover:opacity-80'
+                  : 'text-accent hover:text-accent-hover'
               } disabled:cursor-not-allowed disabled:opacity-50`}
             >
               {label}

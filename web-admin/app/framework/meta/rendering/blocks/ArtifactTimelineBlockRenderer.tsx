@@ -60,10 +60,10 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
 
   return (
     <section className="rounded-card border-border bg-panel border" data-testid="artifact-timeline">
-      <div className="border-b border-gray-100 px-4 py-3">
+      <div className="border-border border-b px-4 py-3">
         <h3 className="text-text text-sm font-semibold">{title}</h3>
       </div>
-      <ol className="divide-y divide-gray-100">
+      <ol className="divide-border divide-y">
         {rows.map((row: any, index: number) => {
     const rowKey = String(readPath(row, item.keyField) ?? row.pid ?? index);
           const titleValue = readPath(row, item.titleField) ?? rowKey;
@@ -82,19 +82,19 @@ export const ArtifactTimelineBlockRenderer: React.FC<ArtifactTimelineBlockRender
               className="grid gap-3 px-4 py-3 sm:grid-cols-[auto_1fr_auto]"
               data-testid={`artifact-timeline-item-${rowKey}`}
             >
-              <div className="mt-1 h-2.5 w-2.5 rounded-full bg-blue-500" />
+              <div className="bg-accent mt-1 h-2.5 w-2.5 rounded-full" />
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-text font-mono text-sm font-semibold">
                     {String(titleValue)}
                   </span>
                   {revision !== undefined && revision !== null && (
-                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                    <span className="bg-status-blue-bg text-status-blue rounded-pill px-2 py-0.5 text-xs">
                       Rev {String(revision)}
                     </span>
                   )}
                   {status && (
-                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs text-emerald-700">
+                    <span className="bg-status-green-bg text-status-green rounded-pill px-2 py-0.5 text-xs">
                       {String(status)}
                     </span>
                   )}

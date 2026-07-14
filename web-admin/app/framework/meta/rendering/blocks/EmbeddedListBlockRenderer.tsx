@@ -59,7 +59,7 @@ export function EmbeddedListBlockRenderer({
 
   if (!modelCode) {
     return (
-      <div className="bg-status-amber-bg rounded border border-yellow-300 p-4">
+      <div className="bg-status-amber-bg rounded border border-status-amber p-4">
         <p className="text-status-amber">
           embedded-list block "{block.id}" is missing modelCode/childModel
         </p>
