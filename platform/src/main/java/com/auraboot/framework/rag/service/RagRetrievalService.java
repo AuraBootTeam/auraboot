@@ -1,5 +1,7 @@
 package com.auraboot.framework.rag.service;
 
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.rag.config.RagRetrievalProperties;
 import com.auraboot.framework.rag.dto.RetrievalOutcome;
 import com.auraboot.framework.rag.dto.RetrievalResult;
@@ -401,8 +403,43 @@ public class RagRetrievalService {
         return count != null && count > 0;
     }
 
+    /**
+     * Resolve which knowledge bases a retrieval may search, and prove every one of them belongs to
+     * {@code tenantId} before returning it.
+     *
+     * <p>This is the tenant boundary for retrieval, and it is the ONLY one: the search SQL below
+     * filters chunks by {@code kb_id IN (...)} with no tenant column of its own, so whatever this
+     * method returns is searched verbatim. An explicit {@code kbPids} that named another tenant's
+     * KB would be read straight across the boundary — no error, no warning, no empty result, just
+     * one tenant's visitor answered out of another's knowledge. {@code ImAiService} never scopes,
+     * and {@code CsMessageService} scoping correctly is a discipline, not a guarantee; the guarantee
+     * has to live here.
+     *
+     * <p>An explicit list is therefore verified, not trusted. If any requested pid is not owned by
+     * this tenant (whether it belongs to someone else or does not exist), the whole request is
+     * refused rather than silently narrowed — a silent drop would let a caller probe pid by pid,
+     * unseen, and would hide the caller's own bug behind a quietly worse answer. The message names
+     * no pid, so a rejected request cannot be used to enumerate which ids exist.
+     *
+     * <p>An empty list means "every active KB this tenant owns" and is resolved by the same
+     * tenant-scoped query — it can only ever return this tenant's KBs.
+     */
     private List<String> resolveTargetKbs(Long tenantId, List<String> kbPids) {
         if (kbPids != null && !kbPids.isEmpty()) {
+            String placeholders = String.join(",", Collections.nCopies(kbPids.size(), "?"));
+            List<Object> params = new ArrayList<>();
+            params.add(tenantId);
+            params.addAll(kbPids);
+            List<String> owned = jdbcTemplate.queryForList(
+                    "SELECT pid FROM ab_knowledge_base "
+                    + "WHERE tenant_id = ? AND pid IN (" + placeholders + ")",
+                    String.class, params.toArray());
+            if (owned.size() != kbPids.size()) {
+                log.warn("Retrieval refused: tenant {} requested {} knowledge base(s), only {} are owned by it",
+                        tenantId, kbPids.size(), owned.size());
+                throw new BusinessException(ResponseCode.FORBIDDEN,
+                        "One or more knowledge bases do not belong to this tenant");
+            }
             return kbPids;
         }
         // Default: all active KBs with chunks for this tenant
