@@ -120,5 +120,26 @@
     "cmd_risk_level": "L3",
     "idempotent": true,
     "reversible": false
+  },
+  {
+    "code": "faq:unpublish",
+    "displayName:zh-CN": "从知识库撤回",
+    "displayName:en": "Unpublish from Knowledge Base",
+    "type": "custom",
+    "modelCode": "faq_candidate",
+    "permissions": [
+      "faq.candidate.publish"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认从知识库撤回该问答？撤回后智能体将不再检索到它，候选回到已批准状态、可重新发布。",
+      "confirmMessage:en": "Unpublish this Q&A from the knowledge base? The agent stops recalling it, and the candidate returns to approved so it can be published again."
+    },
+    "agent_hint": "Retract a published FAQ candidate: remove its ab_kb_document (and chunks) from the knowledge base so it stops being retrievable, and move the candidate back to approved with its kb document pid cleared. Removal is by the same (source_type=conversation, candidate pid) key publish used, so it drops exactly the document publish created. Persistence is owned by the platform FaqCandidateCommandHandler.",
+    "precondition_description": "Candidate must be in published status.",
+    "side_effect_description": "Deletes the candidate's document and its chunks from the knowledge base, so the agent can no longer recall the FAQ. The candidate returns to approved and can be re-published.",
+    "output_description": "Returns the updated candidate with approved status and an empty kb document pid.",
+    "cmd_risk_level": "L3",
+    "idempotent": true,
+    "reversible": true
   }
 ]

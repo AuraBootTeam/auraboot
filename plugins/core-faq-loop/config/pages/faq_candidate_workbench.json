@@ -410,6 +410,25 @@
               "selectedFaqDetail"
             ]
           }
+        },
+        {
+          "code": "unpublish",
+          "icon": "BookDown",
+          "permissionCode": "faq.candidate.publish",
+          "visibleWhen": "row.faq_status == 'published'",
+          "label": {
+            "zh-CN": "从知识库撤回",
+            "en": "Unpublish from KB"
+          },
+          "action": {
+            "type": "command",
+            "command": "faq:unpublish",
+            "refresh": [
+              "faqStats",
+              "faqList",
+              "selectedFaqDetail"
+            ]
+          }
         }
       ]
     },
