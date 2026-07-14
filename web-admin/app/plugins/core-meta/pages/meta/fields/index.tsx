@@ -23,6 +23,8 @@ export default function FieldLibraryPage() {
   const [records, setRecords] = useState<MetaFieldDTO[]>([]);
   const { schema, loading, error } = useSchemaLoader({
     pageKey: 'meta_fields_admin',
+    // ships without a DSL page; a missing schema is the normal case, not an error
+    optional: true,
     token: token ?? undefined,
   });
 

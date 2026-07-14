@@ -552,12 +552,19 @@ public class DictVersionServiceImpl implements DictVersionService {
         log.info("字典缓存预热完成: count={}", targetCodes.size());
     }
 
-    @Override
-    @CacheEvict(value = "dictData", allEntries = true)
-    public void clearDictCache(String code) {
-        log.info("清除字典缓存: code={}", code);
-    }
-
+    /**
+     * Clears every dict's cached data for the current process.
+     *
+     * <p>There used to be a {@code clearDictCache(String code)} beside this one, annotated
+     * {@code @CacheEvict(allEntries = true)} — the code argument was logged and then ignored, so
+     * a caller asking to drop one dict silently dropped all of them. It had no production callers
+     * and no behaviour of its own; removed 2026-07-14 rather than left as a lie with a signature.
+     *
+     * <p>Per-code eviction is not offered because it cannot be done with a key expression: one
+     * dict spans several cache entries (tenant × code × strategy × pinned version). If it is ever
+     * needed, sweep the Caffeine keyspace by prefix — see AggregateQueryCacheInterceptor — and
+     * cover it with a read→write→read test, not with an annotation that quietly widens.
+     */
     @Override
     @CacheEvict(value = "dictData", allEntries = true)
     public void clearAllDictCache( ) {

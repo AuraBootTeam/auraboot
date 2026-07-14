@@ -74,6 +74,21 @@ export interface UseSchemaLoaderOptions {
   pageKey?: string;
   type?: 'list' | 'form' | 'detail' | 'kanban';
   token?: string;
+  /**
+   * The page may legitimately have no DSL schema.
+   *
+   * The platform admin pages (/meta/models, /meta/fields) render through ListPageContent and
+   * *may* be overridden by a DSL page, but ship without one. Loading it unconditionally meant
+   * every visit fired a request for a pageKey that does not exist, got a 404, and logged
+   * "Failed to load schema: Page not found: meta_models_admin" to the console — on a page that
+   * was working perfectly. A console error on a healthy page is not free: it trains readers to
+   * ignore console errors, and it makes every golden spec that asserts "zero console errors"
+   * either fail or carry an allow-list.
+   *
+   * With `optional`, a missing schema resolves to `null` (the caller's fallback) instead of an
+   * error. Anything else — 500, malformed DSL, network — still errors, as it should.
+   */
+  optional?: boolean;
 }
 
 export interface UseSchemaLoaderResult {
@@ -148,7 +163,14 @@ export function useSchemaLoader(options: UseSchemaLoaderOptions): UseSchemaLoade
       }
 
       if (!ResultHelper.isSuccess(result)) {
-        throw new Error(result.message || 'Failed to load schema');
+        const message = result.message || 'Failed to load schema';
+        // "no DSL page for this key" is a normal state for an optional schema, not a failure.
+        if (options.optional && /page not found/i.test(message)) {
+          setSchema(null);
+          setLoading(false);
+          return;
+        }
+        throw new Error(message);
       }
 
       // Build UnifiedSchema from v2 PageSchemaDTO

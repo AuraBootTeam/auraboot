@@ -310,7 +310,7 @@ class DictVersionServiceImplIntegrationTest {
         String code = createVersionedDict();
 
         assertDoesNotThrow(() -> versionService.warmupDictCache(List.of(code)));
-        assertDoesNotThrow(() -> versionService.clearDictCache(code));
+        assertDoesNotThrow(versionService::clearAllDictCache);
         assertDoesNotThrow(() -> versionService.clearAllDictCache());
 
         assertTrue(versionService.getVersionStrategyStats().containsKey("latest"));
