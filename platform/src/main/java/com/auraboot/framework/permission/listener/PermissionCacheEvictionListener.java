@@ -1,9 +1,7 @@
 package com.auraboot.framework.permission.listener;
 
 import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
-import com.auraboot.framework.permission.event.SubjectPermissionChangedEvent;
 import com.auraboot.framework.permission.event.UserRoleChangedEvent;
-import com.auraboot.framework.permission.service.SubjectPermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,13 +20,11 @@ import org.springframework.stereotype.Component;
  * -------------------------------|----------------------------------
  * RolePermissionChangedEvent     | user-permissions (all users of role)
  * UserRoleChangedEvent           | user-permissions (specific user)
- * SubjectPermissionChangedEvent  | subject-evaluation (specific subject)
  * </pre>
  *
  * <p>Cache Hierarchy:
  * <pre>
  * L1: user-permissions:{userId}
- * L2: subject-evaluation:{subjectType}:{subjectId}:{userId}
  * L3: subject-declarations:{subjectType}:{subjectId}
  * </pre>
  *
@@ -41,7 +37,6 @@ import org.springframework.stereotype.Component;
 public class PermissionCacheEvictionListener {
 
     private final UserPermissionService userPermissionService;
-    private final SubjectPermissionService subjectPermissionService;
 
     /**
      * Handle Role-Permission binding changed event
@@ -101,33 +96,4 @@ public class PermissionCacheEvictionListener {
         userPermissionService.evictUserPermissions(userId);
     }
 
-    /**
-     * Handle Subject-Permission declaration changed event
-     *
-     * <p>Triggers:
-     * <ul>
-     *   <li>Subject-Permission declaration created</li>
-     *   <li>Subject-Permission declaration updated</li>
-     *   <li>Subject-Permission declaration deleted</li>
-     * </ul>
-     *
-     * <p>Eviction Strategy:
-     * <ul>
-     *   <li>Evict the subject's evaluation cache (all users)</li>
-     * </ul>
-     *
-     * @param event Subject-Permission changed event
-     */
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
-    public void onSubjectPermissionChanged(SubjectPermissionChangedEvent event) {
-        String subjectType = event.getSubjectType();
-        Long subjectId = event.getSubjectId();
-        String operation = event.getOperation();
-
-        log.info("Subject-Permission changed, evicting cache: {}:{}, operation={}",
-            subjectType, subjectId, operation);
-
-        // Evict the subject's evaluation cache
-        subjectPermissionService.evictSubjectEvaluations(subjectType, subjectId);
-    }
 }

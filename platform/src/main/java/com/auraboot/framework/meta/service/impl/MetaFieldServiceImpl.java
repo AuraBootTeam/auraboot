@@ -202,13 +202,8 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Transactional
     @CacheEvict(value = {
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
             "modelFieldBindings",
-            "fieldBindings",
             "metaField",
-            "metaFieldByKey",
             "viewModelFields",
             "viewModelSummary"
     }, allEntries = true)
@@ -282,13 +277,8 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Transactional
     @CacheEvict(value = {
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
             "modelFieldBindings",
-            "fieldBindings",
             "metaField",
-            "metaFieldByKey",
             "viewModelFields",
             "viewModelSummary"
     }, allEntries = true)
@@ -644,13 +634,8 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Transactional
     @CacheEvict(value = {
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
             "modelFieldBindings",
-            "fieldBindings",
             "metaField",
-            "metaFieldByKey",
             "viewModelFields",
             "viewModelSummary"
     }, allEntries = true)
@@ -675,13 +660,8 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     @Transactional
     @CacheEvict(value = {
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
             "modelFieldBindings",
-            "fieldBindings",
             "metaField",
-            "metaFieldByKey",
             "viewModelFields",
             "viewModelSummary"
     }, allEntries = true)
@@ -722,13 +702,13 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     // ==================== 缓存管理 ====================
 
     @Override
-    @CacheEvict(value = {"metaField", "metaFieldByKey"}, key = "#code + '_' + T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix()")
+    @CacheEvict(value = "metaField", key = "#code + '_' + T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix()")
     public void refreshFieldCache(String code) {
         log.info("刷新字段缓存: code={}", logSafe(code));
     }
 
     @Override
-    @CacheEvict(value = {"metaField", "metaFieldByKey"}, allEntries = true)
+    @CacheEvict(value = "metaField", allEntries = true)
     public void clearAllFieldCache() {
         log.info("清除所有字段缓存");
     }

@@ -114,11 +114,4 @@ public interface SubjectPermissionService {
         Integer logicGroup
     );
     
-    /**
-     * Evict subject evaluation cache
-     * 
-     * @param subjectType Subject type
-     * @param subjectId Subject ID
-     */
-    void evictSubjectEvaluations(String subjectType, Long subjectId);
 }
