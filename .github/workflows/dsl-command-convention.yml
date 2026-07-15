@@ -18,7 +18,12 @@ on:
       - 'plugins/**/config/commands/**'
       - 'scripts/check-dsl-command-convention.mjs'
       - 'scripts/check-dsl-render-types.mjs'
+      - 'scripts/check-dsl-actions.mjs'
+      - 'scripts/sync-dsl-action-catalog.mjs'
+      - 'plugins/schemas/dsl-action-catalog.json'
       - 'web-admin/app/framework/meta/runtime/renderers/CellRendererRegistry.tsx'
+      - 'web-admin/app/framework/meta/rendering/blocks/workbenchBlockUtils.ts'
+      - 'web-admin/app/framework/meta/runtime/actions/ActionRegistry.ts'
       - '.github/workflows/dsl-command-convention.yml'
   pull_request:
     branches: [main]
@@ -27,7 +32,12 @@ on:
       - 'plugins/**/config/commands/**'
       - 'scripts/check-dsl-command-convention.mjs'
       - 'scripts/check-dsl-render-types.mjs'
+      - 'scripts/check-dsl-actions.mjs'
+      - 'scripts/sync-dsl-action-catalog.mjs'
+      - 'plugins/schemas/dsl-action-catalog.json'
       - 'web-admin/app/framework/meta/runtime/renderers/CellRendererRegistry.tsx'
+      - 'web-admin/app/framework/meta/rendering/blocks/workbenchBlockUtils.ts'
+      - 'web-admin/app/framework/meta/runtime/actions/ActionRegistry.ts'
       - '.github/workflows/dsl-command-convention.yml'
   workflow_dispatch:
 
@@ -58,3 +68,6 @@ jobs:
 
       - name: Check DSL pages only ask for renderers that exist
         run: node scripts/check-dsl-render-types.mjs
+
+      - name: Check workbench actions use a real verb + fresh action catalog
+        run: node scripts/check-dsl-actions.mjs
