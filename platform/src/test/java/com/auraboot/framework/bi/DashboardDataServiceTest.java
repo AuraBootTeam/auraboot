@@ -15,6 +15,8 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -154,6 +156,51 @@ class DashboardDataServiceTest {
         DashboardDataResponse second = dashboardDataService.fetchDashboardData("dash-003", false, 1L);
         assertThat(second.getDashboardTitle()).isEqualTo("Cached Dashboard");
         assertThat(second.getFetchedAt()).isEqualTo(first.getFetchedAt());
+    }
+
+    @Test
+    void fetchDashboardData_crossTenantDashboard_isRejected() {
+        // A dashboard owned by tenant 7. A caller from tenant 1 must not be able to
+        // read it by guessing the id — the service must reject with the same
+        // not-found error (no existence oracle across tenants).
+        String dashboardJson = """
+                {
+                    "title": "Tenant 7 Private Dashboard",
+                    "widgets": [ { "id": "w", "dataSource": { "type": "static", "data": 1 } } ]
+                }
+                """;
+        PageSchema schema = new PageSchema();
+        schema.setBlocks(dashboardJson);
+        schema.setTenantId(7L);
+        when(formSchemaMapper.selectById("dash-cross")).thenReturn(schema);
+
+        assertThatThrownBy(() -> dashboardDataService.fetchDashboardData("dash-cross", false, 1L))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Dashboard not found");
+    }
+
+    @Test
+    void fetchDashboardData_cacheIsTenantScoped_notSharedAcrossTenants() {
+        // A shared dashboard (null owner tenant) is readable by any tenant, but the
+        // cache must be keyed per tenant: tenant 2 requesting the same id after
+        // tenant 1 must miss the cache and re-resolve, never receive tenant 1's entry.
+        String dashboardJson = """
+                {
+                    "title": "Shared Dashboard",
+                    "widgets": [],
+                    "dataScreen": { "refreshInterval": 300 }
+                }
+                """;
+        PageSchema schema = new PageSchema();
+        schema.setBlocks(dashboardJson);
+        when(formSchemaMapper.selectById("shared-dash")).thenReturn(schema);
+
+        dashboardDataService.fetchDashboardData("shared-dash", false, 1L);
+        dashboardDataService.fetchDashboardData("shared-dash", false, 2L);
+
+        // A tenant-scoped cache forces a fresh resolve for tenant 2 (2 lookups total).
+        // An id-only cache would have served tenant 1's entry to tenant 2 (only 1 lookup).
+        verify(formSchemaMapper, times(2)).selectById("shared-dash");
     }
 
     @Test

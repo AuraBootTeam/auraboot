@@ -35,9 +35,13 @@ public class DashboardDataServiceImpl implements DashboardDataService {
 
     @Override
     public DashboardDataResponse fetchDashboardData(String dashboardId, boolean forceRefresh, Long tenantId) {
+        // Cache is keyed by tenant + dashboard so one tenant's cached widget data is
+        // never served to another tenant that requests the same dashboardId.
+        String cacheKey = tenantId + ":" + dashboardId;
+
         // Check cache first
         if (!forceRefresh) {
-            CachedData cached = cache.get(dashboardId);
+            CachedData cached = cache.get(cacheKey);
             if (cached != null && !cached.isExpired()) {
                 log.debug("Returning cached dashboard data for {}", dashboardId);
                 return cached.response;
@@ -47,6 +51,16 @@ public class DashboardDataServiceImpl implements DashboardDataService {
         // Fetch dashboard schema
         PageSchema schema = formSchemaMapper.selectById(dashboardId);
         if (schema == null) {
+            throw new IllegalArgumentException("Dashboard not found: " + dashboardId);
+        }
+
+        // Tenant ownership: a dashboard belongs to exactly one tenant. Reject a
+        // cross-tenant read and return the same not-found error so the caller cannot
+        // probe whether an id exists in another tenant. (A null owner tenant is a
+        // shared/system dashboard and stays readable.)
+        if (schema.getTenantId() != null && !schema.getTenantId().equals(tenantId)) {
+            log.warn("Cross-tenant dashboard access rejected: dashboardId={}, callerTenant={}, ownerTenant={}",
+                    dashboardId, tenantId, schema.getTenantId());
             throw new IllegalArgumentException("Dashboard not found: " + dashboardId);
         }
 
@@ -98,8 +112,8 @@ public class DashboardDataServiceImpl implements DashboardDataService {
         Object titleVal = dashboardConfig.get("title");
         response.setDashboardTitle(titleVal != null ? String.valueOf(titleVal) : "Dashboard");
 
-        // Update cache
-        cache.put(dashboardId, new CachedData(response, cacheTtl));
+        // Update cache (tenant-scoped key)
+        cache.put(cacheKey, new CachedData(response, cacheTtl));
 
         return response;
     }

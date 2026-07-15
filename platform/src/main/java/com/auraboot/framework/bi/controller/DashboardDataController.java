@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bi.dto.DashboardDataResponse;
 import com.auraboot.framework.bi.service.DashboardDataService;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class DashboardDataController {
     private final DashboardDataService dashboardDataService;
 
     @GetMapping("/{dashboardId}/data")
+    @AuthenticatedAccess
     @Operation(summary = "Fetch all widget data for a dashboard",
             description = "Returns all widget data in one call. Used by Data Screen auto-refresh.")
     public ApiResponse<DashboardDataResponse> getDashboardData(
