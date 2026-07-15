@@ -83,8 +83,10 @@ import {
   buildQuickFilterPreset,
   buildQuickFilterPresetViewRequest,
   getQuickFilterPresetDefinition,
+  getQuickFilterPresetDefinitions,
   isQuickFilterPresetKey,
 } from './list/quickFilterPresets';
+import { assembleQuickFilterChips, type QuickFilterChip } from './list/quickFilterChips';
 import { resolveListRowClickMode } from './list/rowClickNavigation';
 import { SelectAllMatchingBanner } from './list/SelectAllMatchingBanner';
 import {
@@ -3536,6 +3538,32 @@ function ListPageContentInner(props: PageContentProps) {
     ],
   );
 
+  // Assemble the toolbar chip row: built-in filter presets + pinned views.
+  // `pins` stays empty until Half B (M2) adds per-user chip pins.
+  const quickFilterChips = useMemo<QuickFilterChip[]>(
+    () =>
+      assembleQuickFilterChips({
+        presets: getQuickFilterPresetDefinitions(),
+        t,
+        savedViews,
+        pins: [],
+      }),
+    [t, savedViews],
+  );
+
+  // Activate a chip: a filter-preset chip toggles its preset; a view chip
+  // switches to that SavedView (columns / sort / viewType).
+  const handleActivateChip = useCallback(
+    (chip: QuickFilterChip) => {
+      if (chip.kind === 'view') {
+        selectView(chip.viewPid);
+        return;
+      }
+      handleQuickFilter(chip.key);
+    },
+    [selectView, handleQuickFilter],
+  );
+
   const handleSaveActivePreset = useCallback(async () => {
     if (!activeQuickFilter) return;
 
@@ -4516,8 +4544,10 @@ function ListPageContentInner(props: PageContentProps) {
                 hasFilterBlock={
                   !!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)
                 }
+                chips={quickFilterChips}
                 activeQuickFilter={activeQuickFilter}
-                onQuickFilter={handleQuickFilter}
+                currentViewPid={currentView?.pid ?? null}
+                onActivateChip={handleActivateChip}
                 onSaveActivePreset={handleSaveActivePreset}
                 activeSorts={activeSorts}
                 onSortsChange={setActiveSorts}
