@@ -1,310 +1,279 @@
 import { test, expect } from '../../fixtures';
+import {
+  uniqueId,
+  acceptConfirmDialog,
+  executeCommandViaApi,
+  findRowInPaginatedList,
+  clickRowActionByLocator,
+} from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 import { BASE_URL } from '../../helpers/environments';
 
-
 /**
- * Team Management E2E Tests
+ * Team Management E2E Tests (DSL-migrated)
  *
- * Tests the platform-level team management pages:
- * - /organization/teams — Team list + CRUD
- * - /organization/teams/:teamPid — Team detail + member management
+ * `/organization/teams` is now a DSL page on the `ab_team` model
+ * (`ab_team_list` / `ab_team_form` / `ab_team_detail`, wired to the custom paths in
+ * `app/plugins/core-organization/resources.ts`). The previous custom `teams.tsx`
+ * page (`create-team-btn` / `<h1>` / `team-code-input` / `team-save-btn`) is retired,
+ * so these tests exercise the DSL list/form/detail flow instead — mirroring the
+ * proven `org-department.spec.ts`.
+ *
+ * Commands: `org:create_team` / `org:update_team` / `org:delete_team`
+ * (model `ab_team`, inputFields `code` / `name` / `description`).
+ * The `/api/org/teams/:pid/members` REST API still backs member management.
  */
-test.describe('Team Management', () => {
-  const teamCodes: string[] = [];
+const TEAMS_PATH = '/organization/teams';
 
-  // Cleanup: delete all test teams via API
-  test.afterAll(async ({ browser }) => {
-    if (teamCodes.length === 0) return;
+test.describe('Team Management', () => {
+  test.setTimeout(60000);
+  const createdPids: string[] = [];
+
+  // Cleanup: delete all test teams via the model command API.
+  test.afterAll(async ({ browser }, testInfo) => {
+    if (createdPids.length === 0) return;
 
     const context = await browser.newContext({
       storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
+      baseURL: testInfo.project.use.baseURL ?? BASE_URL,
     });
     const page = await context.newPage();
 
-    for (const code of teamCodes) {
-      try {
-        const resp = await page.request.get(`${BASE_URL}/api/org/teams`, {
-          timeout: 10000,
-        });
-        const body = await resp.json();
-        const teams = body?.data || [];
-        const team = teams.find((t: any) => t.code === code);
-        if (team) {
-          // Remove all members first to allow deletion
-          const membersResp = await page.request.get(
-            `${BASE_URL}/api/org/teams/${team.pid}/members`,
-            { timeout: 10000 }
-          );
-          if (membersResp.ok()) {
-            const membersBody = await membersResp.json();
-            const members = membersBody?.data || [];
-            for (const member of members) {
-              await page.request.delete(
-                `${BASE_URL}/api/org/teams/${team.pid}/members/${member.pid}`,
-                { timeout: 10000 }
-              ).catch(() => {});
-            }
-          }
-          await page.request.delete(`${BASE_URL}/api/org/teams/${team.pid}`, {
-            timeout: 10000,
-          });
-        }
-      } catch {
-        // Ignore cleanup errors
-      }
+    for (const pid of [...createdPids].reverse()) {
+      await executeCommandViaApi(page, 'org:delete_team', {}, pid, 'delete').catch(() => {});
     }
 
     await page.close();
     await context.close();
   });
 
+  async function createTeamViaApi(page: import('@playwright/test').Page, label: string) {
+    const code = `e2e-${label}-${Date.now()}`;
+    const name = `${label} Team ${uniqueId(label[0].toUpperCase())}`;
+    const result = await executeCommandViaApi(page, 'org:create_team', {
+      code,
+      name,
+      description: `${label} target`,
+    });
+    expect(result.code, `create team via API failed — org plugin may not be imported`).toBe(
+      ErrorCodes.SUCCESS,
+    );
+    createdPids.push(result.recordId);
+    return { code, name, pid: result.recordId };
+  }
+
   test('TM-001: should display team list page @smoke', async ({ page }) => {
-    await page.goto('/organization/teams');
-    await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator('h1')).toContainText(/Team Management|团队管理/i, { timeout: 10000 });
-    await expect(page.locator('[data-testid="create-team-btn"]')).toBeVisible();
+    await page.goto(TEAMS_PATH, { waitUntil: 'domcontentloaded' });
+
+    // DSL list page heading (h2, not the retired custom-page h1).
+    await expect(page.locator('h2').first()).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.locator('table, [role="table"], [data-testid="dynamic-list"]').first(),
+    ).toBeVisible({ timeout: 10000 });
   });
 
   test('TM-002: should create a team via UI @smoke', async ({ page }) => {
+    await page.goto(TEAMS_PATH, { waitUntil: 'domcontentloaded' });
+
+    const addBtn = page
+      .locator(
+        '[data-testid="toolbar-btn-create"], button:has-text("新增"), button:has-text("新建"):not(:has-text("今日"))',
+      )
+      .first();
+    await expect(addBtn).toBeVisible({ timeout: 10000 });
+    await addBtn.click();
+
+    await page.waitForURL((url) => url.pathname.includes('/new'), { timeout: 10000 });
+    await page.locator('h2').first().waitFor({ state: 'visible', timeout: 10000 });
+
     const code = `e2e-team-${Date.now()}`;
-    const name = `E2E Test Team ${Date.now()}`;
-    teamCodes.push(code);
-
-    await page.goto('/organization/teams');
-    await page.waitForLoadState('domcontentloaded');
-
-    // Wait for page to be ready
-    await expect(page.locator('[data-testid="create-team-btn"]')).toBeVisible({ timeout: 10000 });
-
-    // Click create button
-    await page.locator('[data-testid="create-team-btn"]').click();
-
-    // Wait for modal/form to appear (supports both stable testid and generic field selectors)
-    const codeInput = page
-      .locator(
-        '[data-testid="team-code-input"], input[name="code"], input[placeholder*="团队编码"], input[placeholder*="Team Code"], input[placeholder*="code" i]',
-      )
-      .first();
-    const nameInput = page
-      .locator(
-        '[data-testid="team-name-input"], input[name="name"], input[placeholder*="团队名称"], input[placeholder*="Team Name"], input[placeholder*="name" i]',
-      )
-      .first();
-    const descInput = page
-      .locator(
-        '[data-testid="team-desc-input"], textarea[name="description"], input[name="description"], textarea[placeholder*="描述"], input[placeholder*="description" i]',
-      )
-      .first();
-    await expect(codeInput).toBeVisible({ timeout: 8000 });
-
-    // Fill form
-    await codeInput.fill(code);
-    await nameInput.fill(name);
-    await descInput.fill('Created by E2E test');
-
-    // Submit and wait for the create API response
-    const createResponsePromise = page.waitForResponse(
-      (r) => r.url().includes('/api/org/teams') && r.request().method().toLowerCase() === 'post',
-      { timeout: 10000 }
-    );
+    const name = `E2E Test Team ${uniqueId('T')}`;
     await page
-      .locator('[data-testid="team-save-btn"], button:has-text("保存"), button:has-text("Save"), button:has-text("确定"), button[type="submit"]')
+      .locator('[data-testid="form-field-code"] input, input[name="code"]')
+      .first()
+      .fill(code);
+    await page
+      .locator('[data-testid="form-field-name"] input, input[name="name"]')
+      .first()
+      .fill(name);
+    const descField = page
+      .locator(
+        '[data-testid="form-field-description"] textarea, [data-testid="form-field-description"] input, textarea[name="description"]',
+      )
+      .first();
+    if (await descField.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await descField.fill('Created by E2E test');
+    }
+
+    // `status` is a required Select on the create form — open it and pick the
+    // first option (edit reuses the record's existing status, so this is
+    // create-only). Click the leaf [role="option"], not the Radix viewport.
+    const statusTrigger = page
+      .locator(
+        '[data-testid="select-trigger-status"], [data-testid="form-field-status"] [role="combobox"], [data-testid="form-field-status"] button[role="combobox"]',
+      )
+      .first();
+    if (await statusTrigger.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await statusTrigger.click();
+      const statusOption = page.locator('[role="option"], [data-slot="select-item"]').first();
+      await expect(statusOption).toBeVisible({ timeout: 5000 });
+      await statusOption.click();
+      await expect(statusOption).toBeHidden({ timeout: 3000 }).catch(() => undefined);
+    }
+
+    const cmdResponse = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post',
+        { timeout: 10000 },
+      )
+      .catch(() => null);
+    await page
+      .locator(
+        '[data-testid="form-btn-submit"], [data-testid^="form-btn-"], button:has-text("保存"), button:has-text("提交")',
+      )
       .first()
       .click();
-    const createResp = await createResponsePromise;
-    expect(createResp.ok()).toBe(true);
 
-    // Verify team appears in list (stable selector first, then text fallback)
-    const rowAction = page.locator(`[data-testid="team-edit-${code}"]`);
-    const hasRowAction = await rowAction.isVisible({ timeout: 10000 }).catch(() => false);
-    if (!hasRowAction) {
-      await expect(page.locator(`text=${name}`)).toBeVisible({ timeout: 10000 });
-    }
+    const resp = await cmdResponse;
+    expect(resp, 'create command should fire').not.toBeNull();
+    const body = await resp!.json();
+    expect(String(body.code), `create team failed: ${JSON.stringify(body)}`).toBe(
+      ErrorCodes.SUCCESS,
+    );
+    const pid = body?.data?.data?.recordPid;
+    if (pid) createdPids.push(pid);
+
+    await page
+      .waitForURL((url) => !url.pathname.includes('/new'), { timeout: 10000 })
+      .catch(() => {});
+
+    // The new team is reachable via the list (search by the unique name).
+    await page.goto(`${TEAMS_PATH}?pageNum=1&pageSize=200`, { waitUntil: 'domcontentloaded' });
+    const row = await findRowInPaginatedList(page, name, 15000);
+    await expect(row).toBeVisible({ timeout: 5000 });
   });
 
   test('TM-003: should edit a team via UI', async ({ page }) => {
-    // Create team via API first
-    const code = `e2e-edit-${Date.now()}`;
-    const name = `Edit Test ${Date.now()}`;
-    teamCodes.push(code);
+    const { name } = await createTeamViaApi(page, 'edit');
 
-    const createResp = await page.request.post(`${BASE_URL}/api/org/teams`, {
-      data: { code, name, description: 'To be edited' },
-      timeout: 10000,
-    });
-    const createBody = await createResp.json();
-    expect(createBody.code).toBe(ErrorCodes.SUCCESS);
+    await page.goto(`${TEAMS_PATH}?pageNum=1&pageSize=200`, { waitUntil: 'domcontentloaded' });
+    const row = await findRowInPaginatedList(page, name, 15000);
+    await expect(row).toBeVisible({ timeout: 5000 });
 
-    await page.goto('/organization/teams');
-    await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator(`text=${name}`)).toBeVisible({ timeout: 10000 });
+    await clickRowActionByLocator(page, row, 'edit');
+    await page.waitForURL((url) => url.pathname.includes('/edit'), { timeout: 10000 });
+    await page.locator('h2').first().waitFor({ state: 'visible', timeout: 10000 });
 
-    // Click edit button
-    await page.locator(`[data-testid="team-edit-${code}"]`).click();
+    const updatedName = `Updated Team ${uniqueId('U')}`;
+    await page
+      .locator('[data-testid="form-field-name"] input, input[name="name"]')
+      .first()
+      .fill(updatedName);
 
-    // Wait for modal to appear with pre-filled data
-    await expect(page.locator('[data-testid="team-name-input"]')).toBeVisible({ timeout: 5000 });
+    const cmdResponse = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post',
+        { timeout: 10000 },
+      )
+      .catch(() => null);
+    await page
+      .locator('[data-testid^="form-btn-"], button:has-text("保存"), button:has-text("提交")')
+      .first()
+      .click();
 
-    // Update name
-    const updatedName = `Updated ${Date.now()}`;
-    await page.locator('[data-testid="team-name-input"]').fill(updatedName);
-
-    // Submit and wait for API response
-    const updateResponsePromise = page.waitForResponse(
-      (r) => r.url().includes('/api/org/teams') && r.request().method().toLowerCase() === 'put',
-      { timeout: 10000 }
+    const resp = await cmdResponse;
+    expect(resp, 'update command should fire').not.toBeNull();
+    const body = await resp!.json();
+    expect(String(body.code), `update team failed: ${JSON.stringify(body)}`).toBe(
+      ErrorCodes.SUCCESS,
     );
-    await page.locator('[data-testid="team-save-btn"]').click();
-    await updateResponsePromise;
 
-    // Verify updated name
-    await expect(page.locator(`text=${updatedName}`)).toBeVisible({ timeout: 10000 });
+    // Verify the persisted rename is visible back in the list.
+    await page.goto(`${TEAMS_PATH}?pageNum=1&pageSize=200`, { waitUntil: 'domcontentloaded' });
+    const updatedRow = await findRowInPaginatedList(page, updatedName, 15000);
+    await expect(updatedRow).toBeVisible({ timeout: 5000 });
   });
 
   test('TM-004: should delete a team via UI', async ({ page }) => {
-    // Create team via API
-    const code = `e2e-del-${Date.now()}`;
-    const name = `Delete Test ${Date.now()}`;
+    const { name, pid } = await createTeamViaApi(page, 'del');
 
-    const createResp = await page.request.post(`${BASE_URL}/api/org/teams`, {
-      data: { code, name },
-      timeout: 10000,
-    });
-    const createBody = await createResp.json();
-    expect(createBody.code).toBe(ErrorCodes.SUCCESS);
+    await page.goto(`${TEAMS_PATH}?pageNum=1&pageSize=200`, { waitUntil: 'domcontentloaded' });
+    const row = await findRowInPaginatedList(page, name, 15000);
+    await expect(row).toBeVisible({ timeout: 5000 });
 
-    await page.goto('/organization/teams');
-    await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator(`text=${name}`)).toBeVisible({ timeout: 10000 });
+    const deleteResponse = page
+      .waitForResponse(
+        (r) =>
+          r.url().includes('/api/meta/commands/execute/') &&
+          r.request().method().toLowerCase() === 'post',
+        { timeout: 10000 },
+      )
+      .catch(() => null);
+    await clickRowActionByLocator(page, row, 'delete');
+    await acceptConfirmDialog(page);
+    await deleteResponse;
 
-    // Auto-accept confirm dialog
-    page.on('dialog', (dialog) => dialog.accept());
+    await expect(page.locator('tbody tr', { hasText: name })).toHaveCount(0, { timeout: 10000 });
 
-    // Set up response listener BEFORE clicking
-    const deleteResponsePromise = page.waitForResponse(
-      (r) => r.url().includes('/api/org/teams') && r.request().method().toLowerCase() === 'delete',
-      { timeout: 10000 }
-    );
-
-    // Click delete
-    await page.locator(`[data-testid="team-delete-${code}"]`).click();
-
-    // Wait for delete API to complete
-    await deleteResponsePromise;
-
-    // Verify removed from list
-    await expect(page.locator(`text=${name}`)).not.toBeVisible({ timeout: 10000 });
+    const idx = createdPids.indexOf(pid);
+    if (idx >= 0) createdPids.splice(idx, 1);
   });
 
-  test('TM-005: should navigate to team detail and view members @smoke', async ({ page }) => {
-    // Create team via API
-    const code = `e2e-detail-${Date.now()}`;
-    const name = `Detail Test ${Date.now()}`;
-    teamCodes.push(code);
+  test('TM-005: should navigate to team detail and view it @smoke', async ({ page }) => {
+    const { name, pid } = await createTeamViaApi(page, 'detail');
 
-    const createResp = await page.request.post(`${BASE_URL}/api/org/teams`, {
-      data: { code, name, description: 'Detail test team' },
-      timeout: 10000,
-    });
-    const createBody = await createResp.json();
-    expect(createBody.code).toBe(ErrorCodes.SUCCESS);
-    const teamPid = createBody.data.pid;
+    await page.goto(`${TEAMS_PATH}/${pid}`, { waitUntil: 'domcontentloaded' });
 
-    await page.goto('/organization/teams');
-    await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator(`text=${name}`)).toBeVisible({ timeout: 10000 });
-
-    // Click members icon to navigate to detail
-    await page.locator(`[data-testid="team-members-${code}"]`).click();
-
-    // Verify detail page — use expect().toHaveURL() for SPA navigation
-    await expect(page).toHaveURL(new RegExp(`/organization/teams/${teamPid}`), { timeout: 10000 });
-    await expect(page.locator(`h1:has-text("${name}")`)).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('[data-testid="add-member-btn"]')).toBeVisible();
+    // Detail page renders in the content area and shows the team name.
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(name).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('TM-006: should add and remove team member via UI', async ({ page }) => {
-    // Create team via API
-    const code = `e2e-member-${Date.now()}`;
-    const name = `Member Test ${Date.now()}`;
-    teamCodes.push(code);
+  test('TM-006: should add and remove a team member', async ({ page, request }) => {
+    const { pid: teamPid } = await createTeamViaApi(page, 'member');
 
-    const createResp = await page.request.post(`${BASE_URL}/api/org/teams`, {
-      data: { code, name },
-      timeout: 10000,
+    // Resolve a real tenant member (its underlying user pid) to add.
+    const membersSearch = await request.post(`${BASE_URL}/api/tenant/members/search`, {
+      data: { keyword: '', pageNum: 1, pageSize: 5 },
     });
-    const createBody = await createResp.json();
-    expect(createBody.code).toBe(ErrorCodes.SUCCESS);
-    const teamPid = createBody.data.pid;
+    expect(membersSearch.ok(), `member search: ${membersSearch.status()}`).toBe(true);
+    const membersBody = await membersSearch.json();
+    const searchRecords = membersBody?.data?.records ?? membersBody?.data ?? [];
+    const userPid = searchRecords[0]?.user?.pid;
+    expect(userPid, 'a tenant member with a user pid should exist').toBeTruthy();
 
-    // Navigate to team detail
-    await page.goto(`/organization/teams/${teamPid}`);
-    await page.waitForLoadState('domcontentloaded');
-    await expect(page.locator(`h1`).filter({ hasText: name })).toBeVisible({ timeout: 10000 });
+    // Add the member via the team REST API — TeamMemberAddRequest accepts userPid
+    // (the /api/org/teams member endpoints still back member management post-DSL).
+    const addResp = await request.post(`${BASE_URL}/api/org/teams/${teamPid}/members`, {
+      data: { userPid },
+    });
+    expect(addResp.ok(), `add member: ${addResp.status()} ${await addResp.text()}`).toBe(true);
 
-    // Click add member
-    await page.locator('[data-testid="add-member-btn"]').click();
-
-    // Wait for member select to load — use soft check since select only appears when members exist
-    const memberSelect = page.locator('[data-testid="member-select"]');
-    const hasMemberSelect = await memberSelect.isVisible({ timeout: 5000 }).catch(() => false);
-
-    if (!hasMemberSelect) {
-      // No available tenant members — nothing to test
-      test.info().annotations.push({
-        type: 'note',
-        description: 'Member select not available — no tenant members to add',
-      });
-      return;
-    }
-
-    // Select first available member (if any)
-    const options = memberSelect.locator('option');
-    const optionCount = await options.count();
-
-    if (optionCount <= 1) {
-      // Only placeholder option — no real members available
-      test.info().annotations.push({
-        type: 'note',
-        description: 'No selectable members available',
-      });
-      return;
-    }
-
-    // Select the first real option (skip placeholder)
-    const firstOption = await options.nth(1).getAttribute('value');
-    if (!firstOption) return;
-
-    await memberSelect.selectOption(firstOption);
-
-    // Click confirm and wait for API response
-    const addMemberResponsePromise = page.waitForResponse(
-      (r) => r.url().includes('/api/org/teams/') && r.request().method().toLowerCase() === 'post',
-      { timeout: 10000 }
+    // Membership is reflected in the team members list.
+    const afterAdd = await request.get(`${BASE_URL}/api/org/teams/${teamPid}/members`);
+    expect(afterAdd.ok()).toBe(true);
+    const addedMembers = (await afterAdd.json())?.data ?? [];
+    const memberRow = addedMembers.find(
+      (m: { userPid?: string }) => m.userPid === userPid,
     );
-    await page.locator('[data-testid="add-member-confirm-btn"]').click();
-    await addMemberResponsePromise;
+    expect(memberRow, `added member should appear in list: ${JSON.stringify(addedMembers)}`).toBeTruthy();
 
-    // Verify member appears in the table
-    const memberRow = page.locator('table tbody tr');
-    await expect(memberRow.first()).toBeVisible({ timeout: 10000 });
+    // The detail page renders for the team with a member.
+    await page.goto(`${TEAMS_PATH}/${teamPid}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('main').first()).toBeVisible({ timeout: 10000 });
 
-    // Auto-accept confirm dialog for removal (uses native confirm())
-    page.on('dialog', (dialog) => dialog.accept());
-
-    // Remove the member — find the remove button in the row
-    const removeBtn = memberRow.first().locator('button[title="Remove member"], button').first();
-
-    // Set up response listener BEFORE clicking
-    const removeResponsePromise = page.waitForResponse(
-      (r) => r.url().includes('/api/org/teams/') && r.request().method().toLowerCase() === 'delete',
-      { timeout: 10000 }
+    // Remove the member (delete keys on the membership row pid) and confirm it is gone.
+    const removeResp = await request.delete(
+      `${BASE_URL}/api/org/teams/${teamPid}/members/${memberRow.pid}`,
     );
-    await removeBtn.click();
-    await removeResponsePromise;
+    expect(removeResp.ok(), `remove member: ${removeResp.status()}`).toBe(true);
 
-    // Verify member removed
-    await expect(page.getByText(/No members yet|暂无成员/i)).toBeVisible({ timeout: 10000 });
+    const afterRemove = await request.get(`${BASE_URL}/api/org/teams/${teamPid}/members`);
+    const remaining = (await afterRemove.json())?.data ?? [];
+    expect(remaining.some((m: { userPid?: string }) => m.userPid === userPid)).toBe(false);
   });
 });
