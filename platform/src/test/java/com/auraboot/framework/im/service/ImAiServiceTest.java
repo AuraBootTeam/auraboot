@@ -1,5 +1,6 @@
 package com.auraboot.framework.im.service;
 
+import com.auraboot.framework.agent.identity.AuraBotAgentResolver;
 import com.auraboot.framework.conversation.ConversationTurnService;
 import com.auraboot.framework.conversation.InboundMode;
 import com.auraboot.framework.conversation.ResponseSink;
@@ -8,6 +9,7 @@ import com.auraboot.framework.conversation.TurnRequest;
 import com.auraboot.framework.conversation.turn.TurnRegistry;
 import com.auraboot.framework.im.dto.WsFrame;
 import com.auraboot.framework.im.mapper.ImConversationMemberMapper;
+import com.auraboot.framework.im.model.ImConstants;
 import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.pubsub.ImMessageBroadcaster;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +30,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -60,9 +63,13 @@ class ImAiServiceTest {
     @Mock private ImMessageBroadcaster broadcaster;
     @Mock private ImConversationMemberMapper memberMapper;
     @Mock private ConversationTurnService turnService;
+    @Mock private AuraBotAgentResolver agentResolver;
     private TurnRegistry turnRegistry = new TurnRegistry();
 
     private ImAiService service;
+
+    /** Default resolved AuraBot agent id used by the shared setUp stub. */
+    private static final long RESOLVED_AGENT_ID = 7777L;
 
     private static final Long TENANT_ID = 7L;
     private static final Long CONV_ID = 999L;
@@ -72,7 +79,12 @@ class ImAiServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ImAiService(messageService, broadcaster, memberMapper, turnService, turnRegistry);
+        service = new ImAiService(messageService, broadcaster, memberMapper, turnService,
+                turnRegistry, agentResolver);
+        // generateResponse now always resolves the AuraBot agent id before building
+        // the sink; lenient so tests that don't assert on the resolved id (and never
+        // drive the sink) don't trip STRICT_STUBS.
+        lenient().when(agentResolver.resolve(anyLong(), any())).thenReturn(RESOLVED_AGENT_ID);
     }
 
     private ImMessage triggeringMessage() {
@@ -237,6 +249,45 @@ class ImAiServiceTest {
         // ImAiService never broadcasts when getMessagesAfterSeq returns empty.
         // The sink's frames are exercised in BroadcastResponseSinkTest, not here.
         verify(broadcaster, never()).publish(any(), any());
+    }
+
+    @Test
+    @DisplayName("P-007: ai_turn_started frame carries the resolved (non-zero) agentId + the sink turnId, not 0L placeholder")
+    void generateResponse_sinkFramesCarryResolvedAgentIdAndTurnId() {
+        when(memberMapper.findHumanMemberIds(CONV_ID, TENANT_ID)).thenReturn(MEMBERS);
+        // Real chokepoint drives the sink lifecycle; here we mimic that by having
+        // the mocked runTurn call sink.onTurnBegin (which publishes ai_turn_started).
+        when(turnService.runTurn(any(), any(ResponseSink.class))).thenAnswer(inv -> {
+            ResponseSink sink = inv.getArgument(1);
+            sink.onTurnBegin("chokepoint-turn-id", null, CONV_ID, IM_MSG_ID, USER_ID);
+            return new TurnOutcome.Success("ok", Map.of());
+        });
+        when(messageService.getMessagesAfterSeq(eq(CONV_ID), eq(42L), anyInt(), eq(TENANT_ID)))
+                .thenReturn(List.of());
+
+        service.generateResponse(triggeringMessage(), TENANT_ID);
+
+        // The AuraBot agent id was resolved via AuraBotAgentResolver.resolve, using
+        // the canonical agentCode — same identity persistOutbound resolves.
+        verify(agentResolver, times(1)).resolve(TENANT_ID, AuraBotAgentResolver.DEFAULT_AGENT_CODE);
+
+        ArgumentCaptor<WsFrame> frameCaptor = ArgumentCaptor.forClass(WsFrame.class);
+        verify(broadcaster, atLeastOnce()).publish(eq(MEMBERS), frameCaptor.capture());
+        WsFrame started = frameCaptor.getAllValues().stream()
+                .filter(f -> ImConstants.WS_AI_TURN_STARTED.equals(f.getType()))
+                .findFirst()
+                .orElseThrow();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) started.getData();
+
+        // agentId is the resolved, non-zero AuraBot id — not the old 0L placeholder.
+        assertThat(data.get("agentId")).isEqualTo(RESOLVED_AGENT_ID);
+        assertThat(data.get("agentId")).isNotEqualTo(0L);
+        // turnId is a single authoritative id threaded through the sink AND
+        // registered with the TurnRegistry (cancel lifecycle) — non-blank + known.
+        String turnId = (String) data.get("turnId");
+        assertThat(turnId).isNotBlank();
+        assertThat(turnRegistry.get(turnId)).isPresent();
     }
 
     @Test
