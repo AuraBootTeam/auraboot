@@ -34,12 +34,13 @@ class ScheduledOnlineEvalJobTest {
 
     private final AgentOnlineEvalService onlineEvalService = mock(AgentOnlineEvalService.class);
     private final AgentObservationService observationService = mock(AgentObservationService.class);
+    private final OnlineEvalCasePromoter casePromoter = mock(OnlineEvalCasePromoter.class);
 
     private ScheduledOnlineEvalJob job;
 
     @BeforeEach
     void setup() {
-        job = new ScheduledOnlineEvalJob(onlineEvalService, observationService);
+        job = new ScheduledOnlineEvalJob(onlineEvalService, observationService, casePromoter);
         ReflectionTestUtils.setField(job, "tenantId", 1L);
         ReflectionTestUtils.setField(job, "sinceHours", 24);
         ReflectionTestUtils.setField(job, "maxRuns", 200);
@@ -105,5 +106,30 @@ class ScheduledOnlineEvalJobTest {
         verify(observationService, never())
                 .publish(anyLong(), anyString(), anyString(), any(), any(), any());
         assertTrue((Boolean) result.get("qualityOk"));
+    }
+
+    @Test
+    void promotesHardFailuresWhenEnabled() {
+        ReflectionTestUtils.setField(job, "promoteFailures", true);
+        ReflectionTestUtils.setField(job, "maxPromotions", 20);
+        AgentTurnQualityJudge.TurnVerdict hardFail =
+                new AgentTurnQualityJudge.TurnVerdict("run-x", 0.0, false, "fail");
+        when(onlineEvalService.sampleAndJudge(anyLong(), anyInt(), anyInt()))
+                .thenReturn(new OnlineEvalSummary("heuristic", 1, 0.0, 1.0, 0.0, 0.0, List.of(hardFail)));
+        when(casePromoter.promoteHardFailures(eq(1L), any(), eq(20))).thenReturn(1);
+
+        Map<String, Object> result = job.runOnce(1L);
+
+        verify(casePromoter).promoteHardFailures(eq(1L), any(), eq(20));
+        assertEquals(1, result.get("promotedCandidates"));
+    }
+
+    @Test
+    void doesNotPromoteWhenDisabled() {
+        // promoteFailures defaults to false
+        when(onlineEvalService.sampleAndJudge(anyLong(), anyInt(), anyInt()))
+                .thenReturn(summary(1, 1.0, 0.0, 0.0, 1.0));
+        job.runOnce(1L);
+        verify(casePromoter, never()).promoteHardFailures(anyLong(), any(), anyInt());
     }
 }

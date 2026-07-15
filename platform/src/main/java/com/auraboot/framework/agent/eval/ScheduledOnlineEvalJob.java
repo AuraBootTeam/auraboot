@@ -33,6 +33,7 @@ public class ScheduledOnlineEvalJob {
 
     private final AgentOnlineEvalService onlineEvalService;
     private final AgentObservationService observationService;
+    private final OnlineEvalCasePromoter casePromoter;
 
     @Value("${aura.agent.online-eval.scheduled.enabled:false}")
     private boolean enabled;
@@ -56,10 +57,18 @@ public class ScheduledOnlineEvalJob {
     @Value("${aura.agent.online-eval.scheduled.min-avg-score:0.50}")
     private double minAvgScore;
 
+    /** CAP-02 flywheel: auto-promote online hard failures to candidate regression cases. Default off. */
+    @Value("${aura.agent.online-eval.promote-failures.enabled:false}")
+    private boolean promoteFailures;
+    @Value("${aura.agent.online-eval.promote-failures.max-per-run:20}")
+    private int maxPromotions;
+
     public ScheduledOnlineEvalJob(AgentOnlineEvalService onlineEvalService,
-                                  AgentObservationService observationService) {
+                                  AgentObservationService observationService,
+                                  OnlineEvalCasePromoter casePromoter) {
         this.onlineEvalService = onlineEvalService;
         this.observationService = observationService;
+        this.casePromoter = casePromoter;
     }
 
     /** Nightly by default (04:00, after the L3 03:00 job). Override via {@code ...scheduled.cron}. */
@@ -96,6 +105,18 @@ public class ScheduledOnlineEvalJob {
         result.put("avgScore", summary.avgScore());
         result.put("qualityOk", verdict.ok());
         result.put("qualitySummary", verdict.summary());
+
+        // CAP-02 flywheel closure: capture hard failures as deduped candidate regression
+        // cases so they outlive the summary. Best-effort — never fails the cycle.
+        if (promoteFailures) {
+            try {
+                int promoted = casePromoter.promoteHardFailures(
+                        tenantId, summary.unhealthy(), maxPromotions);
+                result.put("promotedCandidates", promoted);
+            } catch (Exception e) {
+                log.warn("Online-eval candidate promotion failed for tenant {}: {}", tenantId, e.getMessage());
+            }
+        }
 
         if (!verdict.ok()) {
             emitDegraded(tenantId, summary, verdict);
