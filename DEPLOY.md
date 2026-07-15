@@ -185,6 +185,22 @@ docker compose --profile full up --build -d backend
 docker compose --profile full up --build -d frontend
 ```
 
+## Remote deploy to a host (pre-built images)
+
+To deploy to a host that **can't build or pull the images** (air-gapped, GHCR-blocked,
+or CN networks), use the self-contained orchestrator
+[`scripts/deploy/oss-remote/deploy.sh`](scripts/deploy/oss-remote/deploy.sh). It builds the
+backend + frontend images off-host, ships them with `docker save | ssh docker load`,
+brings the stack up, bootstraps the admin + plugins, seeds showcase demo data, and
+verifies the live URL — nothing is compiled on the target host.
+
+```bash
+HOST=root@1.2.3.4 PUBLIC_URL=http://1.2.3.4 scripts/deploy/oss-remote/deploy.sh
+```
+
+Supports a `coexist` mode to slot in behind an existing reverse proxy on the host
+without touching its config. See [`scripts/deploy/oss-remote/README.md`](scripts/deploy/oss-remote/README.md).
+
 ## Production Checklist
 
 Before going to production:

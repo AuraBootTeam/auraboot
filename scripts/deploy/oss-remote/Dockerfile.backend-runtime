@@ -1,0 +1,26 @@
+# AuraBoot OSS backend — amd64 (or target-arch) runtime-only image.
+# The Spring bootJar is architecture-independent, so deploy.sh builds it natively
+# on the host (fast) and bakes it here, avoiding a slow QEMU cross-compile.
+# Mirrors stage 2 of platform/Dockerfile. Build context: platform/
+FROM eclipse-temurin:21-jre-alpine
+
+WORKDIR /app
+
+# Optional domestic alpine mirror (deploy.sh passes APK_MIRROR when set).
+ARG APK_MIRROR=
+RUN [ -n "$APK_MIRROR" ] && sed -i "s|dl-cdn.alpinelinux.org|${APK_MIRROR}|g" /etc/apk/repositories || true
+RUN apk add --no-cache wget
+
+RUN addgroup -g 1000 appuser && adduser -D -u 1000 -G appuser appuser
+RUN mkdir -p /app/data/files /app/data/git-repos /app/data/artifacts && chown -R appuser:appuser /app
+
+# Freshly-built boot jar (carries the 'boot' classifier).
+COPY --chown=appuser:appuser build/libs/*-boot.jar app.jar
+
+USER appuser
+EXPOSE 6443
+ENV JAVA_OPTS="-Xms384m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200"
+ENV SPRING_PROFILES_ACTIVE="community"
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:6443/actuator/health || exit 1
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

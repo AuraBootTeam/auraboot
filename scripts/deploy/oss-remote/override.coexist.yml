@@ -1,0 +1,18 @@
+# Coexist mode: an existing reverse proxy (e.g. Caddy) on the host already owns
+# 80/443 on another compose project's network. The OSS gateway joins that external
+# network (EDGE_NETWORK) with alias `gateway`, so the existing proxy's
+# `reverse_proxy gateway:80` transparently serves OSS — no proxy config change.
+# Only a loopback admin port is published (for on-host bootstrap/health).
+services:
+  gateway:
+    ports:
+      - "127.0.0.1:${LOCAL_ADMIN_PORT:-18081}:80"
+    networks:
+      oss: {}
+      edge:
+        aliases: [gateway]
+
+networks:
+  edge:
+    external: true
+    name: ${EDGE_NETWORK:?set EDGE_NETWORK for coexist mode}
