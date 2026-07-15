@@ -442,9 +442,11 @@ public class ModelCreateSkill implements AuraBotSkill {
                 "SELECT id FROM ab_meta_model WHERE pid = #{params.p}",
                 Map.of("p", modelPid));
         if (modelRows.isEmpty()) {
+            // English + no raw pid in the message, matching the sibling throws in this file
+            // (I18N-009): the Chinese literal violated §3 and the ULID leaked a raw code.
             throw new ValidationException(
                     com.auraboot.framework.common.constant.ResponseCode.CommonValidationFailed,
-                    "模型不存在: " + modelPid);
+                    "model not found");
         }
         Long modelId = ((Number) modelRows.get(0).get("id")).longValue();
 
