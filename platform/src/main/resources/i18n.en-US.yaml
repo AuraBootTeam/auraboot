@@ -1359,3 +1359,8 @@ notification_rule:
   saving: Saving...
   update_rule: Update rule
   create_rule: Create rule
+
+aurabot:
+  error:
+    # Streamed to the AuraBot chat panel when no LLM provider is configured for the tenant.
+    no_llm_provider: No LLM provider configured. Please configure an API key in Cloud Config.
