@@ -32,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -629,10 +630,29 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     }
                 }
             } catch (Exception e) {
-                // codeql[java/log-injection] Field/model codes are validated metadata identifiers and are logged as structured parameters only.
-                log.warn("Failed to enrich REFERENCE display for field {} in model {}: {}",
-                        logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
+                logReferenceEnrichmentFailure(fieldCode, modelCode, e);
             }
+        }
+    }
+
+    /**
+     * Best-effort reference-display enrichment must never silently mask a real error. When the
+     * enrichment query fails <b>inside an active transaction</b> it also aborts that transaction
+     * (Postgres {@code 25P02}), so the surrounding operation then fails with confusing downstream
+     * {@code current transaction is aborted} errors that bury the true cause. Log at ERROR with
+     * that correlation so the root cause is a one-line find rather than a stack dig. Outside a
+     * transaction the failure is self-contained, so WARN is enough.
+     */
+    private void logReferenceEnrichmentFailure(String fieldCode, String modelCode, Exception e) {
+        // codeql[java/log-injection] Field/model codes are validated metadata identifiers and are logged as structured parameters only.
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            log.error("REFERENCE display enrichment for field {} of model {} failed inside an active "
+                            + "transaction; this aborts the transaction, so any following 'current "
+                            + "transaction is aborted' (25P02) errors are secondary. Root cause: {}",
+                    logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
+        } else {
+            log.warn("Failed to enrich REFERENCE display for field {} in model {}: {}",
+                    logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
         }
     }
 
