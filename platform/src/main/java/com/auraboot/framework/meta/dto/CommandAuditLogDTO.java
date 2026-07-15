@@ -32,6 +32,10 @@ public class CommandAuditLogDTO {
     private String phaseReached;
     /** JSON map of phase → duration_ms, e.g. {"load":5,"schema_validate":2,...} */
     private String phaseTimings;
+    /** OTel W3C trace id (32-hex) — correlates this command execution to the distributed trace. */
+    private String traceId;
+    /** OTel W3C span id (16-hex) of the command execution span. */
+    private String spanId;
     private Instant createdAt;
 
     public static CommandAuditLogDTO from(com.auraboot.framework.meta.entity.CommandAuditLog entity) {
@@ -47,6 +51,8 @@ public class CommandAuditLogDTO {
         dto.setExecutionTimeMs(entity.getExecutionTimeMs());
         dto.setPhaseReached(entity.getPhaseReached());
         dto.setPhaseTimings(normalizePhaseTimings(entity.getPhaseTimings()));
+        dto.setTraceId(entity.getTraceId());
+        dto.setSpanId(entity.getSpanId());
         dto.setCreatedAt(entity.getCreatedAt());
         return dto;
     }

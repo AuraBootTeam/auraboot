@@ -208,6 +208,12 @@ export default function TraceDetailPage() {
           >
             {'\u2190'} {l('返回列表', 'Back to list')}
           </button>
+          <button
+            onClick={() => navigate(`/ops/troubleshooting?traceId=${encodeURIComponent(trace.traceId)}`)}
+            className="mb-3 ml-4 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400"
+          >
+            {l('跨域关联(鹰眼排障台)', 'Cross-domain correlation (Eagle-eye)')} {'→'}
+          </button>
 
           <div className="flex items-start justify-between">
             <div>

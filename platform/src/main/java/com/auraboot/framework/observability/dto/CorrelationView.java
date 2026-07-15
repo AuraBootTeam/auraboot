@@ -3,6 +3,7 @@ package com.auraboot.framework.observability.dto;
 import com.auraboot.framework.agent.trace.entity.GenAiUsageRecord;
 import com.auraboot.framework.audit.entity.AdminEventLog;
 import com.auraboot.framework.behavior.entity.BehaviorEvent;
+import com.auraboot.framework.meta.dto.CommandAuditLogDTO;
 import lombok.Data;
 
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.List;
 @Data
 public class CorrelationView {
     private String traceId;
+    private List<CommandAuditLogDTO> commandAudits; // command pipeline domain (phase timings + error)
     private List<GenAiUsageRecord> llmUsage;     // cost domain (A-G6)
     private List<BehaviorEvent> behaviorEvents;  // behavior domain (M1)
     private List<AdminEventLog> auditEvents;      // audit domain (A-G2)
