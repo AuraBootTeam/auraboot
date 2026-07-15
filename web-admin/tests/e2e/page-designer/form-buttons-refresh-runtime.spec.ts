@@ -263,7 +263,12 @@ test.describe('Page Designer form-buttons refresh runtime', () => {
     const body = await response.json();
     expect(body.code, 'nested form button update command code').toBe('0');
     const commandRequestBody = commandRequestCapture.body;
-    expect(commandRequestBody?.targetRecordId, 'nested form button command target').toBe(targetPid);
+    // pid-only public contract: the form runtime sends targetRecordPid (targetRecordId
+    // is @JsonIgnore on CommandExecuteRequest — data-and-api.md §Public Record).
+    expect(
+      commandRequestBody?.targetRecordPid ?? commandRequestBody?.targetRecordId,
+      'nested form button command target',
+    ).toBe(targetPid);
     expect(commandRequestBody?.operationType, 'nested form button command operation').toBe(
       'UPDATE',
     );

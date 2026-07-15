@@ -302,7 +302,8 @@ test.describe('Scheduled Task — Full Lifecycle (P0)', () => {
     const body = await (commandResponse as any).json().catch(() => ({}));
     expect(String(body?.code), 'create command should succeed').toBe('0');
     const result = body?.data?.data ?? body?.data ?? {};
-    taskPid = String(result?.recordId ?? result?.pid ?? '');
+    // pid-only public contract: create commands return recordPid (data-and-api.md §Public Record).
+    taskPid = String(result?.recordPid ?? result?.recordId ?? result?.pid ?? '');
     expect(taskPid, 'create should return a valid pid').toBeTruthy();
 
     await waitForToast(page, undefined, 5_000).catch(() => null);
