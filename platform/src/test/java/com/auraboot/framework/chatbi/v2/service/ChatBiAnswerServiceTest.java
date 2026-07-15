@@ -22,7 +22,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -31,6 +35,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -45,6 +50,7 @@ class ChatBiAnswerServiceTest {
     private ConversationService conversationService;
     private DisambiguationService disambig;
     private ChatBiAnswerMapper answerMapper;
+    private ChatBiAnswerPersistence persistence;
     private ChatBiAnswerService service;
 
     @BeforeEach
@@ -57,8 +63,14 @@ class ChatBiAnswerServiceTest {
         disambig = mock(DisambiguationService.class);
         answerMapper = mock(ChatBiAnswerMapper.class);
 
+        // Real persistence bean over the mocked mapper + conversation service. In a
+        // plain unit test the REQUIRES_NEW proxy is a no-op, so it simply forwards to
+        // the mocks — the transaction isolation itself is asserted structurally by
+        // bestEffortPersistenceRunsInRequiresNewTransaction() below.
+        persistence = new ChatBiAnswerPersistence(answerMapper, conversationService);
+
         service = new ChatBiAnswerService(router, catalog, queryService,
-                compiler, conversationService, disambig, answerMapper);
+                compiler, conversationService, disambig, persistence);
 
         MetaContext.setCurrentTenantId(1L);
         MetaContext.setCurrentUserId(100L);
@@ -135,6 +147,73 @@ class ChatBiAnswerServiceTest {
         assertThat(r.getStatus()).isEqualTo(ChatBiAnswerResponse.STATUS_SUCCESS);
         verify(conversationService, never()).loadContext(anyLong(), anyString());
         verify(conversationService, never()).append(anyLong(), anyString(), anyString(), anyString());
+    }
+
+    // -- TX-003: best-effort persistence failures must not fail the answer ---
+
+    private void stubHappyPath() throws Exception {
+        when(catalog.listCatalog(1L)).thenReturn(new SemanticMetaResponse());
+        when(router.translate(any(), any(), any()))
+                .thenReturn(routeOutcome(goodIntent(0.95), "anthropic"));
+        when(disambig.evaluate(any(), eq(1L), anyString(), anyString()))
+                .thenReturn(DisambiguationService.Verdict.useTop1());
+        when(compiler.compile(any(), any())).thenReturn(new SemanticQueryRequest());
+        SemanticQueryResponse exec = new SemanticQueryResponse();
+        exec.setRows(List.of(Map.of("month", "2026-01", "total_sales", 100)));
+        exec.setRowcount(1);
+        exec.setSql("SELECT ...");
+        when(queryService.executeQuery(any(), any())).thenReturn(exec);
+    }
+
+    @Test
+    void conversationAppendFailureDoesNotFailAnswer() throws Exception {
+        stubHappyPath();
+        // Simulate the aborting write: append blows up (e.g. 25P02 on a bad row).
+        doThrow(new RuntimeException("current transaction is aborted (25P02)"))
+                .when(conversationService).append(anyLong(), anyString(), anyString(), anyString());
+
+        ChatBiAnswerResponse r = service.ask("sales by month", "CONV-PID", "MODEL-PID");
+
+        // The answer itself still succeeds with its rows; no exception escapes.
+        assertThat(r.getStatus()).isEqualTo(ChatBiAnswerResponse.STATUS_SUCCESS);
+        assertThat(r.getRowCount()).isEqualTo(1);
+        assertThat(r.getRows()).hasSize(1);
+    }
+
+    @Test
+    void answerPersistFailureDoesNotFailAnswer() throws Exception {
+        stubHappyPath();
+        // Simulate the answer-row insert failing.
+        doThrow(new RuntimeException("insert failed"))
+                .when(answerMapper).insert(any(ChatBiAnswer.class));
+
+        ChatBiAnswerResponse r = service.ask("sales by month", "CONV-PID", "MODEL-PID");
+
+        assertThat(r.getStatus()).isEqualTo(ChatBiAnswerResponse.STATUS_SUCCESS);
+        assertThat(r.getRowCount()).isEqualTo(1);
+        assertThat(r.getRows()).hasSize(1);
+    }
+
+    /**
+     * Falsifiable structural guard: the real transaction isolation relies on the
+     * best-effort writes running in a SEPARATE physical transaction. A plain unit
+     * test cannot exercise the transaction manager, so assert the annotation is
+     * actually present — this goes red if a regression drops REQUIRES_NEW or inlines
+     * the writes back into {@code ask()}.
+     */
+    @Test
+    void bestEffortPersistenceRunsInRequiresNewTransaction() {
+        for (String name : List.of("persistAnswer", "appendTurn")) {
+            Method method = Arrays.stream(ChatBiAnswerPersistence.class.getDeclaredMethods())
+                    .filter(m -> m.getName().equals(name))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError(
+                            "ChatBiAnswerPersistence." + name + " must exist"));
+            Transactional tx = method.getAnnotation(Transactional.class);
+            assertThat(tx).as("%s must be @Transactional", name).isNotNull();
+            assertThat(tx.propagation()).as("%s must be REQUIRES_NEW", name)
+                    .isEqualTo(Propagation.REQUIRES_NEW);
+        }
     }
 
     // -- short-circuits --------------------------------------------------
