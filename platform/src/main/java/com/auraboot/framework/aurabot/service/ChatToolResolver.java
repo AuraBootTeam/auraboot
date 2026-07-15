@@ -6,12 +6,13 @@ import com.auraboot.framework.agent.port.GroundingPort;
 import com.auraboot.framework.agent.port.ToolDiscoveryPort;
 import com.auraboot.framework.agent.service.SkillPackActivator;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Resolves available tools for AuraBot chat based on user intent and model context.
@@ -41,9 +42,19 @@ public class ChatToolResolver {
     private final GroundingPort groundingPort;
     private final ToolDiscoveryPort toolDiscoveryPort;
     private final SkillPackActivator skillPackActivator;
-    private final Map<String, Boolean> discoveredToolReadOnlyByName = new ConcurrentHashMap<>();
-    private final Map<String, String> discoveredProviderToolCodeByName = new ConcurrentHashMap<>();
-    private final Map<String, AgentToolDefinition> discoveredAgentToolByName = new ConcurrentHashMap<>();
+    // Tool metadata resolved for the current turn, read back by the executor after
+    // resolveTools returns. This @Service is a process-wide singleton, so keys are
+    // namespaced by tenant (see scopedKey) — otherwise two tenants whose tool codes
+    // sanitize to the same wire name would overwrite each other's readOnly/sourceCode
+    // (a cross-tenant correctness hazard) — and bounded so the cache cannot grow
+    // without limit over a long-running process.
+    private static final long TOOL_METADATA_CACHE_MAX = 10_000;
+    private final Cache<String, Boolean> discoveredToolReadOnlyByName =
+            Caffeine.newBuilder().maximumSize(TOOL_METADATA_CACHE_MAX).build();
+    private final Cache<String, String> discoveredProviderToolCodeByName =
+            Caffeine.newBuilder().maximumSize(TOOL_METADATA_CACHE_MAX).build();
+    private final Cache<String, AgentToolDefinition> discoveredAgentToolByName =
+            Caffeine.newBuilder().maximumSize(TOOL_METADATA_CACHE_MAX).build();
 
     @Autowired
     public ChatToolResolver(
@@ -145,9 +156,20 @@ public class ChatToolResolver {
      * @param toolName the tool name
      * @return true if the tool is read-only
      */
+    /**
+     * Cache key namespaced by the current tenant. The caches are a process-wide
+     * singleton shared by all tenants; without the tenant prefix, two tenants whose
+     * tool codes sanitize to the same wire name (e.g. a custom "foo:bar" → "foo_bar")
+     * would clobber each other's readOnly / sourceCode metadata.
+     */
+    private static String scopedKey(String toolName) {
+        Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        return tenantId + ":" + toolName;
+    }
+
     public boolean isReadOnly(String toolName) {
         if (toolName == null) return true;
-        Boolean discoveredReadOnly = discoveredToolReadOnlyByName.get(toolName);
+        Boolean discoveredReadOnly = discoveredToolReadOnlyByName.getIfPresent(scopedKey(toolName));
         if (discoveredReadOnly != null) return discoveredReadOnly;
         // Provider naming (from ToolDiscoveryPort, sanitized)
         if (toolName.startsWith("nq_") || toolName.startsWith("list_") || toolName.startsWith("get_")) return true;
@@ -163,7 +185,7 @@ public class ChatToolResolver {
      */
     public String getProviderToolCode(String toolName) {
         if (toolName == null) return null;
-        return discoveredProviderToolCodeByName.get(toolName);
+        return discoveredProviderToolCodeByName.getIfPresent(scopedKey(toolName));
     }
 
     /**
@@ -172,7 +194,7 @@ public class ChatToolResolver {
      */
     public AgentToolDefinition getAgentToolDefinition(String toolName) {
         if (toolName == null) return null;
-        return discoveredAgentToolByName.get(toolName);
+        return discoveredAgentToolByName.getIfPresent(scopedKey(toolName));
     }
 
     // ==================== Platform Tool Injection ====================
@@ -280,8 +302,8 @@ public class ChatToolResolver {
         // unset so ChatToolExecutor.resolveToolDefinition types it as AURABOT_SKILL (via inferToolType
         // on the aurabot: prefix) rather than "platform". cacheSyntheticPlatformTool would force
         // toolType="platform" → AuraBotSkillToolProvider.execute() (the bypassed/failure stub).
-        discoveredProviderToolCodeByName.put(PLATFORM_CHAT_BI_TOOL.getName(), "aurabot:chat-bi");
-        discoveredToolReadOnlyByName.put(PLATFORM_CHAT_BI_TOOL.getName(), true);
+        discoveredProviderToolCodeByName.put(scopedKey(PLATFORM_CHAT_BI_TOOL.getName()), "aurabot:chat-bi");
+        discoveredToolReadOnlyByName.put(scopedKey(PLATFORM_CHAT_BI_TOOL.getName()), true);
     }
 
     private void removeSqlFallbackWhenDomainReadToolAvailable(List<LlmChatRequest.Tool> tools) {
@@ -309,9 +331,10 @@ public class ChatToolResolver {
         // Use code as tool name — LLM returns this in tool_use calls.
         // Sanitize: replace colons/dots with underscores for LLM function-name compatibility.
         String llmName = toolDef.code().replace(':', '_').replace('.', '_');
-        discoveredToolReadOnlyByName.put(llmName, toolDef.readOnly());
-        discoveredProviderToolCodeByName.put(llmName, toolDef.code());
-        discoveredAgentToolByName.put(llmName, toAgentToolDefinition(toolDef));
+        String key = scopedKey(llmName);
+        discoveredToolReadOnlyByName.put(key, toolDef.readOnly());
+        discoveredProviderToolCodeByName.put(key, toolDef.code());
+        discoveredAgentToolByName.put(key, toAgentToolDefinition(toolDef));
         String desc = toolDef.description();
         if (toolDef.name() != null && !toolDef.name().isBlank() && !toolDef.name().equals(toolDef.code())) {
             desc = desc + " (" + toolDef.name() + ")";
@@ -327,9 +350,10 @@ public class ChatToolResolver {
                                             String providerToolCode,
                                             boolean readOnly,
                                             String riskLevel) {
-        discoveredToolReadOnlyByName.put(tool.getName(), readOnly);
-        discoveredProviderToolCodeByName.put(tool.getName(), providerToolCode);
-        discoveredAgentToolByName.put(tool.getName(), AgentToolDefinition.builder()
+        String key = scopedKey(tool.getName());
+        discoveredToolReadOnlyByName.put(key, readOnly);
+        discoveredProviderToolCodeByName.put(key, providerToolCode);
+        discoveredAgentToolByName.put(key, AgentToolDefinition.builder()
                 .name(providerToolCode)
                 .description(tool.getDescription())
                 .inputSchema(tool.getInputSchema())
