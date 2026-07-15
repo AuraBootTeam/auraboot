@@ -1,0 +1,94 @@
+# AuraBoot OSS — remote deploy (base). Pair with an override:
+#   override.direct.yml   — fresh host, gateway owns host :80
+#   override.coexist.yml  — join an existing edge network behind another proxy
+# Single-instance: Redis + MinIO omitted (JVM-local locking, local-FS storage).
+# Images are pre-built off-host and loaded via `docker load` (see deploy.sh).
+name: auraboot-oss
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: auraboot-oss-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aura_boot}
+      POSTGRES_USER: ${POSTGRES_USER:-auraboot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+    command: postgres -c shared_buffers=256MB -c max_connections=60 -c work_mem=4MB
+    volumes:
+      - oss_pg_data:/var/lib/postgresql/data
+      # OSS schema is applied at first-init of a fresh DB (no Flyway in the community flow).
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-auraboot} -d ${POSTGRES_DB:-aura_boot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    networks: [oss]
+    logging: { driver: json-file, options: { max-size: "50m", max-file: "5" } }
+
+  backend:
+    image: auraboot-oss/backend:${TAG:?set TAG}
+    container_name: auraboot-oss-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-aura_boot}?charSet=UTF8
+      DATABASE_USERNAME: ${POSTGRES_USER:-auraboot}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set in .env}
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      SPRING_PROFILES_ACTIVE: community
+      FRONTEND_BASE_URL: ${PUBLIC_URL:?set PUBLIC_URL}
+      AURA_BUILTIN_PLUGINS_DIR: /app/plugins
+      AURA_PLUGINS_DIR: /app/pf4j-plugins
+      MANAGEMENT_TRACING_ENABLED: "false"
+      MANAGEMENT_HEALTH_DISKSPACE_ENABLED: "false"
+      JAVA_OPTS: ${BACKEND_JAVA_OPTS:--Xms384m -Xmx1024m -XX:+UseG1GC -XX:MaxGCPauseMillis=200}
+    volumes:
+      - ./plugins:/app/plugins:ro
+      - oss_backend_data:/app/data
+    depends_on:
+      postgres: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6443/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 150s
+    networks: [oss]
+    logging: { driver: json-file, options: { max-size: "50m", max-file: "5" } }
+
+  frontend:
+    image: auraboot-oss/frontend:${TAG:?set TAG}
+    container_name: auraboot-oss-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      BFF_PORT: "3000"
+      SPRING_BOOT_URL: http://backend:6443
+      # SSR data loaders reach the backend via BFF_INTERNAL_URL (not SPRING_BOOT_URL);
+      # unset it defaults to 127.0.0.1:6443 -> authenticated SSR bounces to /login.
+      BFF_INTERNAL_URL: http://backend:6443
+      CORS_ALLOWED_ORIGINS: ${PUBLIC_URL:?set PUBLIC_URL}
+      SESSION_SECRET: ${SESSION_SECRET:?set in .env}
+    depends_on:
+      backend: { condition: service_healthy }
+    networks: [oss]
+    logging: { driver: json-file, options: { max-size: "50m", max-file: "5" } }
+
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: auraboot-oss-gateway
+    restart: unless-stopped
+    volumes:
+      - ./gateway.conf:/etc/nginx/nginx.conf:ro
+    depends_on: [frontend]
+    networks: [oss]
+    logging: { driver: json-file, options: { max-size: "50m", max-file: "5" } }
+
+volumes:
+  oss_pg_data:
+  oss_backend_data:
+
+networks:
+  oss:
+    driver: bridge
