@@ -17,6 +17,7 @@ import {
   FilterBuilder,
   MetricEditor,
   SortEditor,
+  KeyValueEditor,
   TimeGrainPicker,
   SemanticMetricPicker,
   SemanticDimensionPicker,
@@ -45,16 +46,21 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
   const isSemantic = value.semanticModelCode !== undefined;
 
   const handleTypeChange = useCallback(
-    (type: 'aggregate' | 'namedQuery' | 'static') => {
+    (type: 'aggregate' | 'namedQuery' | 'static' | 'api') => {
       onChange({
         type,
         modelCode: type === 'aggregate' ? value.modelCode : undefined,
         queryCode: type === 'namedQuery' ? value.queryCode : undefined,
-        dimensions: type === 'static' ? undefined : value.dimensions,
-        metrics: type === 'static' ? undefined : value.metrics,
-        filters: value.filters,
-        parameters: type === 'namedQuery' ? {} : undefined,
+        dimensions: type === 'static' || type === 'api' ? undefined : value.dimensions,
+        metrics: type === 'static' || type === 'api' ? undefined : value.metrics,
+        // Filters/limit only feed the aggregate & namedQuery SQL paths. The api
+        // branch (useChartData) ignores them, so drop them when leaving those types.
+        filters: type === 'aggregate' || type === 'namedQuery' ? value.filters : undefined,
+        parameters: type === 'namedQuery' ? value.parameters || {} : undefined,
         staticData: type === 'static' ? [] : undefined,
+        // The api branch consumes only url + params (GET query params).
+        url: type === 'api' ? value.url : undefined,
+        params: type === 'api' ? value.params || {} : undefined,
       });
     },
     [value, onChange],
@@ -200,12 +206,13 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
           data-testid="dashboard-datasource-type-select"
           value={value.type}
           onChange={(e) =>
-            handleTypeChange(e.target.value as 'aggregate' | 'namedQuery' | 'static')
+            handleTypeChange(e.target.value as 'aggregate' | 'namedQuery' | 'static' | 'api')
           }
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
         >
           <option value="aggregate">聚合查询</option>
           <option value="namedQuery">命名查询</option>
+          <option value="api">API 接口</option>
           <option value="static">静态数据</option>
         </select>
       </div>
@@ -337,13 +344,62 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
 
       {/* Named Query Config */}
       {value.type === 'namedQuery' && (
-        <NamedQueryPicker
-          value={value.queryCode}
-          onChange={(queryCode) => onChange({ ...value, queryCode, parameters: {} })}
-          label="命名查询"
-          required
-          placeholder="请选择查询"
-        />
+        <>
+          <NamedQueryPicker
+            value={value.queryCode}
+            onChange={(queryCode) => onChange({ ...value, queryCode, parameters: {} })}
+            label="命名查询"
+            required
+            placeholder="请选择查询"
+          />
+          <KeyValueEditor
+            value={(value.parameters || {}) as Record<string, unknown>}
+            onChange={(parameters) => onChange({ ...value, parameters })}
+            label="查询参数"
+            testIdPrefix="dashboard-datasource-namedquery-params"
+            keyPlaceholder="参数名"
+            valuePlaceholder="参数值"
+            addLabel="+ 添加参数"
+            emptyHint="该命名查询若声明了参数，在此填写其值"
+          />
+        </>
+      )}
+
+      {/* API Data Source Config
+          Runtime (useChartData / SmartTableChart / SmartNumberCard) consumes an api
+          source as a GET to `url` with `params` as query params, then normalises the
+          response `records` / `rows` / array. Method is fixed to GET and the result
+          shape is auto-detected, so only url + params are surfaced here — no fake
+          method / body / result-path controls the runtime would ignore. */}
+      {value.type === 'api' && (
+        <>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              接口地址 (GET) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              data-testid="dashboard-datasource-api-url"
+              value={value.url || ''}
+              onChange={(e) => onChange({ ...value, url: e.target.value })}
+              placeholder="/api/..."
+              className="w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              以 GET 请求该地址，响应中的 records / rows / 数组将作为数据行。
+            </p>
+          </div>
+          <KeyValueEditor
+            value={(value.params || {}) as Record<string, unknown>}
+            onChange={(params) => onChange({ ...value, params })}
+            label="查询参数 (Query Params)"
+            testIdPrefix="dashboard-datasource-api-params"
+            keyPlaceholder="参数名"
+            valuePlaceholder="参数值"
+            addLabel="+ 添加参数"
+            emptyHint="可选：作为 URL 查询参数附加到请求"
+          />
+        </>
       )}
 
       {/* Static Data Config */}
@@ -367,29 +423,39 @@ export const DataSourceConfig: React.FC<DataSourceConfigProps> = ({ value, onCha
         </div>
       )}
 
-      {/* Filters */}
-      <FilterBuilder
-        value={(value.filters || []) as FilterCondition[]}
-        onChange={handleFiltersChange}
-        fields={value.type === 'aggregate' ? fields : undefined}
-        label="筛选条件"
-      />
+      {/* Filters + Limit — feed the aggregate & namedQuery query paths. The api
+          branch does a raw GET and ignores both, so they are hidden for api to
+          avoid surfacing controls the runtime never reads. */}
+      {value.type !== 'api' && (
+        <>
+          {/* Filters */}
+          <FilterBuilder
+            value={(value.filters || []) as FilterCondition[]}
+            onChange={handleFiltersChange}
+            fields={value.type === 'aggregate' ? fields : undefined}
+            label="筛选条件"
+          />
 
-      {/* Limit */}
-      <div>
-        <label className="mb-1 block text-sm font-medium text-gray-700">返回行数限制</label>
-        <input
-          type="number"
-          value={value.limit || ''}
-          onChange={(e) =>
-            onChange({ ...value, limit: e.target.value ? parseInt(e.target.value, 10) : undefined })
-          }
-          placeholder="不限制"
-          min={1}
-          max={10000}
-          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-        />
-      </div>
+          {/* Limit */}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">返回行数限制</label>
+            <input
+              type="number"
+              value={value.limit || ''}
+              onChange={(e) =>
+                onChange({
+                  ...value,
+                  limit: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                })
+              }
+              placeholder="不限制"
+              min={1}
+              max={10000}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };
