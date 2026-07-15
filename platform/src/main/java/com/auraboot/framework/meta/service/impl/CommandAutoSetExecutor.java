@@ -28,6 +28,7 @@ public class CommandAutoSetExecutor {
     private final MetaModelService metaModelService;
     private final TenantClock tenantClock;
     private final com.auraboot.framework.user.mapper.UserMapper userMapper;
+    private final CommandSpelEvaluator spelEvaluator;
 
     @SuppressWarnings("unchecked")
     public void executeAutoSetPhase(Map<String, Object> execConfig, Map<String, Object> payload,
@@ -62,6 +63,19 @@ public class CommandAutoSetExecutor {
                 case "current_datetime" -> Instant.now();
                 case "fixed_value", "default_value" -> config.get("value");
                 case "copy_field" -> payload.get(config.get("sourceField"));
+                // DR-20260715-A-002: these were declared in DslRegistry.AutoSetStrategy but had no
+                // runtime branch — configuring one imported with only a warning, then the field
+                // silently stayed empty (author thought it was set). SEQUENCE / FIELD_MAP were
+                // removed from the registry instead (auto_generate / copy_field cover them).
+                case "current_tenant" -> tenantId != null ? String.valueOf(tenantId) : null;
+                case "uuid" -> java.util.UUID.randomUUID().toString();
+                case "expression" -> {
+                    Object expr = config.get("expression");
+                    if (expr == null) {
+                        yield null;
+                    }
+                    yield spelEvaluator.evaluate(String.valueOf(expr), spelEvaluator.buildSpelContext(payload));
+                }
                 default -> {
                     log.warn("Unknown autoSet strategy '{}' for field '{}'", strategy, fieldCode);
                     yield null;

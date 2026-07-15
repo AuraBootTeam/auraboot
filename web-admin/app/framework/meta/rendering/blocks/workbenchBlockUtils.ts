@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
+import { resolveCommandErrorMessage } from '~/framework/meta/hooks/useActionHandler';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { fetchResult } from '~/shared/services/http-client';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -280,9 +281,10 @@ async function pollWorkbenchAsyncTask(
       },
     );
     if (!isSuccessResult(result)) {
-      throw new Error(
-        (result as any).message || (result as any).desc || 'Async task status unavailable',
-      );
+      // B-002 (DR-20260715-B-002): prefer localized context.detail over the generic
+      // message/desc envelope — the third command path (workbench) must extract the
+      // reason the same way useActionHandler / FormPageContent do (OSS #1212).
+      throw new Error(resolveCommandErrorMessage(result, taskCode));
     }
 
     const task: AsyncTaskStatus = result?.data ?? {};
@@ -501,7 +503,11 @@ export async function executeSimpleWorkbenchAction(
         params,
       });
       if (!isSuccessResult(result)) {
-        throw new Error((result as any).message || (result as any).desc || `${command} failed`);
+        // B-002 (DR-20260715-B-002): a business-rejected command puts the real,
+        // localized reason in context.detail; message/desc are the generic envelope.
+        // Use the shared extractor so the workbench toast shows the reason (not
+        // "Business error"), matching useActionHandler / FormPageContent (OSS #1212).
+        throw new Error(resolveCommandErrorMessage(result, command));
       }
 
       const reloadIds = resolveReloadIds(args.reload);
