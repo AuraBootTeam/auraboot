@@ -9,7 +9,7 @@ import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.ObjectMapper;

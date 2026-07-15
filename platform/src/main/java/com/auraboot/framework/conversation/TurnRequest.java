@@ -1,7 +1,7 @@
 package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.triage.TriageBucket;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 
 import java.util.Map;
 

@@ -5,7 +5,7 @@ import com.auraboot.framework.agent.runtime.TurnExecutionPlanner;
 import com.auraboot.framework.agent.runtime.PendingContinuationService;
 import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
