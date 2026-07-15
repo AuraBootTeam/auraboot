@@ -21,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import org.slf4j.MDC;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -70,6 +71,7 @@ class JwtAuthenticationFilterTest {
     void tearDown() {
         SecurityContextHolder.clearContext();
         MetaContext.clear();
+        MDC.clear();
     }
 
     private MockHttpServletRequest req() {
@@ -143,6 +145,40 @@ class JwtAuthenticationFilterTest {
         verify(sessionManagementService).updateLastActive("valid.token");
         // After chain completes the filter clears MetaContext in finally.
         assertFalse(MetaContext.exists());
+    }
+
+    @Test
+    void validToken_putsTenantAndUserIntoMdc_andClearsAfter() throws Exception {
+        MockHttpServletRequest req = req();
+        req.addHeader("Authorization", "Bearer valid.token");
+
+        CustomUserDetails ud = new CustomUserDetails("alice", "p", 7L, "alice_pid",
+                Collections.emptyList(), true, true, true, true);
+        when(jwtUtil.extractIdentifier("valid.token")).thenReturn("alice_pid");
+        when(userDetailsService.loadUserByUsername("alice_pid")).thenReturn(ud);
+        when(jwtUtil.validateToken(eq("valid.token"), eq(ud))).thenReturn(true);
+        when(jwtUtil.extractSecurityVersion("valid.token")).thenReturn(0);
+        User user = new User();
+        user.setSecurityVersion(0);
+        when(userService.findByPid("alice_pid")).thenReturn(user);
+        when(sessionManagementService.isSessionValid("valid.token")).thenReturn(true);
+        when(jwtUtil.extractTenantId("valid.token")).thenReturn(100L);
+        when(jwtUtil.extractMemberId("valid.token")).thenReturn(55L);
+
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+        // Capture the MDC state WHILE the request is in-flight (inside the chain).
+        String[] seen = new String[2];
+        doAnswer(inv -> { seen[0] = MDC.get("tenantId"); seen[1] = MDC.get("userId"); return null; })
+                .when(chain).doFilter(eq(req), eq(resp));
+
+        filter.doFilter(req, resp, chain);
+
+        // during the request: tenant/user surfaced in MDC for the log pattern
+        assertEquals("100", seen[0]);
+        assertEquals("7", seen[1]);
+        // after the request: cleared in finally so a pooled thread never leaks identity
+        assertNull(MDC.get("tenantId"));
+        assertNull(MDC.get("userId"));
     }
 
     @Test

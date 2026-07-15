@@ -29,8 +29,10 @@ logging:
     # at the Logback layout layer so business code does not need per-call sanitizers.
     # [traceId,spanId] are injected by micrometer-tracing into MDC; surfacing them
     # here correlates each log line with the OTel trace (P1, A-G3). Empty when no span.
-    console: '%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}){} %clr(${PID:-}){magenta} %clr(--- [%15.15t]){faint} %clr([%X{traceId:-},%X{spanId:-}]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
-    file: '%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}} ${LOG_LEVEL_PATTERN:-%5p} ${PID:-} --- [%t] [%X{traceId:-},%X{spanId:-}] %-40.40logger{39} : %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
+    # t=/u= are the tenant/user id put into MDC by JwtAuthenticationFilter (and cleared
+    # in its finally) so request logs can be filtered by tenant/user; empty off-request.
+    console: '%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}){} %clr(${PID:-}){magenta} %clr(--- [%15.15t]){faint} %clr([%X{traceId:-},%X{spanId:-},t=%X{tenantId:-},u=%X{userId:-}]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
+    file: '%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}} ${LOG_LEVEL_PATTERN:-%5p} ${PID:-} --- [%t] [%X{traceId:-},%X{spanId:-},t=%X{tenantId:-},u=%X{userId:-}] %-40.40logger{39} : %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
   level:
     org.apache.tomcat.util.net.jsse.JSSESupport: INFO
     org.apache.coyote: INFO
