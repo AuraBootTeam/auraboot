@@ -597,18 +597,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                         .map(id -> "'" + id.replace("'", "''") + "'")
                         .collect(java.util.stream.Collectors.joining(","));
 
-                // Resolve display column name from field code or target model display field metadata.
-                // For system tables (no ModelDefinition), use SYSTEM_TABLE_DISPLAY_EXPRESSIONS mapping
-                // which includes COALESCE fallbacks for when primary display columns are empty.
-                String displayColumnExpr;
-                String displayColumnName;
-                if (targetModelOpt.isEmpty() && displayField == null && SYSTEM_TABLE_DISPLAY_EXPRESSIONS.containsKey(targetModelCode)) {
-                    displayColumnExpr = SYSTEM_TABLE_DISPLAY_EXPRESSIONS.get(targetModelCode);
-                    displayColumnName = "display_value";
-                } else {
-                    displayColumnName = resolveReferenceDisplayColumn(targetModelOpt.orElse(null), displayField);
-                    displayColumnExpr = displayColumnName;
-                }
+                // Resolve the display column expression + alias (system tables → safe COALESCE).
+                String[] displayCol = resolveDisplayColumnExpression(targetModelOpt, targetModelCode, displayField);
+                String displayColumnExpr = displayCol[0];
+                String displayColumnName = displayCol[1];
 
                 String sql = "SELECT pid, " + displayColumnExpr + " AS " + displayColumnName
                         + " FROM " + targetTable
@@ -768,6 +760,31 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             "ns_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)",
             "sys_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)"
     );
+
+    /**
+     * Choose the display column expression + SELECT alias for a reference-enrichment query,
+     * returned as {@code [expression, alias]}.
+     *
+     * <p>For a <b>system table</b> (no registered {@link ModelDefinition}) we always use the
+     * {@link #SYSTEM_TABLE_DISPLAY_EXPRESSIONS} COALESCE expression, <b>regardless of any
+     * configured {@code displayField}</b>. System tables have no field metadata to validate a
+     * configured display field against, so trusting an arbitrary value would splice it straight
+     * into the SQL as a raw column. A plugin writing e.g. {@code refDisplayField: "username"} for
+     * a {@code sys_user} reference (whose {@code ab_user} table has {@code nick_name / user_name /
+     * email} but no {@code username}) would then produce {@code SELECT pid, username ...} and fail
+     * the whole enrichment query with {@code column "username" does not exist} — which, inside a
+     * command's {@code bpm:run-rule} contextLookup, aborts the transaction and surfaces as an
+     * opaque {@code bpm.rule.execution_failed}. The COALESCE already yields the canonical user
+     * display, so ignoring the raw field here is both safe and the intended behaviour.
+     */
+    private String[] resolveDisplayColumnExpression(
+            Optional<ModelDefinition> targetModelOpt, String targetModelCode, String displayField) {
+        if (targetModelOpt.isEmpty() && SYSTEM_TABLE_DISPLAY_EXPRESSIONS.containsKey(targetModelCode)) {
+            return new String[] { SYSTEM_TABLE_DISPLAY_EXPRESSIONS.get(targetModelCode), "display_value" };
+        }
+        String col = resolveReferenceDisplayColumn(targetModelOpt.orElse(null), displayField);
+        return new String[] { col, col };
+    }
 
     @Override
     public PaginationResult<Map<String, Object>> listByQueryCode(String queryCode, DynamicQueryRequest request) {
