@@ -74,7 +74,7 @@ async function seedRecord(request: APIRequestContext): Promise<SeededRecord> {
   expect(resp.ok(), `seed create status=${resp.status()}`).toBe(true);
   const body = await resp.json();
   expect(body?.code).toBe('0');
-  const pid: string | undefined = body?.data?.data?.recordId;
+  const pid: string | undefined = body?.data?.data?.recordPid;
   expect(pid, 'seed should return recordId').toBeTruthy();
 
   // Look up the record back to capture the auto-generated sc_code.
@@ -314,7 +314,7 @@ test.describe('D5 — Sub-table block: 3 data-source modes', () => {
       const pid = createdPids.pop()!;
       await request
         .post('/api/meta/commands/execute/sc:delete_showcase', {
-          data: { operationType: 'delete', targetRecordId: pid },
+          data: { operationType: 'delete', targetRecordPid: pid },
         })
         .catch(() => null);
     }

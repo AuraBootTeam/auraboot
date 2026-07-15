@@ -91,8 +91,8 @@ async function createDraftLeave(
       wd_req_reason: input.reason,
     },
   });
-  const recordId = String(body?.data?.data?.recordId ?? '');
-  expect(recordId, 'create draft must return recordId').toBeTruthy();
+  const recordId = String(body?.data?.data?.recordPid ?? '');
+  expect(recordId, 'create draft must return recordPid').toBeTruthy();
   return recordId;
 }
 
@@ -109,7 +109,7 @@ async function submitLeave(
   },
 ): Promise<void> {
   await executeCommand(request, token, 'wd:submit_leave_request', {
-    targetRecordId: input.recordId,
+    targetRecordPid: input.recordId,
     payload: {
       wd_req_applicant: input.applicantPid,
       wd_req_type: input.type,
@@ -517,7 +517,7 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
     });
     const cancelledSubmitted = await waitForBusinessStatus(request, adminToken, cancelledRecordId, 'submitted');
     await executeCommand(request, cancelledApplicant.token, 'wd:cancel_leave_request', {
-      targetRecordId: cancelledRecordId,
+      targetRecordPid: cancelledRecordId,
       payload: {
         reason: 'detail tabs matrix cancellation',
       },

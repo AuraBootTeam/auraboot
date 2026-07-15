@@ -75,7 +75,7 @@ async function seedRecord(request: APIRequestContext, overrides: SeedFields = {}
   expect(resp.ok(), `seed create failed: ${resp.status()}`).toBe(true);
   const body = await resp.json();
   expect(body?.code, `seed create non-zero code: ${JSON.stringify(body)}`).toBe('0');
-  const pid: string | undefined = body?.data?.data?.recordId;
+  const pid: string | undefined = body?.data?.data?.recordPid;
   expect(pid, 'seed should return recordId').toBeTruthy();
   return pid!;
 }
@@ -83,7 +83,7 @@ async function seedRecord(request: APIRequestContext, overrides: SeedFields = {}
 async function deleteRecord(request: APIRequestContext, pid: string): Promise<void> {
   await request
     .post('/api/meta/commands/execute/sc:delete_showcase', {
-      data: { operationType: 'delete', targetRecordId: pid },
+      data: { operationType: 'delete', targetRecordPid: pid },
     })
     .catch(() => null);
 }
@@ -429,7 +429,7 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
     expect(resp.ok(), `submit response status ${resp.status()}`).toBe(true);
 
     const body = await resp.json().catch(() => ({}));
-    const newPid: string | undefined = body?.data?.data?.recordId;
+    const newPid: string | undefined = body?.data?.data?.recordPid;
     if (newPid) createdPids.push(newPid);
     expect(body?.code, `submit response code: ${JSON.stringify(body)}`).toBe('0');
     expect(newPid, 'submit should return recordId').toBeTruthy();

@@ -57,11 +57,11 @@ async function createSubmittedLeave(
       wd_req_reason: reason,
     },
   });
-  const recordId = String(createBody?.data?.data?.recordId ?? '');
+  const recordId = String(createBody?.data?.data?.recordPid ?? '');
   expect(recordId).toBeTruthy();
 
   await executeCommand(request, token, 'wd:submit_leave_request', {
-    targetRecordId: recordId,
+    targetRecordPid: recordId,
     payload: {
       wd_req_applicant: userId,
       wd_req_type: 'annual',

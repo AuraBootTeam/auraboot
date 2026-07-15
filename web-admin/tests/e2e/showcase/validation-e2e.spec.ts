@@ -46,7 +46,7 @@ let defaultTableView: DefaultTableViewState | null = null;
 async function deleteRecord(request: APIRequestContext, pid: string): Promise<void> {
   await request
     .post('/api/meta/commands/execute/sc:delete_showcase', {
-      data: { operationType: 'delete', targetRecordId: pid },
+      data: { operationType: 'delete', targetRecordPid: pid },
     })
     .catch(() => null);
 }
@@ -237,7 +237,7 @@ test.describe('D8 — showcase_all_fields validation runtime', () => {
     expect(resp.ok(), `submit after fill expected 2xx, got ${resp.status()}`).toBe(true);
     const body = await resp.json().catch(() => ({}));
     expect(body?.code, `submit body code: ${JSON.stringify(body)}`).toBe('0');
-    const newPid: string | undefined = body?.data?.data?.recordId;
+    const newPid: string | undefined = body?.data?.data?.recordPid;
     expect(newPid).toBeTruthy();
     if (newPid) createdPids.push(newPid);
   });
@@ -279,7 +279,7 @@ test.describe('D8 — showcase_all_fields validation runtime', () => {
     });
     expect(seedResp.ok(), `seed create: ${seedResp.status()}`).toBe(true);
     const seedBody = await seedResp.json();
-    const pid: string | undefined = seedBody?.data?.data?.recordId;
+    const pid: string | undefined = seedBody?.data?.data?.recordPid;
     expect(pid).toBeTruthy();
     createdPids.push(pid!);
 
@@ -306,7 +306,7 @@ test.describe('D8 — showcase_all_fields validation runtime', () => {
     const updResp = await request.post('/api/meta/commands/execute/sc:update_showcase', {
       data: {
         operationType: 'update',
-        targetRecordId: pid,
+        targetRecordPid: pid,
         payload: {
           sc_status: 'active',
         },

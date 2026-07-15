@@ -78,7 +78,7 @@ async function submitPaymentViaApi(
 ): Promise<boolean> {
   const resp = await page.request.post('/api/meta/commands/execute/e2et:submit_payment', {
     data: {
-      targetRecordId: pid,
+      targetRecordPid: pid,
       operationType: 'update',
       payload: {},
     },
@@ -92,7 +92,7 @@ async function deletePaymentViaApi(
 ): Promise<void> {
   await page.request
     .post('/api/meta/commands/execute/e2et:delete_payment', {
-      data: { targetRecordId: pid, operationType: 'delete', payload: {} },
+      data: { targetRecordPid: pid, operationType: 'delete', payload: {} },
     })
     .catch(() => {});
 }
@@ -193,7 +193,7 @@ test.describe('Approval Workflow', () => {
     } else {
       // Approve via API fallback
       const resp = await page.request.post('/api/meta/commands/execute/e2et:approve_payment', {
-        data: { targetRecordId: paymentPid, operationType: 'update', payload: {} },
+        data: { targetRecordPid: paymentPid, operationType: 'update', payload: {} },
       });
       expect(resp.status()).toBeLessThan(400);
     }
@@ -227,7 +227,7 @@ test.describe('Approval Workflow', () => {
         .catch(() => null);
     } else {
       const resp = await page.request.post('/api/meta/commands/execute/e2et:reject_payment', {
-        data: { targetRecordId: paymentPid, operationType: 'update', payload: {} },
+        data: { targetRecordPid: paymentPid, operationType: 'update', payload: {} },
       });
       expect(resp.status()).toBeLessThan(400);
     }

@@ -161,11 +161,11 @@ async function fillAndSubmitCreateForm(page: Page, opts: CreatePageOptions): Pro
   expect(resp.ok()).toBe(true);
 
   const body = await resp.json().catch(() => ({}) as Record<string, unknown>);
-  // Command response shape:
-  //   { code: '0', data: { commandCode, data: { recordId, ... } } }
-  const outer = (body as { data?: { data?: { recordId?: string } } }).data;
-  const pid = outer?.data?.recordId;
-  expect(pid, 'create command response should include data.data.recordId').toBeTruthy();
+  // Command response shape (pid-only public contract):
+  //   { code: '0', data: { commandCode, data: { recordPid, ... } } }
+  const outer = (body as { data?: { data?: { recordPid?: string } } }).data;
+  const pid = outer?.data?.recordPid;
+  expect(pid, 'create command response should include data.data.recordPid').toBeTruthy();
   return { pid: pid!, pageKey: opts.pageKey };
 }
 

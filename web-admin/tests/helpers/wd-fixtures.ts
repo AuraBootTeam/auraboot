@@ -357,13 +357,13 @@ export async function setLeaveBalance(
  *     Body: { payload: { wd_req_applicant, wd_req_type, wd_req_start_date,
  *                         wd_req_start_slot, wd_req_end_date, wd_req_end_slot,
  *                         wd_req_days, wd_req_reason } }
- *     Response: { code: "0", data: { data: { recordId: string } } }
+ *     Response: { code: "0", data: { data: { recordPid: string } } }
  *   Step 2 — submit to start BPM process:
  *     POST /api/meta/commands/execute/wd:submit_leave_request
- *     Body: { targetRecordId: "<recordId>", payload: { wd_req_days, wd_req_type,
+ *     Body: { targetRecordPid: "<recordPid>", payload: { wd_req_days, wd_req_type,
  *              wd_req_applicant, wd_req_start_slot, wd_req_end_slot } }
- *     Response: { code: "0", data: { data: { recordId: string } } }
- *   Both recordId paths are at body.data.data.recordId — no fallback chain.
+ *     Response: { code: "0", data: { data: { recordPid: string } } }
+ *   Both id paths are at body.data.data.recordPid (pid-only public contract) — no fallback chain.
  *
  * @param userId     The applicant's userPid (from createLeaveApplicant.userId)
  * @param token      The applicant's JWT (from createLeaveApplicant.token). Required because
@@ -431,25 +431,30 @@ export async function submitLeaveRequest(
     throw new Error(`submitLeaveRequest (create): command failed: ${JSON.stringify(body)}`);
   }
 
-  // Exact path confirmed: body.data.data.recordId
-  const recordId: unknown = body.data.data.recordId;
+  // Public pid-only contract: create commands return the new record's pid at
+  // body.data.data.recordPid (no legacy recordId alias — data-and-api.md §Public Record).
+  // `recordId` below is a local name holding that pid; callers use it in pid contexts
+  // (BPM businessKey, /p/<model>/view/<pid>, /api/dynamic/.../<pid>).
+  const recordId: unknown = body.data.data.recordPid;
   if (typeof recordId !== 'string' || recordId.trim() === '') {
     throw new Error(
-      `submitLeaveRequest: expected body.data.data.recordId (string) but got: ` +
+      `submitLeaveRequest: expected body.data.data.recordPid (string) but got: ` +
         `${JSON.stringify(body.data)}. Full response: ${JSON.stringify(body)}`,
     );
   }
 
   // Step 2: submit the draft to start the BPM approval process.
-  // wd:submit_leave_request is a state_transition command — it requires `targetRecordId`
+  // wd:submit_leave_request is a state_transition command — it requires `targetRecordPid`
   // (not inside payload) to identify the record to update, plus workflow variables in payload.
-  // Contract: { targetRecordId: "<pid>", payload: { wd_req_days, wd_req_type,
+  // targetRecordId is @JsonIgnore on the backend CommandExecuteRequest DTO (pid-only public
+  // contract), so the public request field must be targetRecordPid.
+  // Contract: { targetRecordPid: "<pid>", payload: { wd_req_days, wd_req_type,
   //   wd_req_applicant, wd_req_start_slot, wd_req_end_slot } }
   const submitResp = await page.request.post(
     `${BACKEND_URL}/api/meta/commands/execute/wd:submit_leave_request`,
     {
       data: {
-        targetRecordId: recordId,
+        targetRecordPid: recordId,
         payload: {
           wd_req_applicant: input.userId,
           wd_req_type: input.type,
