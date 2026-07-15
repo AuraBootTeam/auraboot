@@ -34,15 +34,18 @@ async function createCustomRefreshAuthoringPage(page: Page) {
     },
     blocks: [
       {
+        id: 'blk_filters_1',
         blockType: 'filters',
         fields: ['name'],
         actions: ['search', 'reset'],
       },
       {
+        id: 'blk_toolbar_2',
         blockType: 'toolbar',
         buttons: [],
       },
       {
+        id: 'blk_table_3',
         blockType: 'table',
         dataSource: 'tableData',
         columns: [{ field: 'name', width: 260 }, 'pageKey'],
