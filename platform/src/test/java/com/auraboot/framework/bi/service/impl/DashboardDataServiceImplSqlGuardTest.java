@@ -1,7 +1,6 @@
 package com.auraboot.framework.bi.service.impl;
 
 import com.auraboot.framework.bi.dto.DashboardDataResponse;
-import com.auraboot.framework.datasource.dao.mapper.DynamicQueryMapper;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import org.junit.jupiter.api.Test;
@@ -13,32 +12,34 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests for the SELECT-only guard on dashboard {@code type:sql} widgets.
+ * Security regression suite for dashboard {@code type:sql} widgets.
  *
- * <p>Security regression: the widget's {@code dataSource.query} (authored config
- * stored in {@code ab_page_schema}) was executed via {@code SqlRunner} with no
- * validation — the one BI path that skipped {@code SqlSafetyUtils.validateSelectOnlySql}
- * that all sibling raw-SQL paths enforce. A {@code PAGE_SCHEMA_MANAGE} author could
- * run non-SELECT statements / UNION-based exfiltration. The guard now rejects those
- * before {@code DynamicQueryMapper.queryData} is ever called.
+ * <p>History: the widget's {@code dataSource.query} (authored config stored in
+ * {@code ab_page_schema}) was executed via {@code SqlRunner}. An initial fix added
+ * {@code SqlSafetyUtils.validateSelectOnlySql}, which blocks writes/DDL/stacked
+ * statements/UNION/comments/file-ops — but a <em>plain</em> {@code SELECT} still ran
+ * through {@code SqlRunner}, which bypasses the tenant line interceptor. Because
+ * {@code ab_user}/{@code ab_tenant}/{@code ab_user_role} are in the interceptor's
+ * ignore set, a {@code PAGE_SCHEMA_MANAGE} author could exfiltrate every tenant's
+ * users/tokens with {@code SELECT * FROM ab_user} (finding
+ * DR-20260702-SD2-DASHBOARD-003 residual / FU-1).
+ *
+ * <p>Resolution: the free-form SQL path is removed entirely. No {@code type:sql}
+ * widget executes; the Dashboard Designer only produces tenant-scoped data sources
+ * (aggregate / namedQuery / static). These tests assert every free-SQL shape —
+ * including a plain cross-tenant {@code SELECT} — is rejected and never executed.
  */
 @ExtendWith(MockitoExtension.class)
 class DashboardDataServiceImplSqlGuardTest {
 
     @Mock
     private PageSchemaMapper formSchemaMapper;
-    @Mock
-    private DynamicQueryMapper dynamicQueryMapper;
 
     private DashboardDataServiceImpl service() {
-        return new DashboardDataServiceImpl(formSchemaMapper, dynamicQueryMapper);
+        return new DashboardDataServiceImpl(formSchemaMapper);
     }
 
     private void stubDashboardWithSql(String dashboardId, String query) {
@@ -55,33 +56,36 @@ class DashboardDataServiceImplSqlGuardTest {
     }
 
     @Test
-    void nonSelectWidgetQueryIsRejectedBeforeExecution() {
+    void nonSelectWidgetQueryIsRejected() {
         stubDashboardWithSql("dash-del", "DELETE FROM ab_user");
         DashboardDataResponse resp = service().fetchDashboardData("dash-del", true, 1L);
 
-        assertThat(asMap(resp.getWidgets().get("w1"))).containsKey("error");
-        verify(dynamicQueryMapper, never()).queryData(anyString());
+        Object w = resp.getWidgets().get("w1");
+        assertThat(w).isNotInstanceOf(List.class);
+        assertThat(asMap(w)).containsKey("error");
     }
 
     @Test
-    void unionBasedExfiltrationIsRejectedBeforeExecution() {
+    void unionBasedExfiltrationIsRejected() {
         stubDashboardWithSql("dash-union",
                 "SELECT id FROM ab_page_schema UNION SELECT password FROM ab_user");
         DashboardDataResponse resp = service().fetchDashboardData("dash-union", true, 1L);
 
-        assertThat(asMap(resp.getWidgets().get("w1"))).containsKey("error");
-        verify(dynamicQueryMapper, never()).queryData(anyString());
+        Object w = resp.getWidgets().get("w1");
+        assertThat(w).isNotInstanceOf(List.class);
+        assertThat(asMap(w)).containsKey("error");
     }
 
     @Test
-    void plainSelectWidgetQueryIsExecuted() {
-        stubDashboardWithSql("dash-ok", "SELECT status, count(*) c FROM mt_orders GROUP BY status");
-        when(dynamicQueryMapper.queryData(eq("SELECT status, count(*) c FROM mt_orders GROUP BY status")))
-                .thenReturn(List.of(Map.of("status", "open", "c", 3)));
+    void plainCrossTenantSelectIsRejected() {
+        // The residual hole: a syntactically valid SELECT against a shared,
+        // tenant-agnostic table. It used to execute (SqlRunner bypasses the tenant
+        // line interceptor) and leak every tenant's users. It must now be rejected.
+        stubDashboardWithSql("dash-cross", "SELECT id, tenant_id, username FROM ab_user");
+        DashboardDataResponse resp = service().fetchDashboardData("dash-cross", true, 1L);
 
-        DashboardDataResponse resp = service().fetchDashboardData("dash-ok", true, 1L);
-
-        assertThat(resp.getWidgets().get("w1")).isEqualTo(List.of(Map.of("status", "open", "c", 3)));
-        verify(dynamicQueryMapper).queryData(eq("SELECT status, count(*) c FROM mt_orders GROUP BY status"));
+        Object w = resp.getWidgets().get("w1");
+        assertThat(w).isNotInstanceOf(List.class);
+        assertThat(asMap(w)).containsKey("error");
     }
 }

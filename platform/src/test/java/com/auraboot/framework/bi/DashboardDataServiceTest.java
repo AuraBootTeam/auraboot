@@ -4,7 +4,6 @@ import com.auraboot.framework.bi.dto.DashboardDataResponse;
 import com.auraboot.framework.bi.service.impl.DashboardDataServiceImpl;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
-import com.auraboot.framework.datasource.dao.mapper.DynamicQueryMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -16,7 +15,6 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 /**
@@ -27,9 +25,6 @@ class DashboardDataServiceTest {
 
     @Mock
     private PageSchemaMapper formSchemaMapper;
-
-    @Mock
-    private DynamicQueryMapper dynamicQueryMapper;
 
     @InjectMocks
     private DashboardDataServiceImpl dashboardDataService;
@@ -80,14 +75,18 @@ class DashboardDataServiceTest {
     }
 
     @Test
-    void fetchDashboardData_withSqlWidget_executesQuery() {
+    void fetchDashboardData_withCrossTenantSqlWidget_isRejectedNotExecuted() {
+        // A dashboard schema carrying a free-form SQL widget that reads a shared,
+        // tenant-agnostic table. The query would run via SqlRunner, which bypasses
+        // the tenant line interceptor, so executing it would leak every tenant's
+        // users. Sentinel rows stand in for that cross-tenant data.
         String dashboardJson = """
                 {
-                    "title": "Test Dashboard",
+                    "title": "Malicious Dashboard",
                     "widgets": [
                         {
-                            "id": "table1",
-                            "dataSource": { "type": "sql", "query": "SELECT COUNT(*) as cnt FROM ns_device" }
+                            "id": "evil",
+                            "dataSource": { "type": "sql", "query": "SELECT id, tenant_id, username FROM ab_user" }
                         }
                     ]
                 }
@@ -95,17 +94,43 @@ class DashboardDataServiceTest {
         PageSchema schema = new PageSchema();
         schema.setBlocks(dashboardJson);
         when(formSchemaMapper.selectById("dash-002")).thenReturn(schema);
-        when(dynamicQueryMapper.queryData(anyString())).thenReturn(
-                List.of(Map.of("cnt", 25L))
-        );
 
         DashboardDataResponse response = dashboardDataService.fetchDashboardData("dash-002", false, 1L);
 
-        assertThat(response.getWidgets()).containsKey("table1");
+        Object widgetResult = response.getWidgets().get("evil");
+        // The free-SQL query must NOT have been executed, so the widget must not
+        // carry any query rows (List) — cross-tenant data must never surface.
+        assertThat(widgetResult).isNotInstanceOf(List.class);
+        // Instead the widget must carry an explicit rejection.
+        assertThat(widgetResult).isInstanceOf(Map.class);
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> tableData = (List<Map<String, Object>>) response.getWidgets().get("table1");
-        assertThat(tableData).hasSize(1);
-        assertThat(tableData.get(0).get("cnt")).isEqualTo(25L);
+        Map<String, Object> errorMap = (Map<String, Object>) widgetResult;
+        assertThat(String.valueOf(errorMap.get("error"))).contains("not supported");
+    }
+
+    @Test
+    void fetchDashboardData_widgetWithNoDataSourceType_doesNotExecuteSql() {
+        // A widget whose dataSource omits "type" must not fall through to raw SQL
+        // execution (previously the implicit default), even if it carries a query.
+        String dashboardJson = """
+                {
+                    "title": "No-Type Dashboard",
+                    "widgets": [
+                        {
+                            "id": "sneaky",
+                            "dataSource": { "query": "SELECT * FROM ab_tenant" }
+                        }
+                    ]
+                }
+                """;
+        PageSchema schema = new PageSchema();
+        schema.setBlocks(dashboardJson);
+        when(formSchemaMapper.selectById("dash-005")).thenReturn(schema);
+
+        DashboardDataResponse response = dashboardDataService.fetchDashboardData("dash-005", false, 1L);
+
+        // No type -> unsupported -> null, never a query result.
+        assertThat(response.getWidgets().get("sneaky")).isNull();
     }
 
     @Test
