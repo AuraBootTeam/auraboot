@@ -1,6 +1,10 @@
 package com.auraboot.framework.view.service;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
 import com.auraboot.framework.view.dto.ChipPinDTO;
 import com.auraboot.framework.view.entity.SavedViewChipPin;
 import com.auraboot.framework.view.mapper.SavedViewChipPinMapper;
@@ -27,8 +31,16 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class SavedViewChipPinServiceTest {
 
+    private static final String TEAM_ID = "team-42";
+
     @Mock
     private SavedViewChipPinMapper chipPinMapper;
+
+    @Mock
+    private CurrentUserTeamResolver currentUserTeamResolver;
+
+    @Mock
+    private UserPermissionService userPermissionService;
 
     @InjectMocks
     private SavedViewChipPinServiceImpl service;
@@ -107,5 +119,128 @@ class SavedViewChipPinServiceTest {
         MetaContext.clear();
         assertThatThrownBy(() -> service.pinPersonal("view-1", "e2et_order", "e2et_order_list", 1))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    // ==================== team pins (M3) ====================
+
+    @Test
+    @DisplayName("pinTeam inserts a team pin for a member holding team-manage")
+    void pinTeamInsertsForAuthorizedMember() {
+        when(userPermissionService.hasPermission(100L, MetaPermission.VIEW_TEAM_MANAGE)).thenReturn(true);
+        when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of(TEAM_ID));
+        when(chipPinMapper.selectOne(any())).thenReturn(null);
+
+        service.pinTeam("view-1", TEAM_ID, "e2et_order", "e2et_order_list", 2);
+
+        ArgumentCaptor<SavedViewChipPin> captor = ArgumentCaptor.forClass(SavedViewChipPin.class);
+        verify(chipPinMapper).insert(captor.capture());
+        SavedViewChipPin pin = captor.getValue();
+        assertThat(pin.getScope()).isEqualTo("team");
+        assertThat(pin.getTeamId()).isEqualTo(TEAM_ID);
+        assertThat(pin.getUserId()).isNull();
+        assertThat(pin.getViewPid()).isEqualTo("view-1");
+        assertThat(pin.getSortOrder()).isEqualTo(2);
+        assertThat(pin.getCreatedBy()).isEqualTo("user-pid-1");
+    }
+
+    @Test
+    @DisplayName("pinTeam is idempotent — updates order instead of inserting a duplicate")
+    void pinTeamIsIdempotent() {
+        when(userPermissionService.hasPermission(100L, MetaPermission.VIEW_TEAM_MANAGE)).thenReturn(true);
+        when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of(TEAM_ID));
+        SavedViewChipPin existing = new SavedViewChipPin();
+        existing.setId(7L);
+        existing.setSortOrder(1);
+        when(chipPinMapper.selectOne(any())).thenReturn(existing);
+
+        service.pinTeam("view-1", TEAM_ID, "e2et_order", "e2et_order_list", 4);
+
+        verify(chipPinMapper, never()).insert(any(SavedViewChipPin.class));
+        ArgumentCaptor<SavedViewChipPin> updated = ArgumentCaptor.forClass(SavedViewChipPin.class);
+        verify(chipPinMapper).updateById(updated.capture());
+        assertThat(updated.getValue().getSortOrder()).isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("pinTeam is forbidden without team-manage permission")
+    void pinTeamForbiddenWithoutTeamManage() {
+        when(userPermissionService.hasPermission(100L, MetaPermission.VIEW_TEAM_MANAGE)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.pinTeam("view-1", TEAM_ID, "e2et_order", "e2et_order_list", 1))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("team-manage");
+        verify(chipPinMapper, never()).insert(any(SavedViewChipPin.class));
+    }
+
+    @Test
+    @DisplayName("pinTeam is forbidden when the caller is not a member of the team")
+    void pinTeamForbiddenForNonMember() {
+        when(userPermissionService.hasPermission(100L, MetaPermission.VIEW_TEAM_MANAGE)).thenReturn(true);
+        when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of("other-team"));
+
+        assertThatThrownBy(() -> service.pinTeam("view-1", TEAM_ID, "e2et_order", "e2et_order_list", 1))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("not a member");
+        verify(chipPinMapper, never()).insert(any(SavedViewChipPin.class));
+    }
+
+    @Test
+    @DisplayName("pinTeam rejects a blank teamId")
+    void pinTeamRejectsBlankTeamId() {
+        assertThatThrownBy(() -> service.pinTeam("view-1", "  ", "e2et_order", "e2et_order_list", 1))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("teamId is required");
+        verify(chipPinMapper, never()).insert(any(SavedViewChipPin.class));
+    }
+
+    @Test
+    @DisplayName("unpinTeam deletes the team pin for an authorized member")
+    void unpinTeamDeletes() {
+        when(userPermissionService.hasPermission(100L, MetaPermission.VIEW_TEAM_MANAGE)).thenReturn(true);
+        when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of(TEAM_ID));
+
+        service.unpinTeam("view-1", TEAM_ID);
+
+        verify(chipPinMapper).delete(any());
+    }
+
+    @Test
+    @DisplayName("unpinTeam is forbidden without team-manage permission")
+    void unpinTeamForbiddenWithoutTeamManage() {
+        when(userPermissionService.hasPermission(100L, MetaPermission.VIEW_TEAM_MANAGE)).thenReturn(false);
+
+        assertThatThrownBy(() -> service.unpinTeam("view-1", TEAM_ID))
+                .isInstanceOf(ValidationException.class);
+        verify(chipPinMapper, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("listEffectivePins unions personal + team pins and de-dupes by viewPid")
+    void listEffectivePinsUnionsAndDedupes() {
+        when(currentUserTeamResolver.resolveCurrentUserTeamIds()).thenReturn(List.of(TEAM_ID));
+
+        SavedViewChipPin personal = new SavedViewChipPin();
+        personal.setViewPid("view-1");
+        personal.setSortOrder(2);
+
+        SavedViewChipPin teamDup = new SavedViewChipPin(); // same view as personal
+        teamDup.setViewPid("view-1");
+        teamDup.setSortOrder(5);
+        SavedViewChipPin teamOnly = new SavedViewChipPin();
+        teamOnly.setViewPid("view-2");
+        teamOnly.setSortOrder(3);
+
+        // First selectList = personal query, second = team query.
+        when(chipPinMapper.selectList(any()))
+                .thenReturn(List.of(personal))
+                .thenReturn(List.of(teamDup, teamOnly));
+
+        List<ChipPinDTO> pins = service.listEffectivePins("e2et_order", "e2et_order_list");
+
+        assertThat(pins).hasSize(2);
+        assertThat(pins).extracting(ChipPinDTO::viewPid).containsExactly("view-1", "view-2");
+        // Personal pin is added first, so its order wins the de-dup on view-1.
+        assertThat(pins.get(0).order()).isEqualTo(2);
+        assertThat(pins.get(1).order()).isEqualTo(3);
     }
 }

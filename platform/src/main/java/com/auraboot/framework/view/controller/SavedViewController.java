@@ -129,7 +129,8 @@ public class SavedViewController {
 
     @PostMapping("/{viewPid}/pin")
     @Operation(summary = "Pin a view as a quick-filter chip",
-            description = "Pin a SavedView to the current user's list-page quick-filter chip row")
+            description = "Pin a SavedView to the current user's (scope=personal) or a team's "
+                    + "(scope=team) list-page quick-filter chip row. Team pins require team-manage.")
     @RequirePermission(MetaPermission.VIEW_READ)
     public ApiResponse<Void> pinAsChip(
             @Parameter(description = "View PID") @PathVariable @NotBlank String viewPid,
@@ -139,22 +140,36 @@ public class SavedViewController {
             return ApiResponse.error("View not found: " + viewPid);
         }
         Integer order = request != null ? request.getOrder() : null;
-        // M2: personal pins only. Team-scoped pins arrive in M3.
-        chipPinService.pinPersonal(viewPid, view.getModelCode(), view.getPageKey(), order);
+        if (isTeamScope(request)) {
+            // Authorization (team-manage + membership) is enforced in the service.
+            chipPinService.pinTeam(viewPid, request.getTeamId(), view.getModelCode(), view.getPageKey(), order);
+        } else {
+            chipPinService.pinPersonal(viewPid, view.getModelCode(), view.getPageKey(), order);
+        }
         return ApiResponse.success("View pinned as quick-filter chip", null);
     }
 
     @DeleteMapping("/{viewPid}/pin")
     @Operation(summary = "Unpin a view from the quick-filter chip row",
-            description = "Remove the current user's pin of a SavedView")
+            description = "Remove the current user's (scope=personal) or a team's (scope=team) pin of a SavedView")
     @RequirePermission(MetaPermission.VIEW_READ)
     public ApiResponse<Void> unpinChip(
             @Parameter(description = "View PID") @PathVariable @NotBlank String viewPid,
             @Parameter(description = "Pin scope (personal|team)")
-            @RequestParam(required = false, defaultValue = "personal") String scope) {
-        // M2: personal pins only.
-        chipPinService.unpinPersonal(viewPid);
+            @RequestParam(required = false, defaultValue = "personal") String scope,
+            @Parameter(description = "Team PID (required when scope=team)")
+            @RequestParam(required = false) String teamId) {
+        if ("team".equals(scope)) {
+            // Authorization (team-manage + membership) is enforced in the service.
+            chipPinService.unpinTeam(viewPid, teamId);
+        } else {
+            chipPinService.unpinPersonal(viewPid);
+        }
         return ApiResponse.success("View unpinned", null);
+    }
+
+    private boolean isTeamScope(ChipPinRequest request) {
+        return request != null && "team".equals(request.getScope());
     }
 
     @GetMapping("/chip-pins")

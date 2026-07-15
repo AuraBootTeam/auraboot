@@ -20,8 +20,23 @@ public interface SavedViewChipPinService {
     void unpinPersonal(String viewPid);
 
     /**
-     * The effective pins for the current user on a model/page: their personal
-     * pins now, plus team pins once M3 lands. Returns {@code {viewPid, order}} rows.
+     * Pin a view to a team's quick-filter chip row so every team member sees it.
+     * Requires the caller to hold team-manage and to belong to {@code teamId}.
+     * Idempotent: re-pinning updates the order rather than duplicating.
+     */
+    void pinTeam(String viewPid, String teamId, String modelCode, String pageKey, Integer order);
+
+    /**
+     * Remove a team's pin of a view (no-op if absent). Same team-manage +
+     * membership requirement as {@link #pinTeam}.
+     */
+    void unpinTeam(String viewPid, String teamId);
+
+    /**
+     * The effective pins for the current user on a model/page: their own personal
+     * pins union the team pins of every team they belong to. Seeing a team pin is
+     * read-level (membership); only authoring it needs team-manage. Returns
+     * {@code {viewPid, order}} rows, de-duplicated by {@code viewPid}.
      */
     List<ChipPinDTO> listEffectivePins(String modelCode, String pageKey);
 }

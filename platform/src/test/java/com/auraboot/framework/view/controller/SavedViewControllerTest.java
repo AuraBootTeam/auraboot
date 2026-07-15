@@ -4,6 +4,7 @@ import com.auraboot.framework.tenant.service.CurrentUserTeamResolver;
 import com.auraboot.framework.view.dto.SavedViewAuditEventDTO;
 import com.auraboot.framework.view.dto.SavedViewCapabilityCheckRequest;
 import com.auraboot.framework.view.dto.SavedViewCapabilityCheckResponse;
+import com.auraboot.framework.view.service.SavedViewChipPinService;
 import com.auraboot.framework.view.service.SavedViewService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +33,9 @@ class SavedViewControllerTest {
     private SavedViewService savedViewService;
 
     @Mock
+    private SavedViewChipPinService chipPinService;
+
+    @Mock
     private CurrentUserTeamResolver currentUserTeamResolver;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -39,7 +43,8 @@ class SavedViewControllerTest {
 
     @BeforeEach
     void setUp() {
-        SavedViewController controller = new SavedViewController(savedViewService, currentUserTeamResolver);
+        SavedViewController controller =
+                new SavedViewController(savedViewService, chipPinService, currentUserTeamResolver);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
