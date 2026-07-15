@@ -113,6 +113,8 @@ The `full` profile starts PostgreSQL + the Spring Boot backend + the Node BFF/SS
 
 **`scripts/quickstart.sh` is not optional.** `docker compose up` starts the services and nothing else: it creates no admin user and imports no plugins. Without this step the login below fails with *"Invalid username or password"*, and even past it the platform has zero models and zero menus. The script is idempotent — run it again any time.
 
+> **Windows:** the runtime is fully supported through **Docker Desktop**, which runs the whole stack in its WSL2 backend — `docker compose --profile full up` works exactly as above. The only caveat is that `quickstart.sh` (and every other `scripts/*.sh`) is a bash script, so run it from a **WSL** shell or **Git Bash**, not PowerShell/cmd. It needs only `bash` + `curl` and talks to the published port, so `./scripts/quickstart.sh` works unchanged. Native, non-Docker Windows-host deployment is **not** supported: the reset/init/build tooling is bash-only and there is no `gradlew.bat`.
+
 Then open [http://localhost:3000](http://localhost:3000) and log in:
 
 | | |
