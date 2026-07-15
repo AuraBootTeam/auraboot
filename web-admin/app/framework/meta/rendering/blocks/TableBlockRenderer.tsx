@@ -232,17 +232,27 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const treeConfig: TreeConfig | undefined = block.table?.treeConfig || (block as any).treeConfig;
   const { visibleRows, toggleExpand } = useTreeData(rawData, treeConfig);
   const selectionConfig = block.table?.selection || (block as any).selection;
+  const selectionMode = selectionConfig?.mode || 'single';
+  const isMultipleSelection = selectionMode === 'multiple';
   const defaultFirstSelection = Boolean((selectionConfig as any)?.defaultFirst);
-  const rowKeyField = block.table?.rowKey || 'pid';
+  const rowKeyField = block.table?.rowKey || (selectionConfig as any)?.keyField || 'pid';
+  const selectionIdField = (selectionConfig as any)?.idField || rowKeyField;
   const [localSelectedRowKey, setLocalSelectedRowKey] = useState('');
+  const [localSelectedRowKeys, setLocalSelectedRowKeys] = useState<string[]>([]);
   const getRowIdentity = (row: any, index?: number): string =>
     String(row?.[rowKeyField] ?? row?.id ?? row?.pid ?? index ?? '');
-  const selectedRow = selectionConfig?.bind
+  const selectedStateValue = selectionConfig?.bind
     ? (runtime.getContext().state as Record<string, any> | undefined)?.[selectionConfig.bind]
     : undefined;
+  const selectedRowsFromState = Array.isArray(selectedStateValue) ? selectedStateValue : [];
+  const selectedRow = !Array.isArray(selectedStateValue) ? selectedStateValue : undefined;
   const selectedRowKey =
     selectedRow && typeof selectedRow === 'object' ? getRowIdentity(selectedRow) : '';
   const effectiveSelectedRowKey = localSelectedRowKey || selectedRowKey;
+  const effectiveSelectedRowKeys = localSelectedRowKeys.length
+    ? localSelectedRowKeys
+    : selectedRowsFromState.map((row: any, index: number) => getRowIdentity(row, index));
+  const effectiveSelectedRowKeySet = new Set(effectiveSelectedRowKeys);
 
   // Use tree-processed rows when treeConfig is set, otherwise flat data
   const data = treeConfig ? visibleRows : rawData;
@@ -265,7 +275,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // 渲染列头
   useEffect(() => {
-    if (!selectionConfig?.bind || !defaultFirstSelection) return;
+    if (!selectionConfig?.bind || isMultipleSelection || !defaultFirstSelection) return;
     const current = (runtime.getContext().state as Record<string, any> | undefined)?.[
       selectionConfig.bind
     ];
@@ -285,7 +295,52 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       writeRuntimeState(runtime, selectionConfig.bind, null);
       setLocalSelectedRowKey('');
     }
-  }, [data, runtime, selectionConfig?.bind, defaultFirstSelection, rowKeyField]);
+  }, [data, runtime, selectionConfig?.bind, isMultipleSelection, defaultFirstSelection, rowKeyField]);
+
+  const writeMultipleSelection = (rows: any[]) => {
+    if (!selectionConfig?.bind) return;
+    writeRuntimeState(runtime, selectionConfig.bind, rows);
+    if ((selectionConfig as any).idsBind) {
+      writeRuntimeState(
+        runtime,
+        (selectionConfig as any).idsBind,
+        rows.map((row) => row?.[selectionIdField]).filter((value) => value !== undefined && value !== null),
+      );
+    }
+    setLocalSelectedRowKeys(rows.map((row, index) => getRowIdentity(row, index)));
+  };
+
+  const toggleMultipleSelection = (row: any, index: number) => {
+    if (!selectionConfig?.bind) return;
+    if ((selectionConfig as any).detailBind) {
+      writeRuntimeState(runtime, (selectionConfig as any).detailBind, row);
+    }
+    const identity = getRowIdentity(row, index);
+    const currentRows = selectedRowsFromState.length
+      ? selectedRowsFromState
+      : data.filter((candidate: any, candidateIndex: number) =>
+          effectiveSelectedRowKeySet.has(getRowIdentity(candidate, candidateIndex)),
+        );
+    const nextRows = effectiveSelectedRowKeySet.has(identity)
+      ? currentRows.filter((candidate: any, candidateIndex: number) => {
+          const candidateIdentity =
+            getRowIdentity(candidate) ||
+            getRowIdentity(candidate, candidateIndex);
+          return candidateIdentity !== identity;
+        })
+      : [...currentRows, row];
+    writeMultipleSelection(nextRows);
+  };
+
+  const allVisibleRowsSelected =
+    isMultipleSelection &&
+    data.length > 0 &&
+    data.every((row: any, index: number) => effectiveSelectedRowKeySet.has(getRowIdentity(row, index)));
+
+  const toggleAllVisibleRows = () => {
+    if (!isMultipleSelection) return;
+    writeMultipleSelection(allVisibleRowsSelected ? [] : data);
+  };
 
   const renderColumnHeader = (column: ColumnConfig) => {
     const label = getLocalizedText(column.label, locale, t);
@@ -510,8 +565,12 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     dispatchAction(normalized, row);
   };
 
-  const handleRowClick = (row: any) => {
+  const handleRowClick = (row: any, index: number) => {
     if (!selectionConfig?.bind) return;
+    if (isMultipleSelection) {
+      toggleMultipleSelection(row, index);
+      return;
+    }
     writeRuntimeState(runtime, selectionConfig.bind, row);
     setLocalSelectedRowKey(getRowIdentity(row));
   };
@@ -525,6 +584,17 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       <table className="divide-border w-max min-w-full divide-y">
         <thead className={maxHeight ? 'bg-subtle sticky top-0 z-10' : 'bg-subtle'}>
           <tr>
+            {isMultipleSelection && (
+              <th className={`${headerCellClass} w-12 text-left`}>
+                <input
+                  type="checkbox"
+                  data-testid="table-select-all"
+                  checked={allVisibleRowsSelected}
+                  onChange={toggleAllVisibleRows}
+                  aria-label="Select all rows"
+                />
+              </th>
+            )}
             {columns.map(renderColumnHeader)}
             {rowActions.length > 0 && (
               <th
@@ -539,7 +609,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           {data.length === 0 ? (
             <tr>
               <td
-                colSpan={columns.length + (rowActions.length > 0 ? 1 : 0)}
+                colSpan={columns.length + (rowActions.length > 0 ? 1 : 0) + (isMultipleSelection ? 1 : 0)}
                 className="text-text-2 px-6 py-4 text-center"
               >
                 {/* A table that only fills in once you select something upstream should say so.
@@ -556,18 +626,31 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
           ) : (
             data.map((row: any, index: number) => {
               const rowIdentity = getRowIdentity(row, index);
-              const isSelected =
-                Boolean(effectiveSelectedRowKey) && effectiveSelectedRowKey === rowIdentity;
+              const isSelected = isMultipleSelection
+                ? effectiveSelectedRowKeySet.has(rowIdentity)
+                : Boolean(effectiveSelectedRowKey) && effectiveSelectedRowKey === rowIdentity;
 
               return (
                 <tr
                   key={rowIdentity}
                   data-testid={`table-row-${rowIdentity}`}
-                  onClick={() => handleRowClick(row)}
+                  onClick={() => handleRowClick(row, index)}
                   className={`hover:bg-hover ${isSelected ? 'bg-accent-weak' : ''} ${rowClassName(row)} ${
                     selectionConfig?.bind ? 'cursor-pointer' : ''
                   }`}
                 >
+                  {isMultipleSelection && (
+                    <td className={`${bodyCellClass} w-12`}>
+                      <input
+                        type="checkbox"
+                        data-testid={`table-select-row-${rowIdentity}`}
+                        checked={isSelected}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={() => toggleMultipleSelection(row, index)}
+                        aria-label={`Select row ${rowIdentity}`}
+                      />
+                    </td>
+                  )}
                   {columns.map((column, colIdx) => (
                     <td
                       key={column.field}
