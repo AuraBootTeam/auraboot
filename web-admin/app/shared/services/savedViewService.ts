@@ -63,6 +63,15 @@ function handleResponse<T>(
 }
 
 /**
+ * A quick-filter chip pin: which view the current user pinned and its order.
+ * Structurally matches the `pins` input of assembleQuickFilterChips.
+ */
+export interface ChipPin {
+  viewPid: string;
+  order: number;
+}
+
+/**
  * SavedView Service Class
  *
  * Encapsulates all SavedView-related API calls
@@ -99,6 +108,34 @@ export class SavedViewService {
   async getGlobalViews(params: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
     const result = await get<SavedView[]>(`${BASE_URL}/global`, params, undefined, request);
     return handleResponse(result, 'Failed to fetch global views');
+  }
+
+  /**
+   * List the current user's quick-filter chip pins for a model/page.
+   */
+  async getChipPins(params: SavedViewQueryParams, request?: Request): Promise<ChipPin[]> {
+    const result = await get<ChipPin[]>(`${BASE_URL}/chip-pins`, params, undefined, request);
+    return handleResponse(result, 'Failed to fetch quick-filter chip pins');
+  }
+
+  /**
+   * Pin a view to the current user's quick-filter chip row.
+   */
+  async pinView(viewPid: string, order?: number, request?: Request): Promise<void> {
+    const result = await post<void>(`${BASE_URL}/${viewPid}/pin`, { order }, undefined, request);
+    if (!ResultHelper.isSuccess(result)) {
+      throw new Error(result.desc || 'Failed to pin view');
+    }
+  }
+
+  /**
+   * Remove the current user's pin of a view from the quick-filter chip row.
+   */
+  async unpinView(viewPid: string, request?: Request): Promise<void> {
+    const result = await del<void>(`${BASE_URL}/${viewPid}/pin`, undefined, undefined, request);
+    if (!ResultHelper.isSuccess(result)) {
+      throw new Error(result.desc || 'Failed to unpin view');
+    }
   }
 
   /**

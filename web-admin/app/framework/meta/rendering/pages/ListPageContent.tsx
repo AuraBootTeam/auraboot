@@ -103,7 +103,7 @@ import {
   getExplicitIds as selectionGetExplicitIds,
   isAllMatching as selectionIsAllMatching,
 } from './list/selectionModel';
-import { savedViewService } from '~/shared/services/savedViewService';
+import { savedViewService, type ChipPin } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 import {
@@ -1073,6 +1073,25 @@ function ListPageContentInner(props: PageContentProps) {
     scopeFilter: 'personal',
     autoLoad: !!schema && !hideSavedViews && !skipListData,
   });
+
+  // Quick-filter chip pins (Half B): the current user's pinned views for this
+  // model/page, merged into the chip row alongside built-in presets + global pins.
+  const [chipPins, setChipPins] = useState<ChipPin[]>([]);
+  const loadChipPins = useCallback(async () => {
+    if (!schema || hideQuickFilters || skipListData) {
+      setChipPins([]);
+      return;
+    }
+    try {
+      setChipPins(await savedViewService.getChipPins({ modelCode, pageKey }));
+    } catch {
+      setChipPins([]);
+    }
+  }, [schema, hideQuickFilters, skipListData, modelCode, pageKey]);
+  useEffect(() => {
+    void loadChipPins();
+  }, [loadChipPins]);
+
   const [pendingViewConfig, setPendingViewConfig] = useState<Partial<ViewConfig> | null>(null);
   const [savingViewDraft, setSavingViewDraft] = useState(false);
   const [copyingViewDraft, setCopyingViewDraft] = useState(false);
@@ -3546,9 +3565,9 @@ function ListPageContentInner(props: PageContentProps) {
         presets: getQuickFilterPresetDefinitions(),
         t,
         savedViews,
-        pins: [],
+        pins: chipPins,
       }),
-    [t, savedViews],
+    [t, savedViews, chipPins],
   );
 
   // Select a SavedView: clear any active preset, switch the view, sync the URL
