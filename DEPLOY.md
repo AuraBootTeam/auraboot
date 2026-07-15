@@ -17,10 +17,19 @@ cp .env.example .env
 # Start the full stack (first run builds images — allow 5-10 min)
 docker compose --profile full up --build -d
 
+# Bootstrap the stack (NOT optional — see below)
+./scripts/quickstart.sh
+
 # Open the app
 open http://localhost:3000
 # Default login: admin@auraboot.com / Test2026x
 ```
+
+**`scripts/quickstart.sh` is not optional.** `docker compose up` starts the services and
+nothing else: it creates no admin user and imports no plugins. Without this step the login
+above fails with *"Invalid username or password"*, and even past it the platform has zero
+models and zero menus. The script is idempotent — run it again any time. (On Windows, run
+it from WSL or Git Bash — see [Windows](#windows) below.)
 
 ### Windows
 
