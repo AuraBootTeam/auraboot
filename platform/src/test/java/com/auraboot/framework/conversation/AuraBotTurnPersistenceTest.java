@@ -106,8 +106,8 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
 
     private TurnRequest newTurnRequest(String message, String clientMsgId,
                                          Long convId, Long memberId) {
-        com.auraboot.framework.aurabot.dto.ChatRequest legacy =
-                new com.auraboot.framework.aurabot.dto.ChatRequest();
+        com.auraboot.framework.agent.dto.ChatRequest legacy =
+                new com.auraboot.framework.agent.dto.ChatRequest();
         legacy.setMessage(message);
         legacy.setSessionId("persistence-test");
         legacy.setAgentCode("aurabot");
@@ -262,8 +262,8 @@ class AuraBotTurnPersistenceTest extends BaseIntegrationTest {
      * triage decision onto it.
      */
     private TurnRequest newImEventTurnRequest(String message, Long inboundMessageId) {
-        com.auraboot.framework.aurabot.dto.ChatRequest legacy =
-                new com.auraboot.framework.aurabot.dto.ChatRequest();
+        com.auraboot.framework.agent.dto.ChatRequest legacy =
+                new com.auraboot.framework.agent.dto.ChatRequest();
         legacy.setMessage(message);
         legacy.setSessionId("d1-im-event-test");
         legacy.setAgentCode("aurabot");

@@ -1,6 +1,6 @@
 package com.auraboot.framework.agent.port;
 
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.conversation.TurnRequest;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

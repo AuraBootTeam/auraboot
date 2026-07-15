@@ -2,7 +2,7 @@ package com.auraboot.framework.im.service;
 
 import com.auraboot.framework.agent.identity.AuraBotAgentResolver;
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.conversation.BroadcastResponseSink;
 import com.auraboot.framework.conversation.ConversationTurnService;
 import com.auraboot.framework.conversation.InboundMode;

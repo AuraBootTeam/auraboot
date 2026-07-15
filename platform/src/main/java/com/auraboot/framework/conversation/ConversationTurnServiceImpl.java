@@ -19,7 +19,7 @@ import com.auraboot.framework.agent.triage.TriageBucket;
 import com.auraboot.framework.agent.triage.TriageRequest;
 import com.auraboot.framework.agent.triage.TriageVerdict;
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;

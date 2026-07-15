@@ -1,6 +1,6 @@
 package com.auraboot.framework.agent.port;
 
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;

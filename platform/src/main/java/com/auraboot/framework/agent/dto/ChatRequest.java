@@ -1,4 +1,4 @@
-package com.auraboot.framework.aurabot.dto;
+package com.auraboot.framework.agent.dto;
 
 import lombok.Data;
 
