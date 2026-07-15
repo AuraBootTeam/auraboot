@@ -57,7 +57,7 @@ const MODEL_CODE = 'showcase_all_fields';
 const LIST_URL = `/p/${MODEL_CODE}`;
 const DETAIL_URL_RE = new RegExp(`/p/${MODEL_CODE}/view/[^/?#]+`);
 const DETAIL_PAGE_KEY = `${MODEL_CODE}_detail`;
-const SAVED_VIEW_PAGE_KEY = MODEL_CODE;
+const SAVED_VIEW_PAGE_KEY = `${MODEL_CODE}_list`;
 
 interface SeededRecord {
   pid: string;

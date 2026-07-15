@@ -52,7 +52,7 @@ import {
 const MODEL_CODE = 'showcase_all_fields';
 const LIST_URL = `/p/${MODEL_CODE}`;
 const LIST_PAGE_KEY = `${MODEL_CODE}_list`;
-const SAVED_VIEW_PAGE_KEY = MODEL_CODE;
+const SAVED_VIEW_PAGE_KEY = `${MODEL_CODE}_list`;
 
 interface ListPageSnapshot {
   pid: string;
