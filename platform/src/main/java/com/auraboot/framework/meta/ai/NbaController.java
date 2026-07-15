@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.ai;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,6 +20,9 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/ai/nba")
 @RequiredArgsConstructor
+@AuthenticatedAccess("self-scoped next-best-action for a caller-supplied record within the caller's "
+        + "tenant (NbaService runs in MetaContext tenant scope); authentication is the access decision. "
+        + "NOTE: does not re-check record-level ACL on recordPid — a follow-up if NBA must honour row ACL.")
 public class NbaController {
 
     private final NbaService nbaService;
