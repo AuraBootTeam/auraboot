@@ -213,8 +213,9 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature()));
         } catch (Exception e) {
-            // Side effects must never block the outcome from being returned to the caller.
-            log.warn("finalizeTurn threw, swallowing: {}", e.getMessage(), e);
+            // Side effects must never block the outcome from being returned to the caller,
+            // but the failure must not vanish silently (P-006).
+            recordFinalizeFailure(ctx, outcome, e);
         }
         return outcome;
     }
@@ -327,7 +328,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature()));
         } catch (Exception e) {
-            log.warn("resumeTurn finalizeTurn threw, swallowing: {}", e.getMessage(), e);
+            recordFinalizeFailure(ctx, outcome, e);
         }
         return outcome;
     }
@@ -453,7 +454,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
                     capturingSink.capturedContent(), capturingSink.capturedSignature()));
         } catch (Exception e) {
-            log.warn("resumeAcpApproval finalizeTurn threw, swallowing: {}", e.getMessage(), e);
+            recordFinalizeFailure(ctx, outcome, e);
         }
         return outcome;
     }
@@ -1051,6 +1052,39 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         // does not — ctx.taskPid() stays null there).
         closeNamedAgentTask(ctx, outcome);
         sideEffects.metricsRecorder().recordTurnEnd(ctx, outcome);
+    }
+
+    /**
+     * P-006: {@code finalizeTurn} side effects must never block the outcome from
+     * being returned to the caller — the response SSE was already delivered and
+     * we do NOT roll it back. But the previous behaviour merely {@code log.warn}-ed
+     * the swallowed exception: a {@code persistOutbound} failure (e.g. a DB
+     * constraint) then left a turn whose Success response reached the UI yet has
+     * NO {@code ab_im_message} row, with no signal to reconcile "sent but not
+     * persisted". This adds a visible failure surface — a dedicated metric
+     * counter plus an audit failure record — WITHOUT changing the
+     * response-is-not-rolled-back policy. Never throws: it is invoked from a
+     * catch whose whole purpose is to swallow, so metric/audit emission is itself
+     * guarded.
+     */
+    private void recordFinalizeFailure(TurnContext ctx, TurnOutcome outcome, Exception e) {
+        log.warn("finalizeTurn threw, swallowing (response already delivered, NOT rolled back): {}",
+                e.getMessage(), e);
+        try {
+            sideEffects.metricsRecorder().recordOutboundPersistFailure(ctx);
+        } catch (Exception metricEx) {
+            log.warn("finalizeTurn failure metric emit failed: {}", metricEx.getMessage());
+        }
+        try {
+            String outcomeType = outcome != null ? outcome.getClass().getSimpleName() : "unknown";
+            sideEffects.auditWriter().writeFailure(ctx, new TurnOutcome.Failed(
+                    "finalizeTurn side-effect failure after " + outcomeType
+                            + " outcome (response already delivered, not rolled back): "
+                            + safeExceptionMessage(e),
+                    e));
+        } catch (Exception auditEx) {
+            log.warn("finalizeTurn failure audit write failed: {}", auditEx.getMessage());
+        }
     }
 
     /**

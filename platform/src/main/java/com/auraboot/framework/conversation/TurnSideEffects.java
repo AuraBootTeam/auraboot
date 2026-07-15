@@ -106,6 +106,21 @@ public interface TurnSideEffects {
         void recordTurnBegin(TurnContext ctx);
         void recordTurnEnd(TurnContext ctx, TurnOutcome outcome);
 
+        /**
+         * P-006: a {@code finalizeTurn} side-effect (typically
+         * {@link Persistence#persistOutbound} throwing after the response SSE
+         * was already delivered to the client) is swallowed so it never rolls
+         * back the delivered response — but a swallowed persistence failure
+         * would otherwise leave a turn with NO DB record and no way to
+         * reconcile "sent but not persisted". This counter is the visible
+         * failure surface for that drift ({@code aurabot.outbound_persist_fail}).
+         *
+         * <p>Default no-op so {@link #NOOP} and any legacy {@link MetricsRecorder}
+         * impls keep compiling; the production wiring in
+         * {@code ConversationTurnConfig} overrides it to increment the counter.
+         */
+        default void recordOutboundPersistFailure(TurnContext ctx) {}
+
         MetricsRecorder NOOP = new MetricsRecorder() {
             public void recordTurnBegin(TurnContext ctx) {}
             public void recordTurnEnd(TurnContext ctx, TurnOutcome outcome) {}
