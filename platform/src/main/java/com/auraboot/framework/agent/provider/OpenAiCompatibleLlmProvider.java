@@ -2,13 +2,20 @@ package com.auraboot.framework.agent.provider;
 
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
+import com.auraboot.framework.agent.dto.LlmChunk;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Flux;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * OpenAI-compatible Chat Completions API provider.
@@ -79,13 +86,7 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
 
         Map<String, Object> body = buildOpenAiRequestBody(request);
 
-        // Strip trailing /v1 or /v1/ from baseUrl to avoid double path segments
-        String normalizedBase = baseUrl;
-        if (normalizedBase.endsWith("/v1/")) {
-            normalizedBase = normalizedBase.substring(0, normalizedBase.length() - 4);
-        } else if (normalizedBase.endsWith("/v1")) {
-            normalizedBase = normalizedBase.substring(0, normalizedBase.length() - 3);
-        }
+        String normalizedBase = normalizeBaseUrl(baseUrl);
 
         String responseBody;
         try {
@@ -107,6 +108,159 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
 
         Map<String, Object> resp = objectMapper.readValue(responseBody, Map.class);
         return convertResponse(resp, buildToolNameReverseMap(request));
+    }
+
+    // =========================================================================
+    // Real streaming (IMPL-02) — token-by-token SSE for OpenAI-compatible providers
+    // =========================================================================
+
+    /**
+     * Real streaming via OpenAI-compatible {@code /v1/chat/completions}
+     * {@code stream:true}. Consumes the {@code data:}-only SSE the wire emits
+     * (OpenAI, DeepSeek, Qianwen, Zhipu, Moonshot, …) and forwards each
+     * {@code choices[0].delta.content} fragment as an in-progress
+     * {@link LlmChunk} delta, then emits exactly one terminal chunk carrying the
+     * aggregated {@link LlmChatResponse}.
+     *
+     * <p>Before this override the provider fell back to {@link LlmProvider}'s
+     * default, which blocks on {@link #chat} and emits a single terminal chunk —
+     * no per-token stream, SSE back-pressure dead. Every OpenAI-compatible model
+     * (DeepSeek included) was pseudo-streamed on the no-tool chat path.
+     *
+     * <p>The aggregate is rebuilt through the same {@link #convertResponse} used
+     * by the sync path, so tool-call name reverse-mapping, stop-reason
+     * normalisation and usage extraction stay identical across the two paths.
+     * Per {@link LlmProvider} spec Q5 there is no fallback to sync — streaming
+     * failures surface as {@link Flux#error}.
+     */
+    @Override
+    public Flux<LlmChunk> streamChat(LlmChatRequest request, String apiKey, String baseUrl) {
+        // Vision capability gate mirrors chat() — fail fast before the wire.
+        if (containsImageContent(request.getMessages()) && !supportsVision(request.getModel())) {
+            return Flux.error(new IllegalArgumentException(
+                    "model '" + request.getModel() + "' does not accept image input. "
+                            + "Use a vision-capable model (e.g. qwen-vl-max, gpt-4o) or Anthropic Claude."));
+        }
+        if (request.getThinking() != null && request.getThinking().isEnabled() && log.isDebugEnabled()) {
+            log.debug("OpenAI-compatible provider does not honour LlmChatRequest.thinking; "
+                    + "dropping for model={}", request.getModel());
+        }
+
+        String bodyJson;
+        try {
+            Map<String, Object> body = buildOpenAiRequestBody(request);
+            body.put("stream", Boolean.TRUE);
+            // Ask for a trailing usage-only chunk. OpenAI/DeepSeek honour this and
+            // emit final token counts after the content; providers that ignore it
+            // simply omit usage and we report 0 — same as the sync path when absent.
+            body.put("stream_options", Map.of("include_usage", Boolean.TRUE));
+            bodyJson = objectMapper.writeValueAsString(body);
+        } catch (Exception e) {
+            return Flux.error(e);
+        }
+
+        String url = normalizeBaseUrl(baseUrl) + "/v1/chat/completions";
+        Map<String, String> toolNameReverse = buildToolNameReverseMap(request);
+        AtomicLong seq = new AtomicLong(0L);
+        OpenAiStreamAggregator agg = new OpenAiStreamAggregator();
+
+        Flux<ServerSentEvent<String>> sseFlux = webClient.post()
+                .uri(url)
+                .header("Authorization", "Bearer " + apiKey)
+                .header("content-type", "application/json")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .bodyValue(bodyJson)
+                .retrieve()
+                .bodyToFlux(new ParameterizedTypeReference<ServerSentEvent<String>>() {});
+
+        return sseFlux
+                .concatMap(sse -> {
+                    String data = sse.data();
+                    // OpenAI closes with a literal `data: [DONE]` sentinel and
+                    // interleaves keep-alive blanks; neither carries a delta.
+                    if (data == null || data.isBlank() || "[DONE]".equals(data.trim())) {
+                        return Flux.empty();
+                    }
+                    try {
+                        return handleOpenAiSseData(data, seq, agg);
+                    } catch (Exception e) {
+                        return Flux.error(e);
+                    }
+                })
+                // Terminal chunk on successful completion (whether or not a [DONE]
+                // sentinel arrived). concatWith is skipped on Flux.error, so a
+                // mid-stream failure never produces a bogus aggregate.
+                .concatWith(Flux.defer(() ->
+                        Flux.just(LlmChunk.done(seq.getAndIncrement(),
+                                convertResponse(agg.toResponseMap(), toolNameReverse)))));
+    }
+
+    /**
+     * Translate one OpenAI-compatible SSE {@code data:} payload into zero-or-more
+     * {@link LlmChunk} deltas, accumulating tool-call fragments / usage /
+     * finish_reason into {@code agg} for the terminal chunk. Package-private so
+     * unit tests can replay recorded frames without a WebClient.
+     */
+    Flux<LlmChunk> handleOpenAiSseData(String data, AtomicLong seq, OpenAiStreamAggregator agg) throws Exception {
+        JsonNode root = objectMapper.readTree(data);
+
+        // Usage arrives on the finishing chunk or, with stream_options, in a
+        // trailing choices-empty chunk. Capture whenever present.
+        JsonNode usage = root.path("usage");
+        if (usage.isObject()) {
+            agg.promptTokens = usage.path("prompt_tokens").asInt(agg.promptTokens);
+            agg.completionTokens = usage.path("completion_tokens").asInt(agg.completionTokens);
+        }
+
+        JsonNode choices = root.path("choices");
+        if (!choices.isArray() || choices.isEmpty()) {
+            return Flux.empty();
+        }
+        JsonNode choice = choices.get(0);
+        String finishReason = choice.path("finish_reason").asText(null);
+        if (finishReason != null && !finishReason.isEmpty() && !"null".equals(finishReason)) {
+            agg.finishReason = finishReason;
+        }
+
+        JsonNode delta = choice.path("delta");
+        List<LlmChunk> out = new ArrayList<>();
+
+        // DeepSeek-reasoner streams chain-of-thought in reasoning_content; surface it
+        // as a thinking delta. The sync convertResponse ignores it, so it never leaks
+        // into the visible answer text — the aggregate below matches that.
+        JsonNode reasoning = delta.path("reasoning_content");
+        if (reasoning.isTextual() && !reasoning.asText().isEmpty()) {
+            out.add(LlmChunk.thinking(seq.getAndIncrement(), reasoning.asText()));
+        }
+
+        JsonNode content = delta.path("content");
+        if (content.isTextual() && !content.asText().isEmpty()) {
+            String text = content.asText();
+            agg.text.append(text);
+            out.add(LlmChunk.delta(seq.getAndIncrement(), text));
+        }
+
+        // Tool calls stream incrementally: id/name on the first fragment for an
+        // index, arguments concatenated across the following fragments.
+        JsonNode toolCalls = delta.path("tool_calls");
+        if (toolCalls.isArray()) {
+            for (JsonNode tc : toolCalls) {
+                int idx = tc.path("index").asInt(0);
+                OpenAiStreamAggregator.ToolCallAcc acc = agg.toolCall(idx);
+                if (tc.hasNonNull("id")) {
+                    acc.id = tc.path("id").asText();
+                }
+                JsonNode fn = tc.path("function");
+                if (fn.hasNonNull("name")) {
+                    acc.name = fn.path("name").asText();
+                }
+                if (fn.hasNonNull("arguments")) {
+                    acc.arguments.append(fn.path("arguments").asText());
+                }
+            }
+        }
+
+        return out.isEmpty() ? Flux.empty() : Flux.fromIterable(out);
     }
 
     /**
@@ -246,6 +400,20 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
             inputRate = 2.5; outputRate = 10.0;
         }
         return (inputTokens * inputRate + outputTokens * outputRate) / 1_000_000.0;
+    }
+
+    /** Strip a trailing {@code /v1} or {@code /v1/} so we never post to {@code /v1/v1/...}. */
+    private static String normalizeBaseUrl(String baseUrl) {
+        if (baseUrl == null) {
+            return null;
+        }
+        if (baseUrl.endsWith("/v1/")) {
+            return baseUrl.substring(0, baseUrl.length() - 4);
+        }
+        if (baseUrl.endsWith("/v1")) {
+            return baseUrl.substring(0, baseUrl.length() - 3);
+        }
+        return baseUrl;
     }
 
     private boolean isToolUnsupportedProvider(String model) {
@@ -594,5 +762,65 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
                 .inputTokens(inputTokens)
                 .outputTokens(outputTokens)
                 .build();
+    }
+
+    /**
+     * Mutable accumulator for OpenAI-compatible SSE streaming. Confined to a
+     * single Flux pipeline (Reactor serialises emission per subscriber), so no
+     * extra synchronisation is needed. {@link #toResponseMap()} rebuilds the
+     * exact {@code /chat/completions} response shape {@link #convertResponse}
+     * expects, so the streaming aggregate and the sync path share one converter.
+     */
+    static final class OpenAiStreamAggregator {
+        final StringBuilder text = new StringBuilder();
+        final Map<Integer, ToolCallAcc> toolCalls = new LinkedHashMap<>();
+        String finishReason;
+        int promptTokens;
+        int completionTokens;
+
+        ToolCallAcc toolCall(int index) {
+            return toolCalls.computeIfAbsent(index, i -> new ToolCallAcc());
+        }
+
+        /** Rebuild the synthetic {@code /chat/completions} response so the proven
+         *  {@link #convertResponse} path produces the terminal aggregate. */
+        Map<String, Object> toResponseMap() {
+            Map<String, Object> message = new LinkedHashMap<>();
+            message.put("content", text.length() > 0 ? text.toString() : null);
+            if (!toolCalls.isEmpty()) {
+                List<Map<String, Object>> tcs = new ArrayList<>();
+                for (ToolCallAcc acc : toolCalls.values()) {
+                    Map<String, Object> fn = new LinkedHashMap<>();
+                    fn.put("name", acc.name);
+                    fn.put("arguments", acc.arguments.toString());
+                    Map<String, Object> tc = new LinkedHashMap<>();
+                    tc.put("id", acc.id);
+                    tc.put("type", "function");
+                    tc.put("function", fn);
+                    tcs.add(tc);
+                }
+                message.put("tool_calls", tcs);
+            }
+            // OpenAI reports finish_reason=tool_calls when the model chose tools; if the
+            // stream ended without an explicit reason but tool calls accrued, treat it as
+            // such so convertResponse normalises stopReason to "tool_use".
+            String fr = finishReason;
+            if ((fr == null || fr.isEmpty()) && !toolCalls.isEmpty()) {
+                fr = "tool_calls";
+            }
+            Map<String, Object> choice = new LinkedHashMap<>();
+            choice.put("finish_reason", fr);
+            choice.put("message", message);
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("choices", List.of(choice));
+            resp.put("usage", Map.of("prompt_tokens", promptTokens, "completion_tokens", completionTokens));
+            return resp;
+        }
+
+        static final class ToolCallAcc {
+            String id;
+            String name;
+            final StringBuilder arguments = new StringBuilder();
+        }
     }
 }
