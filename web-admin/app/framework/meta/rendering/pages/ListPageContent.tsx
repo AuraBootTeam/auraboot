@@ -3551,17 +3551,42 @@ function ListPageContentInner(props: PageContentProps) {
     [t, savedViews],
   );
 
+  // Select a SavedView: clear any active preset, switch the view, sync the URL
+  // (?view=), and set the non-table view type. Shared by the header selector and
+  // the toolbar view chips so both take the exact same path.
+  const handleSelectView = useCallback(
+    (pid: string) => {
+      activeQuickFilterRef.current = null;
+      setActiveQuickFilter(null);
+      selectView(pid);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set('view', pid);
+          clearTransientViewSearchParams(p);
+          return p;
+        },
+        { replace: true },
+      );
+      const view = savedViews.find((v) => v.pid === pid);
+      if (view?.viewType && view.viewType !== 'table') {
+        setActiveViewType(view.viewType as ViewType);
+      }
+    },
+    [selectView, setSearchParams, savedViews, setActiveViewType, setActiveQuickFilter],
+  );
+
   // Activate a chip: a filter-preset chip toggles its preset; a view chip
   // switches to that SavedView (columns / sort / viewType).
   const handleActivateChip = useCallback(
     (chip: QuickFilterChip) => {
       if (chip.kind === 'view') {
-        selectView(chip.viewPid);
+        handleSelectView(chip.viewPid);
         return;
       }
       handleQuickFilter(chip.key);
     },
-    [selectView, handleQuickFilter],
+    [handleSelectView, handleQuickFilter],
   );
 
   const handleSaveActivePreset = useCallback(async () => {
@@ -3954,26 +3979,7 @@ function ListPageContentInner(props: PageContentProps) {
             viewsLoading={viewsLoading}
             activeViewType={activeViewType}
             onSelectDefaultView={handleSelectDefaultView}
-            onSelectView={(pid) => {
-              activeQuickFilterRef.current = null;
-              setActiveQuickFilter(null);
-              selectView(pid);
-              // Sync view selection to URL
-              setSearchParams(
-                (prev) => {
-                  const p = new URLSearchParams(prev);
-                  p.set('view', pid);
-                  // Clear temporary filter/sort params when switching views
-                  clearTransientViewSearchParams(p);
-                  return p;
-                },
-                { replace: true },
-              );
-              const view = savedViews.find((v) => v.pid === pid);
-              if (view?.viewType && view.viewType !== 'table') {
-                setActiveViewType(view.viewType as ViewType);
-              }
-            }}
+            onSelectView={handleSelectView}
             onCreateView={(viewType) => {
               if (viewType) {
                 setActiveViewType(viewType);
