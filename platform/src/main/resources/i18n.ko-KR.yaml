@@ -362,3 +362,8 @@ search:
   navigate: 이동
   open: 열기
   close: 닫기
+
+aurabot:
+  error:
+    # Streamed to the AuraBot chat panel when no LLM provider is configured for the tenant.
+    no_llm_provider: 구성된 LLM 공급자가 없습니다. 클라우드 구성에서 API 키를 설정하세요.

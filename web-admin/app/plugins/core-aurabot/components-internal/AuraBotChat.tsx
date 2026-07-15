@@ -14,6 +14,7 @@ import {
   type ChatImageAttachment,
 } from '../components-shell/AuraBotProvider';
 import { useI18n } from '~/contexts/I18nContext';
+import { useSmartText } from '~/utils/i18n';
 import { ToolResultCard } from './ToolResultCard';
 import { ChatBiResultCard } from './ChatBiResultCard';
 import { ConfirmCard } from './ConfirmCard';
@@ -125,15 +126,19 @@ interface MessageBubbleProps {
 
 function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbleProps) {
   const isUser = message.sender === 'user';
+  const st = useSmartText();
 
-  // Error message
+  // Error message. Backend streams user-facing errors as a `$i18n:<key>` sentinel
+  // (e.g. "$i18n:aurabot.error.no_llm_provider") because the service layer has no
+  // request locale — resolution happens here where the browser locale is known.
+  // Plain (non-sentinel) error strings pass through useSmartText unchanged.
   if (message.type === 'error') {
     return (
       <div className="mb-3 flex justify-start">
         <div className="max-w-[85%] rounded-2xl rounded-bl-md border border-red-200 bg-red-50 px-4 py-3 text-red-800">
           <div className="flex items-start gap-2">
             <span className="mt-0.5 text-red-500">!</span>
-            <p className="text-sm text-red-600">{message.content}</p>
+            <p className="text-sm text-red-600">{st(message.content, message.content)}</p>
           </div>
           {message.traceId && <TraceLink traceId={message.traceId} />}
         </div>

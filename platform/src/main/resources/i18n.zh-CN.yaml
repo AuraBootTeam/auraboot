@@ -1483,3 +1483,8 @@ notification_rule:
   saving: 保存中...
   update_rule: 更新规则
   create_rule: 创建规则
+
+aurabot:
+  error:
+    # Streamed to the AuraBot chat panel when no LLM provider is configured for the tenant.
+    no_llm_provider: 未配置 LLM 服务商，请在云配置中添加 API Key。
