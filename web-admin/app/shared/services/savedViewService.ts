@@ -72,6 +72,17 @@ export interface ChipPin {
 }
 
 /**
+ * Options for pinning/unpinning a view as a quick-filter chip.
+ * `scope: 'team'` requires `teamId` and the caller holding team-manage (enforced
+ * server-side); it defaults to a personal pin.
+ */
+export interface ChipPinOptions {
+  order?: number;
+  scope?: 'personal' | 'team';
+  teamId?: string;
+}
+
+/**
  * SavedView Service Class
  *
  * Encapsulates all SavedView-related API calls
@@ -119,20 +130,34 @@ export class SavedViewService {
   }
 
   /**
-   * Pin a view to the current user's quick-filter chip row.
+   * Pin a view to the quick-filter chip row. Defaults to a personal pin; pass
+   * `{ scope: 'team', teamId }` to pin it for a team (requires team-manage).
    */
-  async pinView(viewPid: string, order?: number, request?: Request): Promise<void> {
-    const result = await post<void>(`${BASE_URL}/${viewPid}/pin`, { order }, undefined, request);
+  async pinView(viewPid: string, options: ChipPinOptions = {}, request?: Request): Promise<void> {
+    const body: Record<string, unknown> = { order: options.order };
+    if (options.scope === 'team') {
+      body.scope = 'team';
+      body.teamId = options.teamId;
+    }
+    const result = await post<void>(`${BASE_URL}/${viewPid}/pin`, body, undefined, request);
     if (!ResultHelper.isSuccess(result)) {
       throw new Error(result.desc || 'Failed to pin view');
     }
   }
 
   /**
-   * Remove the current user's pin of a view from the quick-filter chip row.
+   * Remove a pin of a view from the quick-filter chip row. Defaults to the
+   * current user's personal pin; pass `{ scope: 'team', teamId }` to remove a
+   * team pin (requires team-manage).
    */
-  async unpinView(viewPid: string, request?: Request): Promise<void> {
-    const result = await del<void>(`${BASE_URL}/${viewPid}/pin`, undefined, undefined, request);
+  async unpinView(
+    viewPid: string,
+    options: Pick<ChipPinOptions, 'scope' | 'teamId'> = {},
+    request?: Request,
+  ): Promise<void> {
+    const params =
+      options.scope === 'team' ? { scope: 'team', teamId: options.teamId } : undefined;
+    const result = await del<void>(`${BASE_URL}/${viewPid}/pin`, params, undefined, request);
     if (!ResultHelper.isSuccess(result)) {
       throw new Error(result.desc || 'Failed to unpin view');
     }

@@ -82,6 +82,62 @@ describe('SavedViewService', () => {
     expect(result).toBe(copied);
   });
 
+  it('pinView posts a personal pin by default (no scope/teamId)', async () => {
+    const service = new SavedViewService();
+    mockedPost.mockResolvedValue({ code: '0', desc: 'ok', data: null });
+
+    await service.pinView('view-1');
+
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/api/views/view-1/pin',
+      { order: undefined },
+      undefined,
+      undefined,
+    );
+  });
+
+  it('pinView posts a team pin with scope + teamId in the body', async () => {
+    const service = new SavedViewService();
+    mockedPost.mockResolvedValue({ code: '0', desc: 'ok', data: null });
+
+    await service.pinView('view-1', { scope: 'team', teamId: 'team-a', order: 3 });
+
+    expect(mockedPost).toHaveBeenCalledWith(
+      '/api/views/view-1/pin',
+      { order: 3, scope: 'team', teamId: 'team-a' },
+      undefined,
+      undefined,
+    );
+  });
+
+  it('unpinView deletes a personal pin by default', async () => {
+    const service = new SavedViewService();
+    mockedDel.mockResolvedValue({ code: '0', desc: 'ok', data: null });
+
+    await service.unpinView('view-1');
+
+    expect(mockedDel).toHaveBeenCalledWith(
+      '/api/views/view-1/pin',
+      undefined,
+      undefined,
+      undefined,
+    );
+  });
+
+  it('unpinView deletes a team pin with scope + teamId query params', async () => {
+    const service = new SavedViewService();
+    mockedDel.mockResolvedValue({ code: '0', desc: 'ok', data: null });
+
+    await service.unpinView('view-1', { scope: 'team', teamId: 'team-a' });
+
+    expect(mockedDel).toHaveBeenCalledWith(
+      '/api/views/view-1/pin',
+      { scope: 'team', teamId: 'team-a' },
+      undefined,
+      undefined,
+    );
+  });
+
   it('getAuditEvents fetches audit trail for a visible saved view', async () => {
     const service = new SavedViewService();
     mockedGet.mockResolvedValue({

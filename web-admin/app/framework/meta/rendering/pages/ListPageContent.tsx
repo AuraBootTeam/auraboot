@@ -4838,6 +4838,19 @@ function ListPageContentInner(props: PageContentProps) {
               await savedViewService.unpinView(pid);
               await loadChipPins();
             }}
+            canManageTeamPins={
+              hasPermission('dashboard.saved_view.team.update') ||
+              hasPermission('dashboard.saved_view.update')
+            }
+            teamPinnedViewPids={chipPins.map((p) => p.viewPid)}
+            onTeamPinView={async (pid: string, teamId: string) => {
+              await savedViewService.pinView(pid, { scope: 'team', teamId });
+              await loadChipPins();
+            }}
+            onTeamUnpinView={async (pid: string, teamId: string) => {
+              await savedViewService.unpinView(pid, { scope: 'team', teamId });
+              await loadChipPins();
+            }}
             viewManageFields={viewManageFields}
             // ColumnSettingsPanel
             columnSettingsOpen={columnSettingsOpen}

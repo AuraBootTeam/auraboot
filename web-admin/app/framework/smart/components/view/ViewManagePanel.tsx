@@ -1,9 +1,12 @@
 /**
  * Personal SavedView management panel.
  *
- * This release intentionally exposes only personal views. Team/global sharing,
- * collaborators, and audit remain backend/roadmap capabilities outside the
- * current user-visible management chain.
+ * The personal-view list (create / rename / duplicate / delete / share / pin)
+ * exposes only personal views. Team/global sharing, collaborators, and audit
+ * remain backend/roadmap capabilities outside that chain. The one exception is
+ * the team quick-filter pin (M3): callers who hold team-manage additionally get
+ * a compact "team views" section for pinning a team view to the whole team's
+ * chip row — authoring the pin only, not managing the view.
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
@@ -238,6 +241,14 @@ export interface ViewManagePanelProps {
   onPinView?: (pid: string) => Promise<void>;
   /** Remove the current user's pin of a view. */
   onUnpinView?: (pid: string) => Promise<void>;
+  /** Whether the current user may author team pins (holds team-manage). */
+  canManageTeamPins?: boolean;
+  /** View pids pinned to their team's quick-filter chip row (toggle state). */
+  teamPinnedViewPids?: string[];
+  /** Pin a team-scoped view to its team's chip row. */
+  onTeamPinView?: (pid: string, teamId: string) => Promise<void>;
+  /** Remove a team's pin of a view. */
+  onTeamUnpinView?: (pid: string, teamId: string) => Promise<void>;
 }
 
 function countPersonalManualViews(views: SavedView[]): number {
@@ -286,6 +297,10 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   pinnedViewPids = [],
   onPinView,
   onUnpinView,
+  canManageTeamPins = false,
+  teamPinnedViewPids = [],
+  onTeamPinView,
+  onTeamUnpinView,
 }) => {
   const { t } = useI18n();
   const tx = useCallback(
@@ -308,7 +323,16 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   const [duplicateName, setDuplicateName] = useState('');
   const [manageSearchTerm, setManageSearchTerm] = useState('');
   const [loadingState, setLoadingState] = useState<{
-    type: 'create' | 'delete' | 'duplicate' | 'setDefault' | 'rename' | 'share' | 'pin' | null;
+    type:
+      | 'create'
+      | 'delete'
+      | 'duplicate'
+      | 'setDefault'
+      | 'rename'
+      | 'share'
+      | 'pin'
+      | 'team-pin'
+      | null;
     pid?: string;
   }>({ type: null });
 
@@ -595,6 +619,32 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
       }
     },
     [pinnedViewPids, onPinView, onUnpinView],
+  );
+
+  // Team-scoped views the current user belongs to (getAccessibleViews already
+  // scopes these to the caller's teams). Only surfaced when the user may author
+  // team pins; the toggle pins/unpins for the whole team.
+  const teamViews = useMemo(
+    () => views.filter((view) => view.scope === 'team' && Boolean(view.teamId)),
+    [views],
+  );
+
+  const handleToggleTeamPin = useCallback(
+    async (view: SavedView) => {
+      if (!view.teamId) return;
+      const pinned = teamPinnedViewPids.includes(view.pid);
+      setLoadingState({ type: 'team-pin', pid: view.pid });
+      try {
+        if (pinned) {
+          await onTeamUnpinView?.(view.pid, view.teamId);
+        } else {
+          await onTeamPinView?.(view.pid, view.teamId);
+        }
+      } finally {
+        setLoadingState({ type: null });
+      }
+    },
+    [teamPinnedViewPids, onTeamPinView, onTeamUnpinView],
   );
 
   const handleSetDefault = useCallback(
@@ -1466,6 +1516,68 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                       )}
                     </div>
                   ))
+                )}
+                {canManageTeamPins && teamViews.length > 0 && (
+                  <div data-testid="saved-view-team-group">
+                    <div className="px-5 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+                      {tx('common.saved_view_team_group', '团队视图')}
+                    </div>
+                    {teamViews.map((view) => (
+                      <div
+                        key={view.pid}
+                        className="px-3 py-1"
+                        data-testid={`saved-view-team-row-${view.pid}`}
+                      >
+                        <div className="rounded-md px-2 py-2 transition-colors hover:bg-gray-50">
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => onSelectView(view.pid)}
+                              className="min-w-0 flex-1 text-left"
+                              data-testid={`saved-view-team-select-${view.pid}`}
+                            >
+                              <span className="truncate text-sm font-medium text-gray-900">
+                                {view.name}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleTeamPin(view)}
+                              disabled={isViewLoading(view.pid)}
+                              className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                              data-testid={`saved-view-action-team-pin-${view.pid}`}
+                              data-team-pinned={
+                                teamPinnedViewPids.includes(view.pid) ? 'true' : 'false'
+                              }
+                              aria-label={
+                                teamPinnedViewPids.includes(view.pid)
+                                  ? tx('common.saved_view_action_unpin_team_chip', '取消团队快捷筛选')
+                                  : tx('common.saved_view_action_pin_team_chip', '为团队钉为快捷筛选')
+                              }
+                              title={
+                                teamPinnedViewPids.includes(view.pid)
+                                  ? tx('common.saved_view_action_unpin_team_chip', '取消团队快捷筛选')
+                                  : tx('common.saved_view_action_pin_team_chip', '为团队钉为快捷筛选')
+                              }
+                            >
+                              {loadingState.type === 'team-pin' && loadingState.pid === view.pid ? (
+                                <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-accent" />
+                              ) : (
+                                <Pin
+                                  className={`h-4 w-4 ${
+                                    teamPinnedViewPids.includes(view.pid)
+                                      ? 'fill-current text-accent'
+                                      : ''
+                                  }`}
+                                  aria-hidden="true"
+                                />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             </>

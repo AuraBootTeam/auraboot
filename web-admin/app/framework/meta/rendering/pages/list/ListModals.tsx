@@ -61,6 +61,10 @@ export interface ListModalsProps {
   pinnedViewPids?: string[];
   onPinView?: (pid: string) => Promise<void>;
   onUnpinView?: (pid: string) => Promise<void>;
+  canManageTeamPins?: boolean;
+  teamPinnedViewPids?: string[];
+  onTeamPinView?: (pid: string, teamId: string) => Promise<void>;
+  onTeamUnpinView?: (pid: string, teamId: string) => Promise<void>;
   viewManageFields?: Array<{ code: string; name: string; dataType: string }>;
 
   // ColumnSettingsPanel
@@ -147,6 +151,10 @@ export function ListModals({
   pinnedViewPids,
   onPinView,
   onUnpinView,
+  canManageTeamPins,
+  teamPinnedViewPids,
+  onTeamPinView,
+  onTeamUnpinView,
   viewManageFields,
 
   // ColumnSettingsPanel
@@ -242,6 +250,10 @@ export function ListModals({
         pinnedViewPids={pinnedViewPids}
         onPinView={onPinView}
         onUnpinView={onUnpinView}
+        canManageTeamPins={canManageTeamPins}
+        teamPinnedViewPids={teamPinnedViewPids}
+        onTeamPinView={onTeamPinView}
+        onTeamUnpinView={onTeamUnpinView}
         fields={viewManageFields}
       />
 
