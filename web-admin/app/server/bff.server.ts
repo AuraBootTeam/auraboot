@@ -130,11 +130,25 @@ app.use((req, res, next) => {
   res.header('Access-Control-Allow-Methods', corsConfig.allowedMethods.join(', '));
   res.header('Access-Control-Allow-Headers', corsConfig.allowedHeaders.join(', '));
 
-  // Handle preflight requests
-  if (req.method === 'options') {
-    res.sendStatus(200);
-    return;
-  }
+  // Do NOT answer CORS preflight (OPTIONS) locally here — let it fall through
+  // to the `/api` proxy so the backend's keyed-origin CORS responds.
+  //
+  // Why this matters (do not "fix" this into a local preflight responder):
+  // This middleware only sets Access-Control-Allow-Origin for origins we
+  // recognize (the config allowlist + dev localhost ports). Third-party
+  // origins — e.g. an embedded AuraBot / customer-service widget running on a
+  // customer's own website — are in NEITHER allowlist, so answering the
+  // preflight here with `res.sendStatus(200)` would carry NO
+  // Access-Control-Allow-Origin and the browser would reject the preflight,
+  // breaking the widget. Falling through forwards the OPTIONS to the backend,
+  // where keyed-origin CORS (X-Site-Key on /api/public/** and /api/collect/**)
+  // returns the correct ACAO for the third-party origin.
+  //
+  // A prior `if (req.method === 'options')` branch lived here but was dead
+  // code: Express normalizes `req.method` to uppercase 'OPTIONS', so lowercase
+  // never matched and preflight already fell through to the backend. "Fixing"
+  // its casing would have introduced exactly the third-party regression above,
+  // so the branch has been removed rather than corrected.
 
   next();
 });

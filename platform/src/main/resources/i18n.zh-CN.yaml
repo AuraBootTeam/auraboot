@@ -1488,3 +1488,13 @@ aurabot:
   error:
     # Streamed to the AuraBot chat panel when no LLM provider is configured for the tenant.
     no_llm_provider: 未配置 LLM 服务商，请在云配置中添加 API Key。
+    # Shown in the AuraBot chat panel when the browser cannot reach the chat SSE endpoint.
+    connect_chat: 无法连接 AuraBot 对话服务，请稍后重试或联系管理员。
+    # Shown in the AuraBot chat panel when the browser cannot reach the execute SSE endpoint.
+    connect_execute: 无法连接 AuraBot 执行服务，请稍后重试或联系管理员。
+  chatbi:
+    # "Save this ad-hoc chat chart as a dashboard widget" action + result states.
+    save_as_dashboard: 存为看板
+    saving: 保存中…
+    saved_as_dashboard: 已存为看板
+    save_failed: 存为看板失败

@@ -12,6 +12,7 @@
 
 import { useState, useMemo, Suspense } from 'react';
 import { toast } from 'sonner';
+import { useI18n } from '~/contexts/I18nContext';
 import { dashboardService } from '~/plugins/core-dashboard/services/dashboardService';
 import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
 import type { ChartDataSource } from '~/framework/smart/types/chart';
@@ -218,6 +219,7 @@ function inferChartType(records: Record<string, unknown>[], columns: string[]): 
 }
 
 export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
+  const { t } = useI18n();
   const [showSql, setShowSql] = useState(false);
 
   const {
@@ -270,9 +272,9 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dash: any = await dashboardService.create({ title, scope: 'personal', widgets } as any);
       setSavedPid(dash?.pid || dash?.code || 'saved');
-      toast.success('已存为看板');
+      toast.success(t('aurabot.chatbi.saved_as_dashboard', undefined, '已存为看板'));
     } catch {
-      toast.error('存为看板失败');
+      toast.error(t('aurabot.chatbi.save_failed', undefined, '存为看板失败'));
     } finally {
       setSaving(false);
     }
@@ -338,7 +340,7 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
           <div className="flex items-center justify-end gap-2 border-t border-gray-100 px-3 py-1.5 dark:border-gray-700">
             {savedPid ? (
               <span data-testid="chatbi-saved-dashboard" className="text-xs font-medium text-green-600 dark:text-green-400">
-                已存为看板 ✓
+                {t('aurabot.chatbi.saved_as_dashboard', undefined, '已存为看板')} ✓
               </span>
             ) : (
               <button
@@ -353,7 +355,9 @@ export function ChatBiResultCard({ result }: ChatBiResultCardProps) {
                   <rect x="14" y="14" width="7" height="7" />
                   <rect x="3" y="14" width="7" height="7" />
                 </svg>
-                {saving ? '保存中…' : '存为看板'}
+                {saving
+                  ? t('aurabot.chatbi.saving', undefined, '保存中…')
+                  : t('aurabot.chatbi.save_as_dashboard', undefined, '存为看板')}
               </button>
             )}
           </div>
