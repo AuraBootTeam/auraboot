@@ -339,6 +339,12 @@ public class ViewConfig {
         private String originViewPid;
         private String originPresetKey;
         private String capabilityStatus;
+        /** When true, this view is pinned as a one-click quick-filter chip. */
+        private Boolean pinnedAsQuickFilter;
+        /** Icon (emoji or known token) rendered on the quick-filter chip. */
+        private String quickFilterIcon;
+        /** Ascending display order among pinned view chips. */
+        private Integer quickFilterOrder;
         private List<CollaboratorAcl> collaborators;
     }
 
