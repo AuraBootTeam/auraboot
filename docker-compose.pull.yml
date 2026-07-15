@@ -1,0 +1,92 @@
+# AuraBoot — Pull-only Docker deployment (no source checkout, no local build)
+#
+# Runs AuraBoot from PREBUILT images instead of building from source. Everything
+# a first boot needs is baked into the images:
+#   - auraboot-postgres  → pgvector + the schema.sql seed (/docker-entrypoint-initdb.d)
+#   - auraboot           → backend + the OSS config plugins at /app/plugins
+#   - auraboot-frontend  → BFF + SSR
+# There are NO repo-path bind mounts, so this file + quickstart.sh are the only
+# two files you need — no `git clone`.
+#
+# Usage (overseas / GHCR):
+#   curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/docker-compose.pull.yml
+#   curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/scripts/quickstart.sh
+#   docker compose -f docker-compose.pull.yml up -d
+#   bash quickstart.sh                 # creates the admin, imports the plugins (NOT optional)
+#   # open http://localhost:3000  (admin@auraboot.com / Test2026x)
+#
+# Usage (mainland China / Tencent TCR mirror) — same, but point REGISTRY at TCR:
+#   REGISTRY=ccr.ccs.tencentyun.com/auraboot-oss docker compose -f docker-compose.pull.yml up -d
+#
+# Redis / MinIO / monitoring are advanced add-ons; use the source docker-compose.yml
+# profiles for those. Redis is not required for single-instance deployments.
+
+services:
+  # ─── PostgreSQL 16 (pgvector + baked schema) ──────────────────────────────
+  postgres:
+    image: ${REGISTRY:-ghcr.io/aurabootteam}/auraboot-postgres:${TAG:-latest}
+    container_name: auraboot-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aura_boot}
+      POSTGRES_USER: ${POSTGRES_USER:-auraboot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-auraboot_dev}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-auraboot} -d ${POSTGRES_DB:-aura_boot}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  # ─── Backend (Spring Boot, plugins baked in) ──────────────────────────────
+  backend:
+    image: ${REGISTRY:-ghcr.io/aurabootteam}/auraboot:${TAG:-latest}
+    container_name: auraboot-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-aura_boot}?charSet=UTF8
+      DATABASE_USERNAME: ${POSTGRES_USER:-auraboot}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-auraboot_dev}
+      JWT_SECRET: ${JWT_SECRET:-docker-eval-secret-change-in-production-min-32-chars}
+      FRONTEND_BASE_URL: http://localhost:${AURABOOT_PORT:-3000}
+      SPRING_PROFILES_ACTIVE: community
+      AURA_BUILTIN_PLUGINS_DIR: /app/plugins
+      AURA_PLUGINS_DIR: /app/pf4j-plugins
+      MANAGEMENT_TRACING_ENABLED: "false"
+      MANAGEMENT_HEALTH_DISKSPACE_ENABLED: "false"
+    volumes:
+      - backend_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:6443/actuator/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+  # ─── Frontend (BFF + SSR) ─────────────────────────────────────────────────
+  frontend:
+    image: ${REGISTRY:-ghcr.io/aurabootteam}/auraboot-frontend:${TAG:-latest}
+    container_name: auraboot-frontend
+    restart: unless-stopped
+    ports:
+      - "${AURABOOT_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      BFF_PORT: "3000"
+      SPRING_BOOT_URL: http://backend:6443
+      CORS_ALLOWED_ORIGINS: http://localhost:${AURABOOT_PORT:-3000}
+      SESSION_SECRET: ${SESSION_SECRET:-docker-eval-session-secret-change-in-production-min-32-chars}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  backend_data:
