@@ -7,6 +7,8 @@ export interface CreateOrReuseSavedViewOptions {
   name: string;
   viewType?: string;
   scope?: string;
+  /** Team PID — required when scope is 'team'. */
+  teamId?: string;
   viewConfig?: Record<string, unknown>;
   expectSuccess?: boolean;
 }
