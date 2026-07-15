@@ -112,6 +112,18 @@ public class AuraBotChatService {
             "Help users with their questions about the current page and data. " +
             "Be concise, accurate, and helpful. Respond in the user's language.";
 
+    /**
+     * Injected in place of the knowledge context when a tool-less (RAG-only) turn has an explicit
+     * knowledge base bound but retrieval returned nothing. Absence of context is NOT "answer freely":
+     * without this an LLM fills the gap from general knowledge (e.g. an empty-KB tenant answering a
+     * "7-day no-reason return" from consumer-law priors). The marker makes the empty result explicit.
+     */
+    private static final String EMPTY_KB_MARKER =
+            "[Knowledge base search result: EMPTY] No relevant content was found in the bound knowledge "
+            + "base for this question. You MUST reply that the information was not found and offer to "
+            + "hand off to a human agent; do NOT answer from general knowledge or industry convention. "
+            + "【知识库检索结果为空:必须如实告知“暂未找到相关信息”并建议转人工客服,禁止用通用常识或行业惯例作答】";
+
     public AuraBotChatService(LlmProviderFactory llmProviderFactory,
                               PromptTemplateService promptTemplateService,
                               ChatToolResolver chatToolResolver,
@@ -511,6 +523,14 @@ public class AuraBotChatService {
                 ? assembledContextBundle
                 : buildAgentContextBundle(tenantId, request);
         String contextSection = contextBundle.renderPromptSection();
+        // RAG-only turn (no tools, e.g. the CS widget) whose bound knowledge base returned nothing:
+        // replace the empty context with an explicit "not found → decline" marker so the model does
+        // not free-associate from general knowledge (gap: empty-KB tenant answering "7-day return").
+        if (!hasTools && contextSection.isBlank()
+                && request != null && request.getKnowledgeBaseIds() != null
+                && !request.getKnowledgeBaseIds().isEmpty()) {
+            contextSection = EMPTY_KB_MARKER;
+        }
         if (ctx != null) {
             vars.put("hasPageContext", true);
             vars.put("pageType", ctx.getKind());

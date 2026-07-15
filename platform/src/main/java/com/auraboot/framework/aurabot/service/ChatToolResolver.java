@@ -37,6 +37,15 @@ public class ChatToolResolver {
 
     private static final int MAX_TOOLS = 15;
 
+    /**
+     * Channels whose AI answers purely from retrieved knowledge and must carry NO tools. The
+     * embeddable customer-service widget ({@code cs_widget}) is customer-facing: exposing execute_sql
+     * / chat-bi / fill_form there invites tool loops and off-scope "let me query the database"
+     * behaviour, and a public CS bot must never run SQL. The answer comes from the injected knowledge
+     * context, so the tool surface is empty.
+     */
+    private static final Set<String> RAG_ONLY_CHANNELS = Set.of("cs_widget");
+
     // SPI ports from the shared AI runtime
     private final GroundingPort groundingPort;
     private final ToolDiscoveryPort toolDiscoveryPort;
@@ -90,6 +99,14 @@ public class ChatToolResolver {
 
         if (userMessage == null || userMessage.isBlank()) {
             log.warn("AuraBot D1: empty user message — no tools will be provided");
+            return new ResolvedTools(List.of(), null, null, true);
+        }
+
+        // RAG-only channel (the embeddable CS widget): answer purely from the retrieved knowledge
+        // context, never from tools. Skipping discovery here also skips ensurePlatformTools' execute_sql
+        // fallback, which is what a customer-facing bot must not carry.
+        if (channel != null && RAG_ONLY_CHANNELS.contains(channel)) {
+            log.info("AuraBot D1: RAG-only channel '{}' — no tools exposed (grounded by knowledge context)", channel);
             return new ResolvedTools(List.of(), null, null, true);
         }
 
