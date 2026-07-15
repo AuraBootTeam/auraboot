@@ -6,7 +6,6 @@ import com.auraboot.framework.chatbi.v2.compiler.TokenCompiler;
 import com.auraboot.framework.chatbi.v2.dto.ChatBiAnswerResponse;
 import com.auraboot.framework.chatbi.v2.dto.SearchToken;
 import com.auraboot.framework.chatbi.v2.entity.ChatBiAnswer;
-import com.auraboot.framework.chatbi.v2.mapper.ChatBiAnswerMapper;
 import com.auraboot.framework.chatbi.v2.provider.AnswerCorrelation;
 import com.auraboot.framework.chatbi.v2.provider.ConversationContext;
 import com.auraboot.framework.chatbi.v2.provider.IntentResult;
@@ -46,9 +45,12 @@ import java.util.Map;
  *   9. Return ChatBiAnswerResponse.
  * </pre>
  *
- * <p>Transactional boundary: the row insert + context append run inside the
- * outer {@link Transactional}. LLM audit rows are written by the providers in
- * REQUIRES_NEW so a failure here does not lose cost data.
+ * <p>Transactional boundary: the answer-row insert + conversation append are
+ * best-effort and delegated to {@link ChatBiAnswerPersistence} in
+ * {@code REQUIRES_NEW} (TX-003), so a persistence failure runs in its own
+ * transaction and cannot abort — nor be rolled back with — the answer. LLM audit
+ * rows are likewise written by the providers in REQUIRES_NEW so a failure there
+ * does not lose cost data.
  *
  * <p>Failure modes never throw to the controller — all are encoded as
  * {@code status=FAILED} responses with a user-safe {@code errorMessage}.
@@ -64,7 +66,7 @@ public class ChatBiAnswerService {
     private final TokenCompiler tokenCompiler;
     private final ConversationService conversationService;
     private final DisambiguationService disambiguationService;
-    private final ChatBiAnswerMapper answerMapper;
+    private final ChatBiAnswerPersistence persistence;
     private final ObjectMapper jsonMapper = new ObjectMapper();
 
     /**
@@ -165,14 +167,9 @@ public class ChatBiAnswerService {
                       ChatBiAnswerResponse.STATUS_SUCCESS, outcome.winner());
 
         if (conversationPid != null) {
-            try {
-                conversationService.append(tenantId, conversationPid, "user", nlQuery);
-                conversationService.append(tenantId, conversationPid, "assistant",
-                        summariseRows(exec));
-            } catch (Exception e) {
-                log.warn("Failed to append answer to conversation {}: {}",
-                        conversationPid, e.getMessage());
-            }
+            // Best-effort: isolated in REQUIRES_NEW (TX-003) so an append failure
+            // cannot abort this answer transaction and turn a success into a 500.
+            persistence.appendTurn(tenantId, conversationPid, nlQuery, summariseRows(exec));
         }
 
         return ChatBiAnswerResponse.builder()
@@ -204,30 +201,28 @@ public class ChatBiAnswerService {
                                SemanticQueryResponse exec,
                                String status,
                                String llmUsed) {
-        try {
-            ChatBiAnswer row = new ChatBiAnswer();
-            row.setPid(answerPid);
-            row.setTenantId(tenantId);
-            row.setUserId(userId);
-            row.setConversationPid(conversationPid);
-            row.setSemanticModelPid(semanticModelPid);
-            row.setNlQuery(nlQuery);
-            row.setTokensJson(serialise(intent.tokens()));
-            if (req != null) row.setSemanticRequestJson(serialise(req));
-            if (exec != null) {
-                row.setSqlHash(exec.getSqlFingerprint());
-                row.setRowCount(exec.getRowcount());
-                row.setDurationMs((int) Math.min(Integer.MAX_VALUE, exec.getDurationMs()));
-            }
-            row.setVizType(suggestVizType(intent.tokens(),
-                    exec != null ? exec.getRowcount() : 0));
-            row.setLlmUsed(llmUsed);
-            row.setLlmCostCents(BigDecimal.valueOf(intent.usage().costCents()));
-            row.setStatus(status);
-            answerMapper.insert(row);
-        } catch (Exception e) {
-            log.warn("Failed to persist ChatBiAnswer {}: {}", answerPid, e.getMessage());
+        ChatBiAnswer row = new ChatBiAnswer();
+        row.setPid(answerPid);
+        row.setTenantId(tenantId);
+        row.setUserId(userId);
+        row.setConversationPid(conversationPid);
+        row.setSemanticModelPid(semanticModelPid);
+        row.setNlQuery(nlQuery);
+        row.setTokensJson(serialise(intent.tokens()));
+        if (req != null) row.setSemanticRequestJson(serialise(req));
+        if (exec != null) {
+            row.setSqlHash(exec.getSqlFingerprint());
+            row.setRowCount(exec.getRowcount());
+            row.setDurationMs((int) Math.min(Integer.MAX_VALUE, exec.getDurationMs()));
         }
+        row.setVizType(suggestVizType(intent.tokens(),
+                exec != null ? exec.getRowcount() : 0));
+        row.setLlmUsed(llmUsed);
+        row.setLlmCostCents(BigDecimal.valueOf(intent.usage().costCents()));
+        row.setStatus(status);
+        // Best-effort: isolated in REQUIRES_NEW (TX-003) so an insert failure cannot
+        // abort this answer transaction and turn a success into a 500.
+        persistence.persistAnswer(row);
     }
 
     private ChatBiAnswerResponse failed(String answerPid,
