@@ -1,5 +1,6 @@
 package com.auraboot.framework.im.service;
 
+import com.auraboot.framework.agent.identity.AuraBotAgentResolver;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.aurabot.dto.ChatRequest;
 import com.auraboot.framework.conversation.BroadcastResponseSink;
@@ -63,6 +64,7 @@ public class ImAiService {
     private final ImConversationMemberMapper memberMapper;
     private final ConversationTurnService turnService;
     private final TurnRegistry turnRegistry;
+    private final AuraBotAgentResolver agentResolver;
 
     /**
      * Check if a message mentions AI.
@@ -83,12 +85,22 @@ public class ImAiService {
             Long conversationId = userMessage.getConversationId();
             List<Long> memberUserIds = memberMapper.findHumanMemberIds(conversationId, tenantId);
 
-            // G1-T6 placeholder: agentId/agentName/initiatorUserId/replyToMessageId threaded properly in G1-T9
+            // G1-T9: resolve the real ids the sink broadcasts, mirroring the group-chat
+            // path (AgentReplyTask). agentId is the same AuraBot identity that
+            // AuraBotTurnPersistence.persistOutbound resolves via AuraBotAgentResolver
+            // — so ai_turn_started / stream_chunk frames carry a non-zero agentId
+            // consistent with the persisted agent row, not the old 0L placeholder.
+            // turnId is a single authoritative id threaded through the sink + the
+            // TurnRegistry (which owns the cancel lifecycle); the chokepoint's
+            // internal ctx.turnId() is generated inside runTurn and never reaches
+            // this sink, so — as group chat does — we mint it here.
+            long agentId = agentResolver.resolve(tenantId, AuraBotAgentResolver.DEFAULT_AGENT_CODE);
+            String turnId = java.util.UUID.randomUUID().toString();
             BroadcastResponseSink sink = new BroadcastResponseSink(
                     broadcaster, memberUserIds, conversationId,
-                    java.util.UUID.randomUUID().toString(),  // turnId — G1-T9 will supply from runTurn
-                    0L,                                      // agentId placeholder (G1-T9: resolve from agentCode)
-                    "aurabot",                               // agentName placeholder
+                    turnId,
+                    agentId,                                 // resolved AuraBot agent id (was 0L placeholder)
+                    AuraBotAgentResolver.DEFAULT_AGENT_CODE,  // agentName — aurabot display code
                     userId,                                  // initiatorUserId — message sender
                     userMessage.getId(),                     // replyToMessageId
                     turnRegistry);

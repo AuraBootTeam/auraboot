@@ -32,6 +32,13 @@ public class ConversationTurnConfig {
                 .tag("phase", "A")
                 .description("ConversationTurnService.runTurn finalized (end / suspend)")
                 .register(registry);
+        // P-006: visible failure surface for swallowed finalizeTurn side-effect
+        // failures (persistOutbound throwing after the response was delivered).
+        Counter outboundPersistFailCounter = Counter.builder("aurabot.outbound_persist_fail")
+                .tag("phase", "A")
+                .description("ConversationTurnService.finalizeTurn side-effect (persistOutbound) "
+                        + "failed after the response was already delivered — turn may be sent but not persisted")
+                .register(registry);
         return new TurnSideEffects.MetricsRecorder() {
             @Override
             public void recordTurnBegin(TurnContext ctx) {
@@ -41,6 +48,11 @@ public class ConversationTurnConfig {
             @Override
             public void recordTurnEnd(TurnContext ctx, TurnOutcome outcome) {
                 endCounter.increment();
+            }
+
+            @Override
+            public void recordOutboundPersistFailure(TurnContext ctx) {
+                outboundPersistFailCounter.increment();
             }
         };
     }
