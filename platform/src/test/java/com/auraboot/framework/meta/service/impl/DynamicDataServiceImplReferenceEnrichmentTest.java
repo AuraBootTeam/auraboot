@@ -20,9 +20,13 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Unit tests for {@link DynamicDataServiceImpl#resolveEnrichmentTarget} — the decision that
@@ -109,5 +113,26 @@ class DynamicDataServiceImplReferenceEnrichmentTest {
     void plainFieldIsNotEnriched() {
         assertNull(target(field("sc_name", "string", Map.of())));
         assertNull(target(field("sc_name", "string", null)));
+    }
+
+    private String[] displayExpr(String targetModelCode, String displayField) {
+        return (String[]) ReflectionTestUtils.invokeMethod(
+                service, "resolveDisplayColumnExpression", Optional.empty(), targetModelCode, displayField);
+    }
+
+    @Test
+    @DisplayName("system-table reference always uses the safe COALESCE display expression, ignoring any configured displayField")
+    void systemTableAlwaysUsesCoalesceRegardlessOfDisplayField() {
+        // A configured displayField that is not a real ab_user column (username, displayName) must
+        // NOT be spliced into the SQL as a raw column — it would fail the enrichment query. All
+        // values, including null and real columns, resolve to the COALESCE expression aliased as
+        // display_value. Deleting the system-table branch in resolveDisplayColumnExpression fails
+        // this test (the bogus values would come back as raw columns).
+        for (String df : new String[] {null, "username", "displayName", "nick_name", "email"}) {
+            String[] r = displayExpr("sys_user", df);
+            assertEquals("display_value", r[1], "alias for displayField=" + df);
+            assertTrue(r[0].startsWith("COALESCE("), "expression for displayField=" + df + " was " + r[0]);
+            assertFalse(r[0].contains("username"), "must not leak a raw username column for displayField=" + df);
+        }
     }
 }
