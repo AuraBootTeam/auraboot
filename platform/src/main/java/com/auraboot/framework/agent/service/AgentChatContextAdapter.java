@@ -3,7 +3,7 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.runtime.context.AgentContextAssembler;
 import com.auraboot.framework.agent.runtime.context.AgentContextBlock;
 import com.auraboot.framework.agent.runtime.context.AgentContextBundle;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.conversation.TurnContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;

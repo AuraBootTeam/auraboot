@@ -3,7 +3,7 @@ package com.auraboot.framework.agent.runtime;
 import com.auraboot.framework.agent.service.ActiveMemoryService;
 import com.auraboot.framework.agent.service.AgentRunService;
 import com.auraboot.framework.agent.service.RunOutcome;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.ResponseSinkContext;

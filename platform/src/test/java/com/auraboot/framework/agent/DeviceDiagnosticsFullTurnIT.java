@@ -1,6 +1,6 @@
 package com.auraboot.framework.agent;
 
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.common.util.UlidGenerator;

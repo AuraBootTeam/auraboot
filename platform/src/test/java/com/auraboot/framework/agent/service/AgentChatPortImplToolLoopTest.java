@@ -21,7 +21,7 @@ import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
 import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.agent.runtime.PendingToolExecutionClaim;
 import com.auraboot.framework.agent.runtime.PendingToolExecutionRecord;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;

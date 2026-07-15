@@ -10,7 +10,7 @@ import com.auraboot.framework.agentchat.handoff.HandoffToolProvider;
 import com.auraboot.framework.agentchat.spi.AgentMemberDto;
 import com.auraboot.framework.agentchat.spi.GroupChatMessagePort;
 import com.auraboot.framework.agentchat.spi.NoOpGroupChatMessagePort;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.conversation.BroadcastResponseSink;
 import com.auraboot.framework.conversation.ConversationTurnService;
 import com.auraboot.framework.conversation.InboundMode;

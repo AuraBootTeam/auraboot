@@ -1,7 +1,7 @@
 package com.auraboot.framework.aurabot.controller;
 
 import com.auraboot.framework.agent.dto.LlmChatRequest;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
 import com.auraboot.framework.aurabot.service.ChatToolResolver;
 import com.auraboot.framework.application.tenant.MetaContext;

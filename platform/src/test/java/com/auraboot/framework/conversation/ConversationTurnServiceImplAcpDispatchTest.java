@@ -6,7 +6,7 @@ import com.auraboot.framework.agent.service.RunOutcome;
 import com.auraboot.framework.agent.triage.TriageBucket;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
