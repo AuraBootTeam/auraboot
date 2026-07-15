@@ -336,7 +336,7 @@ public class AgentChatPortImpl implements AgentChatPort {
         } else {
             try {
                 toolDefs = toolDiscoveryAdapter.discover(
-                        tenantId, ctx.userId(), agentCode, request.getMessage(), agentDef);
+                        tenantId, ctx.userId(), agentCode, ctx.channel(), request.getMessage(), agentDef);
             } catch (IllegalStateException e) {
                 String msg = safeExceptionMessage(e);
                 sink.onError(msg, null);
