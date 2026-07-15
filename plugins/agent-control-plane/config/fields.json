@@ -211,7 +211,7 @@
     "dataType": "reference",
     "refTarget": {
       "targetModel": "sys_user",
-      "displayField": "displayName"
+      "displayField": "nick_name"
     }
   },
   {
