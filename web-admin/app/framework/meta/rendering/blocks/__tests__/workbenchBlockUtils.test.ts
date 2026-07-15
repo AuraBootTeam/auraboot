@@ -330,6 +330,45 @@ describe('workbenchBlockUtils action runner', () => {
   });
 });
 
+describe('workbenchBlockUtils unknown-action backstop', () => {
+  it('throws and logs for an invented string verb instead of silently no-op-ing', async () => {
+    const runtime = makeRuntime() as any;
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(
+      executeSimpleWorkbenchAction(runtime, {
+        action: 'api',
+        args: { command: 'cs:go_online', endpoint: '/api/x' },
+      }),
+    ).rejects.toThrow(/unknown action/);
+    expect(errorSpy).toHaveBeenCalled();
+    // The fatal footgun was a dead button with no side effect — assert nothing ran.
+    expect(runtime.__reload).not.toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+  });
+
+  it('throws for an object-shaped action (the ActionRegistry/rowActions dialect)', async () => {
+    const runtime = makeRuntime() as any;
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(
+      executeSimpleWorkbenchAction(runtime, {
+        action: { type: 'api', endpoint: '/api/x', body: {} },
+      }),
+    ).rejects.toThrow(/unknown action an object/);
+
+    errorSpy.mockRestore();
+  });
+
+  it('still runs the four legal verbs without throwing', async () => {
+    const runtime = makeRuntime() as any;
+    await expect(
+      executeSimpleWorkbenchAction(runtime, { action: 'state.set', args: { statusFilter: [] } }),
+    ).resolves.toBeUndefined();
+  });
+});
+
 describe('workbenchBlockUtils readPath', () => {
   it('reads nested fields from JSON string values', () => {
     expect(
