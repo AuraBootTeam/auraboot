@@ -362,3 +362,8 @@ search:
   navigate: ナビゲート
   open: 開く
   close: 閉じる
+
+aurabot:
+  error:
+    # Streamed to the AuraBot chat panel when no LLM provider is configured for the tenant.
+    no_llm_provider: LLM プロバイダーが設定されていません。クラウド設定で API キーを設定してください。

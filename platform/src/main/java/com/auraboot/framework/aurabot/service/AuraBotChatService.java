@@ -333,9 +333,13 @@ public class AuraBotChatService {
                 llmProviderFactory, options.getProvider(), options.getModel());
         ProviderConfig config = llmProviderFactory.resolveConfig(tenantId, providerCode);
         if (config == null) {
-            String msg = "No LLM provider configured. Please configure an API key in Cloud Config.";
-            sink.onError(msg, null);
-            return new TurnOutcome.Failed(msg, null);
+            // User-facing: emit an $i18n: sentinel so the frontend (which knows the
+            // browser locale) localizes it via useSmartText. The service layer has no
+            // request locale here, mirroring the BusinessException.i18n contract. Keep
+            // a readable English message on the outcome for logs / audit.
+            sink.onError("$i18n:aurabot.error.no_llm_provider", null);
+            return new TurnOutcome.Failed(
+                    "No LLM provider configured. Please configure an API key in Cloud Config.", null);
         }
         // Use the resolved provider code (may differ from input when auto-discovered)
         providerCode = LlmProviderFactory.effectiveProviderCode(providerCode, config);
