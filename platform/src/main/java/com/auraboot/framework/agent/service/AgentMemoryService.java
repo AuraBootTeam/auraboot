@@ -455,6 +455,59 @@ public class AgentMemoryService {
     }
 
     /**
+     * Semantic (vector) counterpart of {@link #searchScoped}: same tenant/user/global
+     * visibility scope, but ranked by cosine distance to {@code queryEmbedding}
+     * (pgvector {@code embedding <=> ?::vector}) instead of keyword match + importance.
+     * Surfaces memories relevant in meaning that share no literal keyword ("上次那个客户").
+     *
+     * <p>The scope predicate is copied verbatim from {@link #searchScoped} so the two share
+     * one visibility contract — a semantic hit can never cross the tenant/user boundary the
+     * keyword path enforces. Rows without a stored embedding are skipped.
+     *
+     * @param queryEmbedding the query vector; MUST be produced by the same provider/model
+     *                       that wrote the stored embeddings ({@code MemoryEmbeddingService},
+     *                       "openai"), or the distances are meaningless. Null/empty → empty list.
+     */
+    public List<Map<String, Object>> searchScopedSemantic(Long tenantId, String userId,
+                                                           String agentCode, float[] queryEmbedding, int limit) {
+        Objects.requireNonNull(tenantId, "tenantId");
+        if (queryEmbedding == null || queryEmbedding.length == 0) {
+            return List.of();
+        }
+        boolean hasUser = userId != null && !userId.isBlank();
+        String vec = toVectorLiteral(queryEmbedding);
+        String sql =
+                "SELECT pid, memory_type, category, memory_title, memory_content, "
+                + "  importance, shareable, scope, scope_key, shadow_mode, created_at "
+                + "FROM ab_agent_memory "
+                + "WHERE memory_agent_id = ? "
+                + "  AND embedding IS NOT NULL "
+                + "  AND (deleted_flag IS NULL OR deleted_flag = FALSE) "
+                + "  AND ( "
+                + "    scope = 'global' "
+                + "    OR (scope = 'tenant' AND tenant_id = ?) "
+                + (hasUser ? "    OR (scope = 'user'   AND scope_key = ?) " : "")
+                + "  ) "
+                + "ORDER BY embedding <=> ?::vector "
+                + "LIMIT ?";
+        return hasUser
+                ? jdbcTemplate.queryForList(sql, agentCode, tenantId, userId, vec, limit)
+                : jdbcTemplate.queryForList(sql, agentCode, tenantId, vec, limit);
+    }
+
+    /** Format a float vector as a pgvector literal {@code [v0,v1,...]} for a {@code ?::vector} bind. */
+    private static String toVectorLiteral(float[] vector) {
+        StringBuilder sb = new StringBuilder(vector.length * 8);
+        sb.append('[');
+        for (int i = 0; i < vector.length; i++) {
+            if (i > 0) sb.append(',');
+            sb.append(vector[i]);
+        }
+        sb.append(']');
+        return sb.toString();
+    }
+
+    /**
      * Importance-ordered recall of memories visible to (tenant, user) — no keyword filter.
      * Used by Active Memory pre-recall when grounding wants top-N user preferences.
      * Same null-userId handling as {@link #searchScoped}.

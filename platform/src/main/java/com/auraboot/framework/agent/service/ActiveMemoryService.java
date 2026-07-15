@@ -1,6 +1,8 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.rag.service.EmbeddingService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,19 @@ public class ActiveMemoryService {
      */
     @Value("${acp.memory.l1l2.max-l1:30}")
     private int maxL1 = 30;
+
+    /** CAP-01 semantic recall — opt-in vector recall over stored memory embeddings. Default off. */
+    @Value("${acp.memory.semantic-recall.enabled:false}")
+    private boolean semanticRecallEnabled;
+    @Value("${acp.memory.semantic-recall.limit:5}")
+    private int semanticLimit = 5;
+    /** Must match the provider that wrote the memory embeddings (MemoryEmbeddingService uses "openai"). */
+    @Value("${acp.memory.semantic-recall.provider:openai}")
+    private String semanticProvider = "openai";
+
+    /** Optional — semantic recall degrades gracefully when no embedding provider is wired. */
+    @Autowired(required = false)
+    private EmbeddingService embeddingService;
 
     public ActiveMemoryService(AgentMemoryService memoryService) {
         this.memoryService = memoryService;
@@ -142,6 +157,24 @@ public class ActiveMemoryService {
             }
         }
 
+        // CAP-01 semantic (vector) recall — surfaces meaning-relevant memories the keyword +
+        // importance passes miss ("上次那个客户"). Opt-in + graceful: skipped when disabled,
+        // when no embedding provider is wired, or when the embedding call fails.
+        if (semanticRecallEnabled && embeddingService != null
+                && snippets.size() < MAX_SNIPPETS && userMessage != null && !userMessage.isBlank()) {
+            float[] q = safeEmbed(tenantId, userMessage.trim());
+            if (q != null) {
+                for (Map<String, Object> row : memoryService.searchScopedSemantic(
+                        tenantId, userId, agent, q, semanticLimit)) {
+                    if (snippets.size() >= MAX_SNIPPETS) break;
+                    if (seenPids.add(String.valueOf(row.get("pid")))) {
+                        snippets.add(snippet(row));
+                        logAccess(row, userId);
+                    }
+                }
+            }
+        }
+
         if (snippets.size() < MAX_SNIPPETS) {
             // Intentionally fetch at least IMPORTANCE_LIMIT rows even when there's
             // less room, so the importance pass always runs and we get fresh
@@ -189,6 +222,16 @@ public class ActiveMemoryService {
             // errors in the row itself still propagate.
             log.warn("access-log write failed for memory={} user={}: {}",
                     pid, userId, e.getMessage());
+        }
+    }
+
+    /** Embed the query text for CAP-01 semantic recall; null on any failure (graceful skip). */
+    private float[] safeEmbed(Long tenantId, String text) {
+        try {
+            return embeddingService.embed(tenantId, text, semanticProvider);
+        } catch (Exception e) {
+            log.warn("Semantic pre-recall embedding failed for tenant {}: {}", tenantId, e.getMessage());
+            return null;
         }
     }
 
