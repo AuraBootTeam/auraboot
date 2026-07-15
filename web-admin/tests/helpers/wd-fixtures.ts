@@ -206,8 +206,12 @@ async function findTenantMemberPid(
   headers: Record<string, string>,
   userEmail: string,
 ): Promise<string> {
+  // NOTE: /api/tenant/members/search does not narrow by the email keyword (it matches
+  // username/realName, which are null for these seed users), so it returns every active
+  // member. Use a large page size so the target member is found regardless of how many
+  // members have accumulated in the tenant.
   const membersResp = await api.post(`${BACKEND_URL}/api/tenant/members/search`, {
-    data: { keyword: userEmail, status: 'active', pageNum: 1, pageSize: 50 },
+    data: { keyword: userEmail, status: 'active', pageNum: 1, pageSize: 2000 },
     headers,
   });
   if (!membersResp.ok()) {

@@ -5,6 +5,7 @@ import {
   ensureRoleUsers,
   loginAs,
   loginViaUI,
+  setLeaveBalance,
 } from '../../helpers/wd-fixtures';
 import { listAuditEvents, waitForTodoTask } from '../bpm/_helpers/bpm-lifecycle';
 
@@ -438,6 +439,12 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
     const shortApplicant = await createLeaveApplicant(request, adminToken, 'wd_detail_short');
     const longApplicant = await createLeaveApplicant(request, adminToken, 'wd_detail_long');
     const cancelledApplicant = await createLeaveApplicant(request, adminToken, 'wd_detail_cancelled');
+
+    // Annual-leave submits run wd_leave_validation, which requires an annual-balance
+    // row for each applicant (freshly created applicants have none).
+    for (const applicant of [draftApplicant, shortApplicant, longApplicant, cancelledApplicant]) {
+      await setLeaveBalance(request, adminToken, applicant.userId, 20);
+    }
 
     await ensureAdminSession(page);
 
