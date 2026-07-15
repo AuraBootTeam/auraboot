@@ -408,10 +408,16 @@ test.describe('UX Empty States — Guidance Text When No Data', () => {
     const tableBody = page.locator('tbody');
     await expect(tableBody).toBeVisible({ timeout: 8_000 });
 
-    // Layer 3 (Behavior): meaningful empty-state text visible
-    // Empty state may be in a td with colspan or a dedicated component
-    const emptyIndicator = page.locator('tbody tr td').first()
-      .or(page.getByText(/暂无数据|No data|No records|没有找到/i).first());
+    // Layer 3 (Behavior): meaningful empty-state text visible.
+    // The empty state renders as a dedicated `[data-testid="empty-state"]` cell; prefer
+    // that stable testid and fall back to the localized text. A single trailing
+    // `.first()` keeps this a single-element locator — the earlier `.first().or(…first())`
+    // form made `.or()` resolve to two matches (the empty-state td AND its 暂无数据 span),
+    // tripping strict-mode even though the empty state rendered correctly.
+    const emptyIndicator = page
+      .locator('[data-testid="empty-state"]')
+      .or(page.getByText(/暂无数据|No data|No records|没有找到/i))
+      .first();
     await expect(emptyIndicator).toBeVisible({ timeout: 8_000 });
   });
 
