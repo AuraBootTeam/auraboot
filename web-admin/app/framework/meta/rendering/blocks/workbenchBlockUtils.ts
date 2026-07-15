@@ -395,11 +395,42 @@ async function downloadWithAuth(url: string): Promise<void> {
   window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 0);
 }
 
+/**
+ * Legal workbench action verbs. Kept as a named list so the static gate
+ * (auraboot/scripts/check-dsl-actions.mjs, via sync-dsl-action-catalog.mjs)
+ * derives the same set from this file and stays drift-free. If you add a verb,
+ * add its `if (config.action === '<verb>')` branch below — the parser reads the
+ * branch conditions, so the catalog updates itself.
+ */
+const KNOWN_WORKBENCH_ACTIONS = ['state.set', 'dataSource.reload', 'navigate', 'command.execute'];
+
 export async function executeSimpleWorkbenchAction(
   runtime: SchemaRuntime,
   config: any,
 ): Promise<void> {
   if (!config) return;
+  if (!KNOWN_WORKBENCH_ACTIONS.includes(config.action)) {
+    // An unrecognized action used to fall through every branch below and return
+    // silently: a wrong-dialect object action ({ type: 'api', ... }), an invented
+    // verb ('api'), or a typo'd arg key produced a DEAD BUTTON with zero signal —
+    // no console log, no toast, no audit row. That is the exact footgun that shipped
+    // to a golden-green page (ENT#784 CS 坐席台). Fail loudly instead, so real-browser
+    // golden verification and the console point straight at the offending action.
+    // The static gate catches these before runtime; this is the backstop for
+    // anything it does not model.
+    const shape =
+      config.action && typeof config.action === 'object'
+        ? 'an object — a workbench action is a string verb + args, not the ' +
+          'ActionRegistry { type, ... } shape used by table rowActions'
+        : JSON.stringify(config.action);
+    const message =
+      `[workbench] unknown action ${shape}. ` +
+      `Legal verbs: ${KNOWN_WORKBENCH_ACTIONS.join(' | ')}. ` +
+      'A backend write must be modeled as command.execute — there is no "api" action here.';
+    console.error(message, config);
+    showCommandFeedback(runtime, {}, 'unknownAction', 'error', message);
+    throw new Error(message);
+  }
   if (config.action === 'state.set' && config.args && typeof config.args === 'object') {
     Object.entries(resolveRuntimeValue(runtime, config.args)).forEach(([key, value]) => {
       writeRuntimeState(runtime, key, value);
