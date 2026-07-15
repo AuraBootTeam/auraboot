@@ -4,6 +4,7 @@ import com.auraboot.framework.ai.search.dto.AiSearchRequest;
 import com.auraboot.framework.ai.search.dto.AiSearchResult;
 import com.auraboot.framework.ai.search.service.AiSearchService;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,6 +30,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/ai/search")
 @RequiredArgsConstructor
+@AuthenticatedAccess("self-scoped NL search: executes only within the caller's own tenant via "
+        + "DynamicDataService (which applies tenant + data filters); authentication is the complete "
+        + "access-control story, no per-resource RBAC applies")
 @Tag(name = "AI Search", description = "Natural language search powered by LLM")
 public class AiSearchController {
 
