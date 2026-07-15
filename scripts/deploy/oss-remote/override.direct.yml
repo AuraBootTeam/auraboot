@@ -1,0 +1,8 @@
+# Fresh-host mode: the OSS gateway owns the host HTTP port directly.
+# Access: http://<host>:${PUBLIC_HTTP_PORT:-80}   (put a TLS proxy in front for https)
+# 127.0.0.1:${LOCAL_ADMIN_PORT:-18081} is a loopback-only entry for on-host bootstrap/health.
+services:
+  gateway:
+    ports:
+      - "127.0.0.1:${LOCAL_ADMIN_PORT:-18081}:80"
+      - "0.0.0.0:${PUBLIC_HTTP_PORT:-80}:80"
