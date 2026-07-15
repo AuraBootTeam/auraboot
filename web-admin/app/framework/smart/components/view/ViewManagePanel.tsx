@@ -7,7 +7,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Check, Copy, Link2, Pencil, Plus, Search, Star, Trash2, X } from 'lucide-react';
+import { Check, Copy, Link2, Pencil, Pin, Plus, Search, Star, Trash2, X } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import {
   type SavedView,
@@ -232,6 +232,12 @@ export interface ViewManagePanelProps {
   modelPid?: string;
   onFieldsCreated?: () => void;
   onViewConfigSaved?: () => void;
+  /** View pids the current user has pinned to the quick-filter chip row. */
+  pinnedViewPids?: string[];
+  /** Pin a view to the current user's quick-filter chip row. */
+  onPinView?: (pid: string) => Promise<void>;
+  /** Remove the current user's pin of a view. */
+  onUnpinView?: (pid: string) => Promise<void>;
 }
 
 function countPersonalManualViews(views: SavedView[]): number {
@@ -277,6 +283,9 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   startInCreateMode,
   fields = [],
   onViewConfigSaved,
+  pinnedViewPids = [],
+  onPinView,
+  onUnpinView,
 }) => {
   const { t } = useI18n();
   const tx = useCallback(
@@ -299,7 +308,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   const [duplicateName, setDuplicateName] = useState('');
   const [manageSearchTerm, setManageSearchTerm] = useState('');
   const [loadingState, setLoadingState] = useState<{
-    type: 'create' | 'delete' | 'duplicate' | 'setDefault' | 'rename' | 'share' | null;
+    type: 'create' | 'delete' | 'duplicate' | 'setDefault' | 'rename' | 'share' | 'pin' | null;
     pid?: string;
   }>({ type: null });
 
@@ -570,6 +579,23 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
       setLoadingState({ type: null });
     }
   }, [duplicateName, duplicatingView, onDuplicateView]);
+
+  const handleTogglePin = useCallback(
+    async (view: SavedView) => {
+      const pinned = pinnedViewPids.includes(view.pid);
+      setLoadingState({ type: 'pin', pid: view.pid });
+      try {
+        if (pinned) {
+          await onUnpinView?.(view.pid);
+        } else {
+          await onPinView?.(view.pid);
+        }
+      } finally {
+        setLoadingState({ type: null });
+      }
+    },
+    [pinnedViewPids, onPinView, onUnpinView],
+  );
 
   const handleSetDefault = useCallback(
     async (view: SavedView) => {
@@ -1310,6 +1336,39 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                             </button>
 
                             <div className="flex flex-shrink-0 items-center gap-1">
+                              {(onPinView || onUnpinView) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleTogglePin(view)}
+                                  disabled={isViewLoading(view.pid)}
+                                  className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-accent disabled:cursor-not-allowed disabled:opacity-50"
+                                  data-testid={`saved-view-action-pin-${view.pid}`}
+                                  data-pinned={pinnedViewPids.includes(view.pid) ? 'true' : 'false'}
+                                  aria-label={
+                                    pinnedViewPids.includes(view.pid)
+                                      ? tx('common.saved_view_action_unpin_chip', '取消快捷筛选')
+                                      : tx('common.saved_view_action_pin_chip', '钉为快捷筛选')
+                                  }
+                                  title={
+                                    pinnedViewPids.includes(view.pid)
+                                      ? tx('common.saved_view_action_unpin_chip', '取消快捷筛选')
+                                      : tx('common.saved_view_action_pin_chip', '钉为快捷筛选')
+                                  }
+                                >
+                                  {loadingState.type === 'pin' && loadingState.pid === view.pid ? (
+                                    <span className="block h-4 w-4 animate-spin rounded-full border-2 border-gray-300 border-t-accent" />
+                                  ) : (
+                                    <Pin
+                                      className={`h-4 w-4 ${
+                                        pinnedViewPids.includes(view.pid)
+                                          ? 'fill-current text-accent'
+                                          : ''
+                                      }`}
+                                      aria-hidden="true"
+                                    />
+                                  )}
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => handleSetDefault(view)}

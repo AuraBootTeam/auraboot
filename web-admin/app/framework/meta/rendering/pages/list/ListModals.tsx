@@ -58,6 +58,9 @@ export interface ListModalsProps {
   modelPid?: string;
   onFieldsCreated: () => void;
   onViewConfigSaved?: () => void;
+  pinnedViewPids?: string[];
+  onPinView?: (pid: string) => Promise<void>;
+  onUnpinView?: (pid: string) => Promise<void>;
   viewManageFields?: Array<{ code: string; name: string; dataType: string }>;
 
   // ColumnSettingsPanel
@@ -141,6 +144,9 @@ export function ListModals({
   modelPid,
   onFieldsCreated,
   onViewConfigSaved,
+  pinnedViewPids,
+  onPinView,
+  onUnpinView,
   viewManageFields,
 
   // ColumnSettingsPanel
@@ -233,6 +239,9 @@ export function ListModals({
         modelPid={modelPid}
         onFieldsCreated={onFieldsCreated}
         onViewConfigSaved={onViewConfigSaved}
+        pinnedViewPids={pinnedViewPids}
+        onPinView={onPinView}
+        onUnpinView={onUnpinView}
         fields={viewManageFields}
       />
 

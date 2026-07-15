@@ -4829,6 +4829,15 @@ function ListPageContentInner(props: PageContentProps) {
               loadData({ page: 0, size: pagination.pageSize, filters });
             }}
             onViewConfigSaved={reloadViews}
+            pinnedViewPids={chipPins.map((p) => p.viewPid)}
+            onPinView={async (pid: string) => {
+              await savedViewService.pinView(pid);
+              await loadChipPins();
+            }}
+            onUnpinView={async (pid: string) => {
+              await savedViewService.unpinView(pid);
+              await loadChipPins();
+            }}
             viewManageFields={viewManageFields}
             // ColumnSettingsPanel
             columnSettingsOpen={columnSettingsOpen}
