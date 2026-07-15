@@ -38,7 +38,8 @@ test.describe('Quick-filter view chip (M1)', () => {
   }
 
   test('VC-001: a pinned view shows as a chip and switches the view on click', async ({ page }) => {
-    const viewName = `Pinned视图_${Date.now()}`;
+    // VC_ prefix so cleanupGeneratedSavedViews treats it as generated (test isolation).
+    const viewName = `VC_Pinned_${Date.now()}`;
     const { pid } = await createOrReuseSavedView(page, {
       modelCode: MODEL_CODE,
       pageKey: PAGE_KEY,
@@ -74,7 +75,7 @@ test.describe('Quick-filter view chip (M1)', () => {
   });
 
   test('VC-002: a view without the pin flag does NOT produce a chip', async ({ page }) => {
-    const viewName = `Unpinned视图_${Date.now()}`;
+    const viewName = `VC_Unpinned_${Date.now()}`;
     const { pid } = await createOrReuseSavedView(page, {
       modelCode: MODEL_CODE,
       pageKey: PAGE_KEY,

@@ -38,6 +38,7 @@ const GENERATED_VIEW_NAME_PREFIXES = [
   'TL_',
   'Tree',
   'UX_',
+  'VC_',
   'VS_',
   '本周修改',
   '今日新建',
