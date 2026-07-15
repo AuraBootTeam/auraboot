@@ -11,6 +11,8 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
 import { ListToolbar } from '../ListToolbar';
+import { assembleQuickFilterChips, type QuickFilterChip } from '../quickFilterChips';
+import { getQuickFilterPresetDefinitions } from '../quickFilterPresets';
 
 const ZH_TRANSLATIONS = {
   common: {
@@ -26,6 +28,21 @@ const ZH_TRANSLATIONS = {
   },
 };
 
+const zhT = (key: string, _vars?: unknown, fallback?: string) => {
+  const [ns, k] = key.split('.');
+  return (ZH_TRANSLATIONS as Record<string, Record<string, string>>)[ns]?.[k] ?? fallback ?? key;
+};
+const enT = (_key: string, _vars?: unknown, fallback?: string) => fallback ?? _key;
+
+/** The three built-in preset chips, labels resolved through the given `t`. */
+const presetChips = (t = zhT): QuickFilterChip[] =>
+  assembleQuickFilterChips({
+    presets: getQuickFilterPresetDefinitions(),
+    t,
+    savedViews: [],
+    pins: [],
+  });
+
 function renderToolbar(extraProps: Partial<React.ComponentProps<typeof ListToolbar>> = {}) {
   const noop = () => {};
   return render(
@@ -34,8 +51,9 @@ function renderToolbar(extraProps: Partial<React.ComponentProps<typeof ListToolb
         keyword=""
         onKeywordChange={noop}
         onSearch={noop}
+        chips={presetChips()}
         activeQuickFilter={null}
-        onQuickFilter={noop}
+        onActivateChip={noop}
         activeSorts={[]}
         onSortsChange={noop}
         sortableColumns={[]}
@@ -114,6 +132,45 @@ describe('ListToolbar i18n', () => {
     expect(screen.queryByTestId('preset-view-save-as-personal')).toBeNull();
   });
 
+  it('renders a pinned SavedView as a view chip and activates it on click', () => {
+    const onActivateChip = vi.fn();
+    const viewChip: QuickFilterChip = {
+      kind: 'view',
+      viewPid: 'view-123',
+      label: '开放订单',
+      icon: '📦',
+      order: 1,
+    };
+    renderToolbar({
+      chips: [...presetChips(), viewChip],
+      currentViewPid: 'view-123',
+      onActivateChip,
+    });
+
+    const chip = screen.getByTestId('quick-filter-view-view-123');
+    expect(chip).toHaveTextContent('开放订单');
+    // currentViewPid matches -> the view chip is the active one.
+    expect(chip).toHaveAttribute('data-preset-active', 'true');
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(chip);
+    expect(onActivateChip).toHaveBeenCalledWith(viewChip);
+  });
+
+  it('marks a view chip inactive when it is not the current view', () => {
+    const viewChip: QuickFilterChip = {
+      kind: 'view',
+      viewPid: 'view-9',
+      label: 'Other View',
+      order: 1,
+    };
+    renderToolbar({ chips: [...presetChips(), viewChip], currentViewPid: 'someone-else' });
+    expect(screen.getByTestId('quick-filter-view-view-9')).toHaveAttribute(
+      'data-preset-active',
+      'false',
+    );
+  });
+
   it('renders search placeholder from common.search', () => {
     renderToolbar();
     const input = screen.getByTestId('list-search-input') as HTMLInputElement;
@@ -170,8 +227,9 @@ describe('ListToolbar i18n', () => {
           keyword=""
           onKeywordChange={noop}
           onSearch={noop}
+          chips={presetChips(enT)}
           activeQuickFilter={null}
-          onQuickFilter={noop}
+          onActivateChip={noop}
           activeSorts={[]}
           onSortsChange={noop}
           sortableColumns={[]}

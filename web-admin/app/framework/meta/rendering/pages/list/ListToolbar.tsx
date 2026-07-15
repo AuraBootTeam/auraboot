@@ -11,7 +11,8 @@ import { FilterChipBar } from '~/framework/smart/components/view/FilterChipBar';
 import type { SortConfig, ViewFilterConfig, RowHeight } from '~/framework/smart/types/savedView';
 import { SortPopover, type SortableColumn } from './SortPopover';
 import { useI18n } from '~/contexts/I18nContext';
-import { type QuickFilterPresetKey, getQuickFilterPresetDefinitions } from './quickFilterPresets';
+import type { QuickFilterPresetKey } from './quickFilterPresets';
+import type { QuickFilterChip } from './quickFilterChips';
 
 type QuickFilterKey = QuickFilterPresetKey;
 
@@ -21,9 +22,14 @@ export interface ListToolbarProps {
   onKeywordChange: (keyword: string) => void;
   onSearch: () => void;
 
-  /** Quick filters */
+  /** Quick filters: the assembled chip row (filter presets + pinned views). */
+  chips: QuickFilterChip[];
+  /** Active filter-preset key (drives preset chip active state). */
   activeQuickFilter: QuickFilterKey | null;
-  onQuickFilter: (key: QuickFilterKey) => void;
+  /** Currently selected SavedView pid (drives view chip active state). */
+  currentViewPid?: string | null;
+  /** Activate a chip: apply a filter preset or switch to a view. */
+  onActivateChip: (chip: QuickFilterChip) => void;
   /** Save the active system preset as a personal SavedView. */
   onSaveActivePreset?: () => void;
 
@@ -70,8 +76,10 @@ export function ListToolbar({
   keyword,
   onKeywordChange,
   onSearch,
+  chips,
   activeQuickFilter,
-  onQuickFilter,
+  currentViewPid,
+  onActivateChip,
   onSaveActivePreset,
   activeSorts,
   onSortsChange,
@@ -103,17 +111,6 @@ export function ListToolbar({
     [onSearch],
   );
 
-  const quickFilterIcons: Record<string, string> = {
-    my_records: '\uD83D\uDC64',
-    created_today: '\uD83D\uDCC5',
-    modified_this_week: '\uD83D\uDD50',
-  };
-  const quickFilters: Array<{ key: QuickFilterKey; label: string; icon: string }> =
-    getQuickFilterPresetDefinitions().map((definition) => ({
-      key: definition.key,
-      label: t(definition.i18nKey, undefined, definition.fallbackLabel),
-      icon: quickFilterIcons[definition.key] ?? '\u25CF',
-    }));
   const savePresetLabel = t(
     'common.saved_view_save_preset_to_personal',
     undefined,
@@ -291,14 +288,24 @@ export function ListToolbar({
             className="flex max-w-full basis-full gap-1.5 overflow-x-auto sm:basis-auto"
             data-testid="quick-filters"
           >
-            {quickFilters.map((qf) => {
-              const active = activeQuickFilter === qf.key;
+            {chips.map((chip) => {
+              const active =
+                chip.kind === 'view'
+                  ? currentViewPid != null && currentViewPid === chip.viewPid
+                  : activeQuickFilter === chip.key;
+              const testId =
+                chip.kind === 'view'
+                  ? `quick-filter-view-${chip.viewPid}`
+                  : `quick-filter-${chip.key}`;
+              const reactKey =
+                chip.kind === 'view' ? `view-${chip.viewPid}` : `preset-${chip.key}`;
               return (
                 <button
-                  key={qf.key}
+                  key={reactKey}
                   type="button"
-                  onClick={() => onQuickFilter(qf.key)}
-                  data-testid={`quick-filter-${qf.key}`}
+                  onClick={() => onActivateChip(chip)}
+                  data-testid={testId}
+                  data-chip-kind={chip.kind}
                   data-preset-active={active ? 'true' : 'false'}
                   aria-pressed={active}
                   className={`rounded-pill inline-flex h-8 items-center gap-1.5 px-3 text-xs font-medium transition-colors ${
@@ -307,7 +314,8 @@ export function ListToolbar({
                       : 'bg-subtle text-text-2 hover:bg-hover'
                   }`}
                 >
-                  <span>{qf.label}</span>
+                  {chip.icon && <span aria-hidden>{chip.icon}</span>}
+                  <span>{chip.label}</span>
                 </button>
               );
             })}
