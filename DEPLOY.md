@@ -22,6 +22,25 @@ open http://localhost:3000
 # Default login: admin@auraboot.com / Test2026x
 ```
 
+### Windows
+
+Windows is supported through the **Docker path** (not native-host deployment). Install
+**Docker Desktop** — it runs the whole stack in its WSL2 backend — and use the same
+`docker compose --profile full up --build -d` command as above.
+
+Two things differ from macOS/Linux:
+
+- **Run the shell scripts from a bash environment.** `scripts/quickstart.sh` (the
+  mandatory bootstrap step that creates the admin user and imports the plugins), and any
+  other `scripts/*.sh`, must be run from a **WSL** shell or **Git Bash**, not
+  PowerShell/cmd. They only need `bash` + `curl` and talk to the published port, so they
+  work unchanged.
+- **Open the app with `start` instead of `open`:** `start http://localhost:3000`.
+
+Native, non-Docker deployment directly on a Windows host is **not** supported: the
+reset/init/build tooling is bash-only and the repo ships no `gradlew.bat`. Use Docker
+(above) or WSL for anything beyond running the compose stack.
+
 ## Infrastructure Only (Local Development)
 
 For local development, start only PostgreSQL and run services locally:
