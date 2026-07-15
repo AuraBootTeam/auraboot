@@ -409,6 +409,10 @@ export interface SelectionConfig {
   mode: 'single' | 'multiple';
   bind: string;
   defaultFirst?: boolean;
+  keyField?: string;
+  detailBind?: string;
+  idsBind?: string;
+  idField?: string;
 }
 
 // List Tabs filter configuration

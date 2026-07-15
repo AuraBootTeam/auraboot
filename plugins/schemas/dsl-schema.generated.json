@@ -341,6 +341,10 @@
           "type": "string",
           "description": "API endpoint (when type = \"api\")"
         },
+        "detailEndpoint": {
+          "type": "string",
+          "description": "Optional detail endpoint template, e.g. \"/api/items/{pid}\""
+        },
         "method": {
           "type": "string",
           "enum": [
@@ -371,6 +375,12 @@
         },
         "cols": {
           "type": "number"
+        },
+        "columnTemplate": {
+          "type": "string"
+        },
+        "gridTemplateColumns": {
+          "type": "string"
         },
         "colGap": {
           "type": "number"
@@ -684,6 +694,10 @@
             "type": "string"
           }
         },
+        "bindState": {
+          "type": "string",
+          "description": "Mirror this field's value to a page state key (e.g. `statusFilter`) so data sources that read `${state.<bindState>}` (filter/search inputs feeding a list query) receive it. Without this the value only lives in form scope."
+        },
         "optionsWhen": {
           "type": "string"
         },
@@ -723,6 +737,34 @@
         "colSpan": {
           "type": "number",
           "description": "Grid column span for this field (shorthand for layout.colSpan)"
+        },
+        "allowCreate": {
+          "type": "boolean",
+          "description": "Reference fields only: show a \"+ 新建\" affordance to inline-create a target-model record and auto-select it. Default false."
+        },
+        "createCommand": {
+          "type": "string",
+          "description": "Override the create command code. Defaults to `${targetModel}:create`."
+        },
+        "createPageKey": {
+          "type": "string",
+          "description": "Override the DSL form pageKey used by inline quick-create. Defaults to `${targetModel}_new`."
+        },
+        "createPermission": {
+          "type": "string",
+          "description": "Override the permission code used to show inline-create. Defaults to createCommand."
+        },
+        "createInitialValues": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Initial values for inline-create. Exact `${form.<field>}` expressions resolve from the parent form."
+        },
+        "createFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Reserved (deferred): restrict the create form to a subset of fields. Not yet honored — full target-model form is rendered."
         }
       },
       "required": [
@@ -775,6 +817,10 @@
             "static",
             "namedQuery"
           ]
+        },
+        "modelCode": {
+          "type": "string",
+          "description": "Optional model scope for runtime reloads after same-model mutations."
         },
         "endpoint": {
           "type": "string"
@@ -841,6 +887,13 @@
         },
         "maxItems": {
           "type": "number"
+        },
+        "format": {
+          "type": "string",
+          "enum": [
+            "records",
+            "options"
+          ]
         }
       },
       "additionalProperties": false
@@ -865,6 +918,10 @@
       "properties": {
         "code": {
           "type": "string"
+        },
+        "preset": {
+          "type": "string",
+          "description": "Designer-authored shorthand for common toolbar buttons."
         },
         "action": {
           "anyOf": [
@@ -914,6 +971,10 @@
         "icon": {
           "type": "string"
         },
+        "inline": {
+          "type": "boolean",
+          "description": "Row actions only — render this button inline in the action column instead of collapsing it into the \"⋮\" overflow menu. At most 3 buttons are laid out inline (ux-design-system.md §3). When no button opts in, the first visible one is rendered inline, preserving the historical behaviour."
+        },
         "visibleWhen": {
           "type": "string"
         },
@@ -938,7 +999,14 @@
           "deprecated": "Use `action: { type: \"flow\", handler }` for onClick handlers."
         },
         "confirm": {
-          "type": "string",
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/LocalizedText"
+            }
+          ],
           "description": "Confirmation prompt i18n key — shown before executing the action."
         },
         "commandCode": {
@@ -1039,6 +1107,40 @@
           "properties": {
             "type": {
               "type": "string",
+              "const": "bulk_command"
+            },
+            "command": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "const": "bulk_state_transition"
+            },
+            "command": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "command"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
               "const": "navigate"
             },
             "to": {
@@ -1046,6 +1148,9 @@
             },
             "command": {
               "type": "string"
+            },
+            "hardReload": {
+              "type": "boolean"
             }
           },
           "required": [
@@ -1220,6 +1325,19 @@
         "dataSource": {
           "type": "string"
         },
+        "maxHeight": {
+          "type": [
+            "number",
+            "string"
+          ]
+        },
+        "density": {
+          "type": "string",
+          "enum": [
+            "default",
+            "compact"
+          ]
+        },
         "pagination": {
           "$ref": "#/definitions/PaginationConfig"
         },
@@ -1242,6 +1360,10 @@
         "treeConfig": {
           "$ref": "#/definitions/TreeConfig",
           "description": "Tree configuration — enables hierarchical expandable rows"
+        },
+        "showSummaryRow": {
+          "type": "boolean",
+          "description": "Show the column summary/footer row (T10). Defaults to showing the footer automatically when any column declares an `aggregate`; set explicitly to `false` to suppress it, or `true` to force it. The footer aggregates the current page's rows only (see ColumnConfig.aggregate)."
         }
       },
       "required": [
@@ -1284,6 +1406,21 @@
           ]
         },
         "bind": {
+          "type": "string"
+        },
+        "defaultFirst": {
+          "type": "boolean"
+        },
+        "keyField": {
+          "type": "string"
+        },
+        "detailBind": {
+          "type": "string"
+        },
+        "idsBind": {
+          "type": "string"
+        },
+        "idField": {
           "type": "string"
         }
       },
@@ -1339,6 +1476,17 @@
         "readOnly": {
           "type": "boolean"
         },
+        "aggregate": {
+          "type": "string",
+          "enum": [
+            "sum",
+            "avg",
+            "count",
+            "min",
+            "max"
+          ],
+          "description": "Column summary/footer aggregate (T10). When set, the list table renders a footer row showing this column's aggregate over the current page's rows:\n- 'sum' / 'avg' / 'min' / 'max' operate on numeric/currency values\n- 'count' counts non-null values (any type) NOTE: aggregates cover the CURRENT page only; cross-page totals would need a backend aggregation endpoint (out of scope). Setting this on any column implicitly enables the summary footer (see TableConfig.showSummaryRow)."
+        },
         "sortable": {
           "type": "boolean"
         },
@@ -1379,6 +1527,7 @@
             "currency",
             "tag",
             "progress",
+            "rating",
             "image",
             "user_identity",
             "reference",
@@ -1595,6 +1744,9 @@
             "$ref": "#/definitions/BlockConfig"
           }
         },
+        "layout": {
+          "$ref": "#/definitions/LayoutConfig"
+        },
         "system": {
           "type": "boolean"
         },
@@ -1649,6 +1801,11 @@
         },
         "resolveVia": {
           "$ref": "#/definitions/ResolveViaConfig"
+        },
+        "defaultValues": {
+          "type": "object",
+          "additionalProperties": {},
+          "description": "Values merged into create payloads before editable row input. String values support the same `${recordPid}` / `${record.field}` templates as sub-table data sources."
         },
         "addCommandCode": {
           "type": "string"

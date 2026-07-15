@@ -326,6 +326,16 @@ describe('TableBlockRenderer', () => {
     });
   }
 
+  function makeRuntimeWithRows(rows: Array<Record<string, unknown>>) {
+    return makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => rows,
+        has: () => true,
+        register: vi.fn(),
+      }),
+    });
+  }
+
   it('renders rows from table-adaptor data source records', () => {
     const runtime = makeRuntime({
       getDataSourceManager: () => ({
@@ -560,6 +570,43 @@ describe('TableBlockRenderer', () => {
     fireEvent.click(getByTestId('table-row-row-1'));
 
     expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', baseRow);
+  });
+
+  it('writes multiple selected rows and derived ids when table.selection.mode is multiple', () => {
+    const rows = [
+      { id: 'row-1', pid: 'row-1', name: 'Alpha' },
+      { id: 'row-2', pid: 'row-2', name: 'Beta' },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: {
+          mode: 'multiple',
+          bind: 'selectedLines',
+          detailBind: 'selectedLine',
+          idsBind: 'selectedLineIds',
+          idField: 'pid',
+        },
+        columns: baseColumns,
+      },
+    };
+
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(getByTestId('table-select-row-row-1'));
+    fireEvent.click(getByTestId('table-select-row-row-2'));
+
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLines', [rows[0]]);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', rows[0]);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLineIds', ['row-1']);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLines', rows);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', rows[1]);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLineIds', [
+      'row-1',
+      'row-2',
+    ]);
   });
 
   it('uses configured rowKey for row identity and highlights the clicked row immediately', () => {
