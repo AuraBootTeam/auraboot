@@ -13,18 +13,17 @@ public class TenantAwareTaskDecorator implements TaskDecorator {
 
     @Override
     public Runnable decorate(Runnable runnable) {
-        // Capture context from the calling thread
-        if (!MetaContext.exists()) {
+        // Snapshot the FULL identity + correlation context, not just the 4 core
+        // fields. The old 4-field copy (tenant/user/userPid/username) dropped
+        // roleIds, memberId, envId and the OTel trace id — so IM @AI / group-chat
+        // @Async workers lost their environment scope and had a broken trace.
+        MetaContext.Snapshot snapshot = MetaContext.snapshot();
+        if (snapshot == null) {
             return runnable;
         }
 
-        Long tenantId = MetaContext.getCurrentTenantId();
-        Long userId = MetaContext.getCurrentUserId();
-        String userPid = MetaContext.getCurrentUserPid();
-        String username = MetaContext.getCurrentUsername();
-
         return () -> {
-            MetaContext.setContext(tenantId, userId, userPid, username);
+            MetaContext.restore(snapshot);
             try {
                 runnable.run();
             } finally {

@@ -89,6 +89,48 @@ public class MetaContext {
         DATA_PERMISSION_BYPASSED.remove();
     }
 
+    /**
+     * Immutable capture of the identity + correlation ThreadLocals for propagation
+     * across an async boundary (e.g. {@code TenantAwareTaskDecorator}, IM {@code @Async}).
+     *
+     * <p>Deliberately EXCLUDES the {@code *_BYPASSED} guard flags. Those are
+     * request-scoped relaxations installed by {@link #runWithoutEnvFilter} /
+     * {@link #runWithoutLockGuard} / {@link #runWithoutDataPermission} around a
+     * specific block; propagating them into a worker thread would let background
+     * work silently run with a foreground request's guard disabled — a security
+     * regression. A snapshot carries only who/where the work runs as.
+     */
+    public record Snapshot(Long tenantId, Long userId, String userPid, String username,
+                           Set<Long> roleIds, Long memberId, Long envId, String otelTraceId) {}
+
+    /**
+     * Capture the current thread's identity + correlation context for later
+     * {@link #restore}. Returns {@code null} when no context is set (mirrors
+     * {@link #exists()}); the async decorator then runs undecorated.
+     */
+    public static Snapshot snapshot() {
+        MetaContext ctx = HOLDER.get();
+        if (ctx == null) {
+            return null;
+        }
+        return new Snapshot(ctx.tenantId, ctx.userId, ctx.userPid, ctx.username, ctx.roleIds,
+                MEMBER_ID.get(), ENV_ID.get(), OTEL_TRACE_ID.get());
+    }
+
+    /**
+     * Install a previously captured {@link #snapshot()} onto the current thread.
+     * No-op for {@code null}. Pair with {@link #clear()} in a finally block.
+     */
+    public static void restore(Snapshot s) {
+        if (s == null) {
+            return;
+        }
+        HOLDER.set(new MetaContext(s.tenantId(), s.userId(), s.userPid(), s.username(), s.roleIds()));
+        MEMBER_ID.set(s.memberId());
+        ENV_ID.set(s.envId());
+        OTEL_TRACE_ID.set(s.otelTraceId());
+    }
+
     /** Snapshotted OTel trace id for the current thread (A-G6 correlation); may be null. */
     public static void setOtelTraceId(String otelTraceId) {
         OTEL_TRACE_ID.set(otelTraceId);
