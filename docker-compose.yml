@@ -74,8 +74,11 @@ services:
   backend:
     profiles: [full]
     build:
-      context: ./platform
-      dockerfile: Dockerfile
+      # Build context is the repo root: platform/Dockerfile bakes the repo-root
+      # plugins/ tree into the image (for the pull-only flow). The ./plugins mount
+      # below still overrides the baked copies for live dev iteration.
+      context: .
+      dockerfile: platform/Dockerfile
     container_name: auraboot-backend
     restart: unless-stopped
     environment:

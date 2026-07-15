@@ -19,12 +19,32 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/auraboot
 
 jobs:
   build:
-    name: Build, push (multi-arch)
+    name: Build, push ${{ matrix.name }} (multi-arch)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Backend: builds the boot jar and bakes the OSS config plugins so a
+          # pure `docker pull` needs no repo checkout. Context is the repo root.
+          - name: backend
+            image: auraboot
+            context: .
+            file: platform/Dockerfile
+          # Frontend: BFF + SSR. Context is the repo root (workspace packages).
+          - name: frontend
+            image: auraboot-frontend
+            context: .
+            file: web-admin/Dockerfile
+          # Postgres: pgvector + baked schema.sql so first boot seeds the schema
+          # without a repo checkout.
+          - name: postgres
+            image: auraboot-postgres
+            context: .
+            file: docker/postgres/Dockerfile
     steps:
       - uses: actions/checkout@v6
 
@@ -45,7 +65,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
           # Tags:
           #   main → latest, sha-<short>
           #   v1.2.3 → 1.2.3, 1.2, 1, latest
@@ -58,19 +78,19 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
 
-      - name: Build & push backend image
+      - name: Build & push ${{ matrix.name }} image
         uses: docker/build-push-action@v7
         with:
-          context: ./platform
-          file: ./platform/Dockerfile
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
       - name: Output image refs
         run: |
-          echo "Pushed:"
+          echo "Pushed ${{ matrix.name }}:"
           echo "${{ steps.meta.outputs.tags }}"
