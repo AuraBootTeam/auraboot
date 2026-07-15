@@ -50,6 +50,46 @@ Native, non-Docker deployment directly on a Windows host is **not** supported: t
 reset/init/build tooling is bash-only and the repo ships no `gradlew.bat`. Use Docker
 (above) or WSL for anything beyond running the compose stack.
 
+## Pull-only deployment (no source checkout, no build)
+
+If you just want to **run** AuraBoot — not build it from source — pull the prebuilt
+images instead. This skips the 5–10 min Java + Node build entirely. Everything a first
+boot needs is baked into the images (postgres schema, backend plugins), so you need
+**no `git clone`** — just two files:
+
+```bash
+# Grab the compose file and the bootstrap script (no repo clone needed)
+curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/docker-compose.pull.yml
+curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/scripts/quickstart.sh
+
+# Pull + start (backend + frontend + postgres, all prebuilt)
+docker compose -f docker-compose.pull.yml up -d
+
+# Bootstrap (NOT optional — creates the admin, imports the plugins)
+bash quickstart.sh
+
+# Open http://localhost:3000  (admin@auraboot.com / Test2026x — change on first login)
+```
+
+Images pulled (multi-arch `amd64`/`arm64`), from GHCR by default:
+
+| Image | What it is |
+|-------|-----------|
+| `ghcr.io/aurabootteam/auraboot` | Backend (Spring Boot) + OSS config plugins baked in |
+| `ghcr.io/aurabootteam/auraboot-frontend` | Frontend (BFF + SSR) |
+| `ghcr.io/aurabootteam/auraboot-postgres` | PostgreSQL 16 (pgvector) + schema seeded on first boot |
+
+**Mainland China** — pull from the Tencent TCR mirror (faster than GHCR) by pointing
+`REGISTRY` at the public `auraboot-oss` namespace:
+
+```bash
+REGISTRY=ccr.ccs.tencentyun.com/auraboot-oss docker compose -f docker-compose.pull.yml up -d
+```
+
+Redis / MinIO / monitoring are advanced add-ons — for those, use the source
+`docker-compose.yml` profiles (`--profile cache` / `storage` / `monitoring`). Redis is
+not required for single-instance deployments.
+
 ## Infrastructure Only (Local Development)
 
 For local development, start only PostgreSQL and run services locally:

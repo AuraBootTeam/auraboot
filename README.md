@@ -130,6 +130,10 @@ If local PostgreSQL is already using port 5432, keep your local service running 
 POSTGRES_PORT=15432 docker compose --profile full up --build -d
 ```
 
+#### Run from prebuilt images (no build, no clone)
+
+To just **run** AuraBoot without building from source, pull the prebuilt multi-arch images instead — you need only `docker-compose.pull.yml` + `scripts/quickstart.sh` (no `git clone`; postgres schema and backend plugins are baked into the images). Mainland-China users can pull from the Tencent TCR mirror by setting `REGISTRY=ccr.ccs.tencentyun.com/auraboot-oss`. See [DEPLOY.md → Pull-only deployment](DEPLOY.md#pull-only-deployment-no-source-checkout-no-build).
+
 ### Manual Setup
 
 **Prerequisites:** Java 21+, Node.js 20+, PostgreSQL 15+ (Docker stack ships 16), Redis 7+, pnpm 9+
