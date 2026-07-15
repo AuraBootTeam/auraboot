@@ -4,6 +4,7 @@ import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.CapabilityEvalCase;
 import com.auraboot.framework.agent.dto.CapabilityView;
 import com.auraboot.framework.agent.entity.AgentEvalCase;
+import com.auraboot.framework.agent.eval.OnlineEvalCasePromoter;
 import com.auraboot.framework.agent.mapper.AgentEvalCaseMapper;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
@@ -95,7 +96,11 @@ public class CapabilityEvalService {
                 new LambdaQueryWrapper<AgentEvalCase>()
                         .eq(AgentEvalCase::getTenantId, tenantId)
                         .and(w -> w.eq(AgentEvalCase::getDeletedFlag, false)
-                                .or().isNull(AgentEvalCase::getDeletedFlag)));
+                                .or().isNull(AgentEvalCase::getDeletedFlag))
+                        // Exclude not-yet-curated online-eval candidates (CAP-02): they carry
+                        // empty expected behaviour and must never run in the capability gate.
+                        .and(w -> w.ne(AgentEvalCase::getCategory, OnlineEvalCasePromoter.CANDIDATE_CATEGORY)
+                                .or().isNull(AgentEvalCase::getCategory)));
         return mapRows(rows);
     }
 
@@ -112,7 +117,11 @@ public class CapabilityEvalService {
                 new LambdaQueryWrapper<AgentEvalCase>()
                         .eq(AgentEvalCase::getTenantId, tenantId)
                         .and(w -> w.eq(AgentEvalCase::getDeletedFlag, false)
-                                .or().isNull(AgentEvalCase::getDeletedFlag)));
+                                .or().isNull(AgentEvalCase::getDeletedFlag))
+                        // Exclude not-yet-curated online-eval candidates (CAP-02): they carry
+                        // empty expected behaviour and must never run in the capability gate.
+                        .and(w -> w.ne(AgentEvalCase::getCategory, OnlineEvalCasePromoter.CANDIDATE_CATEGORY)
+                                .or().isNull(AgentEvalCase::getCategory)));
         Map<String, List<CapabilityEvalCase>> result = new LinkedHashMap<>();
         for (AgentEvalCase r : rows) {
             String agentCode = r.getAgentCode() != null ? r.getAgentCode() : "__unknown__";
