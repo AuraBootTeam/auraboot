@@ -28,6 +28,8 @@ export interface QuickFilterPresetDefinition {
   key: QuickFilterPresetKey;
   i18nKey: string;
   fallbackLabel: string;
+  /** Icon (emoji or known token) rendered on the chip. */
+  icon?: string;
   buildFilters: (ctx: BuildQuickFilterPresetContext) => Record<string, unknown> | null;
 }
 
@@ -48,6 +50,13 @@ export const QUICK_FILTER_PRESET_FALLBACK: Record<BuiltInQuickFilterPresetKey, s
   my_records: 'My Records',
   created_today: 'Created Today',
   modified_this_week: 'Modified This Week',
+};
+
+/** Default emoji icon per built-in preset — source of truth for the chip icon. */
+export const QUICK_FILTER_PRESET_ICON: Record<BuiltInQuickFilterPresetKey, string> = {
+  my_records: '👤',
+  created_today: '📅',
+  modified_this_week: '🕐',
 };
 
 export interface BuildQuickFilterPresetContext {
@@ -95,6 +104,7 @@ const builtInQuickFilterPresetProvider: QuickFilterPresetProvider = {
       key,
       i18nKey: QUICK_FILTER_PRESET_I18N_KEY[key],
       fallbackLabel: QUICK_FILTER_PRESET_FALLBACK[key],
+      icon: QUICK_FILTER_PRESET_ICON[key],
       buildFilters: (ctx) => buildBuiltInQuickFilterPreset(key, ctx),
     })),
 };

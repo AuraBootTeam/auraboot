@@ -224,6 +224,12 @@ export interface ViewConfigMeta {
   capabilityStatus?: string;
   /** Stable capability reason codes captured at import/build time */
   capabilityReasonCodes?: string[];
+  /** When true, this view is pinned as a one-click quick-filter chip. */
+  pinnedAsQuickFilter?: boolean;
+  /** Icon (emoji or known token) rendered on the quick-filter chip. */
+  quickFilterIcon?: string;
+  /** Ascending display order among pinned view chips. */
+  quickFilterOrder?: number;
   /** Per-view collaborator ACL for shared team views */
   collaborators?: ViewCollaboratorAcl[];
 }
