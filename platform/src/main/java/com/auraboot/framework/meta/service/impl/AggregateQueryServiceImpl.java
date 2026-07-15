@@ -21,6 +21,10 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -78,10 +82,29 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
     /**
      * Supported filter operators.
+     *
+     * <p>{@code relative} is a range operator whose {@code value} carries a relative-time
+     * token (or {@code {relative,n}} object); the server resolves it into a concrete
+     * half-open {@code [start, end)} date range and binds both bounds as parameters.
      */
     private static final Set<String> SUPPORTED_OPERATORS = Set.of(
-            "eq", "ne", "neq", "gt", "gte", "ge", "lt", "lte", "le", "like", "in", "not_in", "is_null", "is_not_null"
+            "eq", "ne", "neq", "gt", "gte", "ge", "lt", "lte", "le", "like", "in", "not_in",
+            "is_null", "is_not_null", "relative"
     );
+
+    /**
+     * Maximum nesting depth of a filter group tree. Guards against pathological or abusive
+     * deeply-nested payloads (stack safety); the top-level list itself is depth 0.
+     */
+    private static final int MAX_FILTER_DEPTH = 10;
+
+    /**
+     * Clock used to resolve relative-time tokens (e.g. {@code this_month}). Package-private and
+     * non-final so tests can pin "now" via {@code ReflectionTestUtils.setField(service, "clock", fixed)};
+     * production uses the system clock in the JVM default zone. Not a Lombok-generated ctor arg
+     * (only final fields are), so it does not affect constructor / {@code @InjectMocks} wiring.
+     */
+    Clock clock = Clock.systemDefaultZone();
 
     private static final Set<String> PUBLIC_FORBIDDEN_OUTPUT_ALIASES = Set.of(
             "id", "record_id", "tenant_id", "created_by", "updated_by"
@@ -119,8 +142,13 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     private AggregateQueryResponse executeAggregateQuery(AggregateQueryRequest request) {
         String tableName = resolveTableName(request.getModelCode());
         List<String> accessClauses = buildDataAccessClauses(request.getModelCode());
-        String sql = buildAggregateSql(request, tableName, accessClauses);
-        Map<String, Object> params = buildParams(request);
+        // Filter (incl. nested OR groups + relative-time) params are bound during SQL build
+        // so the WHERE tree and its parameter keys are produced in a single, in-sync pass.
+        Map<String, Object> params = new HashMap<>();
+        String sql = buildAggregateSql(request, tableName, accessClauses, params);
+        if (request.getParameters() != null) {
+            params.putAll(request.getParameters());
+        }
 
         log.debug("Executing aggregate query: SQL={}, params={}", sql, params);
 
@@ -191,20 +219,26 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         validateNamedQueryFilters(request.getFilters(), fieldMap);
         validateNamedQueryFilters(request.getDrillFilters(), fieldMap);
 
-        Map<String, Object> params = buildNamedQueryParams(request, fieldMap);
-        // Inject tenantId for fromSql that uses #{params.tenantId} for tenant isolation
+        Long currentUserId = getCurrentUserId();
+        List<String> accessClauses = buildNamedQueryDataAccessClauses(query, tenantId, currentUserId);
+
+        // 6. Build SQL. Filter (incl. nested OR groups + relative-time) params are bound during
+        // the build so the WHERE tree and its parameter keys stay in a single in-sync pass.
+        Map<String, Object> params = new HashMap<>();
+        String sql = buildNamedQuerySql(request, query, fieldMap, tenantId, accessClauses, params);
+
+        // User-supplied named-query parameters may override generated filter keys (unchanged precedence).
+        if (request.getParameters() != null) {
+            params.putAll(request.getParameters());
+        }
+        // Inject tenantId for fromSql that uses #{params.tenantId} for tenant isolation.
         params.put("tenantId", tenantId);
         // Inject currentUserId so user-scoped named queries (#{params.currentUserId}) — e.g.
         // "my commission" / team-by-manager dashboards — return the same rows when rendered as
         // a chart (this path) as they do on the /api/datasource/list card/table path. Without
         // it the WHERE clause matches nothing and the chart shows an empty state. Mirrors
         // NamedQueryServiceImpl (the datasource/list executor).
-        Long currentUserId = getCurrentUserId();
         params.put("currentUserId", currentUserId != null ? currentUserId.toString() : null);
-        List<String> accessClauses = buildNamedQueryDataAccessClauses(query, tenantId, currentUserId);
-
-        // 6. Build SQL
-        String sql = buildNamedQuerySql(request, query, fieldMap, tenantId, accessClauses);
 
         log.debug("Executing named query aggregate: code={}, SQL={}, params={}", queryCode, sql, params);
 
@@ -226,21 +260,36 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
     /**
      * Validate filter fields against Named Query field whitelist and operator permissions.
+     * Recurses into nested AND/OR group nodes so every leaf in the tree is whitelisted.
      */
     private void validateNamedQueryFilters(List<AggregateQueryRequest.FilterConfig> filters,
                                            Map<String, NamedQueryField> fieldMap) {
         if (filters == null) return;
         for (AggregateQueryRequest.FilterConfig filter : filters) {
-            if (filter.getField() == null) continue;
-            NamedQueryField fieldDef = fieldMap.get(filter.getField());
-            if (fieldDef == null) {
-                throw new MetaServiceException("Filter field not in whitelist: " + filter.getField());
+            validateNamedQueryFilterNode(filter, fieldMap, 0);
+        }
+    }
+
+    private void validateNamedQueryFilterNode(AggregateQueryRequest.FilterConfig node,
+                                              Map<String, NamedQueryField> fieldMap, int depth) {
+        if (node == null) return;
+        if (isGroup(node)) {
+            requireGroupInvariants(node, depth);
+            groupJoiner(node.getLogic()); // validates logic ∈ {and, or}
+            for (AggregateQueryRequest.FilterConfig child : node.getChildren()) {
+                validateNamedQueryFilterNode(child, fieldMap, depth + 1);
             }
-            String operator = filter.getOperator() != null ? filter.getOperator().toLowerCase() : "eq";
-            if (fieldDef.hasOperators() && !fieldDef.supportsOperator(operator)) {
-                throw new MetaServiceException(
-                        "Operator not allowed for field " + filter.getField() + ": " + operator);
-            }
+            return;
+        }
+        if (node.getField() == null) return; // empty leaf — ignored, matches SQL-build behaviour
+        NamedQueryField fieldDef = fieldMap.get(node.getField());
+        if (fieldDef == null) {
+            throw new MetaServiceException("Filter field not in whitelist: " + node.getField());
+        }
+        String operator = node.getOperator() != null ? node.getOperator().toLowerCase(Locale.ROOT) : "eq";
+        if (fieldDef.hasOperators() && !fieldDef.supportsOperator(operator)) {
+            throw new MetaServiceException(
+                    "Operator not allowed for field " + node.getField() + ": " + operator);
         }
     }
 
@@ -250,7 +299,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
      */
     private String buildNamedQuerySql(AggregateQueryRequest request, NamedQuery query,
                                       Map<String, NamedQueryField> fieldMap, Long tenantId,
-                                      List<String> accessClauses) {
+                                      List<String> accessClauses, Map<String, Object> params) {
         StringBuilder sql = new StringBuilder("SELECT ");
 
         List<String> selectClauses = new ArrayList<>();
@@ -310,15 +359,14 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
             sql.append(" FROM (SELECT * FROM ").append(fromSql).append(") AS _nq");
         }
 
-        // WHERE clause on the outer query (filters mapped to columnExpr)
+        // WHERE clause on the outer query (filters mapped to columnExpr). Supports nested AND/OR
+        // groups and relative-time ranges; each leaf binds via a unique #{params.nqf_N} key.
         List<String> whereClauses = new ArrayList<>();
+        int[] paramCounter = {0};
 
         if (request.getFilters() != null) {
-            for (int i = 0; i < request.getFilters().size(); i++) {
-                AggregateQueryRequest.FilterConfig filter = request.getFilters().get(i);
-                NamedQueryField fieldDef = fieldMap.get(filter.getField());
-                String whereClause = buildNamedQueryFilterClause(fieldDef.getColumnExpr(),
-                        filter, "nqf_" + i);
+            for (AggregateQueryRequest.FilterConfig filter : request.getFilters()) {
+                String whereClause = compileNamedQueryFilter(filter, fieldMap, "nqf", paramCounter, params, 0);
                 if (whereClause != null) {
                     whereClauses.add(whereClause);
                 }
@@ -326,11 +374,8 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         }
 
         if (request.getDrillFilters() != null) {
-            for (int i = 0; i < request.getDrillFilters().size(); i++) {
-                AggregateQueryRequest.FilterConfig filter = request.getDrillFilters().get(i);
-                NamedQueryField fieldDef = fieldMap.get(filter.getField());
-                String whereClause = buildNamedQueryFilterClause(fieldDef.getColumnExpr(),
-                        filter, "nqdf_" + i);
+            for (AggregateQueryRequest.FilterConfig filter : request.getDrillFilters()) {
+                String whereClause = compileNamedQueryFilter(filter, fieldMap, "nqdf", paramCounter, params, 0);
                 if (whereClause != null) {
                     whereClauses.add(whereClause);
                 }
@@ -404,66 +449,199 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     }
 
     /**
-     * Build filter clause for named query using columnExpr instead of raw field names.
+     * Compile a named-query filter (sub)tree into a SQL boolean expression, mapping each leaf's
+     * field to its whitelisted {@code columnExpr} and binding leaf values into {@code params}.
+     * Groups are wrapped in parentheses and combined with their {@code logic} (AND/OR).
      */
-    private String buildNamedQueryFilterClause(String columnExpr,
-                                               AggregateQueryRequest.FilterConfig filter,
-                                               String paramKey) {
-        if (filter == null || filter.getField() == null) {
+    private String compileNamedQueryFilter(AggregateQueryRequest.FilterConfig node,
+                                           Map<String, NamedQueryField> fieldMap,
+                                           String prefix, int[] counter,
+                                           Map<String, Object> params, int depth) {
+        if (node == null) {
             return null;
         }
-
-        String operator = filter.getOperator() != null ? filter.getOperator().toLowerCase() : "eq";
-        if (!SUPPORTED_OPERATORS.contains(operator)) {
-            throw new MetaServiceException("Unsupported filter operator: " + operator);
+        if (isGroup(node)) {
+            requireGroupInvariants(node, depth);
+            List<String> parts = new ArrayList<>();
+            for (AggregateQueryRequest.FilterConfig child : node.getChildren()) {
+                String frag = compileNamedQueryFilter(child, fieldMap, prefix, counter, params, depth + 1);
+                if (frag != null) {
+                    parts.add(frag);
+                }
+            }
+            if (parts.isEmpty()) {
+                return null;
+            }
+            return "(" + String.join(groupJoiner(node.getLogic()), parts) + ")";
         }
+        // Leaf — column comes from the field whitelist (already validated in validateNamedQueryFilters).
+        if (node.getField() == null) {
+            return null;
+        }
+        NamedQueryField fieldDef = fieldMap.get(node.getField());
+        if (fieldDef == null) {
+            throw new MetaServiceException("Filter field not in whitelist: " + node.getField());
+        }
+        return emitLeafPredicate(fieldDef.getColumnExpr(), node, prefix, counter, params);
+    }
 
-        return switch (operator) {
-            case "eq" -> columnExpr + " = #{params." + paramKey + "}";
-            case "ne", "neq" -> columnExpr + " != #{params." + paramKey + "}";
-            case "gt" -> columnExpr + " > #{params." + paramKey + "}";
-            case "gte", "ge" -> columnExpr + " >= #{params." + paramKey + "}";
-            case "lt" -> columnExpr + " < #{params." + paramKey + "}";
-            case "lte", "le" -> columnExpr + " <= #{params." + paramKey + "}";
-            case "like" -> columnExpr + " LIKE #{params." + paramKey + "}";
-            case "in" -> columnExpr + " IN (#{params." + paramKey + "})";
-            case "not_in" -> columnExpr + " NOT IN (#{params." + paramKey + "})";
-            case "is_null" -> columnExpr + " IS NULL";
-            case "is_not_null" -> columnExpr + " IS NOT NULL";
-            default -> columnExpr + " = #{params." + paramKey + "}";
+    // ==================== Shared filter-tree compilation (both query paths) ====================
+
+    /** A node is a group iff it carries child filters; otherwise it is a leaf. */
+    private boolean isGroup(AggregateQueryRequest.FilterConfig node) {
+        return node.getChildren() != null && !node.getChildren().isEmpty();
+    }
+
+    /** Reject ambiguous group nodes and over-deep nesting before descending. */
+    private void requireGroupInvariants(AggregateQueryRequest.FilterConfig node, int depth) {
+        if (node.getField() != null) {
+            throw new MetaServiceException(
+                    "Filter node cannot be both a leaf (field) and a group (children): " + node.getField());
+        }
+        if (depth >= MAX_FILTER_DEPTH) {
+            throw new MetaServiceException("Filter nesting exceeds max depth " + MAX_FILTER_DEPTH);
+        }
+    }
+
+    /** Map a group's {@code logic} to a SQL joiner, validating it is exactly {@code and} or {@code or}. */
+    private String groupJoiner(String logic) {
+        String normalized = logic == null ? "and" : logic.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "and" -> " AND ";
+            case "or" -> " OR ";
+            default -> throw new MetaServiceException(
+                    "Invalid filter group logic (expected 'and' or 'or'): " + logic);
         };
     }
 
     /**
-     * Build query parameters for named query filters.
+     * Emit a single leaf predicate ({@code columnExpr <op> #{params.key}}) and bind its value.
+     * All comparison values travel as bound parameters — never concatenated into SQL — so a
+     * malicious value cannot alter query structure. {@code columnExpr} is a whitelisted column
+     * (aggregate path: validated bare identifier; namedQuery path: whitelist {@code column_expr}).
      */
-    private Map<String, Object> buildNamedQueryParams(AggregateQueryRequest request,
-                                                      Map<String, NamedQueryField> fieldMap) {
-        Map<String, Object> params = new HashMap<>();
+    private String emitLeafPredicate(String columnExpr, AggregateQueryRequest.FilterConfig filter,
+                                     String prefix, int[] counter, Map<String, Object> params) {
+        String operator = filter.getOperator() != null
+                ? filter.getOperator().toLowerCase(Locale.ROOT) : "eq";
+        if (!SUPPORTED_OPERATORS.contains(operator)) {
+            throw new MetaServiceException("Unsupported filter operator: " + operator);
+        }
+        int idx = counter[0]++;
 
-        if (request.getFilters() != null) {
-            for (int i = 0; i < request.getFilters().size(); i++) {
-                AggregateQueryRequest.FilterConfig filter = request.getFilters().get(i);
-                if (filter.getValue() != null) {
-                    params.put("nqf_" + i, prepareFilterValue(filter));
+        if ("relative".equals(operator)) {
+            return emitRelativeRange(columnExpr, filter.getValue(), prefix, idx, params);
+        }
+
+        String key = prefix + "_" + idx;
+        String placeholder = "#{params." + key + "}";
+        String sql = switch (operator) {
+            case "eq" -> columnExpr + " = " + placeholder;
+            case "ne", "neq" -> columnExpr + " != " + placeholder;
+            case "gt" -> columnExpr + " > " + placeholder;
+            case "gte", "ge" -> columnExpr + " >= " + placeholder;
+            case "lt" -> columnExpr + " < " + placeholder;
+            case "lte", "le" -> columnExpr + " <= " + placeholder;
+            case "like" -> columnExpr + " LIKE " + placeholder;
+            case "in" -> columnExpr + " IN (" + placeholder + ")";
+            case "not_in" -> columnExpr + " NOT IN (" + placeholder + ")";
+            case "is_null" -> columnExpr + " IS NULL";
+            case "is_not_null" -> columnExpr + " IS NOT NULL";
+            default -> columnExpr + " = " + placeholder;
+        };
+        // Null-checks take no value; every other operator binds one (null-safe: a missing value
+        // binds SQL NULL, preserving prior behaviour).
+        if (!"is_null".equals(operator) && !"is_not_null".equals(operator)) {
+            params.put(key, prepareFilterValue(operator, filter.getValue()));
+        }
+        return sql;
+    }
+
+    /**
+     * Emit a relative-time range predicate, binding the resolved {@code [start, end)} bounds as
+     * parameters. Produces {@code (columnExpr >= #{lo} AND columnExpr < #{hi})} — parenthesised so
+     * it composes correctly inside OR groups. Bounds are {@link LocalDate}; PostgreSQL compares
+     * them correctly against both {@code date} and {@code timestamp} columns.
+     */
+    private String emitRelativeRange(String columnExpr, Object spec, String prefix, int idx,
+                                     Map<String, Object> params) {
+        LocalDate[] range = resolveRelativeRange(spec);
+        String loKey = prefix + "_" + idx + "_lo";
+        String hiKey = prefix + "_" + idx + "_hi";
+        params.put(loKey, range[0]);
+        params.put(hiKey, range[1]);
+        return "(" + columnExpr + " >= #{params." + loKey + "}"
+                + " AND " + columnExpr + " < #{params." + hiKey + "})";
+    }
+
+    /**
+     * Resolve a relative-time spec into a concrete half-open {@code [startInclusive, endExclusive)}
+     * date range, evaluated against {@link #clock}. Accepts a token string (e.g. {@code this_month})
+     * or an object {@code {"relative":"last_n_days","n":30}}. Windows use whole calendar days;
+     * {@code last_n_days} is the trailing {@code n} days ending today inclusive.
+     */
+    private LocalDate[] resolveRelativeRange(Object spec) {
+        String token;
+        Integer n = null;
+        if (spec instanceof Map<?, ?> map) {
+            Object t = map.get("relative");
+            token = t != null ? t.toString() : null;
+            Object rawN = map.get("n");
+            if (rawN instanceof Number num) {
+                n = num.intValue();
+            } else if (rawN != null) {
+                try {
+                    n = Integer.parseInt(rawN.toString().trim());
+                } catch (NumberFormatException e) {
+                    throw new MetaServiceException("Relative time 'n' must be an integer: " + rawN);
                 }
             }
+        } else if (spec instanceof String s) {
+            token = s;
+        } else {
+            throw new MetaServiceException(
+                    "Relative time value must be a token string or {relative, n} object");
         }
-
-        if (request.getDrillFilters() != null) {
-            for (int i = 0; i < request.getDrillFilters().size(); i++) {
-                AggregateQueryRequest.FilterConfig filter = request.getDrillFilters().get(i);
-                if (filter.getValue() != null) {
-                    params.put("nqdf_" + i, prepareFilterValue(filter));
+        if (token == null || token.isBlank()) {
+            throw new MetaServiceException("Relative time token is required");
+        }
+        String normalized = token.trim().toLowerCase(Locale.ROOT);
+        LocalDate today = LocalDate.now(clock);
+        return switch (normalized) {
+            case "today" -> new LocalDate[]{today, today.plusDays(1)};
+            case "yesterday" -> new LocalDate[]{today.minusDays(1), today};
+            case "last_7_days" -> lastNDays(today, 7);
+            case "last_30_days" -> lastNDays(today, 30);
+            case "last_n_days" -> {
+                if (n == null || n <= 0) {
+                    throw new MetaServiceException("Relative time 'last_n_days' requires a positive 'n'");
                 }
+                yield lastNDays(today, n);
             }
-        }
+            case "this_week" -> {
+                LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+                yield new LocalDate[]{weekStart, weekStart.plusWeeks(1)};
+            }
+            case "this_month" -> {
+                LocalDate monthStart = today.withDayOfMonth(1);
+                yield new LocalDate[]{monthStart, monthStart.plusMonths(1)};
+            }
+            case "this_quarter" -> {
+                int firstMonthOfQuarter = ((today.getMonthValue() - 1) / 3) * 3 + 1;
+                LocalDate quarterStart = LocalDate.of(today.getYear(), firstMonthOfQuarter, 1);
+                yield new LocalDate[]{quarterStart, quarterStart.plusMonths(3)};
+            }
+            case "this_year" -> {
+                LocalDate yearStart = today.withDayOfYear(1);
+                yield new LocalDate[]{yearStart, yearStart.plusYears(1)};
+            }
+            default -> throw new MetaServiceException("Unsupported relative time token: " + token);
+        };
+    }
 
-        if (request.getParameters() != null) {
-            params.putAll(request.getParameters());
-        }
-
-        return params;
+    /** Trailing {@code n} calendar days ending today inclusive: {@code [today-(n-1), today+1)}. */
+    private LocalDate[] lastNDays(LocalDate today, int n) {
+        return new LocalDate[]{today.minusDays(n - 1L), today.plusDays(1)};
     }
 
     /**
@@ -722,7 +900,8 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     /**
      * Build the aggregate SQL query.
      */
-    private String buildAggregateSql(AggregateQueryRequest request, String tableName, List<String> accessClauses) {
+    private String buildAggregateSql(AggregateQueryRequest request, String tableName,
+                                     List<String> accessClauses, Map<String, Object> params) {
         StringBuilder sql = new StringBuilder("SELECT ");
 
         List<String> selectClauses = new ArrayList<>();
@@ -764,9 +943,12 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
             whereClauses.add("deleted_flag = false");
         }
 
+        // Filters support nested AND/OR groups and relative-time ranges; each leaf binds via a
+        // unique #{params.f_N} / #{params.df_N} key generated in this same pass.
+        int[] paramCounter = {0};
         if (request.getFilters() != null) {
             for (AggregateQueryRequest.FilterConfig filter : request.getFilters()) {
-                String whereClause = buildFilterClause(filter, "f_");
+                String whereClause = compileAggregateFilter(filter, "f", paramCounter, params, 0);
                 if (whereClause != null) {
                     whereClauses.add(whereClause);
                 }
@@ -775,7 +957,7 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
 
         if (request.getDrillFilters() != null) {
             for (AggregateQueryRequest.FilterConfig filter : request.getDrillFilters()) {
-                String whereClause = buildFilterClause(filter, "df_");
+                String whereClause = compileAggregateFilter(filter, "df", paramCounter, params, 0);
                 if (whereClause != null) {
                     whereClauses.add(whereClause);
                 }
@@ -847,83 +1029,49 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     }
 
     /**
-     * Build a filter clause with parameterized values.
+     * Compile an aggregate-path filter (sub)tree into a SQL boolean expression over bare (validated)
+     * column identifiers, binding leaf values into {@code params}. Groups are wrapped in parentheses
+     * and combined with their {@code logic} (AND/OR); leaves validate the field identifier so a
+     * malicious field name is rejected before any SQL is composed.
      */
-    private String buildFilterClause(AggregateQueryRequest.FilterConfig filter, String prefix) {
-        if (filter == null || filter.getField() == null) {
+    private String compileAggregateFilter(AggregateQueryRequest.FilterConfig node, String prefix,
+                                          int[] counter, Map<String, Object> params, int depth) {
+        if (node == null) {
             return null;
         }
-
-        String field = filter.getField();
+        if (isGroup(node)) {
+            requireGroupInvariants(node, depth);
+            List<String> parts = new ArrayList<>();
+            for (AggregateQueryRequest.FilterConfig child : node.getChildren()) {
+                String frag = compileAggregateFilter(child, prefix, counter, params, depth + 1);
+                if (frag != null) {
+                    parts.add(frag);
+                }
+            }
+            if (parts.isEmpty()) {
+                return null;
+            }
+            return "(" + String.join(groupJoiner(node.getLogic()), parts) + ")";
+        }
+        // Leaf — the column is the raw field, which must be a safe bare identifier.
+        String field = node.getField();
+        if (field == null) {
+            return null;
+        }
         if (!IDENTIFIER_PATTERN.matcher(field).matches()) {
             throw new MetaServiceException("Invalid filter field: " + field);
         }
-
-        String operator = filter.getOperator() != null ? filter.getOperator().toLowerCase() : "eq";
-        if (!SUPPORTED_OPERATORS.contains(operator)) {
-            throw new MetaServiceException("Unsupported filter operator: " + operator);
-        }
-
-        String paramKey = prefix + field;
-
-        return switch (operator) {
-            case "eq" -> field + " = #{params." + paramKey + "}";
-            case "ne", "neq" -> field + " != #{params." + paramKey + "}";
-            case "gt" -> field + " > #{params." + paramKey + "}";
-            case "gte", "ge" -> field + " >= #{params." + paramKey + "}";
-            case "lt" -> field + " < #{params." + paramKey + "}";
-            case "lte", "le" -> field + " <= #{params." + paramKey + "}";
-            case "like" -> field + " LIKE #{params." + paramKey + "}";
-            case "in" -> field + " IN (#{params." + paramKey + "})";
-            case "not_in" -> field + " NOT IN (#{params." + paramKey + "})";
-            case "is_null" -> field + " IS NULL";
-            case "is_not_null" -> field + " IS NOT NULL";
-            default -> field + " = #{params." + paramKey + "}";
-        };
+        return emitLeafPredicate(field, node, prefix, counter, params);
     }
 
     /**
-     * Build query parameters from the request.
+     * Prepare a leaf filter value based on operator (e.g. wrap {@code like} in {@code %...%}).
+     * The returned value is always <em>bound</em> as a parameter, never concatenated into SQL.
      */
-    private Map<String, Object> buildParams(AggregateQueryRequest request) {
-        Map<String, Object> params = new HashMap<>();
-
-        if (request.getFilters() != null) {
-            for (AggregateQueryRequest.FilterConfig filter : request.getFilters()) {
-                if (filter.getValue() != null) {
-                    String paramKey = "f_" + filter.getField();
-                    params.put(paramKey, prepareFilterValue(filter));
-                }
-            }
+    private Object prepareFilterValue(String operator, Object value) {
+        if ("like".equals(operator) && value instanceof String s) {
+            return "%" + s + "%";
         }
-
-        if (request.getDrillFilters() != null) {
-            for (AggregateQueryRequest.FilterConfig filter : request.getDrillFilters()) {
-                if (filter.getValue() != null) {
-                    String paramKey = "df_" + filter.getField();
-                    params.put(paramKey, prepareFilterValue(filter));
-                }
-            }
-        }
-
-        if (request.getParameters() != null) {
-            params.putAll(request.getParameters());
-        }
-
-        return params;
-    }
-
-    /**
-     * Prepare filter value based on operator.
-     */
-    private Object prepareFilterValue(AggregateQueryRequest.FilterConfig filter) {
-        Object value = filter.getValue();
-        String operator = filter.getOperator() != null ? filter.getOperator().toLowerCase() : "eq";
-
-        if ("like".equals(operator) && value instanceof String) {
-            return "%" + value + "%";
-        }
-
         return value;
     }
 
