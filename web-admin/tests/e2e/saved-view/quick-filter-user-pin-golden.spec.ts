@@ -53,7 +53,9 @@ test.describe('Quick-filter user pin (M2)', () => {
       name: viewName,
       viewType: 'table',
       scope: 'personal',
-      viewConfig: { rowHeight: 'tall' },
+      // Distinctive config (not {rowHeight:'tall'}) so it never collides with
+      // other specs' reuse keys under parallel runs.
+      viewConfig: { showRowNumbers: true },
       expectSuccess: true,
     });
 

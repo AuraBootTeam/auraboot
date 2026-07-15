@@ -46,9 +46,9 @@ test.describe('Quick-filter view chip (M1)', () => {
       name: viewName,
       viewType: 'table',
       scope: 'personal',
-      // The pin flag + a distinguishing rowHeight so we can prove the view switched.
+      // Distinctive config (no rowHeight) so this never collides with other
+      // specs' reuse keys (e.g. QF's {rowHeight:'tall'}) under parallel runs.
       viewConfig: {
-        rowHeight: 'tall',
         meta: { pinnedAsQuickFilter: true, quickFilterIcon: '📦' },
       },
       expectSuccess: true,
