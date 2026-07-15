@@ -259,6 +259,33 @@ describe('workbenchBlockUtils action runner', () => {
     expect(runtime.__reload).not.toHaveBeenCalled();
   });
 
+  it('B-002: surfaces localized context.detail over the generic message envelope on command reject', async () => {
+    // A business-rejected command puts the real reason in context.detail; message/desc
+    // are the generic "Business error" envelope. The workbench path (executeSimpleWorkbenchAction)
+    // is the third command path (after useActionHandler / FormPageContent, OSS #1212) and
+    // must extract the same way. Pre-fix it threw message ('Business error'); this asserts detail.
+    const runtime = makeRuntime() as any;
+    fetchResultMock.mockResolvedValue({
+      code: '500',
+      message: 'Business error',
+      desc: 'Business error',
+      context: { detail: '库存不足,无法确认入库' },
+    });
+
+    await expect(
+      executeSimpleWorkbenchAction(runtime, {
+        action: 'command.execute',
+        args: {
+          command: 'tinv:confirm_stock_in',
+          targetRecordPid: 'SI-1',
+          operationType: 'update',
+        },
+      }),
+    ).rejects.toThrow('库存不足,无法确认入库');
+
+    expect(runtime.__reload).not.toHaveBeenCalled();
+  });
+
   it('downloads the returned file with browser auth after executing a command', async () => {
     const runtime = makeRuntime() as any;
     const fetchMock = vi.fn().mockResolvedValue({

@@ -154,13 +154,11 @@ public final class DslRegistry {
         CURRENT_DATETIME("current_datetime", "Current UTC timestamp", "1.2"),
         CURRENT_TENANT("current_tenant", "Current tenant ID", "1.0"),
         UUID("uuid", "Generated UUID", "1.0"),
-        SEQUENCE("sequence", "Auto-increment sequence", "1.0"),
         EXPRESSION("expression", "SpEL expression", "1.0"),
         FIXED_VALUE("fixed_value", "Fixed constant (always overrides payload)", "1.0"),
         DEFAULT_VALUE("default_value", "Default constant (only when payload omits field)", "1.3"),
         AUTO_GENERATE("auto_generate", "Auto-generated value", "1.0"),
-        COPY_FIELD("copy_field", "Copy from another field", "1.0"),
-        FIELD_MAP("field_map", "Map from source field", "1.0");
+        COPY_FIELD("copy_field", "Copy from another field", "1.0");
 
         private final String code, label, since;
         AutoSetStrategy(String code, String label, String since) { this.code = code; this.label = label; this.since = since; }
@@ -185,6 +183,7 @@ public final class DslRegistry {
         LIKE("like", "Pattern match", "1.0"),
         NOT_LIKE("not_like", "Not pattern match", "1.0"),
         CONTAINS("contains", "Contains substring", "1.0"),
+        NOT_CONTAINS("not_contains", "Not contains substring", "1.0"),
         STARTS_WITH("starts_with", "Starts with", "1.0"),
         ENDS_WITH("ends_with", "Ends with", "1.0");
 
