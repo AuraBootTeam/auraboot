@@ -60,6 +60,7 @@ class ChatBiV2RoundtripTest {
     private ConversationService conversationService;
     private DisambiguationService disambig;
     private ChatBiAnswerMapper answerMapper;
+    private ChatBiAnswerPersistence persistence;
     private ChatBiAnswerService service;
 
     @BeforeEach
@@ -71,8 +72,11 @@ class ChatBiV2RoundtripTest {
         conversationService = mock(ConversationService.class);
         disambig = mock(DisambiguationService.class);
         answerMapper = mock(ChatBiAnswerMapper.class);
+        // Real persistence bean forwards to the mocked mapper (REQUIRES_NEW proxy is a
+        // no-op in a plain unit test), so existing verify(answerMapper) checks still hold.
+        persistence = new ChatBiAnswerPersistence(answerMapper, conversationService);
         service = new ChatBiAnswerService(router, catalog, queryService,
-                compiler, conversationService, disambig, answerMapper);
+                compiler, conversationService, disambig, persistence);
         MetaContext.setCurrentTenantId(1L);
         MetaContext.setCurrentUserId(100L);
         when(catalog.listCatalog(1L)).thenReturn(new SemanticMetaResponse());
