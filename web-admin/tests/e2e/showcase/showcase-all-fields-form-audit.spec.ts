@@ -16,7 +16,7 @@ import {
 test.describe.configure({ mode: 'serial' });
 
 const MODEL_CODE = 'showcase_all_fields';
-const PAGE_KEY = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields_list';
 const LIST_URL = `/p/${MODEL_CODE}`;
 
 const ALL_FIELD_CODES = [

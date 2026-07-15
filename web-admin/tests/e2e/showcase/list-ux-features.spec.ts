@@ -19,7 +19,7 @@ import {
 
 const SHOWCASE_LIST_URL = '/p/showcase_all_fields';
 const MODEL_CODE = 'showcase_all_fields';
-const PAGE_KEY = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields_list';
 
 let defaultTableView: DefaultTableViewState | null = null;
 

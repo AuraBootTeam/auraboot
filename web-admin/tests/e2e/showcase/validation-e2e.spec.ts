@@ -36,7 +36,7 @@ import {
 } from './helpers/default-table-view';
 
 const MODEL_CODE = 'showcase_all_fields';
-const PAGE_KEY = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields_list';
 const LIST_URL = `/p/${MODEL_CODE}`;
 const FORM_NEW_URL_RE = new RegExp(`/p/${MODEL_CODE}/new(?:$|\\?)`);
 
