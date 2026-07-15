@@ -554,22 +554,39 @@ describe('ViewManagePanel team quick-filter pin (M3)', () => {
     makeView({ pid: 'team-1', name: '团队看板', scope: 'team', teamId: 'team-a' });
 
   it('hides the team section when the user cannot manage team pins', () => {
+    // Team views are supplied separately from the personal `views` list.
     renderPanel({
-      views: [makeView({ pid: 'personal-1', scope: 'personal' }), teamView()],
+      views: [makeView({ pid: 'personal-1', scope: 'personal' })],
+      teamViews: [teamView()],
       canManageTeamPins: false,
       onTeamPinView: vi.fn(),
     });
 
     expect(screen.queryByTestId('saved-view-team-group')).toBeNull();
     expect(screen.queryByTestId('saved-view-action-team-pin-team-1')).toBeNull();
-    // The team view must not leak into the personal-only chain either.
     expect(screen.queryByText('团队看板')).toBeNull();
+  });
+
+  it('does not derive team views from the personal `views` list', () => {
+    // Regression guard: the list page passes a personal-only `views` list, so a
+    // team-scoped view there must never surface a team section (only `teamViews`
+    // does). This is what the M3 golden caught.
+    renderPanel({
+      views: [teamView()],
+      teamViews: [],
+      canManageTeamPins: true,
+      onTeamPinView: vi.fn(),
+    });
+
+    expect(screen.queryByTestId('saved-view-team-group')).toBeNull();
+    expect(screen.queryByTestId('saved-view-action-team-pin-team-1')).toBeNull();
   });
 
   it('pins a team view for its team when the user has team-manage', async () => {
     const onTeamPinView = vi.fn(async () => {});
     renderPanel({
-      views: [teamView()],
+      views: [],
+      teamViews: [teamView()],
       canManageTeamPins: true,
       teamPinnedViewPids: [],
       onTeamPinView,
@@ -587,7 +604,8 @@ describe('ViewManagePanel team quick-filter pin (M3)', () => {
   it('unpins a team view that is already team-pinned', async () => {
     const onTeamUnpinView = vi.fn(async () => {});
     renderPanel({
-      views: [teamView()],
+      views: [],
+      teamViews: [teamView()],
       canManageTeamPins: true,
       teamPinnedViewPids: ['team-1'],
       onTeamPinView: vi.fn(),

@@ -62,6 +62,7 @@ export interface ListModalsProps {
   onPinView?: (pid: string) => Promise<void>;
   onUnpinView?: (pid: string) => Promise<void>;
   canManageTeamPins?: boolean;
+  teamViews?: any[];
   teamPinnedViewPids?: string[];
   onTeamPinView?: (pid: string, teamId: string) => Promise<void>;
   onTeamUnpinView?: (pid: string, teamId: string) => Promise<void>;
@@ -152,6 +153,7 @@ export function ListModals({
   onPinView,
   onUnpinView,
   canManageTeamPins,
+  teamViews,
   teamPinnedViewPids,
   onTeamPinView,
   onTeamUnpinView,
@@ -251,6 +253,7 @@ export function ListModals({
         onPinView={onPinView}
         onUnpinView={onUnpinView}
         canManageTeamPins={canManageTeamPins}
+        teamViews={teamViews}
         teamPinnedViewPids={teamPinnedViewPids}
         onTeamPinView={onTeamPinView}
         onTeamUnpinView={onTeamUnpinView}

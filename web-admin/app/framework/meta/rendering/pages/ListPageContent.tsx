@@ -1092,6 +1092,29 @@ function ListPageContentInner(props: PageContentProps) {
     void loadChipPins();
   }, [loadChipPins]);
 
+  // Team-scoped views the user may pin for their team. The saved-view list above
+  // is personal-only (scopeFilter='personal'), so team views are fetched
+  // separately and only when the user can author team pins (team-manage or the
+  // broader view-manage, mirroring the backend gate).
+  const canManageTeamPins =
+    hasPermission('dashboard.saved_view.team.update') ||
+    hasPermission('dashboard.saved_view.update');
+  const [teamViews, setTeamViews] = useState<SavedView[]>([]);
+  const loadTeamViews = useCallback(async () => {
+    if (!schema || !canManageTeamPins || skipListData) {
+      setTeamViews([]);
+      return;
+    }
+    try {
+      setTeamViews(await savedViewService.getTeamViews({ modelCode, pageKey }));
+    } catch {
+      setTeamViews([]);
+    }
+  }, [schema, canManageTeamPins, skipListData, modelCode, pageKey]);
+  useEffect(() => {
+    void loadTeamViews();
+  }, [loadTeamViews]);
+
   const [pendingViewConfig, setPendingViewConfig] = useState<Partial<ViewConfig> | null>(null);
   const [savingViewDraft, setSavingViewDraft] = useState(false);
   const [copyingViewDraft, setCopyingViewDraft] = useState(false);
@@ -3557,17 +3580,19 @@ function ListPageContentInner(props: PageContentProps) {
     ],
   );
 
-  // Assemble the toolbar chip row: built-in filter presets + pinned views.
-  // `pins` stays empty until Half B (M2) adds per-user chip pins.
+  // Assemble the toolbar chip row: built-in filter presets + pinned views. A
+  // pin only resolves to a chip if its SavedView is in the pool, so team views
+  // (fetched separately from the personal-only list) are merged in — otherwise a
+  // team-pinned view could never render as a chip.
   const quickFilterChips = useMemo<QuickFilterChip[]>(
     () =>
       assembleQuickFilterChips({
         presets: getQuickFilterPresetDefinitions(),
         t,
-        savedViews,
+        savedViews: teamViews.length > 0 ? [...savedViews, ...teamViews] : savedViews,
         pins: chipPins,
       }),
-    [t, savedViews, chipPins],
+    [t, savedViews, teamViews, chipPins],
   );
 
   // Select a SavedView: clear any active preset, switch the view, sync the URL
@@ -4838,10 +4863,8 @@ function ListPageContentInner(props: PageContentProps) {
               await savedViewService.unpinView(pid);
               await loadChipPins();
             }}
-            canManageTeamPins={
-              hasPermission('dashboard.saved_view.team.update') ||
-              hasPermission('dashboard.saved_view.update')
-            }
+            canManageTeamPins={canManageTeamPins}
+            teamViews={teamViews}
             teamPinnedViewPids={chipPins.map((p) => p.viewPid)}
             onTeamPinView={async (pid: string, teamId: string) => {
               await savedViewService.pinView(pid, { scope: 'team', teamId });

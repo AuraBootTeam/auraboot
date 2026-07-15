@@ -122,6 +122,14 @@ export class SavedViewService {
   }
 
   /**
+   * Get team views shared with the current user's teams (scope=team).
+   */
+  async getTeamViews(params: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
+    const result = await get<SavedView[]>(`${BASE_URL}/team`, params, undefined, request);
+    return handleResponse(result, 'Failed to fetch team views');
+  }
+
+  /**
    * List the current user's quick-filter chip pins for a model/page.
    */
   async getChipPins(params: SavedViewQueryParams, request?: Request): Promise<ChipPin[]> {

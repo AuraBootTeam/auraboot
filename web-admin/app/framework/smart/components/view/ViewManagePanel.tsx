@@ -243,6 +243,11 @@ export interface ViewManagePanelProps {
   onUnpinView?: (pid: string) => Promise<void>;
   /** Whether the current user may author team pins (holds team-manage). */
   canManageTeamPins?: boolean;
+  /**
+   * Team-scoped views the current user may pin for their team. Supplied
+   * separately from `views` because the panel's main list is personal-only.
+   */
+  teamViews?: SavedView[];
   /** View pids pinned to their team's quick-filter chip row (toggle state). */
   teamPinnedViewPids?: string[];
   /** Pin a team-scoped view to its team's chip row. */
@@ -298,6 +303,7 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   onPinView,
   onUnpinView,
   canManageTeamPins = false,
+  teamViews = [],
   teamPinnedViewPids = [],
   onTeamPinView,
   onTeamUnpinView,
@@ -621,12 +627,12 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
     [pinnedViewPids, onPinView, onUnpinView],
   );
 
-  // Team-scoped views the current user belongs to (getAccessibleViews already
-  // scopes these to the caller's teams). Only surfaced when the user may author
-  // team pins; the toggle pins/unpins for the whole team.
-  const teamViews = useMemo(
-    () => views.filter((view) => view.scope === 'team' && Boolean(view.teamId)),
-    [views],
+  // Team-scoped views (supplied by the parent, already scoped to the caller's
+  // teams) that carry a teamId. Only surfaced when the user may author team pins;
+  // the toggle pins/unpins for the whole team.
+  const pinnableTeamViews = useMemo(
+    () => teamViews.filter((view) => view.scope === 'team' && Boolean(view.teamId)),
+    [teamViews],
   );
 
   const handleToggleTeamPin = useCallback(
@@ -1517,12 +1523,12 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                     </div>
                   ))
                 )}
-                {canManageTeamPins && teamViews.length > 0 && (
+                {canManageTeamPins && pinnableTeamViews.length > 0 && (
                   <div data-testid="saved-view-team-group">
                     <div className="px-5 py-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
                       {tx('common.saved_view_team_group', '团队视图')}
                     </div>
-                    {teamViews.map((view) => (
+                    {pinnableTeamViews.map((view) => (
                       <div
                         key={view.pid}
                         className="px-3 py-1"

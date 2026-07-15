@@ -82,6 +82,22 @@ describe('SavedViewService', () => {
     expect(result).toBe(copied);
   });
 
+  it('getTeamViews fetches team-scoped views from the /team endpoint', async () => {
+    const service = new SavedViewService();
+    const teamView = makeView({ pid: 'tv-1', scope: 'team', teamId: 'team-a' });
+    mockedGet.mockResolvedValue({ code: '0', desc: 'ok', data: [teamView] });
+
+    const result = await service.getTeamViews({ modelCode: 'order', pageKey: 'order_list' });
+
+    expect(mockedGet).toHaveBeenCalledWith(
+      '/api/views/team',
+      { modelCode: 'order', pageKey: 'order_list' },
+      undefined,
+      undefined,
+    );
+    expect(result).toEqual([teamView]);
+  });
+
   it('pinView posts a personal pin by default (no scope/teamId)', async () => {
     const service = new SavedViewService();
     mockedPost.mockResolvedValue({ code: '0', desc: 'ok', data: null });
