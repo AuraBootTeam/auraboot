@@ -28,7 +28,7 @@
       }
     },
     "permissions": [
-      "E2ET.order.manage"
+      "e2et.order.manage"
     ]
   },
   {
@@ -61,7 +61,7 @@
       }
     },
     "permissions": [
-      "E2ET.order.manage"
+      "e2et.order.manage"
     ]
   },
   {
@@ -103,7 +103,7 @@
       ]
     },
     "permissions": [
-      "E2ET.order.manage"
+      "e2et.order.manage"
     ]
   },
   {
@@ -133,7 +133,7 @@
       }
     ],
     "permissions": [
-      "E2ET.order.manage"
+      "e2et.order.manage"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认删除此订单？关联明细和日志将一并删除，此操作不可撤销。",
@@ -182,7 +182,7 @@
       }
     ],
     "permissions": [
-      "E2ET.order.manage"
+      "e2et.order.manage"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认提交此订单？提交后将进入审批流程。",
@@ -218,7 +218,7 @@
       }
     ],
     "permissions": [
-      "E2ET.order.approve"
+      "e2et.order.approve"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认审批通过此订单？",
@@ -257,7 +257,7 @@
       }
     ],
     "permissions": [
-      "E2ET.order.approve"
+      "e2et.order.approve"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认退回此订单？退回后可重新修改提交。",
@@ -293,7 +293,7 @@
       }
     ],
     "permissions": [
-      "E2ET.order.manage"
+      "e2et.order.manage"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认完成此订单？",
@@ -330,7 +330,7 @@
       }
     ],
     "permissions": [
-      "E2ET.order.manage"
+      "e2et.order.manage"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认取消此订单？取消后不可恢复。",
@@ -380,7 +380,7 @@
       }
     ],
     "permissions": [
-      "E2ET.order.manage"
+      "e2et.order.manage"
     ]
   },
   {
@@ -425,7 +425,7 @@
       }
     ],
     "permissions": [
-      "E2ET.order.manage"
+      "e2et.order.manage"
     ]
   },
   {
@@ -461,7 +461,7 @@
       }
     ],
     "permissions": [
-      "E2ET.order.manage"
+      "e2et.order.manage"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认删除此明细？",
@@ -497,7 +497,7 @@
       ]
     },
     "permissions": [
-      "E2ET.customer.manage"
+      "e2et.customer.manage"
     ]
   },
   {
@@ -515,7 +515,7 @@
       "e2et_cust_active"
     ],
     "permissions": [
-      "E2ET.customer.manage"
+      "e2et.customer.manage"
     ]
   },
   {
@@ -526,7 +526,7 @@
     "type": "delete",
     "modelCode": "e2et_customer",
     "permissions": [
-      "E2ET.customer.manage"
+      "e2et.customer.manage"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认删除此客户？",
@@ -557,7 +557,7 @@
       }
     },
     "permissions": [
-      "E2ET.payment.manage"
+      "e2et.payment.manage"
     ]
   },
   {
@@ -576,7 +576,7 @@
       "processKey": "e2et_payment_approval"
     },
     "permissions": [
-      "E2ET.payment.manage"
+      "e2et.payment.manage"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认提交付款单？提交后将进入审批流程。",
@@ -624,7 +624,7 @@
       }
     ],
     "permissions": [
-      "E2ET.payment.approve"
+      "e2et.payment.approve"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认审批通过此付款单？",
@@ -647,7 +647,7 @@
       "e2et_pay_remark"
     ],
     "permissions": [
-      "E2ET.payment.approve"
+      "e2et.payment.approve"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认驳回此付款单？",
@@ -672,7 +672,7 @@
       }
     },
     "permissions": [
-      "E2ET.payment.manage"
+      "e2et.payment.manage"
     ],
     "extension": {
       "confirmMessage:zh-CN": "确认已完成付款？",

@@ -99,7 +99,7 @@
             "code": "create",
             "primary": true,
             "icon": "Plus",
-            "permissionCode": "E2ET.order.manage",
+            "permissionCode": "e2et.order.manage",
             "label": {
               "zh-CN": "新建",
               "en": "Create"
@@ -163,7 +163,7 @@
           {
             "code": "detail",
             "icon": "Eye",
-            "permissionCode": "E2ET.order.read",
+            "permissionCode": "e2et.order.read",
             "label": {
               "zh-CN": "查看",
               "en": "View"
@@ -177,7 +177,7 @@
             "code": "edit",
             "icon": "Edit",
             "visibleWhen": "['draft','rejected'].includes(row.e2et_order_status)",
-            "permissionCode": "E2ET.order.manage",
+            "permissionCode": "e2et.order.manage",
             "label": {
               "zh-CN": "编辑",
               "en": "Edit"
@@ -192,7 +192,7 @@
             "code": "submit",
             "icon": "Send",
             "visibleWhen": "['draft','rejected'].includes(row.e2et_order_status)",
-            "permissionCode": "E2ET.order.manage",
+            "permissionCode": "e2et.order.manage",
             "label": {
               "zh-CN": "提交",
               "en": "Submit"
@@ -207,7 +207,7 @@
             "code": "approve",
             "icon": "Check",
             "visibleWhen": "row.e2et_order_status === 'submitted'",
-            "permissionCode": "E2ET.order.approve",
+            "permissionCode": "e2et.order.approve",
             "label": {
               "zh-CN": "通过",
               "en": "Approve"
@@ -222,7 +222,7 @@
             "code": "reject",
             "icon": "X",
             "visibleWhen": "row.e2et_order_status === 'submitted'",
-            "permissionCode": "E2ET.order.approve",
+            "permissionCode": "e2et.order.approve",
             "label": {
               "zh-CN": "拒绝",
               "en": "Reject"
@@ -237,7 +237,7 @@
             "code": "complete",
             "icon": "CheckCircle",
             "visibleWhen": "row.e2et_order_status === 'approved'",
-            "permissionCode": "E2ET.order.manage",
+            "permissionCode": "e2et.order.manage",
             "label": {
               "zh-CN": "完成",
               "en": "Complete"
@@ -252,7 +252,7 @@
             "code": "cancel",
             "icon": "XCircle",
             "visibleWhen": "['draft','submitted'].includes(row.e2et_order_status)",
-            "permissionCode": "E2ET.order.manage",
+            "permissionCode": "e2et.order.manage",
             "label": {
               "zh-CN": "取消",
               "en": "Cancel"
@@ -268,7 +268,7 @@
             "icon": "Trash2",
             "danger": true,
             "visibleWhen": "row.e2et_order_status === 'draft'",
-            "permissionCode": "E2ET.order.manage",
+            "permissionCode": "e2et.order.manage",
             "label": {
               "zh-CN": "删除",
               "en": "Delete"
@@ -708,7 +708,7 @@
             "code": "edit",
             "icon": "Edit",
             "visibleWhen": "['draft','rejected'].includes(record.e2et_order_status)",
-            "permissionCode": "E2ET.order.manage",
+            "permissionCode": "e2et.order.manage",
             "label": {
               "zh-CN": "编辑",
               "en": "Edit"
@@ -723,7 +723,7 @@
             "primary": true,
             "icon": "Send",
             "visibleWhen": "['draft','rejected'].includes(record.e2et_order_status)",
-            "permissionCode": "E2ET.order.manage",
+            "permissionCode": "e2et.order.manage",
             "label": {
               "zh-CN": "提交",
               "en": "Submit"
@@ -739,7 +739,7 @@
             "primary": true,
             "icon": "Check",
             "visibleWhen": "record.e2et_order_status === 'submitted'",
-            "permissionCode": "E2ET.order.approve",
+            "permissionCode": "e2et.order.approve",
             "label": {
               "zh-CN": "通过",
               "en": "Approve"
@@ -754,7 +754,7 @@
             "code": "reject",
             "icon": "X",
             "visibleWhen": "record.e2et_order_status === 'submitted'",
-            "permissionCode": "E2ET.order.approve",
+            "permissionCode": "e2et.order.approve",
             "label": {
               "zh-CN": "拒绝",
               "en": "Reject"
@@ -769,7 +769,7 @@
             "code": "complete",
             "icon": "CheckCircle",
             "visibleWhen": "record.e2et_order_status === 'approved'",
-            "permissionCode": "E2ET.order.manage",
+            "permissionCode": "e2et.order.manage",
             "label": {
               "zh-CN": "完成",
               "en": "Complete"
@@ -784,7 +784,7 @@
             "code": "cancel",
             "icon": "XCircle",
             "visibleWhen": "['draft','submitted'].includes(record.e2et_order_status)",
-            "permissionCode": "E2ET.order.manage",
+            "permissionCode": "e2et.order.manage",
             "label": {
               "zh-CN": "取消",
               "en": "Cancel"
@@ -820,7 +820,7 @@
             "code": "create",
             "primary": true,
             "icon": "Plus",
-            "permissionCode": "E2ET.customer.manage",
+            "permissionCode": "e2et.customer.manage",
             "label": {
               "zh-CN": "新建",
               "en": "Create"
@@ -868,7 +868,7 @@
           {
             "code": "edit",
             "icon": "Edit",
-            "permissionCode": "E2ET.customer.manage",
+            "permissionCode": "e2et.customer.manage",
             "label": {
               "zh-CN": "编辑",
               "en": "Edit"
@@ -883,7 +883,7 @@
             "code": "delete",
             "icon": "Trash2",
             "danger": true,
-            "permissionCode": "E2ET.customer.manage",
+            "permissionCode": "e2et.customer.manage",
             "label": {
               "zh-CN": "删除",
               "en": "Delete"
@@ -1073,7 +1073,7 @@
             "code": "create",
             "primary": true,
             "icon": "Plus",
-            "permissionCode": "E2ET.payment.manage",
+            "permissionCode": "e2et.payment.manage",
             "label": {
               "zh-CN": "新建",
               "en": "Create"
@@ -1127,7 +1127,7 @@
           {
             "code": "detail",
             "icon": "Eye",
-            "permissionCode": "E2ET.payment.manage",
+            "permissionCode": "e2et.payment.manage",
             "label": {
               "zh-CN": "查看",
               "en": "View"
@@ -1141,7 +1141,7 @@
             "code": "submit",
             "icon": "Send",
             "visibleWhen": "row.e2et_pay_status === 'draft'",
-            "permissionCode": "E2ET.payment.manage",
+            "permissionCode": "e2et.payment.manage",
             "label": {
               "zh-CN": "提交",
               "en": "Submit"
@@ -1156,7 +1156,7 @@
             "code": "approve",
             "icon": "Check",
             "visibleWhen": "row.e2et_pay_status === 'pending'",
-            "permissionCode": "E2ET.payment.approve",
+            "permissionCode": "e2et.payment.approve",
             "label": {
               "zh-CN": "通过",
               "en": "Approve"
@@ -1171,7 +1171,7 @@
             "code": "reject",
             "icon": "X",
             "visibleWhen": "row.e2et_pay_status === 'pending'",
-            "permissionCode": "E2ET.payment.approve",
+            "permissionCode": "e2et.payment.approve",
             "label": {
               "zh-CN": "拒绝",
               "en": "Reject"
@@ -1186,7 +1186,7 @@
             "code": "pay",
             "icon": "CreditCard",
             "visibleWhen": "row.e2et_pay_status === 'approved'",
-            "permissionCode": "E2ET.payment.manage",
+            "permissionCode": "e2et.payment.manage",
             "label": {
               "zh-CN": "付款",
               "en": "Pay"
@@ -1353,7 +1353,7 @@
             "primary": true,
             "icon": "Send",
             "visibleWhen": "record.e2et_pay_status === 'draft'",
-            "permissionCode": "E2ET.payment.manage",
+            "permissionCode": "e2et.payment.manage",
             "label": {
               "zh-CN": "提交",
               "en": "Submit"
@@ -1369,7 +1369,7 @@
             "primary": true,
             "icon": "Check",
             "visibleWhen": "record.e2et_pay_status === 'pending'",
-            "permissionCode": "E2ET.payment.approve",
+            "permissionCode": "e2et.payment.approve",
             "label": {
               "zh-CN": "通过",
               "en": "Approve"
@@ -1384,7 +1384,7 @@
             "code": "reject",
             "icon": "X",
             "visibleWhen": "record.e2et_pay_status === 'pending'",
-            "permissionCode": "E2ET.payment.approve",
+            "permissionCode": "e2et.payment.approve",
             "label": {
               "zh-CN": "拒绝",
               "en": "Reject"
@@ -1399,7 +1399,7 @@
             "code": "pay",
             "icon": "CreditCard",
             "visibleWhen": "record.e2et_pay_status === 'approved'",
-            "permissionCode": "E2ET.payment.manage",
+            "permissionCode": "e2et.payment.manage",
             "label": {
               "zh-CN": "付款",
               "en": "Pay"

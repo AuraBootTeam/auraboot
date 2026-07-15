@@ -127,7 +127,11 @@ async function assignFixtureRole(
 }
 
 async function ensureFixtureUserRoles(request: APIRequestContext, token: string): Promise<void> {
-  const roleCodes = await loadRoleCodes(request, token, ['e2et_operator', 'e2et_viewer']);
+  const roleCodes = await loadRoleCodes(request, token, [
+    'e2et_operator',
+    'e2et_viewer',
+    'e2et_admin',
+  ]);
   expect(
     roleCodes.has('e2et_operator'),
     'e2et_operator role missing after test-fixtures import',
@@ -135,9 +139,17 @@ async function ensureFixtureUserRoles(request: APIRequestContext, token: string)
   expect(roleCodes.has('e2et_viewer'), 'e2et_viewer role missing after test-fixtures import').toBe(
     true,
   );
+  expect(roleCodes.has('e2et_admin'), 'e2et_admin role missing after test-fixtures import').toBe(
+    true,
+  );
 
   await assignFixtureRole(request, token, 'e2e-operator@test.com', 'e2et_operator');
   await assignFixtureRole(request, token, 'e2e-viewer@test.com', 'e2et_viewer');
+  // e2et_order golden tests (action-system / automation / saved-view toolbar) run under the
+  // admin storageState, so admin needs the fixture's E2ET.* action permissions for the
+  // permission-gated toolbar buttons (create/delete/…) to render. The tenant_admin role
+  // does not auto-inherit a later-imported plugin's permissions, so grant it explicitly.
+  await assignFixtureRole(request, token, 'admin@auraboot.com', 'e2et_admin');
 }
 
 test.describe.configure({ mode: 'serial' });
