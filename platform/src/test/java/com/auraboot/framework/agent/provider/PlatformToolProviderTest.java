@@ -155,6 +155,42 @@ class PlatformToolProviderTest extends BaseIntegrationTest {
                 .contains("code IS NOT NULL");
     }
 
+    /**
+     * SEC-001: the SQL is authored by the LLM from a tool-call param, so a
+     * caller-declared {@code tenant_id = <foreign>} must never stand alone. The
+     * server-side current-tenant predicate is injected unconditionally and AND-ed
+     * onto the caller's condition, intersecting the result down to the current
+     * tenant. Falsifiable against the old "already mentions tenant_id → skip
+     * injection" behaviour: that path would leave the foreign literal unqualified.
+     */
+    @Test
+    void execute_executeSql_injectsServerTenantEvenWhenSqlDeclaresForeignTenant() {
+        long foreignTenant = 9_999_999L;
+        var result = provider.execute(testTenant.getId(), "platform.execute_sql",
+                Map.of("sql", "SELECT code FROM ab_meta_model WHERE tenant_id = " + foreignTenant));
+
+        assertThat(result.isSuccess()).isTrue();
+        String rewritten = result.getData().get("sql").toString();
+        // Server-side current-tenant predicate is ALWAYS present...
+        assertThat(rewritten).contains("tenant_id = #{params.tenantId}");
+        // ...AND-ed with the caller-declared literal, so it cannot stand alone.
+        assertThat(rewritten).contains(String.valueOf(foreignTenant));
+        assertThat(rewritten.toLowerCase()).contains(" and ");
+        // The foreign tenant is intersected with the current tenant → no rows leak.
+        assertThat(result.getData().get("records")).isInstanceOf(java.util.List.class);
+        assertThat((java.util.List<?>) result.getData().get("records")).isEmpty();
+    }
+
+    @Test
+    void execute_executeSql_injectsTenantFilterWhenSqlHasNoTenantPredicate() {
+        var result = provider.execute(testTenant.getId(), "platform.execute_sql",
+                Map.of("sql", "SELECT code FROM ab_meta_model"));
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getData().get("sql").toString())
+                .contains("tenant_id = #{params.tenantId}");
+    }
+
     // ========== execute() - unknown tool code ==========
 
     @Test
