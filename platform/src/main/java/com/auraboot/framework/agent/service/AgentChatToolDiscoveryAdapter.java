@@ -37,6 +37,7 @@ class AgentChatToolDiscoveryAdapter {
     List<ToolDefinition> discover(Long tenantId,
                                   Long userId,
                                   String agentCode,
+                                  String channel,
                                   String userMessage,
                                   Map<String, Object> agentDef) {
         try {
@@ -46,17 +47,34 @@ class AgentChatToolDiscoveryAdapter {
 
             List<ToolDefinition> explicitDefs = discoverExplicitAgentTools(tenantId, userId, agentCode, agentDef, bif);
 
+            // Phase 0: channel-gated always-on tools (e.g. CS escalate_to_human on cs_widget).
+            // The aurabot path injects these in ToolDiscoveryPortImpl; the named-agent path used
+            // to skip them, so a CS site bound to a NAMED agent silently lost escalate_to_human
+            // (ARCH-004). Discovered with the channel and merged ahead of the rest so the
+            // maxResults cut can never drop them.
+            ToolDiscoveryContext alwaysOnCtx = ToolDiscoveryContext.builder()
+                    .tenantId(tenantId)
+                    .userId(userId)
+                    .agentCode(agentCode)
+                    .modelHint(bif != null ? bif.getObject() : null)
+                    .intentHint(bif != null ? bif.getIntent() : null)
+                    .channel(channel)
+                    .maxResults(20)
+                    .build();
+            List<ToolDefinition> alwaysOnDefs = toolProviderRegistry.discoverAlwaysOn(alwaysOnCtx);
+
             ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
                     .tenantId(tenantId)
                     .userId(userId)
                     .agentCode(agentCode)
                     .modelHint(bif != null ? bif.getObject() : null)
                     .intentHint(bif != null ? bif.getIntent() : null)
+                    .channel(channel)
                     .maxResults(20)
                     .build();
 
             List<ToolDefinition> defs = toolProviderRegistry.discoverAll(ctx);
-            return mergeExplicitTools(explicitDefs, defs);
+            return mergeTools(alwaysOnDefs, explicitDefs, defs);
         } catch (Exception e) {
             String error = safeExceptionMessage(e);
             log.error("Tool discovery failed for agent {}: {}", agentCode, error, e);
@@ -225,24 +243,28 @@ class AgentChatToolDiscoveryAdapter {
         return text.isBlank() ? null : text;
     }
 
-    private List<ToolDefinition> mergeExplicitTools(List<ToolDefinition> explicitTools,
-                                                    List<ToolDefinition> discoveredTools) {
+    private List<ToolDefinition> mergeTools(List<ToolDefinition> alwaysOnTools,
+                                            List<ToolDefinition> explicitTools,
+                                            List<ToolDefinition> discoveredTools) {
         Map<String, ToolDefinition> byCode = new LinkedHashMap<>();
-        if (explicitTools != null) {
-            for (ToolDefinition tool : explicitTools) {
-                if (tool != null && tool.getToolCode() != null) {
-                    byCode.put(tool.getToolCode(), tool);
-                }
-            }
-        }
-        if (discoveredTools != null) {
-            for (ToolDefinition tool : discoveredTools) {
-                if (tool != null && tool.getToolCode() != null) {
-                    byCode.putIfAbsent(tool.getToolCode(), tool);
-                }
-            }
-        }
+        // Insertion order = priority. Always-on leads and wins a code collision (the
+        // provider that declared it always-on owns the definition), then explicit agent
+        // tools, then the rest of discovery.
+        putIfAbsentByCode(byCode, alwaysOnTools);
+        putIfAbsentByCode(byCode, explicitTools);
+        putIfAbsentByCode(byCode, discoveredTools);
         return new ArrayList<>(byCode.values());
+    }
+
+    private void putIfAbsentByCode(Map<String, ToolDefinition> byCode, List<ToolDefinition> tools) {
+        if (tools == null) {
+            return;
+        }
+        for (ToolDefinition tool : tools) {
+            if (tool != null && tool.getToolCode() != null) {
+                byCode.putIfAbsent(tool.getToolCode(), tool);
+            }
+        }
     }
 
     @SuppressWarnings("unchecked")
