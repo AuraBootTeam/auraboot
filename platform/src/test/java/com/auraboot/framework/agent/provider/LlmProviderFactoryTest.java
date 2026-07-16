@@ -5,6 +5,7 @@ import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
@@ -113,5 +114,49 @@ class LlmProviderFactoryTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("CloudConfig provider auto-discovery failed for LLM")
                 .hasRootCauseMessage("cloud config db down");
+    }
+
+    @Test
+    @DisplayName("resolveProvider falls back to a configured provider when the requested one has no usable config (CAP-04)")
+    void resolveProviderFallsBackWhenRequestedUnconfigured() {
+        LlmProvider anthropicProvider = mock(LlmProvider.class);
+        when(anthropicProvider.getProviderCode()).thenReturn("anthropic");
+
+        AgentProperties properties = new AgentProperties();
+        properties.getAnthropic().setApiKey("sk-real-anthropic");   // anthropic configured via yml
+        properties.getAnthropic().setBaseUrl("https://api.anthropic.com");
+        properties.getAnthropic().setDefaultModel("claude-sonnet-4-6");
+
+        LlmProviderFactory factory = new LlmProviderFactory(
+                List.of(anthropicProvider),
+                mock(CloudConfigService.class),   // no CloudConfig → deepseek unresolvable
+                properties,
+                new ObjectMapper(),
+                mock(com.auraboot.framework.agent.trace.GenAiUsageRecorder.class),
+                mock(org.springframework.beans.factory.ObjectProvider.class));
+        ReflectionTestUtils.setField(factory, "providerFallbackRaw", "anthropic");
+
+        LlmProviderFactory.ProviderResolution resolution = factory.resolveProvider(7L, "deepseek");
+
+        assertThat(resolution).isNotNull();
+        assertThat(resolution.getRequestedProviderCode()).isEqualTo("deepseek");   // original preserved
+        assertThat(resolution.getEffectiveProviderCode()).isEqualTo("anthropic");  // fell back
+        // getProvider wraps the raw provider in the UsageRecording decorator; assert identity via code.
+        assertThat(resolution.getProvider()).isNotNull();
+        assertThat(resolution.getProvider().getProviderCode()).isEqualTo("anthropic");
+    }
+
+    @Test
+    @DisplayName("resolveProvider returns null (no fallback) when the chain is empty and the provider is unconfigured (CAP-04)")
+    void resolveProviderNoFallbackWhenChainEmpty() {
+        LlmProviderFactory factory = new LlmProviderFactory(
+                List.of(mock(LlmProvider.class)),
+                mock(CloudConfigService.class),
+                new AgentProperties(),
+                new ObjectMapper(),
+                mock(com.auraboot.framework.agent.trace.GenAiUsageRecorder.class),
+                mock(org.springframework.beans.factory.ObjectProvider.class));
+        // providerFallbackRaw defaults to null → empty chain → behaviour unchanged
+        assertThat(factory.resolveProvider(7L, "deepseek")).isNull();
     }
 }
