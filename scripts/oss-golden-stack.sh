@@ -283,7 +283,8 @@ cmd_up() {
       ln -sfn "$node_modules_seed" "$REPO_ROOT/web-admin/node_modules"
     fi
     spawn_detached "$sd/frontend.pid" "$REPO_ROOT/web-admin" "$sd/frontend.log" \
-      env VITE_PORT="$vite_port" BFF_PORT="$bff_port" SPRING_BOOT_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
+      env VITE_PORT="$vite_port" BFF_PORT="$bff_port" SPRING_BOOT_URL="http://127.0.0.1:$server_port" \
+      BFF_INTERNAL_URL="http://127.0.0.1:$server_port" NODE_ENV=development \
       pnpm dev:full
     # Wait for Vite to start accepting connections (302 → /login is fine). Poll
     # on HTTP status, not body — a 302 has an empty body that a grep-poll would
