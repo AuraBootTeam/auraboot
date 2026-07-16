@@ -143,4 +143,86 @@ test.describe('Dashboard Designer — data source configuration', () => {
       'crm_opp_owner',
     );
   });
+
+  // ---- G5: api data source + named-query parameter editor ------------------
+  // The `api` type was consumed by the runtime (useChartData / SmartTableChart /
+  // SmartNumberCard do a GET to `url` with `params`) but had no Designer UI, and the
+  // named-query `parameters` map had no editor. These drive both authoring paths and
+  // assert the authored config reaches the runtime as a real request — the seam this
+  // feature adds. Endpoint content is intentionally not asserted (seed-independent):
+  // the claim is "what the user typed is what the runtime fetches".
+
+  // A real GET endpoint that returns 200 on the golden stack, used purely so the
+  // authored request resolves rather than 404s.
+  const API_PROBE_URL = `/api/dashboards/code/${DASHBOARD_CODE}`;
+
+  test('D3: an api data source authored in the designer is fetched with the typed url + params', async ({
+    page,
+  }) => {
+    await openDesignerOnWidget(page, 'w_pie_stage');
+    const panel = page.locator('[data-testid="widget-property-panel"]');
+
+    // Switch the widget to the api data source type through the real select.
+    await panel.locator('[data-testid="dashboard-datasource-type-select"]').selectOption('api');
+
+    // The api-only UI must appear; aggregate/limit controls must not.
+    await expect(panel.locator('[data-testid="dashboard-datasource-api-url"]')).toBeVisible();
+    await expect(panel.locator('[data-testid="dashboard-datasource-api-params"]')).toBeVisible();
+    await expect(panel.getByText('返回行数限制')).toHaveCount(0);
+
+    // Author url + one query param.
+    await panel.locator('[data-testid="dashboard-datasource-api-url"]').fill(API_PROBE_URL);
+    await panel.locator('[data-testid="dashboard-datasource-api-params-add"]').click();
+    await panel.locator('[data-testid="dashboard-datasource-api-params-key"]').fill('probe');
+    await panel.locator('[data-testid="dashboard-datasource-api-params-value"]').fill('g5');
+
+    // The runtime must issue a GET to exactly that url carrying the typed param —
+    // proving the authored api config is what the widget fetches (not a dead dropdown).
+    const apiReq = page.waitForRequest(
+      (r) =>
+        r.method() === 'GET' &&
+        r.url().includes(API_PROBE_URL) &&
+        r.url().includes('probe=g5'),
+      { timeout: 20_000 },
+    );
+    // Nudge a re-render so the widget's fetch effect runs with the new config.
+    await panel.locator('[data-testid="dashboard-datasource-api-url"]').blur();
+    const request = await apiReq;
+    expect(request.url(), 'the api widget did not fetch the authored url+params').toContain(
+      'probe=g5',
+    );
+  });
+
+  test('D4: the named-query parameter editor persists parameters into the widget config', async ({
+    page,
+  }) => {
+    await openDesignerOnWidget(page, 'w_pie_stage');
+    const panel = page.locator('[data-testid="widget-property-panel"]');
+
+    await panel
+      .locator('[data-testid="dashboard-datasource-type-select"]')
+      .selectOption('namedQuery');
+
+    // The parameter editor must render for a named-query source (it used to be a
+    // forced empty `{}` with no way to fill it).
+    const paramEditor = panel.locator('[data-testid="dashboard-datasource-namedquery-params"]');
+    await expect(paramEditor).toBeVisible();
+
+    await paramEditor.locator('[data-testid="dashboard-datasource-namedquery-params-add"]').click();
+    await paramEditor
+      .locator('[data-testid="dashboard-datasource-namedquery-params-key"]')
+      .fill('region');
+    await paramEditor
+      .locator('[data-testid="dashboard-datasource-namedquery-params-value"]')
+      .fill('east');
+
+    // The typed value must survive as the input's value (the editor is controlled by
+    // the widget config; a broken write path would reset it to empty).
+    await expect(
+      paramEditor.locator('[data-testid="dashboard-datasource-namedquery-params-value"]'),
+    ).toHaveValue('east');
+    await expect(
+      paramEditor.locator('[data-testid="dashboard-datasource-namedquery-params-key"]'),
+    ).toHaveValue('region');
+  });
 });
