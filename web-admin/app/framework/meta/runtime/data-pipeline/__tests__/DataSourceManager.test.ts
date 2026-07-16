@@ -389,6 +389,32 @@ describe('DataSourceManager', () => {
     expect(mockedFetchResult).toHaveBeenCalledTimes(2);
   });
 
+  it('preserves HTTP status metadata on API data-source errors', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '503',
+      desc: 'temporary dependency outage',
+      success: false,
+      data: null,
+    } as any);
+    const manager = new DataSourceManager(createExpressionContext({} as any));
+    manager.register('batchJobList', {
+      type: 'api',
+      endpoint: '/api/dynamic/iot_dps_batch_onboarding_job_list/list',
+      method: 'get',
+      adaptor: 'table',
+      autoFetch: false,
+    });
+
+    await manager.fetch('batchJobList');
+
+    expect(manager.getState('batchJobList')?.error).toMatchObject({
+      message: 'temporary dependency outage',
+      status: 503,
+      statusCode: 503,
+      code: '503',
+    });
+  });
+
   it('omits format for namedQuery sources by default (option/dropdown format)', async () => {
     mockedFetchResult.mockResolvedValueOnce({ code: '0', data: [] } as any);
 
