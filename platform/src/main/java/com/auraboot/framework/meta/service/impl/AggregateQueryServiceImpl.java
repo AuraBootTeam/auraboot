@@ -532,6 +532,12 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
         if ("relative".equals(operator)) {
             return emitRelativeRange(columnExpr, filter.getValue(), prefix, idx, params);
         }
+        if ("in".equals(operator) || "not_in".equals(operator)) {
+            // IN / NOT IN expand each list element into its own bound placeholder. A single
+            // #{} placeholder would bind the whole List to one JDBC parameter, which PostgreSQL
+            // rejects (MyBatis #{} does not expand collections — only <foreach> does).
+            return emitInListPredicate(columnExpr, operator, filter.getValue(), prefix, idx, params);
+        }
 
         String key = prefix + "_" + idx;
         String placeholder = "#{params." + key + "}";
@@ -543,8 +549,6 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
             case "lt" -> columnExpr + " < " + placeholder;
             case "lte", "le" -> columnExpr + " <= " + placeholder;
             case "like" -> columnExpr + " LIKE " + placeholder;
-            case "in" -> columnExpr + " IN (" + placeholder + ")";
-            case "not_in" -> columnExpr + " NOT IN (" + placeholder + ")";
             case "is_null" -> columnExpr + " IS NULL";
             case "is_not_null" -> columnExpr + " IS NOT NULL";
             default -> columnExpr + " = " + placeholder;
@@ -555,6 +559,45 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
             params.put(key, prepareFilterValue(operator, filter.getValue()));
         }
         return sql;
+    }
+
+    /**
+     * Emit an {@code IN} / {@code NOT IN} predicate, expanding each element of the list value into
+     * its own bound placeholder ({@code col IN (#{k_0}, #{k_1}, ...)}). A single placeholder would
+     * bind the whole {@link java.util.Collection} to one JDBC parameter — PostgreSQL rejects that,
+     * and MyBatis {@code #{}} never expands collections. Values stay bound (never concatenated).
+     * An empty list degenerates to a constant: {@code IN ()} is invalid SQL, so an empty
+     * {@code in} matches nothing and an empty {@code not_in} matches everything.
+     */
+    private String emitInListPredicate(String columnExpr, String operator, Object value,
+                                       String prefix, int idx, Map<String, Object> params) {
+        boolean negate = "not_in".equals(operator);
+        List<Object> items = toValueList(value);
+        if (items.isEmpty()) {
+            return negate ? "1 = 1" : "1 = 0";
+        }
+        List<String> placeholders = new ArrayList<>(items.size());
+        for (int i = 0; i < items.size(); i++) {
+            String key = prefix + "_" + idx + "_" + i;
+            params.put(key, items.get(i));
+            placeholders.add("#{params." + key + "}");
+        }
+        return columnExpr + (negate ? " NOT IN (" : " IN (")
+                + String.join(", ", placeholders) + ")";
+    }
+
+    /** Normalise an {@code in}/{@code not_in} value to a list: a Collection/array as-is, a scalar as a singleton. */
+    private List<Object> toValueList(Object value) {
+        if (value == null) {
+            return List.of();
+        }
+        if (value instanceof Collection<?> c) {
+            return new ArrayList<>(c);
+        }
+        if (value instanceof Object[] arr) {
+            return Arrays.asList(arr);
+        }
+        return List.of(value);
     }
 
     /**

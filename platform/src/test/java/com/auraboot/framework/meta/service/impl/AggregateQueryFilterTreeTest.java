@@ -182,9 +182,38 @@ class AggregateQueryFilterTreeTest {
                         leaf("name", "like", "wid"),
                         leaf("region", "in", List.of("East", "West"))))));
 
-        assertThat(c.sql()).contains("(name LIKE #{params.f_0} OR region IN (#{params.f_1}))");
+        assertThat(c.sql()).contains(
+                "(name LIKE #{params.f_0} OR region IN (#{params.f_1_0}, #{params.f_1_1}))");
         assertThat(c.params()).containsEntry("f_0", "%wid%");
-        assertThat(c.params().get("f_1")).isEqualTo(List.of("East", "West"));
+        // IN list expands to one bound placeholder per element — never the whole List on one #{}
+        // (which MyBatis would bind as a single JDBC parameter and PostgreSQL would reject).
+        assertThat(c.params()).containsEntry("f_1_0", "East").containsEntry("f_1_1", "West");
+        assertThat(c.params()).doesNotContainKey("f_1");
+    }
+
+    @Test
+    @DisplayName("not_in expands each element into its own bound placeholder")
+    void notInExpandsEachElement() {
+        Captured c = runAggregate(aggregate(List.of(
+                leaf("status", "not_in", List.of("A", "B", "C")))));
+        assertThat(c.sql()).contains(
+                "status NOT IN (#{params.f_0_0}, #{params.f_0_1}, #{params.f_0_2})");
+        assertThat(c.params())
+                .containsEntry("f_0_0", "A").containsEntry("f_0_1", "B").containsEntry("f_0_2", "C");
+    }
+
+    @Test
+    @DisplayName("empty `in` matches nothing (IN () is invalid SQL)")
+    void emptyInMatchesNothing() {
+        Captured c = runAggregate(aggregate(List.of(leaf("status", "in", List.of()))));
+        assertThat(c.sql()).contains("1 = 0");
+    }
+
+    @Test
+    @DisplayName("empty `not_in` matches everything")
+    void emptyNotInMatchesEverything() {
+        Captured c = runAggregate(aggregate(List.of(leaf("status", "not_in", List.of()))));
+        assertThat(c.sql()).contains("1 = 1");
     }
 
     @Test
