@@ -55,9 +55,16 @@ public class BroadcastResponseSink implements ResponseSink {
     private final Long replyToMessageId;
     private final TurnRegistry registry;
 
+    // IMPL-10 — cumulativeBuf/chunkBuf are intentionally UN-synchronized. The contract is that a
+    // single turn's provider stream is consumed on one thread, so onTextChunk (the only writer) is
+    // never called concurrently. If a future change ever appends/flushes these from another thread
+    // it silently corrupts the StringBuilder; the dev-only assert in onTextChunk (assertSingleWriter)
+    // makes that contract violation fail fast under -ea instead of producing garbled output.
     private final StringBuilder cumulativeBuf = new StringBuilder();
     private final StringBuilder chunkBuf = new StringBuilder();
     private long chunkLastFlush = System.currentTimeMillis();
+    /** First thread to append; used only by the dev-only single-writer assert (see assertSingleWriter). */
+    private Thread writerThread;
 
     private AtomicBoolean cancelled;  // captured from TurnHandle in onTurnBegin
 
@@ -103,6 +110,9 @@ public class BroadcastResponseSink implements ResponseSink {
             throw new TurnCancelledException(turnId);
         }
         if (text == null || text.isEmpty()) return;
+        assert assertSingleWriter() : "BroadcastResponseSink buffers appended from >1 thread ("
+                + writerThread + " vs " + Thread.currentThread() + "); the un-synchronized "
+                + "StringBuilders assume single-threaded stream consumption (IMPL-10).";
         chunkBuf.append(text);
         cumulativeBuf.append(text);
 
@@ -110,6 +120,21 @@ public class BroadcastResponseSink implements ResponseSink {
         if (chunkBuf.length() >= CHUNK_VOLUME_THRESHOLD || now - chunkLastFlush >= CHUNK_TIME_THRESHOLD_MS) {
             flushChunkBuf(now);
         }
+    }
+
+    /**
+     * Dev-only single-writer check: returns true on the first append (capturing the thread) and on
+     * same-thread appends; false only when a DIFFERENT thread writes, which the {@code assert} in
+     * onTextChunk turns into an AssertionError under {@code -ea}. Never throws in production
+     * (assertions disabled) — zero prod cost.
+     */
+    private boolean assertSingleWriter() {
+        Thread current = Thread.currentThread();
+        if (writerThread == null) {
+            writerThread = current;
+            return true;
+        }
+        return writerThread == current;
     }
 
     private void flushChunkBuf(long now) {
