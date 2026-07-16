@@ -62,7 +62,39 @@ async function fillTextarea(page: Page, fieldCode: string, value: string) {
       ].join(', '),
     )
     .first();
-  await fillControlledInput(textarea, value);
+  // These connector fields (default_headers / retry_policy) render a JSON editor
+  // that (a) auto-closes brackets — so char-by-char typing produces garbage — and
+  // (b) pretty-prints valid JSON on input, so the textarea value will NOT match
+  // the compact input string byte-for-byte. Set the value via the native setter +
+  // dispatch input/change (the proven path — mirrors fillControlledInput's
+  // fallback) so the editor's onChange runs and reformats, then verify the PARSED
+  // (semantic) content is equal instead of an exact string round-trip.
+  await textarea.waitFor({ state: 'visible', timeout: 5000 });
+  await textarea.scrollIntoViewIfNeeded();
+  await textarea.click();
+  await textarea.evaluate((node, nextValue) => {
+    const el = node as HTMLTextAreaElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+    setter?.call(el, nextValue);
+    el.dispatchEvent(
+      new InputEvent('input', { bubbles: true, inputType: 'insertText', data: nextValue }),
+    );
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }, value);
+  const canonical = JSON.stringify(JSON.parse(value));
+  await expect
+    .poll(
+      async () => {
+        const raw = await textarea.inputValue().catch(() => '');
+        try {
+          return JSON.stringify(JSON.parse(raw));
+        } catch {
+          return raw;
+        }
+      },
+      { timeout: 5000 },
+    )
+    .toBe(canonical);
 }
 
 async function selectAuthType(page: Page, value: string) {
