@@ -154,6 +154,30 @@ describe('workbenchBlockUtils action runner', () => {
     expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
   });
 
+  it('downloads Base64 command artifacts from the workbench action path', async () => {
+    fetchResultMock.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        success: true,
+        data: {
+          fileName: 'audit.json',
+          contentType: 'application/json',
+          contentBase64: btoa('{"schema":"v1"}'),
+        },
+      },
+    });
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:workbench-artifact');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+    await executeSimpleWorkbenchAction(makeRuntime() as any, {
+      action: 'command.execute',
+      args: { command: 'iot_dps_batch_onboarding_job:export_audit', targetRecordPid: 'B1' },
+    });
+
+    expect(click).toHaveBeenCalledOnce();
+  });
+
   it('accepts targetRecordId alias for command actions', async () => {
     const runtime = makeRuntime({
       getContext: () => ({
