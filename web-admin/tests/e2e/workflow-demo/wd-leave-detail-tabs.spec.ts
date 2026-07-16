@@ -226,10 +226,10 @@ async function listActivities(
 async function listFieldChanges(
   request: APIRequestContext,
   token: string,
-  numericId: string,
+  recordPid: string,
 ): Promise<FieldChangeQueryResult> {
   const resp = await request.get(
-    `/api/audit/field-changes?modelCode=wd_leave_request&recordId=${encodeURIComponent(numericId)}`,
+    `/api/audit/field-changes?modelCode=wd_leave_request&recordPid=${encodeURIComponent(recordPid)}`,
     {
       headers: { Authorization: `Bearer ${token}` },
     },
@@ -237,7 +237,7 @@ async function listFieldChanges(
   if (resp.status() === 403) {
     return { status: 403, records: [] };
   }
-  expect(resp.ok(), `field changes for ${numericId} must load`).toBeTruthy();
+  expect(resp.ok(), `field changes for ${recordPid} must load`).toBeTruthy();
   const body = await resp.json();
   return {
     status: resp.status(),
@@ -564,7 +564,7 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
 
     await test.step('draft detail page: all tabs render and non-process tabs degrade correctly', async () => {
       const draftActivities = await listActivities(request, adminToken, draftRecord.pid);
-      const draftChanges = await listFieldChanges(request, adminToken, draftRecord.id);
+      const draftChanges = await listFieldChanges(request, adminToken, draftRecord.pid);
 
       await openLeaveDetail(page, draftRecordId);
       await assertCommonTabs(page);
@@ -603,7 +603,7 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
 
     await test.step('submitted manager branch: approval history, bpm panel, activity and field history all reflect pending manager approval', async () => {
       const activities = await listActivities(request, adminToken, shortSubmitted.pid);
-      const fieldChanges = await listFieldChanges(request, adminToken, shortSubmitted.id);
+      const fieldChanges = await listFieldChanges(request, adminToken, shortSubmitted.pid);
       const bpmAuditEvents = await listAuditEvents(request, adminToken, shortSubmitted.processInstanceId);
 
       await openLeaveDetail(page, shortRecordId);
@@ -650,7 +650,7 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
       const fieldChanges = await listFieldChanges(
         request,
         adminToken,
-        (await fetchLeaveDetail(request, adminToken, cancelledRecordId)).id,
+        (await fetchLeaveDetail(request, adminToken, cancelledRecordId)).pid,
       );
       const bpmAuditEvents = await listAuditEvents(request, adminToken, cancelledSubmitted.processInstanceId);
 
@@ -705,7 +705,7 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
       await waitForBusinessStatus(request, adminToken, shortRecordId, 'approved');
       const approvedRecord = await fetchLeaveDetail(request, adminToken, shortRecordId);
       const activities = await listActivities(request, adminToken, approvedRecord.pid);
-      const fieldChanges = await listFieldChanges(request, adminToken, approvedRecord.id);
+      const fieldChanges = await listFieldChanges(request, adminToken, approvedRecord.pid);
       const bpmAuditEvents = await listAuditEvents(request, adminToken, shortSubmitted.processInstanceId);
 
       await openLeaveDetail(page, shortRecordId);
@@ -742,7 +742,7 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
 
     await test.step('submitted hr branch: detail page reflects pending HR approval across every tab', async () => {
       const activities = await listActivities(request, adminToken, longSubmitted.pid);
-      const fieldChanges = await listFieldChanges(request, adminToken, longSubmitted.id);
+      const fieldChanges = await listFieldChanges(request, adminToken, longSubmitted.pid);
       const bpmAuditEvents = await listAuditEvents(request, adminToken, longSubmitted.processInstanceId);
 
       await openLeaveDetail(page, longRecordId);
@@ -785,7 +785,7 @@ test.describe('workflow-demo — wd_leave_request detail tabs and status matrix'
       await waitForBusinessStatus(request, adminToken, longRecordId, 'rejected');
       const rejectedRecord = await fetchLeaveDetail(request, adminToken, longRecordId);
       const activities = await listActivities(request, adminToken, rejectedRecord.pid);
-      const fieldChanges = await listFieldChanges(request, adminToken, rejectedRecord.id);
+      const fieldChanges = await listFieldChanges(request, adminToken, rejectedRecord.pid);
       const bpmAuditEvents = await listAuditEvents(request, adminToken, longSubmitted.processInstanceId);
 
       await openLeaveDetail(page, longRecordId);
