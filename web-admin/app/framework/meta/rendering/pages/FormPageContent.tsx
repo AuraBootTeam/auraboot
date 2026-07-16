@@ -34,6 +34,7 @@ import { SubTable } from '~/framework/meta/components/SubTable';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
 import { BlockRenderer, BlockErrorBoundary, type PageContentProps } from '@auraboot/runtime-kernel';
+import { DslFormFillProvider } from '~/framework/meta/rendering/DslFormFillContext';
 import type { SubTableColumn } from '~/framework/meta/components/types';
 import { resolveExtensionDisplayName } from '~/framework/meta/utils/i18nResolver';
 import { mergeRules as crossFieldMergeRules } from '~/framework/meta/validation/ruleMerger';
@@ -1211,6 +1212,15 @@ export function FormPageContent(props: PageContentProps) {
     [setError],
   );
 
+  // B-003 (DR-20260715-B-003): the field setter handed to top-level blocks via
+  // DslFormFillProvider. An ai-fill-banner (or any block that calls useDslFormFill)
+  // writes AI-extracted values straight into this page's formData so the form updates.
+  // Defined before early returns to keep hook order stable. setFormData identity is
+  // stable, so [] deps is correct.
+  const applyAiFilledField = useCallback((field: string, value: unknown) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
   // Fetch model field metadata for component resolution (must be before early returns)
   const [modelFields, setModelFields] = useState<Record<string, FieldMetaInfo>>({});
   const [fieldMetaLoaded, setFieldMetaLoaded] = useState(false);
@@ -2198,12 +2208,30 @@ export function FormPageContent(props: PageContentProps) {
   const effectiveButtonBlock = buttonBlock || null;
   const submitReady = mainRecordLoaded && (schemaFieldNames.size === 0 || fieldMetaLoaded);
 
+  // B-003 (DR-20260715-B-003): kind:form previously hard-coded form-section / tabs /
+  // custom / form-buttons / sub-table and silently dropped every other top-level block —
+  // an ai-fill-banner declared at the top of a form vanished. Dispatch the rest through
+  // the kernel BlockRenderer (mirrors the ListPageContent / DetailPageContent G7 fallback);
+  // unknown types surface a visible placeholder + console.warn instead of disappearing.
+  const FORM_SPECIALIZED_BLOCK_TYPES = new Set<string>([
+    'form-section',
+    'tabs',
+    'custom',
+    'form-buttons',
+    'sub-table',
+  ]);
+  const miscFormBlocks = allBlocks.filter(
+    (block: any) => !FORM_SPECIALIZED_BLOCK_TYPES.has(block.blockType),
+  );
+
   return (
     <DataSourceProvider manager={dataSourceManager}>
-      {/* Centered, width-capped form: full-width inputs stretched edge-to-edge on
+      {/* B-003: give top-level blocks (ai-fill-banner) a working applyFields wired to formData. */}
+      <DslFormFillProvider setFieldValue={applyAiFilledField} lockedFields={[]}>
+        {/* Centered, width-capped form: full-width inputs stretched edge-to-edge on
           wide screens read as sparse and hurt scanability. max-w-6xl (~1152px) keeps
           a comfortable 2-column line length while staying roomy for sub-tables. */}
-      <div
+        <div
         className="mx-auto w-full max-w-6xl px-2 py-3"
         data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
       >
@@ -2284,6 +2312,18 @@ export function FormPageContent(props: PageContentProps) {
               </div>
             ) : (
               <>
+                {/* B-003: top-level non-whitelist blocks (ai-fill-banner etc.) via the kernel
+                    BlockRenderer, rendered above the form so operators see them first. */}
+                {runtime &&
+                  miscFormBlocks.map((block: any, idx: number) => (
+                    <div
+                      key={block.id || `misc-form-${idx}`}
+                      data-block-id={block.id}
+                      className="mb-4"
+                    >
+                      <BlockRenderer block={block} runtime={runtime} areaId="form-misc" />
+                    </div>
+                  ))}
                 {customBlocks.length > 0 &&
                   customBlocks.map((block: any) => {
                     // Honour DSL visibility condition (matches form-section behavior below).
@@ -2607,6 +2647,7 @@ export function FormPageContent(props: PageContentProps) {
           </form>
         </div>
       </div>
+      </DslFormFillProvider>
     </DataSourceProvider>
   );
 }
