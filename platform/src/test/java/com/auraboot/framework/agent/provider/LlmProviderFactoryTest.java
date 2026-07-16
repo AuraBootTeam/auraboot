@@ -159,4 +159,102 @@ class LlmProviderFactoryTest {
         // providerFallbackRaw defaults to null → empty chain → behaviour unchanged
         assertThat(factory.resolveProvider(7L, "deepseek")).isNull();
     }
+
+    @Test
+    @DisplayName("resolveByTier routes a configured tier to the mapped provider + model (CAP-04 routing)")
+    void resolveByTierRoutesConfiguredTier() {
+        LlmProvider anthropicProvider = mock(LlmProvider.class);
+        when(anthropicProvider.getProviderCode()).thenReturn("anthropic");
+
+        AgentProperties properties = anthropicYmlProps("claude-sonnet-4-6");            // provider default model
+        properties.getLlm().getModelRouting().put("smart", "anthropic:claude-opus-4-1"); // routed model differs
+
+        LlmProviderFactory factory = factory(properties, anthropicProvider);
+
+        LlmProviderFactory.ProviderResolution resolution = factory.resolveByTier(7L, "smart");
+
+        assertThat(resolution).isNotNull();
+        assertThat(resolution.getEffectiveProviderCode()).isEqualTo("anthropic");
+        // The routed model is stamped onto the config, not the provider's yml default.
+        assertThat(resolution.getConfig().getDefaultModel()).isEqualTo("claude-opus-4-1");
+        assertThat(resolution.getProvider().getProviderCode()).isEqualTo("anthropic");
+    }
+
+    @Test
+    @DisplayName("resolveByTier falls back to the default provider for an unmapped tier (CAP-04 routing)")
+    void resolveByTierUnmappedTierFallsBackToDefault() {
+        LlmProvider anthropicProvider = mock(LlmProvider.class);
+        when(anthropicProvider.getProviderCode()).thenReturn("anthropic");
+
+        AgentProperties properties = anthropicYmlProps("claude-sonnet-4-6");
+        properties.getLlm().getModelRouting().put("smart", "anthropic:claude-opus-4-1"); // only "smart" mapped
+
+        LlmProviderFactory factory = factory(properties, anthropicProvider);
+
+        // "cheap" is not in the routing map → default provider, provider's own default model (not routed).
+        LlmProviderFactory.ProviderResolution resolution = factory.resolveByTier(7L, "cheap");
+
+        assertThat(resolution).isNotNull();
+        assertThat(resolution.getEffectiveProviderCode()).isEqualTo("anthropic");
+        assertThat(resolution.getConfig().getDefaultModel()).isEqualTo("claude-sonnet-4-6"); // default, not routed
+    }
+
+    @Test
+    @DisplayName("resolveByTier with an empty routing map is a no-op → default provider (CAP-04 routing)")
+    void resolveByTierEmptyMapIsNoOp() {
+        LlmProvider anthropicProvider = mock(LlmProvider.class);
+        when(anthropicProvider.getProviderCode()).thenReturn("anthropic");
+
+        AgentProperties properties = anthropicYmlProps("claude-sonnet-4-6");   // model-routing left empty (default)
+
+        LlmProviderFactory factory = factory(properties, anthropicProvider);
+
+        // A tier name that would be routed if configured still resolves to the default provider.
+        LlmProviderFactory.ProviderResolution resolution = factory.resolveByTier(7L, "smart");
+
+        assertThat(resolution).isNotNull();
+        assertThat(resolution.getEffectiveProviderCode()).isEqualTo("anthropic");
+        assertThat(resolution.getConfig().getDefaultModel()).isEqualTo("claude-sonnet-4-6");
+    }
+
+    @Test
+    @DisplayName("resolveByTier inherits the availability-fallback chain and keeps the fallback provider's model (CAP-04 routing)")
+    void resolveByTierInheritsAvailabilityFallback() {
+        LlmProvider anthropicProvider = mock(LlmProvider.class);
+        when(anthropicProvider.getProviderCode()).thenReturn("anthropic");
+
+        AgentProperties properties = anthropicYmlProps("claude-sonnet-4-6");            // only anthropic configured
+        properties.getLlm().getModelRouting().put("cheap", "deepseek:deepseek-chat");  // deepseek unconfigured
+
+        LlmProviderFactory factory = factory(properties, anthropicProvider);
+        ReflectionTestUtils.setField(factory, "providerFallbackRaw", "anthropic");     // availability fallback chain
+
+        LlmProviderFactory.ProviderResolution resolution = factory.resolveByTier(7L, "cheap");
+
+        assertThat(resolution).isNotNull();
+        assertThat(resolution.getRequestedProviderCode()).isEqualTo("deepseek");    // routed provider preserved
+        assertThat(resolution.getEffectiveProviderCode()).isEqualTo("anthropic");   // fell back via the shared chain
+        // The routed model (deepseek-chat) is NOT forced onto the anthropic fallback provider.
+        assertThat(resolution.getConfig().getDefaultModel()).isEqualTo("claude-sonnet-4-6");
+    }
+
+    // ---- helpers (mirror the existing construction pattern) ----
+
+    private static AgentProperties anthropicYmlProps(String defaultModel) {
+        AgentProperties properties = new AgentProperties();
+        properties.getAnthropic().setApiKey("sk-real-anthropic");
+        properties.getAnthropic().setBaseUrl("https://api.anthropic.com");
+        properties.getAnthropic().setDefaultModel(defaultModel);
+        return properties;
+    }
+
+    private static LlmProviderFactory factory(AgentProperties properties, LlmProvider... providers) {
+        return new LlmProviderFactory(
+                List.of(providers),
+                mock(CloudConfigService.class),
+                properties,
+                new ObjectMapper(),
+                mock(com.auraboot.framework.agent.trace.GenAiUsageRecorder.class),
+                mock(org.springframework.beans.factory.ObjectProvider.class));
+    }
 }
