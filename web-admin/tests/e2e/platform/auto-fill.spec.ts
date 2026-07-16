@@ -44,7 +44,7 @@ test.describe('Auto-Fill API', () => {
   /**
    * AF-001: Valid model + record returns a field value map
    *
-   * Uses the e2eto_order model from the e2e-test-order plugin since it
+   * Uses the e2et_order model from the e2e-test-order plugin since it
    * is always present after env initialization. Verifies the endpoint
    * returns HTTP 200 with a valid JSON body (success or empty map —
    * both are acceptable because the test environment may not have records).
@@ -58,11 +58,11 @@ test.describe('Auto-Fill API', () => {
       return;
     }
 
-    // Use a model we know exists (e2eto_order from the e2e-test-order plugin)
+    // Use a model we know exists (e2et_order from the e2e-test-order plugin)
     const params = new URLSearchParams({
-      modelCode: 'e2eto_order',
-      recordId: 'non_existent_but_valid_format',
-      fields: 'e2eto_ord_name,e2eto_ord_status',
+      modelCode: 'e2et_order',
+      recordPid: 'non_existent_but_valid_format',
+      fields: 'e2et_order_title,e2et_order_status',
     });
 
     const res = await request.get(`${BASE_URL}/api/meta/auto-fill?${params.toString()}`, {
@@ -101,9 +101,9 @@ test.describe('Auto-Fill API', () => {
     }
 
     const params = new URLSearchParams({
-      modelCode: 'e2eto_order',
-      recordId: 'pid_does_not_exist_000000',
-      fields: 'e2eto_ord_name',
+      modelCode: 'e2et_order',
+      recordPid: 'pid_does_not_exist_000000',
+      fields: 'e2et_order_title',
     });
 
     const res = await request.get(`${BASE_URL}/api/meta/auto-fill?${params.toString()}`, {
@@ -144,7 +144,7 @@ test.describe('Auto-Fill API', () => {
 
     const params = new URLSearchParams({
       modelCode: "'; DROP TABLE users; --",
-      recordId: 'some_record',
+      recordPid: 'some_record',
       fields: 'some_field',
     });
 
