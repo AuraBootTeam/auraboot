@@ -10,6 +10,15 @@ import type { DictDTO } from '~/types/dict';
 import { dictService } from '~/shared/services/dictService';
 import { useToastContext } from '~/contexts/ToastContext';
 import { confirmDialog } from '~/utils/confirmDialog';
+import { Input } from '~/ui/ui/input';
+import { Textarea } from '~/ui/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/ui/ui/select';
 
 interface DictConfigDialogProps {
   field: ModelFieldBinding;
@@ -316,12 +325,11 @@ export function DictConfigDialog({
               <div className="space-y-4">
                 {/* Search */}
                 <div>
-                  <input
+                  <Input
                     type="text"
                     value={searchKeyword}
                     onChange={(e) => setSearchKeyword(e.target.value)}
                     placeholder="搜索字典名称..."
-                    className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
                   />
                 </div>
 
@@ -392,11 +400,10 @@ export function DictConfigDialog({
                     <label className="text-text-2 mb-1 block text-sm font-medium">
                       字典编码 <span className="text-status-red">*</span>
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={dictForm.code}
                       onChange={(e) => setDictForm({ ...dictForm, code: e.target.value })}
-                      className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
                       placeholder="dict_field_name"
                     />
                   </div>
@@ -404,11 +411,10 @@ export function DictConfigDialog({
                     <label className="text-text-2 mb-1 block text-sm font-medium">
                       字典名称 <span className="text-status-red">*</span>
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={dictForm.name}
                       onChange={(e) => setDictForm({ ...dictForm, name: e.target.value })}
-                      className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
                       placeholder="字段名称字典"
                     />
                   </div>
@@ -416,24 +422,29 @@ export function DictConfigDialog({
 
                 <div>
                   <label className="text-text-2 mb-1 block text-sm font-medium">字典类型</label>
-                  <select
+                  <Select
                     value={dictForm.dictType}
-                    onChange={(e) => setDictForm({ ...dictForm, dictType: e.target.value as any })}
-                    className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
+                    onValueChange={(value) =>
+                      setDictForm({ ...dictForm, dictType: value as DictFormData['dictType'] })
+                    }
                   >
-                    <option value="simple">简单字典</option>
-                    <option value="tree">树形字典</option>
-                    <option value="cascade">级联字典</option>
-                  </select>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="simple">简单字典</SelectItem>
+                      <SelectItem value="tree">树形字典</SelectItem>
+                      <SelectItem value="cascade">级联字典</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="text-text-2 mb-1 block text-sm font-medium">备注</label>
-                  <textarea
+                  <Textarea
                     value={dictForm.remark}
                     onChange={(e) => setDictForm({ ...dictForm, remark: e.target.value })}
                     rows={2}
-                    className="rounded-control border-border-strong focus-visible:shadow-focus w-full border px-3 py-2 focus:outline-none"
                     placeholder="字典说明..."
                   />
                 </div>
@@ -453,30 +464,33 @@ export function DictConfigDialog({
                   </div>
                   <div className="space-y-2">
                     {dictForm.items.map((item, index) => (
-                      <div key={index} className="flex gap-2">
-                        <input
-                          type="text"
-                          value={item.value}
-                          onChange={(e) => handleItemChange(index, 'value', e.target.value)}
-                          placeholder="值"
-                          className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 focus:outline-none"
-                        />
-                        <input
-                          type="text"
-                          value={item.label}
-                          onChange={(e) => handleItemChange(index, 'label', e.target.value)}
-                          placeholder="标签"
-                          className="rounded-control border-border-strong focus-visible:shadow-focus flex-1 border px-3 py-2 focus:outline-none"
-                        />
-                        <input
-                          type="number"
-                          value={item.sortOrder}
-                          onChange={(e) =>
-                            handleItemChange(index, 'sortOrder', parseInt(e.target.value) || 0)
-                          }
-                          placeholder="排序"
-                          className="rounded-control border-border-strong focus-visible:shadow-focus w-20 border px-3 py-2 focus:outline-none"
-                        />
+                      <div key={index} className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <Input
+                            type="text"
+                            value={item.value}
+                            onChange={(e) => handleItemChange(index, 'value', e.target.value)}
+                            placeholder="值"
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Input
+                            type="text"
+                            value={item.label}
+                            onChange={(e) => handleItemChange(index, 'label', e.target.value)}
+                            placeholder="标签"
+                          />
+                        </div>
+                        <div className="w-20">
+                          <Input
+                            type="number"
+                            value={item.sortOrder}
+                            onChange={(e) =>
+                              handleItemChange(index, 'sortOrder', parseInt(e.target.value) || 0)
+                            }
+                            placeholder="排序"
+                          />
+                        </div>
                         <button
                           onClick={() => handleRemoveItem(index)}
                           className="text-status-red px-3 py-2 hover:text-red-800"
