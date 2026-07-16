@@ -15,6 +15,7 @@ on:
     branches: [main]
     paths:
       - 'plugins/**/config/pages/**'
+      - 'plugins/**/config/pages.json'
       - 'plugins/**/config/commands/**'
       - 'scripts/check-dsl-command-convention.mjs'
       - 'scripts/check-dsl-render-types.mjs'
@@ -29,6 +30,7 @@ on:
     branches: [main]
     paths:
       - 'plugins/**/config/pages/**'
+      - 'plugins/**/config/pages.json'
       - 'plugins/**/config/commands/**'
       - 'scripts/check-dsl-command-convention.mjs'
       - 'scripts/check-dsl-render-types.mjs'
