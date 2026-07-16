@@ -34,12 +34,15 @@ interface FormOptionConfig {
 interface FormFieldConfig {
   field: string;
   label?: string | Record<string, string>;
-  type?: 'text' | 'select' | 'number' | 'textarea' | 'multiselect' | 'segmented' | 'checkbox';
+  type?: 'text' | 'select' | 'number' | 'textarea' | 'multiselect' | 'segmented' | 'checkbox' | 'file';
   required?: boolean;
   mustBeTrue?: boolean;
   placeholder?: string | Record<string, string>;
   defaultValue?: any;
   searchable?: boolean;
+  accept?: string;
+  maxBytes?: number;
+  fileNameField?: string;
   visibleWhen?: VisibilityRule;
   dataSource?: {
     type: 'api' | 'static';
@@ -213,7 +216,13 @@ export default function FormDialog() {
     }
 
     const submitted = Object.fromEntries(
-      visibleFields.map((field) => [field.field, formData[field.field]]),
+      visibleFields.flatMap((field) => {
+        const entries: [string, any][] = [[field.field, formData[field.field]]];
+        if (field.type === 'file' && field.fileNameField) {
+          entries.push([field.fileNameField, formData[field.fileNameField]]);
+        }
+        return entries;
+      }),
     );
     state.onSubmit?.(submitted);
     setState((prev) => ({ ...prev, open: false }));
@@ -430,6 +439,45 @@ export default function FormDialog() {
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-200">{placeholder || label}</span>
                   </label>
+                ) : fieldType === 'file' ? (
+                  <input
+                    ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
+                    data-testid={`form-dialog-field-${field.field}`}
+                    type="file"
+                    accept={field.accept}
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) {
+                        updateField(field.field, '');
+                        if (field.fileNameField) updateField(field.fileNameField, '');
+                        return;
+                      }
+                      if (field.maxBytes && file.size > field.maxBytes) {
+                        setErrors((prev) => ({
+                          ...prev,
+                          [field.field]: locale.startsWith('zh')
+                            ? `文件不能超过 ${Math.ceil(field.maxBytes! / 1024 / 1024)} MB`
+                            : `File must not exceed ${Math.ceil(field.maxBytes! / 1024 / 1024)} MB`,
+                        }));
+                        event.target.value = '';
+                        return;
+                      }
+                      try {
+                        const content = await file.text();
+                        updateField(field.field, content);
+                        if (field.fileNameField) updateField(field.fileNameField, file.name);
+                      } catch {
+                        setErrors((prev) => ({
+                          ...prev,
+                          [field.field]: locale.startsWith('zh') ? '无法读取文件' : 'Unable to read file',
+                        }));
+                        event.target.value = '';
+                      }
+                    }}
+                    className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded file:border-0 file:bg-blue-50 file:px-3 file:py-1 file:text-blue-700 dark:bg-gray-700 dark:text-white ${
+                      error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                    }`}
+                  />
                 ) : fieldType === 'number' ? (
                   <input
                     ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}

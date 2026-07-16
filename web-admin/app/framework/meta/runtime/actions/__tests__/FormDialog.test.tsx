@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { I18nProvider } from '~/contexts/I18nContext';
 import FormDialog from '../FormDialog';
@@ -146,5 +146,38 @@ describe('FormDialog choice fields', () => {
 
     expect(onSubmit).not.toHaveBeenCalled();
     expect(screen.getAllByText(/来源列|显式确认/).length).toBeGreaterThan(1);
+  });
+
+  it('reads a selected CSV file into the command payload and carries its filename', async () => {
+    const onSubmit = vi.fn();
+    renderDialog({
+      fields: [{
+        field: 'csvText',
+        label: 'CSV 文件',
+        type: 'file',
+        required: true,
+        accept: '.csv,text/csv',
+        maxBytes: 1024,
+        fileNameField: 'sourceName',
+      }],
+      fieldOptions: {},
+      defaults: {},
+      onSubmit,
+    });
+    const file = new File(['deviceCode,sn\nDPS-001,SN-001'], 'devices.csv', { type: 'text/csv' });
+    Object.defineProperty(file, 'text', {
+      value: vi.fn().mockResolvedValue('deviceCode,sn\nDPS-001,SN-001'),
+    });
+
+    fireEvent.change(screen.getByTestId('form-dialog-field-csvText'), {
+      target: { files: [file] },
+    });
+    await waitFor(() => expect(file.text).toHaveBeenCalled());
+    fireEvent.click(screen.getByTestId('form-dialog-submit'));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      csvText: 'deviceCode,sn\nDPS-001,SN-001',
+      sourceName: 'devices.csv',
+    });
   });
 });
