@@ -5,10 +5,12 @@
 #   ./scripts/sync-dsl-registry.sh            # Use live backend if running
 #   ./scripts/sync-dsl-registry.sh --offline  # Parse Java source directly (no backend needed)
 #
-# The registry file is the single source of truth consumed by:
-#   - CLI validation (plugins/cli/src/utils/dsl-registry-loader.ts)
-#   - Frontend chart type validation (SharedChartFactory.ts)
-#   - Agent tooling (AgentToolAutoGenerator.java)
+# The registry file is consumed by the CLI validator only:
+#   - plugins/cli/src/utils/dsl-registry-loader.ts
+#   - plugins/cli/src/validation/semantic.ts
+# (DR-20260715-A-007: this header previously also named SharedChartFactory.ts and
+#  AgentToolAutoGenerator.java as consumers — SharedChartFactory does not read this file
+#  and AgentToolAutoGenerator does not exist. Keep the consumer list honest.)
 
 set -euo pipefail
 
