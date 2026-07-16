@@ -50,8 +50,14 @@ public class PluginValidationPipeline {
                 List<PluginValidationMessage> messages = validator.validate(ctx);
                 result.addAll(messages);
             } catch (Exception e) {
-                log.warn("Validator {} threw exception: {}", validator.getClass().getSimpleName(), e.getMessage());
-                result.addMessage(PluginValidationMessage.warning("V-INTERNAL", "semantic",
+                // DR-20260715-A-005: fail closed. A validator that throws cannot vouch for the
+                // plugin on its dimension, so that check is UNKNOWN — treat it as a blocking
+                // error, not a warning. Previously this degraded to a warning, so e.g. an
+                // ExtensionValidator NPE silently skipped its S-EXT-HANDLER check and a hybrid
+                // plugin with an unregistered handler still imported "successfully".
+                log.error("Validator {} threw exception (blocking import): {}",
+                        validator.getClass().getSimpleName(), e.getMessage(), e);
+                result.addMessage(PluginValidationMessage.error("V-INTERNAL", "semantic",
                         "Validator " + validator.getClass().getSimpleName() + " failed: " + e.getMessage()));
             }
         }
@@ -69,8 +75,10 @@ public class PluginValidationPipeline {
                 List<PluginValidationMessage> messages = validator.validate(ctx);
                 result.addAll(messages);
             } catch (Exception e) {
-                log.warn("Validator {} threw exception: {}", validator.getClass().getSimpleName(), e.getMessage());
-                result.addMessage(PluginValidationMessage.warning("V-INTERNAL", "governance",
+                // DR-20260715-A-005: fail closed (see the semantic layer above).
+                log.error("Validator {} threw exception (blocking import): {}",
+                        validator.getClass().getSimpleName(), e.getMessage(), e);
+                result.addMessage(PluginValidationMessage.error("V-INTERNAL", "governance",
                         "Validator " + validator.getClass().getSimpleName() + " failed: " + e.getMessage()));
             }
         }
