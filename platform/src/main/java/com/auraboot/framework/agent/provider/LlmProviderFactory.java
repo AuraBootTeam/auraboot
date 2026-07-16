@@ -47,6 +47,14 @@ public class LlmProviderFactory {
     @Value("${agent.llm.stub-mode:false}")
     private boolean stubMode;
 
+    /**
+     * CAP-04 — ordered comma-separated provider-code fallback chain tried when the requested
+     * provider has no usable config (missing/blank API key). Empty (default) = no fallback,
+     * behaviour unchanged. Example: {@code agent.llm.provider-fallback=deepseek,anthropic}.
+     */
+    @Value("${agent.llm.provider-fallback:}")
+    private String providerFallbackRaw;
+
     public LlmProviderFactory(List<LlmProvider> providers, CloudConfigService cloudConfigService,
                                AgentProperties agentProperties, ObjectMapper objectMapper,
                                com.auraboot.framework.agent.trace.GenAiUsageRecorder genAiUsageRecorder,
@@ -123,6 +131,36 @@ public class LlmProviderFactory {
      * resolution has routed to a different implementation, such as stub mode.
      */
     public ProviderResolution resolveProvider(Long tenantId, String providerCode) {
+        ProviderResolution primary = resolveProviderExact(tenantId, providerCode);
+        if (primary != null) {
+            return primary;
+        }
+        // CAP-04: config-driven provider fallback. When the requested provider has no usable
+        // config, try the configured fallback chain so a single mis-provisioned provider is
+        // not a hard single point of failure. Default chain is empty → returns null as before.
+        String requested = defaultProviderCode(providerCode);
+        for (String fallbackCode : providerFallbackChain()) {
+            if (fallbackCode.equalsIgnoreCase(requested)) {
+                continue; // the one that already failed
+            }
+            ProviderResolution fb = resolveProviderExact(tenantId, fallbackCode);
+            if (fb != null) {
+                log.warn("LLM provider '{}' unavailable for tenant {}; fell back to '{}'",
+                        requested, tenantId, fb.getEffectiveProviderCode());
+                // Preserve the original request for observability; effective reflects the fallback.
+                return ProviderResolution.builder()
+                        .requestedProviderCode(requested)
+                        .effectiveProviderCode(fb.getEffectiveProviderCode())
+                        .config(fb.getConfig())
+                        .provider(fb.getProvider())
+                        .build();
+            }
+        }
+        return null;
+    }
+
+    /** Resolve exactly the requested provider (no fallback). Null when its config is unusable. */
+    private ProviderResolution resolveProviderExact(Long tenantId, String providerCode) {
         ProviderConfig config = resolveConfig(tenantId, providerCode);
         if (config == null || config.getApiKey() == null || config.getApiKey().isBlank()) {
             return null;
@@ -140,6 +178,21 @@ public class LlmProviderFactory {
                 .config(config)
                 .provider(provider)
                 .build();
+    }
+
+    /** Parse the configured comma-separated fallback chain; empty when unset (no fallback). */
+    private List<String> providerFallbackChain() {
+        if (providerFallbackRaw == null || providerFallbackRaw.isBlank()) {
+            return List.of();
+        }
+        List<String> chain = new ArrayList<>();
+        for (String part : providerFallbackRaw.split(",")) {
+            String code = part.trim();
+            if (!code.isBlank()) {
+                chain.add(code);
+            }
+        }
+        return chain;
     }
 
     public static String effectiveProviderCode(String requestedProviderCode, ProviderConfig config) {
