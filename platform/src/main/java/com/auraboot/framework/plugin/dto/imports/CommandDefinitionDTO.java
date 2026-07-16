@@ -206,6 +206,22 @@ public class CommandDefinitionDTO {
     private Map<String, Object> bpmTrigger;
 
     /**
+     * Optional distributed-lock key template for serializing concurrent executions
+     * of this command (e.g. {@code "so:${payload.sl_so_code}"}). Consumed at runtime
+     * by LoadPhase / CommandExecutorImpl via {@code config.get("concurrencyKey")}.
+     * DR-20260715-A-006: previously absent from the DTO, so a plugin that declared it
+     * fell into {@code unknownFields} and never reached the consolidated config —
+     * the author believed they had a lock that did not exist.
+     */
+    private String concurrencyKey;
+
+    /**
+     * Lock acquisition timeout in milliseconds for {@link #concurrencyKey} (default
+     * 5000 at runtime). Consumed via {@code config.get("lockTimeoutMs")}. See A-006.
+     */
+    private Long lockTimeoutMs;
+
+    /**
      * Validate command definition has required fields.
      */
     public boolean isValid() {
@@ -265,6 +281,8 @@ public class CommandDefinitionDTO {
         if (preconditions != null) config.put("preconditions", preconditions);
         if (preActions != null) config.put("preActions", preActions);
         if (bpmTrigger != null) config.put("bpmTrigger", bpmTrigger);
+        if (concurrencyKey != null) config.put("concurrencyKey", concurrencyKey);
+        if (lockTimeoutMs != null) config.put("lockTimeoutMs", lockTimeoutMs);
 
         return config.isEmpty() ? null : config;
     }
