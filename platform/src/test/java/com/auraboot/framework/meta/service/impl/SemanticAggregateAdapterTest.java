@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.AggregateQueryRequest;
 import com.auraboot.framework.meta.dto.AggregateQueryResponse;
 import com.auraboot.framework.meta.dto.MetricConfig;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
 import com.auraboot.framework.semantic.compiler.UserContext;
 import com.auraboot.framework.semantic.dto.SemanticQueryResponse;
@@ -137,6 +138,40 @@ class SemanticAggregateAdapterTest {
         assertThat(sem.getFilters().get(2).getField()).isEqualTo("category");
         // missing operator defaults to eq
         assertThat(sem.getFilters().get(2).getOp()).isEqualTo("eq");
+    }
+
+    @Test
+    void translateRejectsOrFilterGroupsOnSemanticPath() {
+        // OR / nested groups cannot be expressed against a declared semantic model.
+        // The adapter must reject them, not silently drop the group (which would
+        // return unfiltered, wrong results).
+        AggregateQueryRequest req = baseRequest();
+        AggregateQueryRequest.FilterConfig east = new AggregateQueryRequest.FilterConfig();
+        east.setField("region"); east.setOperator("eq"); east.setValue("East");
+        AggregateQueryRequest.FilterConfig west = new AggregateQueryRequest.FilterConfig();
+        west.setField("region"); west.setOperator("eq"); west.setValue("West");
+        AggregateQueryRequest.FilterConfig group = new AggregateQueryRequest.FilterConfig();
+        group.setLogic("or");
+        group.setChildren(List.of(east, west));
+        req.setFilters(List.of(group));
+
+        assertThatThrownBy(() -> adapter.translate(req, "sales"))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("not supported on the semantic-model aggregate path");
+    }
+
+    @Test
+    void translateRejectsRelativeTimeFilterOnSemanticPath() {
+        // Relative-time tokens are resolved by the raw aggregate path's range logic,
+        // not by the semantic compiler — reject rather than forward an unresolved token.
+        AggregateQueryRequest req = baseRequest();
+        AggregateQueryRequest.FilterConfig rel = new AggregateQueryRequest.FilterConfig();
+        rel.setField("order_date"); rel.setOperator("relative"); rel.setValue("last_30_days");
+        req.setFilters(List.of(rel));
+
+        assertThatThrownBy(() -> adapter.translate(req, "sales"))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("Relative-time filters are not supported");
     }
 
     @Test

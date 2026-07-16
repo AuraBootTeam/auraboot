@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.AggregateQueryRequest;
 import com.auraboot.framework.meta.dto.AggregateQueryResponse;
 import com.auraboot.framework.meta.dto.MetricConfig;
+import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
 import com.auraboot.framework.semantic.compiler.UserContext;
 import com.auraboot.framework.semantic.dto.SemanticQueryResponse;
@@ -151,7 +152,20 @@ public class SemanticAggregateAdapter {
 
     private void appendFilter(SemanticQueryRequest sem,
                               AggregateQueryRequest.FilterConfig f) {
-        if (f == null || f.getField() == null) return;
+        if (f == null) return;
+        // The semantic-model aggregate path only supports flat leaf predicates. OR /
+        // nested filter groups and relative-time ranges cannot be expressed against a
+        // declared semantic model, so reject them explicitly rather than silently
+        // dropping the filter (which would return unfiltered, wrong results).
+        if (f.getChildren() != null && !f.getChildren().isEmpty()) {
+            throw new MetaServiceException(
+                    "OR / nested filter groups are not supported on the semantic-model aggregate path");
+        }
+        if (f.getField() == null) return;
+        if ("relative".equalsIgnoreCase(f.getOperator())) {
+            throw new MetaServiceException(
+                    "Relative-time filters are not supported on the semantic-model aggregate path");
+        }
         SemanticQueryRequest.Filter sf = new SemanticQueryRequest.Filter();
         sf.setField(f.getField());
         sf.setOp(f.getOperator() == null ? "eq"
