@@ -48,4 +48,36 @@ class SecurityHeadersFilterTest {
                 resp.getHeader("Content-Security-Policy"));
         verify(chain).doFilter(req, resp);
     }
+
+    @Test
+    void doFilter_csFrameEmbedPath_omitsFramingLock_soControllerCanSetPerSiteAllowlist() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", SecurityHeadersFilter.CS_FRAME_EMBED_PATH);
+        req.setServletPath(SecurityHeadersFilter.CS_FRAME_EMBED_PATH);
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+
+        filter.doFilter(req, resp, chain);
+
+        // The deliberate embed path must NOT carry the global clickjacking lock — its controller emits
+        // a per-site frame-ancestors allowlist instead. (X-Frame-Options has no allowlist form.)
+        assertNull(resp.getHeader("X-Frame-Options"));
+        assertNull(resp.getHeader("Content-Security-Policy"));
+        // ...but every other hardening header is still present (this is a scoped hole, not an open door)
+        assertEquals("nosniff", resp.getHeader("X-Content-Type-Options"));
+        assertEquals("max-age=31536000; includeSubDomains", resp.getHeader("Strict-Transport-Security"));
+        verify(chain).doFilter(req, resp);
+    }
+
+    @Test
+    void doFilter_csFrameLookalikePath_keepsFramingLock() throws Exception {
+        // Falsifiability: a path that merely CONTAINS the embed segment but isn't it must stay locked.
+        MockHttpServletRequest req = new MockHttpServletRequest("GET", "/api/public/cs/session");
+        req.setServletPath("/api/public/cs/session");
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+
+        filter.doFilter(req, resp, chain);
+
+        assertEquals("DENY", resp.getHeader("X-Frame-Options"));
+        assertEquals("default-src 'none'; frame-ancestors 'none'", resp.getHeader("Content-Security-Policy"));
+        verify(chain).doFilter(req, resp);
+    }
 }

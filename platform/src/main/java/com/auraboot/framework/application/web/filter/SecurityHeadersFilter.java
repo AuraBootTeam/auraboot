@@ -16,14 +16,28 @@ import java.io.IOException;
 @Component
 public class SecurityHeadersFilter extends OncePerRequestFilter {
 
+    /**
+     * The one path that is INTENTIONALLY embeddable in a third-party iframe: the CS widget's frame
+     * host. It does not get the global clickjacking lock here — instead the controller serving it sets
+     * a per-site {@code Content-Security-Policy: frame-ancestors <the CS site's own registered origins>}
+     * so only that tenant's allowlisted domains can frame it. Everything else stays {@code DENY}.
+     */
+    static final String CS_FRAME_EMBED_PATH = "/api/public/cs/frame";
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                      FilterChain filterChain) throws ServletException, IOException {
+        boolean csFrameEmbed = request.getServletPath().startsWith(CS_FRAME_EMBED_PATH);
+
         // Prevent browsers from MIME-sniffing away from declared Content-Type
         response.setHeader("X-Content-Type-Options", "nosniff");
 
-        // Block page from being embedded in iframe (clickjacking defense)
-        response.setHeader("X-Frame-Options", "DENY");
+        // Block page from being embedded in iframe (clickjacking defense). The CS frame-embed path is
+        // the deliberate exception — its controller emits a per-site frame-ancestors allowlist instead
+        // (X-Frame-Options has no allowlist form, so we must omit it there, not weaken it).
+        if (!csFrameEmbed) {
+            response.setHeader("X-Frame-Options", "DENY");
+        }
 
         // Enable browser XSS filter (legacy but still useful for older browsers)
         response.setHeader("X-XSS-Protection", "1; mode=block");
@@ -40,7 +54,7 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
         // Basic CSP for API responses — prevents script execution if a browser
         // directly opens an API endpoint. Frontend CSP should be set at the
         // BFF/CDN layer with nonce-based script-src.
-        if (request.getServletPath().startsWith("/api/")) {
+        if (request.getServletPath().startsWith("/api/") && !csFrameEmbed) {
             response.setHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'");
         }
 
