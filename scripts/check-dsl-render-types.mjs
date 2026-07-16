@@ -78,7 +78,13 @@ const failures = [];
 let checked = 0;
 
 for (const file of walk(PLUGIN_ROOT)) {
-  if (!file.includes(`${path.sep}config${path.sep}pages${path.sep}`)) continue;
+  // DR-20260715-C-003: scan BOTH page layouts. The split layout lives under
+  // `config/pages/<file>.json`; the single-file layout is `config/pages.json` (no
+  // trailing separator). The old `includes('/config/pages/')` filter silently skipped
+  // every single-file plugin, leaving its renderTypes ungated.
+  const inSplitPages = file.includes(`${path.sep}config${path.sep}pages${path.sep}`);
+  const isSingleFilePages = file.endsWith(`${path.sep}config${path.sep}pages.json`);
+  if (!inSplitPages && !isSingleFilePages) continue;
   let schema;
   try {
     schema = JSON.parse(fs.readFileSync(file, 'utf8'));
