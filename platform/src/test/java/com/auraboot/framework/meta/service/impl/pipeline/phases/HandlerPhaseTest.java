@@ -206,6 +206,25 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_mapsPluginVersionConflictToHttpConflictSemantic() {
+        CommandHandlerExtension staleWrite = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) {
+                throw new IllegalStateException("iot.error.version_conflict:expected=2,actual=3");
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(staleWrite));
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(com.auraboot.framework.exception.ConflictException.class)
+                .hasMessageContaining("iot.error.version_conflict");
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
     void execute_fallsBackToCommandCodeWhenNoConfiguredPluginHandler() throws Exception {
         RecordingPluginHandler handler = new RecordingPluginHandler(BUSINESS_COMMAND_CODE);
         when(extensionRegistry.getCommandHandler(BUSINESS_COMMAND_CODE)).thenReturn(Optional.of(handler));
@@ -355,14 +374,15 @@ class HandlerPhaseTest {
         verify(dynamicDataMapper, never()).updateWithJsonb(eq(tableName), any(), any(), any());
         assertThat(sqlCaptor.getValue())
                 .contains("UPDATE " + tableName + " SET")
-                .containsPattern("cr_cj_seed_urls = #\\{params\\.set\\d+}::jsonb")
+                .containsPattern("cr_cj_seed_urls = #\\{params\\.set\\d+,jdbcType=OTHER,typeHandler=.*JsonbStringTypeHandler}::jsonb")
                 .contains("WHERE id = #{params.recordId}")
                 .contains("tenant_id = #{params.tenantId}")
                 .contains("created_by = 2")
                 .contains("domain_id = 7");
         assertThat(paramsCaptor.getValue())
                 .containsEntry("recordId", 42L)
-                .containsEntry("tenantId", 1L);
+                .containsEntry("tenantId", 1L)
+                .containsValue("[\"https://example.com/\"]");
     }
 
     private CommandPipelineContext buildContext(String commandCode, String modelCode, Map<String, Object> execConfig) {
@@ -411,8 +431,9 @@ class HandlerPhaseTest {
         public Object execute(CommandContext context) {
             Map<String, Object> fullRow = new HashMap<>();
             fullRow.put("cr_cj_status", "PAUSED");
-            // jsonb host column round-tripped from getById comes back as a JSON String
-            fullRow.put("cr_cj_seed_urls", "[\"https://example.com/\"]");
+            // A handler may return a structured value instead of a JDBC-ready
+            // string. The final scoped SQL binding must serialize it explicitly.
+            fullRow.put("cr_cj_seed_urls", java.util.List.of("https://example.com/"));
             return fullRow;
         }
     }

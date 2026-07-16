@@ -130,7 +130,20 @@ function unwrapApiResult(result: any): any {
     }
   }
 
-  throw new Error(result?.desc || result?.message || 'API request failed');
+  const error = new Error(result?.desc || result?.message || 'API request failed') as Error & {
+    status?: number;
+    statusCode?: number;
+    code?: string | number;
+  };
+  const numericStatus = Number(result?.status ?? result?.statusCode ?? result?.code);
+  if (Number.isFinite(numericStatus) && numericStatus >= 100 && numericStatus <= 599) {
+    error.status = numericStatus;
+    error.statusCode = numericStatus;
+  }
+  if (result?.code !== undefined && result?.code !== null) {
+    error.code = result.code;
+  }
+  throw error;
 }
 
 type DataSourceFetchPolicy = DataSourceConfig & {

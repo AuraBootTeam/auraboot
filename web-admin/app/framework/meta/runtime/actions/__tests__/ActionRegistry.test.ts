@@ -264,6 +264,33 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
       expect.objectContaining({ params: expect.objectContaining({ payload: { a: 1 } }) }),
     );
   });
+
+  it('downloads a Base64 file artifact returned by a command', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({
+      code: '0',
+      data: {
+        success: true,
+        data: {
+          data: {
+            fileName: 'batch-failures.csv',
+            contentType: 'text/csv;charset=UTF-8',
+            contentBase64: btoa('row,error\n1,INVALID'),
+          },
+        },
+      },
+    });
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:command-artifact');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      args: { command: 'iot_dps_batch_onboarding_job:export_failures', targetRecordPid: 'B1' },
+    });
+
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(click).toHaveBeenCalledOnce();
+  });
 });
 
 describe('ActionRegistry dialog.confirm', () => {

@@ -6,6 +6,7 @@ import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { executeSimpleWorkbenchAction, useRuntimeStateSubscription } from './workbenchBlockUtils';
 import { LoadingOverlay } from '~/ui/LoadingOverlay';
 import { confirmDialog } from '~/utils/confirmDialog';
+import { useAuth } from '~/contexts/AuthContext';
 
 export interface WorkbenchActionBarBlockRendererProps {
   block: BlockConfig;
@@ -34,11 +35,13 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
   const evaluator = runtime.getEvaluator();
+  const { hasPermission } = useAuth();
   const actions = Array.isArray((block as any).actions) ? (block as any).actions : [];
   const [runningAction, setRunningAction] = useState<string | null>(null);
   useRuntimeStateSubscription(runtime);
 
   const visibleActions = actions.filter((actionConfig: any) => {
+    if (actionConfig?.permissionCode && !hasPermission(actionConfig.permissionCode)) return false;
     if (!actionConfig?.visibleWhen) return true;
     return evaluator.evaluateCondition(actionConfig.visibleWhen, context);
   });
