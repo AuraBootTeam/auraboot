@@ -97,32 +97,63 @@ public class AggregateQueryRequest {
 
     /**
      * Filter configuration for query conditions.
+     *
+     * <p>A {@code FilterConfig} is one of two node kinds, forming a recursive boolean tree:
+     * <ul>
+     *   <li><b>Leaf</b> — has a {@link #field} (+ {@link #operator} + {@link #value}) and
+     *       no {@link #children}. Produces a single predicate ({@code field op value}).</li>
+     *   <li><b>Group</b> — has a non-empty {@link #children} list and no {@link #field}.
+     *       Combines its children with the group's {@link #logic} ({@code "and"} / {@code "or"}),
+     *       recursively. {@code field}/{@code operator}/{@code value} are ignored on a group.</li>
+     * </ul>
+     *
+     * <p><b>Combination semantics:</b> the top-level {@code filters} / {@code drillFilters}
+     * list elements are always combined with <b>AND</b> (backward compatible). To express OR
+     * (or nested AND/OR), wrap conditions in a group node, e.g.
+     * <pre>{@code {"logic":"or","children":[{"field":"region","operator":"eq","value":"East"},
+     *                                      {"field":"region","operator":"eq","value":"West"}]}}</pre>
+     * A leaf's own {@link #logic} value is not used — only a group's {@code logic} matters.
      */
     @Data
     public static class FilterConfig {
         /**
-         * The field name to filter on.
+         * The field name to filter on. Required for a leaf node; must be {@code null} on a group node.
          */
         private String field;
 
         /**
-         * The comparison operator.
-         * Supported: eq, ne, gt, gte, lt, lte, in, notIn, like, between, isNull, isNotNull
+         * The comparison operator (leaf only).
+         * Supported: eq, ne/neq, gt, gte/ge, lt, lte/le, like, in, not_in, is_null, is_not_null,
+         * and {@code relative} (relative-time range — see {@link #value}).
          */
         private String operator;
 
         /**
-         * The value to compare against.
-         * For 'in' operator, this should be an array.
-         * For 'between' operator, this should be an array with two elements [min, max].
+         * The value to compare against (leaf only).
+         * <ul>
+         *   <li>For {@code in} / {@code not_in}: an array.</li>
+         *   <li>For {@code relative}: a relative-time token string
+         *       ({@code today}, {@code yesterday}, {@code last_7_days}, {@code last_30_days},
+         *       {@code this_week}, {@code this_month}, {@code this_quarter}, {@code this_year})
+         *       or an object {@code {"relative":"last_n_days","n":30}}. The server resolves the
+         *       token into a concrete half-open date range and binds the bounds as parameters.</li>
+         * </ul>
          */
         private Object value;
 
         /**
-         * Logical operator to combine with other filters.
-         * Defaults to "and".
+         * Logical operator used by a <b>group</b> node to combine its {@link #children}
+         * ({@code "and"} or {@code "or"}). Defaults to {@code "and"}. Ignored on a leaf node,
+         * where combination is dictated by the parent group (top-level list is always AND).
          */
         private String logic = "and";
+
+        /**
+         * Child filters of a <b>group</b> node. When non-empty this {@code FilterConfig} is a
+         * group and {@link #field}/{@link #operator}/{@link #value} are ignored; when
+         * {@code null}/empty it is a leaf. Enables arbitrary nested AND/OR trees.
+         */
+        private List<FilterConfig> children;
     }
 
     /**
