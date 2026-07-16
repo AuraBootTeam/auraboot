@@ -112,6 +112,35 @@ public class AuraBotChatService {
             "Help users with their questions about the current page and data. " +
             "Be concise, accurate, and helpful. Respond in the user's language.";
 
+    /**
+     * Injected in place of the knowledge context when a tool-less (RAG-only) turn has an explicit
+     * knowledge base bound but retrieval returned nothing. Absence of context is NOT "answer freely":
+     * without this an LLM fills the gap from general knowledge (e.g. an empty-KB tenant answering a
+     * "7-day no-reason return" from consumer-law priors). The marker makes the empty result explicit.
+     */
+    private static final String EMPTY_KB_MARKER =
+            "[Knowledge base search result: EMPTY] No relevant content was found in the bound knowledge "
+            + "base for this question. You MUST reply that the information was not found and offer to "
+            + "hand off to a human agent; do NOT answer from general knowledge or industry convention. "
+            + "【知识库检索结果为空:必须如实告知“暂未找到相关信息”并建议转人工客服,禁止用通用常识或行业惯例作答】";
+
+    /**
+     * Appended AFTER the retrieved context on a tool-less (RAG-only, e.g. CS widget) turn that DID get
+     * context. The customer-facing gap: the model has the right fact in context ("7 个自然日") yet
+     * overrides it with a parametric prior ("30 days") and drifts to English. Recency-positioned hard
+     * grounding — verbatim facts, no substitution, answer in the user's language — closes it. Kept
+     * separate from the tenant prompt template so it holds even if a tenant customizes/omits the rule.
+     */
+    private static final String RAG_ONLY_GROUNDING =
+            "\n\n【回答约束(必须遵守)】\n"
+            + "1. 只依据上面的“知识库检索结果”回答;其中的数字、日期、期限、金额、型号、比例等事实必须逐字照抄,"
+            + "严禁用常识、行业惯例或训练知识替换、推算或补全。\n"
+            + "2. 若检索结果没有包含用户问题的答案,只回答“抱歉,暂未找到相关信息”,并主动提出转接人工客服,不要编造。\n"
+            + "3. 始终使用用户提问所用的语言回答。\n"
+            + "(Answer strictly from the retrieved context above; copy figures/dates/terms verbatim, never "
+            + "substitute from general knowledge; if the answer is not in the context, say it was not found "
+            + "and offer a human handoff; reply in the user's language.)";
+
     public AuraBotChatService(LlmProviderFactory llmProviderFactory,
                               PromptTemplateService promptTemplateService,
                               ChatToolResolver chatToolResolver,
@@ -515,6 +544,18 @@ public class AuraBotChatService {
                 ? assembledContextBundle
                 : buildAgentContextBundle(tenantId, request);
         String contextSection = contextBundle.renderPromptSection();
+        // RAG-only turn (no tools, e.g. the CS widget) whose bound knowledge base returned nothing:
+        // replace the empty context with an explicit "not found → decline" marker so the model does
+        // not free-associate from general knowledge (gap: empty-KB tenant answering "7-day return").
+        if (!hasTools && contextSection.isBlank()
+                && request != null && request.getKnowledgeBaseIds() != null
+                && !request.getKnowledgeBaseIds().isEmpty()) {
+            contextSection = EMPTY_KB_MARKER;
+        }
+        // RAG-only turn that DID get real context: enforce verbatim grounding + user-language reply
+        // (closes the "has '7 个自然日' in context but answers '30 days' in English" hallucination).
+        boolean ragOnlyGrounding = !hasTools && !contextSection.isBlank()
+                && !EMPTY_KB_MARKER.equals(contextSection);
         if (ctx != null) {
             vars.put("hasPageContext", true);
             vars.put("pageType", ctx.getKind());
@@ -564,6 +605,9 @@ public class AuraBotChatService {
             if (!contextSection.isBlank()) {
                 prompt += "\n\n" + contextSection;
             }
+            if (ragOnlyGrounding) {
+                prompt += RAG_ONLY_GROUNDING;
+            }
             return prompt;
         }
 
@@ -574,6 +618,9 @@ public class AuraBotChatService {
         }
         if (!contextSection.isBlank()) {
             sb.append("\n\n").append(contextSection);
+        }
+        if (ragOnlyGrounding) {
+            sb.append(RAG_ONLY_GROUNDING);
         }
         return sb.toString();
     }
