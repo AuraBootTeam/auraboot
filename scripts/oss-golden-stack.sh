@@ -253,6 +253,7 @@ cmd_up() {
       SPRING_KAFKA_BOOTSTRAP_SERVERS=127.0.0.1:9092 \
       AURA_PLUGINS_DIR="$sd/pf4j-plugins" \
       AURA_BUILTIN_PLUGINS_DIR="$REPO_ROOT/plugins" \
+      AGENT_LLM_STUB_MODE=true \
       java -jar "$jar"
   echo "$server_port $vite_port $bff_port" >"$sd/ports"
   poll_http "http://127.0.0.1:$server_port/actuator/health" '"status":"UP"' 150 backend \
