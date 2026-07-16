@@ -1197,6 +1197,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
             case "DATETIME":
             case "TIMESTAMP":
+            case "LOCALDATETIME":
+                if (value instanceof java.time.Instant instant) {
+                    return java.sql.Timestamp.from(instant);
+                }
+                if (value instanceof java.time.LocalDateTime localDateTime) {
+                    return java.sql.Timestamp.valueOf(localDateTime);
+                }
                 if (value instanceof String) {
                     try {
                         return java.sql.Timestamp.valueOf((String) value);
@@ -1312,10 +1319,15 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // 使用验证服务的严格模式进行验证
             // 验证失败会抛出异常并触发事务回滚
             validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
+            // Validation intentionally works with java.time domain types. Convert
+            // them to JDBC-native values only afterwards, matching the CREATE
+            // path and preventing MyBatis from binding Instant as an untyped
+            // Object for dynamic timestamp columns.
+            data = convertDataTypes(model, data);
             
             // Set system fields
             Map<String, Object> enrichedData = new HashMap<>(data);
-            enrichedData.put("updated_at", java.time.Instant.now());
+            enrichedData.put("updated_at", java.sql.Timestamp.from(java.time.Instant.now()));
             enrichedData.put("updated_by", getCurrentUserId());
             enrichedData.remove("tenant_id");
             enrichedData.remove("created_at");
@@ -1488,11 +1500,22 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 sql.append(", ");
             }
             String paramName = "set" + index;
-            sql.append(columnName).append(" = #{params.").append(paramName).append("}");
             if (jsonbColumns != null && jsonbColumns.contains(columnName)) {
-                sql.append("::jsonb");
+                sql.append(columnName).append(" = #{params.").append(paramName)
+                        .append(",jdbcType=OTHER,typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb");
+            } else {
+                sql.append(columnName).append(" = #{params.").append(paramName).append("}");
             }
-            params.put(paramName, entry.getValue());
+            Object parameterValue = entry.getValue();
+            // The SQL cast alone is not enough: MyBatis sees a Map first and
+            // asks PostgreSQL for its hstore handler. Serialize every structured
+            // JSONB value at this final binding chokepoint so regular JSON fields
+            // and values produced by virtual-field merging behave identically.
+            if (jsonbColumns != null && jsonbColumns.contains(columnName)
+                    && parameterValue != null && !(parameterValue instanceof String)) {
+                parameterValue = JsonbFieldHelper.toJsonString(parameterValue);
+            }
+            params.put(paramName, parameterValue);
             index++;
         }
 

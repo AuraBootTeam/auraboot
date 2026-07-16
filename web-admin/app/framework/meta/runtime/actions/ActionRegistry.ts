@@ -986,6 +986,41 @@ actionRegistry.register(
   },
 );
 
+export function downloadBase64CommandArtifact(value: any): boolean {
+  let artifact = value;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (
+      artifact
+      && typeof artifact === 'object'
+      && typeof artifact.contentBase64 !== 'string'
+      && artifact.data
+      && typeof artifact.data === 'object'
+    ) {
+      artifact = artifact.data;
+    } else {
+      break;
+    }
+  }
+  if (
+    typeof document === 'undefined'
+    || typeof artifact?.contentBase64 !== 'string'
+    || typeof artifact?.fileName !== 'string'
+  ) return false;
+  const binary = atob(artifact.contentBase64);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const blob = new Blob([bytes], { type: artifact.contentType || 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = artifact.fileName;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  return true;
+}
+
 /**
  * command.execute - Execute a DSL command from an ActionFlow.
  *
@@ -1061,6 +1096,8 @@ actionRegistry.register(
     if (!ResultHelper.isSuccess(result)) {
       throw new Error(result.desc || result.message || `Command ${command} failed`);
     }
+
+    downloadBase64CommandArtifact(result.data);
 
     return result.data;
   },

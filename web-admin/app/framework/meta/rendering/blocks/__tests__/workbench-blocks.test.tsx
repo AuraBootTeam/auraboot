@@ -25,6 +25,11 @@ vi.mock('~/utils/confirmDialog', () => ({
   confirmDialog: vi.fn(() => Promise.resolve(true)),
 }));
 
+const hasPermissionSpy = vi.fn<(code: string) => boolean>(() => true);
+vi.mock('~/contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: hasPermissionSpy }),
+}));
+
 function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
   const context: Record<string, any> = {
     locale: 'en-US',
@@ -463,10 +468,29 @@ describe('MetricStripBlockRenderer', () => {
 
 describe('WorkbenchActionBarBlockRenderer', () => {
   beforeEach(() => {
+    hasPermissionSpy.mockReset();
+    hasPermissionSpy.mockReturnValue(true);
     vi.mocked(fetchResult).mockReset();
     vi.mocked(fetchResult).mockResolvedValue({ code: '0', data: {} } as any);
     vi.mocked(confirmDialog).mockReset();
     vi.mocked(confirmDialog).mockResolvedValue(true);
+  });
+
+  it('hides actions whose permissionCode is not granted', () => {
+    hasPermissionSpy.mockImplementation((code) => code !== 'iot.dps.execute');
+    const runtime = makeRuntime() as any;
+    const block: BlockConfig = {
+      id: 'actions', blockType: 'workbench-action-bar',
+      actions: [
+        { code: 'cancel', label: 'Cancel Batch', permissionCode: 'iot.dps.execute' },
+        { code: 'read', label: 'View Batch', permissionCode: 'iot.dps.read' },
+      ],
+    };
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.queryByTestId('workbench-action-cancel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('workbench-action-read')).toBeInTheDocument();
   });
 
   it('renders configured actions and executes their lifecycle', async () => {

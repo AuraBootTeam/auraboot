@@ -521,6 +521,10 @@ export async function executeSimpleWorkbenchAction(
         await reloadDataSources(runtime, reloadIds);
       }
       const resultData = unwrapCommandData(result);
+      const { downloadBase64CommandArtifact } = await import(
+        '~/framework/meta/runtime/actions/ActionRegistry'
+      );
+      downloadBase64CommandArtifact(resultData);
       if (isBusinessRejected(resultData)) {
         showCommandFeedback(
           runtime,
