@@ -26,23 +26,26 @@ env:
 # native runners keep every build under ~15 min.
 jobs:
   build:
-    name: Build ${{ matrix.image }} (${{ matrix.platform }})
-    runs-on: ${{ matrix.platform == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    name: Build ${{ matrix.image }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         image: [backend, frontend, postgres]
-        platform: [linux/amd64, linux/arm64]
+        arch: [amd64, arm64]
     steps:
-      - name: Resolve image name + Dockerfile
+      - name: Resolve image ref + Dockerfile
         id: img
         run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"   # GHCR refs must be lowercase
           case "${{ matrix.image }}" in
-            backend)  echo "name=auraboot"          >> "$GITHUB_OUTPUT"; echo "file=platform/Dockerfile"        >> "$GITHUB_OUTPUT" ;;
-            frontend) echo "name=auraboot-frontend" >> "$GITHUB_OUTPUT"; echo "file=web-admin/Dockerfile"       >> "$GITHUB_OUTPUT" ;;
-            postgres) echo "name=auraboot-postgres" >> "$GITHUB_OUTPUT"; echo "file=docker/postgres/Dockerfile" >> "$GITHUB_OUTPUT" ;;
+            backend)  name=auraboot;          file=platform/Dockerfile ;;
+            frontend) name=auraboot-frontend; file=web-admin/Dockerfile ;;
+            postgres) name=auraboot-postgres; file=docker/postgres/Dockerfile ;;
           esac
+          echo "image=${REGISTRY}/${owner}/${name}" >> "$GITHUB_OUTPUT"
+          echo "file=${file}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v6
 
@@ -62,10 +65,10 @@ jobs:
         with:
           context: .
           file: ${{ steps.img.outputs.file }}
-          platforms: ${{ matrix.platform }}
-          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.platform }}
-          outputs: type=image,name=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ steps.img.outputs.name }},push-by-digest=true,name-canonical=true,push=true
+          platforms: linux/${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.arch }}
+          outputs: type=image,name=${{ steps.img.outputs.image }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
         run: |
@@ -76,7 +79,7 @@ jobs:
       - name: Upload digest
         uses: actions/upload-artifact@v4
         with:
-          name: digests-${{ matrix.image }}-${{ matrix.platform == 'linux/arm64' && 'arm64' || 'amd64' }}
+          name: digests-${{ matrix.image }}-${{ matrix.arch }}
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
@@ -90,14 +93,16 @@ jobs:
       matrix:
         image: [backend, frontend, postgres]
     steps:
-      - name: Resolve image name
+      - name: Resolve image ref
         id: img
         run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
           case "${{ matrix.image }}" in
-            backend)  echo "name=auraboot"          >> "$GITHUB_OUTPUT" ;;
-            frontend) echo "name=auraboot-frontend" >> "$GITHUB_OUTPUT" ;;
-            postgres) echo "name=auraboot-postgres" >> "$GITHUB_OUTPUT" ;;
+            backend)  name=auraboot ;;
+            frontend) name=auraboot-frontend ;;
+            postgres) name=auraboot-postgres ;;
           esac
+          echo "image=${REGISTRY}/${owner}/${name}" >> "$GITHUB_OUTPUT"
 
       - name: Download digests
         uses: actions/download-artifact@v4
@@ -120,7 +125,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ steps.img.outputs.name }}
+          images: ${{ steps.img.outputs.image }}
           # Tags:
           #   main → latest, sha-<short>
           #   v1.2.3 → 1.2.3, 1.2, 1, latest
@@ -138,8 +143,8 @@ jobs:
         run: |
           docker buildx imagetools create \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
-            $(printf '${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ steps.img.outputs.name }}@sha256:%s ' *)
+            $(printf '${{ steps.img.outputs.image }}@sha256:%s ' *)
 
       - name: Inspect published manifest
         run: |
-          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ steps.img.outputs.name }}:${{ steps.meta.outputs.version }}
+          docker buildx imagetools inspect ${{ steps.img.outputs.image }}:${{ steps.meta.outputs.version }}
