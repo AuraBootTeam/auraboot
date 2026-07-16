@@ -12,6 +12,7 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -75,6 +76,13 @@ public class SecurityConfig {
                 || activeProfile.contains("test") || "default".equals(activeProfile);
 
         http
+                // Spring Security's default HeaderWriterFilter stamps X-Frame-Options: DENY on every
+                // response — including the deliberate CS iframe-embed path /api/public/cs/frame, which
+                // must be framable by a site's own registered origins. SecurityHeadersFilter already
+                // owns framing policy (DENY for every path EXCEPT that one, which instead emits a
+                // per-site frame-ancestors allowlist), so Security's redundant copy only re-adds DENY
+                // and defeats the allowlist. Disable it here; the custom filter stays the single source.
+                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable))
                 // codeql[java/csrf-unprotected-request-type] AuraBoot API
                 // authentication is stateless and requires an Authorization:
                 // Bearer token; browser cookies are not an authentication
