@@ -1,4 +1,4 @@
-package com.auraboot.framework.ai.search.dto;
+package com.auraboot.framework.aisearch.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

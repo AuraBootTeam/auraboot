@@ -1,12 +1,12 @@
-package com.auraboot.framework.ai.search.service;
+package com.auraboot.framework.aisearch.service;
 
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
-import com.auraboot.framework.ai.search.dto.AiSearchRequest;
-import com.auraboot.framework.ai.search.dto.AiSearchResult;
-import com.auraboot.framework.ai.search.dto.ParsedFilter;
+import com.auraboot.framework.aisearch.dto.AiSearchRequest;
+import com.auraboot.framework.aisearch.dto.AiSearchResult;
+import com.auraboot.framework.aisearch.dto.ParsedFilter;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
