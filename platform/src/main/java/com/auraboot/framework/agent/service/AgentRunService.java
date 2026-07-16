@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.agent.config.AgentProperties;
 import com.auraboot.framework.agent.dto.AgentPlanStep;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
+import com.auraboot.framework.agent.eval.RunOutcomeEvaluator;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ToolDefinition;
@@ -27,6 +28,7 @@ import com.auraboot.framework.meta.dto.PaginationResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessException;
 import org.springframework.scheduling.annotation.Async;
@@ -70,6 +72,15 @@ public class AgentRunService {
      */
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private UserSoulProfileReader userSoulProfileReader;
+
+    /**
+     * CAP-03 run-completion outcome/goal verdict gate. Default on — the verdict is
+     * observation-only and cheap. Operators can disable it per-deployment. The field
+     * initializer keeps it on for non-Spring unit construction (where {@code @Value}
+     * is never injected).
+     */
+    @Value("${aura.agent.run-outcome.enabled:true}")
+    private boolean runOutcomeEvalEnabled = true;
 
     private static final int MAX_HALLUCINATION_COUNT = 3;
     private static final int DEFAULT_TIMEOUT_SECONDS = 300;
@@ -446,7 +457,7 @@ public class AgentRunService {
                 // Persist final plan state
                 planService.persistPlan(runPid, plan, plan.size());
 
-                completeRun(tenantId, runPid, taskPid, startedAt, result, model);
+                completeRun(tenantId, runPid, taskPid, agentCode, plan, startedAt, result, model);
 
                 observationService.publish(tenantId, "run_completed", agentCode, "agent_run", runPid,
                         Map.of("task_id", taskPid, "status", result.success ? "success" : "failed",
@@ -616,9 +627,15 @@ public class AgentRunService {
      * Complete a run: update records + dispatch child tasks + update mission + save memory.
      * Record updates are delegated to RunLifecycleService; dispatch stays here to avoid circular dependency.
      */
-    private void completeRun(Long tenantId, String runPid, String taskPid, LocalDateTime startedAt,
+    private void completeRun(Long tenantId, String runPid, String taskPid, String agentCode,
+                              List<AgentPlanStep> plan, LocalDateTime startedAt,
                               AgentLoopResult result, String model) {
         boolean success = runLifecycleService.completeRunRecord(tenantId, runPid, taskPid, startedAt, result, model);
+
+        // CAP-03: after the run is marked terminal, derive and record the
+        // outcome/goal verdict. Best-effort + observation-only — never changes
+        // the run and never disturbs completion (mirrors the CAP-02 promotion).
+        publishRunOutcome(tenantId, runPid, agentCode, plan, result);
 
         // Dispatch child tasks when parent completes successfully
         if (success) {
@@ -639,21 +656,68 @@ public class AgentRunService {
                 }
             }
 
-            // Save-back: store a summary memory from this successful run
+            // Save-back: store a summary memory from this successful run. Re-read
+            // the agent code from the task row (its assignee_id) — the memory /
+            // session-ended path has historically keyed off the persisted task
+            // owner rather than the caller-supplied agentCode.
             Map<String, Object> task = loadTask(tenantId, taskPid);
-            String agentCode = task != null ? (String) task.get("assignee_id") : null;
+            String taskAgentCode = task != null ? (String) task.get("assignee_id") : null;
             String taskTitle = task != null ? (String) task.get("title") : null;
-            if (agentCode != null) {
-                Map<String, Object> agentDef = loadAgentDefinition(tenantId, agentCode);
+            if (taskAgentCode != null) {
+                Map<String, Object> agentDef = loadAgentDefinition(tenantId, taskAgentCode);
                 String providerCode = LlmRuntimeResolver.resolveAgentProviderCode(
                         objectMapper, providerFactory, agentDef);
                 String memModel = LlmRuntimeResolver.resolveAgentModel(providerFactory, agentDef, providerCode);
                 runLifecycleService.saveRunMemory(tenantId, runPid, taskPid, result,
-                        agentCode, taskTitle, providerCode, memModel);
+                        taskAgentCode, taskTitle, providerCode, memModel);
 
-                publishSessionEndedIfApplicable(tenantId, runPid, agentCode,
+                publishSessionEndedIfApplicable(tenantId, runPid, taskAgentCode,
                         SessionEndedEvent.TerminalOutcome.SUCCEEDED);
             }
+        }
+    }
+
+    /**
+     * CAP-03: emit a best-effort run-completion outcome/goal verdict as an
+     * OBSERVATION on {@code ab_agent_observation}. The step loop only judges
+     * "keep going?"; nothing otherwise records whether a terminated run actually
+     * ACHIEVED its goal. {@link RunOutcomeEvaluator} derives the verdict
+     * ({@code achieved}/{@code partial}/{@code abandoned}) purely from the final
+     * plan + terminal-success flag; we publish it here.
+     *
+     * <p><strong>Observation-only + best-effort.</strong> This never mutates the
+     * run and never changes control flow. A failure to evaluate or publish is
+     * swallowed with a warn — run completion must not be disturbed (mirrors the
+     * CAP-02 best-effort candidate promotion). Gated by
+     * {@code aura.agent.run-outcome.enabled} (default true).
+     *
+     * <p>Degrades gracefully when the observation channel is absent — the
+     * try/catch covers a null/throwing {@code observationService} the same way it
+     * covers any other publish failure.
+     */
+    private void publishRunOutcome(Long tenantId, String runPid, String agentCode,
+                                   List<AgentPlanStep> plan, AgentLoopResult result) {
+        if (!runOutcomeEvalEnabled || observationService == null) {
+            return;
+        }
+        try {
+            RunOutcomeEvaluator.Outcome outcome = RunOutcomeEvaluator.evaluate(plan, result.success);
+            String runStatus = result.success ? "success" : "failed";
+            Map<String, Object> detail = new LinkedHashMap<>();
+            detail.put("verdict", outcome.verdict().code());
+            detail.put("completedSteps", outcome.completedSteps());
+            detail.put("totalSteps", outcome.totalSteps());
+            detail.put("failedSteps", outcome.failedSteps());
+            detail.put("skippedSteps", outcome.skippedSteps());
+            detail.put("runStatus", runStatus);
+            // recordPid = runPid so the observation is traceable back to the run
+            // row; modelCode slot carries the verdict as a coarse classifier
+            // (mirrors ScheduledOnlineEvalJob.emitDegraded's judgeMode usage).
+            observationService.publish(tenantId, "agent_run.outcome", agentCode,
+                    outcome.verdict().code(), runPid, detail);
+        } catch (Exception e) {
+            log.warn("CAP-03 run-outcome evaluation failed for run {} (observation-only, ignored): {}",
+                    runPid, e.getMessage());
         }
     }
 
