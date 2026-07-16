@@ -13,8 +13,8 @@ import {
  * Test cases: CUST-04 (delete), CUST-05 (sales self isolation + admin all).
  * Real browser, host-first stack.
  */
-const CUST_LIST = '/p/crm_account';
-const CUST_NEW = '/p/crm_account/new?commandCode=crm:create_account';
+const CUST_LIST = '/p/crm_account_common';
+const CUST_NEW = '/p/crm_account_common/new?commandCode=crm:create_account';
 
 const uid = uniqueId('w2a').replace(/_/g, '-');
 const users: Record<string, QuoteRoleUser> = {};
@@ -50,7 +50,7 @@ async function listSearch(page: Page, listPath: string, keyword: string): Promis
       '[data-testid="search-button"], [data-testid="table-search-button"], button:has-text("搜索")'
     ).first();
     const response = page.waitForResponse((r) => (
-      r.url().includes('/api/dynamic/crm_account/list') && r.request().method() === 'GET'
+      r.url().includes('/api/dynamic/crm_account_common/list') && r.request().method() === 'GET'
     ), { timeout: 5000 }).catch(() => null);
     if (await searchBtn.count() > 0) await searchBtn.click();
     else await page.keyboard.press('Enter');

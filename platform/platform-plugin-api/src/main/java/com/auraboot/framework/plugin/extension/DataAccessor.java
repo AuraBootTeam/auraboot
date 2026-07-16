@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Data access interface for plugin command handlers.
@@ -114,4 +115,28 @@ public interface DataAccessor {
      * @param recordId  the record ID to delete
      */
     void delete(String modelCode, String recordId);
+
+    /**
+     * Atomically increment one numeric field, optionally bounded by another
+     * numeric field. Runtime implementations execute one UPDATE ... RETURNING;
+     * the default fails closed so plugins cannot silently fall back to a racy
+     * read-modify-write sequence.
+     *
+     * @since 2.7.0
+     */
+    default Optional<Long> incrementWithinCap(String modelCode,
+                                              String recordId,
+                                              String counterCode,
+                                              long delta,
+                                              String capCode) {
+        throw new UnsupportedOperationException("Atomic increment is not supported by this DataAccessor");
+    }
+
+    /** Atomically increment one numeric field without a cap. */
+    default Optional<Long> increment(String modelCode,
+                                     String recordId,
+                                     String counterCode,
+                                     long delta) {
+        return incrementWithinCap(modelCode, recordId, counterCode, delta, null);
+    }
 }

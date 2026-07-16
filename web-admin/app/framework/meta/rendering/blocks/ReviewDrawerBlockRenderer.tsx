@@ -960,7 +960,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   </summary>
                   <div className="space-y-3 border-t border-gray-100 p-3">
                     {sourceCards.length > 0 && (
-                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <div
+                        data-testid="review-drawer-source-cards"
+                        className="grid gap-3 md:grid-cols-2"
+                      >
                         {sourceCards.map((card: any) => {
                           const key = String(card.key || card.title || card.valueField);
                           const value = `${formatValue(readFieldValue(sourceRecord, card), card.emptyText)}${
@@ -969,12 +972,17 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           return (
                             <section
                               key={key}
+                              data-testid={`review-drawer-source-card-${key}`}
                               className="rounded-card border-border bg-subtle border p-3"
                             >
                               <h3 className="text-text-2 text-xs font-medium">
                                 {getLocalizedText(card.title || key, locale, t)}
                               </h3>
-                              <div className="text-text mt-2 text-sm font-semibold break-words">
+                              <div
+                                data-testid={`review-drawer-source-card-${key}-value`}
+                                title={value}
+                                className="text-text mt-2 text-sm font-semibold [overflow-wrap:anywhere]"
+                              >
                                 {value}
                               </div>
                               {card.description && (

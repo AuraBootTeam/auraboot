@@ -67,6 +67,41 @@ function mappedValue(
   return typeof mapped === 'string' ? mapped : getLocalizedText(mapped as LocalizedText, locale, t);
 }
 
+function formatSummaryValue(
+  value: unknown,
+  field: any,
+  locale: string,
+  t: (key: string) => string,
+): string {
+  const mapped = mappedValue(value, field?.valueMap, locale, t);
+  if (mapped !== null) return mapped;
+
+  const precision = Number(field?.precision);
+  const numericValue = typeof value === 'number' ? value : Number(String(value).trim());
+  if (
+    Number.isInteger(precision) &&
+    precision >= 0 &&
+    precision <= 20 &&
+    Number.isFinite(numericValue)
+  ) {
+    return new Intl.NumberFormat(locale, {
+      maximumFractionDigits: precision,
+      useGrouping: false,
+    }).format(numericValue);
+  }
+  return String(value);
+}
+
+function localizedAuxValue(
+  value: unknown,
+  locale: string,
+  t: (key: string) => string,
+): string {
+  if (value === undefined || value === null || value === '') return '';
+  if (typeof value === 'object') return getLocalizedText(value as LocalizedText, locale, t);
+  return String(value);
+}
+
 function shouldHideSummaryField(field: any): boolean {
   if (field?.hidden === true) return true;
   const fieldName = String(field?.field || field?.key || '')
@@ -308,7 +343,10 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
             if (shouldHideSummaryField(field)) return null;
             const value = readPath(record, field.field);
             if (value === undefined || value === null || value === '') return null;
-            const displayValue = mappedValue(value, field.valueMap, locale, t) ?? String(value);
+            const displayValue = formatSummaryValue(value, field, locale, t);
+            const unitValue = field.unitField ? readPath(record, field.unitField) : field.unit;
+            const unit = localizedAuxValue(unitValue, locale, t);
+            const renderedDisplayValue = unit ? `${displayValue} ${unit}` : displayValue;
             const href = resolveSummaryFieldLink(field, record, displayValue);
             return (
               <div key={key} className="rounded-control min-w-0 bg-white/60 px-3 py-2">
@@ -317,7 +355,7 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
                 </dt>
                 <dd
                   className="mt-0.5 min-w-0 text-sm leading-snug font-semibold break-words"
-                  title={displayValue}
+                  title={renderedDisplayValue}
                 >
                   {href ? (
                     <a
@@ -325,10 +363,10 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
                       href={href}
                       onClick={(event) => handleSummaryLinkClick(event, href)}
                     >
-                      {displayValue}
+                      {renderedDisplayValue}
                     </a>
                   ) : (
-                    displayValue
+                    renderedDisplayValue
                   )}
                 </dd>
               </div>

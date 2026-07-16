@@ -4,7 +4,9 @@ import { AsyncTaskProgressModal, parseProgressMessage } from '../AsyncTaskProgre
 
 describe('parseProgressMessage', () => {
   it('parses progress json', () => {
-    expect(parseProgressMessage('{"processed":10,"total":20,"ok":8,"failed":1,"skipped":1}')).toEqual({
+    expect(
+      parseProgressMessage('{"processed":10,"total":20,"ok":8,"failed":1,"skipped":1}'),
+    ).toEqual({
       processed: 10,
       total: 20,
       ok: 8,
@@ -39,6 +41,7 @@ describe('AsyncTaskProgressModal', () => {
       <AsyncTaskProgressModal
         task={{
           status: 'completed',
+          taskLabel: '数据导入',
           progress: 100,
           resultData: {
             totalRows: 3,
@@ -52,7 +55,7 @@ describe('AsyncTaskProgressModal', () => {
         onBackground={() => {}}
       />,
     );
-    expect(screen.getByText(/导入完成|Completed/)).toBeTruthy();
+    expect(screen.getByText(/数据导入已完成|Completed/)).toBeTruthy();
     expect(screen.getByText(/重复料号/)).toBeTruthy();
     expect(screen.getByTestId('copy-failures')).toBeTruthy();
   });
@@ -63,6 +66,7 @@ describe('AsyncTaskProgressModal', () => {
       <AsyncTaskProgressModal
         task={{
           status: 'completed',
+          taskLabel: '数据导入',
           progress: 100,
           resultData: {
             totalRows: 3,
@@ -89,13 +93,67 @@ describe('AsyncTaskProgressModal', () => {
     );
     expect(screen.getByText(/文件解析失败/)).toBeTruthy();
   });
+  it('completed generic command: renders declarative metrics without import-only zero counts', () => {
+    render(
+      <AsyncTaskProgressModal
+        task={{
+          status: 'completed',
+          taskLabel: '立即增量同步',
+          locale: 'zh-CN',
+          progress: 100,
+          resultData: { processedRows: 154, masterCreated: 151, failedRows: 0 },
+          presentation: {
+            title: { 'zh-CN': '金蝶物料增量同步', 'en-US': 'Kingdee incremental sync' },
+            completedMessage: { 'zh-CN': '金蝶物料同步完成', 'en-US': 'Kingdee sync completed' },
+            metrics: [
+              { field: 'processedRows', label: { 'zh-CN': '处理行数', 'en-US': 'Processed' } },
+              {
+                field: 'masterCreated',
+                label: { 'zh-CN': '新增物料', 'en-US': 'Created' },
+                tone: 'success',
+              },
+              {
+                field: 'failedRows',
+                label: { 'zh-CN': '失败行数', 'en-US': 'Failed' },
+                tone: 'danger',
+              },
+            ],
+          },
+        }}
+        onClose={() => {}}
+        onBackground={() => {}}
+      />,
+    );
+    expect(screen.getByText('金蝶物料增量同步')).toBeTruthy();
+    expect(screen.getByText('金蝶物料同步完成')).toBeTruthy();
+    expect(screen.getByText(/处理行数/).textContent).toContain('154');
+    expect(screen.queryByText(/总行数: 0/)).toBeNull();
+  });
+  it('cancelled: is terminal and exposes cancellation state', () => {
+    render(
+      <AsyncTaskProgressModal
+        task={{ status: 'cancelled', taskLabel: '全量对账', progress: 20 }}
+        onClose={() => {}}
+        onBackground={() => {}}
+      />,
+    );
+    expect(screen.getByTestId('async-task-modal-cancelled')).toBeTruthy();
+    expect(screen.getByText(/任务已取消|Cancelled/)).toBeTruthy();
+  });
   it('empty file: total 0 message', () => {
     render(
       <AsyncTaskProgressModal
         task={{
           status: 'completed',
+          taskLabel: '数据导入',
           progress: 100,
-          resultData: { totalRows: 0, importedRows: 0, skippedRows: 0, failedRows: 0, failures: [] },
+          resultData: {
+            totalRows: 0,
+            importedRows: 0,
+            skippedRows: 0,
+            failedRows: 0,
+            failures: [],
+          },
         }}
         onClose={() => {}}
         onBackground={() => {}}

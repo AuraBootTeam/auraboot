@@ -3,13 +3,17 @@ package com.auraboot.framework.meta.service.impl;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.meta.ddl.TableMetadataService;
 import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.meta.service.executor.ExecutorRegistry;
 import com.auraboot.framework.permission.service.FieldPermissionService;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -19,6 +23,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationContext;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -27,6 +34,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for {@link DynamicDataServiceImpl#resolveEnrichmentTarget} — the decision that
@@ -66,6 +77,16 @@ class DynamicDataServiceImplReferenceEnrichmentTest {
 
     @InjectMocks
     private DynamicDataServiceImpl service;
+
+    @BeforeEach
+    void setContext() {
+        MetaContext.setContext(1L, 2L, "user-pid", "tester");
+    }
+
+    @AfterEach
+    void clearContext() {
+        MetaContext.clear();
+    }
 
     private String[] target(FieldDefinition field) {
         return (String[]) ReflectionTestUtils.invokeMethod(service, "resolveEnrichmentTarget", field);
@@ -134,5 +155,34 @@ class DynamicDataServiceImplReferenceEnrichmentTest {
             assertTrue(r[0].startsWith("COALESCE("), "expression for displayField=" + df + " was " + r[0]);
             assertFalse(r[0].contains("username"), "must not leak a raw username column for displayField=" + df);
         }
+    }
+
+    @Test
+    @DisplayName("configured displayName on sys_user uses the canonical physical display expression")
+    void systemUserLogicalDisplayNameNeverBecomesAnUnvalidatedColumn() {
+        FieldDefinition owner = field("crm_acc_owner", "reference", Map.of(
+                "refTarget", Map.of("targetEntity", "sys_user", "displayField", "displayName")));
+        owner.setColumnName("crm_acc_owner");
+        ModelDefinition source = ModelDefinition.builder()
+                .code("crm_account_common")
+                .tableName("mt_crm_account_common")
+                .fields(List.of(owner))
+                .build();
+        when(metadataService.getModelDefinition("crm_account_common")).thenReturn(Optional.of(source));
+        when(metadataService.getModelDefinition("sys_user")).thenReturn(Optional.empty());
+        when(dataPermissionEngine.getFieldMaskRules(1L, "sys_user", 2L)).thenReturn(List.of());
+        when(dynamicDataMapper.selectByQuery(argThat(sql ->
+                        sql.contains("COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email) AS display_value")
+                                && !sql.contains(" displayName ")), anyMap()))
+                .thenReturn(List.of(Map.of("pid", "owner-1", "display_value", "Alice")));
+
+        Map<String, Object> record = new HashMap<>();
+        record.put("crm_acc_owner", "owner-1");
+        List<Map<String, Object>> records = new ArrayList<>(List.of(record));
+        ReflectionTestUtils.invokeMethod(service, "enrichReferenceDisplayFields",
+                "crm_account_common", records);
+
+        assertEquals("Alice", record.get("crm_acc_owner_display"));
+        verify(dynamicDataMapper).selectByQuery(argThat(sql -> sql.contains(" AS display_value")), anyMap());
     }
 }

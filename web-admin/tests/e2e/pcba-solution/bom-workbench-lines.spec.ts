@@ -37,7 +37,10 @@ function findSampleBom(): string | undefined {
 async function post(page: Page, code: string, payload: any, op = 'create', target?: string) {
   const data: any = { payload, operationType: op };
   if (target) data.targetRecordPid = target;
-  const r = await page.request.post(`/api/meta/commands/execute/${code}`, { data });
+  const r = await page.request.post(`/api/meta/commands/execute/${code}`, {
+    data,
+    timeout: 150_000,
+  });
   return { status: r.status(), body: await r.json().catch(() => ({})) };
 }
 const pid = (b: any) => b?.data?.data?.recordPid || b?.data?.recordPid || b?.data?.recordId;
@@ -55,6 +58,32 @@ async function listConversionTasks(page: Page): Promise<any[]> {
   const lb = await list.json().catch(() => ({} as any));
   const recs = lb?.data?.records || lb?.data?.data?.records || lb?.data || [];
   return Array.isArray(recs) ? recs : [];
+}
+
+async function advanceTaskThroughImportGateway(page: Page, projId: string, fileId: string): Promise<string> {
+  let task: any;
+  await expect.poll(async () => {
+    task = findTask(await listConversionTasks(page), projId, fileId);
+    return String(task?.bom_task_status || '');
+  }, { timeout: 150_000, intervals: [1_000, 2_000, 5_000] }).toMatch(
+    /^(analysis_ready|adjustment_required|plan_ready|completed)$/,
+  );
+
+  const id = task?.pid || task?.id || '';
+  expect(id, 'pre-analysis produced a conversion task').toBeTruthy();
+  if (task?.bom_task_status !== 'completed') {
+    if (task?.bom_task_status !== 'plan_ready') {
+      const dryRun = await post(page, 'bom:dry_run_parse_plan', { pid: id }, 'update', id);
+      expect(dryRun.status, 'parse-plan dry run is accepted').toBe(200);
+      await expect.poll(async () => {
+        task = findTask(await listConversionTasks(page), projId, fileId);
+        return String(task?.bom_task_status || '');
+      }, { timeout: 150_000, intervals: [1_000, 2_000, 5_000] }).toBe('plan_ready');
+    }
+    const applied = await post(page, 'bom:apply_parse_plan', { pid: id }, 'update', id);
+    expect(applied.status, 'passing parse plan is applied').toBe(200);
+  }
+  return id;
 }
 
 function findTask(recs: any[], projId: string, fileId: string): any | undefined {
@@ -91,10 +120,10 @@ test.describe('BOM workbench candidate confirm/undo/exclude (BOM-05/06/07) @smok
       const up = await s.page.request.post('/api/file/upload', { multipart: { file: { name: 'bom.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: fs.readFileSync(bom!) } } });
       const fileId = (await up.json())?.data?.fileId;
       await post(s.page, 'bom:start_conversion', { bom_task_project_id: projId, bom_task_source_package: 'wbl', bom_task_raw_file_id: fileId });
+      taskId = await advanceTaskThroughImportGateway(s.page, projId, fileId);
       await expect.poll(async () => {
         const mine = findTask(await listConversionTasks(s.page), projId, fileId);
-        taskId = mine?.pid || mine?.id || '';
-        return taskId ? (await listLines(s.page)).length : 0;
+        return mine?.bom_task_status === 'completed' && taskId ? (await listLines(s.page)).length : 0;
       }, { timeout: 150_000, intervals: [1_000, 2_000, 5_000] }).toBeGreaterThan(0);
       expect(taskId, 'conversion produced a task').toBeTruthy();
       expect((await listLines(s.page)).length, 'conversion produced standard lines').toBeGreaterThan(0);

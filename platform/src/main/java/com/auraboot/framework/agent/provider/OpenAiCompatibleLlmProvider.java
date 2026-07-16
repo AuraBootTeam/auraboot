@@ -328,6 +328,14 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
         }
         body.put("messages", messages);
 
+        if (request.getResponseFormat() != null && !request.getResponseFormat().isBlank()) {
+            if (!"json_object".equals(request.getResponseFormat())) {
+                throw new IllegalArgumentException(
+                        "Unsupported OpenAI-compatible response format: " + request.getResponseFormat());
+            }
+            body.put("response_format", Map.of("type", "json_object"));
+        }
+
         // Tools
         if (request.getTools() != null && !request.getTools().isEmpty() && !isToolUnsupportedProvider(request.getModel())) {
             List<Map<String, Object>> tools = new ArrayList<>();
