@@ -64,11 +64,12 @@ export function AsyncTaskModalHost() {
     const terminal =
       task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled';
     const live = parseProgressMessage(task.progressMessage);
+    const taskLabel = task.taskLabel || '后台任务';
     const label = terminal
       ? task.status === 'completed'
-        ? '导入完成'
-        : '导入结束'
-      : `导入中 ${typeof task.progress === 'number' ? task.progress : 0}%${
+        ? `${taskLabel}已完成`
+        : `${taskLabel}已结束`
+      : `${taskLabel} ${typeof task.progress === 'number' ? task.progress : 0}%${
           live ? ` · ${live.ok}/${live.total}` : ''
         }`;
     return (

@@ -45,8 +45,29 @@ describe('useActionHandler - handlerParams.async polling', () => {
     // 1) command execute → immediate async ack; 2) task poll → completed.
     fetchResultMock
       // Command engine wraps the handler ack one level deep (result.data.data).
-      .mockResolvedValueOnce({ code: '0', data: { commandCode: 'c', phaseReached: 'completed', data: { async: true, taskCode: 'T1', taskType: 'command-handler' } } })
-      .mockResolvedValueOnce({ code: '0', data: { status: 'completed', resultData: { importedRows: 35924 } } });
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          commandCode: 'c',
+          phaseReached: 'completed',
+          data: { async: true, taskCode: 'T1', taskType: 'command-handler' },
+        },
+      })
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          status: 'completed',
+          inputParams: {
+            handlerParams: {
+              taskPresentation: {
+                title: { 'zh-CN': '物料导入' },
+                metrics: [{ field: 'importedRows', label: { 'zh-CN': '导入行数' } }],
+              },
+            },
+          },
+          resultData: { importedRows: 35924 },
+        },
+      });
 
     const loadData = vi.fn().mockResolvedValue(undefined);
     const showToast = vi.fn();
@@ -74,7 +95,9 @@ describe('useActionHandler - handlerParams.async polling', () => {
 
     // Polled the async-task status endpoint (not just the execute call).
     const urls = fetchResultMock.mock.calls.map((c) => String(c[0]));
-    expect(urls.some((u) => u.includes('/api/meta/commands/execute/bom:import_material_library'))).toBe(true);
+    expect(
+      urls.some((u) => u.includes('/api/meta/commands/execute/bom:import_material_library')),
+    ).toBe(true);
     expect(urls.some((u) => u.includes('/api/async-tasks/T1'))).toBe(true);
     // Success path reloaded the list.
     expect(loadData).toHaveBeenCalled();
@@ -84,7 +107,12 @@ describe('useActionHandler - handlerParams.async polling', () => {
     // summary (not just a fire-and-forget toast).
     expect(result.current.activeTask).not.toBeNull();
     expect(result.current.activeTask?.status).toBe('completed');
+    expect(result.current.activeTask?.taskLabel).toBe('Import');
     expect(result.current.activeTask?.resultData).toEqual({ importedRows: 35924 });
+    expect(result.current.activeTask?.presentation).toEqual({
+      title: { 'zh-CN': '物料导入' },
+      metrics: [{ field: 'importedRows', label: { 'zh-CN': '导入行数' } }],
+    });
     // Dismissing clears the modal.
     act(() => result.current.clearActiveTask());
     expect(result.current.activeTask).toBeNull();
@@ -125,10 +153,7 @@ describe('useActionHandler - handlerParams.async polling', () => {
     });
 
     expect(writeText).toHaveBeenCalledWith('TempPass1!');
-    expect(showToast).toHaveBeenCalledWith(
-      expect.stringContaining('TempPass1!'),
-      'success',
-    );
+    expect(showToast).toHaveBeenCalledWith(expect.stringContaining('TempPass1!'), 'success');
   });
 
   it('collects command inputFields and merges them into the command payload', async () => {
@@ -207,8 +232,18 @@ describe('useActionHandler - handlerParams.async polling', () => {
 
   it('surfaces a failed async task in the modal instead of throwing to the page', async () => {
     fetchResultMock
-      .mockResolvedValueOnce({ code: '0', data: { commandCode: 'c', phaseReached: 'completed', data: { async: true, taskCode: 'T2' } } })
-      .mockResolvedValueOnce({ code: '0', data: { status: 'failed', errorMessage: 'source_file_id is required' } });
+      .mockResolvedValueOnce({
+        code: '0',
+        data: {
+          commandCode: 'c',
+          phaseReached: 'completed',
+          data: { async: true, taskCode: 'T2' },
+        },
+      })
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { status: 'failed', errorMessage: 'source_file_id is required' },
+      });
 
     const loadData = vi.fn();
     const onError = vi.fn();
@@ -460,16 +495,21 @@ describe('useActionHandler - handlerParams.async polling', () => {
       await result.current.handleAction(button, { pid: 'TASK-123' });
     });
 
-    expect(openSpy).toHaveBeenCalledWith('/p/bom_conversion_task_pcba_workbench/view/TASK-123', '_self');
+    expect(openSpy).toHaveBeenCalledWith(
+      '/p/bom_conversion_task_pcba_workbench/view/TASK-123',
+      '_self',
+    );
     expect(navigate).not.toHaveBeenCalled();
     openSpy.mockRestore();
   });
 
   it('injects the original filename alongside promptUpload file ids', async () => {
     fetchResultMock.mockResolvedValueOnce({ code: '0', data: { importId: 'BOM-IMPORT-1' } });
-    const pickFileSpy = vi.spyOn(promptUpload, 'pickFile').mockResolvedValueOnce(
-      new File(['mpn,qty\nRC0603FR-0710KL,2'], 'corrected-bom-ui-upload.xlsx'),
-    );
+    const pickFileSpy = vi
+      .spyOn(promptUpload, 'pickFile')
+      .mockResolvedValueOnce(
+        new File(['mpn,qty\nRC0603FR-0710KL,2'], 'corrected-bom-ui-upload.xlsx'),
+      );
     vi.spyOn(promptUpload, 'uploadCommandFile').mockResolvedValueOnce('FILE-123');
 
     const reload = vi.fn().mockResolvedValue(undefined);
@@ -719,7 +759,9 @@ describe('useActionHandler - handlerParams.async polling', () => {
       'info',
     );
     expect(runtimeToast).toHaveBeenCalledWith(
-      expect.stringContaining('process-fee-rules.xlsx 已导入为草稿 PFR-20260615113614，共 10 行；发布后生效'),
+      expect.stringContaining(
+        'process-fee-rules.xlsx 已导入为草稿 PFR-20260615113614，共 10 行；发布后生效',
+      ),
       'success',
     );
   });

@@ -77,9 +77,9 @@ test.describe('QuoteOps corrected BOM upload golden', () => {
       await expect(
         page.getByRole('alert').filter({ hasText: /completed|完成|导入|Imported/i }).first(),
       ).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByText(/导入完成\s*\/\s*Completed/i)).toBeVisible({
-        timeout: 20_000,
-      });
+      await expect(
+        page.getByText(/上传修正BOM已完成|任务已成功完成|Completed/i).first(),
+      ).toBeVisible({ timeout: 20_000 });
 
       await expect
         .poll(

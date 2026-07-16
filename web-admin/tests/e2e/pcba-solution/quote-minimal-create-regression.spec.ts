@@ -178,7 +178,7 @@ test.describe('PCBA quote minimal create regression', () => {
         accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '',
       );
       expect(accountId, 'crm:create_account should return recordId').toBeTruthy();
-      created.rows.push({ model: 'crm_account', pid: accountId });
+      created.rows.push({ model: 'crm_account_common', pid: accountId });
 
       const projectResult = await executeCommand(
         page,
@@ -202,7 +202,7 @@ test.describe('PCBA quote minimal create regression', () => {
       const accountOptionsLoaded = page
         .waitForResponse(
           (response) =>
-            response.url().includes('/api/dynamic/crm_account/list') &&
+            response.url().includes('/api/dynamic/crm_account_common/list') &&
             response.request().method() === 'GET' &&
             response.status() === 200,
           { timeout: 20_000 },
@@ -283,7 +283,7 @@ test.describe('PCBA quote minimal create regression', () => {
       const customerRequestId = String(quote.qo_quote_customer_request_id ?? '');
       expect(customerRequestId, 'quote should keep hidden customer request id').toBeTruthy();
       created.rows = [
-        { model: 'crm_account', pid: accountId },
+        { model: 'crm_account_common', pid: accountId },
         { model: 'req_requirement_set_pcba_bom', pid: projectId },
         { model: 'crm_customer_request_common', pid: customerRequestId },
         { model: 'qo_quote_common', pid: quoteId },
@@ -314,7 +314,7 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(pcbaRfq.crm_customer_request_id).toBe(customerRequestId);
       expect(pcbaRfqId, 'pcba rfq id should be known for cleanup').toBeTruthy();
       created.rows = [
-        { model: 'crm_account', pid: accountId },
+        { model: 'crm_account_common', pid: accountId },
         { model: 'req_requirement_set_pcba_bom', pid: projectId },
         { model: 'crm_customer_request_common', pid: customerRequestId },
         { model: 'crm_customer_request_pcba_rfq', pid: pcbaRfqId },

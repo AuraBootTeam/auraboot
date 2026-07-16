@@ -743,11 +743,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         if (configuredDisplayField != null && !configuredDisplayField.isBlank()) {
             for (FieldDefinition field : fields) {
-                if (configuredDisplayField.equals(field.getCode())) {
+                String columnName = field.getColumnName() != null ? field.getColumnName() : field.getCode();
+                if (configuredDisplayField.equals(field.getCode()) || configuredDisplayField.equals(columnName)) {
                     return field.getColumnName() != null ? field.getColumnName() : field.getCode();
                 }
             }
-            return configuredDisplayField;
         }
 
         if (targetModel != null) {
