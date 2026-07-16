@@ -244,6 +244,10 @@ test.describe('SavedView shared local draft actions', () => {
   test('SV-SD-001: viewer keeps global view changes local and can copy draft to personal', async ({
     browser,
   }) => {
+    // This case drives two separate role contexts (admin seed + viewer flow) and a
+    // full dashboard load before the multi-step nav, which legitimately exceeds the
+    // 15s global default. Triple the budget rather than trim the user journey.
+    test.slow();
     let sourceViewPid = '';
     const viewName = `SV_Global_ReadOnly_${uniqueId()}`;
     await withRolePage(browser, ADMIN_STORAGE_STATE, async (page) => {
