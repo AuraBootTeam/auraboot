@@ -168,18 +168,30 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         try {
             ChatRequest legacyRequest = request.legacyRequest();
             String agentCode = request.agentCode();
-            TurnExecutionPlanner.TurnExecutionPlan turnPlan = turnExecutionPlanner.decide(
-                    new TurnExecutionPlanner.TurnExecutionInput(
-                            agentCode,
-                            ctx.triageBucket(),
-                            ctx.allowedReadOnlyTools(),
-                            optionFlag(request, "explicitDurableRequest", "durableWorkflow", "durable"),
-                            optionFlag(request, "requiresApproval"),
-                            optionFlag(request, "externalSideEffect"),
-                            optionFlag(request, "batch")));
-            TurnExecutionPlanner.InitialExecutionMode initialMode = turnPlan.initialMode();
-            log.debug("Agent turn execution plan: turnId={}, initialMode={}, reason={}, signals={}",
-                    ctx.turnId(), initialMode, turnPlan.reason(), turnPlan.policySignals());
+            TurnExecutionPlanner.InitialExecutionMode initialMode;
+            if (TurnExecutionPlanner.isRagOnlyChannel(request.channel())) {
+                // RAG-only channel (embeddable CS widget): pure knowledge Q&A. Never route to the
+                // durable/planner path regardless of triage bucket — otherwise a "cancel account /
+                // export data" question is classified as a task and runs execute_sql, looping on tool
+                // rounds or demanding human approval on a customer-facing widget (the RAG-only channel
+                // tool gate in ChatToolResolver only covers the SYNC path). Force the sync RAG turn.
+                initialMode = TurnExecutionPlanner.InitialExecutionMode.SYNC_AGENT_TURN;
+                log.debug("Agent turn execution plan: turnId={}, RAG-only channel {} forced to SYNC_AGENT_TURN",
+                        ctx.turnId(), request.channel());
+            } else {
+                TurnExecutionPlanner.TurnExecutionPlan turnPlan = turnExecutionPlanner.decide(
+                        new TurnExecutionPlanner.TurnExecutionInput(
+                                agentCode,
+                                ctx.triageBucket(),
+                                ctx.allowedReadOnlyTools(),
+                                optionFlag(request, "explicitDurableRequest", "durableWorkflow", "durable"),
+                                optionFlag(request, "requiresApproval"),
+                                optionFlag(request, "externalSideEffect"),
+                                optionFlag(request, "batch")));
+                initialMode = turnPlan.initialMode();
+                log.debug("Agent turn execution plan: turnId={}, initialMode={}, reason={}, signals={}",
+                        ctx.turnId(), initialMode, turnPlan.reason(), turnPlan.policySignals());
+            }
             if (initialMode == TurnExecutionPlanner.InitialExecutionMode.NAMED_AGENT_TURN) {
                 outcome = dispatchToNamedAgent(ctx, request, legacyRequest, capturingSink, agentCode);
             } else {

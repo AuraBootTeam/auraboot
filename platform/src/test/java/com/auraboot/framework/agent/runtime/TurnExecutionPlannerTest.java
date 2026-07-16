@@ -110,4 +110,13 @@ class TurnExecutionPlannerTest {
                         .doesNotContain("CONTEXTUAL")
                         .doesNotContain("LIGHT"));
     }
+
+    @Test
+    @DisplayName("cs_widget is a RAG-only channel; other channels and null are not")
+    void csWidgetIsRagOnlyChannel() {
+        assertThat(TurnExecutionPlanner.isRagOnlyChannel("cs_widget")).isTrue();
+        assertThat(TurnExecutionPlanner.isRagOnlyChannel("web")).isFalse();
+        assertThat(TurnExecutionPlanner.isRagOnlyChannel("im")).isFalse();
+        assertThat(TurnExecutionPlanner.isRagOnlyChannel(null)).isFalse();
+    }
 }
