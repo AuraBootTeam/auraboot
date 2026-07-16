@@ -24,6 +24,19 @@ server:
 
 # 基础日志配置
 logging:
+  # Structured (JSON) logging for the aggregated/prod surface. Empty by default
+  # (falls back to the human-readable pattern below), so local dev logs stay readable.
+  # Turn on per-env, e.g. LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs, to emit ECS JSON that
+  # Loki/Grafana/ELK parse natively. Spring Boot structured logging (3.4+) emits MDC as
+  # fields, so the traceId/spanId/tenantId/userId put into MDC by JwtAuthenticationFilter
+  # become queryable fields. See docs/backlog observability Phase 2 plan.
+  structured:
+    format:
+      console: ${LOGGING_STRUCTURED_FORMAT_CONSOLE:}
+      file: ${LOGGING_STRUCTURED_FORMAT_FILE:}
+    ecs:
+      service:
+        name: ${LOGGING_STRUCTURED_ECS_SERVICE_NAME:auraboot}
   pattern:
     # Central log-injection guard: normalize CR/LF/TAB in formatted log messages
     # at the Logback layout layer so business code does not need per-call sanitizers.
