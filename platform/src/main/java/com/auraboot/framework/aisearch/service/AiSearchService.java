@@ -1,7 +1,7 @@
-package com.auraboot.framework.ai.search.service;
+package com.auraboot.framework.aisearch.service;
 
-import com.auraboot.framework.ai.search.dto.AiSearchRequest;
-import com.auraboot.framework.ai.search.dto.AiSearchResult;
+import com.auraboot.framework.aisearch.dto.AiSearchRequest;
+import com.auraboot.framework.aisearch.dto.AiSearchResult;
 
 /**
  * AI-powered natural language search service.
