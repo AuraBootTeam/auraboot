@@ -260,6 +260,15 @@ configurations {
         exclude group: 'org.slf4j', module: 'slf4j-reload4j'
         exclude group: 'org.slf4j', module: 'slf4j-log4j12'
         exclude group: 'log4j', module: 'log4j'
+        // The ancient XPP pull parsers (org.gjt.xpp, from xmlpull/pull-parser/xpp3) register
+        // org.gjt.xpp.sax2.Driver as the SAX driver but reject SAX properties Apache POI/xmlbeans
+        // require ("not supported setting property lexical-handler") — OOXML ingestion then throws
+        // "Failed to parse PPTX" in the assembled app (unit tests pass on the JDK parser, so only a
+        // real-stack golden catches it). The JDK SAX parser + stax2-api/woodstox handle XML; drop them.
+        exclude group: 'pull-parser', module: 'pull-parser'
+        exclude group: 'xpp3', module: 'xpp3'
+        exclude group: 'stax', module: 'stax-api'
+        exclude group: 'javax.xml.stream', module: 'stax-api'
     }
 }
 
