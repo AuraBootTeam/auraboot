@@ -20,36 +20,31 @@ permissions:
 env:
   REGISTRY: ghcr.io
 
+# Native per-arch build + manifest merge (no QEMU). amd64 builds on ubuntu-latest,
+# arm64 builds on the free public ubuntu-24.04-arm runner. Emulating the frontend
+# (pnpm/Vite) on arm64 via QEMU used to exceed GitHub's 6h job cap (issue #1270);
+# native runners keep every build under ~15 min.
 jobs:
   build:
-    name: Build, push ${{ matrix.name }} (multi-arch)
-    runs-on: ubuntu-latest
+    name: Build ${{ matrix.image }} (${{ matrix.platform }})
+    runs-on: ${{ matrix.platform == 'linux/arm64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Backend: builds the boot jar and bakes the OSS config plugins so a
-          # pure `docker pull` needs no repo checkout. Context is the repo root.
-          - name: backend
-            image: auraboot
-            context: .
-            file: platform/Dockerfile
-          # Frontend: BFF + SSR. Context is the repo root (workspace packages).
-          - name: frontend
-            image: auraboot-frontend
-            context: .
-            file: web-admin/Dockerfile
-          # Postgres: pgvector + baked schema.sql so first boot seeds the schema
-          # without a repo checkout.
-          - name: postgres
-            image: auraboot-postgres
-            context: .
-            file: docker/postgres/Dockerfile
+        image: [backend, frontend, postgres]
+        platform: [linux/amd64, linux/arm64]
     steps:
-      - uses: actions/checkout@v6
+      - name: Resolve image name + Dockerfile
+        id: img
+        run: |
+          case "${{ matrix.image }}" in
+            backend)  echo "name=auraboot"          >> "$GITHUB_OUTPUT"; echo "file=platform/Dockerfile"        >> "$GITHUB_OUTPUT" ;;
+            frontend) echo "name=auraboot-frontend" >> "$GITHUB_OUTPUT"; echo "file=web-admin/Dockerfile"       >> "$GITHUB_OUTPUT" ;;
+            postgres) echo "name=auraboot-postgres" >> "$GITHUB_OUTPUT"; echo "file=docker/postgres/Dockerfile" >> "$GITHUB_OUTPUT" ;;
+          esac
 
-      - name: Set up QEMU (multi-arch)
-        uses: docker/setup-qemu-action@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -61,11 +56,71 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build & push by digest
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ steps.img.outputs.file }}
+          platforms: ${{ matrix.platform }}
+          cache-from: type=gha,scope=${{ matrix.image }}-${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}-${{ matrix.platform }}
+          outputs: type=image,name=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ steps.img.outputs.name }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export digest
+        run: |
+          mkdir -p /tmp/digests
+          digest="${{ steps.build.outputs.digest }}"
+          touch "/tmp/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests-${{ matrix.image }}-${{ matrix.platform == 'linux/arm64' && 'arm64' || 'amd64' }}
+          path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    name: Merge & tag ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [backend, frontend, postgres]
+    steps:
+      - name: Resolve image name
+        id: img
+        run: |
+          case "${{ matrix.image }}" in
+            backend)  echo "name=auraboot"          >> "$GITHUB_OUTPUT" ;;
+            frontend) echo "name=auraboot-frontend" >> "$GITHUB_OUTPUT" ;;
+            postgres) echo "name=auraboot-postgres" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Download digests
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/digests
+          pattern: digests-${{ matrix.image }}-*
+          merge-multiple: true
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image }}
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ steps.img.outputs.name }}
           # Tags:
           #   main → latest, sha-<short>
           #   v1.2.3 → 1.2.3, 1.2, 1, latest
@@ -78,19 +133,13 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
 
-      - name: Build & push ${{ matrix.name }} image
-        uses: docker/build-push-action@v7
-        with:
-          context: ${{ matrix.context }}
-          file: ${{ matrix.file }}
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
-
-      - name: Output image refs
+      - name: Create manifest list & push
+        working-directory: /tmp/digests
         run: |
-          echo "Pushed ${{ matrix.name }}:"
-          echo "${{ steps.meta.outputs.tags }}"
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ steps.img.outputs.name }}@sha256:%s ' *)
+
+      - name: Inspect published manifest
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ steps.img.outputs.name }}:${{ steps.meta.outputs.version }}
