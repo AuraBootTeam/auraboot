@@ -59,7 +59,7 @@ async function seedMinimalDeepSeekQuote(page: Page): Promise<DeepSeekQuoteSeed> 
   try {
     const accountId = await dynamicCreate(
       page,
-      'crm_account',
+      'crm_account_common',
       {
         crm_acc_code: `ACC-E2E-DS-${suffix}`,
         crm_acc_name: `E2E DeepSeek Customer ${suffix}`,

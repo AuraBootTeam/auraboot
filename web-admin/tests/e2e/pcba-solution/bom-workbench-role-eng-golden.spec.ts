@@ -11,6 +11,7 @@ import {
 } from '../helpers';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 import {
+  clickSidebarPage,
   isTransientViteDynamicImportIssue,
   openQuoteRolePage,
   queryDynamicRecords,
@@ -188,9 +189,11 @@ test.describe('BOM workbench deep golden as bom_engineering @smoke', () => {
       step = 'open workbench list';
       await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
       await ensureSidebarExpanded(page);
-      const sidebar = page.getByTestId('sidebar');
-      await sidebar.locator('a[href="/p/bom_conversion_task_pcba_workbench"]').first().click();
-      await waitForDynamicPageLoad(page, 20_000);
+      await clickSidebarPage(
+        page,
+        '/p/bom_conversion_task_pcba_workbench',
+        /BOM 工作台|Workbench/i,
+      );
       await expect(page.locator('main')).toContainText(created.marker, { timeout: 20_000 });
 
       // 2. open the workbench detail via the row action

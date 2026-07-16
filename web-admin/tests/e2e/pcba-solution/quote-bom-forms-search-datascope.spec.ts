@@ -16,8 +16,8 @@ import {
  *  account→project→BOM provision chain.)
  * Real browser, host-first stack, reuses quote-e2e-helpers (login per role).
  */
-const CUST_LIST = '/p/crm_account';
-const CUST_NEW = '/p/crm_account/new?commandCode=crm:create_account';
+const CUST_LIST = '/p/crm_account_common';
+const CUST_NEW = '/p/crm_account_common/new?commandCode=crm:create_account';
 const PROJ_LIST = '/p/req_requirement_set_pcba_bom';
 const PROJ_NEW = '/p/req_requirement_set_pcba_bom/new?commandCode=bom:create_project';
 

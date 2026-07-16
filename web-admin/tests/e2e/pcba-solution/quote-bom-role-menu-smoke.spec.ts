@@ -72,7 +72,6 @@ const MENU_CODE = {
   workbench: 'bom_v2_workbench',
   kingdeeSync: 'bom_sync_kingdee_material_library',
   sourceFormatProfiles: 'bom_source_format_profiles',
-  fieldCompositionRules: 'bom_field_composition_rules',
   quote: 'qo_quote_menu',
   priceLibrary: 'qo_purchase_price_library_menu',
 };
@@ -99,7 +98,6 @@ const ADMIN_SWEEP_CODES = [
   MENU_CODE.workbench,
   MENU_CODE.kingdeeSync,
   MENU_CODE.sourceFormatProfiles,
-  MENU_CODE.fieldCompositionRules,
   MENU_CODE.quote,
   MENU_CODE.priceLibrary,
   'org_departments',

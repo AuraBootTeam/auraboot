@@ -13,6 +13,7 @@ import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Implementation of DataAccessor that delegates to DynamicDataService.
@@ -123,5 +124,17 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     public void delete(String modelCode, String recordId) {
         log.debug("Plugin DataAccessor: delete({}, {})", modelCode, recordId);
         dynamicDataService.delete(modelCode, recordId);
+    }
+
+    @Override
+    public Optional<Long> incrementWithinCap(String modelCode,
+                                             String recordId,
+                                             String counterCode,
+                                             long delta,
+                                             String capCode) {
+        log.debug("Plugin DataAccessor: incrementWithinCap({}, {}, {}, {})",
+                modelCode, recordId, counterCode, delta);
+        return dynamicDataService.incrementWithinCap(
+                modelCode, recordId, counterCode, delta, capCode);
     }
 }

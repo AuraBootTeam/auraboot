@@ -55,6 +55,13 @@ public class LlmChatRequest {
     private int maxTokens;
 
     /**
+     * Optional provider-agnostic structured-output mode. OpenAI-compatible
+     * providers currently support {@code json_object}; other providers may
+     * ignore it until they expose an equivalent wire contract.
+     */
+    private String responseFormat;
+
+    /**
      * Optional Anthropic Extended Thinking configuration. When {@code null} the
      * provider must NOT add a {@code thinking} field to the wire request — this
      * keeps existing chat callers byte-identical with the pre-P0-2 behaviour.

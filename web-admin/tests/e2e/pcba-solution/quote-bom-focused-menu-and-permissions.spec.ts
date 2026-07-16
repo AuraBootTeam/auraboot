@@ -32,7 +32,6 @@ const BOM_WORKBENCH_PATH = '/p/bom_conversion_task_pcba_workbench';
 const BOM_REVIEW_QUEUE_PATH = '/p/bom_review_queue';
 const BOM_MATERIAL_LIBRARY_PATH = '/p/bom_material_master';
 const BOM_FORMAT_PROFILE_PATH = '/p/bom_source_format_profile';
-const BOM_FIELD_COMPOSITION_RULE_PATH = '/p/bom_field_composition_rule';
 const ORG_TEAMS_PATH = '/organization/teams';
 const MEMBER_MANAGEMENT_PATH = '/p/tenant_member';
 const PERMISSION_ROLES_PATH = '/enterprise/permissions';
@@ -286,7 +285,6 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
           BOM_REVIEW_QUEUE_PATH,
           BOM_MATERIAL_LIBRARY_PATH,
           BOM_FORMAT_PROFILE_PATH,
-          BOM_FIELD_COMPOSITION_RULE_PATH,
         ],
         'bom_engineering menu paths',
       );
@@ -320,7 +318,6 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
             BOM_REVIEW_QUEUE_PATH,
             BOM_MATERIAL_LIBRARY_PATH,
             BOM_FORMAT_PROFILE_PATH,
-            BOM_FIELD_COMPOSITION_RULE_PATH,
           ],
         );
         await expectUnavailableByDirectUrl(page, BOM_MATERIAL_LIBRARY_PATH);
@@ -332,7 +329,6 @@ test.describe('QuoteOps + BOM focused menu and permission matrix @smoke', () => 
         BOM_REVIEW_QUEUE_PATH,
         BOM_MATERIAL_LIBRARY_PATH,
         BOM_FORMAT_PROFILE_PATH,
-        BOM_FIELD_COMPOSITION_RULE_PATH,
       ]);
       await expectUnavailableByDirectUrl(page, BOM_MATERIAL_LIBRARY_PATH);
     });

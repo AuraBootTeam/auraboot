@@ -467,6 +467,40 @@ export function resolveVisibleDetailTabs(
   });
 }
 
+export function resolveVisibleDetailTabsFromBlocks(
+  blocks: BlockConfig[],
+  isVisible: (visibleWhen: string | undefined) => boolean,
+): DetailTabConfig[] {
+  return blocks
+    .map((block, sourceIndex) => ({
+      block,
+      sourceIndex,
+      order: Number((block as BlockConfig & { detailTabOrder?: number }).detailTabOrder),
+    }))
+    .filter(
+      ({ block }) =>
+        block.blockType === 'tabs' &&
+        (!block.visibleWhen || isVisible(block.visibleWhen)),
+    )
+    .sort((left, right) => {
+      const leftOrder = Number.isFinite(left.order) ? left.order : left.sourceIndex;
+      const rightOrder = Number.isFinite(right.order) ? right.order : right.sourceIndex;
+      return leftOrder - rightOrder || left.sourceIndex - right.sourceIndex;
+    })
+    .flatMap(({ block }) => (block.tabs || []) as DetailTabConfig[]);
+}
+
+export function resolveVisibleTopLevelDetailBlocks(
+  blocks: BlockConfig[],
+  isVisible: (visibleWhen: string | undefined) => boolean,
+): BlockConfig[] {
+  return blocks.filter((block) => {
+    if (block.blockType === 'toolbar' || block.blockType === 'tabs') return false;
+    if (block.visibleWhen && !isVisible(block.visibleWhen)) return false;
+    return (block as BlockConfig & { detailPlacement?: string }).detailPlacement !== 'header';
+  });
+}
+
 export function resolveSubTableDataSourceConfig(
   dataSource: BlockConfig['dataSource'] | undefined,
   schemaDataSources?: Record<string, DataSourceConfig>,
@@ -772,11 +806,6 @@ function DetailPageContentInner(props: PageContentProps) {
   );
   const effectiveHeaderToolbar = headerToolbar || null;
 
-  const tabsBlock = useMemo(
-    () => allBlocks.find((b: BlockConfig) => b.blockType === 'tabs'),
-    [allBlocks],
-  );
-
   // For simple detail pages without tabs, find field-display blocks directly.
   // Page Designer exposes both form-section and detail-section; both render
   // as read-only field groups on detail pages.
@@ -837,10 +866,14 @@ function DetailPageContentInner(props: PageContentProps) {
     [directMiscBlocks],
   );
 
-  // System tabs are injected by backend into dsl_schema. Filter out system tabs when no recordPid (new record).
-  const tabsBlockVisible = !tabsBlock?.visibleWhen || evaluateVisibleWhen(tabsBlock.visibleWhen);
-  const allTabs = tabsBlockVisible ? ((tabsBlock?.tabs || []) as DetailTabConfig[]) : [];
+  // A detail page may expose multiple phase-specific tab groups. Compose every
+  // visible group instead of silently dropping all but the first one.
+  const allTabs = resolveVisibleDetailTabsFromBlocks(allBlocks, evaluateVisibleWhen);
   const tabs = resolveVisibleDetailTabs(allTabs, recordPid, schema);
+  const topLevelDetailBlocks = resolveVisibleTopLevelDetailBlocks(
+    allBlocks,
+    evaluateVisibleWhen,
+  );
   const [activeTab, setActiveTab] = useState(0);
 
   const tabHashKeys = useMemo(
@@ -1042,8 +1075,15 @@ function DetailPageContentInner(props: PageContentProps) {
             )}
 
             {/* Tab headers (hidden in print — only active tab content shows) */}
-            <div className="print-hide border-border border-b px-6" data-print="hide">
-              <nav className="-mb-px flex space-x-8" role="tablist" aria-label="Tabs">
+            <div
+              className="print-hide border-border overflow-x-auto border-b px-6"
+              data-print="hide"
+            >
+              <nav
+                className="-mb-px flex w-max min-w-full space-x-8 whitespace-nowrap"
+                role="tablist"
+                aria-label="Tabs"
+              >
                 {tabs.map((tab, index) => (
                   <button
                     key={tab.key || index}
@@ -1096,6 +1136,39 @@ function DetailPageContentInner(props: PageContentProps) {
                     />
                   )}
                 />
+              </div>
+            )}
+            {topLevelDetailBlocks.length > 0 && (
+              <div className="space-y-6 border-t p-6">
+                {topLevelDetailBlocks.map((block: BlockConfig, blockIndex: number) =>
+                  DETAIL_SPECIALIZED_BLOCK_TYPES.has(block.blockType as string) ? (
+                    <DetailBlockRenderer
+                      key={block.id || `top-level-${blockIndex}`}
+                      block={block}
+                      recordData={recordData}
+                      rawData={rawData}
+                      recordPid={recordPid!}
+                      token={token || undefined}
+                      locale={locale}
+                      t={t}
+                      modelCode={schema?.modelCode || tableName}
+                      evaluateEditableWhen={evaluateVisibleWhen}
+                      onDataChange={reloadRecord}
+                      getDictItems={getDictItems}
+                      enrichField={enrichField}
+                      runtime={runtime as SchemaRuntime}
+                      schemaDataSources={schema?.dataSources}
+                      dataSourceManager={dataSourceManager}
+                    />
+                  ) : runtime ? (
+                    <BlockRenderer
+                      key={block.id || `top-level-${blockIndex}`}
+                      block={prepareDetailRuntimeBlock(block, recordData, recordPid!)}
+                      runtime={runtime}
+                      areaId="detail-tabs-body"
+                    />
+                  ) : null,
+                )}
               </div>
             )}
             {/* Inline approval panel — shown when the record has an associated BPM process */}

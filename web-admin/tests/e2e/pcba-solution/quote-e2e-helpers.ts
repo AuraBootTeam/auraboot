@@ -128,7 +128,7 @@ export function isTransientViteDynamicImportIssue(text: string): boolean {
   );
 }
 
-async function clickSidebarPage(page: Page, href: string, label: RegExp): Promise<void> {
+export async function clickSidebarPage(page: Page, href: string, label: RegExp): Promise<void> {
   const nav = page.locator('nav, aside, [role="navigation"]').first();
   const link = nav.locator(`a[href="${href}"]`).or(nav.getByRole('link', { name: label })).first();
   await expect(link).toBeVisible({ timeout: 10_000 });
@@ -757,7 +757,7 @@ async function seedQuoteScaffold(
     );
     const accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
     expect(accountId, 'crm:create_account should return account id').toBeTruthy();
-    created.rows.push({ model: 'crm_account', pid: accountId });
+    created.rows.push({ model: 'crm_account_common', pid: accountId });
 
     const projectId = await dynamicCreate(
       page,
@@ -1012,7 +1012,7 @@ export async function seedBomWorkbench(
     );
     const accountId = String(accountResult.recordId ?? accountResult.pid ?? accountResult.id ?? '');
     expect(accountId, 'crm:create_account should return account id').toBeTruthy();
-    created.rows.push({ model: 'crm_account', pid: accountId });
+    created.rows.push({ model: 'crm_account_common', pid: accountId });
 
     created.projectId = await dynamicCreate(
       page,
@@ -1240,7 +1240,7 @@ export async function seedBomWorkbench(
         [
           { model: 'bom_conversion_task_pcba', pid: created.taskId },
           { model: 'req_requirement_set_pcba_bom', pid: created.projectId },
-          { model: 'crm_account', pid: accountId },
+          { model: 'crm_account_common', pid: accountId },
         ],
         opts.ownerEmail,
       );

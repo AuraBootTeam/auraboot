@@ -41,7 +41,7 @@ import {
  *   Verified green 2026-06-28 (slot 40): 3/3 role tests pass.
  */
 const MENU = {
-  customer: '/p/crm_account',
+  customer: '/p/crm_account_common',
   project: '/p/req_requirement_set_pcba_bom',
   quote: '/p/qo_quote_common',
 };
@@ -61,8 +61,13 @@ async function waitForListReady(page: Page): Promise<void> {
     const searchReady = await page.locator('[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"], input[placeholder="查询..."]').first().count();
     const tableReady = await page.locator('table, [role="table"]').first().count();
     const loading = await page.locator('[aria-busy="true"], .ant-spin-spinning, [data-loading="true"]').count();
-    return (searchReady > 0 || tableReady > 0) && loading === 0;
-  }).toBe(true);
+    const loadingTextVisible = await page
+      .getByText(/^(?:加载中|Loading)(?:\.\.\.)?$/i)
+      .first()
+      .isVisible()
+      .catch(() => false);
+    return (searchReady > 0 || tableReady > 0) && loading === 0 && !loadingTextVisible;
+  }, { timeout: 15_000 }).toBe(true);
 }
 
 async function searchList(page: Page, listPath: string, marker: string): Promise<number> {
@@ -71,16 +76,21 @@ async function searchList(page: Page, listPath: string, marker: string): Promise
   const q = page.getByPlaceholder('查询...').first();
   if (await q.count() > 0) {
     const response = page.waitForResponse((r) => (
-      r.url().includes('/api/dynamic/') && r.url().includes('/list') && r.request().method() === 'GET'
-    ), { timeout: 5000 }).catch(() => null);
+      r.url().includes('/api/dynamic/') &&
+      r.url().includes('/list') &&
+      r.request().method() === 'GET' &&
+      decodeURIComponent(r.url()).includes(marker)
+    ), { timeout: 15_000 });
     await q.click();
-    await q.fill('');
-    await q.pressSequentially(marker, { delay: 15 });
+    await q.fill(marker);
     await page.keyboard.press('Enter');
-    await response;
+    const searchResponse = await response;
+    expect(searchResponse.ok(), `list search failed: HTTP ${searchResponse.status()}`).toBe(true);
     await waitForListReady(page);
   }
-  return page.locator(`table tbody tr:has-text("${marker}")`).count();
+  const rows = page.locator(`table tbody tr:has-text("${marker}")`);
+  await expect.poll(() => rows.count(), { timeout: 15_000 }).toBeGreaterThan(0);
+  return rows.count();
 }
 
 async function pickFirstComboboxOptions(page: Page, maxCount: number): Promise<void> {
@@ -124,10 +134,15 @@ test.describe('Role × capability 真机闭环 @smoke', () => {
     await nameInput.pressSequentially(marker, { delay: 15 });
     if (extra) await extra(page);
     const saveResponse = page.waitForResponse((r) => (
-      r.url().includes('/api/meta/commands/execute/') && r.request().method() === 'POST'
-    ), { timeout: 5000 }).catch(() => null);
+      r.url().includes('/api/meta/commands/execute/') &&
+      r.request().method() === 'POST' &&
+      decodeURIComponent(r.url()).includes(commandCode)
+    ), { timeout: 20_000 });
     await page.getByRole('button', { name: '保存' }).first().click();
-    await saveResponse;
+    const commandResponse = await saveResponse;
+    expect(commandResponse.ok(), `${commandCode} failed: HTTP ${commandResponse.status()}`).toBe(true);
+    const commandBody = await commandResponse.json().catch(() => ({}));
+    expect(String((commandBody as { code?: unknown }).code), JSON.stringify(commandBody)).toBe('0');
     return (await searchList(page, listPath, marker)) > 0;
   }
 

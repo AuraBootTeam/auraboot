@@ -138,14 +138,9 @@ test.describe('QuoteOps visual feedback golden', () => {
       // failure surfaces in the import-result modal (AsyncTaskProgressModal), NOT the inline
       // status-banner. Assert the visible failure the user actually sees — the modal shows the
       // failed state and the real backend error, so a bad file is never a silent success.
-      // Prefer the stable testid (present post-merge); fall back to the modal's visible failed
-      // text so this also passes on already-deployed builds without the testid.
-      const failurePanelById = page.getByTestId('async-task-modal-failed');
-      const failurePanel = (await failurePanelById.count())
-        ? failurePanelById
-        : page.getByText(/导入失败\s*\/\s*Failed/i).locator('xpath=ancestor::*[self::div][1]');
-      await expect(failurePanel.first()).toBeVisible({ timeout: 20_000 });
-      await expect(page.getByText(/导入失败\s*\/\s*Failed/i).first()).toBeVisible();
+      await expect(page.getByText(/任务执行失败\s*\/\s*Failed/i).first()).toBeVisible({
+        timeout: 20_000,
+      });
       // ImportCorrectedBomHandler.requireStandardBomFormat now rejects any upload whose
       // fixed 12-column standard-BOM header isn't on row 4 (see the workbook's "Part
       // Number"/"Count" 2-column header above), surfacing this message instead of the
