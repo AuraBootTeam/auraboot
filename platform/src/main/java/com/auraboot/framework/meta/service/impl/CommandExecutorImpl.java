@@ -203,7 +203,8 @@ public class CommandExecutorImpl implements CommandExecutor {
                         null, false, e.getMessage(), executionTimeMs, phaseReached, phaseTimings);
             }
 
-            if (e instanceof BusinessException || e instanceof ValidationException) {
+            if (e instanceof BusinessException || e instanceof ValidationException
+                    || e instanceof com.auraboot.framework.exception.ConflictException) {
                 throw e;
             }
             throw new BusinessException(ResponseCode.BadParam, "Command execution failed: " + e.getMessage());

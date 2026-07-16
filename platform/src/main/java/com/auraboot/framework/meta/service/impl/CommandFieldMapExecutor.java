@@ -373,11 +373,18 @@ public class CommandFieldMapExecutor {
                 sql.append(", ");
             }
             String paramName = "set" + index;
-            sql.append(entry.getKey()).append(" = #{params.").append(paramName).append("}");
             if (jsonbColumns != null && jsonbColumns.contains(entry.getKey())) {
-                sql.append("::jsonb");
+                sql.append(entry.getKey()).append(" = #{params.").append(paramName)
+                        .append(",jdbcType=OTHER,typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb");
+            } else {
+                sql.append(entry.getKey()).append(" = #{params.").append(paramName).append("}");
             }
-            params.put(paramName, entry.getValue());
+            Object parameterValue = entry.getValue();
+            if (jsonbColumns != null && jsonbColumns.contains(entry.getKey())
+                    && parameterValue != null && !(parameterValue instanceof String)) {
+                parameterValue = com.auraboot.framework.meta.util.JsonbFieldHelper.toJsonString(parameterValue);
+            }
+            params.put(paramName, parameterValue);
             index++;
         }
 

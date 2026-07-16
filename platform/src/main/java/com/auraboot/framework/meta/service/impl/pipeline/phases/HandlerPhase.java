@@ -311,11 +311,18 @@ public class HandlerPhase implements CommandPhase {
                 sql.append(", ");
             }
             String paramName = "set" + index;
-            sql.append(entry.getKey()).append(" = #{params.").append(paramName).append("}");
             if (jsonbColumns != null && jsonbColumns.contains(entry.getKey())) {
-                sql.append("::jsonb");
+                sql.append(entry.getKey()).append(" = #{params.").append(paramName)
+                        .append(",jdbcType=OTHER,typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb");
+            } else {
+                sql.append(entry.getKey()).append(" = #{params.").append(paramName).append("}");
             }
-            params.put(paramName, entry.getValue());
+            Object parameterValue = entry.getValue();
+            if (jsonbColumns != null && jsonbColumns.contains(entry.getKey())
+                    && parameterValue != null && !(parameterValue instanceof String)) {
+                parameterValue = com.auraboot.framework.meta.util.JsonbFieldHelper.toJsonString(parameterValue);
+            }
+            params.put(paramName, parameterValue);
             index++;
         }
 
@@ -528,6 +535,13 @@ public class HandlerPhase implements CommandPhase {
         } catch (Exception e) {
             log.error("Plugin command handler execution failed for {} (command={}): {}",
                     handlerCode, commandCode, e.getMessage(), e);
+            // Plugin handlers use stable, transport-neutral error keys because
+            // the plugin API must not depend on host web exceptions. Preserve
+            // the optimistic-concurrency semantic at the host boundary so DSL
+            // clients receive HTTP 409 and can offer reload/retry recovery.
+            if (e.getMessage() != null && e.getMessage().contains("iot.error.version_conflict")) {
+                throw new com.auraboot.framework.exception.ConflictException(e.getMessage(), e);
+            }
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
         } finally {
             queryScope.close();
