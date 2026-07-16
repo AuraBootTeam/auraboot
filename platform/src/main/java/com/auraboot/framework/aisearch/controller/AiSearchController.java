@@ -1,8 +1,8 @@
-package com.auraboot.framework.ai.search.controller;
+package com.auraboot.framework.aisearch.controller;
 
-import com.auraboot.framework.ai.search.dto.AiSearchRequest;
-import com.auraboot.framework.ai.search.dto.AiSearchResult;
-import com.auraboot.framework.ai.search.service.AiSearchService;
+import com.auraboot.framework.aisearch.dto.AiSearchRequest;
+import com.auraboot.framework.aisearch.dto.AiSearchResult;
+import com.auraboot.framework.aisearch.service.AiSearchService;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import io.swagger.v3.oas.annotations.Operation;
