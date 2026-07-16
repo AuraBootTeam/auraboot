@@ -615,6 +615,72 @@ class PluginValidationPipelineTest {
         assertEquals(1, result.getInfoCount());
     }
 
+    @Test
+    void pipeline_semanticValidatorThrows_failsClosedAsError() {
+        // DR-20260715-A-005: a validator that throws used to degrade to a warning, so the
+        // import proceeded (e.g. an ExtensionValidator NPE silently skipped S-EXT-HANDLER and
+        // a hybrid plugin with an unregistered handler still imported). It must now be a
+        // blocking error so the sync import aborts (createPreviewFromManifest -> !isValid()).
+        PluginValidator throwingSemantic = new PluginValidator() {
+            @Override
+            public String category() { return "semantic"; }
+            @Override
+            public List<PluginValidationMessage> validate(PluginValidationContext ctx) {
+                throw new RuntimeException("boom (e.g. ExtensionValidator NPE)");
+            }
+        };
+        PluginValidator governance = new PluginValidator() {
+            @Override
+            public String category() { return "governance"; }
+            @Override
+            public List<PluginValidationMessage> validate(PluginValidationContext ctx) {
+                return List.of(PluginValidationMessage.info("G-TEST", "governance", "should be skipped"));
+            }
+        };
+
+        PluginValidationPipeline pipeline = new PluginValidationPipeline(List.of(throwingSemantic, governance));
+        PluginValidationResult result = pipeline.validate(PluginValidationContext.builder()
+                .pluginId("test").manifest(new PluginManifestExtended()).build());
+
+        assertFalse(result.isValid(), "a validator crash must invalidate the plugin (fail closed)");
+        assertEquals(1, result.getErrorCount());
+        assertEquals(0, result.getWarningCount(), "the crash is an error, not a warning");
+        assertEquals(0, result.getInfoCount(), "governance is skipped after a semantic error");
+        assertTrue(result.getMessages().stream()
+                        .anyMatch(m -> "V-INTERNAL".equals(m.getCode()) && m.isError()),
+                "expected a blocking V-INTERNAL error");
+    }
+
+    @Test
+    void pipeline_governanceValidatorThrows_failsClosedAsError() {
+        // DR-20260715-A-005: same fail-closed contract for a governance-layer crash.
+        PluginValidator cleanSemantic = new PluginValidator() {
+            @Override
+            public String category() { return "semantic"; }
+            @Override
+            public List<PluginValidationMessage> validate(PluginValidationContext ctx) {
+                return List.of();
+            }
+        };
+        PluginValidator throwingGovernance = new PluginValidator() {
+            @Override
+            public String category() { return "governance"; }
+            @Override
+            public List<PluginValidationMessage> validate(PluginValidationContext ctx) {
+                throw new RuntimeException("boom");
+            }
+        };
+
+        PluginValidationPipeline pipeline = new PluginValidationPipeline(List.of(cleanSemantic, throwingGovernance));
+        PluginValidationResult result = pipeline.validate(PluginValidationContext.builder()
+                .pluginId("test").manifest(new PluginManifestExtended()).build());
+
+        assertFalse(result.isValid());
+        assertTrue(result.getMessages().stream()
+                        .anyMatch(m -> "V-INTERNAL".equals(m.getCode()) && m.isError()),
+                "expected a blocking V-INTERNAL error from the governance layer");
+    }
+
     // ==================== ExtensionValidator — Type Compatibility (GAP-092) ====================
 
     /** Build a minimal ExtensionValidator with no-op registries (nothing registered → all unknown). */
