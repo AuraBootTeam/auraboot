@@ -105,7 +105,7 @@ jobs:
           echo "image=${REGISTRY}/${owner}/${name}" >> "$GITHUB_OUTPUT"
 
       - name: Download digests
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: /tmp/digests
           pattern: digests-${{ matrix.image }}-*
