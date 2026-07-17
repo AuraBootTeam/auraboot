@@ -22,7 +22,7 @@ dependencies {
     compileOnly project(':')
 
     // Spring Boot (conditional annotations, lifecycle interfaces)
-    compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.14'
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.16'
     compileOnly 'org.springframework:spring-beans:6.2.18'
     compileOnly 'org.springframework:spring-context:6.2.18'
 
@@ -44,7 +44,7 @@ dependencies {
         transitive = false
     }
     testImplementation 'org.springframework:spring-beans:6.2.18'
-    testImplementation 'org.springframework.boot:spring-boot:3.5.14'
+    testImplementation 'org.springframework.boot:spring-boot:3.5.16'
     testImplementation 'org.slf4j:slf4j-api:2.0.18'
     testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.21'
     testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.16'
