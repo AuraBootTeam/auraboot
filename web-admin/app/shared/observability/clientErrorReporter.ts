@@ -25,7 +25,7 @@ function sessionId(): string {
     const KEY = 'ab_client_session_id';
     let sid = sessionStorage.getItem(KEY);
     if (!sid) {
-      sid = `${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+      sid = `${Date.now().toString(36)}-${crypto.getRandomValues(new Uint32Array(1))[0].toString(36)}`;
       sessionStorage.setItem(KEY, sid);
     }
     return sid;
