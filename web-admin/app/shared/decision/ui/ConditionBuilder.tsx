@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   type ConditionNode, type GroupNode, type CompareNode, type Operator, type DataType,
-  type PathOperand, cmp, path, lit, toNaturalLanguage,
-  not,
+  type PathOperand, cmp, path, lit,
+  not, operatorLabel, UNARY_OPERATORS,
 } from '../ast/conditionAst';
 
 /**
@@ -18,6 +18,25 @@ export interface FieldOption {
   label: string;
   dataType: DataType;
   options?: string[];
+  valueLabels?: Record<string, string>;
+  modelCode?: string;
+  modelName?: string;
+  operators?: Operator[];
+  dictCode?: string;
+  reference?: {
+    targetEntity?: string;
+    valueField?: string;
+    displayField?: string;
+  };
+  required?: boolean;
+  visible?: boolean;
+  editable?: boolean;
+  masked?: boolean;
+  permission?: string;
+  sourceType?: string;
+  sourceRef?: string;
+  factKey?: string;
+  entityCode?: string;
 }
 
 export interface ConditionBuilderProps {
@@ -48,8 +67,62 @@ export function operatorsForDataType(dt: DataType): Operator[] {
 
 const fieldKey = (scope: string, p: string): string => `${scope}:${p}`;
 
+function optionLabel(field: FieldOption | undefined, value: unknown): string {
+  const raw = String(value ?? '');
+  if (!field) return raw;
+  return field.valueLabels?.[raw] ?? raw;
+}
+
 function idFor(pathParts: number[]): string {
   return pathParts.length === 0 ? '' : `-${pathParts.join('-')}`;
+}
+
+const SCOPE_LABELS: Record<PathOperand['scope'], string> = {
+  meta: '元数据',
+  event: '事件',
+  record: '业务记录',
+  before: '变更前',
+  after: '变更后',
+  process: '流程',
+  task: '任务',
+  sla: 'SLA',
+  actor: '操作者',
+  tenant: '租户',
+  time: '时间',
+  env: '环境',
+};
+
+function fieldGroupLabel(field: FieldOption): string {
+  return field.modelName || SCOPE_LABELS[field.scope] || field.scope;
+}
+
+function fieldSearchText(field: FieldOption): string {
+  return [
+    field.label,
+    field.path,
+    field.scope,
+    field.modelCode,
+    field.modelName,
+    field.dataType,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
+function filterFields(fields: FieldOption[], query: string): FieldOption[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return fields;
+  return fields.filter((field) => fieldSearchText(field).includes(normalized));
+}
+
+function groupFields(fields: FieldOption[]): Array<{ label: string; fields: FieldOption[] }> {
+  const groups = new Map<string, FieldOption[]>();
+  fields.forEach((field) => {
+    const label = fieldGroupLabel(field);
+    groups.set(label, [...(groups.get(label) ?? []), field]);
+  });
+  return Array.from(groups, ([label, groupFields]) => ({ label, fields: groupFields }));
 }
 
 function firstCompare(fields: FieldOption[]): CompareNode | null {
@@ -91,16 +164,21 @@ function CompareEditor({
 }: CompareEditorProps) {
   const left = row.left as PathOperand;
   const curKey = fieldKey(left.scope, left.path);
-  const dt = left.dataType ?? 'string';
-  const ops = operatorsForDataType(dt);
   const fieldOpt = fieldByKey.get(curKey);
+  const dt = left.dataType ?? 'string';
+  const ops = fieldOpt?.operators?.length ? fieldOpt.operators : operatorsForDataType(dt);
+  const selectableFields = useMemo(() => {
+    const hasCurrent = fields.some((field) => fieldKey(field.scope, field.path) === curKey);
+    return hasCurrent || !fieldOpt ? fields : [fieldOpt, ...fields];
+  }, [curKey, fieldOpt, fields]);
+  const groupedFields = useMemo(() => groupFields(selectableFields), [selectableFields]);
   const showValue = !UNARY.has(row.operator);
   const id = idPath.join('-');
 
   const onFieldChange = (key: string) => {
     const f = fieldByKey.get(key);
     if (!f) return;
-    const nextOps = operatorsForDataType(f.dataType);
+    const nextOps = f.operators?.length ? f.operators : operatorsForDataType(f.dataType);
     updateRow(cmp(path(f.scope, f.path, f.dataType), nextOps[0], lit('', f.dataType)));
   };
 
@@ -120,10 +198,14 @@ function CompareEditor({
         value={curKey}
         onChange={(e) => onFieldChange(e.target.value)}
       >
-        {fields.map((f) => (
-          <option key={fieldKey(f.scope, f.path)} value={fieldKey(f.scope, f.path)}>
-            {f.label}
-          </option>
+        {groupedFields.map((fieldGroup) => (
+          <optgroup key={fieldGroup.label} label={fieldGroup.label}>
+            {fieldGroup.fields.map((f) => (
+              <option key={fieldKey(f.scope, f.path)} value={fieldKey(f.scope, f.path)}>
+                {f.label}
+              </option>
+            ))}
+          </optgroup>
         ))}
       </select>
 
@@ -132,7 +214,7 @@ function CompareEditor({
         value={row.operator}
         onChange={(e) => onOperatorChange(e.target.value as Operator)}
       >
-        {ops.map((op) => <option key={op} value={op}>{op}</option>)}
+        {ops.map((op) => <option key={op} value={op}>{operatorLabel(op)}</option>)}
       </select>
 
       {showValue && (
@@ -143,7 +225,11 @@ function CompareEditor({
             onChange={(e) => onValueChange(e.target.value)}
           >
             <option value="">—</option>
-            {fieldOpt.options.map((o) => <option key={o} value={o}>{o}</option>)}
+            {fieldOpt.options.map((o) => (
+              <option key={o} value={o}>
+                {optionLabel(fieldOpt, o)}
+              </option>
+            ))}
           </select>
         ) : (
           <input
@@ -277,13 +363,13 @@ function GroupEditor({
           data-testid={idPath.length === 0 ? 'op-and' : `op-and${suffix}`}
           aria-pressed={node.op === 'AND'}
           onClick={() => updateNode({ ...node, op: 'AND' })}
-        >并且(AND)</button>
+        >全部满足</button>
         <button
           type="button"
           data-testid={idPath.length === 0 ? 'op-or' : `op-or${suffix}`}
           aria-pressed={node.op === 'OR'}
           onClick={() => updateNode({ ...node, op: 'OR' })}
-        >或(OR)</button>
+        >任一满足</button>
       </div>
 
       {node.children.length === 0 && (
@@ -310,13 +396,19 @@ function GroupEditor({
       ))}
 
       <div className="cb-actions">
-        <button type="button" data-testid={idPath.length === 0 ? 'cb-add' : `cb-add${suffix}`} onClick={addRow}>
+        <button
+          type="button"
+          data-testid={idPath.length === 0 ? 'cb-add' : `cb-add${suffix}`}
+          onClick={addRow}
+          disabled={fields.length === 0}
+        >
           添加条件
         </button>
         <button
           type="button"
           data-testid={idPath.length === 0 ? 'cb-add-group' : `cb-add-group${suffix}`}
           onClick={addGroup}
+          disabled={fields.length === 0}
         >
           添加条件组
         </button>
@@ -324,6 +416,7 @@ function GroupEditor({
           type="button"
           data-testid={idPath.length === 0 ? 'cb-add-not' : `cb-add-not${suffix}`}
           onClick={addNot}
+          disabled={fields.length === 0}
         >
           添加 NOT
         </button>
@@ -333,6 +426,8 @@ function GroupEditor({
 }
 
 export function ConditionBuilder({ value, fields, onChange }: ConditionBuilderProps) {
+  const [fieldQuery, setFieldQuery] = useState('');
+  const filteredFields = useMemo(() => filterFields(fields, fieldQuery), [fieldQuery, fields]);
   const fieldByKey = useMemo(() => {
     const m = new Map<string, FieldOption>();
     fields.forEach((f) => m.set(fieldKey(f.scope, f.path), f));
@@ -342,18 +437,67 @@ export function ConditionBuilder({ value, fields, onChange }: ConditionBuilderPr
   const labelOf = (o: PathOperand): string =>
     fieldByKey.get(fieldKey(o.scope, o.path))?.label ?? `${o.scope}.${o.path}`;
 
+  const operandPreview = (operand: CompareNode['left'] | CompareNode['right'], leftField?: FieldOption): string => {
+    if (!operand) return '';
+    if (operand.type === 'path') return labelOf(operand);
+    if (operand.type === 'literal') {
+      if (Array.isArray(operand.value)) {
+        return operand.value.map((item) => optionLabel(leftField, item)).join('、');
+      }
+      return optionLabel(leftField, operand.value);
+    }
+    return `${operand.name}(...)`;
+  };
+
+  const previewNode = (node: ConditionNode): string => {
+    if (node.type === 'compare') {
+      const leftField = node.left.type === 'path'
+        ? fieldByKey.get(fieldKey(node.left.scope, node.left.path))
+        : undefined;
+      const left = operandPreview(node.left, leftField);
+      const right = UNARY_OPERATORS.has(node.operator) ? '' : ` ${operandPreview(node.right, leftField)}`;
+      return `【${left} ${operatorLabel(node.operator)}${right}】`;
+    }
+    if (node.type === 'not') return `非(${previewNode(node.child)})`;
+    const parts = node.children
+      .filter((child) => !(child.type === 'compare' && child.enabled === false))
+      .map(previewNode);
+    return `(${parts.join(node.op === 'AND' ? ' 并且 ' : ' 或 ')})`;
+  };
+
   return (
     <div data-testid="condition-builder">
+      <div className="cb-field-tools">
+        <label>
+          字段搜索
+          <input
+            aria-label="condition-field-search"
+            value={fieldQuery}
+            onChange={(event) => setFieldQuery(event.target.value)}
+            placeholder="搜索字段、模型或路径"
+          />
+        </label>
+        <span data-testid="cb-field-result-count">
+          {filteredFields.length} / {fields.length}
+        </span>
+      </div>
+
+      {fieldQuery.trim() && filteredFields.length === 0 && (
+        <div className="cb-field-empty" data-testid="cb-field-empty">
+          没有匹配字段
+        </div>
+      )}
+
       <GroupEditor
         node={value}
         idPath={[]}
-        fields={fields}
+        fields={filteredFields}
         fieldByKey={fieldByKey}
         updateNode={onChange}
       />
 
       <div data-testid="cb-preview" className="cb-preview">
-        {value.children.length === 0 ? '—' : toNaturalLanguage(value, labelOf)}
+        {value.children.length === 0 ? '—' : previewNode(value)}
       </div>
     </div>
   );

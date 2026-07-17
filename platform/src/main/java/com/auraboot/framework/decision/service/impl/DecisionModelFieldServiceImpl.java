@@ -19,6 +19,8 @@ import com.auraboot.framework.meta.mapper.DictItemMapper;
 import com.auraboot.framework.meta.mapper.DictMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.service.ModelFieldBindingService;
+import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
+import com.auraboot.framework.permission.service.FieldPermissionService;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -48,6 +50,7 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
     private final ModelFieldBindingService modelFieldBindingService;
     private final DictMapper dictMapper;
     private final DictItemMapper dictItemMapper;
+    private final FieldPermissionService fieldPermissionService;
 
     @Override
     public List<DecisionModelFieldDTO> listFields() {
@@ -122,12 +125,22 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
                     continue;
                 }
                 FieldRefParts parts = new FieldRefParts("record", recordDataPath(field.getCode()));
-                FieldAccumulator acc = fields.computeIfAbsent(parts.key(), ignored -> new FieldAccumulator(parts));
+                FieldAccumulator acc = fields.computeIfAbsent(
+                        modelScopedKey(model.getCode(), parts),
+                        ignored -> new FieldAccumulator(parts));
                 acc.dataType = chooseDataType(acc.dataType, field.getDataType());
+                acc.modelCode = model.getCode();
+                acc.modelName = modelLabel;
+                acc.masked = resolveMasked(field);
+                acc.permission = resolvePermission(field);
                 String fieldLabel = hasText(field.getDisplayName()) ? field.getDisplayName() : field.getCode();
                 acc.label = modelLabel + " / " + fieldLabel;
             }
         }
+    }
+
+    private String modelScopedKey(String modelCode, FieldRefParts parts) {
+        return String.valueOf(modelCode) + "\u0000" + parts.key();
     }
 
     private String recordDataPath(String fieldCode) {
@@ -143,18 +156,22 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
         entity.setSourceType(hasText(model.getSourceType()) ? model.getSourceType() : "physical");
         entity.setSourceRef(model.getSourceRef());
 
+        FieldPermissionSet fieldPermissions = resolveFieldPermissions(model.getCode());
         List<MetaFieldDTO> modelFields = modelFieldBindingService.getModelFields(model.getPid());
         for (MetaFieldDTO field : modelFields) {
             if (field == null || !Boolean.TRUE.equals(field.getVisible()) || !hasText(field.getCode())) {
                 continue;
             }
-            entity.getFacts().add(buildFieldFact(model, field));
+            if (!canViewField(fieldPermissions, field)) {
+                continue;
+            }
+            entity.getFacts().add(buildFieldFact(model, field, fieldPermissions));
         }
         entity.getFacts().sort(Comparator.comparing(DecisionFactDTO::getFactKey));
         return entity;
     }
 
-    private DecisionFactDTO buildFieldFact(Model model, MetaFieldDTO field) {
+    private DecisionFactDTO buildFieldFact(Model model, MetaFieldDTO field, FieldPermissionSet fieldPermissions) {
         String dataType = normalizeDataType(field.getDataType());
         DecisionFactDTO fact = new DecisionFactDTO();
         fact.setScope("record");
@@ -170,8 +187,131 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
         fact.setReference(field.getRefTarget());
         fact.setRequired(field.getRequired());
         fact.setVisible(field.getVisible());
-        fact.setEditable(field.getEditable());
+        fact.setEditable(canEditField(fieldPermissions, field));
+        fact.setMasked(resolveMasked(field));
+        fact.setPermission(resolvePermission(field));
         return fact;
+    }
+
+    private FieldPermissionSet resolveFieldPermissions(String modelCode) {
+        Long memberId = currentMemberIdForFieldPermissions();
+        if (memberId == null || !hasText(modelCode)) {
+            return null;
+        }
+        try {
+            return fieldPermissionService.getFieldPermissions(memberId, modelCode);
+        } catch (Exception ex) {
+            throw new ValidationException(ResponseCode.FORBIDDEN,
+                    "Decision fact catalog field permissions unavailable for model: " + modelCode);
+        }
+    }
+
+    private Long currentMemberIdForFieldPermissions() {
+        Long memberId = MetaContext.getCurrentMemberId();
+        if (memberId != null) {
+            return memberId;
+        }
+        return MetaContext.exists() ? MetaContext.get().getUserId() : null;
+    }
+
+    private boolean canViewField(FieldPermissionSet permissions, MetaFieldDTO field) {
+        if (permissions == null) {
+            return true;
+        }
+        if (containsField(permissions.hiddenFields(), field)) {
+            return false;
+        }
+        if (isEmpty(permissions.viewableFields()) && isEmpty(permissions.hiddenFields())) {
+            return true;
+        }
+        return containsField(permissions.viewableFields(), field);
+    }
+
+    private boolean canEditField(FieldPermissionSet permissions, MetaFieldDTO field) {
+        boolean fieldEditable = field.getEditable() == null || Boolean.TRUE.equals(field.getEditable());
+        if (permissions == null) {
+            return fieldEditable;
+        }
+        if (containsField(permissions.hiddenFields(), field)) {
+            return false;
+        }
+        if (isEmpty(permissions.viewableFields()) && isEmpty(permissions.editableFields())
+                && isEmpty(permissions.hiddenFields())) {
+            return fieldEditable;
+        }
+        return fieldEditable && containsField(permissions.editableFields(), field);
+    }
+
+    private boolean containsField(Set<String> fields, MetaFieldDTO field) {
+        if (fields == null || fields.isEmpty() || field == null || !hasText(field.getCode())) {
+            return false;
+        }
+        String code = field.getCode();
+        String path = recordDataPath(code);
+        String factKey = "record." + path;
+        return fields.contains(code) || fields.contains(path) || fields.contains(factKey);
+    }
+
+    private boolean isEmpty(Set<String> values) {
+        return values == null || values.isEmpty();
+    }
+
+    private Boolean resolveMasked(MetaFieldDTO field) {
+        return firstBoolean(
+                List.of("masked", "mask", "masking", "sensitive", "pii"),
+                field.getRuleSchema(),
+                field.getFeature(),
+                field.getUiSchema(),
+                field.getExtension());
+    }
+
+    private String resolvePermission(MetaFieldDTO field) {
+        return firstString(
+                List.of("permission", "permissionCode", "readPermission", "viewPermission"),
+                field.getRuleSchema(),
+                field.getFeature(),
+                field.getUiSchema(),
+                field.getExtension());
+    }
+
+    @SafeVarargs
+    private final Boolean firstBoolean(List<String> keys, Map<String, Object>... maps) {
+        for (Map<String, Object> map : maps) {
+            if (map == null || map.isEmpty()) {
+                continue;
+            }
+            for (String key : keys) {
+                Object value = map.get(key);
+                if (value instanceof Boolean booleanValue) {
+                    return booleanValue;
+                }
+                if (value instanceof String stringValue && hasText(stringValue)) {
+                    if ("true".equalsIgnoreCase(stringValue) || "yes".equalsIgnoreCase(stringValue)) {
+                        return true;
+                    }
+                    if ("false".equalsIgnoreCase(stringValue) || "no".equalsIgnoreCase(stringValue)) {
+                        return false;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    @SafeVarargs
+    private final String firstString(List<String> keys, Map<String, Object>... maps) {
+        for (Map<String, Object> map : maps) {
+            if (map == null || map.isEmpty()) {
+                continue;
+            }
+            for (String key : keys) {
+                Object value = map.get(key);
+                if (value instanceof String stringValue && hasText(stringValue)) {
+                    return stringValue;
+                }
+            }
+        }
+        return null;
     }
 
     private List<DecisionFactOptionDTO> loadDictOptions(String dictCode) {
@@ -330,6 +470,10 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
         private int refs;
         private String dataType = "object";
         private String label;
+        private String modelCode;
+        private String modelName;
+        private Boolean masked = false;
+        private String permission;
 
         private FieldAccumulator(FieldRefParts parts) {
             this.parts = parts;
@@ -337,12 +481,15 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
 
         private DecisionModelFieldDTO toDTO() {
             DecisionModelFieldDTO dto = new DecisionModelFieldDTO();
+            dto.setModelCode(modelCode);
+            dto.setModelName(modelName);
             dto.setEntityCode(parts.entityCode());
             dto.setPath(parts.path());
             dto.setLabel(label != null ? label : parts.label());
             dto.setDataType(dataType);
             dto.setRefs(refs);
-            dto.setMasked(false);
+            dto.setMasked(masked);
+            dto.setPermission(permission);
             dto.setDecisionCodes(List.copyOf(decisionCodes));
             return dto;
         }

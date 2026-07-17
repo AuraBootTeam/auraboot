@@ -19,6 +19,14 @@ public class DecisionFieldPreflightRequest {
 
     private String nextDataType;
 
+    private String dictCode;
+
+    private String dictValue;
+
+    private String nextPermission;
+
+    private String nextSourceRef;
+
     private Boolean impactAcknowledged;
 
     private String note;

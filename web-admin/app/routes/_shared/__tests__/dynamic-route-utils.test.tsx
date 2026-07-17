@@ -125,6 +125,26 @@ describe('DynamicField', () => {
     expect(screen.queryByText('service_consulting_strategy')).not.toBeInTheDocument();
   });
 
+  it('matches readonly dict values case-insensitively for API-backed detail pages', () => {
+    render(
+      <DynamicField
+        field={{
+          field: 'target_type',
+          label: '目标类型',
+          component: 'smartselect',
+          dictCode: 'sla_target_type',
+        }}
+        value="NODE"
+        onChange={vi.fn()}
+        readOnly
+        getDictItems={(code) => (code === 'sla_target_type' ? [{ value: 'node', label: '节点' }] : [])}
+      />,
+    );
+
+    expect(screen.getByText('节点')).toBeInTheDocument();
+    expect(screen.queryByText('NODE')).not.toBeInTheDocument();
+  });
+
   it('renders readonly userselect values as user labels', async () => {
     render(
       <DynamicField

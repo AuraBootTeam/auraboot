@@ -102,12 +102,17 @@ export const BlockRenderer: React.FC<BlockRendererProps> = ({
     }
 
     const CustomBlock = getCustomBlockComponent();
+    const ProfileCustomBlock = Renderer;
     return (
       <BlockErrorBoundary blockType={blockType} blockId={block.id}>
         <div className={`block-${blockType} ${block.className || ''}`}>
           {CustomBlock ? (
             <Suspense fallback={<div className="bg-muted h-24 animate-pulse rounded" />}>
               <CustomBlock componentName={block.component} props={{ block, runtime }} />
+            </Suspense>
+          ) : ProfileCustomBlock ? (
+            <Suspense fallback={<div className="bg-muted h-24 animate-pulse rounded" />}>
+              <ProfileCustomBlock block={block} runtime={runtime} areaId={_areaId} />
             </Suspense>
           ) : (
             <div className="border-status-red bg-status-red-bg rounded border p-4">

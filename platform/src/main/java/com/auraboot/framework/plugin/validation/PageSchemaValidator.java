@@ -2,6 +2,7 @@ package com.auraboot.framework.plugin.validation;
 
 import com.auraboot.framework.meta.constant.DslRegistry;
 import com.auraboot.framework.meta.validator.PageSchemaDslI18nValidator;
+import com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.FieldDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ModelFieldBindingDTO;
 import com.auraboot.framework.plugin.dto.imports.PageSchemaDTO;
@@ -281,10 +282,13 @@ public class PageSchemaValidator implements PluginValidator {
         if (expectedDictCode.equals(actualDictCode)) {
             return;
         }
+        if (!isBlank(actualDictCode) && modelIndex.dictCodes().contains(actualDictCode)) {
+            return;
+        }
         messages.add(error("S-PAGE-TABLE-DICT", category(), columnPath + ".dictCode",
                 "Page '" + pageKey + "' renders dictionary-backed field '" + fieldCode +
                         "' in a table column but does not declare matching dictCode '" + expectedDictCode +
-                        "'. Without this, runtime table cells expose raw enum values instead of business labels."));
+                        "' or a plugin-declared override dictionary. Without this, runtime table cells expose raw enum values instead of business labels."));
     }
 
     @SuppressWarnings("unchecked")
@@ -534,10 +538,11 @@ public class PageSchemaValidator implements PluginValidator {
         Map<String, Set<String>> requiredFieldsByModel = new HashMap<>();
         Map<String, Set<String>> fieldLabelsByCode = fieldLabelsByCode(manifest);
         Map<String, String> dictCodeByField = fieldDictCodesByCode(manifest);
+        Set<String> dictCodes = dictCodes(manifest);
         Set<String> globallyRequiredFields = requiredFieldCodes(manifest);
 
         if (manifest.getModelFieldBindings() == null) {
-            return new PageModelIndex(fieldsByModel, requiredFieldsByModel, fieldLabelsByCode, dictCodeByField);
+            return new PageModelIndex(fieldsByModel, requiredFieldsByModel, fieldLabelsByCode, dictCodeByField, dictCodes);
         }
 
         for (ModelFieldBindingDTO binding : manifest.getModelFieldBindings()) {
@@ -552,7 +557,17 @@ public class PageSchemaValidator implements PluginValidator {
             }
         }
 
-        return new PageModelIndex(fieldsByModel, requiredFieldsByModel, fieldLabelsByCode, dictCodeByField);
+        return new PageModelIndex(fieldsByModel, requiredFieldsByModel, fieldLabelsByCode, dictCodeByField, dictCodes);
+    }
+
+    private Set<String> dictCodes(PluginManifestExtended manifest) {
+        if (manifest.getDicts() == null) {
+            return Collections.emptySet();
+        }
+        return manifest.getDicts().stream()
+                .map(DictDefinitionDTO::getCode)
+                .filter(code -> !isBlank(code))
+                .collect(Collectors.toSet());
     }
 
     private Map<String, Set<String>> fieldLabelsByCode(PluginManifestExtended manifest) {
@@ -661,7 +676,8 @@ public class PageSchemaValidator implements PluginValidator {
     private record PageModelIndex(Map<String, Set<String>> fieldsByModel,
                                   Map<String, Set<String>> requiredFieldsByModel,
                                   Map<String, Set<String>> fieldLabelsByCode,
-                                  Map<String, String> dictCodeByField) {}
+                                  Map<String, String> dictCodeByField,
+                                  Set<String> dictCodes) {}
 
     private void validateLegacyTopLevelFields(PageSchemaDTO page, String path, String pageKey,
                                               List<PluginValidationMessage> messages) {

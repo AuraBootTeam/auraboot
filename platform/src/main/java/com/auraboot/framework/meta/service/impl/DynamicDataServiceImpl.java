@@ -20,7 +20,12 @@ import com.auraboot.framework.meta.util.JsonbFieldHelper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
+import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.permission.service.FieldPermissionService;
+import com.auraboot.framework.permission.service.PermissionAuditService;
+import com.auraboot.framework.permission.service.PermissionFacade;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -139,6 +144,18 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     // Lazy lookup (mirrors getAutomationTriggerService) for F3 record-level SLA activation.
     private com.auraboot.framework.bpm.listener.SlaActivationListener getSlaActivationListener() {
         return applicationContext.getBean(com.auraboot.framework.bpm.listener.SlaActivationListener.class);
+    }
+
+    private PermissionFacade getPermissionFacade() {
+        return applicationContext.getBean(PermissionFacade.class);
+    }
+
+    private PermissionAuditService getPermissionAuditService() {
+        return applicationContext.getBean(PermissionAuditService.class);
+    }
+
+    private TenantMemberService getTenantMemberService() {
+        return applicationContext.getBean(TenantMemberService.class);
     }
 
     @Override
@@ -386,7 +403,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             if (fieldPerms.hiddenFields().isEmpty()) {
                 return record;
             }
-            fieldPerms.hiddenFields().forEach(record::remove);
+            List<String> appliedHiddenFields = fieldPerms.hiddenFields().stream()
+                    .filter(record::containsKey)
+                    .sorted()
+                    .toList();
+            if (!appliedHiddenFields.isEmpty()) {
+                auditHiddenFieldFiltering(modelCode, memberId, record, appliedHiddenFields);
+                appliedHiddenFields.forEach(record::remove);
+            }
         } catch (Exception e) {
             // Fail closed for security (matches the sibling row-ACL / field-mask paths in this class).
             // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
@@ -396,9 +420,57 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return record;
     }
 
+    private void auditHiddenFieldFiltering(
+            String modelCode,
+            Long memberId,
+            Map<String, Object> record,
+            List<String> hiddenFields) {
+        if (memberId == null || hiddenFields == null || hiddenFields.isEmpty() || !MetaContext.exists()) {
+            return;
+        }
+        try {
+            Long tenantId = MetaContext.getCurrentTenantId();
+            getPermissionAuditService().logFieldGovernanceFilter(
+                    tenantId,
+                    memberId,
+                    modelCode,
+                    "read",
+                    toLongOrNull(record.get("id")),
+                    toNonBlankString(record.get("pid")),
+                    hiddenFields);
+        } catch (Exception e) {
+            // Audit is for forensics; the filtered response has already removed
+            // hidden fields and must not fail because audit persistence is down.
+            log.warn("Failed to submit field-governance audit for model {}: {}",
+                    logSafe(modelCode), logSafe(e.getMessage()), e);
+        }
+    }
+
+    private Long toLongOrNull(Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private String toNonBlankString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value);
+        return text.isBlank() ? null : text;
+    }
+
     private Long currentMemberIdForFieldPermissions() {
         Long memberId = MetaContext.getCurrentMemberId();
-        return memberId != null ? memberId : getCurrentUserId();
+        return memberId != null ? memberId : resolveCurrentTenantMemberId();
     }
 
     private List<Map<String, Object>> enrichListRecords(String modelCode, List<Map<String, Object>> records) {
@@ -927,9 +999,30 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         Map<String, Object> record = records.get(0);
 
         if (!MetaContext.isDataPermissionBypassed()) {
+            // Apply the Rule Center-backed permission pipeline before the
+            // legacy row-level gate. A Rule Center DENY is responsible for
+            // producing the permission audit/trace row; if the legacy row ACL
+            // runs first, the request can fail with no explainability trail.
+            // Field-level masking still happens afterwards so the evaluator
+            // sees the original record shape.
+            try {
+                enforceRuleCenterRecordPermission(modelCode, recordId, record);
+            } catch (MetaServiceException e) {
+                throw e;
+            } catch (Exception e) {
+                log.error("Failed to evaluate Rule Center permission for model {} record {} — failing closed for security",
+                        logSafe(modelCode), logSafe(recordId), e);
+                throw new MetaServiceException(
+                        "Rule Center permission evaluation failed for model: " + modelCode, e);
+            }
+        }
+
+        if (!MetaContext.isDataPermissionBypassed()) {
             // Apply row-level access check for single record — fail-secure: any
             // non-MetaServiceException must surface as a 5xx, not be swallowed.
-            // Mirrors the list() pattern at lines 173 and 185.
+            // Mirrors the list() pattern at lines 173 and 185. This remains an
+            // additional legacy guard after the Rule Center permission pipeline
+            // has either allowed the record or produced a DENY trace.
             try {
                 Long userId = getCurrentUserId();
                 if (!dataPermissionEngine.canAccessRecord(tenantId, modelCode, userId, record)) {
@@ -991,6 +1084,41 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         record = single.get(0);
 
         return record;
+    }
+
+    private void enforceRuleCenterRecordPermission(String modelCode, String recordId, Map<String, Object> record) {
+        Long subjectId = currentMemberIdForRuleCenterPermission();
+        if (subjectId == null) {
+            throw new MetaServiceException("Permission context missing for model: " + modelCode);
+        }
+
+        PermissionFacade facade = getPermissionFacade();
+        if (facade == null) {
+            throw new MetaServiceException("Permission facade unavailable for model: " + modelCode);
+        }
+
+        PermissionResult result = facade.canOperate(subjectId, modelCode, "read", record);
+        if (!result.granted()) {
+            throw new MetaServiceException("Access denied: you do not have permission to view this record");
+        }
+    }
+
+    private Long currentMemberIdForRuleCenterPermission() {
+        Long memberId = MetaContext.getCurrentMemberId();
+        return memberId != null ? memberId : resolveCurrentTenantMemberId();
+    }
+
+    private Long resolveCurrentTenantMemberId() {
+        if (!MetaContext.exists()) {
+            return null;
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Long userId = MetaContext.getCurrentUserId();
+        if (tenantId == null || userId == null) {
+            return null;
+        }
+        TenantMember member = getTenantMemberService().findByTenantIdAndUserId(tenantId, userId);
+        return member == null ? null : member.getId();
     }
 
     @Override

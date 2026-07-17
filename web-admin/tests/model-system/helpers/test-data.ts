@@ -83,6 +83,7 @@ export interface FieldTestData {
     placeholder?: string;
     component?: string;
   };
+  ruleSchema?: Record<string, any>;
 }
 
 /**

@@ -16,14 +16,17 @@ import java.util.Map;
  * DTO for importing SLA config definitions from plugin manifest
  * (mirrors {@link com.auraboot.framework.bpm.entity.SlaConfigEntity}).
  *
- * <p>Upsert key is {@code (tenantId, name)}; existing rows with the same name
- * within the tenant are updated in place.
+ * <p>Upsert key prefers {@code slaKey} or the rule binding consumer code.
+ * Display names may be localized and must not be used as the primary import key.
  */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class SlaConfigDefinitionDTO {
+
+    /** Stable plugin resource key. Not persisted directly in ab_sla_config. */
+    private String slaKey;
 
     /** Unique name within tenant. Required — used as the import upsert key. */
     private String name;
@@ -52,6 +55,9 @@ public class SlaConfigDefinitionDTO {
 
     /** Platform rule-center binding for deadline/breach/escalation decisions. */
     private RuleConsumerBinding ruleBinding;
+
+    /** Action orchestration policy for warning/timeout side effects. */
+    private Map<String, Object> actionPolicy;
 
     /** Associated model code. */
     private String modelCode;

@@ -6,6 +6,7 @@ import type { CapabilityGroup } from './types';
 import { SCOPE_OPTIONS, normalizeScope } from '../scopeConfig';
 import { deriveCodeSources, sourceFor } from './coverageHelpers';
 import PolicyConfigDialog from '../PolicyConfigDialog';
+import { permissionService } from '~/shared/services/permissionService';
 
 interface AdvancedAtomicActionsProps {
   rolePid: string;
@@ -58,6 +59,7 @@ export default function AdvancedAtomicActions({
   const [onlyGranted, setOnlyGranted] = useState(false);
   const [onlyUncovered, setOnlyUncovered] = useState(false);
   const [policyDialog, setPolicyDialog] = useState<PolicyDialogState | null>(null);
+  const [loadingPolicyPid, setLoadingPolicyPid] = useState<string | null>(null);
 
   const sources = useMemo(() => deriveCodeSources(capabilityGroups), [capabilityGroups]);
 
@@ -232,18 +234,32 @@ export default function AdvancedAtomicActions({
                               type="button"
                               title={t('admin.permission.advanced.configurePolicy', undefined, 'Configure policy')}
                               data-testid={`atomic-policy-${r.code}`}
-                              onClick={() => {
+                              disabled={loadingPolicyPid === r.permissionPid}
+                              onClick={async () => {
                                 try {
+                                  setLoadingPolicyPid(r.permissionPid);
+                                  const initialValues = await permissionService.getPolicy(rolePid, r.permissionPid);
                                   setPolicyDialog({
                                     permissionPid: r.permissionPid,
                                     permissionLabel: r.label || r.code,
                                     schema: JSON.parse(r.policySchema!),
+                                    initialValues,
                                   });
                                 } catch {
-                                  /* invalid schema — ignore */
+                                  try {
+                                    setPolicyDialog({
+                                      permissionPid: r.permissionPid,
+                                      permissionLabel: r.label || r.code,
+                                      schema: JSON.parse(r.policySchema!),
+                                    });
+                                  } catch {
+                                    /* invalid schema — ignore */
+                                  }
+                                } finally {
+                                  setLoadingPolicyPid(null);
                                 }
                               }}
-                              className="ml-1 inline-flex items-center rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 dark:hover:bg-gray-700"
+                              className="ml-1 inline-flex items-center rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-blue-600 disabled:opacity-50 dark:hover:bg-gray-700"
                             >
                               <Cog6ToothIcon className="h-3.5 w-3.5" />
                             </button>

@@ -181,6 +181,9 @@ public class EventPolicyVersionServiceImpl implements EventPolicyVersionService 
 
         String userPid = MetaContext.getCurrentUserPid();
         Instant now = Instant.now();
+        Long tid = requireTenant();
+
+        versionMapper.deprecateOtherPublished(tid, entity.getPolicyCode(), entity.getPid());
 
         entity.setStatus(VersionStatus.PUBLISHED.name());
         entity.setPublishedBy(userPid);

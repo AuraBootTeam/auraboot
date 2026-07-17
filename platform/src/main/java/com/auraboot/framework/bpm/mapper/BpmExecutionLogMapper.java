@@ -39,6 +39,33 @@ public interface BpmExecutionLogMapper extends BaseMapper<BpmExecutionLog> {
                 .orderByDesc("created_at"));
     }
 
+    default BpmExecutionLog findLatestFailureByExecutionId(Long tenantId, String executionId) {
+        QueryWrapper<BpmExecutionLog> query = new QueryWrapper<BpmExecutionLog>()
+                .eq("execution_id", executionId)
+                .eq("event_type", "node_failure")
+                .orderByDesc("created_at")
+                .last("LIMIT 1");
+        if (tenantId != null) {
+            query.eq("tenant_id", tenantId);
+        }
+        return selectOne(query);
+    }
+
+    default BpmExecutionLog findLatestFailureByBusinessKey(Long tenantId, String processKey, String businessKey) {
+        QueryWrapper<BpmExecutionLog> query = new QueryWrapper<BpmExecutionLog>()
+                .eq("event_type", "node_failure")
+                .apply("input_data ->> 'businessKey' = {0}", businessKey)
+                .orderByDesc("created_at")
+                .last("LIMIT 1");
+        if (tenantId != null) {
+            query.eq("tenant_id", tenantId);
+        }
+        if (processKey != null && !processKey.isBlank()) {
+            query.apply("input_data ->> 'processKey' = {0}", processKey);
+        }
+        return selectOne(query);
+    }
+
     @Select("SELECT COUNT(*) FROM ab_bpm_execution_log " +
             "WHERE execution_id = #{executionId} AND event_type = #{eventType}")
     int countByEventType(@Param("executionId") String executionId,

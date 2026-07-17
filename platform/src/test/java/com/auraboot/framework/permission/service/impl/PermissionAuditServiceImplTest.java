@@ -15,6 +15,7 @@ import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,7 +58,7 @@ class PermissionAuditServiceImplTest {
         EvaluationStep allow = new EvaluationStep("RBAC", EvaluationVerdict.ALLOW, "rbac ok");
         EvaluationStep deny = new EvaluationStep("DataScope", EvaluationVerdict.DENY, "out of scope");
         PermissionExplanation explanation = new PermissionExplanation(
-                1L, "model.user", "read", 10L, false, List.of(allow, deny));
+                1L, "model.user", "read", 10L, "USER-PID-10", false, List.of(allow, deny));
 
         service.logEvaluation(100L, explanation);
 
@@ -70,10 +71,106 @@ class PermissionAuditServiceImplTest {
         assertThat(entry.getResourceCode()).isEqualTo("model.user");
         assertThat(entry.getActionCode()).isEqualTo("read");
         assertThat(entry.getRecordId()).isEqualTo(10L);
+        assertThat(entry.getRecordPid()).isEqualTo("USER-PID-10");
         assertThat(entry.getResult()).isFalse();
         assertThat(entry.getReason()).isEqualTo("out of scope");
         assertThat(entry.getEvaluationTrace()).hasSize(2);
         assertThat(entry.getCreatedAt()).isNotNull();
+    }
+
+    @Test
+    void logEvaluationPersistsStructuredRuleCenterStepDetails() {
+        EvaluationStep deny = new EvaluationStep(
+                "Policy",
+                EvaluationVerdict.DENY,
+                "Condition guard not satisfied",
+                Map.of(
+                        "ruleTraceId", "trace-permission-deny",
+                        "decisionCode", "leave_request_automation",
+                        "permissionContext", Map.of(
+                                "severity", "warning",
+                                "decisionMessage", "Needs manager review")));
+        PermissionExplanation explanation = new PermissionExplanation(
+                1L, "model.leave", "approve", 10L, "LEAVE-PID-10", false, List.of(deny));
+
+        service.logEvaluation(100L, explanation);
+
+        ArgumentCaptor<PermissionAuditLog> captor = ArgumentCaptor.forClass(PermissionAuditLog.class);
+        verify(auditLogMapper).insertAuditLog(captor.capture());
+
+        PermissionAuditLog entry = captor.getValue();
+        assertThat(entry.getReason()).isEqualTo("Condition guard not satisfied");
+        assertThat(entry.getEvaluationTrace()).hasSize(1);
+        assertThat(entry.getEvaluationTrace().get(0))
+                .isInstanceOf(Map.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("evaluatorName", "Policy")
+                .containsEntry("verdict", "DENY");
+        Object details = ((Map<?, ?>) entry.getEvaluationTrace().get(0)).get("details");
+        assertThat(details)
+                .isInstanceOf(Map.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("ruleTraceId", "trace-permission-deny")
+                .containsEntry("decisionCode", "leave_request_automation");
+        Object permissionContext = ((Map<?, ?>) details).get("permissionContext");
+        assertThat(permissionContext)
+                .isInstanceOf(Map.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("severity", "warning")
+                .containsEntry("decisionMessage", "Needs manager review");
+    }
+
+    @Test
+    void logFieldGovernanceFilterPersistsFieldPermissionTraceWithoutFieldValues() {
+        service.logFieldGovernanceFilter(
+                100L,
+                1L,
+                "wd_leave_request",
+                "read",
+                10L,
+                "LEAVE-PID-10",
+                List.of("wd_req_type", "wd_req_type", "wd_req_secret"));
+
+        ArgumentCaptor<PermissionAuditLog> captor = ArgumentCaptor.forClass(PermissionAuditLog.class);
+        verify(auditLogMapper).insertAuditLog(captor.capture());
+
+        PermissionAuditLog entry = captor.getValue();
+        assertThat(entry.getTenantId()).isEqualTo(100L);
+        assertThat(entry.getMemberId()).isEqualTo(1L);
+        assertThat(entry.getResourceCode()).isEqualTo("wd_leave_request");
+        assertThat(entry.getActionCode()).isEqualTo("read");
+        assertThat(entry.getRecordId()).isEqualTo(10L);
+        assertThat(entry.getRecordPid()).isEqualTo("LEAVE-PID-10");
+        assertThat(entry.getResult()).isFalse();
+        assertThat(entry.getReason()).isEqualTo("字段权限拒绝：字段已从响应移除");
+        assertThat(entry.getEvaluationTrace()).hasSize(1);
+
+        Object step = entry.getEvaluationTrace().get(0);
+        assertThat(step)
+                .isInstanceOf(Map.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("evaluatorName", "FieldPermission")
+                .containsEntry("verdict", "DENY")
+                .containsEntry("reason", "字段权限拒绝：字段已从响应移除");
+        Object details = ((Map<?, ?>) step).get("details");
+        assertThat(details)
+                .isInstanceOf(Map.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsKey("fieldGovernance");
+        Object fieldGovernance = ((Map<?, ?>) details).get("fieldGovernance");
+        assertThat(fieldGovernance)
+                .isInstanceOf(Map.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("reason", "field-permission-hidden")
+                .containsEntry("validation", "DENY")
+                .containsEntry("source", "dynamic-data-field-permission")
+                .containsEntry("modelCode", "wd_leave_request");
+        List<String> fieldRefs = ((List<?>) ((Map<?, ?>) fieldGovernance).get("fieldRefs")).stream()
+                .map(String::valueOf)
+                .toList();
+        assertThat(fieldRefs)
+                .containsExactly("record.data.wd_req_secret", "record.data.wd_req_type");
+        assertThat(entry.getEvaluationTrace().toString()).doesNotContain("annual_leave", "secret-value");
     }
 
     @Test
@@ -147,5 +244,21 @@ class PermissionAuditServiceImplTest {
                 .thenReturn(List.of(new PermissionAuditLog()));
 
         assertThat(service.getLogsByResource(100L, "model.user", 10)).hasSize(1);
+    }
+
+    @Test
+    void getLogsByTraceIdFailsClosedOnError() {
+        when(auditLogMapper.findByTraceId(100L, "trace-permission-001", 10))
+                .thenThrow(new RuntimeException("db"));
+
+        assertThat(service.getLogsByTraceId(100L, "trace-permission-001", 10)).isEmpty();
+    }
+
+    @Test
+    void getLogsByTraceIdReturnsMapperResult() {
+        when(auditLogMapper.findByTraceId(100L, "trace-permission-001", 10))
+                .thenReturn(List.of(new PermissionAuditLog()));
+
+        assertThat(service.getLogsByTraceId(100L, "trace-permission-001", 10)).hasSize(1);
     }
 }

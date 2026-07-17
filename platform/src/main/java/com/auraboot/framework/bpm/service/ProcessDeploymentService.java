@@ -38,6 +38,7 @@ import com.auraboot.framework.common.constant.StatusConstants;
 @RequiredArgsConstructor
 public class ProcessDeploymentService {
 
+    private static final String INTERNAL_AUTOMATION_CATEGORY = "automation";
     private final SmartEngine smartEngine;
     private final BpmProcessDefinitionMapper processDefinitionMapper;
     private final BpmAuditService bpmAuditService;
@@ -60,6 +61,7 @@ public class ProcessDeploymentService {
                         .eq("tenant_id", tenantId)
                         .eq("deleted_flag", false)
                         .eq("is_current", true)
+                        .and(w -> w.ne("category", INTERNAL_AUTOMATION_CATEGORY).or().isNull("category"))
                         .orderByAsc("process_name"));
     }
 
@@ -82,6 +84,10 @@ public class ProcessDeploymentService {
                         .eq("deleted_flag", false)
                         .eq("is_current", true)
                         .orderByDesc("created_at");
+
+        if (!hasExplicitCategoryFilter(filtersJson)) {
+            wrapper.and(w -> w.ne("category", INTERNAL_AUTOMATION_CATEGORY).or().isNull("category"));
+        }
 
         // Keyword search on process_key and process_name
         if (keyword != null && !keyword.isBlank()) {
@@ -117,6 +123,31 @@ public class ProcessDeploymentService {
         }
 
         return processDefinitionMapper.selectPage(pageRequest, wrapper);
+    }
+
+    private boolean hasExplicitCategoryFilter(String filtersJson) {
+        if (filtersJson == null || filtersJson.isBlank()) {
+            return false;
+        }
+        try {
+            com.fasterxml.jackson.databind.JsonNode filters = objectMapper.readTree(filtersJson);
+            if (!filters.isArray()) {
+                return false;
+            }
+            for (com.fasterxml.jackson.databind.JsonNode filter : filters) {
+                String fieldName = filter.has("fieldName")
+                        ? filter.get("fieldName").asText()
+                        : filter.has("field")
+                                ? filter.get("field").asText()
+                                : null;
+                if ("category".equals(fieldName)) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            log.warn("Failed to inspect filters JSON for category filter: {}", filtersJson, e);
+        }
+        return false;
     }
 
     /**

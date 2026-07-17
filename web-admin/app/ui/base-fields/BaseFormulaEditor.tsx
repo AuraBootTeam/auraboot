@@ -7,7 +7,7 @@
 import React from 'react';
 import type { FieldAdapter } from '~/ui/field-adapter';
 import { FormulaEditor } from '~/framework/smart/components/formula/FormulaEditor';
-import type { FormulaFunction } from '~/framework/smart/components/formula/FormulaEditor';
+import type { FormulaField, FormulaFunction } from '~/framework/smart/components/formula/FormulaEditor';
 import { cn } from '~/utils/cn';
 
 export interface BaseFormulaEditorProps {
@@ -18,9 +18,11 @@ export interface BaseFormulaEditorProps {
   helpText?: string;
   className?: string;
   /** Available fields for autocomplete */
-  fields?: { code: string; name: string }[];
+  fields?: FormulaField[];
   /** Fetch available formula functions */
   fetchFunctions?: () => Promise<FormulaFunction[]>;
+  /** Show the generic FormulaEditor syntax help. */
+  showHelp?: boolean;
 }
 
 export function BaseFormulaEditor({
@@ -32,6 +34,7 @@ export function BaseFormulaEditor({
   className,
   fields,
   fetchFunctions,
+  showHelp,
 }: BaseFormulaEditorProps) {
   const hasError = !!adapter.error;
 
@@ -47,10 +50,12 @@ export function BaseFormulaEditor({
         value={(adapter.value as string) ?? ''}
         onChange={(val) => adapter.setValue(val)}
         placeholder={placeholder}
+        ariaLabel={label || name}
         disabled={adapter.disabled}
         error={hasError ? adapter.error : undefined}
         fields={fields}
         fetchFunctions={fetchFunctions}
+        showHelp={showHelp}
       />
       {!hasError && helpText && <p className="text-text-2 mt-1 text-xs">{helpText}</p>}
     </div>

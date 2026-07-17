@@ -1,5 +1,6 @@
 package com.auraboot.framework.permission.engine.evaluator;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -37,18 +38,30 @@ public class RolePermissionEvaluator {
      * @return evaluation step with ALLOW or DENY verdict
      */
     public EvaluationStep evaluate(Long memberId, String resource, String action) {
-        String permissionCode = resource + ":" + action;
-
-        boolean hasPermission = userPermissionService.hasPermission(memberId, permissionCode);
-
-        if (hasPermission) {
-            log.debug("RBAC ALLOW: memberId={}, permissionCode={}", memberId, permissionCode);
-            return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
-                    "User has permission: " + permissionCode);
-        } else {
-            log.debug("RBAC DENY: memberId={}, permissionCode={}", memberId, permissionCode);
-            return new EvaluationStep(NAME, EvaluationVerdict.DENY,
-                    "User lacks permission: " + permissionCode);
+        Long userId = currentUserIdOr(memberId);
+        for (String permissionCode : PermissionCodeCandidates.forResourceAction(resource, action)) {
+            boolean hasPermission = userPermissionService.hasPermission(userId, permissionCode);
+            if (hasPermission) {
+                log.debug("RBAC ALLOW: memberId={}, userId={}, permissionCode={}", memberId, userId, permissionCode);
+                return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
+                        "User has permission: " + permissionCode);
+            }
         }
+
+        String attempted = String.join(", ", PermissionCodeCandidates.forResourceAction(resource, action));
+        log.debug("RBAC DENY: memberId={}, userId={}, candidates={}", memberId, userId, attempted);
+        return new EvaluationStep(NAME, EvaluationVerdict.DENY,
+                "User lacks permission: " + attempted);
+    }
+
+    private Long currentUserIdOr(Long fallback) {
+        try {
+            if (MetaContext.exists() && MetaContext.getCurrentUserId() != null) {
+                return MetaContext.getCurrentUserId();
+            }
+        } catch (Exception ignored) {
+            // Unit tests and background paths may not have a full request context.
+        }
+        return fallback;
     }
 }

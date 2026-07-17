@@ -45,6 +45,21 @@ export interface DecisionResult {
   violations?: { fieldPath?: string; code?: string; message?: string; severity?: string }[];
   matchedRules?: { ruleId?: string; reason?: string }[];
   errors?: string[];
+  unknownReasons?: string[];
+}
+
+export interface DecisionVirtualSourceTrace {
+  sourceRef?: string;
+  modelCode?: string;
+  recordPid?: string;
+  status?: string;
+  reason?: string;
+  fields?: Record<string, unknown>;
+}
+
+export interface DecisionTraceSnapshot {
+  virtualSources?: DecisionVirtualSourceTrace[];
+  unknownReasons?: string[];
 }
 
 export interface DecisionLogRecord {
@@ -68,6 +83,8 @@ export interface DecisionLogRecord {
   matched?: boolean;
   status?: string;
   matchedRulesJson?: unknown;
+  outputSnapshot?: Record<string, unknown>;
+  traceSnapshot?: DecisionTraceSnapshot | Record<string, unknown>;
   durationMs?: number;
   errorCode?: string;
   errorMessage?: string;
@@ -79,6 +96,7 @@ export interface DecisionLogFilters {
   decisionCode?: string;
   status?: string;
   callerType?: string;
+  callerRef?: string;
   matched?: boolean | '';
   rolloutArm?: string;
   minDurationMs?: number | '';
@@ -95,6 +113,43 @@ export interface DecisionPageResult<T> {
   pages?: number;
   hasPrevious?: boolean;
   hasNext?: boolean;
+}
+
+export interface DecisionDefinitionListFilters {
+  keyword?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface EventPolicyActionLogFilters {
+  decisionTraceId?: string;
+  correlationId?: string;
+  policyCode?: string;
+  policyCodePrefix?: string;
+  size?: number;
+}
+
+export interface EventPolicyActionLogRecord {
+  pid?: string;
+  tenantId?: number;
+  idempotencyKey?: string;
+  policyCode?: string;
+  decisionTraceId?: string;
+  correlationId?: string;
+  ruleCode?: string;
+  actionType?: string;
+  status?: string;
+  failureStrategy?: string;
+  errorMessage?: string;
+  resultPayload?: Record<string, unknown>;
+  actionPayload?: Record<string, unknown>;
+  contextPayload?: Record<string, unknown>;
+  attemptCount?: number;
+  maxAttempts?: number;
+  nextRetryAt?: string;
+  lastRetryAt?: string;
+  deadLetteredAt?: string;
+  executedAt?: string;
 }
 
 export interface DecisionDashboardSummary {
@@ -121,6 +176,8 @@ export interface DecisionDashboardResponse {
 }
 
 export interface DecisionModelField {
+  modelCode?: string;
+  modelName?: string;
   entityCode: string;
   path: string;
   label: string;
@@ -131,6 +188,57 @@ export interface DecisionModelField {
   decisionCodes?: string[];
 }
 
+export interface DecisionFactOption {
+  value: string | number | boolean;
+  label?: string;
+  disabled?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface DecisionFactReference {
+  targetEntity?: string;
+  valueField?: string;
+  displayField?: string;
+}
+
+export interface DecisionFact {
+  factKey?: string;
+  scope?: string;
+  path: string;
+  label?: string;
+  dataType?: DataType | string;
+  modelCode?: string;
+  modelName?: string;
+  entityCode?: string;
+  sourceType?: string;
+  sourceRef?: string;
+  operators?: string[];
+  dictCode?: string;
+  allowedValues?: DecisionFactOption[];
+  reference?: DecisionFactReference;
+  required?: boolean;
+  visible?: boolean;
+  editable?: boolean;
+  masked?: boolean;
+  permission?: string;
+}
+
+export interface DecisionFactEntity {
+  entityCode?: string;
+  modelCode?: string;
+  label?: string;
+  modelName?: string;
+  sourceType?: string;
+  sourceRef?: string;
+  facts?: DecisionFact[];
+}
+
+export interface DecisionFactCatalog {
+  entities?: DecisionFactEntity[];
+  facts?: DecisionFact[];
+  generatedAt?: string;
+}
+
 export interface DecisionAction {
   actionType: string;
   label?: string;
@@ -138,7 +246,30 @@ export interface DecisionAction {
   description?: string;
   scopes?: string[];
   handlerAvailable?: boolean;
+  availabilityStatus?: 'AVAILABLE' | 'UNAVAILABLE' | string;
+  availabilityReason?: string;
+  consumerTypes?: string[];
+  consumerAvailability?: DecisionActionConsumerAvailability[];
+  providerDependencies?: DecisionActionProviderDependency[];
   inputSchema?: Record<string, unknown>;
+}
+
+export interface DecisionActionConsumerAvailability {
+  consumerType: string;
+  handlerAvailable?: boolean;
+  availabilityStatus?: 'AVAILABLE' | 'UNAVAILABLE' | string;
+  availabilityReason?: string;
+  providerDependencies?: DecisionActionProviderDependency[];
+}
+
+export interface DecisionActionProviderDependency {
+  providerType?: string;
+  providerCodes?: string[];
+  label?: string;
+  required?: boolean;
+  available?: boolean;
+  availabilityStatus?: 'AVAILABLE' | 'UNAVAILABLE' | string;
+  availabilityReason?: string;
 }
 
 export interface DecisionActionCatalog {
@@ -228,13 +359,22 @@ export interface DecisionIntegrationImpact {
   risk: DecisionImpactRisk;
 }
 
-export type DecisionFieldPreflightAction = 'DELETE_FIELD' | 'CHANGE_TYPE';
+export type DecisionFieldPreflightAction =
+  | 'DELETE_FIELD'
+  | 'CHANGE_DATA_TYPE'
+  | 'DELETE_DICT_ITEM'
+  | 'CHANGE_PERMISSION'
+  | 'CHANGE_VIRTUAL_SOURCE';
 
 export interface DecisionFieldPreflightRequest {
   fieldRef: string;
   action: DecisionFieldPreflightAction;
   currentDataType?: string;
   nextDataType?: string;
+  dictCode?: string;
+  dictValue?: string;
+  nextPermission?: string;
+  nextSourceRef?: string;
   impactAcknowledged?: boolean;
   note?: string;
 }
@@ -244,6 +384,10 @@ export interface DecisionFieldPreflight {
   action: DecisionFieldPreflightAction;
   currentDataType?: string;
   nextDataType?: string;
+  dictCode?: string;
+  dictValue?: string;
+  nextPermission?: string;
+  nextSourceRef?: string;
   allowed: boolean;
   blocked: boolean;
   requiresAcknowledgement: boolean;
@@ -259,6 +403,63 @@ export interface DecisionUsageIndexRebuild {
   decisionRefs: number;
   fieldRefs: number;
   functionRefs: number;
+}
+
+export interface ConditionFragment {
+  id?: number;
+  pid?: string;
+  tenantId?: number;
+  fragmentCode: string;
+  fragmentName?: string;
+  description?: string;
+  scopeType?: string;
+  scopeRef?: string;
+  version?: number;
+  status?: string;
+  conditionSpec?: unknown;
+  fieldRefs?: string[];
+  decisionRefs?: string[];
+  ownerModule?: string;
+  enabled?: boolean;
+  publishedBy?: string;
+  publishedAt?: string;
+  createdBy?: string;
+  createdAt?: string;
+  updatedBy?: string;
+  updatedAt?: string;
+}
+
+export interface ConditionFragmentListFilters {
+  keyword?: string;
+  scopeType?: string;
+  scopeRef?: string;
+  page?: number;
+  size?: number;
+}
+
+export interface ConditionFragmentUpsertRequest {
+  fragmentCode?: string;
+  fragmentName?: string;
+  description?: string;
+  scopeType?: string;
+  scopeRef?: string;
+  ownerModule?: string;
+  enabled?: boolean;
+  conditionSpec: unknown;
+}
+
+export interface ConditionFragmentEvaluation {
+  fragmentCode?: string;
+  version?: number;
+  result?: string;
+  matched?: boolean;
+  trace?: unknown;
+}
+
+export interface ConditionFragmentImpact {
+  fragmentCode?: string;
+  incomingCount?: number;
+  incoming?: DecisionImpactRef[];
 }
 
 export interface DecisionTableAnalysisIssue {
@@ -316,6 +517,9 @@ export interface DecisionVersionSummary {
   status?: string;
   kind?: string;
   runtimeAdapter?: string;
+  inputSchemaJson?: unknown;
+  outputSchemaJson?: unknown;
+  contextSchemaJson?: unknown;
   publishedAt?: string;
 }
 
@@ -573,7 +777,8 @@ export function createDecisionApi(http: HttpClient) {
 
     getDefinition: (code: string) =>
       http.get<unknown>(`${D}/definitions/${code}`).then(unwrap),
-    listDefinitions: () => http.get<unknown>(`${D}/definitions`).then(unwrap),
+    listDefinitions: (filters: DecisionDefinitionListFilters = {}) =>
+      http.get<unknown>(`${D}/definitions`, compactParams(filters)).then(unwrap),
 
     createDraftVersion: (
       code: string,
@@ -620,9 +825,28 @@ export function createDecisionApi(http: HttpClient) {
         .then(unwrap),
     getLogByPid: (pid: string) =>
       http.get<DecisionLogRecord>(`${D}/logs/${encodeURIComponent(pid)}`).then(unwrap),
+    getEventPolicyActionLogs: (filters: EventPolicyActionLogFilters = {}) =>
+      http
+        .get<EventPolicyActionLogRecord[]>(`${P}/action-logs`, compactParams(filters))
+        .then(unwrap),
+    replayEventPolicyActionLog: (pid: string) =>
+      http
+        .post<EventPolicyActionLogRecord>(
+          `${P}/action-logs/${encodeURIComponent(pid)}/replay`,
+        )
+        .then(unwrap),
     getDashboard: () =>
       http.get<DecisionDashboardResponse>(`${D}/dashboard/summary`).then(unwrap),
     getModelFields: () => http.get<DecisionModelField[]>(`${D}/model/fields`).then(unwrap),
+    getFactCatalog: (modelCode?: string) => {
+      const params = compactParams({ modelCode });
+      return http
+        .get<DecisionFactCatalog>(
+          `${D}/facts/catalog`,
+          Object.keys(params).length > 0 ? params : undefined,
+        )
+        .then(unwrap);
+    },
     getActionCatalog: () => http.get<DecisionActionCatalog>(`${D}/actions/catalog`).then(unwrap),
     getPermissionMatrix: () =>
       http.get<DecisionPermissionMatrix>(`${D}/permissions/matrix`).then(unwrap),
@@ -659,6 +883,59 @@ export function createDecisionApi(http: HttpClient) {
         .then(unwrap),
     preflightFieldChange: (req: DecisionFieldPreflightRequest) =>
       http.post<DecisionFieldPreflight>(`${D}/fields/preflight`, req).then(unwrap),
+    listConditionFragments: (filters: ConditionFragmentListFilters = {}) =>
+      http
+        .get<DecisionPageResult<ConditionFragment>>(
+          `${D}/condition-fragments`,
+          compactParams(filters),
+        )
+        .then(unwrap),
+    createConditionFragment: (req: ConditionFragmentUpsertRequest & {
+      fragmentCode: string;
+      fragmentName: string;
+    }) => http.post<ConditionFragment>(`${D}/condition-fragments`, req).then(unwrap),
+    createConditionFragmentVersion: (
+      code: string,
+      req: ConditionFragmentUpsertRequest,
+    ) =>
+      http
+        .post<ConditionFragment>(
+          `${D}/condition-fragments/${encodeURIComponent(code)}/versions`,
+          req,
+        )
+        .then(unwrap),
+    listConditionFragmentVersions: (code: string) =>
+      http
+        .get<ConditionFragment[]>(
+          `${D}/condition-fragments/${encodeURIComponent(code)}/versions`,
+        )
+        .then(unwrap),
+    evaluateConditionFragment: (code: string, context?: ScopedContext) =>
+      http
+        .post<ConditionFragmentEvaluation>(
+          `${D}/condition-fragments/${encodeURIComponent(code)}/evaluate`,
+          { context: context ?? {} },
+        )
+        .then(unwrap),
+    getConditionFragmentImpact: (code: string) =>
+      http
+        .get<ConditionFragmentImpact>(
+          `${D}/condition-fragments/${encodeURIComponent(code)}/impact`,
+        )
+        .then(unwrap),
+    validateConditionFragmentVersion: (pid: string) =>
+      http
+        .post<ConditionFragment>(
+          `${D}/condition-fragment-versions/${encodeURIComponent(pid)}/validate`,
+        )
+        .then(unwrap),
+    publishConditionFragmentVersion: (pid: string, req?: DecisionVersionTransitionRequest) =>
+      http
+        .post<ConditionFragment>(
+          `${D}/condition-fragment-versions/${encodeURIComponent(pid)}/publish`,
+          req,
+        )
+        .then(unwrap),
     analyzeTable: (model: DecisionTable, decisionCode?: string, versionPid?: string) =>
       http
         .post<DecisionTableAnalysis>(`${D}/tables/analyze`, { decisionCode, versionPid, model })

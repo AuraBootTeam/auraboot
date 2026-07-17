@@ -14,5 +14,10 @@ public class DecisionActionDTO {
     private String description;
     private List<String> scopes = new ArrayList<>();
     private Boolean handlerAvailable;
+    private String availabilityStatus;
+    private String availabilityReason;
+    private List<String> consumerTypes = new ArrayList<>();
+    private List<DecisionActionConsumerAvailabilityDTO> consumerAvailability = new ArrayList<>();
+    private List<DecisionActionProviderDependencyDTO> providerDependencies = new ArrayList<>();
     private Map<String, Object> inputSchema;
 }

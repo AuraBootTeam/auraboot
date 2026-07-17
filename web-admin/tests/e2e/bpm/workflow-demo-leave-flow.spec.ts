@@ -11,7 +11,8 @@
  *      `postActions[].start_process`.
  *   3. UI approve: sidebar → Task Center → find task row for our businessKey
  *      (recordId) → open action menu → click "通过" → fill dialog textarea
- *      → confirm.
+ *      → confirm. The spec asserts the UI request payload carries the
+ *      designer-authored taskActions variable (`taskResult=approved`).
  *   4. Audit: cross-check that the audit trail records process_start +
  *      activity_event rows (Drools route, gateway, userTask) + the approve
  *      operation.
@@ -20,15 +21,8 @@
  *   - Every navigation is real sidebar click (D1).
  *   - Submit is a real toolbar click on the list row action (D9).
  *   - Approve is a real Task Center action-menu click + dialog fill + confirm.
- *   - API helpers only seed the draft record (one call) and cross-check state
- *     (no assertion depends on the API being the sole surface).
- *
- * Known environment constraint: admin@auraboot.com carries tenant_admin only
- * (no wd_manager/wd_hr role binding), but the deployed wd_leave_approval
- * BPMN has NO smart:assigneeType attribute on task_manager_approve /
- * task_hr_approve (see IdAndGroupTaskAssigneeDispatcher fallback: "assign to
- * process starter"). Admin therefore becomes the assignee of whichever
- * branch fires, which is what drives the Task Center row in B5.2.
+ *   - API helpers only seed the draft record and cross-check state; task
+ *     completion itself is driven through Task Center UI.
  *
  * Dimensions covered:
  *   D1  — sidebar nav (no page.goto direct for workflow nav)
@@ -42,18 +36,21 @@
  */
 
 import { test, expect, type Page } from '../../fixtures';
+import type { APIRequestContext } from '@playwright/test';
 import { uniqueId, dateOffsetStr, findRowInPaginatedList } from '../helpers';
-import { ensureRoleUsers } from '../../helpers/wd-fixtures';
+import { ensureRoleUsers, setLeaveBalance } from '../../helpers/wd-fixtures';
 import {
   loginAsAdmin,
   queryInstanceStatus,
   listAuditEvents,
+  listExecutionTimeline,
   hasProcessStart,
   waitForTodoTask,
   AuditOp,
+  type ExecutionTimelineEntry,
   type InstanceStatus,
 } from './_helpers/bpm-lifecycle';
-import { findTaskRowByBusinessKey, navigateToTaskCenter, openTaskCenterAsRole, openTaskRowMenu } from './_helpers/task-center';
+import { findTaskRowByBusinessKey, openTaskCenterAsRole, openTaskRowMenu } from './_helpers/task-center';
 
 // Serial mode — each test depends on state from the previous
 test.describe.configure({ mode: 'serial' });
@@ -63,6 +60,10 @@ const UID = uniqueId('B5');
 const LEAVE_REASON = `B5 E2E leave ${UID}`;
 const START_DATE = dateOffsetStr(7);
 const END_DATE = dateOffsetStr(8);
+const REJECT_UID = uniqueId('B5R');
+const REJECT_REASON = `B5 E2E reject ${REJECT_UID}`;
+const REJECT_START_DATE = dateOffsetStr(10);
+const REJECT_END_DATE = dateOffsetStr(11);
 const PROCESS_KEY = 'wd_leave_approval';
 
 // Shared state threaded across serial tests
@@ -72,6 +73,22 @@ let managerToken = '';
 let leaveRequestPid = '';
 let leaveRequestCode = '';
 let instanceId = '';
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function readRuleBindingTrace(entry: ExecutionTimelineEntry): Record<string, unknown> | null {
+  const outputData = asRecord(entry.outputData);
+  const nested = outputData ? asRecord(outputData.ruleBinding) : null;
+  if (nested) return nested;
+  if (entry.eventType === 'rule_evaluated' || entry.nodeType === 'ruleBinding') {
+    return outputData ?? {};
+  }
+  return null;
+}
 
 // ---------------------------------------------------------------------------
 // Sidebar navigation helpers (D1)
@@ -108,6 +125,112 @@ async function navigateToLeaveRequestList(page: Page): Promise<void> {
   await expect(page.locator('table').first()).toBeVisible({ timeout: 10_000 });
 }
 
+async function seedLeaveDraft(
+  request: APIRequestContext,
+  args: { reason: string; startDate: string; endDate: string },
+): Promise<{ pid: string; code: string }> {
+  const createResp = await request.post('/api/meta/commands/execute/wd:create_leave_request', {
+    headers: { Authorization: `Bearer ${adminToken}` },
+    data: {
+      payload: {
+        wd_req_applicant: adminUserId,
+        wd_req_type: 'annual',
+        wd_req_start_date: args.startDate,
+        wd_req_start_slot: 'AM',
+        wd_req_end_date: args.endDate,
+        wd_req_end_slot: 'PM',
+        wd_req_days: 2,
+        wd_req_reason: args.reason,
+      },
+      operationType: 'create',
+    },
+  });
+  expect(createResp.ok(), `draft create must succeed: ${createResp.status()}`).toBe(true);
+  const body = await createResp.json();
+  expect(String(body?.code)).toBe('0');
+  const resultData = body?.data?.data ?? {};
+  expect(
+    typeof resultData?.recordPid,
+    `create must return data.data.recordPid, got body=${JSON.stringify(body).slice(0, 500)}`,
+  ).toBe('string');
+  const pid = String(resultData.recordPid);
+
+  const detailResp = await request.get(`/api/dynamic/wd_leave_request_detail/${pid}`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  expect(detailResp.ok()).toBe(true);
+  const record = (await detailResp.json())?.data;
+  const code = String(record?.wd_req_code ?? '');
+  expect(code).toMatch(/^WDLR-/);
+  return { pid, code };
+}
+
+async function submitLeaveDraftViaUi(
+  page: Page,
+  request: APIRequestContext,
+  args: { pid: string; code: string },
+): Promise<string> {
+  await navigateToLeaveRequestList(page);
+
+  const row = await findRowInPaginatedList(page, args.code, 15_000);
+  await expect(row, `row for ${args.code} must appear in list`).toBeVisible();
+  await expect(row).toContainText(/draft|草稿/i);
+
+  const moreBtn = row.locator('[data-testid="row-action-more"]').first();
+  await expect(moreBtn).toBeVisible({ timeout: 5_000 });
+  await moreBtn.click();
+
+  const dropdown = page.locator('[data-testid="row-action-dropdown"]');
+  await expect(dropdown).toBeVisible({ timeout: 5_000 });
+  const submitMenuItem = dropdown.locator('[data-testid="row-action-submit"]');
+  await expect(submitMenuItem).toBeVisible({ timeout: 3_000 });
+
+  const cmdResp = page.waitForResponse(
+    (r) =>
+      r.url().includes('/api/meta/commands/execute/wd%3Asubmit_leave_request') ||
+      r.url().includes('/api/meta/commands/execute/wd:submit_leave_request'),
+    { timeout: 20_000 },
+  );
+
+  await submitMenuItem.click();
+
+  const earlyDialog = page
+    .locator('[data-testid="confirm-dialog"]')
+    .or(page.locator('[role="alertdialog"]'))
+    .or(page.locator('[role="dialog"]'));
+  const hasEarlyDialog = await earlyDialog
+    .first()
+    .isVisible({ timeout: 2_000 })
+    .catch(() => false);
+  if (hasEarlyDialog) {
+    const okBtn = page
+      .locator('[data-testid="confirm-ok"]')
+      .or(page.getByRole('button', { name: /^确认$|^确定$|^OK$|^Confirm$/i }))
+      .first();
+    await okBtn.click();
+  }
+
+  const resp = await cmdResp;
+  const body = await resp.json();
+  expect(
+    body?.code,
+    `submit command HTTP=${resp.status()} body=${JSON.stringify(body).slice(0, 300)}`,
+  ).toBe('0');
+
+  const detailResp = await request.get(`/api/dynamic/wd_leave_request_detail/${args.pid}`, {
+    headers: { Authorization: `Bearer ${adminToken}` },
+  });
+  expect(detailResp.ok()).toBe(true);
+  const record = (await detailResp.json())?.data;
+  expect(record?.wd_req_status).toBe('submitted');
+  const startedInstanceId = String(record?.wd_req_process_instance ?? '');
+  expect(
+    startedInstanceId,
+    'wd_req_process_instance must be populated after submit',
+  ).toBeTruthy();
+  return startedInstanceId;
+}
+
 // ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
@@ -130,44 +253,18 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
     adminUserId = String(meBody?.data?.user?.id ?? '');
     expect(adminUserId, 'admin /me must return a userId').toBeTruthy();
 
+    await setLeaveBalance(request, adminToken, adminUserId, 20);
+
     // Seed a draft leave request via command API (same pattern as WD1-001 +
     // B1 hybrid — form-fill is brittle for Member/Date pickers, and B5's
     // focus is the BPM chain from submit onward).
-    const createResp = await request.post(
-      '/api/meta/commands/execute/wd:create_leave_request',
-      {
-        headers: { Authorization: `Bearer ${adminToken}` },
-        data: {
-          payload: {
-            wd_req_applicant: adminUserId,
-            wd_req_type: 'annual',
-            wd_req_start_date: START_DATE,
-            wd_req_start_slot: 'AM',
-            wd_req_end_date: END_DATE,
-            wd_req_end_slot: 'PM',
-            wd_req_days: 2,
-            wd_req_reason: LEAVE_REASON,
-          },
-          operationType: 'create',
-        },
-      },
-    );
-    expect(createResp.ok(), `draft create must succeed: ${createResp.status()}`).toBe(true);
-    const body = await createResp.json();
-    expect(String(body?.code)).toBe('0');
-    const resultData = body?.data?.data ?? {};
-    leaveRequestPid = String(resultData?.recordId ?? resultData?.pid ?? resultData?.id ?? '');
-    expect(leaveRequestPid, 'create must return a recordId').toBeTruthy();
-
-    // Fetch the generated code for later assertions
-    const detailResp = await request.get(
-      `/api/dynamic/wd_leave_request_detail/${leaveRequestPid}`,
-      { headers: { Authorization: `Bearer ${adminToken}` } },
-    );
-    expect(detailResp.ok()).toBe(true);
-    const record = (await detailResp.json())?.data;
-    leaveRequestCode = String(record?.wd_req_code ?? '');
-    expect(leaveRequestCode).toMatch(/^WDLR-/);
+    const seeded = await seedLeaveDraft(request, {
+      reason: LEAVE_REASON,
+      startDate: START_DATE,
+      endDate: END_DATE,
+    });
+    leaveRequestPid = seeded.pid;
+    leaveRequestCode = seeded.code;
   });
 
   // =========================================================================
@@ -176,80 +273,14 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
   test('B5.1: user submits leave request via UI, BPM instance starts', async ({
     page,
     request,
-  }) => {
+  }, testInfo) => {
     expect(leaveRequestPid, 'draft seeded in beforeAll').toBeTruthy();
 
     // UI nav: sidebar → "我的申请"
-    await navigateToLeaveRequestList(page);
-
-    // Find the draft row by its generated code. The list can already contain
-    // many WDLR rows, so narrow through the list search/pagination helper.
-    const row = await findRowInPaginatedList(page, leaveRequestCode, 15_000);
-    await expect(row, `row for ${leaveRequestCode} must appear in list`).toBeVisible();
-
-    // Row should show status=draft before submit (D7 baseline)
-    await expect(row).toContainText(/draft|草稿/i);
-
-    // The action column surfaces only the primary action (first visible
-    // button — here "detail") inline; Submit/Edit/Delete live behind the
-    // "More actions" (...) trigger. The dropdown itself is rendered via
-    // Portal into document.body, so we scope its menu items to page (not
-    // the row). Testids are authoritative (see RowActionButtons.tsx).
-    const moreBtn = row.locator('[data-testid="row-action-more"]').first();
-    await expect(moreBtn).toBeVisible({ timeout: 5_000 });
-    await moreBtn.click();
-
-    const dropdown = page.locator('[data-testid="row-action-dropdown"]');
-    await expect(dropdown).toBeVisible({ timeout: 5_000 });
-    const submitMenuItem = dropdown.locator('[data-testid="row-action-submit"]');
-    await expect(submitMenuItem).toBeVisible({ timeout: 3_000 });
-
-    // Fire command + capture response. We wait on ANY status (not just 200)
-    // so we get a concrete error if the command rejects — blind timeout makes
-    // debugging much harder.
-    const cmdResp = page.waitForResponse(
-      (r) => r.url().includes('/api/meta/commands/execute/wd%3Asubmit_leave_request') ||
-        r.url().includes('/api/meta/commands/execute/wd:submit_leave_request'),
-      { timeout: 20_000 },
-    );
-
-    await submitMenuItem.click();
-
-    // A confirm dialog may appear first (wd:submit_leave_request has
-    // extension.confirmMessage wired through the command engine).
-    const earlyDialog = page
-      .locator('[data-testid="confirm-dialog"]')
-      .or(page.locator('[role="alertdialog"]'))
-      .or(page.locator('[role="dialog"]'));
-    const hasEarlyDialog = await earlyDialog
-      .first()
-      .isVisible({ timeout: 2_000 })
-      .catch(() => false);
-    if (hasEarlyDialog) {
-      const okBtn = page
-        .locator('[data-testid="confirm-ok"]')
-        .or(page.getByRole('button', { name: /^确认$|^确定$|^OK$|^Confirm$/i }))
-        .first();
-      await okBtn.click();
-    }
-
-    const resp = await cmdResp;
-    const body = await resp.json();
-    expect(
-      body?.code,
-      `submit command HTTP=${resp.status()} body=${JSON.stringify(body).slice(0, 300)}`,
-    ).toBe('0');
-
-    // Cross-check: record transitioned to submitted + process instance linked
-    const detailResp = await request.get(
-      `/api/dynamic/wd_leave_request_detail/${leaveRequestPid}`,
-      { headers: { Authorization: `Bearer ${adminToken}` } },
-    );
-    expect(detailResp.ok()).toBe(true);
-    const record = (await detailResp.json())?.data;
-    expect(record?.wd_req_status).toBe('submitted');
-    instanceId = String(record?.wd_req_process_instance ?? '');
-    expect(instanceId, 'wd_req_process_instance must be populated after submit').toBeTruthy();
+    instanceId = await submitLeaveDraftViaUi(page, request, {
+      pid: leaveRequestPid,
+      code: leaveRequestCode,
+    });
 
     // BPM status: one node currently active on the manager branch (days=2 → Drools → manager)
     // businessKey in wd:submit_leave_request postActions is `${recordId}`.
@@ -268,6 +299,56 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
     const completedIds = status.completedNodes.map((n) => n.nodeId);
     expect(completedIds, 'svc_rule_route should be in completedNodes').toContain('svc_rule_route');
     expect(completedIds, 'gw_approver should be in completedNodes').toContain('gw_approver');
+
+    // Runtime trace backend evidence: the BPM assignment rule was evaluated
+    // during the real UI-submitted process instance and produced manager
+    // reviewer output for the active user task.
+    const timeline = await listExecutionTimeline(request, adminToken, instanceId);
+    const ruleTrace = timeline
+      .map(readRuleBindingTrace)
+      .find(
+        (trace) =>
+          String(trace?.decisionCode ?? '') === 'approval_routing' &&
+          String(trace?.consumerNodeId ?? '') === 'task_manager_approve',
+      );
+    expect(
+      ruleTrace,
+      `timeline must include BPM ruleBinding trace for ${instanceId}: ${JSON.stringify(timeline)}`,
+    ).toBeTruthy();
+    expect(ruleTrace?.consumerType).toBe('BPM');
+    expect(ruleTrace?.status).toBe('MATCHED');
+    expect(ruleTrace?.matched).toBe(true);
+    const outputs = asRecord(ruleTrace?.outputs);
+    expect(outputs, 'rule trace outputs must be an object').toBeTruthy();
+    expect(outputs?.reviewGroups).toEqual(['wd_manager']);
+
+    // Browser evidence: the process status page must surface that same rule
+    // execution trace, so a business user can inspect how the approver was
+    // selected without opening raw backend logs.
+    await page.goto(`/bpm/process-status?processInstanceId=${encodeURIComponent(instanceId)}`, {
+      waitUntil: 'domcontentloaded',
+    });
+    await expect(page.getByRole('heading', { name: /Process Status/i })).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId('bpm-process-status-rule-trace')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId('bpm-rule-trace-panel')).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByTestId('bpm-rule-trace-item-task_manager_approve'),
+    ).toBeVisible();
+    await expect(
+      page.getByTestId('bpm-rule-trace-decision').filter({ hasText: 'approval_routing' }).first(),
+    ).toBeVisible();
+    await expect(page.getByTestId('bpm-rule-trace-status').filter({ hasText: '已命中' }).first()).toBeVisible();
+    await expect(page.getByTestId('bpm-rule-trace-output').filter({ hasText: '审批组' }).first()).toContainText(
+      'wd_manager',
+    );
+    await page.screenshot({
+      path: testInfo.outputPath('workflow-demo-bpm-rule-trace.png'),
+      fullPage: true,
+    });
   });
 
   // =========================================================================
@@ -325,52 +406,45 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
     // UI visibility check: open the row action menu so we assert the
     // user-facing action is reachable from Task Center (D10).
     const menu = await openTaskRowMenu(taskRow, managerPage);
-    const approveItem = menu.locator('button:has-text("通过")').first();
+    const approveItem = menu.locator('[data-testid="task-action-approve"]').first();
     await expect(
       approveItem,
       'Approve action "通过" must be reachable from Task Center row menu',
     ).toBeVisible();
 
-    // --- Why the actual approve fires via API here (not the UI dialog) ---
-    //
-    // The UI Approve dialog (TaskCenter → 通过 dialog) calls
-    //   POST /api/bpm/tasks/{taskId}/approve
-    // with body { comment } and NO `variables`. Our process's gw_result has
-    //   <conditionExpression>${taskResult == 'approved'}</conditionExpression>
-    // MVEL evaluates conditions against process variables — with no
-    // `taskResult` injected, the gateway throws MVEL
-    //   "null pointer or function not found: taskResult"
-    // and the backend returns HTTP 500. This is a real OSS product gap in
-    // `bpmWorkbenchService.approveTask` (it should read the userTask's
-    // taskActions[].resultVariable / resultValue from the DSL and inject
-    // them on complete), tracked separately.
-    //
-    // To keep the E2E green around the UI surface we DO open the menu and
-    // confirm the Approve action is exposed (above), but fire the actual
-    // completion call via API with the required `taskResult` variable so
-    // the BPM chain can proceed. Every other step stays UI-driven.
-    //
-    // Close the action menu to mimic the user aborting the dialog path.
-    await managerPage.keyboard.press('Escape').catch(() => {});
-    await managerCtx.close();
+    await approveItem.click();
+    const approveDialog = managerPage.getByRole('dialog', { name: /通过审批/ }).first();
+    await expect(approveDialog).toBeVisible({ timeout: 5_000 });
+    await approveDialog
+      .locator('textarea')
+      .fill(`B5 UI lifecycle approve ${UID}`);
 
-    const approveResp = await request.post(
-      `/api/bpm/tasks/${encodeURIComponent(String(ourTask.instanceId))}/approve`,
-      {
-        headers: {
-          Authorization: `Bearer ${managerToken}`,
-          'Content-Type': 'application/json',
-        },
-        data: {
-          comment: `B5 UI lifecycle approve ${UID}`,
-          variables: { taskResult: 'approved' },
-        },
-      },
+    const approveRespPromise = managerPage.waitForResponse(
+      (resp) =>
+        resp.request().method() === 'POST' &&
+        resp
+          .url()
+          .includes(`/api/bpm/tasks/${encodeURIComponent(String(ourTask.instanceId))}/approve`),
+      { timeout: 20_000 },
     );
+
+    await approveDialog.getByRole('button', { name: '确认通过' }).click();
+    const approveResp = await approveRespPromise;
+    const approveReqBody = approveResp.request().postDataJSON() as Record<string, unknown>;
+    const approveVariables =
+      approveReqBody.variables && typeof approveReqBody.variables === 'object'
+        ? (approveReqBody.variables as Record<string, unknown>)
+        : {};
+    expect(
+      approveVariables.taskResult,
+      `UI approve request must inject taskActions variable; body=${JSON.stringify(approveReqBody)}`,
+    ).toBe('approved');
+    expect(approveReqBody.comment).toBe(`B5 UI lifecycle approve ${UID}`);
     expect(
       approveResp.status(),
       `approve API HTTP=${approveResp.status()} body=${await approveResp.text().then((t) => t.slice(0, 300))}`,
     ).toBeLessThan(400);
+    await managerCtx.close();
 
     // Verify progress: manager task no longer active, instance advanced.
     // After approve, gw_result fires → notify_approved → end_approved.
@@ -451,6 +525,183 @@ test.describe('workflow-demo wd_leave_approval UI full lifecycle', { tag: ['@bpm
       hasEnd,
       `task_manager_approve activity_end must be audited (instance progressed past userTask)`,
     ).toBe(true);
+  });
+
+  // =========================================================================
+  // B5.5: manager rejects task in Task Center → rejected branch executes
+  // =========================================================================
+  test('B5.5: reject action submits taskResult=rejected and reaches rejected branch', async ({
+    browser,
+    page,
+    request,
+  }, testInfo) => {
+    const seeded = await seedLeaveDraft(request, {
+      reason: REJECT_REASON,
+      startDate: REJECT_START_DATE,
+      endDate: REJECT_END_DATE,
+    });
+    const rejectInstanceId = await submitLeaveDraftViaUi(page, request, seeded);
+
+    const afterSubmit = await queryInstanceStatus(request, adminToken, {
+      processKey: PROCESS_KEY,
+      businessKey: seeded.pid,
+    });
+    expect(afterSubmit.instanceId).toBe(rejectInstanceId);
+    expect(afterSubmit.currentNodes.map((n) => n.nodeId)).toContain('task_manager_approve');
+
+    const { context: managerCtx, page: managerPage } = await openTaskCenterAsRole(
+      browser,
+      'wd_manager@example.com',
+      'Test2026x',
+    );
+
+    const ourTask = await waitForTodoTask(
+      request,
+      managerToken,
+      (candidate) =>
+        candidate.processInstanceId === String(rejectInstanceId) &&
+        candidate.processDefinitionActivityId.includes('task_manager_approve'),
+      {
+        timeout: 15_000,
+        message: `todo tasks must contain task_manager_approve for reject instanceId=${rejectInstanceId}`,
+      },
+    );
+
+    const taskRow = findTaskRowByBusinessKey(
+      managerPage,
+      seeded.pid,
+      /task_manager_approve|主管审批|Manager Approve/i,
+    );
+    await expect(
+      taskRow,
+      'a task_manager_approve row for the reject path must appear',
+    ).toBeVisible({ timeout: 15_000 });
+
+    const menu = await openTaskRowMenu(taskRow, managerPage);
+    const rejectItem = menu.locator('[data-testid="task-action-reject"]').first();
+    await expect(
+      rejectItem,
+      'Reject action "驳回" must be reachable from Task Center row menu',
+    ).toBeVisible();
+
+    await rejectItem.click();
+    const rejectDialog = managerPage.getByRole('dialog', { name: /驳回审批/ }).first();
+    await expect(rejectDialog).toBeVisible({ timeout: 5_000 });
+    await rejectDialog.locator('textarea').fill(`B5 UI lifecycle reject ${REJECT_UID}`);
+
+    const rejectRespPromise = managerPage.waitForResponse(
+      (resp) =>
+        resp.request().method() === 'POST' &&
+        resp
+          .url()
+          .includes(`/api/bpm/tasks/${encodeURIComponent(String(ourTask.instanceId))}/reject`),
+      { timeout: 20_000 },
+    );
+
+    await rejectDialog.getByRole('button', { name: '确认驳回' }).click();
+    const rejectResp = await rejectRespPromise;
+    const rejectReqBody = rejectResp.request().postDataJSON() as Record<string, unknown>;
+    const rejectVariables =
+      rejectReqBody.variables && typeof rejectReqBody.variables === 'object'
+        ? (rejectReqBody.variables as Record<string, unknown>)
+        : {};
+    expect(
+      rejectVariables.taskResult,
+      `UI reject request must inject taskActions variable; body=${JSON.stringify(rejectReqBody)}`,
+    ).toBe('rejected');
+    expect(rejectReqBody.comment).toBe(`B5 UI lifecycle reject ${REJECT_UID}`);
+    expect(
+      rejectResp.status(),
+      `reject API HTTP=${rejectResp.status()} body=${await rejectResp.text().then((t) => t.slice(0, 300))}`,
+    ).toBeLessThan(400);
+    await managerCtx.close();
+
+    await expect
+      .poll(
+        async () => {
+          const status = await queryInstanceStatus(request, adminToken, {
+            processKey: PROCESS_KEY,
+            businessKey: seeded.pid,
+          });
+          return status.currentNodes.map((n) => n.nodeId);
+        },
+        { timeout: 10_000, message: 'task_manager_approve must exit currentNodes after reject' },
+      )
+      .not.toContain('task_manager_approve');
+
+    await expect
+      .poll(
+        async () => {
+          const status = await queryInstanceStatus(request, adminToken, {
+            processKey: PROCESS_KEY,
+            businessKey: seeded.pid,
+          });
+          return status.completedNodes.map((n) => n.nodeId);
+        },
+        { timeout: 15_000, message: 'rejected service branch must complete after reject' },
+      )
+      .toEqual(
+        expect.arrayContaining([
+          'task_manager_approve',
+          'svc_set_rejected',
+          'svc_notify_rejected',
+        ]),
+      );
+
+    await expect
+      .poll(
+        async () => {
+          const detailResp = await request.get(
+            `/api/dynamic/wd_leave_request_detail/${seeded.pid}`,
+            { headers: { Authorization: `Bearer ${adminToken}` } },
+          );
+          if (!detailResp.ok()) return '';
+          return String(((await detailResp.json())?.data?.wd_req_status) ?? '');
+        },
+        { timeout: 10_000, message: 'leave request status must become rejected' },
+      )
+      .toBe('rejected');
+
+    const audit = await listAuditEvents(request, adminToken, rejectInstanceId);
+    const activityEvents = audit.filter((a) => a.operation === AuditOp.ACTIVITY_EVENT);
+    type Ev = { activityId: string; eventType: string };
+    const events: Ev[] = activityEvents.map((a) => ({
+      activityId: (a.details?.activityId as string) ?? '',
+      eventType: (a.details?.eventType as string) ?? '',
+    }));
+    const rejectTaskEvents = events.filter((e) => e.activityId === 'task_manager_approve');
+    expect(
+      rejectTaskEvents.some((e) => e.eventType === 'activity_start'),
+      `reject path task_manager_approve activity_start must be audited: ${JSON.stringify(rejectTaskEvents)}`,
+    ).toBe(true);
+    expect(
+      rejectTaskEvents.some((e) => e.eventType === 'activity_end'),
+      `reject path task_manager_approve activity_end must be audited: ${JSON.stringify(rejectTaskEvents)}`,
+    ).toBe(true);
+    expect(
+      events.some((e) => e.activityId === 'svc_notify_rejected' && e.eventType === 'activity_end'),
+      `svc_notify_rejected activity_end must be audited: ${JSON.stringify(events)}`,
+    ).toBe(true);
+    expect(
+      events.some((e) => e.activityId === 'svc_notify_approved'),
+      `reject path must not enter approved notification branch: ${JSON.stringify(events)}`,
+    ).toBe(false);
+
+    await page.goto(
+      `/bpm/process-status?processInstanceId=${encodeURIComponent(rejectInstanceId)}`,
+      { waitUntil: 'domcontentloaded' },
+    );
+    await expect(page.getByTestId('bpm-process-status-rule-trace')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId('bpm-rule-trace-panel')).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByTestId('bpm-rule-trace-item-task_manager_approve'),
+    ).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath('workflow-demo-bpm-reject-rule-trace.png'),
+      fullPage: true,
+    });
   });
 
   // =========================================================================

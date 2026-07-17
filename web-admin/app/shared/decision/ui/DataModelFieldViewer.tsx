@@ -11,6 +11,8 @@ import type { DecisionApi, DecisionFieldImpact, DecisionFieldPreflight } from '.
 
 export interface ModelField {
   entityCode: string;
+  modelCode?: string;
+  modelName?: string;
   path: string;
   label: string;
   dataType: DataType;

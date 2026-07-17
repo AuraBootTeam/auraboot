@@ -8,12 +8,45 @@ import { humanizeType } from '../utils';
 import { PropertyField } from './PropertyField';
 import { cn } from '~/utils/cn';
 import { confirmDialog } from '~/utils/confirmDialog';
-import type { PropertySchema } from '../nodes/types';
+import { resolveIcon } from '~/utils/icon-resolver';
+import type {
+  FlowNodeAvailabilityMetadata,
+  FlowNodeDefinition,
+  PropertySchema,
+} from '../nodes/types';
 import type { FlowEdge } from '../store/types';
 
 export interface FlowPropertyPanelProps {
   readOnly?: boolean;
   className?: string;
+}
+
+function renderHeaderIcon(icon: unknown, label: string) {
+  if (React.isValidElement(icon)) return icon;
+  if (typeof icon === 'string') {
+    const trimmed = icon.trim();
+    if (trimmed.length > 0 && trimmed.length <= 2 && !/[A-Za-z0-9_-]/.test(trimmed)) {
+      return <span aria-hidden="true">{trimmed}</span>;
+    }
+    return resolveIcon(trimmed || null, label, 20);
+  }
+  return resolveIcon(null, label, 20);
+}
+
+function resolveSmartText(
+  st: (key: string) => string,
+  key: string,
+  fallback: string,
+) {
+  const value = st(key);
+  return value && value !== key ? value : fallback;
+}
+
+function nodeAvailability(
+  definition: FlowNodeDefinition | undefined,
+): FlowNodeAvailabilityMetadata | undefined {
+  const availability = definition?.metadata?.availability;
+  return availability && typeof availability === 'object' ? availability : undefined;
 }
 
 export function FlowPropertyPanel({ readOnly, className }: FlowPropertyPanelProps) {
@@ -34,7 +67,7 @@ export function FlowPropertyPanel({ readOnly, className }: FlowPropertyPanelProp
 
   if (!selectedNode && !selectedEdge) {
     return (
-      <div className={cn('w-80 border-l border-gray-200 bg-white p-4', className)}>
+      <div className={cn('w-96 border-l border-gray-200 bg-white p-4', className)}>
         <div className="mt-8 text-center text-gray-500">
           {st('$i18n:flow.panel.selectNode') || 'Select a node to configure'}
         </div>
@@ -62,6 +95,9 @@ export function FlowPropertyPanel({ readOnly, className }: FlowPropertyPanelProp
   const definition = nodeRegistry.get(selectedNode.type);
   const CustomEditor = definition?.propertyEditor;
   const allSchema = definition?.configSchema || [];
+  const selectedLabel = st(definition?.label) || humanizeType(selectedNode.type);
+  const availability = nodeAvailability(definition);
+  const unavailable = availability?.unavailable === true;
 
   // Evaluate dependsOn visibility
   const visibleSchema = allSchema.filter((field) => {
@@ -88,22 +124,54 @@ export function FlowPropertyPanel({ readOnly, className }: FlowPropertyPanelProp
   };
 
   return (
-    <div className={cn('w-80 overflow-y-auto border-l border-gray-200 bg-white', className)}>
+    <div className={cn('w-96 overflow-y-auto border-l border-gray-200 bg-white', className)}>
       <div className="p-4">
         {/* Header */}
         <div className="mb-4 flex items-center gap-2 border-b border-gray-200 pb-4">
-          <span className="text-xl">
-            {typeof definition?.icon === 'string' ? definition.icon : null}
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-gray-50 text-gray-700">
+            {renderHeaderIcon(definition?.icon, selectedLabel)}
           </span>
           <div className="flex-1">
-            <h3 className="font-medium text-gray-900">
-              {st(definition?.label) || humanizeType(selectedNode.type)}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-medium text-gray-900">
+                {selectedLabel}
+              </h3>
+              {unavailable && (
+                <span
+                  className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+                  data-testid={`flow-node-availability-badge-${selectedNode.id}`}
+                >
+                  {resolveSmartText(st, '$i18n:flow.availability.unavailable', '不可用')}
+                </span>
+              )}
+            </div>
             {definition?.description && (
               <p className="text-xs text-gray-500">{st(definition.description)}</p>
             )}
           </div>
         </div>
+
+        {unavailable && (
+          <div
+            className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+            data-testid={`flow-node-availability-${selectedNode.id}`}
+          >
+            <div className="font-medium">
+              {resolveSmartText(st, '$i18n:flow.availability.providerStatus', '动作可用性')}
+            </div>
+            <div className="mt-1 text-xs">
+              {availability?.reason ||
+                resolveSmartText(
+                  st,
+                  '$i18n:flow.availability.reasonFallback',
+                  '当前环境未提供该动作的可用服务。',
+                )}
+            </div>
+            {availability?.providerSummary && (
+              <div className="mt-1 text-xs">{availability.providerSummary}</div>
+            )}
+          </div>
+        )}
 
         {/* Properties — bespoke editor (G2 injection) takes precedence over the
             generic configSchema fields; automation nodes omit propertyEditor. */}
@@ -253,7 +321,7 @@ function EdgeInspector({
   const data: EdgeData = edge.data || {};
 
   return (
-    <div className={cn('w-80 overflow-y-auto border-l border-gray-200 bg-white', className)}>
+    <div className={cn('w-96 overflow-y-auto border-l border-gray-200 bg-white', className)}>
       <div className="p-4">
         <div className="mb-4 border-b border-gray-200 pb-4">
           <h3 className="font-medium text-gray-900">

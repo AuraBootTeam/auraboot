@@ -25,7 +25,8 @@ public class NoOpSmsSender implements SmsSender {
 
     @Override
     public SmsSendResult send(String phoneNumber, String templateId, Map<String, String> params) {
-        log.info("[NoOp SMS] to={}, templateId={}, params={}", phoneNumber, templateId, params);
+        log.info("[NoOp SMS] to={}, templateId={}, paramKeys={}",
+                maskPhoneNumber(phoneNumber), templateId, params == null ? "[]" : params.keySet());
         return SmsSendResult.ok("noop-" + System.currentTimeMillis());
     }
 
@@ -33,5 +34,12 @@ public class NoOpSmsSender implements SmsSender {
     public boolean isAvailable() {
         // Always available as the last-resort fallback
         return true;
+    }
+
+    private String maskPhoneNumber(String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.length() <= 4) {
+            return "****";
+        }
+        return "****" + phoneNumber.substring(phoneNumber.length() - 4);
     }
 }

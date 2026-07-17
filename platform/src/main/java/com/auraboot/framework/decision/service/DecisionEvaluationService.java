@@ -64,6 +64,7 @@ public interface DecisionEvaluationService {
             String decisionCode,
             String status,
             String callerType,
+            String callerRef,
             Boolean matched,
             String rolloutArm,
             Long minDurationMs,

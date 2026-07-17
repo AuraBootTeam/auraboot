@@ -40,6 +40,10 @@ function hasEnv(name: string): boolean {
   return typeof process.env[name] === 'string' && process.env[name]!.trim().length > 0;
 }
 
+function hasAnyEnv(names: string[]): boolean {
+  return names.some((name) => hasEnv(name));
+}
+
 function localhostPort(urlValue: string | undefined): string | null {
   if (!urlValue) {
     return null;
@@ -76,7 +80,7 @@ function assertMatchingLocalPort(urlName: string, portName: string): void {
 }
 
 function assertTargetedDockerEnvContract(): void {
-  if (process.env.PW_SKIP_WEBSERVER !== '1' || !hasEnv('PLAYWRIGHT_BASE_URL')) {
+  if (!hasEnv('PLAYWRIGHT_BASE_URL')) {
     return;
   }
 
@@ -85,14 +89,25 @@ function assertTargetedDockerEnvContract(): void {
     return;
   }
 
-  const missing = ['BACKEND_URL', 'BE_PORT', 'BFF_PORT'].filter((name) => !hasEnv(name));
+  const required: Array<[string, string[]]> = [
+    ['BACKEND_URL', ['BACKEND_URL']],
+    ['BE_PORT', ['BE_PORT']],
+    ['BFF_PORT', ['BFF_PORT']],
+    ['PG_DB', ['PG_DB', 'PGDATABASE']],
+  ];
+  const missing = required
+    .filter(([, names]) => !hasAnyEnv(names))
+    .map(([label]) => label);
+  if (process.env.PW_SKIP_WEBSERVER !== '1') {
+    missing.push('PW_SKIP_WEBSERVER=1');
+  }
   if (missing.length > 0) {
     throw new Error(
-      `[E2E env] Targeted Docker Playwright run against ${process.env.PLAYWRIGHT_BASE_URL} ` +
+      `[E2E env] Targeted Playwright run against ${process.env.PLAYWRIGHT_BASE_URL} ` +
         `requires ${missing.join(', ')}. Example: ` +
         'PLAYWRIGHT_BASE_URL=http://localhost:<vite> ' +
         'BACKEND_URL=http://localhost:<backend> ' +
-        'BE_PORT=<backend> BFF_PORT=<bff> PW_SKIP_WEBSERVER=1',
+        'BE_PORT=<backend> BFF_PORT=<bff> PG_DB=<database> PW_SKIP_WEBSERVER=1',
     );
   }
 

@@ -627,6 +627,7 @@ export interface ProcessInstanceNodeStatus {
   }>;
   completedNodes: Array<{
     nodeId: string;
+    status?: string;
     completedAt?: string;
     completedBy?: string;
   }>;

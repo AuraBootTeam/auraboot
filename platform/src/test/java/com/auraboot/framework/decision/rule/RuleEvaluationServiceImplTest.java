@@ -181,6 +181,60 @@ class RuleEvaluationServiceImplTest {
     }
 
     @Test
+    void evaluateDecisionBindingPreservesVirtualSourcesAndSkipsMissingFieldInput() {
+        DecisionBinding binding = new DecisionBinding(
+                "sla_risk_routing",
+                DecisionVersionPolicy.LATEST_PUBLISHED,
+                null,
+                null,
+                null,
+                List.of(new DecisionBinding.InputMapping(
+                        "slaRiskScore",
+                        RuleValueSource.field(Scope.RECORD, "data.slaRiskScore"))),
+                List.of(),
+                DecisionBinding.FallbackPolicy.failClosed(),
+                200,
+                DecisionBinding.TraceMode.ALWAYS,
+                true,
+                null,
+                null);
+        List<Map<String, Object>> virtualSources = List.of(Map.of(
+                "sourceRef", "virtual.leave_request_summary.v1",
+                "recordId", "REQ-1"));
+        RuleEvaluationContext context = new RuleEvaluationContext(
+                Map.of(
+                        Scope.RECORD, Map.of("data", Map.of("recordPid", "REQ-1")),
+                        Scope.META, Map.of("virtualSources", virtualSources)),
+                "SLA",
+                "leave-sla",
+                null,
+                "trace-sla-virtual-1",
+                null,
+                null);
+        when(decisionEvaluationService.evaluate(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(DecisionResult.builder("sla_risk_routing")
+                        .traceId("decision-trace-virtual-1")
+                        .version(1)
+                        .status(DecisionStatus.MATCHED)
+                        .matched(true)
+                        .outputs(Map.of("deadlineMinutes", 45))
+                        .build());
+
+        RuleEvaluationTrace trace = service.evaluateDecisionBinding(binding, context);
+
+        ArgumentCaptor<DrtEvaluateRequest> request = ArgumentCaptor.forClass(DrtEvaluateRequest.class);
+        verify(decisionEvaluationService).evaluate(request.capture());
+        Map<String, Map<String, Object>> requestContext = request.getValue().getContext();
+        assertThat(requestContext).containsKey(Scope.RECORD.code());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> recordData = (Map<String, Object>) requestContext.get(Scope.RECORD.code()).get("data");
+        assertThat(recordData).doesNotContainKey("slaRiskScore");
+        assertThat(requestContext.get(Scope.META.code())).containsEntry("virtualSources", virtualSources);
+        assertThat(trace.inputSnapshot()).doesNotContainKey("slaRiskScore");
+        assertThat(trace.outputSnapshot()).containsEntry("deadlineMinutes", 45);
+    }
+
+    @Test
     void evaluateDecisionBindingAppliesDefaultFallbackOnDecisionError() {
         DecisionBinding binding = new DecisionBinding(
                 "sla_deadline",

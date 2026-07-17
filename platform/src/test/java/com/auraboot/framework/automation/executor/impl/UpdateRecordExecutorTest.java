@@ -1,5 +1,6 @@
 package com.auraboot.framework.automation.executor.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import org.junit.jupiter.api.Test;
@@ -38,6 +39,11 @@ class UpdateRecordExecutorTest {
     }
 
     @Test
+    void supports_patchRecord_returnsTrue() {
+        assertThat(executor.supports("patch_record")).isTrue();
+    }
+
+    @Test
     void supports_other_returnsFalse() {
         assertThat(executor.supports("create_record")).isFalse();
         assertThat(executor.supports("condition")).isFalse();
@@ -50,7 +56,10 @@ class UpdateRecordExecutorTest {
     @Test
     @SuppressWarnings("unchecked")
     void execute_withExplicitRecordPid_updatesCorrectRecord() {
-        when(dynamicDataService.update(any(), any(), any())).thenReturn(Map.of());
+        when(dynamicDataService.update(any(), any(), any())).thenAnswer(inv -> {
+            assertThat(MetaContext.isDataPermissionBypassed()).isTrue();
+            return Map.of();
+        });
 
         AutomationAction action = buildAction(Map.of(
                 "modelCode", "crm_lead",
@@ -61,12 +70,14 @@ class UpdateRecordExecutorTest {
         Map<String, Object> result = (Map<String, Object>) executor.execute(action, Map.of());
 
         assertThat(result.get("success")).isEqualTo(true);
+        assertThat(result.get("actionType")).isEqualTo("update_record");
         assertThat(result.get("recordPid")).isEqualTo("lead-123");
         @SuppressWarnings("unchecked")
         Set<String> updatedFields = (Set<String>) result.get("updatedFields");
         assertThat(updatedFields).contains("status");
         verify(dynamicDataService).update(eq("crm_lead"), eq("lead-123"), argThat(f ->
                 "qualified".equals(f.get("status"))));
+        assertThat(MetaContext.isDataPermissionBypassed()).isFalse();
     }
 
     @Test

@@ -20,6 +20,9 @@ export interface PaletteItem {
   icon?: React.ReactNode;
   description?: string;
   category?: string;
+  statusLabel?: string;
+  statusText?: string;
+  statusTone?: 'neutral' | 'warning' | 'danger' | 'success';
   /** Arbitrary extra data preserved during drag/click callbacks */
   data?: unknown;
   /** Whether the item is disabled (e.g. already added) */
@@ -122,6 +125,19 @@ export function DesignerPalette({
     }
   };
 
+  const statusToneClass = (tone: PaletteItem['statusTone']) => {
+    switch (tone) {
+      case 'danger':
+        return 'border-red-200 bg-red-50 text-red-700';
+      case 'success':
+        return 'border-green-200 bg-green-50 text-green-700';
+      case 'warning':
+        return 'border-amber-200 bg-amber-50 text-amber-700';
+      default:
+        return 'border-gray-200 bg-gray-50 text-gray-600';
+    }
+  };
+
   const renderItem = (item: PaletteItem) => {
     const isDisabled = !!item.disabled;
     const isDraggable = draggable && !isDisabled;
@@ -157,9 +173,42 @@ export function DesignerPalette({
       >
         {item.icon && <span className="flex-shrink-0 text-lg">{item.icon}</span>}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-medium text-gray-900">{item.label}</div>
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="truncate text-sm font-medium text-gray-900">{item.label}</div>
+            {item.statusLabel && (
+              <span
+                className={cn(
+                  'shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] font-medium leading-none',
+                  statusToneClass(item.statusTone),
+                )}
+                data-testid={
+                  itemTestIdPrefix
+                    ? `${itemTestIdPrefix}-${item.type}-status`
+                    : testId
+                      ? `${testId}-item-${item.type}-status`
+                      : undefined
+                }
+              >
+                {item.statusLabel}
+              </span>
+            )}
+          </div>
           {item.description && (
             <div className="mt-0.5 truncate text-xs text-gray-500">{item.description}</div>
+          )}
+          {item.statusText && (
+            <div
+              className="mt-1 line-clamp-2 text-xs text-amber-700"
+              data-testid={
+                itemTestIdPrefix
+                  ? `${itemTestIdPrefix}-${item.type}-status-text`
+                  : testId
+                    ? `${testId}-item-${item.type}-status-text`
+                    : undefined
+              }
+            >
+              {item.statusText}
+            </div>
           )}
           {isDisabled && item.disabledText && (
             <div className="mt-0.5 text-xs text-green-600">{item.disabledText}</div>

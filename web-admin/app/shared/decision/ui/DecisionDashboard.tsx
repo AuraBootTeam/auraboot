@@ -5,6 +5,8 @@
  * fetches it. Match rate / failure formatting is derived here so the numbers stay consistent.
  */
 
+import { decisionStatusLabel } from './statusLabels';
+
 export interface DashboardSummary {
   definitions: number;
   policies: number;
@@ -63,7 +65,9 @@ export function DecisionDashboard({ summary, exceptions }: DecisionDashboardProp
             {exceptions.map((e) => (
               <li key={e.traceId} data-testid={`dd-exc-${e.traceId}`} data-status={e.status}>
                 <span className="mono">{e.code}</span>
-                <span className={`dd-exc-status dd-${e.status}`}>{e.status}</span>
+                <span className={`dd-exc-status dd-${e.status}`} title={e.status}>
+                  {decisionStatusLabel(e.status)}
+                </span>
                 {e.error && <span className="dd-exc-error">{e.error}</span>}
                 {e.time && <span className="dd-exc-time">{e.time}</span>}
               </li>

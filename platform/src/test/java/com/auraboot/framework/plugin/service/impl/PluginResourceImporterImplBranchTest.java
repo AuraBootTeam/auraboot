@@ -3,6 +3,7 @@ package com.auraboot.framework.plugin.service.impl;
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.dashboard.service.DashboardService;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.environment.service.EnvironmentService;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.auraboot.framework.menu.service.MenuService;
@@ -45,6 +46,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -82,6 +84,7 @@ class PluginResourceImporterImplBranchTest {
     @Mock private RoleMapper roleMapper;
     @Mock private MenuMapper menuMapper;
     @Mock private ObjectMapper objectMapper;
+    @Mock private ObjectProvider<DecisionUsageIndexService> usageIndexServiceProvider;
     @Mock private MetaModelMapper metaModelMapper;
     @Mock private CommandDefinitionMapper commandDefinitionMapper;
     @Mock private BindingRuleMapper bindingRuleMapper;

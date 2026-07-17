@@ -4,12 +4,16 @@ import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.notification.service.NotificationService;
+import com.auraboot.framework.notification.sms.SmsSendResult;
+import com.auraboot.framework.notification.sms.SmsSenderRouter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Executor for SEND_NOTIFICATION action type
@@ -22,8 +26,17 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class SendNotificationExecutor implements ActionExecutor {
 
+    private static final String USER_PREFIX = "USER:";
+    private static final String ROLE_PREFIX = "ROLE:";
+    private static final String GROUP_PREFIX = "GROUP:";
+    private static final String TEAM_PREFIX = "TEAM:";
+    private static final String PHONE_PREFIX = "PHONE:";
+    private static final String DEFAULT_SMS_TEMPLATE = "direct_message";
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^\\+?\\d{6,20}$");
+
     private final NotificationService notificationService;
     private final DynamicDataService dynamicDataService;
+    private final SmsSenderRouter smsSenderRouter;
 
     @Override
     public Object execute(AutomationAction action, Map<String, Object> context) {
@@ -39,19 +52,21 @@ public class SendNotificationExecutor implements ActionExecutor {
         String content = (String) config.get("content");
         List<String> recipients = parseRecipients(config.get("recipients"));
 
-        String processedContent = processTemplate(content, context);
-        String processedTitle = processTemplate(title, context);
+        String processedContent = AutomationActionValueResolver.resolveString(content, context);
+        String processedTitle = AutomationActionValueResolver.resolveString(title, context);
 
         log.info("Sending notification: type={}, recipients={}, title={}",
                 notificationType, recipients, processedTitle);
 
         int sent = 0;
         if (recipients == null || recipients.isEmpty()) {
-            log.warn("SEND_NOTIFICATION action has no recipients, skipping");
-            return Map.of("success", true, "type", notificationType != null ? notificationType : "unknown", "sentCount", 0, "recipientCount", 0);
+            throw new IllegalArgumentException("SEND_NOTIFICATION action requires recipients");
         }
 
-        String automationPid = (String) context.get("automationPid");
+        String automationPid = context.get("automationPid") != null
+                ? String.valueOf(context.get("automationPid"))
+                : String.valueOf(context.getOrDefault("_automation_id", ""));
+        String effectiveType = notificationType != null ? notificationType : "in_app";
 
         for (String rawRecipient : recipients) {
             String recipientId = resolveRecipient(rawRecipient, context);
@@ -60,11 +75,9 @@ public class SendNotificationExecutor implements ActionExecutor {
                 continue;
             }
             try {
-                switch (notificationType != null ? notificationType : "in_app") {
+                switch (effectiveType) {
                     case "in_app" -> {
-                        Long userId = Long.valueOf(recipientId);
-                        notificationService.sendInApp(userId, processedTitle, processedContent,
-                                "automation", "automation", automationPid);
+                        sendInApp(recipientId, processedTitle, processedContent, automationPid);
                         sent++;
                     }
                     case "email" -> {
@@ -83,7 +96,7 @@ public class SendNotificationExecutor implements ActionExecutor {
                         sent++;
                     }
                     case "sms" -> {
-                        log.info("SMS channel not configured, logging: to={}, content={}", recipientId, processedContent);
+                        sendSms(recipientId, processedTitle, processedContent, config, context);
                         sent++;
                     }
                     case "webhook" -> {
@@ -93,16 +106,127 @@ public class SendNotificationExecutor implements ActionExecutor {
                     default -> log.warn("Unknown notification type: {}", notificationType);
                 }
             } catch (Exception e) {
-                log.warn("Failed to send {} notification to {}: {}", notificationType, recipientId, e.getMessage());
+                log.warn("Failed to send {} notification to {}: {}", effectiveType, recipientId, e.getMessage());
+                if ("sms".equals(effectiveType)) {
+                    throw e instanceof RuntimeException runtime ? runtime : new IllegalStateException(e);
+                }
             }
         }
 
         return Map.of(
                 "success", true,
-                "type", notificationType != null ? notificationType : "in_app",
+                "type", effectiveType,
                 "sentCount", sent,
                 "recipientCount", recipients != null ? recipients.size() : 0
         );
+    }
+
+    private void sendInApp(String recipientId, String title, String content, String automationPid) {
+        if (recipientId.startsWith(USER_PREFIX)) {
+            notificationService.sendInApp(parseUserId(recipientId), title, content,
+                    "automation", "automation", automationPid);
+            return;
+        }
+        if (recipientId.startsWith(ROLE_PREFIX)) {
+            notificationService.sendInAppToRecipient("role", suffix(recipientId, ROLE_PREFIX), title, content,
+                    "automation", "automation", automationPid);
+            return;
+        }
+        if (recipientId.startsWith(GROUP_PREFIX)) {
+            notificationService.sendInAppToRecipient("group", suffix(recipientId, GROUP_PREFIX), title, content,
+                    "automation", "automation", automationPid);
+            return;
+        }
+        if (recipientId.startsWith(TEAM_PREFIX)) {
+            notificationService.sendInAppToRecipient("team", suffix(recipientId, TEAM_PREFIX), title, content,
+                    "automation", "automation", automationPid);
+            return;
+        }
+        notificationService.sendInApp(Long.valueOf(recipientId), title, content,
+                "automation", "automation", automationPid);
+    }
+
+    private void sendSms(String recipientId, String title, String content,
+                         Map<String, Object> config, Map<String, Object> context) {
+        if (content == null || content.isBlank()) {
+            throw new IllegalArgumentException("SMS notification requires content");
+        }
+        String phone = normalizeSmsRecipient(recipientId);
+        String template = firstNonBlank(
+                string(config.get("template")),
+                string(config.get("templateCode")),
+                DEFAULT_SMS_TEMPLATE);
+        SmsSenderRouter.RoutedSmsResult routed = smsSenderRouter.sendWithRealProvider(
+                phone,
+                template,
+                smsParams(content, title, context));
+        SmsSendResult result = routed.sendResult();
+        if (result == null || !result.isSuccess()) {
+            String error = result != null ? result.getErrorMessage() : "empty result";
+            throw new IllegalStateException("SMS notification failed via " + routed.providerCode() + ": " + error);
+        }
+    }
+
+    private static String normalizeSmsRecipient(String recipientId) {
+        String value = recipientId != null ? recipientId.trim() : "";
+        if (value.startsWith(PHONE_PREFIX)) {
+            value = value.substring(PHONE_PREFIX.length()).trim();
+        }
+        if (!PHONE_PATTERN.matcher(value).matches()) {
+            throw new IllegalArgumentException(
+                    "SMS notification target must be a phone number or PHONE:<number>: " + recipientId);
+        }
+        return value;
+    }
+
+    private static Map<String, String> smsParams(String content, String title, Map<String, Object> context) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("content", content);
+        if (title != null && !title.isBlank()) {
+            params.put("title", title);
+        }
+        putString(params, "automationPid", context.get("automationPid"));
+        putString(params, "modelCode", context.get("modelCode"));
+        putString(params, "recordPid", context.get("recordPid"));
+        return params;
+    }
+
+    private static long parseUserId(String recipientId) {
+        try {
+            return Long.parseLong(suffix(recipientId, USER_PREFIX));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Invalid notification target, expected USER:<numericId>: " + recipientId, e);
+        }
+    }
+
+    private static String suffix(String target, String prefix) {
+        String value = target.substring(prefix.length()).trim();
+        if (value.isEmpty()) {
+            throw new IllegalArgumentException("Invalid notification target, missing value after " + prefix);
+        }
+        return value;
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private static String string(Object value) {
+        return value != null ? String.valueOf(value) : null;
+    }
+
+    private static void putString(Map<String, String> map, String key, Object value) {
+        if (value != null && !String.valueOf(value).isBlank()) {
+            map.put(key, String.valueOf(value));
+        }
     }
 
     @Override
@@ -186,20 +310,4 @@ public class SendNotificationExecutor implements ActionExecutor {
         return target == null ? null : String.valueOf(target);
     }
 
-    private String processTemplate(String template, Map<String, Object> context) {
-        if (template == null) return null;
-
-        String result = template;
-
-        // Simple variable substitution
-        for (Map.Entry<String, Object> entry : context.entrySet()) {
-            String placeholder = "${" + entry.getKey() + "}";
-            if (result.contains(placeholder)) {
-                result = result.replace(placeholder,
-                        entry.getValue() != null ? entry.getValue().toString() : "");
-            }
-        }
-
-        return result;
-    }
 }

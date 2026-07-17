@@ -48,6 +48,7 @@ public class PermissionCreateRequest {
     // Metadata
     private Map<String, Object> extension;
     private String[] tags;
+    private Map<String, Object> policySchema;
 
     /**
      * 插件PID（用于标识资源来源的插件）

@@ -1,6 +1,8 @@
 package com.auraboot.framework.eventpolicy.controller;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.eventpolicy.dto.EventPolicyActionLogDTO;
 import com.auraboot.framework.eventpolicy.dto.EventPolicyDefinitionCopyRequest;
 import com.auraboot.framework.eventpolicy.dto.EventPolicyDefinitionCreateRequest;
 import com.auraboot.framework.eventpolicy.dto.EventPolicyDefinitionEnabledRequest;
@@ -8,7 +10,10 @@ import com.auraboot.framework.eventpolicy.dto.EventPolicyDefinitionSummary;
 import com.auraboot.framework.eventpolicy.dto.EventPolicyRunRequest;
 import com.auraboot.framework.eventpolicy.dto.EventPolicyVersionCreateRequest;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyDefinitionEntity;
+import com.auraboot.framework.eventpolicy.entity.DrtPolicyExecLogEntity;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
+import com.auraboot.framework.eventpolicy.executor.EventPolicyActionRetryService;
+import com.auraboot.framework.eventpolicy.mapper.DrtPolicyExecLogMapper;
 import com.auraboot.framework.eventpolicy.model.EventPolicyResult;
 import com.auraboot.framework.eventpolicy.service.EventPolicyDefinitionService;
 import com.auraboot.framework.eventpolicy.service.EventPolicyRuntimeService;
@@ -23,6 +28,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -48,6 +54,8 @@ public class EventPolicyController {
     private final EventPolicyDefinitionService definitionService;
     private final EventPolicyVersionService versionService;
     private final EventPolicyRuntimeService runtimeService;
+    private final DrtPolicyExecLogMapper execLogMapper;
+    private final EventPolicyActionRetryService actionRetryService;
 
     // ==================== Definition CRUD ====================
 
@@ -206,5 +214,83 @@ public class EventPolicyController {
         var result = runtimeService.runAndExecute(
                 request.getEventType(), request.getTargetType(), request.getTargetKey(), context);
         return ApiResponse.success(result);
+    }
+
+    @GetMapping("/action-logs")
+    @Operation(summary = "List EventPolicy action execution evidence by linked decision trace")
+    @RequirePermission(MetaPermission.POLICY_DEFINITION_READ)
+    public ApiResponse<List<EventPolicyActionLogDTO>> actionLogs(
+            @Parameter(description = "Decision Runtime trace id") @RequestParam(required = false) String decisionTraceId,
+            @Parameter(description = "EventPolicy run correlation id") @RequestParam(required = false) String correlationId,
+            @Parameter(description = "Exact policy code") @RequestParam(required = false) String policyCode,
+            @Parameter(description = "Policy code prefix") @RequestParam(required = false) String policyCodePrefix,
+            @Parameter(description = "Maximum rows") @RequestParam(required = false, defaultValue = "50") Integer size) {
+        boolean hasTraceFilter = StringUtils.hasText(decisionTraceId) || StringUtils.hasText(correlationId);
+        boolean hasPolicyFilter = StringUtils.hasText(policyCode) || StringUtils.hasText(policyCodePrefix);
+        if (!hasTraceFilter && !hasPolicyFilter) {
+            return ApiResponse.success(List.of());
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        int limit = Math.max(1, Math.min(size != null ? size : 50, 200));
+        List<DrtPolicyExecLogEntity> rows = hasPolicyFilter
+                ? execLogMapper.findByPolicyCodeFilter(
+                        tenantId,
+                        normalize(policyCode),
+                        normalize(policyCodePrefix),
+                        limit)
+                : execLogMapper.findByTraceLink(
+                        tenantId,
+                        normalize(decisionTraceId),
+                        normalize(correlationId));
+        List<EventPolicyActionLogDTO> result = rows
+                .stream()
+                .map(this::toActionLogDTO)
+                .toList();
+        return ApiResponse.success(result);
+    }
+
+    @PostMapping("/action-logs/{pid}/replay")
+    @Operation(summary = "Replay a failed or dead-letter EventPolicy action")
+    @RequirePermission(MetaPermission.POLICY_RUNTIME_RUN)
+    public ApiResponse<EventPolicyActionLogDTO> replayActionLog(
+            @Parameter(description = "Action log PID") @PathVariable @NotBlank String pid) {
+        log.info("Replaying event policy action log: pid={}", pid);
+        try {
+            DrtPolicyExecLogEntity result = actionRetryService.replayAction(pid);
+            return ApiResponse.success("Event policy action replayed", toActionLogDTO(result));
+        } catch (IllegalArgumentException e) {
+            return ApiResponse.error(404, e.getMessage());
+        } catch (IllegalStateException e) {
+            return ApiResponse.error(409, e.getMessage());
+        }
+    }
+
+    private static String normalize(String value) {
+        return StringUtils.hasText(value) ? value.trim() : null;
+    }
+
+    private EventPolicyActionLogDTO toActionLogDTO(DrtPolicyExecLogEntity entity) {
+        EventPolicyActionLogDTO dto = new EventPolicyActionLogDTO();
+        dto.setPid(entity.getPid());
+        dto.setTenantId(entity.getTenantId());
+        dto.setIdempotencyKey(entity.getIdempotencyKey());
+        dto.setPolicyCode(entity.getPolicyCode());
+        dto.setDecisionTraceId(entity.getDecisionTraceId());
+        dto.setCorrelationId(entity.getCorrelationId());
+        dto.setRuleCode(entity.getRuleCode());
+        dto.setActionType(entity.getActionType());
+        dto.setStatus(entity.getStatus());
+        dto.setFailureStrategy(entity.getFailureStrategy());
+        dto.setErrorMessage(entity.getErrorMessage());
+        dto.setResultPayload(entity.getResultPayload());
+        dto.setActionPayload(entity.getActionPayload());
+        dto.setContextPayload(entity.getContextPayload());
+        dto.setAttemptCount(entity.getAttemptCount());
+        dto.setMaxAttempts(entity.getMaxAttempts());
+        dto.setNextRetryAt(entity.getNextRetryAt());
+        dto.setLastRetryAt(entity.getLastRetryAt());
+        dto.setDeadLetteredAt(entity.getDeadLetteredAt());
+        dto.setExecutedAt(entity.getExecutedAt());
+        return dto;
     }
 }

@@ -97,8 +97,19 @@ describe('Playwright test environment helpers', () => {
     process.env.PW_SKIP_WEBSERVER = '1';
 
     await expect(loadEnvironments()).rejects.toThrow(
-      /requires BACKEND_URL, BE_PORT, BFF_PORT/,
+      /requires BACKEND_URL, BE_PORT, BFF_PORT, PG_DB/,
     );
+  });
+
+  it('fails fast when a targeted runtime omits PW_SKIP_WEBSERVER', async () => {
+    resetEnv();
+    process.env.PLAYWRIGHT_BASE_URL = 'http://localhost:5226';
+    process.env.BACKEND_URL = 'http://localhost:6496';
+    process.env.BE_PORT = '6496';
+    process.env.BFF_PORT = '3553';
+    process.env.PG_DB = 'auraboot_96';
+
+    await expect(loadEnvironments()).rejects.toThrow(/requires PW_SKIP_WEBSERVER=1/);
   });
 
   it('accepts the targeted Docker env contract used by BPM and OSS slices', async () => {
@@ -107,6 +118,7 @@ describe('Playwright test environment helpers', () => {
     process.env.BACKEND_URL = 'http://localhost:6496';
     process.env.BE_PORT = '6496';
     process.env.BFF_PORT = '3553';
+    process.env.PG_DB = 'auraboot_96';
     process.env.PW_SKIP_WEBSERVER = '1';
 
     const env = await loadEnvironments();
@@ -114,6 +126,7 @@ describe('Playwright test environment helpers', () => {
     expect(env.BASE_URL).toBe('http://localhost:5226');
     expect(env.BACKEND_URL).toBe('http://localhost:6496');
     expect(env.BFF_URL).toBe('http://localhost:3553');
+    expect(env.PG_CONN.database).toBe('auraboot_96');
     expect(env.loadEnv('r2').ports).toMatchObject({
       be: '6496',
       bff: '3553',
@@ -126,6 +139,7 @@ describe('Playwright test environment helpers', () => {
     process.env.BACKEND_URL = 'http://localhost:6443';
     process.env.BE_PORT = '6496';
     process.env.BFF_PORT = '3553';
+    process.env.PG_DB = 'auraboot_96';
     process.env.PW_SKIP_WEBSERVER = '1';
 
     await expect(loadEnvironments()).rejects.toThrow(

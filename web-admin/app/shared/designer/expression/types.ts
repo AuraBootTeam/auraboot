@@ -19,6 +19,8 @@ export interface FieldOption {
   name: string;
   category: FieldCategory;
   group?: string;
+  /** Optional literal inserted by FormulaEditor instead of the display code. */
+  insertion?: string;
 }
 
 export interface OperatorOption {

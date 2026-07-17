@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -245,12 +246,27 @@ public class AutomationController {
             @RequestBody(required = false) Map<String, Object> request) {
         Object recordPidValue = request != null ? request.get("recordPid") : null;
         String recordPid = recordPidValue != null ? String.valueOf(recordPidValue) : null;
+        Map<String, Object> context = extractManualTriggerContext(request);
         log.info("Manually triggering automation: pid={}, recordPid={}", pid, recordPid);
 
-        AutomationLogDTO result = automationService.triggerManually(pid, recordPid);
+        AutomationLogDTO result = automationService.triggerManually(pid, recordPid, context);
 
         log.info("Automation triggered: logPid={}, status={}", result.getPid(), result.getStatus());
         return ApiResponse.success("Automation triggered", result);
+    }
+
+    private Map<String, Object> extractManualTriggerContext(Map<String, Object> request) {
+        Object contextValue = request != null ? request.get("context") : null;
+        if (!(contextValue instanceof Map<?, ?> raw)) {
+            return Map.of();
+        }
+        Map<String, Object> context = new LinkedHashMap<>();
+        raw.forEach((key, value) -> {
+            if (key != null) {
+                context.put(String.valueOf(key), value);
+            }
+        });
+        return context;
     }
 
     @PostMapping("/logs/cleanup")

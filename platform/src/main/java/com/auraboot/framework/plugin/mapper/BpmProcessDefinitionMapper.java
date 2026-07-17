@@ -37,7 +37,7 @@ public interface BpmProcessDefinitionMapper extends BaseMapper<BpmProcessDefinit
     /**
      * Find deployed processes.
      */
-    @Select("SELECT * FROM ab_bpm_process_definition WHERE tenant_id = #{tenantId} AND status = 'deployed' AND deleted_flag = false ORDER BY process_name")
+    @Select("SELECT * FROM ab_bpm_process_definition WHERE tenant_id = #{tenantId} AND status = 'deployed' AND deleted_flag = false AND (category IS NULL OR category <> 'automation') ORDER BY process_name")
     List<BpmProcessDefinition> findDeployed(@Param("tenantId") Long tenantId);
 
     /**
@@ -49,7 +49,7 @@ public interface BpmProcessDefinitionMapper extends BaseMapper<BpmProcessDefinit
      * this runs before any request context is established.
      */
     @InterceptorIgnore(tenantLine = "true")
-    @Select("SELECT * FROM ab_bpm_process_definition WHERE status = 'deployed' AND deleted_flag = false ORDER BY tenant_id, process_name")
+    @Select("SELECT * FROM ab_bpm_process_definition WHERE status = 'deployed' AND deleted_flag = false ORDER BY tenant_id, process_key, version")
     List<BpmProcessDefinition> findAllDeployedAcrossTenants();
 
     /**

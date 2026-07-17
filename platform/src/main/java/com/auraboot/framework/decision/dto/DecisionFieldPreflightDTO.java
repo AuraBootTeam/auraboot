@@ -18,6 +18,14 @@ public class DecisionFieldPreflightDTO {
 
     private String nextDataType;
 
+    private String dictCode;
+
+    private String dictValue;
+
+    private String nextPermission;
+
+    private String nextSourceRef;
+
     private Boolean allowed;
 
     private Boolean blocked;

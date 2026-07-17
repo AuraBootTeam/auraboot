@@ -1,6 +1,10 @@
 package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.decision.dto.DecisionFactCatalogDTO;
+import com.auraboot.framework.decision.dto.DecisionFactDTO;
+import com.auraboot.framework.decision.dto.DecisionFactEntityDTO;
+import com.auraboot.framework.decision.service.DecisionModelFieldService;
 import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.entity.Permission;
@@ -56,6 +60,9 @@ class PermissionPolicyServiceImplTest {
 
     @Mock
     private DecisionUsageIndexService usageIndexService;
+
+    @Mock
+    private DecisionModelFieldService decisionModelFieldService;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -268,6 +275,196 @@ class PermissionPolicyServiceImplTest {
     }
 
     @Test
+    void setPolicyAcceptsRuleCenterInputMappingFromFactCatalog() {
+        RolePermission rp = new RolePermission();
+        rp.setId(900L);
+        rp.setPid("rp-abac-900");
+        when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+        when(permissionMapper.selectById(50L)).thenReturn(permissionWithFactCatalogModel("wd_leave_request"));
+        when(decisionModelFieldService.getFactCatalog("wd_leave_request"))
+                .thenReturn(factCatalog("wd_leave_request", "record", "data.wd_req_days", true));
+
+        service.setPolicy(7L, 50L, Map.of("dynamicAbac", Map.of(
+                "ruleBinding", Map.of(
+                        "bindingKind", "DECISION_REF",
+                        "decisionBinding", Map.of(
+                                "decisionCode", "permission_leave_guard",
+                                "inputMappings", List.of(Map.of(
+                                        "input", "days",
+                                        "source", Map.of(
+                                                "kind", "FIELD",
+                                                "scope", "record",
+                                                "path", "data.wd_req_days"))))))));
+
+        verify(rolePermissionMapper).updateConditionsById(eq(900L), anyString());
+    }
+
+    @Test
+    void setPolicyRejectsRuleCenterInputMappingOutsideFactCatalog() {
+        RolePermission rp = new RolePermission();
+        rp.setId(900L);
+        rp.setPid("rp-abac-900");
+        when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+        when(permissionMapper.selectById(50L)).thenReturn(permissionWithFactCatalogModel("wd_leave_request"));
+        when(decisionModelFieldService.getFactCatalog("wd_leave_request"))
+                .thenReturn(factCatalog("wd_leave_request", "record", "data.wd_req_days", true));
+
+        assertThatThrownBy(() -> service.setPolicy(7L, 50L, Map.of("dynamicAbac", Map.of(
+                "ruleBinding", Map.of(
+                        "bindingKind", "DECISION_REF",
+                        "decisionBinding", Map.of(
+                                "decisionCode", "permission_leave_guard",
+                                "inputMappings", List.of(Map.of(
+                                        "input", "secret",
+                                        "source", Map.of(
+                                                "kind", "FIELD",
+                                                "scope", "record",
+                                                "path", "data.secret")))))))))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessageContaining("not available in permission ABAC fact catalog");
+
+        verify(rolePermissionMapper, never()).updateConditionsById(anyLong(), anyString());
+    }
+
+    @Test
+    void setPolicyRejectsRuleCenterInputMappingFromMaskedFactCatalogField() {
+        RolePermission rp = new RolePermission();
+        rp.setId(900L);
+        rp.setPid("rp-abac-900");
+        when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+        when(permissionMapper.selectById(50L)).thenReturn(permissionWithFactCatalogModel("wd_leave_request"));
+        when(decisionModelFieldService.getFactCatalog("wd_leave_request"))
+                .thenReturn(factCatalog("wd_leave_request", "record", "data.salary", true, true));
+
+        assertThatThrownBy(() -> service.setPolicy(7L, 50L, Map.of("dynamicAbac", Map.of(
+                "ruleBinding", Map.of(
+                        "bindingKind", "DECISION_REF",
+                        "decisionBinding", Map.of(
+                                "decisionCode", "permission_salary_guard",
+                                "inputMappings", List.of(Map.of(
+                                        "input", "salary",
+                                        "source", Map.of(
+                                                "kind", "FIELD",
+                                                "scope", "record",
+                                                "path", "data.salary")))))))))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessageContaining("masked")
+                .hasMessageContaining("record.data.salary");
+
+        verify(rolePermissionMapper, never()).updateConditionsById(anyLong(), anyString());
+    }
+
+    @Test
+    void setPolicyRejectsRuleCenterFieldSourceWhenDeclaredFactCatalogHasNoFields() {
+        RolePermission rp = new RolePermission();
+        rp.setId(900L);
+        rp.setPid("rp-abac-900");
+        when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
+        when(permissionMapper.selectById(50L)).thenReturn(permissionWithFactCatalogModel("wd_leave_request"));
+        when(decisionModelFieldService.getFactCatalog("wd_leave_request")).thenReturn(new DecisionFactCatalogDTO());
+
+        assertThatThrownBy(() -> service.setPolicy(7L, 50L, Map.of("dynamicAbac", Map.of(
+                "ruleBinding", Map.of(
+                        "bindingKind", "DECISION_REF",
+                        "decisionBinding", Map.of(
+                                "decisionCode", "permission_leave_guard",
+                                "inputMappings", List.of(Map.of(
+                                        "input", "days",
+                                        "source", Map.of(
+                                                "kind", "FIELD",
+                                                "scope", "record",
+                                                "path", "data.wd_req_days")))))))))
+                .isInstanceOf(RootUnCheckedException.class)
+                .hasMessageContaining("not available in permission ABAC fact catalog");
+
+        verify(rolePermissionMapper, never()).updateConditionsById(anyLong(), anyString());
+    }
+
+    @Test
+    void getConditionGuardsMarksMaskedRuleCenterInputMappingInvalidForRuntimeDeny() {
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
+        Permission perm = permissionWithFactCatalogModel("wd_leave_request");
+        perm.setId(50L);
+        when(permissionMapper.findByCode("model.leave.approve")).thenReturn(perm);
+        when(decisionModelFieldService.getFactCatalog("wd_leave_request"))
+                .thenReturn(factCatalog("wd_leave_request", "record", "data.salary", true, true));
+        RolePermissionMapper.RolePermissionConditionAstRow row =
+                new RolePermissionMapper.RolePermissionConditionAstRow();
+        row.setId(900L);
+        row.setConditionsJson("""
+                {
+                  "dynamicAbac": {
+                    "ruleBinding": {
+                      "bindingKind": "DECISION_REF",
+                      "decisionBinding": {
+                        "decisionCode": "permission_salary_guard",
+                        "inputMappings": [{
+                          "input": "salary",
+                          "source": {
+                            "kind": "FIELD",
+                            "scope": "record",
+                            "path": "data.salary"
+                          }
+                        }]
+                      }
+                    }
+                  }
+                }
+                """);
+        when(rolePermissionMapper.findConditionAstGrants(List.of(7L), 50L)).thenReturn(List.of(row));
+
+        List<com.auraboot.framework.permission.service.PermissionPolicyService.ConditionGuard> guards =
+                service.getConditionGuards(1L, "model.leave.approve");
+
+        assertThat(guards).hasSize(1);
+        assertThat(guards.get(0).validationError())
+                .contains("masked")
+                .contains("record.data.salary");
+    }
+
+    @Test
+    void getConditionGuardsMarksLowPermissionHiddenInputMappingInvalidForRuntimeDeny() {
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
+        Permission perm = permissionWithFactCatalogModel("wd_leave_request");
+        perm.setId(50L);
+        when(permissionMapper.findByCode("model.leave.approve")).thenReturn(perm);
+        when(decisionModelFieldService.getFactCatalog("wd_leave_request"))
+                .thenReturn(factCatalog("wd_leave_request", "record", "data.wd_req_days", true));
+        RolePermissionMapper.RolePermissionConditionAstRow row =
+                new RolePermissionMapper.RolePermissionConditionAstRow();
+        row.setId(901L);
+        row.setConditionsJson("""
+                {
+                  "dynamicAbac": {
+                    "ruleBinding": {
+                      "bindingKind": "DECISION_REF",
+                      "decisionBinding": {
+                        "decisionCode": "permission_salary_guard",
+                        "inputMappings": [{
+                          "input": "salary",
+                          "source": {
+                            "kind": "FIELD",
+                            "scope": "record",
+                            "path": "data.salary"
+                          }
+                        }]
+                      }
+                    }
+                  }
+                }
+                """);
+        when(rolePermissionMapper.findConditionAstGrants(List.of(7L), 50L)).thenReturn(List.of(row));
+
+        List<com.auraboot.framework.permission.service.PermissionPolicyService.ConditionGuard> guards =
+                service.getConditionGuards(1L, "model.leave.approve");
+
+        assertThat(guards).hasSize(1);
+        assertThat(guards.get(0).validationError())
+                .contains("record.data.salary")
+                .contains("not available in permission ABAC fact catalog");
+    }
+
+    @Test
     void setPolicySkipsWhenNoBindingFound() {
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(null);
 
@@ -314,5 +511,39 @@ class PermissionPolicyServiceImplTest {
         when(rolePermissionMapper.findConditionsByRoleId(7L)).thenReturn(List.of(row));
 
         assertThat(service.getPoliciesByRoleId(7L)).isEmpty();
+    }
+
+    private Permission permissionWithFactCatalogModel(String modelCode) {
+        Permission permission = new Permission();
+        permission.setPolicySchema(Map.of(
+                "dynamicAbac", Map.of(
+                        "type", "rule-center",
+                        "fieldCatalogModelCode", modelCode)));
+        return permission;
+    }
+
+    private DecisionFactCatalogDTO factCatalog(String modelCode, String scope, String path, boolean visible) {
+        return factCatalog(modelCode, scope, path, visible, false);
+    }
+
+    private DecisionFactCatalogDTO factCatalog(
+            String modelCode,
+            String scope,
+            String path,
+            boolean visible,
+            boolean masked) {
+        DecisionFactCatalogDTO catalog = new DecisionFactCatalogDTO();
+        DecisionFactEntityDTO entity = new DecisionFactEntityDTO();
+        entity.setModelCode(modelCode);
+        entity.setScope(scope);
+        DecisionFactDTO fact = new DecisionFactDTO();
+        fact.setScope(scope);
+        fact.setPath(path);
+        fact.setFactKey(scope + "." + path);
+        fact.setVisible(visible);
+        fact.setMasked(masked);
+        entity.getFacts().add(fact);
+        catalog.getEntities().add(entity);
+        return catalog;
     }
 }

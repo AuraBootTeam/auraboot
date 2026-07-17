@@ -15,7 +15,7 @@
  *   handles      : [data-testid="node-handle-source-<id>"] / "-target-<id>"
  *                  condition dual: "node-handle-source-<id>-true" / "-false"
  *   prop field   : [data-testid="prop-field-<key>"]
- *   save button  : [data-testid="designer-save"]
+ *   save button  : [data-testid="designer-save"] or [data-testid="automation-editor-toolbar-btn-save"]
  *   (no in-designer enable control — enable via the list page btn-toggle-<pid>,
  *    or the /enable API for behavioral setup.)
  *
@@ -27,6 +27,10 @@ import type { Page, Locator } from '@playwright/test';
 
 export const DATA_TRANSFER_KEY = 'application/flow-node';
 export const API_OK = '0';
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // ───────────────────────── UI helpers (real designer) ─────────────────────────
 
@@ -49,7 +53,7 @@ export async function dragNodeToCanvas(
 ): Promise<string> {
   const idsBefore = await currentNodeIds(page);
   const paletteSel = `[data-testid="palette-node-${paletteType}"]`;
-  await page.locator(paletteSel).waitFor({ state: 'visible' });
+  await ensurePaletteItemVisible(page, paletteSel);
 
   const box = await canvas(page).boundingBox();
   if (!box) throw new Error('canvas has no bounding box');
@@ -94,7 +98,30 @@ export async function dragNodeToCanvas(
     },
     idsBefore,
   );
+  await closeCompactPaletteDrawer(page);
   return String(await newId.jsonValue());
+}
+
+async function ensurePaletteItemVisible(page: Page, paletteSel: string): Promise<void> {
+  const paletteItem = page.locator(paletteSel);
+  if (await paletteItem.isVisible().catch(() => false)) return;
+
+  const toggle = page.locator('[data-testid="flow-toggle-palette"]');
+  if (await toggle.isVisible().catch(() => false)) {
+    const shell = page.locator('[data-testid="flow-palette-shell"]');
+    if ((await shell.getAttribute('data-open').catch(() => 'false')) !== 'true') {
+      await toggle.click();
+    }
+  }
+
+  await paletteItem.waitFor({ state: 'visible' });
+}
+
+async function closeCompactPaletteDrawer(page: Page): Promise<void> {
+  const close = page.locator('[data-testid="flow-close-palette"]');
+  if (await close.isVisible().catch(() => false)) {
+    await close.click();
+  }
 }
 
 /** Current node ids on the canvas (by flow-node-<id> testid). */
@@ -173,15 +200,42 @@ export async function setEdgeCondition(
   content: string,
   opts: { isDefault?: boolean } = {},
 ): Promise<void> {
-  const edgeGroup = page.locator(`.react-flow__edge[data-id="${edgeId}"]`);
-  await edgeGroup.waitFor({ state: 'attached' });
-  // Click the interaction path (force: the visible path is a thin SVG stroke).
-  const interaction = edgeGroup.locator('.react-flow__edge-interaction').first();
-  if (await interaction.count()) {
-    await interaction.click({ force: true });
-  } else {
-    // Fallback: click the edge path itself.
-    await edgeGroup.locator('path').first().click({ force: true });
+  await page.locator(`.react-flow__edge[data-id="${edgeId}"]`).waitFor({ state: 'attached' });
+  await closeCompactDrawers(page);
+  const selectedNodeId = await page.evaluate(() => {
+    const store = (window as unknown as { __flowDesignerStore?: any }).__flowDesignerStore;
+    return store?.getState?.().selectedNodeId ?? null;
+  });
+  if (selectedNodeId) {
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+  }
+  await page.locator(`.react-flow__edge[data-id="${edgeId}"]`).waitFor({ state: 'attached' });
+  await clickEdgeInteractionPath(page, edgeId);
+  try {
+    await page.waitForFunction(
+      (id) => {
+        const store = (window as unknown as { __flowDesignerStore?: any }).__flowDesignerStore;
+        return store?.getState?.().selectedEdgeId === id;
+      },
+      edgeId,
+      { timeout: 5_000 },
+    );
+  } catch (error) {
+    const debug = await page.evaluate((id) => {
+      const store = (window as unknown as { __flowDesignerStore?: any }).__flowDesignerStore;
+      const state = store?.getState?.();
+      const edge = document.querySelector(`.react-flow__edge[data-id="${id}"]`);
+      const clickDebug = (window as unknown as { __lastFlowEdgeClickDebug?: unknown })
+        .__lastFlowEdgeClickDebug;
+      return {
+        selectedNodeId: state?.selectedNodeId ?? null,
+        selectedEdgeId: state?.selectedEdgeId ?? null,
+        clickDebug,
+        edgeClass: edge?.getAttribute('class') ?? null,
+        edgeHtml: edge?.outerHTML.slice(0, 600) ?? null,
+      };
+    }, edgeId);
+    throw new Error(`edge click did not select ${edgeId}: ${JSON.stringify(debug)}; ${String(error)}`);
   }
   // The EdgeInspector renders the condition textarea (placeholder "e.g. amount > 1000").
   const condArea = page
@@ -194,6 +248,51 @@ export async function setEdgeCondition(
   }
 }
 
+async function clickEdgeInteractionPath(page: Page, edgeId: string): Promise<void> {
+  const result = await page.evaluate((id) => {
+    const edge = document.querySelector(`.react-flow__edge[data-id="${id}"]`);
+    const path =
+      edge?.querySelector<SVGPathElement>('.react-flow__edge-interaction') ??
+      edge?.querySelector<SVGPathElement>('path');
+    if (!edge || !path) return { error: `edge interaction path missing: ${id}` };
+    const ctm = path.getScreenCTM();
+    if (!ctm) return { error: `edge interaction path has no CTM: ${id}` };
+    const length = path.getTotalLength();
+    const samples = [0.18, 0.3, 0.42, 0.5, 0.58, 0.7, 0.82].map((ratio) => {
+      const point = path.getPointAtLength(length * ratio);
+      const x = point.x * ctm.a + point.y * ctm.c + ctm.e;
+      const y = point.x * ctm.b + point.y * ctm.d + ctm.f;
+      const target = document.elementFromPoint(x, y);
+      const targetEdge = target?.closest('.react-flow__edge');
+      return {
+        ratio,
+        x,
+        y,
+        tag: target?.tagName ?? null,
+        className: target?.getAttribute('class') ?? null,
+        edgeId: targetEdge?.getAttribute('data-id') ?? null,
+      };
+    });
+    const hit = samples.find((sample) => sample.edgeId === id) ?? samples.find((sample) => sample.tag === 'path');
+    const point = hit ?? samples[Math.floor(samples.length / 2)];
+    (window as unknown as { __lastFlowEdgeClickDebug?: unknown }).__lastFlowEdgeClickDebug = {
+      edgeId: id,
+      point,
+      samples,
+    };
+    return { point, samples };
+  }, edgeId);
+
+  if ('error' in result && result.error) {
+    throw new Error(result.error);
+  }
+  if (!('point' in result) || !result.point) {
+    throw new Error(`edge ${edgeId} did not return a click point`);
+  }
+
+  await page.mouse.click(result.point.x, result.point.y);
+}
+
 /**
  * Select a node and fill its property-panel fields. `fields` maps configSchema
  * key → value; the writer dispatches per the rendered control type found under
@@ -204,6 +303,7 @@ export async function fillNodeConfig(
   nodeId: string,
   fields: Record<string, string | string[] | boolean>,
 ): Promise<void> {
+  await closeCompactDrawers(page);
   await page.locator(`[data-testid="flow-node-${nodeId}"]`).click();
   for (const [key, value] of Object.entries(fields)) {
     const field = page.locator(`[data-testid="prop-field-${key}"]`);
@@ -225,6 +325,13 @@ async function expandCollapsedPropertyGroups(page: Page): Promise<void> {
     await toggles.first().click();
   }
   throw new Error('too many collapsed property groups to expand');
+}
+
+async function closeCompactDrawers(page: Page): Promise<void> {
+  const backdrop = page.locator('[data-testid="flow-drawer-backdrop"]');
+  if (await backdrop.isVisible().catch(() => false)) {
+    await backdrop.click();
+  }
 }
 
 /**
@@ -337,7 +444,7 @@ export async function saveAutomation(page: Page): Promise<{ pid: string }> {
       { timeout: 15_000 },
     )
     .catch(() => null);
-  await page.locator('[data-testid="designer-save"]').click();
+  await clickDesignerSave(page);
   const resp = await respPromise;
   if (!resp) {
     const validation = await page
@@ -372,6 +479,13 @@ export async function saveAutomation(page: Page): Promise<{ pid: string }> {
   const pid = body?.data?.pid;
   if (!pid) throw new Error(`save (POST) succeeded but pid missing in response`);
   return { pid: String(pid) };
+}
+
+export async function clickDesignerSave(page: Page): Promise<void> {
+  await page
+    .locator('[data-testid="designer-save"], [data-testid="automation-editor-toolbar-btn-save"]')
+    .first()
+    .click();
 }
 
 /**
@@ -467,7 +581,7 @@ export async function pollNodeStatuses(
         return last;
       }
     }
-    await page.waitForTimeout(1_000);
+    await delay(1_000);
   }
   return last;
 }

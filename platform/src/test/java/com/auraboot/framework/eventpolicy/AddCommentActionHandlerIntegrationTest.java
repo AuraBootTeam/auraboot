@@ -47,7 +47,7 @@ class AddCommentActionHandlerIntegrationTest extends BaseIntegrationTest {
                  "left":{"type":"path","scope":"record","path":"data.priority","dataType":"enum"},
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
               "actions":[{"type":"ADD_COMMENT","target":"RECORD","order":10,
-                 "payload":{"content":"auto: high-priority — please triage"},
+                 "payload":{"content":"auto: ${record.recordPid} high-priority, please triage"},
                  "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:CMT"}]}]
             """);
         var draft = versionService.createDraft(code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
@@ -65,12 +65,17 @@ class AddCommentActionHandlerIntegrationTest extends BaseIntegrationTest {
 
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");
         assertThat(result.execution().actions().get(0).status().name()).isEqualTo("SUCCESS");
+        assertThat(result.execution().actions().get(0).resultPayload())
+                .containsEntry("modelCode", targetKey)
+                .containsEntry("recordPid", recordPid)
+                .containsEntry("content", "auto: " + recordPid + " high-priority, please triage")
+                .containsKey("commentPid");
 
         // a real record comment was persisted by RecordCommentService
         Map<String, Object> c = jdbcTemplate.queryForMap(
                 "select content, model_code from ab_record_comment where tenant_id=? and record_pid=?",
                 tid, recordPid);
-        assertThat(c.get("content")).isEqualTo("auto: high-priority — please triage");
+        assertThat(c.get("content")).isEqualTo("auto: " + recordPid + " high-priority, please triage");
         assertThat(c.get("model_code")).isEqualTo(targetKey);
     }
 }

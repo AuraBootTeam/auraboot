@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.dto;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
@@ -40,6 +41,7 @@ public class CommandExecuteRequest {
     /**
      * Public target record pid for UPDATE/DELETE.
      */
+    @JsonAlias("targetRecordId")
     @JsonProperty("targetRecordPid")
     private String targetRecordPid;
 

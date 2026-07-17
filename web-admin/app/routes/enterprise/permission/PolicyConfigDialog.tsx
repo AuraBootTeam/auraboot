@@ -17,6 +17,8 @@ import { useToastContext } from '~/contexts/ToastContext';
 import { permissionService } from '~/shared/services/permissionService';
 import {
   DecisionRuleBindingBlock,
+  type DecisionOption,
+  type RuleBindingDecisionApi,
   type RuleConsumerBindingDraft,
 } from '~/ui/smart/decision/DecisionRuleBindingBlock';
 import type { FieldOption } from '~/shared/decision/ui/ConditionBuilder';
@@ -36,8 +38,12 @@ interface PolicyFieldSchema {
   mode?: 'condition' | 'decision' | 'combined';
   expectedMatched?: boolean;
   timeoutMs?: number;
-  decisions?: Array<{ code: string; name?: string }>;
+  decisions?: DecisionOption[];
   fields?: FieldOption[];
+  fieldCatalogMode?: 'disabled' | 'fallback' | 'merge';
+  fieldCatalogModelCode?: string;
+  fieldCatalogModelCodeField?: string;
+  initialContextJson?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -52,6 +58,7 @@ export interface PolicyConfigDialogProps {
   permissionLabel: string;
   schema: Record<string, PolicyFieldSchema>;
   initialValues?: Record<string, any>;
+  decisionApi?: RuleBindingDecisionApi;
   onSuccess: () => void;
 }
 
@@ -66,10 +73,11 @@ interface FieldRendererProps {
   fieldKey: string;
   fieldSchema: PolicyFieldSchema;
   value: any;
+  decisionApi?: RuleBindingDecisionApi;
   onChange: (key: string, value: any) => void;
 }
 
-function FieldRenderer({ fieldKey, fieldSchema, value, onChange }: FieldRendererProps) {
+function FieldRenderer({ fieldKey, fieldSchema, value, decisionApi, onChange }: FieldRendererProps) {
   const fieldId = `policy-field-${fieldKey}`;
 
   const labelEl = (
@@ -285,7 +293,7 @@ function FieldRenderer({ fieldKey, fieldSchema, value, onChange }: FieldRenderer
             <div>
               {labelEl}
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                Permission ABAC is read-only and fails closed on timeout, error, or fallback.
+                权限 ABAC 仅读取上下文字段，超时、异常或未命中兜底时默认阻断。
               </p>
             </div>
             <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
@@ -295,12 +303,12 @@ function FieldRenderer({ fieldKey, fieldSchema, value, onChange }: FieldRenderer
                 onChange={(event) => emitRuleCenterValue({ expectedMatched: event.target.checked })}
                 data-testid={`policy-rule-expected-${fieldKey}`}
               />
-              expected matched
+              要求命中
             </label>
           </div>
 
           <label className="mb-3 block text-xs font-medium text-gray-600 dark:text-gray-300">
-            Timeout ms
+            超时毫秒
             <input
               id={`${fieldId}-timeout`}
               type="number"
@@ -326,10 +334,15 @@ function FieldRenderer({ fieldKey, fieldSchema, value, onChange }: FieldRenderer
                 showImpactPreview: true,
                 showTestRunner: true,
                 fields: fieldSchema.fields,
+                fieldCatalogMode: fieldSchema.fieldCatalogMode,
+                fieldCatalogModelCode: fieldSchema.fieldCatalogModelCode,
+                fieldCatalogModelCodeField: fieldSchema.fieldCatalogModelCodeField,
                 decisions: fieldSchema.decisions,
+                initialContextJson: fieldSchema.initialContextJson,
                 initialVersionPolicy: 'LATEST_PUBLISHED',
               },
             }}
+            api={decisionApi}
           />
         </div>
       );
@@ -352,6 +365,7 @@ export default function PolicyConfigDialog({
   permissionLabel,
   schema,
   initialValues,
+  decisionApi,
   onSuccess,
 }: PolicyConfigDialogProps) {
   const { t } = useI18n();
@@ -395,7 +409,7 @@ export default function PolicyConfigDialog({
           (Array.isArray(v) && v.length === 0);
         if (isEmpty) {
           showErrorToast(
-            text('admin.permission.policy.requiredError', 'Required field missing') +
+            text('admin.permission.policy.requiredError', '必填字段缺失') +
               ': ' +
               field.label,
           );
@@ -408,13 +422,13 @@ export default function PolicyConfigDialog({
     try {
       await permissionService.setPolicy(rolePid, permissionPid, values);
       showSuccessToast(
-        text('admin.permission.policy.saveSuccess', 'Policy configuration saved'),
+        text('admin.permission.policy.saveSuccess', '策略配置已保存'),
       );
       onSuccess();
       onClose();
     } catch (err) {
       showErrorToast(
-        text('admin.permission.policy.saveError', 'Failed to save policy configuration'),
+        text('admin.permission.policy.saveError', '策略配置保存失败'),
       );
     } finally {
       setSaving(false);
@@ -428,9 +442,8 @@ export default function PolicyConfigDialog({
       <DialogContent className="h-[calc(100vh-2rem)] max-h-[calc(100vh-2rem)] max-w-3xl overflow-hidden p-0">
         <DialogHeader className="px-6 pt-6 pr-12">
           <DialogTitle className="flex items-center gap-2">
-            <span>⚙️</span>
             <span>
-              {text('admin.permission.policy.dialogTitle', 'Policy Configuration')}
+              {text('admin.permission.policy.dialogTitle', '策略配置')}
               {' — '}
               <span className="font-normal text-gray-600 dark:text-gray-400">
                 {permissionLabel}
@@ -447,7 +460,7 @@ export default function PolicyConfigDialog({
           <div className="max-h-[calc(100vh-13rem)] space-y-4 overflow-y-auto px-6 py-4 pb-24">
             {fieldEntries.length === 0 ? (
               <p className="text-sm text-gray-400 italic">
-                {text('admin.permission.policy.noFields', 'No configurable fields in this policy.')}
+                {text('admin.permission.policy.noFields', '此策略没有可配置字段。')}
               </p>
             ) : (
               fieldEntries.map(([key, fieldSchema]) => (
@@ -456,6 +469,7 @@ export default function PolicyConfigDialog({
                   fieldKey={key}
                   fieldSchema={fieldSchema}
                   value={values[key]}
+                  decisionApi={decisionApi}
                   onChange={handleFieldChange}
                 />
               ))
@@ -470,7 +484,7 @@ export default function PolicyConfigDialog({
               disabled={saving}
               className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-60 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
             >
-              {text('common.cancel', 'Cancel')}
+              {text('common.cancel', '取消')}
             </button>
             <button
               type="submit"
@@ -500,10 +514,10 @@ export default function PolicyConfigDialog({
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                     />
                   </svg>
-                  {text('common.saving', 'Saving...')}
+                  {text('common.saving', '保存中...')}
                 </>
               ) : (
-                text('common.save', 'Save')
+                text('common.save', '保存')
               )}
             </button>
           </div>

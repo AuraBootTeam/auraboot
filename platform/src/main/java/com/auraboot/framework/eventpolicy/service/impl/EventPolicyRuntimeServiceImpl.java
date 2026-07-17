@@ -2,6 +2,7 @@ package com.auraboot.framework.eventpolicy.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.decision.ast.Truth;
@@ -31,7 +32,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -129,7 +132,11 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
         DecisionContext ctx = buildContext(context);
 
         // 6. Evaluate
-        EventPolicyResult result = evaluatorFor(context).evaluate(policy, ctx);
+        String correlationId = "ep-" + UniqueIdGenerator.generate();
+        List<String> decisionTraceIds = new ArrayList<>();
+        EventPolicyResult result = evaluatorFor(context, correlationId, decisionTraceIds)
+                .evaluate(policy, ctx)
+                .withRuntimeTrace(correlationId, decisionTraceIds);
 
         log.info("EventPolicy evaluated: code={}, version={}, status={}",
                 def.getPolicyCode(), ver.getVersion(), result.status());
@@ -152,7 +159,13 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
         Long tid = requireTenant();
         FailureStrategy fs = resolveFailureStrategy(tid, eventType, targetType, targetKey);
         DecisionContext ctx = buildContext(context);
-        var exec = policyExecutor.execute(result, ctx, fs, tid);
+        var exec = policyExecutor.execute(
+                result,
+                ctx,
+                fs,
+                tid,
+                result.primaryDecisionTraceId(),
+                result.correlationId());
         log.info("EventPolicy executed: code={}, overall={}", result.policyCode(), exec.overallStatus());
         return new com.auraboot.framework.eventpolicy.model.EventPolicyExecutionResult(result, exec);
     }
@@ -201,20 +214,24 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
         return Map.copyOf(scopes);
     }
 
-    private EventPolicyEvaluator evaluatorFor(Map<String, Map<String, Object>> rawContext) {
+    private EventPolicyEvaluator evaluatorFor(Map<String, Map<String, Object>> rawContext,
+                                              String correlationId,
+                                              List<String> decisionTraceIds) {
         RuleEvaluationService ruleEvaluationService = ruleEvaluationServiceProvider.getIfAvailable();
         if (ruleEvaluationService == null) {
             return evaluator;
         }
         Map<Scope, Map<String, Object>> scopes = buildScopes(rawContext);
         return new EventPolicyEvaluator((policy, rule, context) ->
-                evaluateDecisionBinding(ruleEvaluationService, policy, rule, scopes));
+                evaluateDecisionBinding(ruleEvaluationService, policy, rule, scopes, correlationId, decisionTraceIds));
     }
 
     private Truth evaluateDecisionBinding(RuleEvaluationService ruleEvaluationService,
                                           EventPolicy policy,
                                           PolicyRule rule,
-                                          Map<Scope, Map<String, Object>> scopes) {
+                                          Map<Scope, Map<String, Object>> scopes,
+                                          String correlationId,
+                                          List<String> decisionTraceIds) {
         if (rule.decisionBinding() == null) {
             return Truth.UNKNOWN;
         }
@@ -226,9 +243,12 @@ public class EventPolicyRuntimeServiceImpl implements EventPolicyRuntimeService 
                             "EVENT_POLICY",
                             policy.policyCode(),
                             rule.ruleCode(),
-                            null,
+                            correlationId,
                             null,
                             null));
+            if (StringUtils.hasText(trace.traceId()) && !decisionTraceIds.contains(trace.traceId())) {
+                decisionTraceIds.add(trace.traceId());
+            }
             return trace.matched() ? Truth.TRUE : Truth.FALSE;
         } catch (RuntimeException e) {
             log.warn("EventPolicy decision binding failed: policy={}, rule={}, decision={}, error={}",

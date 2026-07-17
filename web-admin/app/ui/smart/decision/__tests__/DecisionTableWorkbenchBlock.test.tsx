@@ -178,7 +178,9 @@ describe('DecisionTableWorkbenchBlock', () => {
         }),
       })),
     );
-    expect(await screen.findByTestId('dtw-test-result')).toHaveTextContent('MATCHED');
+    expect(await screen.findByTestId('dtw-test-result')).toHaveTextContent('命中');
+    expect(screen.getByTestId('dtw-test-result')).not.toHaveTextContent('MATCHED');
+    expect(screen.getByTestId('dtw-test-result')).not.toHaveTextContent('matched=true');
     expect(screen.getByTestId('dtw-test-result')).toHaveTextContent('director');
   });
 

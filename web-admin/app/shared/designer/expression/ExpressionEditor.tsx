@@ -5,6 +5,7 @@ import { ConditionBuilder } from './ConditionBuilder';
 import { serialize, deserialize } from './serializer';
 import { CONTEXT_VARIABLES } from './context-variables';
 import { BaseFormulaEditor } from '~/ui/base-fields';
+import { useSmartText } from '~/utils/i18n';
 
 export interface ExpressionEditorProps {
   adapter: FieldAdapter<any>;
@@ -15,6 +16,23 @@ export interface ExpressionEditorProps {
 }
 
 type EditorMode = 'builder' | 'text';
+
+const CONTEXT_VARIABLE_LABEL_KEYS: Record<string, string> = {
+  '$user.id': '$i18n:expression.variable.userId',
+  '$user.name': '$i18n:expression.variable.userName',
+  '$user.email': '$i18n:expression.variable.userEmail',
+  '$user.roles': '$i18n:expression.variable.userRoles',
+  '$user.permissions': '$i18n:expression.variable.userPermissions',
+  '$form.mode': '$i18n:expression.variable.formMode',
+  '$page.kind': '$i18n:expression.variable.pageKind',
+  '$page.modelCode': '$i18n:expression.variable.pageModelCode',
+  '$page.pageKey': '$i18n:expression.variable.pageKey',
+  '$page.mode': '$i18n:expression.variable.pageMode',
+  '$page.recordPid': '$i18n:expression.variable.currentRecordPid',
+  '$record.pid': '$i18n:expression.variable.recordPid',
+  '$state.filters': '$i18n:expression.variable.activeFilters',
+  '$state.selectedPids': '$i18n:expression.variable.selectedRowPids',
+};
 
 function normalizeExpressionValue(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -36,6 +54,7 @@ function normalizeExpressionValue(value: unknown): string {
 }
 
 export function ExpressionEditor({ adapter, name, label, helpText, modelFields }: ExpressionEditorProps) {
+  const st = useSmartText();
   const currentExpr = normalizeExpressionValue(adapter.value);
 
   const initialGroup = useMemo(() => deserialize(currentExpr), []);
@@ -49,10 +68,14 @@ export function ExpressionEditor({ adapter, name, label, helpText, modelFields }
   const allFields = useMemo<FieldOption[]>(() => {
     const fields: FieldOption[] = (modelFields ?? []).map((f) => ({
       ...f,
-      group: 'Fields',
+      group: f.group || st('$i18n:expression.fieldGroup.fields', '字段'),
     }));
-    return [...fields, ...CONTEXT_VARIABLES];
-  }, [modelFields]);
+    const contextFields = CONTEXT_VARIABLES.map((field) => ({
+      ...field,
+      name: st(CONTEXT_VARIABLE_LABEL_KEYS[field.code] || field.name, field.name) || field.name,
+    }));
+    return dedupeFields([...fields, ...contextFields]);
+  }, [modelFields, st]);
 
   const handleGroupChange = useCallback(
     (newGroup: ConditionGroup) => {
@@ -98,10 +121,17 @@ export function ExpressionEditor({ adapter, name, label, helpText, modelFields }
           }`}
           onClick={() => mode !== 'builder' && handleModeToggle()}
           disabled={mode === 'builder' || !canSwitchToBuilder}
-          title={!canSwitchToBuilder ? 'Expression too complex for condition builder' : undefined}
+          title={
+            !canSwitchToBuilder
+              ? st(
+                  '$i18n:expression.tooComplexForBuilder',
+                  '当前表达式过于复杂，无法切换为条件构造器',
+                )
+              : undefined
+          }
           data-testid="mode-builder"
         >
-          Conditions
+          {st('$i18n:expression.mode.conditions', '条件')}
         </button>
         <button
           className={`rounded px-2 py-0.5 text-[11px] font-medium ${
@@ -112,7 +142,7 @@ export function ExpressionEditor({ adapter, name, label, helpText, modelFields }
           onClick={() => mode !== 'text' && handleModeToggle()}
           data-testid="mode-text"
         >
-          Expression
+          {st('$i18n:expression.mode.expression', '表达式')}
         </button>
       </div>
 
@@ -122,9 +152,18 @@ export function ExpressionEditor({ adapter, name, label, helpText, modelFields }
         <BaseFormulaEditor
           adapter={adapter}
           name={name}
-          placeholder="e.g. status === 'draft' && amount > 1000"
+          placeholder={st(
+            '$i18n:expression.placeholder.formula',
+            "例如 status === 'draft' && amount > 1000",
+          )}
           helpText={helpText}
-          fields={allFields.map((f) => ({ code: f.code, name: f.name }))}
+          fields={allFields.map((f) => ({
+            code: f.code,
+            name: f.name,
+            group: f.group,
+            insertion: f.insertion,
+          }))}
+          showHelp={false}
         />
       )}
 
@@ -139,4 +178,15 @@ export function ExpressionEditor({ adapter, name, label, helpText, modelFields }
       )}
     </div>
   );
+}
+
+function dedupeFields(fields: FieldOption[]): FieldOption[] {
+  const seen = new Set<string>();
+  const result: FieldOption[] = [];
+  for (const field of fields) {
+    if (seen.has(field.code)) continue;
+    seen.add(field.code);
+    result.push(field);
+  }
+  return result;
 }

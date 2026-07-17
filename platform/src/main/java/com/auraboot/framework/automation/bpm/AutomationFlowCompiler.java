@@ -93,6 +93,7 @@ public class AutomationFlowCompiler {
                 .map(e -> String.valueOf(e.get("source")))
                 .collect(Collectors.toSet());
         List<String> terminalActionIds = new ArrayList<>();
+        int actionSequence = 1;
 
         for (Map<String, Object> node : nodes) {
             String id = String.valueOf(node.get("id"));
@@ -116,6 +117,7 @@ public class AutomationFlowCompiler {
                 Map<String, Object> spec = new HashMap<>();
                 spec.put("type", resolveActionType(type, config));
                 spec.put("config", new HashMap<>(config));
+                spec.put("sequence", actionSequence++);
                 Map<String, Object> loop = loopByBodyId.get(id);
                 if (loop != null) {
                     spec.put("loop", loop);

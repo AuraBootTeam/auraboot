@@ -23,6 +23,7 @@ import { BpmStatusSection } from '~/plugins/core-bpm/components/panel/BpmStatusS
 import { BpmDiagramSection } from '~/plugins/core-bpm/components/panel/BpmDiagramSection';
 import { BpmOperationsSection } from '~/plugins/core-bpm/components/panel/BpmOperationsSection';
 import { BpmHistorySection } from '~/plugins/core-bpm/components/panel/BpmHistorySection';
+import { BpmRuleTraceSection } from '~/plugins/core-bpm/components/panel/BpmRuleTraceSection';
 import {
   getInstanceForRecord,
   type BpmInstanceForRecord,
@@ -191,7 +192,10 @@ export function BpmPanelBlock({ block, record, recordPid }: BpmPanelBlockProps) 
         if (section === 'history') {
           return (
             <div key={section} data-testid="bpm-section-history">
-              <BpmHistorySection instance={instance} t={t} />
+              <div className="space-y-3">
+                <BpmRuleTraceSection processInstanceId={instance.instanceId} t={t} />
+                <BpmHistorySection instance={instance} t={t} />
+              </div>
             </div>
           );
         }

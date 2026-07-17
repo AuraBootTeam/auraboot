@@ -5,8 +5,9 @@
  * A formula expression editor with function picker and preview.
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { cn } from '~/utils/cn';
+import { useSmartText } from '~/utils/i18n';
 
 /**
  * Formula function info
@@ -19,6 +20,14 @@ export interface FormulaFunction {
   parameterTypes: string[];
 }
 
+export interface FormulaField {
+  code: string;
+  name: string;
+  group?: string;
+  /** Optional literal inserted into the editor instead of the display code. */
+  insertion?: string;
+}
+
 /**
  * Props for FormulaEditor component
  */
@@ -28,7 +37,7 @@ export interface FormulaEditorProps {
   /** On change callback */
   onChange?: (value: string) => void;
   /** Available fields for autocomplete */
-  fields?: { code: string; name: string }[];
+  fields?: FormulaField[];
   /** Fetch functions from API */
   fetchFunctions?: () => Promise<FormulaFunction[]>;
   /** Preview expression result */
@@ -37,10 +46,14 @@ export interface FormulaEditorProps {
   previewContext?: Record<string, unknown>;
   /** Placeholder text */
   placeholder?: string;
+  /** Accessible label for the expression textarea. */
+  ariaLabel?: string;
   /** Whether editor is disabled */
   disabled?: boolean;
   /** Error message */
   error?: string;
+  /** Show the generic syntax help under the editor. */
+  showHelp?: boolean;
   /** Custom class name */
   className?: string;
 }
@@ -55,17 +68,21 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
   fetchFunctions,
   previewExpression,
   previewContext = {},
-  placeholder = 'Enter formula expression...',
+  placeholder,
+  ariaLabel,
   disabled = false,
   error,
+  showHelp = true,
   className,
 }) => {
+  const st = useSmartText();
   const [functions, setFunctions] = useState<FormulaFunction[]>([]);
   const [showFunctionPicker, setShowFunctionPicker] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [previewResult, setPreviewResult] = useState<unknown>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showFieldPicker, setShowFieldPicker] = useState(false);
 
   // $ variable autocomplete state
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -92,6 +109,37 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
     ? functions.filter((f) => f.category === selectedCategory)
     : functions;
 
+  const hasScenarioFields = useMemo(
+    () => fields.some((field) => !isRuntimeContextField(field)),
+    [fields],
+  );
+
+  const quickFields = useMemo(() => {
+    const candidates = hasScenarioFields
+      ? fields.filter((field) => !isRuntimeContextField(field))
+      : fields.filter(isRuntimeContextField);
+    return candidates.slice(0, 6);
+  }, [fields, hasScenarioFields]);
+
+  const groupedFields = useMemo(() => {
+    const groups = new Map<string, typeof fields>();
+    for (const field of fields) {
+      const group = field.group || st('$i18n:formula.fieldPicker.fields', '字段');
+      const existing = groups.get(group) || [];
+      existing.push(field);
+      groups.set(group, existing);
+    }
+    const contextGroups = ['$record', '$task', '$process', '$sla', '$event', '$user', '$page', '$state', '$form'];
+    return Array.from(groups.entries()).sort(([a], [b]) => {
+      const aContext = contextGroups.indexOf(a);
+      const bContext = contextGroups.indexOf(b);
+      if (aContext >= 0 && bContext >= 0) return aContext - bContext;
+      if (aContext >= 0) return 1;
+      if (bContext >= 0) return -1;
+      return a.localeCompare(b, 'zh-CN');
+    });
+  }, [fields, st]);
+
   // Insert function at cursor
   const insertFunction = (func: FormulaFunction) => {
     const insertion = `#${func.name}()`;
@@ -100,9 +148,13 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
   };
 
   // Insert field reference
-  const insertField = (fieldCode: string) => {
-    const insertion = `#${fieldCode}`;
+  const insertField = (field: FormulaField | string) => {
+    const fieldCode = typeof field === 'string' ? field : field.code;
+    const insertion = typeof field === 'string'
+      ? (fieldCode.startsWith('$') ? fieldCode : `#${fieldCode}`)
+      : field.insertion ?? (fieldCode.startsWith('$') ? fieldCode : `#${fieldCode}`);
     onChange?.((value || '') + insertion);
+    setShowFieldPicker(false);
   };
 
   // Preview the expression
@@ -116,12 +168,16 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
       const result = await previewExpression(value, previewContext);
       setPreviewResult(result);
     } catch (err) {
-      setPreviewError(err instanceof Error ? err.message : 'Preview failed');
+      setPreviewError(
+        err instanceof Error
+          ? err.message
+          : st('$i18n:formula.previewFailed', '预览失败'),
+      );
       setPreviewResult(null);
     } finally {
       setLoading(false);
     }
-  }, [previewExpression, value, previewContext]);
+  }, [previewExpression, value, previewContext, st]);
 
   // Handle textarea input for $ autocomplete trigger
   const handleInput = useCallback((newValue: string) => {
@@ -180,23 +236,23 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
           onClick={() => setShowFunctionPicker(!showFunctionPicker)}
           disabled={disabled}
         >
-          fx Functions
+          fx {st('$i18n:formula.functions', '函数')}
         </button>
 
         {fields.length > 0 && (
-          <select
-            className="rounded border px-2 py-1 text-xs"
-            onChange={(e) => e.target.value && insertField(e.target.value)}
+          <button
+            type="button"
+            className={cn(
+              'rounded border px-2 py-1 text-xs hover:bg-gray-50',
+              showFieldPicker && 'border-blue-300 bg-blue-50 text-blue-700',
+            )}
+            onClick={() => setShowFieldPicker((open) => !open)}
             disabled={disabled}
-            value=""
           >
-            <option value="">Insert field...</option>
-            {fields.map((f) => (
-              <option key={f.code} value={f.code}>
-                {f.name} ({f.code})
-              </option>
-            ))}
-          </select>
+            {showFieldPicker
+              ? st('$i18n:formula.fieldPicker.close', '收起字段')
+              : st('$i18n:formula.insertField', '插入字段')}
+          </button>
         )}
 
         {previewExpression && (
@@ -206,10 +262,82 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
             onClick={handlePreview}
             disabled={disabled || loading}
           >
-            {loading ? 'Previewing...' : 'Preview'}
+            {loading
+              ? st('$i18n:formula.previewing', '预览中...')
+              : st('$i18n:formula.preview', '预览')}
           </button>
         )}
       </div>
+
+      {showFieldPicker && fields.length > 0 && (
+        <div
+          className="max-h-72 overflow-y-auto rounded-md border border-gray-200 bg-white p-2 shadow-sm"
+          data-testid="formula-field-picker"
+        >
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-xs font-medium text-gray-600">
+              {st('$i18n:formula.fieldPicker.title', '可用字段')}
+            </div>
+            <button
+              type="button"
+              className="rounded px-2 py-0.5 text-xs text-gray-500 hover:bg-gray-100"
+              onClick={() => setShowFieldPicker(false)}
+            >
+              {st('$i18n:formula.fieldPicker.close', '收起字段')}
+            </button>
+          </div>
+
+          {quickFields.length > 0 && (
+            <div className="mb-3">
+              <div className="mb-1 text-[11px] font-medium text-gray-500">
+                {hasScenarioFields
+                  ? st('$i18n:formula.fieldPicker.quickFields', '常用字段')
+                  : st('$i18n:formula.fieldPicker.quick', '常用上下文')}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {quickFields.map((field) => (
+                  <button
+                    key={`quick-${field.code}`}
+                    type="button"
+                    className="rounded-full border border-blue-100 bg-blue-50 px-2 py-1 text-[11px] text-blue-700 hover:bg-blue-100"
+                    onClick={() => insertField(field)}
+                  >
+                    <span>{field.name}</span>
+                    <span className="ml-1 font-mono text-blue-500">{field.code}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {groupedFields.length === 0 && quickFields.length === 0 ? (
+            <div className="rounded bg-gray-50 px-3 py-2 text-xs text-gray-500">
+              {st('$i18n:formula.fieldPicker.empty', '暂无可插入字段')}
+            </div>
+          ) : groupedFields.length > 0 ? (
+            <div className="space-y-3">
+              {groupedFields.map(([group, groupFields]) => (
+                <div key={group}>
+                  <div className="mb-1 text-[11px] font-semibold text-gray-500">{group}</div>
+                  <div className="grid gap-1">
+                    {groupFields.map((field) => (
+                      <button
+                        key={field.code}
+                        type="button"
+                        className="flex min-w-0 items-center justify-between gap-2 rounded px-2 py-1.5 text-left text-xs hover:bg-gray-50"
+                        onClick={() => insertField(field)}
+                      >
+                        <span className="truncate text-gray-700">{field.name}</span>
+                        <span className="shrink-0 font-mono text-gray-400">{field.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      )}
 
       {/* Function picker */}
       {showFunctionPicker && (
@@ -223,7 +351,7 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
               )}
               onClick={() => setSelectedCategory(null)}
             >
-              All
+              {st('$i18n:formula.category.all', '全部')}
             </button>
             {categories.map((cat) => (
               <button
@@ -270,7 +398,8 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
           onChange={(e) => handleInput(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={() => setTimeout(() => setAcQuery(null), 150)}
-          placeholder={placeholder}
+          placeholder={placeholder || st('$i18n:formula.placeholder', '请输入公式表达式...')}
+          aria-label={ariaLabel}
           disabled={disabled}
           rows={3}
           data-testid="formula-editor-textarea"
@@ -320,7 +449,9 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
       {/* Preview result */}
       {previewResult !== null && (
         <div className="rounded border border-green-200 bg-green-50 p-2 text-sm">
-          <span className="font-medium text-green-700">Result: </span>
+          <span className="font-medium text-green-700">
+            {st('$i18n:formula.result', '结果')}:{' '}
+          </span>
           <span className="font-mono">{JSON.stringify(previewResult)}</span>
         </div>
       )}
@@ -332,12 +463,20 @@ export const FormulaEditor: React.FC<FormulaEditorProps> = ({
       )}
 
       {/* Help text */}
-      <p className="text-xs text-gray-400">
-        Use #FUNCTION() for functions and #fieldCode for field references. Example: #IF(#amount{' '}
-        {'>'} 100, 'High', 'Low')
-      </p>
+      {showHelp && (
+        <p className="text-xs text-gray-400">
+          {st(
+            '$i18n:formula.help',
+            "使用 #FUNCTION() 调用函数，使用 #fieldCode 引用字段。例如：#IF(#amount > 100, '高', '低')",
+          )}
+        </p>
+      )}
     </div>
   );
 };
+
+function isRuntimeContextField(field: FormulaField): boolean {
+  return field.code.startsWith('$');
+}
 
 export default FormulaEditor;

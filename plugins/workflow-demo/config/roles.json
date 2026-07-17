@@ -4,6 +4,7 @@
     "name:zh-CN": "员工",
     "name:en": "Employee",
     "description": "Regular employee: can submit and view own leave requests and balance.",
+    "seedMembers": ["CURRENT_MEMBER"],
     "permissions": [
       "wd.leave_request.read",
       "wd.leave_request.manage",
@@ -16,12 +17,80 @@
     "name:zh-CN": "主管",
     "name:en": "Manager",
     "description": "Line manager: approves short leave (routed by Drools).",
+    "seedMembers": ["CURRENT_MEMBER"],
     "permissions": [
       "wd.leave_request.read",
       "wd.leave_request.manage",
       "wd.leave_request.submit",
       "wd.leave_request.approve",
       "wd.leave_balance.read"
+    ],
+    "permissionPolicies": [
+      {
+        "permissionCode": "wd.leave_request.approve",
+        "conditions": {
+          "dynamicAbac": {
+            "expectedMatched": true,
+            "fields": [
+              {
+                "scope": "record",
+                "path": "data.wd_req_days",
+                "label": "Leave days",
+                "dataType": "decimal",
+                "visible": true
+              }
+            ],
+            "ruleBinding": {
+              "consumerType": "PERMISSION",
+              "consumerCode": "wd.leave_request.approve",
+              "consumerNodeId": "dynamicAbac",
+              "bindingKind": "DECISION_REF",
+              "enabled": true,
+              "conditionFragmentRefs": ["shared_leave_approval_guard"],
+              "decisionBinding": {
+                "decisionCode": "leave_request_automation",
+                "versionPolicy": "LATEST_PUBLISHED",
+                "inputMappings": [
+                  {
+                    "input": "leaveDays",
+                    "source": {
+                      "kind": "FIELD",
+                      "scope": "record",
+                      "path": "data.wd_req_days"
+                    }
+                  }
+                ],
+                "outputMappings": [
+                  {
+                    "output": "severity",
+                    "target": {
+                      "kind": "PERMISSION_CONTEXT",
+                      "path": "severity"
+                    }
+                  },
+                  {
+                    "output": "message",
+                    "target": {
+                      "kind": "PERMISSION_CONTEXT",
+                      "path": "message"
+                    }
+                  },
+                  {
+                    "output": "actionType",
+                    "target": {
+                      "kind": "PERMISSION_CONTEXT",
+                      "path": "actionType"
+                    }
+                  }
+                ],
+                "fallbackPolicy": { "mode": "FAIL_CLOSED" },
+                "traceMode": "ALWAYS",
+                "enabled": true
+              }
+            }
+          }
+        }
+      }
     ]
   },
   {
@@ -29,6 +98,7 @@
     "name:zh-CN": "HR",
     "name:en": "HR",
     "description": "HR: approves long leave and maintains balance records.",
+    "seedMembers": ["CURRENT_MEMBER"],
     "permissions": [
       "wd.leave_request.read",
       "wd.leave_request.manage",
@@ -36,6 +106,73 @@
       "wd.leave_request.approve",
       "wd.leave_balance.read",
       "wd.leave_balance.manage"
+    ],
+    "permissionPolicies": [
+      {
+        "permissionCode": "wd.leave_request.approve",
+        "conditions": {
+          "dynamicAbac": {
+            "expectedMatched": true,
+            "fields": [
+              {
+                "scope": "record",
+                "path": "data.wd_req_days",
+                "label": "Leave days",
+                "dataType": "decimal",
+                "visible": true
+              }
+            ],
+            "ruleBinding": {
+              "consumerType": "PERMISSION",
+              "consumerCode": "wd.leave_request.approve",
+              "consumerNodeId": "dynamicAbac",
+              "bindingKind": "DECISION_REF",
+              "enabled": true,
+              "conditionFragmentRefs": ["shared_leave_approval_guard"],
+              "decisionBinding": {
+                "decisionCode": "leave_request_automation",
+                "versionPolicy": "LATEST_PUBLISHED",
+                "inputMappings": [
+                  {
+                    "input": "leaveDays",
+                    "source": {
+                      "kind": "FIELD",
+                      "scope": "record",
+                      "path": "data.wd_req_days"
+                    }
+                  }
+                ],
+                "outputMappings": [
+                  {
+                    "output": "severity",
+                    "target": {
+                      "kind": "PERMISSION_CONTEXT",
+                      "path": "severity"
+                    }
+                  },
+                  {
+                    "output": "message",
+                    "target": {
+                      "kind": "PERMISSION_CONTEXT",
+                      "path": "message"
+                    }
+                  },
+                  {
+                    "output": "actionType",
+                    "target": {
+                      "kind": "PERMISSION_CONTEXT",
+                      "path": "actionType"
+                    }
+                  }
+                ],
+                "fallbackPolicy": { "mode": "FAIL_CLOSED" },
+                "traceMode": "ALWAYS",
+                "enabled": true
+              }
+            }
+          }
+        }
+      }
     ]
   },
   {
@@ -43,6 +180,7 @@
     "name:zh-CN": "流程管理员",
     "name:en": "Workflow Administrator",
     "description": "Workflow admin: full access including rules / SLA configuration.",
+    "seedMembers": ["CURRENT_MEMBER"],
     "permissions": [
       "wd.leave_request.read",
       "wd.leave_request.manage",

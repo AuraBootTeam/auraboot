@@ -59,6 +59,10 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
                             "type", action.getType(),
                             "config", action.getConfig() != null ? action.getConfig() : Map.of(),
                             "recordPid", String.valueOf(context.get("recordPid")),
+                            "recordId", String.valueOf(context.get("recordId")),
+                            "modelCode", String.valueOf(context.get("modelCode")),
+                            "entityCode", String.valueOf(context.get("entityCode")),
+                            "trigger", context.get("trigger") instanceof Map<?, ?> trigger ? trigger : Map.of(),
                             "item", String.valueOf(context.get("item"))));
                     return Map.of("ok", true);
                 }
@@ -85,6 +89,7 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
         a.setPid("ITAUTO" + System.currentTimeMillis());
         a.setName("E2E marker automation");
         a.setTenantId(MetaContext.getCurrentTenantId());
+        a.setModelCode("wd_leave_request");
         a.setFlowConfig(Map.of(
                 "nodes", List.of(
                         Map.of("id", "t1", "type", "trigger-record-create",
@@ -105,12 +110,25 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
         String processKey = runtime.deploy(automation);
         assertThat(processKey).isEqualTo("auto_" + automation.getPid());
 
-        runtime.run(automation, "rec-1", Map.of("event", "create"));
+        runtime.run(automation, "rec-1", Map.of(
+                "event", "create",
+                "record", Map.of("title", "Leave request")));
 
         assertThat(MARKER_INVOCATIONS)
                 .as("marker action should have fired once via the SmartEngine serviceTask delegate")
                 .hasSize(1);
         assertThat(MARKER_INVOCATIONS.get(0)).containsEntry("recordPid", "rec-1");
+        assertThat(MARKER_INVOCATIONS.get(0)).containsEntry("recordId", "rec-1");
+        assertThat(MARKER_INVOCATIONS.get(0)).containsEntry("modelCode", "wd_leave_request");
+        assertThat(MARKER_INVOCATIONS.get(0)).containsEntry("entityCode", "wd_leave_request");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> trigger = (Map<String, Object>) MARKER_INVOCATIONS.get(0).get("trigger");
+        assertThat(trigger)
+                .containsEntry("recordPid", "rec-1")
+                .containsEntry("recordId", "rec-1")
+                .containsEntry("modelCode", "wd_leave_request")
+                .containsEntry("event", "create");
+        assertThat(trigger.get("record")).isEqualTo(Map.of("title", "Leave request"));
     }
 
     @Test
@@ -303,6 +321,7 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
         assertThat(logEntry.getCompletedAt())
                 .as("log must be marked completed even on failure")
                 .isNotNull();
+        assertFailedActionResult(logEntry);
 
         // Persisted log row must reflect the same status (catches @Transactional rollback
         // bugs that would silently drop the FAILED row).
@@ -311,6 +330,19 @@ public class AutomationProcessRuntimeIntegrationTest extends BaseIntegrationTest
                 .as("log row must survive the failed run")
                 .isNotNull();
         assertThat(persisted.getStatus()).isEqualTo(StatusConstants.FAILED);
+        assertFailedActionResult(persisted);
+    }
+
+    private void assertFailedActionResult(AutomationLog logEntry) {
+        assertThat(logEntry.getActionResults())
+                .as("failed automation logs must expose the failed action for the result panel")
+                .hasSize(1);
+        AutomationLog.ActionResult result = logEntry.getActionResults().getFirst();
+        assertThat(result.getSequence()).isEqualTo(1);
+        assertThat(result.getActionType()).isEqualTo("test_failure");
+        assertThat(result.getStatus()).isEqualTo(StatusConstants.FAILED);
+        assertThat(result.getErrorMessage()).contains("synthetic action failure");
+        assertThat(result.getDurationMs()).isNotNull().isGreaterThanOrEqualTo(0);
     }
 
     @Test

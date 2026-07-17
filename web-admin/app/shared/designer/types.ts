@@ -88,11 +88,26 @@ export interface PropertySchema<TLabel = string | I18nText> {
   /** type='rule-binding' only: consumer metadata persisted in RuleConsumerBinding. */
   ruleBindingConsumerType?: string;
   ruleBindingConsumerCode?: string;
+  /** type='rule-binding' only: sibling config field used as dynamic consumer code. */
+  ruleBindingConsumerCodeField?: string;
   ruleBindingConsumerNodeId?: string;
   /** type='rule-binding' only: optional rule-center helper panels. */
   ruleBindingShowImpactPreview?: boolean;
   ruleBindingShowTestRunner?: boolean;
   ruleBindingInitialDecisionCode?: string;
+  /** type='rule-binding' only: static JSON context for the embedded decision test runner. */
+  ruleBindingInitialContextJson?: string;
+  /** type='rule-binding' only: sibling config field that stores sample context for the embedded decision test runner. */
+  ruleBindingInitialContextJsonField?: string;
+  /** type='rule-binding' only: static model code used to scope record fields in the field catalog. */
+  ruleBindingFieldCatalogModelCode?: string;
+  /** type='rule-binding' only: sibling config field that stores the model code. */
+  ruleBindingFieldCatalogModelCodeField?: string;
+
+  /** type='expression' only: static model code used to scope record fields in the field picker. */
+  expressionFieldCatalogModelCode?: string;
+  /** type='expression' only: sibling config field that stores the model code. */
+  expressionFieldCatalogModelCodeField?: string;
 }
 
 // ==================== Validation ====================

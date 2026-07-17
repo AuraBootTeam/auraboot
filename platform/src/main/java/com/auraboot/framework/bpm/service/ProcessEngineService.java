@@ -8,6 +8,7 @@ import com.auraboot.smart.framework.engine.service.query.RepositoryQueryService;
 import com.auraboot.smart.framework.engine.model.assembly.ProcessDefinition;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
+import com.auraboot.framework.bpm.dto.ExecutionLogEntry;
 import com.auraboot.framework.bpm.dto.NodeStatusDTO;
 import com.auraboot.framework.bpm.dto.ProcessInstanceStatusDTO;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
@@ -40,6 +41,7 @@ public class ProcessEngineService {
     private final SlaRecordService slaRecordService;
     private final BpmProcessDefinitionMapper processDefinitionMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final ExecutionLogService executionLogService;
 
     /**
      * 启动流程实例
@@ -242,7 +244,7 @@ public class ProcessEngineService {
         // 1. Get process instance
         ProcessInstance instance = smartEngine.getProcessQueryService().findById(processInstanceId, tenantId);
         if (instance == null) {
-            return null;
+            return getFailureSnapshotStatus(processInstanceId, tenantId);
         }
 
         // 2. Resolve process instance status string
@@ -421,7 +423,7 @@ public class ProcessEngineService {
         List<ProcessInstance> instances = smartEngine.getProcessQueryService().findList(param);
 
         if (instances == null || instances.isEmpty()) {
-            return null;
+            return getFailureSnapshotStatusByBusinessKey(processKey, businessKey, tenantId);
         }
 
         // Filter by processKey if provided
@@ -436,10 +438,97 @@ public class ProcessEngineService {
         }
 
         if (target == null) {
-            return null;
+            return getFailureSnapshotStatusByBusinessKey(processKey, businessKey, tenantId);
         }
 
         return getProcessInstanceStatus(target.getInstanceId());
+    }
+
+    private ProcessInstanceStatusDTO getFailureSnapshotStatus(String executionId, String tenantId) {
+        ExecutionLogEntry failure = executionLogService.getLatestFailure(executionId, parseTenantId(tenantId));
+        return toFailureSnapshotStatus(failure, null, null);
+    }
+
+    private ProcessInstanceStatusDTO getFailureSnapshotStatusByBusinessKey(String processKey,
+                                                                           String businessKey,
+                                                                           String tenantId) {
+        ExecutionLogEntry failure = executionLogService.getLatestFailureByBusinessKey(
+                parseTenantId(tenantId), processKey, businessKey);
+        return toFailureSnapshotStatus(failure, processKey, businessKey);
+    }
+
+    private ProcessInstanceStatusDTO toFailureSnapshotStatus(ExecutionLogEntry failure,
+                                                             String processKeyFallback,
+                                                             String businessKeyFallback) {
+        if (failure == null) {
+            return null;
+        }
+        Map<String, Object> inputData = failure.inputData() == null
+                ? Collections.emptyMap()
+                : failure.inputData();
+        String nodeId = StringUtils.hasText(failure.nodeId())
+                ? failure.nodeId()
+                : "failed-service-task";
+        String processKey = firstText(stringValue(inputData.get("processKey")), processKeyFallback);
+        if (!StringUtils.hasText(processKey)) {
+            return null;
+        }
+
+        Map<String, Object> variables = new LinkedHashMap<>();
+        putIfText(variables, "businessKey", firstText(stringValue(inputData.get("businessKey")), businessKeyFallback));
+        putIfText(variables, "failureNodeId", nodeId);
+        putIfText(variables, "failureMessage", failure.errorMessage());
+        Object action = inputData.get("action");
+        if (action != null) {
+            variables.put("_action_" + nodeId + "_success", false);
+            variables.put("_action_" + nodeId + "_result", action);
+            putIfText(variables, "_action_" + nodeId + "_error", failure.errorMessage());
+        }
+
+        NodeStatusDTO failedNode = new NodeStatusDTO(
+                nodeId,
+                StringUtils.hasText(failure.nodeType()) ? failure.nodeType() : "serviceTask",
+                null,
+                "failed",
+                null,
+                failure.createdAt() == null ? null : ISO_FORMATTER.format(failure.createdAt()),
+                null
+        );
+
+        return new ProcessInstanceStatusDTO(
+                failure.executionId(),
+                processKey,
+                stringValue(inputData.get("startUserId")),
+                "terminated",
+                List.of(failedNode),
+                List.of(),
+                variables
+        );
+    }
+
+    private Long parseTenantId(String tenantId) {
+        if (!StringUtils.hasText(tenantId)) {
+            return null;
+        }
+        try {
+            return Long.parseLong(tenantId);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    private String stringValue(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private String firstText(String primary, String fallback) {
+        return StringUtils.hasText(primary) ? primary : fallback;
+    }
+
+    private void putIfText(Map<String, Object> target, String key, String value) {
+        if (StringUtils.hasText(value)) {
+            target.put(key, value);
+        }
     }
 
     public List<ProcessInstance> getProcessInstancesByUser(String userId) {
@@ -495,15 +584,41 @@ public class ProcessEngineService {
     }
 
     private int compareVersion(String left, String right) {
-        Integer leftInt = parseVersion(left);
-        Integer rightInt = parseVersion(right);
-        if (leftInt != null && rightInt != null) {
-            return leftInt.compareTo(rightInt);
+        List<Integer> leftParts = parseVersionParts(left);
+        List<Integer> rightParts = parseVersionParts(right);
+        if (!leftParts.isEmpty() && !rightParts.isEmpty()) {
+            int size = Math.max(leftParts.size(), rightParts.size());
+            for (int i = 0; i < size; i++) {
+                int l = i < leftParts.size() ? leftParts.get(i) : 0;
+                int r = i < rightParts.size() ? rightParts.get(i) : 0;
+                if (l != r) {
+                    return Integer.compare(l, r);
+                }
+            }
+            return 0;
         }
         return left.compareTo(right);
     }
 
-    private Integer parseVersion(String version) {
+    private List<Integer> parseVersionParts(String version) {
+        if (!StringUtils.hasText(version)) {
+            return List.of();
+        }
+        List<Integer> parts = new ArrayList<>();
+        for (String part : version.split("\\.")) {
+            if (!StringUtils.hasText(part)) {
+                return List.of();
+            }
+            Integer parsed = parseVersionPart(part);
+            if (parsed == null) {
+                return List.of();
+            }
+            parts.add(parsed);
+        }
+        return parts;
+    }
+
+    private Integer parseVersionPart(String version) {
         try {
             return Integer.parseInt(version);
         } catch (NumberFormatException e) {

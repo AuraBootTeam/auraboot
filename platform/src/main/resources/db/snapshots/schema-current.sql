@@ -5601,6 +5601,8 @@ CREATE TABLE public.ab_drt_log (
     error_code character varying(100),
     error_message text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    output_snapshot jsonb,
+    trace_snapshot jsonb,
     CONSTRAINT chk_drt_log_status CHECK (((status)::text = ANY ((ARRAY['MATCHED'::character varying, 'NOT_MATCHED'::character varying, 'ERROR'::character varying, 'SKIPPED'::character varying, 'UNKNOWN'::character varying])::text[])))
 );
 
@@ -5610,6 +5612,20 @@ CREATE TABLE public.ab_drt_log (
 --
 
 COMMENT ON TABLE public.ab_drt_log IS 'Decision Runtime — immutable evaluation audit trail';
+
+
+--
+-- Name: COLUMN ab_drt_log.output_snapshot; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_log.output_snapshot IS 'Decision Runtime output snapshot for execution-log trace UI';
+
+
+--
+-- Name: COLUMN ab_drt_log.trace_snapshot; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_log.trace_snapshot IS 'Decision Runtime trace diagnostics such as virtual source resolution evidence';
 
 
 --
@@ -5726,6 +5742,18 @@ CREATE TABLE public.ab_drt_policy_exec_log (
     status text NOT NULL,
     error_message text,
     executed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    result_payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    decision_trace_id character varying(64),
+    correlation_id character varying(64),
+    failure_strategy text,
+    action_payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    context_payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    attempt_count integer DEFAULT 0 NOT NULL,
+    max_attempts integer DEFAULT 3 NOT NULL,
+    next_retry_at timestamp with time zone,
+    last_retry_at timestamp with time zone,
+    dead_lettered_at timestamp with time zone,
+    CONSTRAINT chk_drt_exec_retry_attempts CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (max_attempts <= 20))),
     CONSTRAINT chk_drt_exec_status CHECK ((status = ANY (ARRAY['SUCCESS'::text, 'FAILED'::text, 'SKIPPED'::text, 'NO_HANDLER'::text, 'RETRY_PENDING'::text, 'DEAD_LETTER'::text, 'NOT_EXECUTED'::text])))
 );
 
@@ -5735,6 +5763,83 @@ CREATE TABLE public.ab_drt_policy_exec_log (
 --
 
 COMMENT ON TABLE public.ab_drt_policy_exec_log IS 'EventPolicy action execution log; unique (tenant, idempotency_key) gives restart-durable idempotency';
+
+
+--
+-- Name: COLUMN ab_drt_policy_exec_log.result_payload; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_policy_exec_log.result_payload IS 'Structured ActionHandler result payload for product trace UI, e.g. sentCount, processInstanceId, updatedFields';
+
+
+--
+-- Name: COLUMN ab_drt_policy_exec_log.decision_trace_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_policy_exec_log.decision_trace_id IS 'Decision Runtime trace_id that caused this EventPolicy action execution';
+
+
+--
+-- Name: COLUMN ab_drt_policy_exec_log.correlation_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_policy_exec_log.correlation_id IS 'EventPolicy run correlation id shared with linked decision evaluations';
+
+
+--
+-- Name: COLUMN ab_drt_policy_exec_log.failure_strategy; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_policy_exec_log.failure_strategy IS 'Failure strategy used when the action execution row was recorded';
+
+
+--
+-- Name: COLUMN ab_drt_policy_exec_log.action_payload; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_policy_exec_log.action_payload IS 'Retry envelope: resolved action target/order/payload captured before execution';
+
+
+--
+-- Name: COLUMN ab_drt_policy_exec_log.context_payload; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_policy_exec_log.context_payload IS 'Retry envelope: decision context scopes captured before execution';
+
+
+--
+-- Name: COLUMN ab_drt_policy_exec_log.attempt_count; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_policy_exec_log.attempt_count IS 'Number of execution attempts recorded for this idempotency key';
+
+
+--
+-- Name: COLUMN ab_drt_policy_exec_log.max_attempts; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_policy_exec_log.max_attempts IS 'Maximum attempts before RETRY_PENDING is exhausted into DEAD_LETTER';
+
+
+--
+-- Name: COLUMN ab_drt_policy_exec_log.next_retry_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_policy_exec_log.next_retry_at IS 'When RETRY_ASYNC worker may next execute this action';
+
+
+--
+-- Name: COLUMN ab_drt_policy_exec_log.last_retry_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_policy_exec_log.last_retry_at IS 'Last time the action was attempted';
+
+
+--
+-- Name: COLUMN ab_drt_policy_exec_log.dead_lettered_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_drt_policy_exec_log.dead_lettered_at IS 'When retry exhaustion or explicit DEAD_LETTER routing moved this row to the dead-letter queue';
 
 
 --
@@ -10538,7 +10643,8 @@ CREATE TABLE public.ab_permission_audit_log (
     result boolean NOT NULL,
     reason text,
     evaluation_trace jsonb,
-    created_at timestamp without time zone DEFAULT now()
+    created_at timestamp without time zone DEFAULT now(),
+    record_pid character varying(64)
 );
 
 
@@ -12817,7 +12923,8 @@ CREATE TABLE public.ab_sla_config (
     created_by bigint,
     updated_by bigint,
     deleted_flag boolean DEFAULT false NOT NULL,
-    suspend_policy character varying(20) DEFAULT 'pause'::character varying
+    suspend_policy character varying(20) DEFAULT 'pause'::character varying,
+    action_policy jsonb DEFAULT '{}'::jsonb
 );
 
 
@@ -20596,6 +20703,13 @@ CREATE INDEX idx_ab_perm_audit_resource ON public.ab_permission_audit_log USING 
 
 
 --
+-- Name: idx_ab_perm_audit_resource_record_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_perm_audit_resource_record_pid ON public.ab_permission_audit_log USING btree (tenant_id, resource_code, record_pid, created_at) WHERE (record_pid IS NOT NULL);
+
+
+--
 -- Name: idx_ab_plugin_import_log_pid; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -22374,10 +22488,38 @@ CREATE INDEX idx_drt_def_tenant ON public.ab_drt_definition USING btree (tenant_
 
 
 --
+-- Name: idx_drt_exec_correlation; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_drt_exec_correlation ON public.ab_drt_policy_exec_log USING btree (tenant_id, correlation_id, executed_at DESC) WHERE (correlation_id IS NOT NULL);
+
+
+--
+-- Name: idx_drt_exec_dead_letter; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_drt_exec_dead_letter ON public.ab_drt_policy_exec_log USING btree (tenant_id, dead_lettered_at DESC, executed_at DESC) WHERE (status = 'DEAD_LETTER'::text);
+
+
+--
+-- Name: idx_drt_exec_decision_trace; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_drt_exec_decision_trace ON public.ab_drt_policy_exec_log USING btree (tenant_id, decision_trace_id, executed_at DESC) WHERE (decision_trace_id IS NOT NULL);
+
+
+--
 -- Name: idx_drt_exec_policy; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_drt_exec_policy ON public.ab_drt_policy_exec_log USING btree (tenant_id, policy_code, executed_at);
+
+
+--
+-- Name: idx_drt_exec_retry_ready; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_drt_exec_retry_ready ON public.ab_drt_policy_exec_log USING btree (next_retry_at, tenant_id, executed_at) WHERE (status = 'RETRY_PENDING'::text);
 
 
 --
@@ -24387,6 +24529,13 @@ CREATE INDEX idx_skill_draft_tenant_status ON public.ab_agent_skill_draft USING 
 --
 
 CREATE INDEX idx_skill_pack_tenant ON public.ab_agent_skill_pack USING btree (tenant_id, active);
+
+
+--
+-- Name: idx_sla_config_action_policy_gin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_sla_config_action_policy_gin ON public.ab_sla_config USING gin (action_policy);
 
 
 --

@@ -65,19 +65,23 @@ async function navigateToProcessDefinitionList(page: Page): Promise<void> {
   const nav = page.locator('nav');
   await nav.first().waitFor({ state: 'visible', timeout: 10_000 });
 
-  // Click parent menu "流程管理" / "Process Management"
-  const bpmParent = nav
-    .getByRole('button', { name: /流程管理|Process Management/i })
-    .first();
-  await bpmParent.scrollIntoViewIfNeeded();
-  await bpmParent.evaluate((el: HTMLElement) => el.click());
-
   // Click leaf menu "流程定义" / "Process Definitions"
   const leafLink = nav.locator('a[href*="bpm_process_management"]').first();
-  await leafLink.waitFor({ state: 'attached', timeout: 8_000 });
-  await leafLink.evaluate((el: HTMLElement) => el.click());
+  const leafVisible = await leafLink.isVisible().catch(() => false);
+  if (!leafVisible) {
+    const bpmParent = nav
+      .getByRole('button', { name: /流程管理|Process Management/i })
+      .first();
+    await bpmParent.scrollIntoViewIfNeeded();
+    await bpmParent.click();
+  }
 
-  await page.waitForURL(/\/p\/bpm_process_management/, { timeout: 20_000 });
+  await leafLink.waitFor({ state: 'visible', timeout: 8_000 });
+  await leafLink.scrollIntoViewIfNeeded();
+  await Promise.all([
+    page.waitForURL(/\/p\/bpm_process_management/, { timeout: 20_000 }),
+    leafLink.click(),
+  ]);
 
   // Wait for the list page toolbar or table to appear
   await page
@@ -127,10 +131,10 @@ export async function openDesigner(
     '[data-testid="toolbar-btn-create"], button:has-text("创建"), button:has-text("新建"):not(:has-text("今日")), button:has-text("Create")',
   ).first();
   await createBtn.waitFor({ state: 'visible', timeout: 10_000 });
-  await createBtn.click();
-
-  // Wait for navigation to the designer
-  await page.waitForURL(/\/bpmn-designer/, { timeout: 15_000 });
+  await Promise.all([
+    page.waitForURL(/\/bpmn-designer/, { timeout: 15_000 }),
+    createBtn.click(),
+  ]);
 
   // Wait for the canvas to mount
   await page.locator('.react-flow, [data-testid="bpmn-page-title"]').first().waitFor({

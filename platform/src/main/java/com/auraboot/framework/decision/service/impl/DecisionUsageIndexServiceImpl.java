@@ -289,6 +289,10 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
                     metadata("status", version.getStatus(), "kind", version.getKind(),
                             "runtimeAdapter", version.getRuntimeAdapter())));
         }
+        addConditionFragmentRefs(refs, tenantId, "DECISION_VERSION", version.getDecisionCode(),
+                versionNumber(version), version.getPid(), ruleRefs, null, "VERSION",
+                metadata("status", version.getStatus(), "kind", version.getKind(),
+                        "runtimeAdapter", version.getRuntimeAdapter()));
         return refs;
     }
 
@@ -318,6 +322,10 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
                         metadata("sourceName", automation.getName(), "modelCode", automation.getModelCode(),
                                 "triggerType", automation.getTriggerType(), "enabled", automation.getEnabled())));
             }
+            addConditionFragmentRefs(refs, tenantId, "AUTOMATION", automation.getPid(), null,
+                    automation.getPid(), ruleRefs, null, "RULE_BINDING",
+                    metadata("sourceName", automation.getName(), "modelCode", automation.getModelCode(),
+                            "triggerType", automation.getTriggerType(), "enabled", automation.getEnabled()));
             if (!nullToBlank(config.getDecisionRef()).isBlank()) {
                 refs.add(ref(tenantId, "AUTOMATION", automation.getPid(), null, automation.getPid(),
                         "DECISION", config.getDecisionRef(), null, defaultBinding(config.getDecisionBinding()),
@@ -386,6 +394,8 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
             refs.add(ref(tenantId, "SLA_RULE", sla.getPid(), null, sla.getPid(),
                     "FIELD", null, fieldRef, "RULE_BINDING", baseMetadata));
         }
+        addConditionFragmentRefs(refs, tenantId, "SLA_RULE", sla.getPid(), null, sla.getPid(),
+                ruleRefs, null, "RULE_BINDING", baseMetadata);
 
         if ("RULE".equalsIgnoreCase(nullToBlank(sla.getDeadlineMode()))
                 && !nullToBlank(sla.getDeadlineValue()).isBlank()) {
@@ -412,29 +422,42 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         Set<String> decisionRefs = new LinkedHashSet<>(ruleRefs.decisionRefs());
         Set<String> webhookEventTypes = new LinkedHashSet<>();
         collectWebhookEventTypes(version.getRulesJson(), webhookEventTypes);
-        if (decisionRefs.isEmpty() && ruleRefs.fieldRefs().isEmpty() && webhookEventTypes.isEmpty()) {
+        if (decisionRefs.isEmpty()
+                && ruleRefs.fieldRefs().isEmpty()
+                && ruleRefs.conditionFragmentRefs().isEmpty()
+                && webhookEventTypes.isEmpty()) {
             return List.of();
         }
         DrtPolicyDefinitionEntity def = policyDefinitionMapper.findByTenantAndCode(tenantId, version.getPolicyCode());
         String sourceName = def != null ? def.getPolicyName() : version.getPolicyCode();
+        Map<String, Object> baseMetadata = metadata(
+                "sourceName", sourceName,
+                "status", version.getStatus(),
+                "phase", version.getPhase(),
+                "matchMode", version.getMatchMode(),
+                "eventType", def != null ? def.getEventType() : null,
+                "targetType", def != null ? def.getTargetType() : null,
+                "targetKey", def != null ? def.getTargetKey() : null);
         List<DecisionUsageRefEntity> refs = new ArrayList<>();
         for (String decisionRef : decisionRefs) {
             refs.add(ref(tenantId, "EVENT_POLICY", version.getPolicyCode(), versionNumber(version),
                     version.getPid(), "DECISION", decisionRef, null, "VERSION_RULES",
-                    metadata("sourceName", sourceName, "status", version.getStatus(), "phase", version.getPhase(),
-                            "matchMode", version.getMatchMode())));
+                    baseMetadata));
         }
         for (String fieldRef : ruleRefs.fieldRefs()) {
             refs.add(ref(tenantId, "EVENT_POLICY", version.getPolicyCode(), versionNumber(version),
                     version.getPid(), "FIELD", null, fieldRef, "VERSION_RULES",
-                    metadata("sourceName", sourceName, "status", version.getStatus(), "phase", version.getPhase(),
-                            "matchMode", version.getMatchMode())));
+                    baseMetadata));
         }
+        addConditionFragmentRefs(refs, tenantId, "EVENT_POLICY", version.getPolicyCode(),
+                versionNumber(version), version.getPid(), ruleRefs, null, "VERSION_RULES",
+                baseMetadata);
         for (String eventType : webhookEventTypes) {
+            Map<String, Object> webhookMetadata = new LinkedHashMap<>(baseMetadata);
+            webhookMetadata.put("actionType", "WEBHOOK");
             refs.add(ref(tenantId, "EVENT_POLICY", version.getPolicyCode(), versionNumber(version),
                     version.getPid(), "WEBHOOK", eventType, eventType, "VERSION_RULES",
-                    metadata("sourceName", sourceName, "status", version.getStatus(), "phase", version.getPhase(),
-                            "matchMode", version.getMatchMode(), "actionType", "WEBHOOK")));
+                    webhookMetadata));
         }
         return refs;
     }
@@ -492,7 +515,9 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
     private List<DecisionUsageRefEntity> refsForPermissionPolicy(Long tenantId, RolePermission rolePermission) {
         JsonNode conditions = toJsonNode(rolePermission.getConditions());
         RuleReferenceSet ruleRefs = RuleReferenceCollector.collect(conditions);
-        if (ruleRefs.decisionRefs().isEmpty() && ruleRefs.fieldRefs().isEmpty()) {
+        if (ruleRefs.decisionRefs().isEmpty()
+                && ruleRefs.fieldRefs().isEmpty()
+                && ruleRefs.conditionFragmentRefs().isEmpty()) {
             return List.of();
         }
 
@@ -522,6 +547,8 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
             refs.add(ref(tenantId, "PERMISSION_POLICY", permissionCode, null, rolePermission.getPid(),
                     "FIELD", null, fieldRef, "ROLE_PERMISSION_CONDITION", baseMetadata));
         }
+        addConditionFragmentRefs(refs, tenantId, "PERMISSION_POLICY", permissionCode, null,
+                rolePermission.getPid(), ruleRefs, null, "ROLE_PERMISSION_CONDITION", baseMetadata);
         return refs;
     }
 
@@ -620,7 +647,9 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
                                                         String binding, Map<String, Object> metadata,
                                                         String decisionTargetPath) {
         RuleReferenceSet ruleRefs = RuleReferenceCollector.collect(node);
-        if (ruleRefs.decisionRefs().isEmpty() && ruleRefs.fieldRefs().isEmpty()) {
+        if (ruleRefs.decisionRefs().isEmpty()
+                && ruleRefs.fieldRefs().isEmpty()
+                && ruleRefs.conditionFragmentRefs().isEmpty()) {
             return List.of();
         }
         List<DecisionUsageRefEntity> refs = new ArrayList<>();
@@ -632,6 +661,8 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
             refs.add(ref(tenantId, "BPM_PROCESS", process.getProcessKey(), versionNumber(process),
                     process.getPid(), "FIELD", null, fieldRef, binding, metadata));
         }
+        addConditionFragmentRefs(refs, tenantId, "BPM_PROCESS", process.getProcessKey(),
+                versionNumber(process), process.getPid(), ruleRefs, decisionTargetPath, binding, metadata);
         return refs;
     }
 
@@ -696,6 +727,16 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
         return ref;
     }
 
+    private void addConditionFragmentRefs(List<DecisionUsageRefEntity> refs, Long tenantId,
+                                          String sourceType, String sourceCode, String sourceVersion,
+                                          String sourcePid, RuleReferenceSet ruleRefs, String targetPath,
+                                          String binding, Map<String, Object> metadata) {
+        for (String fragmentRef : ruleRefs.conditionFragmentRefs()) {
+            refs.add(ref(tenantId, sourceType, sourceCode, sourceVersion, sourcePid,
+                    "CONDITION_FRAGMENT", fragmentRef, targetPath, binding, metadata));
+        }
+    }
+
     private DecisionImpactRefDTO toDto(DecisionUsageRefEntity entity) {
         Map<String, Object> metadata = metadataFrom(entity.getMetadataJson());
         DecisionImpactRefDTO dto = new DecisionImpactRefDTO();
@@ -755,6 +796,8 @@ public class DecisionUsageIndexServiceImpl implements DecisionUsageIndexService 
             summary.setFunctionRefs(summary.getFunctionRefs() + 1);
         } else if ("CONNECTOR".equals(ref.getTargetType()) || "WEBHOOK".equals(ref.getTargetType())) {
             summary.setIntegrationRefs(summary.getIntegrationRefs() + 1);
+        } else if ("CONDITION_FRAGMENT".equals(ref.getTargetType())) {
+            summary.setConsumerRefs(summary.getConsumerRefs() + 1);
         } else if ("DECISION".equals(ref.getTargetType())) {
             if ("DECISION_VERSION".equals(ref.getSourceType())) {
                 summary.setDecisionRefs(summary.getDecisionRefs() + 1);

@@ -63,6 +63,15 @@ class PermissionAuditRecordPidResolverTest {
     }
 
     @Test
+    @DisplayName("returns the persisted public pid without resolving internal id")
+    void returnsPersistedRecordPidFirst() {
+        PermissionAuditLog log = auditLog(null, "crm_lead", 1L);
+        log.setRecordPid("PERSISTED-PID-1");
+
+        assertThat(resolver.resolve(log)).isEqualTo("PERSISTED-PID-1");
+    }
+
+    @Test
     @DisplayName("returns null when the audit row has no internal record id")
     void returnsNullWhenRecordIdMissing() {
         assertThat(resolver.resolve(auditLog(null, "crm_lead", 1L))).isNull();

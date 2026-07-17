@@ -38,6 +38,11 @@ public class DDLPreviewResult {
      * 风险评估
      */
     private RiskAssessment riskAssessment;
+
+    /**
+     * Rule Center and low-code model governance preflight.
+     */
+    private ModelPublishGovernanceDTO governance;
     
     @Data
     @Builder

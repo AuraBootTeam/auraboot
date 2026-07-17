@@ -29,4 +29,12 @@ public interface NotificationService {
      */
     void sendInApp(Long userId, String title, String content,
                    String category, String sourceType, String sourceId);
+
+    /**
+     * Send an in-app notification to a resolved recipient target (no template).
+     *
+     * @return resolved user ids that received the notification
+     */
+    List<Long> sendInAppToRecipient(String recipientType, String recipientId, String title, String content,
+                                    String category, String sourceType, String sourceId);
 }

@@ -23,6 +23,8 @@ describe('DecisionDashboard', () => {
     render(<DecisionDashboard summary={summary} exceptions={exceptions} />);
     const item = screen.getByTestId('dd-exc-t-1');
     expect(item).toHaveAttribute('data-status', 'FAILED_RETRYING');
+    expect(item).toHaveTextContent('失败重试中');
+    expect(item).not.toHaveTextContent('FAILED_RETRYING');
     expect(item).toHaveTextContent('connector timeout');
   });
 

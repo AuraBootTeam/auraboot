@@ -195,6 +195,22 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
       'decisionrulebinding',
     ],
   }),
+  decisionactionplan: runtime('decision', 'DecisionActionPlanBlock', {
+    aliases: [
+      'DecisionActionPlanBlock',
+      'decision-action-plan',
+      'decision_action_plan',
+      'decisionactionplan',
+    ],
+  }),
+  decisionconditionfragmentlibrary: runtime('decision', 'ConditionFragmentLibraryBlock', {
+    aliases: [
+      'ConditionFragmentLibraryBlock',
+      'decision-condition-fragment-library',
+      'decision_condition_fragment_library',
+      'decisionconditionfragmentlibrary',
+    ],
+  }),
   processfeerulematrix: runtime('quoteops', 'ProcessFeeRuleMatrixBlock', {
     aliases: ['ProcessFeeRuleMatrixBlock', 'processFeeRuleMatrixBlock', 'process_fee_rule_matrix'],
   }),

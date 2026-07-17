@@ -8,9 +8,24 @@ import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtDefinitionDTO;
 import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionDTO;
+import com.auraboot.framework.decision.dto.ConditionFragmentCreateRequest;
+import com.auraboot.framework.decision.dto.ConditionFragmentDTO;
+import com.auraboot.framework.decision.dto.ConditionFragmentVersionCreateRequest;
 import com.auraboot.framework.decision.model.DecisionValidateResult;
+import com.auraboot.framework.decision.service.ConditionFragmentService;
 import com.auraboot.framework.decision.service.DecisionVersionService;
 import com.auraboot.framework.decision.service.DrtDefinitionService;
+import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.eventpolicy.entity.DrtPolicyDefinitionEntity;
+import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
+import com.auraboot.framework.eventpolicy.model.ConflictStrategy;
+import com.auraboot.framework.eventpolicy.model.DedupStrategy;
+import com.auraboot.framework.eventpolicy.model.ExecutionMode;
+import com.auraboot.framework.eventpolicy.model.FailureStrategy;
+import com.auraboot.framework.eventpolicy.model.MatchMode;
+import com.auraboot.framework.eventpolicy.model.PolicyPhase;
+import com.auraboot.framework.eventpolicy.service.EventPolicyDefinitionService;
+import com.auraboot.framework.eventpolicy.service.EventPolicyVersionService;
 import com.auraboot.framework.i18n.compiler.I18nCompiler;
 import com.auraboot.framework.i18n.entity.I18nResource;
 import com.auraboot.framework.i18n.service.I18nResourceService;
@@ -138,6 +153,9 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final AutomationService automationService;
     private final DrtDefinitionService drtDefinitionService;
     private final DecisionVersionService decisionVersionService;
+    private final ConditionFragmentService conditionFragmentService;
+    private final EventPolicyDefinitionService eventPolicyDefinitionService;
+    private final EventPolicyVersionService eventPolicyVersionService;
     private final JdbcTemplate jdbcTemplate;
     /** Used by {@link #verifyImportReferenceIntegrity()} to enumerate the tenant's commands. */
     private final com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitionMapper;
@@ -509,6 +527,26 @@ public class PluginImportServiceImpl implements PluginImportService {
                 if (!decisions.isEmpty()) {
                     manifest.setDecisionDefinitions(
                             mergeResourceList(manifest.getDecisionDefinitions(), decisions));
+                }
+            }
+
+            // Load reusable condition fragments
+            if (resourceDirs.containsKey("conditionFragments")) {
+                List<ConditionFragmentSeedDTO> fragments = loadResourceListFromZip(
+                        files, resourceDirs.get("conditionFragments"), ConditionFragmentSeedDTO.class);
+                if (!fragments.isEmpty()) {
+                    manifest.setConditionFragments(
+                            mergeResourceList(manifest.getConditionFragments(), fragments));
+                }
+            }
+
+            // Load EventPolicy seeds
+            if (resourceDirs.containsKey("eventPolicies")) {
+                List<EventPolicySeedDTO> policies = loadResourceListFromZip(
+                        files, resourceDirs.get("eventPolicies"), EventPolicySeedDTO.class);
+                if (!policies.isEmpty()) {
+                    manifest.setEventPolicies(
+                            mergeResourceList(manifest.getEventPolicies(), policies));
                 }
             }
 
@@ -1537,6 +1575,8 @@ public class PluginImportServiceImpl implements PluginImportService {
         // Import Drools rules and SLA configs (extension resources — not tracked via
         // PluginResource / ResourceType to avoid enum/DB check-constraint churn).
         importDecisionDefinitions(manifest);
+        importConditionFragments(manifest);
+        importEventPolicies(manifest);
         importAutomations(manifest);
         importRules(manifest);
         importSlaConfigs(manifest);
@@ -2300,6 +2340,226 @@ public class PluginImportServiceImpl implements PluginImportService {
                         && Objects.equals(version.getContextSchemaJson(), dto.getContextSchemaJson()));
     }
 
+    private void importConditionFragments(PluginManifestExtended manifest) {
+        if (manifest.getConditionFragments() == null || manifest.getConditionFragments().isEmpty()) return;
+        int imported = 0;
+        for (ConditionFragmentSeedDTO dto : manifest.getConditionFragments()) {
+            if (!dto.isValid()) {
+                log.warn("Skipping invalid condition fragment seed (missing code/name/spec): index={}",
+                        manifest.getConditionFragments().indexOf(dto));
+                continue;
+            }
+            importConditionFragment(dto);
+            imported++;
+        }
+        if (imported > 0) {
+            log.info("Imported {} condition fragment seed(s) for plugin {}",
+                    imported, logSafe(manifest.getPluginId()));
+        }
+    }
+
+    private void importConditionFragment(ConditionFragmentSeedDTO dto) {
+        if (hasMatchingPublishedConditionFragment(dto)) {
+            log.info("Condition fragment seed unchanged; keeping existing published version: code={}",
+                    logSafe(dto.getFragmentCode()));
+            return;
+        }
+
+        ConditionFragmentDTO target = findConditionFragmentOrNull(dto.getFragmentCode());
+        if (target == null) {
+            target = conditionFragmentService.create(toConditionFragmentCreateRequest(dto));
+        } else if (isImmutableConditionFragmentStatus(target.getStatus())) {
+            target = conditionFragmentService.createVersion(
+                    dto.getFragmentCode(), toConditionFragmentVersionCreateRequest(dto));
+        } else if (!Objects.equals(target.getConditionSpec(), dto.getConditionSpec())) {
+            throw new PluginException("Condition fragment seed conflicts with editable version: "
+                    + dto.getFragmentCode()
+                    + ". Publish or remove the draft before importing a different seed version.");
+        }
+
+        publishConditionFragmentSeedIfRequested(dto, target);
+    }
+
+    private ConditionFragmentDTO findConditionFragmentOrNull(String fragmentCode) {
+        try {
+            return conditionFragmentService.findByCode(fragmentCode);
+        } catch (ValidationException e) {
+            return null;
+        }
+    }
+
+    private boolean hasMatchingPublishedConditionFragment(ConditionFragmentSeedDTO dto) {
+        List<ConditionFragmentDTO> versions = conditionFragmentService.listVersions(dto.getFragmentCode());
+        if (versions == null || versions.isEmpty()) {
+            return false;
+        }
+        return versions.stream().anyMatch(version ->
+                "PUBLISHED".equals(version.getStatus())
+                        && Objects.equals(version.getFragmentName(), dto.getFragmentName())
+                        && Objects.equals(version.getDescription(), dto.getDescription())
+                        && Objects.equals(version.getScopeType(), dto.getScopeType())
+                        && Objects.equals(version.getScopeRef(), dto.getScopeRef())
+                        && Objects.equals(version.getOwnerModule(), dto.getOwnerModule())
+                        && Objects.equals(version.getEnabled(), dto.getEnabled())
+                        && Objects.equals(version.getConditionSpec(), dto.getConditionSpec()));
+    }
+
+    private boolean isImmutableConditionFragmentStatus(String status) {
+        return "PUBLISHED".equals(status) || "DEPRECATED".equals(status) || "RETIRED".equals(status);
+    }
+
+    private ConditionFragmentCreateRequest toConditionFragmentCreateRequest(ConditionFragmentSeedDTO dto) {
+        ConditionFragmentCreateRequest request = new ConditionFragmentCreateRequest();
+        request.setFragmentCode(dto.getFragmentCode());
+        request.setFragmentName(dto.getFragmentName());
+        request.setDescription(dto.getDescription());
+        request.setScopeType(dto.getScopeType());
+        request.setScopeRef(dto.getScopeRef());
+        request.setOwnerModule(dto.getOwnerModule());
+        request.setEnabled(dto.getEnabled());
+        request.setConditionSpec(dto.getConditionSpec());
+        return request;
+    }
+
+    private ConditionFragmentVersionCreateRequest toConditionFragmentVersionCreateRequest(ConditionFragmentSeedDTO dto) {
+        ConditionFragmentVersionCreateRequest request = new ConditionFragmentVersionCreateRequest();
+        request.setFragmentName(dto.getFragmentName());
+        request.setDescription(dto.getDescription());
+        request.setScopeType(dto.getScopeType());
+        request.setScopeRef(dto.getScopeRef());
+        request.setOwnerModule(dto.getOwnerModule());
+        request.setEnabled(dto.getEnabled());
+        request.setConditionSpec(dto.getConditionSpec());
+        return request;
+    }
+
+    private void publishConditionFragmentSeedIfRequested(ConditionFragmentSeedDTO dto, ConditionFragmentDTO fragment) {
+        if (!dto.isPublish() || fragment == null || isImmutableConditionFragmentStatus(fragment.getStatus())) {
+            return;
+        }
+        ConditionFragmentDTO validated = fragment;
+        if ("DRAFT".equals(fragment.getStatus())) {
+            validated = conditionFragmentService.validate(fragment.getPid());
+        }
+        if ("VALIDATED".equals(validated.getStatus())) {
+            conditionFragmentService.publish(validated.getPid(), true);
+        }
+    }
+
+    private void importEventPolicies(PluginManifestExtended manifest) {
+        if (manifest.getEventPolicies() == null || manifest.getEventPolicies().isEmpty()) return;
+        int imported = 0;
+        for (EventPolicySeedDTO dto : manifest.getEventPolicies()) {
+            if (!dto.isValid()) {
+                log.warn("Skipping invalid EventPolicy seed (missing definition fields or rulesJson): index={}",
+                        manifest.getEventPolicies().indexOf(dto));
+                continue;
+            }
+            importEventPolicy(dto);
+            imported++;
+        }
+        if (imported > 0) {
+            log.info("Imported {} EventPolicy seed(s) for plugin {}", imported, logSafe(manifest.getPluginId()));
+        }
+    }
+
+    private void importEventPolicy(EventPolicySeedDTO dto) {
+        DrtPolicyDefinitionEntity definition = eventPolicyDefinitionService.findByCode(dto.getPolicyCode());
+        if (definition == null) {
+            definition = eventPolicyDefinitionService.create(
+                    dto.getPolicyCode(),
+                    dto.getPolicyName(),
+                    dto.getEventType(),
+                    dto.getTargetType(),
+                    dto.getTargetKey());
+        } else if (dto.getEnabled() != null && !Objects.equals(definition.getEnabled(), dto.getEnabled())) {
+            eventPolicyDefinitionService.setEnabled(dto.getPolicyCode(), dto.getEnabled());
+        }
+
+        if (hasMatchingPublishedEventPolicyVersion(dto)) {
+            log.info("EventPolicy seed unchanged; keeping existing published version: code={}",
+                    logSafe(dto.getPolicyCode()));
+            return;
+        }
+
+        DrtPolicyVersionEntity latest = latestEventPolicyVersion(dto.getPolicyCode());
+        DrtPolicyVersionEntity target;
+        if (latest == null || isImmutableEventPolicyStatus(latest.getStatus())) {
+            target = createEventPolicyDraft(dto);
+        } else if (!isSameEventPolicyVersion(latest, dto)) {
+            throw new PluginException("EventPolicy seed conflicts with editable version: "
+                    + dto.getPolicyCode()
+                    + ". Publish or remove the draft before importing a different seed version.");
+        } else {
+            target = latest;
+        }
+
+        publishEventPolicySeedIfRequested(dto, target);
+    }
+
+    private DrtPolicyVersionEntity createEventPolicyDraft(EventPolicySeedDTO dto) {
+        return eventPolicyVersionService.createDraft(
+                dto.getPolicyCode(),
+                enumValueOrDefault(dto.getPhase(), PolicyPhase.class, PolicyPhase.AFTER_COMMIT),
+                enumValueOrDefault(dto.getMatchMode(), MatchMode.class, MatchMode.COLLECT_ALL),
+                enumValueOrDefault(dto.getExecutionMode(), ExecutionMode.class, ExecutionMode.ORDERED),
+                enumValueOrDefault(dto.getFailureStrategy(), FailureStrategy.class, FailureStrategy.FAIL_FAST),
+                enumValueOrDefault(dto.getConflictStrategy(), ConflictStrategy.class, ConflictStrategy.REJECT_ON_CONFLICT),
+                enumValueOrDefault(dto.getDedupStrategy(), DedupStrategy.class, DedupStrategy.BY_IDEMPOTENCY_KEY),
+                dto.getRulesJson());
+    }
+
+    private boolean hasMatchingPublishedEventPolicyVersion(EventPolicySeedDTO dto) {
+        List<DrtPolicyVersionEntity> versions = eventPolicyVersionService.listByCode(dto.getPolicyCode());
+        if (versions == null || versions.isEmpty()) {
+            return false;
+        }
+        return versions.stream().anyMatch(version ->
+                "PUBLISHED".equals(version.getStatus()) && isSameEventPolicyVersion(version, dto));
+    }
+
+    private DrtPolicyVersionEntity latestEventPolicyVersion(String policyCode) {
+        List<DrtPolicyVersionEntity> versions = eventPolicyVersionService.listByCode(policyCode);
+        if (versions == null || versions.isEmpty()) {
+            return null;
+        }
+        return versions.get(versions.size() - 1);
+    }
+
+    private boolean isSameEventPolicyVersion(DrtPolicyVersionEntity version, EventPolicySeedDTO dto) {
+        return Objects.equals(version.getPhase(), enumValueOrDefault(dto.getPhase(), PolicyPhase.class, PolicyPhase.AFTER_COMMIT).name())
+                && Objects.equals(version.getMatchMode(), enumValueOrDefault(dto.getMatchMode(), MatchMode.class, MatchMode.COLLECT_ALL).name())
+                && Objects.equals(version.getExecutionMode(), enumValueOrDefault(dto.getExecutionMode(), ExecutionMode.class, ExecutionMode.ORDERED).name())
+                && Objects.equals(version.getFailureStrategy(), enumValueOrDefault(dto.getFailureStrategy(), FailureStrategy.class, FailureStrategy.FAIL_FAST).name())
+                && Objects.equals(version.getConflictStrategy(), enumValueOrDefault(dto.getConflictStrategy(), ConflictStrategy.class, ConflictStrategy.REJECT_ON_CONFLICT).name())
+                && Objects.equals(version.getDedupStrategy(), enumValueOrDefault(dto.getDedupStrategy(), DedupStrategy.class, DedupStrategy.BY_IDEMPOTENCY_KEY).name())
+                && Objects.equals(version.getRulesJson(), dto.getRulesJson());
+    }
+
+    private boolean isImmutableEventPolicyStatus(String status) {
+        return "PUBLISHED".equals(status) || "DEPRECATED".equals(status) || "RETIRED".equals(status);
+    }
+
+    private void publishEventPolicySeedIfRequested(EventPolicySeedDTO dto, DrtPolicyVersionEntity version) {
+        if (!dto.isPublish() || version == null || isImmutableEventPolicyStatus(version.getStatus())) {
+            return;
+        }
+        DrtPolicyVersionEntity validated = version;
+        if ("DRAFT".equals(version.getStatus())) {
+            validated = eventPolicyVersionService.validate(version.getPid());
+        }
+        if ("VALIDATED".equals(validated.getStatus())) {
+            eventPolicyVersionService.publish(validated.getPid());
+        }
+    }
+
+    private <T extends Enum<T>> T enumValueOrDefault(String value, Class<T> enumType, T fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        return Enum.valueOf(enumType, value);
+    }
+
     private void importSlaConfigs(PluginManifestExtended manifest) {
         if (manifest.getSlaConfigs() == null || manifest.getSlaConfigs().isEmpty()) return;
         int created = 0;
@@ -2978,10 +3238,15 @@ public class PluginImportServiceImpl implements PluginImportService {
 
         if (manifest.getRoles() != null) {
             for (RoleDefinitionDTO role : manifest.getRoles()) {
-                if (role == null || isBlank(role.getCode()) || role.getPermissions() == null) {
+                if (role == null || isBlank(role.getCode())) {
                     continue;
                 }
-                for (String permissionCode : role.getPermissions()) {
+                Set<String> rolePermissionCodes = role.getPermissions() == null
+                        ? Set.of()
+                        : role.getPermissions().stream()
+                        .filter(code -> !isBlank(code))
+                        .collect(Collectors.toCollection(LinkedHashSet::new));
+                for (String permissionCode : rolePermissionCodes) {
                     if (isBlank(permissionCode)) {
                         continue;
                     }
@@ -2989,6 +3254,25 @@ public class PluginImportServiceImpl implements PluginImportService {
                             && !existsInTenant(tenantId, permissionCode, permissionExistsCache,
                             code -> resourceImporter.checkPermissionExists(tenantId, code))) {
                         errors.add("Role '" + role.getCode() + "' references missing permission: " + permissionCode);
+                    }
+                }
+                if (role.getPermissionPolicies() != null) {
+                    for (RolePermissionPolicyDefinitionDTO policy : role.getPermissionPolicies()) {
+                        if (policy == null || isBlank(policy.getPermissionCode())) {
+                            continue;
+                        }
+                        String permissionCode = policy.getPermissionCode();
+                        if (!rolePermissionCodes.contains(permissionCode)) {
+                            errors.add("Role '" + role.getCode()
+                                    + "' permissionPolicies references permission not assigned to role: "
+                                    + permissionCode);
+                        }
+                        if (!manifestPermissionCodes.contains(permissionCode)
+                                && !existsInTenant(tenantId, permissionCode, permissionExistsCache,
+                                code -> resourceImporter.checkPermissionExists(tenantId, code))) {
+                            errors.add("Role '" + role.getCode()
+                                    + "' permissionPolicies references missing permission: " + permissionCode);
+                        }
                     }
                 }
             }

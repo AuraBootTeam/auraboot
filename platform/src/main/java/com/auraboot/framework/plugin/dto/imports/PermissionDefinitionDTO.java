@@ -93,6 +93,11 @@ public class PermissionDefinitionDTO {
     private Map<String, Object> extension;
 
     /**
+     * Policy schema for configurable permission policies / dynamic ABAC.
+     */
+    private Map<String, Object> policySchema;
+
+    /**
      * Captures all "name:*" localized name entries from JSON beyond the hardcoded nameZhCN/nameEn.
      */
     @JsonIgnore

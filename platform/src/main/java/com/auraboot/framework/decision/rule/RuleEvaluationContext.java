@@ -39,17 +39,21 @@ public record RuleEvaluationContext(
         return result;
     }
 
-    public Object resolve(RuleValueSource source) {
+    public DecisionContext.PathValue resolvePath(RuleValueSource source) {
         if (source == null) {
-            return null;
+            return DecisionContext.PathValue.present(null);
         }
         if (source.kind() == RuleValueSource.Kind.LITERAL) {
-            return source.value();
+            return DecisionContext.PathValue.present(source.value());
         }
         if (source.scope() == null || source.path() == null || source.path().isBlank()) {
-            return null;
+            return DecisionContext.PathValue.MISSING;
         }
-        DecisionContext.PathValue value = toDecisionContext().resolve(source.scope(), source.path());
+        return toDecisionContext().resolve(source.scope(), source.path());
+    }
+
+    public Object resolve(RuleValueSource source) {
+        DecisionContext.PathValue value = resolvePath(source);
         return value.present() ? value.value() : null;
     }
 

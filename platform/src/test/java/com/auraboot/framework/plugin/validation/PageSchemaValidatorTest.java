@@ -1,12 +1,14 @@
 package com.auraboot.framework.plugin.validation;
 
 import com.auraboot.framework.plugin.dto.imports.FieldDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.DictDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ModelFieldBindingDTO;
 import com.auraboot.framework.plugin.dto.imports.PageSchemaDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -260,6 +262,23 @@ class PageSchemaValidatorTest {
         List<PluginValidationMessage> messages = validate(manifest);
         assertTrue(messages.stream().noneMatch(m -> "S-PAGE-TABLE-DICT".equals(m.getCode())),
                 () -> "Expected matching dictCode to pass but got " + messages);
+    }
+
+    @Test
+    void tableColumnForSharedDictionaryFieldCanDeclarePageSpecificDictCode() {
+        PluginManifestExtended manifest = manifestWithOrderModel();
+        manifest.getDicts().add(dict("pe_bpm_process_status"));
+        Map<String, Object> statusColumn = column("pe_status", localized("Status"));
+        statusColumn.put("dictCode", "pe_bpm_process_status");
+        manifest.setPages(List.of(page("pe_bpm_process_list", "list", "pe_order", List.of(Map.of(
+                "id", "process_table",
+                "blockType", "table",
+                "columns", List.of(statusColumn)
+        )))));
+
+        List<PluginValidationMessage> messages = validate(manifest);
+        assertTrue(messages.stream().noneMatch(m -> "S-PAGE-TABLE-DICT".equals(m.getCode())),
+                () -> "Expected page-specific dictCode override to pass but got " + messages);
     }
 
     @Test
@@ -714,8 +733,17 @@ class PageSchemaValidatorTest {
         statusBinding.setFieldCode("pe_status");
 
         manifest.setFields(List.of(orderNo, title, unlabeled, status));
+        manifest.setDicts(new ArrayList<>(List.of(dict("pe_order_status"))));
         manifest.setModelFieldBindings(List.of(orderNoBinding, titleBinding, unlabeledBinding, statusBinding));
         return manifest;
+    }
+
+    private DictDefinitionDTO dict(String code) {
+        DictDefinitionDTO dict = new DictDefinitionDTO();
+        dict.setCode(code);
+        dict.setName(code);
+        dict.setDictType("static");
+        return dict;
     }
 
     private PageSchemaDTO page(String pageKey, String kind, String modelCode, List<Object> blocks) {

@@ -253,6 +253,46 @@ class WebhookServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("Tracked dispatch returns delivery log PID for each attempted subscription")
+    void testTrackedDispatchReturnsDeliveryLogPid() {
+        WebhookCreateRequest request = new WebhookCreateRequest();
+        request.setName("Tracked Blocked URL Webhook");
+        request.setTargetUrl("http://127.0.0.1:6443/internal");
+        request.setEventType("tracked.dispatch." + System.currentTimeMillis());
+        request.setMaxRetries(0);
+        WebhookSubscription subscription = webhookService.create(request);
+
+        WebhookDispatchResult result = webhookDispatcher.dispatchTracked(
+                subscription.getEventType(),
+                Map.of("_eventId", "evt-tracked-1", "caseId", "CMP-1"),
+                subscription.getTenantId());
+
+        assertEquals(1, result.receipts().size());
+        WebhookDispatchResult.Receipt receipt = result.receipts().get(0);
+        assertEquals(subscription.getPid(), receipt.subscriptionPid());
+        assertEquals("evt-tracked-1", receipt.eventId());
+        assertEquals("failed", receipt.deliveryStatus());
+        assertNotNull(receipt.deliveryLogPid());
+
+        WebhookDeliveryLog logEntry = deliveryLogMapper.selectOne(new QueryWrapper<WebhookDeliveryLog>()
+                .eq("pid", receipt.deliveryLogPid()));
+        assertNotNull(logEntry);
+        assertEquals("evt-tracked-1", logEntry.getEventId());
+        assertEquals(subscription.getPid(), logEntry.getSubscriptionPid());
+    }
+
+    @Test
+    @DisplayName("Tracked dispatch without subscriptions returns empty receipts")
+    void testTrackedDispatchWithoutSubscriptionsReturnsEmptyReceipts() {
+        WebhookDispatchResult result = webhookDispatcher.dispatchTracked(
+                "tracked.missing." + System.currentTimeMillis(),
+                Map.of("_eventId", "evt-no-subscription"),
+                MetaContext.getCurrentTenantId());
+
+        assertTrue(result.receipts().isEmpty());
+    }
+
+    @Test
     @DisplayName("Update with masked secret keeps stored secret unchanged")
     void testUpdateWithMaskedSecretPreservesOriginalValue() {
         WebhookCreateRequest request = new WebhookCreateRequest();

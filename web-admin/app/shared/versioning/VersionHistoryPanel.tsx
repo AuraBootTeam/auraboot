@@ -5,6 +5,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
+import { useI18n } from '~/contexts/I18nContext';
 import type { VersionEntry } from './types';
 import { getOperationConfig } from './types';
 import { RollbackDialog } from './RollbackDialog';
@@ -30,9 +31,14 @@ interface VersionItemProps {
   isActive: boolean;
   isLatest: boolean;
   onClick: () => void;
+  labels: {
+    latest: string;
+    by: string;
+    operation: (operation: string, fallback: string) => string;
+  };
 }
 
-function VersionItem({ version, isActive, isLatest, onClick }: VersionItemProps) {
+function VersionItem({ version, isActive, isLatest, onClick, labels }: VersionItemProps) {
   const opConfig = getOperationConfig(version.operation);
 
   return (
@@ -48,19 +54,19 @@ function VersionItem({ version, isActive, isLatest, onClick }: VersionItemProps)
           <span className="text-sm font-semibold text-gray-900">v{version.version}</span>
           {isLatest && (
             <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">
-              Latest
+              {labels.latest}
             </span>
           )}
         </div>
         <span
           className={`rounded px-1.5 py-0.5 text-xs font-medium ${opConfig.badgeBg} ${opConfig.badgeText}`}
         >
-          {opConfig.label}
+          {labels.operation(version.operation, opConfig.label)}
         </span>
       </div>
       <div className="text-xs text-gray-500">
         <span>{formatDate(version.operationAt)}</span>
-        {version.operationBy && <span className="ml-2">by {version.operationBy}</span>}
+        {version.operationBy && <span className="ml-2">{labels.by} {version.operationBy}</span>}
       </div>
       {version.description && (
         <p className="mt-1 line-clamp-2 text-xs text-gray-400">{version.description}</p>
@@ -102,6 +108,26 @@ export function VersionHistoryPanel({
   isRollingBack,
 }: VersionHistoryPanelProps) {
   const [rollbackTarget, setRollbackTarget] = useState<VersionEntry | null>(null);
+  const { t } = useI18n();
+  const labels = {
+    title: t('version.history.title', undefined, '版本历史'),
+    close: t('version.history.close', undefined, '关闭版本面板'),
+    previewing: t('version.history.previewing', undefined, '正在查看历史版本（只读）'),
+    backToCurrent: t('version.history.backToCurrent', undefined, '返回当前版本'),
+    loading: t('version.history.loading', undefined, '正在加载版本...'),
+    emptyTitle: t('version.history.empty.title', undefined, '暂无版本记录'),
+    emptyDescription: t('version.history.empty.description', undefined, '保存后会生成第一个版本'),
+    footerEmpty: t('version.history.footer.empty', undefined, '暂无可用版本'),
+    footerCount: (count: number) =>
+      t('version.history.footer.count', { count }, `${count} 个可用版本`),
+    latest: t('version.history.latest', undefined, '最新'),
+    by: t('version.history.by', undefined, '由'),
+    back: t('version.history.back', undefined, '返回'),
+    rollback: t('version.history.rollback', undefined, '回滚'),
+    rollingBack: t('version.history.rollingBack', undefined, '回滚中...'),
+    operation: (operation: string, fallback: string) =>
+      t(`version.history.operation.${operation.toLowerCase()}`, undefined, fallback),
+  };
 
   // Handle ESC key to close panel
   useEffect(() => {
@@ -120,18 +146,19 @@ export function VersionHistoryPanel({
   return (
     <>
       <div
-        className={`fixed top-0 right-0 z-40 flex h-full w-80 flex-col bg-white shadow-lg transition-transform duration-300 ease-in-out ${
+        data-testid="version-history-panel"
+        className={`fixed top-14 right-0 z-50 flex h-[calc(100vh-3.5rem)] w-[min(20rem,100vw)] flex-col bg-white shadow-lg transition-transform duration-300 ease-in-out ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
         {/* Panel header */}
         <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-3">
-          <h2 className="text-base font-semibold text-gray-900">Version History</h2>
+          <h2 className="text-base font-semibold text-gray-900">{labels.title}</h2>
           <button
             type="button"
             onClick={onClose}
             className="text-gray-400 transition-colors hover:text-gray-600"
-            aria-label="Close version panel"
+            aria-label={labels.close}
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -148,14 +175,14 @@ export function VersionHistoryPanel({
         {viewingVersionPid && (
           <div className="flex items-center justify-between border-b border-yellow-200 bg-yellow-50 px-4 py-2">
             <span className="text-xs font-medium text-yellow-800">
-              Viewing historical version (read-only)
+              {labels.previewing}
             </span>
             <button
               type="button"
               onClick={onExitPreview}
               className="text-xs font-medium text-blue-600 underline hover:text-blue-800"
             >
-              Back to Current
+              {labels.backToCurrent}
             </button>
           </div>
         )}
@@ -179,7 +206,7 @@ export function VersionHistoryPanel({
                   d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
                 />
               </svg>
-              <span className="text-sm">Loading versions...</span>
+              <span className="text-sm">{labels.loading}</span>
             </div>
           ) : versions.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-gray-400">
@@ -191,8 +218,8 @@ export function VersionHistoryPanel({
                   d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                 />
               </svg>
-              <span className="text-sm">No versions yet</span>
-              <span className="mt-1 text-xs">Save to create the first version</span>
+              <span className="text-sm">{labels.emptyTitle}</span>
+              <span className="mt-1 text-xs">{labels.emptyDescription}</span>
             </div>
           ) : (
             versions.map((version) => (
@@ -201,6 +228,7 @@ export function VersionHistoryPanel({
                 version={version}
                 isActive={viewingVersionPid === version.pid}
                 isLatest={version.pid === latestVersionPid}
+                labels={labels}
                 onClick={() => {
                   if (version.pid === latestVersionPid) {
                     if (viewingVersionPid) {
@@ -224,7 +252,7 @@ export function VersionHistoryPanel({
                 onClick={onExitPreview}
                 className="flex-1 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
               >
-                Back
+                {labels.back}
               </button>
               <button
                 type="button"
@@ -235,12 +263,12 @@ export function VersionHistoryPanel({
                 disabled={isRollingBack}
                 className="flex-1 rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-purple-700 disabled:opacity-50"
               >
-                {isRollingBack ? 'Rolling back...' : 'Rollback'}
+                {isRollingBack ? labels.rollingBack : labels.rollback}
               </button>
             </div>
           ) : (
             <p className="text-center text-xs text-gray-500">
-              {versions.length} version{versions.length !== 1 ? 's' : ''} available
+              {versions.length === 0 ? labels.footerEmpty : labels.footerCount(versions.length)}
             </p>
           )}
         </div>

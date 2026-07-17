@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 /**
  * Mapper for {@link DrtPolicyVersionEntity}.
@@ -25,13 +26,32 @@ public interface DrtPolicyVersionMapper extends BaseMapper<DrtPolicyVersionEntit
             @Param("policyCode") String policyCode);
 
     /**
-     * Find the single PUBLISHED version for a (tenant, policy_code).
-     * There should be at most one published version at a time by convention.
+     * Find the active PUBLISHED version for a (tenant, policy_code).
+     * Re-imports and historical publishes can leave multiple published rows, so runtime
+     * resolution must prefer the highest version number deterministically.
      */
-    @Select("SELECT * FROM ab_drt_policy_version WHERE tenant_id = #{tenantId} AND policy_code = #{policyCode} AND status = 'PUBLISHED' LIMIT 1")
+    @Select("SELECT * FROM ab_drt_policy_version WHERE tenant_id = #{tenantId} AND policy_code = #{policyCode} AND status = 'PUBLISHED' ORDER BY version DESC LIMIT 1")
     DrtPolicyVersionEntity findPublished(
             @Param("tenantId") Long tenantId,
             @Param("policyCode") String policyCode);
+
+    /**
+     * Keep EventPolicy publishing aligned with the rest of rule assets: a newly
+     * published version becomes the single active PUBLISHED row, while older
+     * published rows remain immutable history as DEPRECATED.
+     */
+    @Update("""
+            UPDATE ab_drt_policy_version
+            SET status = 'DEPRECATED'
+            WHERE tenant_id = #{tenantId}
+              AND policy_code = #{policyCode}
+              AND status = 'PUBLISHED'
+              AND pid <> #{currentPid}
+            """)
+    int deprecateOtherPublished(
+            @Param("tenantId") Long tenantId,
+            @Param("policyCode") String policyCode,
+            @Param("currentPid") String currentPid);
 
     /**
      * Find the latest version by version number for a (tenant, policy_code).

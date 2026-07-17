@@ -85,13 +85,17 @@ class BpmProcessDefinitionTest extends BaseIntegrationTest {
      * Create a process definition with a unique key to avoid conflicts across tests.
      */
     private BpmProcessDefinition createTestDefinition(String keySuffix) {
+        return createTestDefinition(keySuffix, "test");
+    }
+
+    private BpmProcessDefinition createTestDefinition(String keySuffix, String category) {
         String uniqueKey = TEST_PROCESS_KEY + "-" + keySuffix + "-" + System.nanoTime();
         ProcessDeploymentService.CreateProcessRequest request =
                 new ProcessDeploymentService.CreateProcessRequest(
                         uniqueKey,
                         TEST_PROCESS_NAME + " " + keySuffix,
                         "Integration test process",
-                        "test",
+                        category,
                         SIMPLE_BPMN_XML.replace("id=\"test-def-lifecycle\"", "id=\"" + uniqueKey + "\""),
                         SIMPLE_DESIGNER_JSON.replace("\"key\": \"test-def-lifecycle\"", "\"key\": \"" + uniqueKey + "\""),
                         null,
@@ -225,8 +229,35 @@ class BpmProcessDefinitionTest extends BaseIntegrationTest {
 
     @Test
     @Order(6)
-    @DisplayName("D1-06: Suspend definition - status becomes SUSPENDED")
-    void d1_06_suspendDefinition() {
+    @DisplayName("D1-06: List hides automation runtime process definitions by default")
+    void d1_06_listHidesAutomationRuntimeDefinitionsByDefault() {
+        String uniqueSuffix = "lf" + Long.toString(System.nanoTime(), 36);
+        BpmProcessDefinition bpmDefinition = createTestDefinition(uniqueSuffix + "b", "approval");
+        BpmProcessDefinition automationRuntimeDefinition = createTestDefinition(uniqueSuffix + "a", "automation");
+
+        var defaultPage = deploymentService.listProcessDefinitionsPaged(0, 50, uniqueSuffix, null);
+
+        assertTrue(defaultPage.getRecords().stream().anyMatch(row -> row.getPid().equals(bpmDefinition.getPid())),
+                "Default BPM management list should include human BPM definitions");
+        assertTrue(defaultPage.getRecords().stream().noneMatch(row -> row.getPid().equals(automationRuntimeDefinition.getPid())),
+                "Default BPM management list must not be polluted by Automation runtime definitions");
+
+        String automationCategoryFilter = """
+                [{"fieldName":"category","operator":"EQ","value":"automation"}]
+                """;
+        var automationPage = deploymentService.listProcessDefinitionsPaged(0, 50, uniqueSuffix, automationCategoryFilter);
+
+        assertTrue(automationPage.getRecords().stream()
+                        .anyMatch(row -> row.getPid().equals(automationRuntimeDefinition.getPid())),
+                "Explicit category=automation diagnostics should still be able to find runtime definitions");
+        assertTrue(automationPage.getRecords().stream().noneMatch(row -> row.getPid().equals(bpmDefinition.getPid())),
+                "Explicit category=automation diagnostics should not mix human BPM definitions");
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("D1-07: Suspend definition - status becomes SUSPENDED")
+    void d1_07_suspendDefinition() {
         // Test that suspending a non-deployed (DRAFT) process throws a 409-domain conflict.
         BpmProcessDefinition created = createTestDefinition("d106");
         assertEquals("draft", created.getStatus());
@@ -238,9 +269,9 @@ class BpmProcessDefinitionTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Order(7)
-    @DisplayName("D1-07: Resume definition - status becomes DEPLOYED again")
-    void d1_07_resumeDefinition() {
+    @Order(8)
+    @DisplayName("D1-08: Resume definition - status becomes DEPLOYED again")
+    void d1_08_resumeDefinition() {
         // Test that resuming a non-suspended (DRAFT) process throws a 409-domain conflict.
         BpmProcessDefinition created = createTestDefinition("d107");
         assertEquals("draft", created.getStatus());
@@ -252,9 +283,9 @@ class BpmProcessDefinitionTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Order(8)
-    @DisplayName("D1-08: Undeploy - status becomes ARCHIVED")
-    void d1_08_undeploy() {
+    @Order(9)
+    @DisplayName("D1-09: Undeploy - status becomes ARCHIVED")
+    void d1_09_undeploy() {
         // Test that undeploying a non-deployed (DRAFT) process throws a 409-domain conflict.
         BpmProcessDefinition created = createTestDefinition("d108");
         assertEquals("draft", created.getStatus());
@@ -266,9 +297,9 @@ class BpmProcessDefinitionTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Order(9)
-    @DisplayName("D1-09: Delete definition - soft delete (deletedFlag=true)")
-    void d1_09_deleteDefinition() {
+    @Order(10)
+    @DisplayName("D1-10: Delete definition - soft delete (deletedFlag=true)")
+    void d1_10_deleteDefinition() {
         // Arrange
         BpmProcessDefinition created = createTestDefinition("d109");
         String pid = created.getPid();
@@ -290,9 +321,9 @@ class BpmProcessDefinitionTest extends BaseIntegrationTest {
     }
 
     @Test
-    @Order(10)
-    @DisplayName("D1-10: Version list - returns all versions of a process")
-    void d1_10_versionList() {
+    @Order(11)
+    @DisplayName("D1-11: Version list - returns all versions of a process")
+    void d1_11_versionList() {
         // Arrange: create a process and then add versions
         BpmProcessDefinition v1 = createTestDefinition("d110");
         String processKey = v1.getProcessKey();

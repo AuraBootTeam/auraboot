@@ -17,6 +17,7 @@ import {
   validateTable,
 } from '~/shared/decision/table/decisionTable';
 import { DecisionTableEditor } from '~/shared/decision/ui/DecisionTableEditor';
+import { decisionStatusLabel } from '~/shared/decision/ui/statusLabels';
 
 interface DecisionTableWorkbenchBlockProps {
   block?: {
@@ -191,6 +192,12 @@ function downloadTextFile(filename: string, content: string, type: string): void
 
 function displayJson(value: unknown): string {
   return JSON.stringify(value ?? {}, null, 2);
+}
+
+function testResultSummary(result: DecisionResult): string {
+  const status = decisionStatusLabel(result.status);
+  const matched = result.matched ? '命中' : '未命中';
+  return status === matched ? status : `${status} · ${matched}`;
 }
 
 function versionLabel(version?: DecisionVersionSummary | null): string {
@@ -493,7 +500,7 @@ export function DecisionTableWorkbenchBlock({
           />
         </label>
         <div className="dtw-result" data-testid="dtw-test-result">
-          <strong>{testResult ? `${testResult.status} · matched=${String(testResult.matched)}` : '尚未执行'}</strong>
+          <strong>{testResult ? testResultSummary(testResult) : '尚未执行'}</strong>
           <pre>{testResult ? displayJson(testResult.outputs) : displayJson({})}</pre>
         </div>
       </section>

@@ -21,11 +21,13 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.AuthorityUtils;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import java.time.Instant;
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 
@@ -51,6 +53,7 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired private RolePermissionMapper rolePermissionMapper;
     @Autowired private UserPermissionService userPermissionService;
     @Autowired private DecisionUsageRefMapper usageRefMapper;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private final ObjectMapper json = new ObjectMapper();
     private MockMvc mockMvc;
@@ -285,6 +288,150 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data[0].version").value(1))
                 .andExpect(jsonPath("$.data[0].status").value("DRAFT"))
                 .andExpect(jsonPath("$.data[0].matchMode").value("COLLECT_ALL"));
+    }
+
+    @Test
+    void httpActionLogsReturnsEventPolicyActionPayloadByCorrelation() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String traceId = "decision-trace-" + suffix;
+        String correlationId = "event-policy-run-" + suffix;
+        String key = "idem-" + suffix;
+        jdbcTemplate.update("""
+                insert into ab_drt_policy_exec_log
+                    (pid, tenant_id, idempotency_key, policy_code, rule_code, action_type,
+                     status, error_message, result_payload, decision_trace_id, correlation_id, executed_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?)
+                """,
+                UniqueIdGenerator.generate(),
+                getTestTenant().getId(),
+                key,
+                "leave_request_event_policy",
+                "notify_long_leave",
+                "NOTIFY",
+                "SUCCESS",
+                null,
+                "{\"sentCount\":1,\"channel\":\"in_app\",\"target\":\"ROLE:wd_manager\"}",
+                traceId,
+                correlationId,
+                Timestamp.from(Instant.now()));
+
+        mockMvc.perform(get("/api/event-policy/action-logs")
+                        .param("decisionTraceId", traceId)
+                        .param("correlationId", correlationId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].policyCode").value("leave_request_event_policy"))
+                .andExpect(jsonPath("$.data[0].ruleCode").value("notify_long_leave"))
+                .andExpect(jsonPath("$.data[0].actionType").value("NOTIFY"))
+                .andExpect(jsonPath("$.data[0].resultPayload.sentCount").value(1))
+                .andExpect(jsonPath("$.data[0].resultPayload.channel").value("in_app"));
+
+        String slaPolicyCode = "SLA_TIMEOUT:sla-" + suffix;
+        jdbcTemplate.update("""
+                insert into ab_drt_policy_exec_log
+                    (pid, tenant_id, idempotency_key, policy_code, rule_code, action_type,
+                     status, failure_strategy, error_message, result_payload, action_payload, context_payload,
+                     attempt_count, max_attempts, next_retry_at, last_retry_at, dead_lettered_at,
+                     decision_trace_id, correlation_id, executed_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                UniqueIdGenerator.generate(),
+                getTestTenant().getId(),
+                "idem-sla-" + suffix,
+                slaPolicyCode,
+                "SLA_TIMEOUT",
+                "SEND_SMS",
+                "DEAD_LETTER",
+                "RETRY_ASYNC",
+                "Retry attempts exhausted after 3 attempts: No real SMS sender available",
+                "{\"channel\":\"sms\",\"targetPhones\":[\"+8613800138000\"],\"retryExhausted\":true}",
+                "{\"type\":\"SEND_SMS\",\"target\":\"PHONE:+8613800138000\"}",
+                "{\"SLA\":{\"recordPid\":\"sla-record-" + suffix + "\"}}",
+                3,
+                3,
+                null,
+                Timestamp.from(Instant.parse("2026-07-15T09:00:00Z")),
+                Timestamp.from(Instant.parse("2026-07-15T09:00:01Z")),
+                null,
+                "sla:record-" + suffix,
+                Timestamp.from(Instant.now()));
+
+        mockMvc.perform(get("/api/event-policy/action-logs")
+                        .param("policyCodePrefix", "SLA_TIMEOUT:sla-" + suffix)
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].policyCode").value(slaPolicyCode))
+                .andExpect(jsonPath("$.data[0].ruleCode").value("SLA_TIMEOUT"))
+                .andExpect(jsonPath("$.data[0].actionType").value("SEND_SMS"))
+                .andExpect(jsonPath("$.data[0].status").value("DEAD_LETTER"))
+                .andExpect(jsonPath("$.data[0].failureStrategy").value("RETRY_ASYNC"))
+                .andExpect(jsonPath("$.data[0].attemptCount").value(3))
+                .andExpect(jsonPath("$.data[0].maxAttempts").value(3))
+                .andExpect(jsonPath("$.data[0].lastRetryAt").value("2026-07-15T09:00:00Z"))
+                .andExpect(jsonPath("$.data[0].deadLetteredAt").value("2026-07-15T09:00:01Z"))
+                .andExpect(jsonPath("$.data[0].resultPayload.retryExhausted").value(true))
+                .andExpect(jsonPath("$.data[0].actionPayload.target").value("PHONE:+8613800138000"))
+                .andExpect(jsonPath("$.data[0].contextPayload.SLA.recordPid").value("sla-record-" + suffix))
+                .andExpect(jsonPath("$.data[0].errorMessage")
+                        .value("Retry attempts exhausted after 3 attempts: No real SMS sender available"));
+    }
+
+    @Test
+    void httpReplayActionLog_replaysDeadLetterThroughPolicyExecutorAndUpdatesAttemptEvidence() throws Exception {
+        String suffix = String.valueOf(System.nanoTime());
+        String rowPid = UniqueIdGenerator.generate();
+        String key = "idem-replay-sla-" + suffix;
+        jdbcTemplate.update("""
+                insert into ab_drt_policy_exec_log
+                    (pid, tenant_id, idempotency_key, policy_code, rule_code, action_type,
+                     status, failure_strategy, error_message, result_payload, action_payload, context_payload,
+                     attempt_count, max_attempts, next_retry_at, last_retry_at, dead_lettered_at,
+                     decision_trace_id, correlation_id, executed_at)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?::jsonb, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                rowPid,
+                getTestTenant().getId(),
+                key,
+                "SLA_TIMEOUT:sla-replay-" + suffix,
+                "SLA_TIMEOUT",
+                "SEND_SMS",
+                "DEAD_LETTER",
+                "RETRY_ASYNC",
+                "Retry attempts exhausted after 3 attempts: No real SMS sender available",
+                "{\"channel\":\"sms\",\"targetPhones\":[\"+8613800138000\"],\"retryExhausted\":true}",
+                """
+                        {
+                          "ruleCode":"SLA_TIMEOUT",
+                          "type":"SEND_SMS",
+                          "target":"PHONE:+8613800138000",
+                          "order":10,
+                          "payload":{"content":"SLA ${SLA.recordPid} timeout"},
+                          "idempotencyKey":"%s"
+                        }
+                        """.formatted(key),
+                "{\"SLA\":{\"recordPid\":\"sla-record-" + suffix + "\"}}",
+                3,
+                3,
+                null,
+                Timestamp.from(Instant.parse("2026-07-15T09:00:00Z")),
+                Timestamp.from(Instant.parse("2026-07-15T09:00:01Z")),
+                "trace-replay-" + suffix,
+                "sla:replay-" + suffix,
+                Timestamp.from(Instant.now()));
+
+        mockMvc.perform(post("/api/event-policy/action-logs/" + rowPid + "/replay"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pid").value(rowPid))
+                .andExpect(jsonPath("$.data.status").value("DEAD_LETTER"))
+                .andExpect(jsonPath("$.data.failureStrategy").value("RETRY_ASYNC"))
+                .andExpect(jsonPath("$.data.attemptCount").value(4))
+                .andExpect(jsonPath("$.data.maxAttempts").value(3))
+                .andExpect(jsonPath("$.data.resultPayload.channel").value("sms"))
+                .andExpect(jsonPath("$.data.resultPayload.targetPhones[0]").value("+8613800138000"))
+                .andExpect(jsonPath("$.data.resultPayload.retryExhausted").value(true))
+                .andExpect(jsonPath("$.data.actionPayload.payload.content").value("SLA ${SLA.recordPid} timeout"))
+                .andExpect(jsonPath("$.data.contextPayload.sla.recordPid").value("sla-record-" + suffix))
+                .andExpect(jsonPath("$.data.errorMessage")
+                        .value("Retry attempts exhausted after 4 attempts: No real SMS sender available"));
     }
 
     @Test

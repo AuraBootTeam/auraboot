@@ -1,0 +1,25 @@
+{
+  "cookies": [
+    {
+      "name": "__session",
+      "value": "eyJqd3RUb2tlbiI6ImV5SnJhV1FpT2lKclpYa3RNU0lzSW1Gc1p5STZJa2hUTXpnMEluMC5leUp1WVcxbElqb2laVEpsTFc5d1pYSmhkRzl5UUhSbGMzUXVZMjl0SWl3aWRHVnVZVzUwU1dRaU9qTXpNVGcyT0RZeE16YzFOVFkzTURVeU9Dd2liV1Z0WW1WeVNXUWlPak16TWpZM056UTJNalUxTXpFek56RTFNaXdpYzNWaUlqb2lNREZMVjFkYU56QlJPVGt4UnpoRFRrdFNNRFkwVWtvM09VNGlMQ0pwWVhRaU9qRTNPRE01TWpRMU5EQXNJbVY0Y0NJNk1UYzROREF4TURrME1IMC5GSnhELVRmblZ4d3cyN05DdDFnVklrVE5wNkFrbmlMSlB0Qm5IZ0J3blVWWGk3VUhValdjN0tJRk9iazN1Y1NWIn0%3D.mkk2HQqcU9Wk2jjbwh5Qfx5ql24Tb9lPIJjetJcUI5k",
+      "domain": "127.0.0.1",
+      "path": "/",
+      "expires": 1784529340,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__session",
+      "value": "eyJqd3RUb2tlbiI6ImV5SnJhV1FpT2lKclpYa3RNU0lzSW1Gc1p5STZJa2hUTXpnMEluMC5leUp1WVcxbElqb2laVEpsTFc5d1pYSmhkRzl5UUhSbGMzUXVZMjl0SWl3aWRHVnVZVzUwU1dRaU9qTXpNVGcyT0RZeE16YzFOVFkzTURVeU9Dd2liV1Z0WW1WeVNXUWlPak16TWpZM056UTJNalUxTXpFek56RTFNaXdpYzNWaUlqb2lNREZMVjFkYU56QlJPVGt4UnpoRFRrdFNNRFkwVWtvM09VNGlMQ0pwWVhRaU9qRTNPRE01TWpRMU5EQXNJbVY0Y0NJNk1UYzROREF4TURrME1IMC5GSnhELVRmblZ4d3cyN05DdDFnVklrVE5wNkFrbmlMSlB0Qm5IZ0J3blVWWGk3VUhValdjN0tJRk9iazN1Y1NWIn0%3D.mkk2HQqcU9Wk2jjbwh5Qfx5ql24Tb9lPIJjetJcUI5k",
+      "domain": "localhost",
+      "path": "/",
+      "expires": 1784529340,
+      "httpOnly": true,
+      "secure": false,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": []
+}

@@ -48,7 +48,7 @@ class CommandExecuteRequestDryRunTest {
     }
 
     @Test
-    @DisplayName("targetRecordPid is the only public JSON target field")
+    @DisplayName("targetRecordPid is the public JSON target field; targetRecordId is read-compatible legacy")
     void target_record_pid_public_json_contract() throws Exception {
         ObjectMapper mapper = new ObjectMapper();
         CommandExecuteRequest req = new CommandExecuteRequest();
@@ -66,6 +66,7 @@ class CommandExecuteRequestDryRunTest {
 
         CommandExecuteRequest fromLegacyId =
                 mapper.readValue("{\"targetRecordId\":\"legacy-pid\"}", CommandExecuteRequest.class);
-        assertThat(fromLegacyId.getTargetRecordId()).isNull();
+        assertThat(fromLegacyId.getTargetRecordId()).isEqualTo("legacy-pid");
+        assertThat(fromLegacyId.getTargetRecordPid()).isEqualTo("legacy-pid");
     }
 }

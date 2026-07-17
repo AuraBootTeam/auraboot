@@ -17,6 +17,7 @@ import com.auraboot.framework.decision.rule.DecisionVersionPolicy;
 import com.auraboot.framework.decision.rule.RuleBindingKind;
 import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import com.auraboot.framework.decision.rule.RuleValueSource;
+import com.auraboot.framework.eventpolicy.entity.DrtPolicyDefinitionEntity;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyDefinitionMapper;
 import com.auraboot.framework.eventpolicy.mapper.DrtPolicyVersionMapper;
@@ -28,6 +29,7 @@ import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
 import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -377,6 +379,14 @@ class DecisionUsageIndexServiceImplTest {
                 }]
                 """));
         when(policyVersionMapper.selectList(any())).thenReturn(List.of(policyVersion));
+        DrtPolicyDefinitionEntity policyDefinition = new DrtPolicyDefinitionEntity();
+        policyDefinition.setPolicyCode("case_routing_policy");
+        policyDefinition.setPolicyName("Case Routing Policy");
+        policyDefinition.setEventType("FORM_SUBMITTED");
+        policyDefinition.setTargetType("FORM");
+        policyDefinition.setTargetKey("case_form");
+        when(policyDefinitionMapper.findByTenantAndCode(10L, "case_routing_policy"))
+                .thenReturn(policyDefinition);
 
         DecisionUsageIndexRebuildDTO summary = service.rebuild();
 
@@ -394,6 +404,14 @@ class DecisionUsageIndexServiceImplTest {
                                 "EVENT_POLICY", "DECISION", "approval_routing", null, "VERSION_RULES"),
                         org.assertj.core.groups.Tuple.tuple(
                                 "EVENT_POLICY", "FIELD", null, "record.data.amount", "VERSION_RULES"));
+        assertThat(captor.getAllValues())
+                .allSatisfy(ref -> {
+                    JsonNode metadata = ref.getMetadataJson();
+                    assertThat(metadata.path("sourceName").asText()).isEqualTo("Case Routing Policy");
+                    assertThat(metadata.path("eventType").asText()).isEqualTo("FORM_SUBMITTED");
+                    assertThat(metadata.path("targetType").asText()).isEqualTo("FORM");
+                    assertThat(metadata.path("targetKey").asText()).isEqualTo("case_form");
+                });
     }
 
     @Test
@@ -693,5 +711,155 @@ class DecisionUsageIndexServiceImplTest {
                     assertThat(ref.getMetadataJson().get("roleId").asLong()).isEqualTo(700L);
                     assertThat(ref.getMetadataJson().get("sourceName").asText()).isEqualTo("Approve Invoice");
                 });
+    }
+
+    @Test
+    void rebuildIndexesConditionFragmentRefsAcrossConsumers() throws Exception {
+        MetaContext.setContext(10L, 20L, "tester", "Tester");
+        when(versionMapper.selectList(any())).thenReturn(List.of());
+        when(namedQueryMapper.selectList(any())).thenReturn(List.of());
+
+        TriggerConfig triggerConfig = new TriggerConfig();
+        triggerConfig.setRuleBinding(new RuleConsumerBinding(
+                "AUTOMATION",
+                "wd_leave_high_value_notify",
+                "trigger",
+                RuleBindingKind.CONDITION,
+                null,
+                null,
+                true,
+                List.of("shared_leave_approval_guard")));
+        Automation automation = new Automation();
+        automation.setPid("wd_leave_high_value_notify");
+        automation.setTenantId(10L);
+        automation.setName("长假申请提醒");
+        automation.setModelCode("wd_leave_request");
+        automation.setTriggerType("on_record_create");
+        automation.setEnabled(true);
+        automation.setTriggerConfig(triggerConfig);
+        when(automationMapper.selectList(any())).thenReturn(List.of(automation));
+
+        com.auraboot.framework.bpm.entity.SlaConfigEntity sla = com.auraboot.framework.bpm.entity.SlaConfigEntity.builder()
+                .pid("wd_manager_approve_sla")
+                .tenantId(10L)
+                .name("主管审批 SLA")
+                .targetType("NODE")
+                .targetKey("task_manager_approve")
+                .enabled(true)
+                .deletedFlag(false)
+                .ruleBinding(new RuleConsumerBinding(
+                        "SLA",
+                        "wd_manager_approve_sla",
+                        "task_manager_approve",
+                        RuleBindingKind.CONDITION,
+                        null,
+                        null,
+                        true,
+                        List.of("shared_leave_approval_guard")))
+                .build();
+        when(slaConfigMapper.selectList(any())).thenReturn(List.of(sla));
+
+        DrtPolicyVersionEntity policyVersion = new DrtPolicyVersionEntity();
+        policyVersion.setPid("policy-version-shared-fragment");
+        policyVersion.setTenantId(10L);
+        policyVersion.setPolicyCode("leave_event_policy");
+        policyVersion.setVersion(2);
+        policyVersion.setStatus("PUBLISHED");
+        policyVersion.setPhase("AFTER_COMMIT");
+        policyVersion.setMatchMode("COLLECT_ALL");
+        policyVersion.setRulesJson(objectMapper.readTree("""
+                [{
+                  "ruleCode": "leave-reuse-shared-guard",
+                  "conditionFragmentRef": "shared_leave_approval_guard"
+                }]
+                """));
+        when(policyVersionMapper.selectList(any())).thenReturn(List.of(policyVersion));
+
+        BpmProcessDefinition process = new BpmProcessDefinition();
+        process.setPid("bpm-shared-fragment-pid");
+        process.setTenantId(10L);
+        process.setProcessKey("wd_leave_approval");
+        process.setProcessName("请假审批流程");
+        process.setStatus("deployed");
+        process.setVersion(1);
+        process.setIsCurrent(true);
+        process.setDeletedFlag(false);
+        process.setExtension(Map.of("designerJson", """
+                {
+                  "key": "wd_leave_approval",
+                  "nodes": [
+                    {
+                      "id": "task_manager_approve",
+                      "type": "userTask",
+                      "data": {
+                        "label": "主管审批",
+                        "config": {
+                          "conditionFragmentRefs": ["shared_leave_approval_guard"]
+                        }
+                      }
+                    }
+                  ],
+                  "edges": []
+                }
+                """));
+        when(bpmProcessDefinitionMapper.selectList(any())).thenReturn(List.of(process));
+
+        RolePermission rolePermission = new RolePermission();
+        rolePermission.setPid("rp-shared-fragment");
+        rolePermission.setTenantId(10L);
+        rolePermission.setRoleId(700L);
+        rolePermission.setPermissionId(500L);
+        rolePermission.setGrantType("grant");
+        rolePermission.setStatus("active");
+        rolePermission.setDeletedFlag(false);
+        rolePermission.setConditions(Map.of(
+                "dynamicAbac", Map.of(
+                        "conditionFragments", List.of(Map.of(
+                                "fragmentCode", "shared_leave_approval_guard")))));
+        when(rolePermissionMapper.selectList(any())).thenReturn(List.of(rolePermission));
+
+        Permission permission = new Permission();
+        permission.setId(500L);
+        permission.setCode("model.leave_request.view");
+        permission.setName("查看请假申请");
+        permission.setResourceType("model");
+        permission.setResourceCode("wd_leave_request");
+        permission.setAction("view");
+        when(permissionMapper.selectById(500L)).thenReturn(permission);
+
+        DecisionUsageIndexRebuildDTO summary = service.rebuild();
+
+        ArgumentCaptor<DecisionUsageRefEntity> captor = ArgumentCaptor.forClass(DecisionUsageRefEntity.class);
+        verify(usageRefMapper).deleteByTenant(10L);
+        verify(usageRefMapper, times(5)).insert(captor.capture());
+        assertThat(summary.getConsumerRefs()).isEqualTo(5);
+        assertThat(summary.getFieldRefs()).isZero();
+        assertThat(summary.getDecisionRefs()).isZero();
+        assertThat(captor.getAllValues())
+                .extracting(DecisionUsageRefEntity::getSourceType, DecisionUsageRefEntity::getSourceCode,
+                        DecisionUsageRefEntity::getSourcePid, DecisionUsageRefEntity::getTargetType,
+                        DecisionUsageRefEntity::getTargetCode, DecisionUsageRefEntity::getTargetPath,
+                        DecisionUsageRefEntity::getBinding)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple(
+                                "AUTOMATION", "wd_leave_high_value_notify", "wd_leave_high_value_notify",
+                                "CONDITION_FRAGMENT", "shared_leave_approval_guard", null,
+                                "RULE_BINDING"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "SLA_RULE", "wd_manager_approve_sla", "wd_manager_approve_sla",
+                                "CONDITION_FRAGMENT", "shared_leave_approval_guard", null,
+                                "RULE_BINDING"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "EVENT_POLICY", "leave_event_policy", "policy-version-shared-fragment",
+                                "CONDITION_FRAGMENT", "shared_leave_approval_guard", null,
+                                "VERSION_RULES"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "BPM_PROCESS", "wd_leave_approval", "bpm-shared-fragment-pid",
+                                "CONDITION_FRAGMENT", "shared_leave_approval_guard",
+                                "nodes.task_manager_approve", "DESIGNER_NODE"),
+                        org.assertj.core.groups.Tuple.tuple(
+                                "PERMISSION_POLICY", "model.leave_request.view", "rp-shared-fragment",
+                                "CONDITION_FRAGMENT", "shared_leave_approval_guard", null,
+                                "ROLE_PERMISSION_CONDITION"));
     }
 }

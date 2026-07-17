@@ -42,6 +42,10 @@ class PolicyExecutorRealStackIntegrationTest extends BaseIntegrationTest {
         ActionHandler notifyHandler = new ActionHandler() {
             @Override public boolean supports(String t) { return "NOTIFY".equals(t); }
             @Override public void execute(ResolvedActionPlan p, DecisionContext c) { invocations.incrementAndGet(); }
+            @Override public Map<String, Object> executeWithResult(ResolvedActionPlan p, DecisionContext c) {
+                execute(p, c);
+                return Map.of("dispatchId", "notify-" + p.idempotencyKey(), "sentCount", 1);
+            }
         };
         PolicyExecutor executor = new PolicyExecutor(List.of(notifyHandler), idempotencyStore);
 
@@ -54,6 +58,13 @@ class PolicyExecutorRealStackIntegrationTest extends BaseIntegrationTest {
                 "select count(*) from ab_drt_policy_exec_log where tenant_id = ? and idempotency_key = ? and status = 'SUCCESS'",
                 Integer.class, tenant, key);
         assertThat(rows).isEqualTo(1);
+
+        Map<String, Object> logPayload = jdbcTemplate.queryForMap(
+                "select result_payload from ab_drt_policy_exec_log where tenant_id = ? and idempotency_key = ?",
+                tenant, key);
+        assertThat(String.valueOf(logPayload.get("result_payload")))
+                .contains("\"dispatchId\"")
+                .contains("\"sentCount\"");
 
         // replay (same key): SKIPPED, handler NOT invoked again, still one row
         PolicyExecutionResult second = executor.execute(oneNotify(key), ctx, FailureStrategy.RETRY_ASYNC, tenant);

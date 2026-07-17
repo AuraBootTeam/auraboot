@@ -30,6 +30,95 @@ vi.mock('~/shared/services/permissionService', () => ({
 }));
 
 describe('PolicyConfigDialog', () => {
+  it('loads permission ABAC field choices from the Rule Center fact catalog', async () => {
+    const decisionApi = {
+      getFactCatalog: vi.fn().mockResolvedValue({
+        entities: [
+          {
+            entityCode: 'wd_leave_request',
+            modelCode: 'wd_leave_request',
+            modelName: '请假申请',
+            facts: [
+              {
+                scope: 'record',
+                path: 'data.wd_req_days',
+                label: '请假天数',
+                dataType: 'decimal',
+                modelCode: 'wd_leave_request',
+              },
+            ],
+          },
+        ],
+      }),
+      getDecisionImpact: vi.fn().mockResolvedValue({ incoming: [], outgoing: [], risk: { summary: '无影响' } }),
+      evaluate: vi.fn().mockResolvedValue({ status: 'MATCHED', matched: true, outputs: {} }),
+      getModelFields: vi.fn().mockResolvedValue([]),
+    };
+
+    render(
+      <PolicyConfigDialog
+        open
+        onClose={vi.fn()}
+        rolePid="role-admin"
+        permissionPid="perm-approve"
+        permissionLabel="Approve Invoice"
+        decisionApi={decisionApi}
+        schema={{
+          dynamicAbac: {
+            type: 'rule-center',
+            label: 'Rule center ABAC',
+            mode: 'decision',
+            fieldCatalogMode: 'merge',
+            fieldCatalogModelCode: 'wd_leave_request',
+            decisions: [{ code: 'permission_amount_guard', name: 'Amount Guard' }],
+            fields: [
+              { scope: 'actor', path: 'roles', label: '角色', dataType: 'collection' },
+            ],
+          },
+        }}
+        initialValues={{}}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    await waitFor(() => expect(decisionApi.getFactCatalog).toHaveBeenCalledWith('wd_leave_request'));
+
+    fireEvent.click(screen.getByRole('button', { name: '添加映射' }));
+    await waitFor(() =>
+      expect(screen.getByRole('option', { name: '请假天数' })).toHaveValue('record:data.wd_req_days'),
+    );
+    fireEvent.change(screen.getByLabelText('mapping-input-0'), {
+      target: { value: 'days' },
+    });
+    fireEvent.change(screen.getByLabelText('mapping-field-0'), {
+      target: { value: 'record:data.wd_req_days' },
+    });
+
+    fireEvent.click(screen.getByTestId('policy-save-button'));
+
+    await waitFor(() => {
+      expect(permissionService.setPolicy).toHaveBeenCalledWith(
+        'role-admin',
+        'perm-approve',
+        expect.objectContaining({
+          dynamicAbac: expect.objectContaining({
+            ruleBinding: expect.objectContaining({
+              consumerType: 'PERMISSION',
+              decisionBinding: expect.objectContaining({
+                inputMappings: [
+                  {
+                    input: 'days',
+                    source: { kind: 'FIELD', scope: 'record', path: 'data.wd_req_days' },
+                  },
+                ],
+              }),
+            }),
+          }),
+        }),
+      );
+    });
+  });
+
   it('saves rule-center ABAC values as a RuleConsumerBinding under the policy key', async () => {
     const onClose = vi.fn();
     const onSuccess = vi.fn();
@@ -49,7 +138,14 @@ describe('PolicyConfigDialog', () => {
             timeoutMs: 50,
             decisions: [
               { code: 'permission_amount_guard', name: 'Amount Guard' },
-              { code: 'permission_department_guard', name: 'Department Guard' },
+              {
+                code: 'permission_department_guard',
+                name: 'Department Guard',
+                outputs: [
+                  { id: 'allowed', label: '是否允许', dataType: 'boolean' },
+                  { id: 'grantReason', label: '授权说明', dataType: 'string' },
+                ],
+              },
             ],
             fields: [
               { scope: 'record', path: 'amount', label: 'Amount', dataType: 'decimal' },
@@ -78,6 +174,12 @@ describe('PolicyConfigDialog', () => {
     fireEvent.change(screen.getByLabelText('mapping-field-0'), {
       target: { value: 'actor:departmentId' },
     });
+    fireEvent.click(screen.getByRole('button', { name: '添加输出' }));
+    expect(screen.getByLabelText('output-mapping-output-picker-0')).toHaveTextContent('授权说明');
+    fireEvent.change(screen.getByLabelText('output-mapping-output-picker-0'), {
+      target: { value: 'grantReason' },
+    });
+    expect(screen.getByLabelText('output-mapping-kind-0')).toHaveValue('PERMISSION_CONTEXT');
     fireEvent.change(screen.getByTestId('policy-rule-timeout-dynamicAbac'), {
       target: { value: '75' },
     });
@@ -105,6 +207,12 @@ describe('PolicyConfigDialog', () => {
                   {
                     input: 'departmentId',
                     source: { kind: 'FIELD', scope: 'actor', path: 'departmentId' },
+                  },
+                ],
+                outputMappings: [
+                  {
+                    output: 'grantReason',
+                    target: { kind: 'PERMISSION_CONTEXT', path: 'grantReason' },
                   },
                 ],
               }),

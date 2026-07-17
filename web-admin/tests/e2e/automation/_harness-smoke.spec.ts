@@ -33,9 +33,12 @@ test.describe('Phase-0 — harness smoke: drag to canvas', () => {
     // Navigate to the new automation designer. Wait for the palette to appear
     // (ensures the canvas + nodes are registered and ready).
     await page.goto(DESIGNER_ROUTE);
-    // Wait for the palette root — signals the flow-designer-sdk is mounted and
-    // node definitions are registered.
-    await page.locator('[data-testid="flow-palette"]').waitFor({ state: 'visible', timeout: 15000 });
+    // Compact workspaces keep the palette in a closed drawer by default. The
+    // drag helper owns opening it, so smoke should only require the shell to be
+    // mounted here.
+    await page
+      .locator('[data-testid="flow-palette-shell"]')
+      .waitFor({ state: 'attached', timeout: 15000 });
     // Wait for the canvas pane to be present.
     await page.locator('.react-flow__pane').waitFor({ state: 'visible', timeout: 10000 });
   });
@@ -48,10 +51,11 @@ test.describe('Phase-0 — harness smoke: drag to canvas', () => {
       const before = await currentNodeIds(page);
       expect(before.length, 'Canvas should start empty on /automation/new').toBe(0);
 
-      // Confirm palette item is present.
+      // Confirm palette item is registered. It may be hidden until the compact
+      // palette drawer is opened by dragNodeToCanvas.
       await expect(
         page.locator('[data-testid="palette-node-trigger-record-create"]'),
-      ).toBeVisible();
+      ).toBeAttached();
 
       // Perform the drag at offset (200, 150) — well within the canvas area.
       const newNodeId = await dragNodeToCanvas(page, 'trigger-record-create', { x: 200, y: 150 });

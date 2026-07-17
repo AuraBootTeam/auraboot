@@ -35,6 +35,8 @@ public class DrtLogDTO {
     private Boolean matched;
     private String status;
     private JsonNode matchedRulesJson;
+    private JsonNode outputSnapshot;
+    private JsonNode traceSnapshot;
     private Long durationMs;
     private String errorCode;
     private String errorMessage;

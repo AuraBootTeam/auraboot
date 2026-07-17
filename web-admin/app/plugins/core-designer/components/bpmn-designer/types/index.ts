@@ -84,7 +84,7 @@ export interface UserTaskAuraConfig {
 
 // 服务任务配置
 export interface ServiceTaskConfig extends TaskBaseConfig {
-  serviceType?: 'http' | 'java' | 'script' | 'command'; // 服务类型
+  serviceType?: 'http' | 'java' | 'script' | 'command' | 'action'; // 服务类型
   serviceUrl?: string; // HTTP服务地址
   className?: string; // Java类名
   scriptContent?: string; // 脚本内容
@@ -94,8 +94,26 @@ export interface ServiceTaskConfig extends TaskBaseConfig {
   // (process variable `_chain_nodes[<activityId>].commandCode`), which then
   // invokes the full 16-phase Command pipeline.
   commandCode?: string;
+  /**
+   * Rule Center action bridge: when serviceType === 'action', actionType and
+   * actionPayloadJson compile to pluginActionServiceTaskDelegate and execute
+   * through the shared ActionHandler catalog.
+   */
+  actionType?: string;
+  actionTarget?: string;
+  actionPayloadJson?: string;
+  actionResultVar?: string;
+  actionIdempotencyKey?: string;
+  actionRuleCode?: string;
   async?: boolean; // 是否异步执行
   hooks?: NodeHookEntry[]; // Pre/post execution hooks
+}
+
+// 规则任务配置
+export interface RuleTaskConfig extends TaskBaseConfig {
+  ruleCode?: string;
+  factsVars?: string;
+  ruleBinding?: RuleConsumerBindingDraft;
 }
 
 // 接收任务配置
@@ -171,6 +189,7 @@ export interface BPMNNodeData extends Record<string, unknown> {
   config?:
     | UserTaskConfig
     | ServiceTaskConfig
+    | RuleTaskConfig
     | ReceiveTaskConfig
     | ExclusiveGatewayConfig
     | ParallelGatewayConfig
@@ -279,7 +298,7 @@ export interface ProcessAuraConfig {
 }
 
 // Node monitor status (used in monitor mode)
-export type NodeMonitorStatus = 'active' | 'completed' | 'idle';
+export type NodeMonitorStatus = 'active' | 'completed' | 'failed' | 'idle';
 
 // Node validation status (used in design mode after a Validate run) — G-U1
 export type NodeValidationStatus = 'error' | 'warning' | null;

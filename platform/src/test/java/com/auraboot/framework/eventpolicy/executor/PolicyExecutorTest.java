@@ -24,13 +24,35 @@ class PolicyExecutorTest {
         final String type;
         final boolean fail;
         final List<String> executed;
+        final Map<String, Object> resultPayload;
         RecordingHandler(String type, boolean fail, List<String> executed) {
-            this.type = type; this.fail = fail; this.executed = executed;
+            this(type, fail, executed, Map.of());
+        }
+        RecordingHandler(String type, boolean fail, List<String> executed, Map<String, Object> resultPayload) {
+            this.type = type; this.fail = fail; this.executed = executed; this.resultPayload = resultPayload;
         }
         @Override public boolean supports(String t) { return type.equals(t); }
         @Override public void execute(ResolvedActionPlan plan, DecisionContext c) throws Exception {
             executed.add(plan.idempotencyKey());
             if (fail) throw new IllegalStateException("boom:" + type);
+        }
+        @Override public Map<String, Object> executeWithResult(ResolvedActionPlan plan, DecisionContext c) throws Exception {
+            execute(plan, c);
+            return resultPayload;
+        }
+    }
+
+    static class RecordingStore implements IdempotencyStore {
+        final List<ActionExecutionResult> records = new ArrayList<>();
+
+        @Override
+        public boolean alreadySucceeded(Long tenantId, String idempotencyKey) {
+            return false;
+        }
+
+        @Override
+        public void record(Long tenantId, String policyCode, ActionExecutionResult result) {
+            records.add(result);
         }
     }
 
@@ -57,6 +79,61 @@ class PolicyExecutorTest {
     }
 
     @Test
+    void successActionIncludesStructuredHandlerResultPayload() {
+        List<String> exec = new ArrayList<>();
+        PolicyExecutor ex = new PolicyExecutor(
+                List.of(new RecordingHandler("NOTIFY", false, exec,
+                        Map.of("recipientType", "USER", "sentCount", 1, "notificationRef", "R1:NOTIFY"))),
+                new InMemoryIdempotencyStore());
+
+        PolicyExecutionResult r = ex.execute(
+                resultWith(plan("R1", "NOTIFY", 10, "k1")),
+                ctx, FailureStrategy.CONTINUE_ON_ERROR, tenant);
+
+        assertThat(r.actions().get(0).status()).isEqualTo(ActionExecutionStatus.SUCCESS);
+        assertThat(r.actions().get(0).resultPayload())
+                .containsEntry("recipientType", "USER")
+                .containsEntry("sentCount", 1)
+                .containsEntry("notificationRef", "R1:NOTIFY");
+    }
+
+    @Test
+    void failedActionCanIncludeStructuredHandlerResultPayloadForTraceEvidence() {
+        ActionHandler failingSms = new ActionHandler() {
+            @Override
+            public boolean supports(String type) {
+                return "SEND_SMS".equals(type);
+            }
+
+            @Override
+            public void execute(ResolvedActionPlan plan, DecisionContext context) {
+                throw new UnsupportedOperationException("not used");
+            }
+
+            @Override
+            public Map<String, Object> executeWithResult(ResolvedActionPlan plan, DecisionContext context) {
+                throw new ActionExecutionException("No real SMS sender available", Map.of(
+                        "channel", "sms",
+                        "targetPhones", List.of("+8613800138000"),
+                        "sentCount", 0), null);
+            }
+        };
+        PolicyExecutor ex = new PolicyExecutor(List.of(failingSms), new InMemoryIdempotencyStore());
+
+        PolicyExecutionResult r = ex.execute(
+                resultWith(plan("R1", "SEND_SMS", 10, "k1")),
+                ctx, FailureStrategy.CONTINUE_ON_ERROR, tenant);
+
+        assertThat(r.actions().get(0).status()).isEqualTo(ActionExecutionStatus.FAILED);
+        assertThat(r.actions().get(0).error()).isEqualTo("No real SMS sender available");
+        assertThat(r.actions().get(0).resultPayload())
+                .containsEntry("channel", "sms")
+                .containsEntry("sentCount", 0);
+        assertThat((List<String>) r.actions().get(0).resultPayload().get("targetPhones"))
+                .containsExactly("+8613800138000");
+    }
+
+    @Test
     void idempotency_alreadySucceededIsSkipped() {
         List<String> exec = new ArrayList<>();
         InMemoryIdempotencyStore store = new InMemoryIdempotencyStore();
@@ -80,6 +157,26 @@ class PolicyExecutorTest {
         assertThat(r.actions().get(0).status()).isEqualTo(ActionExecutionStatus.FAILED);
         assertThat(r.actions().get(1).status()).isEqualTo(ActionExecutionStatus.NOT_EXECUTED);
         assertThat(exec).containsExactly("k1"); // second never ran
+    }
+
+    @Test
+    void failFast_recordsNotExecutedActionsForTraceEvidence() {
+        List<String> exec = new ArrayList<>();
+        RecordingStore store = new RecordingStore();
+        PolicyExecutor ex = new PolicyExecutor(List.of(
+                new RecordingHandler("NOTIFY", true, exec),
+                new RecordingHandler("CREATE_TASK", false, exec)),
+                store);
+
+        PolicyExecutionResult r = ex.execute(
+                resultWith(plan("R1", "NOTIFY", 10, "k1"), plan("R2", "CREATE_TASK", 20, "k2")),
+                ctx, FailureStrategy.FAIL_FAST, tenant);
+
+        assertThat(r.actions()).extracting(ActionExecutionResult::status)
+                .containsExactly(ActionExecutionStatus.FAILED, ActionExecutionStatus.NOT_EXECUTED);
+        assertThat(store.records).extracting(ActionExecutionResult::status)
+                .containsExactly(ActionExecutionStatus.FAILED, ActionExecutionStatus.NOT_EXECUTED);
+        assertThat(store.records.get(1).idempotencyKey()).isEqualTo("k2");
     }
 
     @Test

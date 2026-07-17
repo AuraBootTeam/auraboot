@@ -20,7 +20,13 @@ import {
   Link,
   type LoaderFunctionArgs,
 } from 'react-router';
-import { modelService, type RelatedPage } from '~/shared/services/modelService';
+import {
+  modelService,
+  type ModelPublishReplayReport,
+  type ModelPublishReplayResult,
+  type PublishPreview,
+  type RelatedPage,
+} from '~/shared/services/modelService';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { permissionService } from '~/shared/services/permissionService';
 import { useToastContext } from '~/contexts/ToastContext';
@@ -130,6 +136,306 @@ function getRelatedPageTitle(page: RelatedPage | null | undefined): string {
   );
 }
 
+function getReplayStatusLabel(status?: string): string {
+  const labels: Record<string, string> = {
+    EXECUTED: '已执行',
+    READY: '可自动执行',
+    MANUAL_REQUIRED: '需人工复核',
+    NEEDS_SAMPLE_CONTEXT: '需样本',
+    AUTOMATION_UNAVAILABLE: '自动化不可用',
+    PERMISSION_UNAVAILABLE: '权限服务不可用',
+    BPM_UNAVAILABLE: 'BPM 服务不可用',
+    FAILED: '失败',
+  };
+  return labels[status || ''] || status || '待复核';
+}
+
+function getReplayStatusClass(status?: string): string {
+  if (status === 'EXECUTED') return 'bg-emerald-50 text-emerald-700';
+  if (status === 'READY') return 'bg-blue-50 text-blue-700';
+  if (status === 'MANUAL_REQUIRED' || status === 'NEEDS_SAMPLE_CONTEXT') {
+    return 'bg-amber-50 text-amber-700';
+  }
+  if (
+    status === 'FAILED' ||
+    status === 'AUTOMATION_UNAVAILABLE' ||
+    status === 'PERMISSION_UNAVAILABLE' ||
+    status === 'BPM_UNAVAILABLE'
+  ) {
+    return 'bg-red-50 text-red-700';
+  }
+  return 'bg-gray-100 text-gray-700';
+}
+
+function getReplayResultMessage(result: ModelPublishReplayResult): string | null {
+  const consumerType = result.step?.consumerType;
+  if (consumerType === 'PERMISSION_POLICY' && result.status === 'NEEDS_SAMPLE_CONTEXT') {
+    return '补充成员 ID 和记录样本后，可执行权限策略复核。';
+  }
+  if (consumerType === 'PERMISSION_POLICY' && result.status === 'READY') {
+    return '可使用代表性成员和记录数据执行权限策略复核。';
+  }
+  if (consumerType === 'PERMISSION_POLICY' && result.status === 'EXECUTED') {
+    if (result.message?.includes('DENY')) {
+      return '权限策略复核结果：拒绝。';
+    }
+    if (result.message?.includes('ALLOW')) {
+      return '权限策略复核结果：允许。';
+    }
+  }
+  if (consumerType === 'DECISION_VERSION' && result.message?.includes('Decision replay executed')) {
+    if (result.message.includes('MATCHED')) {
+      return '决策版本复核结果：命中。';
+    }
+    if (result.message.includes('NOT_MATCHED')) {
+      return '决策版本复核结果：未命中。';
+    }
+    return '决策版本复核已执行。';
+  }
+  if (consumerType === 'BPM_PROCESS' && result.status === 'READY') {
+    return '可使用流程实例和业务记录样本执行 BPM 规则复核。';
+  }
+  if (consumerType === 'BPM_PROCESS' && result.status === 'NEEDS_SAMPLE_CONTEXT') {
+    return '补充流程样本和记录数据后，可执行 BPM 规则复核。';
+  }
+  if (consumerType === 'BPM_PROCESS' && result.status === 'BPM_UNAVAILABLE') {
+    return '当前运行态未启用 BPM 回放服务。';
+  }
+  if (consumerType === 'BPM_PROCESS' && result.status === 'FAILED') {
+    if (result.outputs?.failClosed === true || result.outputs?.fallbackApplied === true) {
+      return 'BPM 分派规则复核失败：规则执行异常，已失败关闭，未使用静态审批人兜底。';
+    }
+    return 'BPM 规则复核失败，请检查规则绑定、流程样本和决策版本。';
+  }
+  if (consumerType === 'BPM_PROCESS' && result.status === 'EXECUTED') {
+    const hasAssignment =
+      Array.isArray(result.outputs?.candidateUserIds) ||
+      Array.isArray(result.outputs?.candidateGroupIds);
+    if (hasAssignment) {
+      return result.matched === false
+        ? 'BPM 分派规则复核已执行：未命中候选人规则。'
+        : 'BPM 分派规则复核已执行：已解析候选审批人。';
+    }
+    return result.matched === false ? 'BPM 规则复核结果：未命中。' : 'BPM 规则复核结果：命中。';
+  }
+  if (consumerType === 'SLA_RULE' && result.status === 'READY') {
+    return '可使用流程实例、租户和任务样本执行 SLA 节点复核。';
+  }
+  if (consumerType === 'SLA_RULE' && result.status === 'NEEDS_SAMPLE_CONTEXT') {
+    return '补充流程实例、租户和任务样本后，可执行 SLA 节点复核。';
+  }
+  if (
+    consumerType === 'SLA_RULE' &&
+    result.status === 'EXECUTED' &&
+    result.message?.includes('SLA NODE replay')
+  ) {
+    return 'SLA 节点复核已执行。';
+  }
+  if (
+    consumerType === 'SLA_RULE' &&
+    result.status === 'EXECUTED' &&
+    result.message?.includes('SLA RECORD replay')
+  ) {
+    return 'SLA 记录复核已执行。';
+  }
+  if (typeof result.message === 'string' && result.message.includes('sampleContext')) {
+    return '需要补充样本上下文后再复核。';
+  }
+  return result.message || null;
+}
+
+function metadataString(metadata: Record<string, unknown> | undefined, key: string): string {
+  const value = metadata?.[key];
+  return typeof value === 'string' && value.trim() ? value : '';
+}
+
+function formatReplayOutputLabel(key: string): string {
+  const labels: Record<string, string> = {
+    permissionCode: '权限标识',
+    memberId: '成员 ID',
+    granted: '授权结果',
+    resource: '资源',
+    action: '操作',
+    recordPid: '记录 PID',
+    permissionPolicyPid: '权限策略 PID',
+    roleId: '角色 ID',
+    grantType: '授权类型',
+    status: '状态',
+    truth: '条件结果',
+    matched: '命中结果',
+    reason: '原因',
+    stepCount: '步骤数',
+    steps: '评估步骤',
+    fieldRefs: '字段引用',
+    traceId: '追踪 ID',
+    deadlineMinutes: '截止分钟数',
+    processPid: '流程 PID',
+    slaConfigPid: 'SLA 配置 PID',
+    processInstanceId: '流程实例',
+    taskId: '任务 ID',
+    processKey: '流程标识',
+    processName: '流程名称',
+    processVersion: '流程版本',
+    processStatus: '流程状态',
+    targetType: '目标类型',
+    targetKey: '目标节点',
+    nodeId: '节点 ID',
+    nodeType: '节点类型',
+    edgeId: '连线 ID',
+    edgeSource: '来源节点',
+    edgeTarget: '目标节点',
+    bindingSurface: '绑定位置',
+    bindingKind: '绑定类型',
+    decisionCode: '决策标识',
+    decisionStatus: '决策状态',
+    conditionResult: '条件结果',
+    fallbackApplied: '已使用兜底',
+    durationMs: '耗时',
+    errorCode: '错误码',
+    inputs: '输入快照',
+    outputs: '输出快照',
+    decisionRefs: '决策引用',
+    candidateUserIds: '候选审批人',
+    candidateGroupIds: '候选审批组',
+    failClosed: '失败关闭',
+    slaRecordPid: 'SLA 记录 PID',
+    slaRecordStatus: 'SLA 状态',
+    actionCount: '动作数',
+    actionPolicyTrigger: '动作触发',
+    deadlineMode: '截止方式',
+    deadlineValue: '截止配置',
+    deadlineTime: '截止时间',
+    startTime: '开始时间',
+    enabled: '启用',
+    modelCode: '模型',
+    affectedFieldRef: '影响字段',
+    fieldRiskLevel: '字段风险',
+    fieldRiskSummary: '风险说明',
+    fieldMasked: '脱敏字段',
+    fieldPermissionChange: '字段权限变更',
+    fieldPermission: '字段权限',
+    requiresLowPermissionSample: '需要低权限样本',
+  };
+  return labels[key] || key;
+}
+
+function shouldShowReplayOutput(key: string): boolean {
+  return key !== 'steps';
+}
+
+function formatReplayOutputValue(key: string, value: unknown): string {
+  if (value === null || value === undefined) return '-';
+  if (typeof value === 'string') {
+    const normalized = value.toLowerCase();
+    if ((key === 'truth' || key === 'matched') && ['true', 'yes', 'matched'].includes(normalized)) {
+      return '是';
+    }
+    if ((key === 'truth' || key === 'matched') && ['false', 'no', 'not_matched'].includes(normalized)) {
+      return '否';
+    }
+    if (key === 'grantType') {
+      if (normalized === 'grant') return '授权';
+      if (normalized === 'deny') return '拒绝';
+    }
+    if (key === 'status') {
+      if (normalized === 'active') return '启用';
+      if (normalized === 'inactive') return '停用';
+      if (normalized === 'disabled') return '禁用';
+      if (normalized === 'pending') return '处理中';
+    }
+    if (key === 'targetType' && normalized === 'node') return '流程节点';
+    if (key === 'targetType' && normalized === 'record') return '业务记录';
+    if (key === 'nodeType' && normalized === 'usertask') return '审批任务';
+    if (key === 'nodeType' && normalized === 'sequenceflow') return '流程连线';
+    if (key === 'nodeType' && normalized === 'exclusivegateway') return '排他网关';
+    if (key === 'nodeType' && normalized === 'inclusivegateway') return '包容网关';
+    if (key === 'bindingSurface' && normalized === 'node rulebinding') return '节点规则绑定';
+    if (key === 'bindingSurface' && normalized === 'edge conditionspec') return '连线条件';
+    if (key === 'bindingKind' && normalized === 'decision_ref') return '决策引用';
+    if (key === 'bindingKind' && normalized === 'condition') return '条件表达式';
+    if (key === 'decisionStatus') {
+      if (normalized === 'matched') return '命中';
+      if (normalized === 'not_matched') return '未命中';
+      if (normalized === 'unknown') return '未知';
+      if (normalized === 'error') return '错误';
+      if (normalized === 'skipped') return '已跳过';
+    }
+    if (key === 'errorCode' && normalized === 'decision_evaluation_failed') {
+      return '决策执行失败';
+    }
+    if (key === 'conditionResult') {
+      if (normalized === 'true') return '满足';
+      if (normalized === 'false') return '不满足';
+      if (normalized === 'unknown') return '未知';
+    }
+    if (key === 'processStatus') {
+      if (normalized === 'deployed') return '已部署';
+      if (normalized === 'draft') return '草稿';
+      if (normalized === 'suspended') return '已挂起';
+      if (normalized === 'archived') return '已归档';
+    }
+    if (key === 'actionPolicyTrigger' && normalized === 'sla_timeout') return 'SLA 超时';
+    if (key === 'actionPolicyTrigger' && normalized === 'sla_warning') return 'SLA 预警';
+    if (key === 'deadlineMode' && normalized === 'fixed') return '固定时长';
+    if (key === 'deadlineMode' && normalized === 'rule') return '规则计算';
+    if (key === 'slaRecordStatus') {
+      if (normalized === 'running') return '运行中';
+      if (normalized === 'completed') return '已完成';
+      if (normalized === 'breached') return '已超时';
+      if (normalized === 'cancelled' || normalized === 'canceled') return '已取消';
+    }
+    if (key === 'reason') {
+      if (normalized === 'granted') return '已授权';
+      if (normalized === 'denied') return '已拒绝';
+      if (normalized === 'rejected') return '已拒绝';
+      if (normalized.includes('condition guard not satisfied')) return '条件未满足';
+    }
+    if (key === 'fieldRiskLevel') {
+      if (normalized === 'field_permission_change') return '字段权限变更';
+      if (normalized === 'field_masked') return '字段脱敏';
+      if (normalized === 'field_governance_review') return '字段治理复核';
+    }
+    if (key === 'fieldRiskSummary') {
+      if (normalized === 'masked_permission_change') {
+        return '字段已脱敏且权限策略已变化，需使用低权限样本复核';
+      }
+      if (normalized === 'permission_change') {
+        return '字段权限策略已变化，需使用低权限样本复核';
+      }
+      if (normalized === 'masked_field') {
+        return '字段已脱敏，复核报告不会展示原始字段值';
+      }
+    }
+    return value;
+  }
+  if (typeof value === 'boolean') return value ? '是' : '否';
+  if (typeof value === 'number') return String(value);
+  if (Array.isArray(value)) {
+    if (key === 'candidateUserIds' || key === 'candidateGroupIds') {
+      return value.length > 0 ? value.map((item) => String(item)).join('、') : '无';
+    }
+    return `${value.length} 项`;
+  }
+  if (typeof value === 'object') {
+    return '已记录';
+  }
+  return String(value);
+}
+
+function formatReplayError(error: string, result: ModelPublishReplayResult): string {
+  const consumerType = result.step?.consumerType;
+  const normalized = error.toLowerCase();
+  if (consumerType === 'BPM_PROCESS' && result.outputs?.failClosed === true) {
+    if (normalized === 'bpm_rule_binding_fail_closed') {
+      return '规则绑定已失败关闭，未返回候选审批人或候选审批组';
+    }
+    return '决策执行失败，请检查绑定的决策版本、输入映射和兜底策略';
+  }
+  if (normalized === 'decision_evaluation_failed') return '决策执行失败';
+  if (normalized === 'bpm_rule_binding_fail_closed') return '规则绑定已失败关闭';
+  return error;
+}
+
 function normalizePageKind(page: RelatedPage): StandardPageKind | 'custom' {
   const raw = String(page.kind || page.type || '').toLowerCase();
   if (raw.includes('list')) return 'list';
@@ -214,14 +520,28 @@ export default function ModelDetailPage() {
 
   // 发布相关状态
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
-  const [publishPreview, setPublishPreview] = useState<{
-    modelCode: string;
-    ddlStatements: string[];
-    operationType: string;
-    affectedTables: string[];
-    riskAssessment: { level: string; description: string; warnings: string[] } | null;
-  } | null>(null);
+  const [publishPreview, setPublishPreview] = useState<PublishPreview | null>(null);
+  const [publishReplayReport, setPublishReplayReport] =
+    useState<ModelPublishReplayReport | null>(null);
+  const [publishImpactAcknowledged, setPublishImpactAcknowledged] = useState(false);
   const [publishLoading, setPublishLoading] = useState(false);
+  const [publishReplayLoading, setPublishReplayLoading] = useState(false);
+  const [publishReplaySampleMemberId, setPublishReplaySampleMemberId] = useState('');
+  const [publishReplaySamplePermissionCode, setPublishReplaySamplePermissionCode] = useState('');
+  const [publishReplaySampleRecordPid, setPublishReplaySampleRecordPid] = useState('');
+  const [publishReplaySampleRecordJson, setPublishReplaySampleRecordJson] = useState('{}');
+  const [publishReplaySampleError, setPublishReplaySampleError] = useState<string | null>(null);
+  const [publishReplaySlaProcessInstanceId, setPublishReplaySlaProcessInstanceId] = useState('');
+  const [publishReplaySlaTaskId, setPublishReplaySlaTaskId] = useState('');
+  const [publishReplaySlaTenantId, setPublishReplaySlaTenantId] = useState('');
+  const [publishReplaySlaProcessKey, setPublishReplaySlaProcessKey] = useState('');
+  const [publishReplaySlaRecordJson, setPublishReplaySlaRecordJson] = useState('{}');
+  const [publishReplaySlaSampleError, setPublishReplaySlaSampleError] = useState<string | null>(null);
+  const [publishReplayBpmProcessInstanceId, setPublishReplayBpmProcessInstanceId] = useState('');
+  const [publishReplayBpmProcessKey, setPublishReplayBpmProcessKey] = useState('');
+  const [publishReplayBpmRecordPid, setPublishReplayBpmRecordPid] = useState('');
+  const [publishReplayBpmRecordJson, setPublishReplayBpmRecordJson] = useState('{}');
+  const [publishReplayBpmSampleError, setPublishReplayBpmSampleError] = useState<string | null>(null);
 
   // CRUD向导状态
   const [showCrudWizard, setShowCrudWizard] = useState(false);
@@ -256,6 +576,32 @@ export default function ModelDetailPage() {
   const customPages = useMemo(
     () => (pages as RelatedPage[]).filter((page) => normalizePageKind(page) === 'custom'),
     [pages],
+  );
+
+  const permissionReplayStep = useMemo(
+    () =>
+      publishPreview?.governance?.replayPlan?.find(
+        (step) => step.consumerType === 'PERMISSION_POLICY',
+      ) || null,
+    [publishPreview],
+  );
+
+  const slaNodeReplayStep = useMemo(
+    () =>
+      publishPreview?.governance?.replayPlan?.find(
+        (step) =>
+          step.consumerType === 'SLA_RULE' &&
+          String(step.metadata?.targetType || '').toUpperCase() === 'NODE',
+      ) || null,
+    [publishPreview],
+  );
+
+  const bpmReplayStep = useMemo(
+    () =>
+      publishPreview?.governance?.replayPlan?.find(
+        (step) => step.consumerType === 'BPM_PROCESS',
+      ) || null,
+    [publishPreview],
   );
 
   const primaryDesignerPage = useMemo(
@@ -563,7 +909,32 @@ export default function ModelDetailPage() {
     setPublishLoading(true);
     try {
       const preview = await modelService.previewPublishDDL(pid!);
+      const permissionStep = preview.governance?.replayPlan?.find(
+        (step) => step.consumerType === 'PERMISSION_POLICY',
+      );
       setPublishPreview(preview);
+      setPublishReplayReport(null);
+      setPublishImpactAcknowledged(false);
+      setPublishReplaySampleMemberId('');
+      setPublishReplaySamplePermissionCode(
+        metadataString(permissionStep?.metadata, 'permissionCode') ||
+          permissionStep?.sourceCode ||
+          '',
+      );
+      setPublishReplaySampleRecordPid('');
+      setPublishReplaySampleRecordJson('{}');
+      setPublishReplaySampleError(null);
+      setPublishReplaySlaProcessInstanceId('');
+      setPublishReplaySlaTaskId('');
+      setPublishReplaySlaTenantId('');
+      setPublishReplaySlaProcessKey('');
+      setPublishReplaySlaRecordJson('{}');
+      setPublishReplaySlaSampleError(null);
+      setPublishReplayBpmProcessInstanceId('');
+      setPublishReplayBpmProcessKey('');
+      setPublishReplayBpmRecordPid('');
+      setPublishReplayBpmRecordJson('{}');
+      setPublishReplayBpmSampleError(null);
       setShowPublishConfirm(true);
     } catch (error) {
       console.error('Failed to preview DDL:', error);
@@ -574,15 +945,245 @@ export default function ModelDetailPage() {
   }, [pid, showErrorToast]);
 
   /**
+   * 生成发布后复核报告。没有代表性样本时只收集可自动化/需人工项，不伪装成已执行。
+   */
+  const buildPermissionReplaySampleContext = useCallback(() => {
+    const memberId = publishReplaySampleMemberId.trim();
+    if (!/^\d+$/.test(memberId) || /^0+$/.test(memberId)) {
+      throw new Error('请填写有效的权限成员 ID');
+    }
+
+    let recordData: Record<string, unknown> = {};
+    const rawRecordJson = publishReplaySampleRecordJson.trim();
+    if (rawRecordJson) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawRecordJson) as unknown;
+      } catch {
+        throw new Error('记录数据必须是有效 JSON 对象');
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('记录数据必须是 JSON 对象');
+      }
+      recordData = parsed as Record<string, unknown>;
+    }
+
+    const permission: Record<string, unknown> = { memberId };
+    const permissionCode = publishReplaySamplePermissionCode.trim();
+    if (permissionCode) {
+      permission.permissionCode = permissionCode;
+    }
+
+    const record: Record<string, unknown> = { data: recordData };
+    const recordPid = publishReplaySampleRecordPid.trim();
+    if (recordPid) {
+      record.pid = recordPid;
+    }
+
+    return { permission, record };
+  }, [
+    publishReplaySampleMemberId,
+    publishReplaySamplePermissionCode,
+    publishReplaySampleRecordJson,
+    publishReplaySampleRecordPid,
+  ]);
+
+  const buildSlaNodeReplaySampleContext = useCallback(() => {
+    const processInstanceId = publishReplaySlaProcessInstanceId.trim();
+    if (!processInstanceId) {
+      throw new Error('请填写流程实例 ID');
+    }
+
+    const tenantId = publishReplaySlaTenantId.trim();
+    if (!/^\d+$/.test(tenantId) || /^0+$/.test(tenantId)) {
+      throw new Error('请填写有效的租户 ID');
+    }
+
+    let recordData: Record<string, unknown> = {};
+    const rawRecordJson = publishReplaySlaRecordJson.trim();
+    if (rawRecordJson) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawRecordJson) as unknown;
+      } catch {
+        throw new Error('SLA 记录数据必须是有效 JSON 对象');
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('SLA 记录数据必须是 JSON 对象');
+      }
+      recordData = parsed as Record<string, unknown>;
+    }
+
+    const bpm: Record<string, unknown> = {
+      processInstanceId,
+      tenantId,
+    };
+    const taskId = publishReplaySlaTaskId.trim();
+    if (taskId) {
+      bpm.taskId = taskId;
+    }
+    const processKey = publishReplaySlaProcessKey.trim();
+    if (processKey) {
+      bpm.processKey = processKey;
+    }
+
+    return { bpm, record: { data: recordData } };
+  }, [
+    publishReplaySlaProcessInstanceId,
+    publishReplaySlaProcessKey,
+    publishReplaySlaRecordJson,
+    publishReplaySlaTaskId,
+    publishReplaySlaTenantId,
+  ]);
+
+  const buildBpmReplaySampleContext = useCallback(() => {
+    let recordData: Record<string, unknown> = {};
+    const rawRecordJson = publishReplayBpmRecordJson.trim();
+    if (rawRecordJson) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(rawRecordJson) as unknown;
+      } catch {
+        throw new Error('BPM 记录数据必须是有效 JSON 对象');
+      }
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('BPM 记录数据必须是 JSON 对象');
+      }
+      recordData = parsed as Record<string, unknown>;
+    }
+
+    const context: Record<string, Record<string, unknown>> = {
+      record: { data: recordData },
+    };
+    const recordPid = publishReplayBpmRecordPid.trim();
+    if (recordPid) {
+      context.record.pid = recordPid;
+    }
+
+    const bpm: Record<string, unknown> = {};
+    const processInstanceId = publishReplayBpmProcessInstanceId.trim();
+    if (processInstanceId) {
+      bpm.processInstanceId = processInstanceId;
+    }
+    const processKey = publishReplayBpmProcessKey.trim();
+    if (processKey) {
+      bpm.processKey = processKey;
+    }
+    if (Object.keys(bpm).length > 0) {
+      context.bpm = bpm;
+    }
+    return context;
+  }, [
+    publishReplayBpmProcessInstanceId,
+    publishReplayBpmProcessKey,
+    publishReplayBpmRecordJson,
+    publishReplayBpmRecordPid,
+  ]);
+
+  const handlePublishReplay = useCallback(async (
+    replayMode: 'default' | 'permission' | 'sla-node' | 'bpm' = 'default',
+  ) => {
+    setPublishReplaySampleError(null);
+    setPublishReplaySlaSampleError(null);
+    setPublishReplayBpmSampleError(null);
+    let sampleContext: Record<string, Record<string, unknown>> | undefined;
+    if (replayMode === 'permission') {
+      try {
+        sampleContext = buildPermissionReplaySampleContext();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : '权限样本无效';
+        setPublishReplaySampleError(message);
+        return;
+      }
+    } else if (replayMode === 'sla-node') {
+      try {
+        sampleContext = buildSlaNodeReplaySampleContext();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'SLA 节点样本无效';
+        setPublishReplaySlaSampleError(message);
+        return;
+      }
+    } else if (replayMode === 'bpm') {
+      try {
+        sampleContext = buildBpmReplaySampleContext();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'BPM 样本无效';
+        setPublishReplayBpmSampleError(message);
+        return;
+      }
+    }
+
+    setPublishReplayLoading(true);
+    try {
+      const report = await modelService.replayPublishImpact(pid!, {
+        executeAutomated: replayMode !== 'default',
+        correlationId:
+          replayMode === 'permission'
+            ? `model-publish-${model.code}-permission`
+            : replayMode === 'sla-node'
+              ? `model-publish-${model.code}-sla-node`
+              : replayMode === 'bpm'
+                ? `model-publish-${model.code}-bpm`
+              : `model-publish-${model.code}`,
+        sampleContext,
+      });
+      setPublishReplayReport(report);
+    } catch (error) {
+      console.error('Failed to replay model publish impact:', error);
+      const message = error instanceof Error ? error.message : '生成发布后复核报告失败';
+      if (replayMode === 'sla-node') {
+        setPublishReplaySlaSampleError(message);
+      } else if (replayMode === 'bpm') {
+        setPublishReplayBpmSampleError(message);
+      } else {
+        setPublishReplaySampleError(message);
+      }
+      showErrorToast(message);
+    } finally {
+      setPublishReplayLoading(false);
+    }
+  }, [
+    buildBpmReplaySampleContext,
+    buildPermissionReplaySampleContext,
+    buildSlaNodeReplaySampleContext,
+    model.code,
+    pid,
+    showErrorToast,
+  ]);
+
+  /**
    * 确认发布
    */
   const handlePublishConfirm = useCallback(async () => {
     setPublishLoading(true);
     try {
-      await modelService.publish(pid!);
+      await modelService.publish(pid!, {
+        impactAcknowledged: publishImpactAcknowledged,
+        acknowledgementNote: publishPreview?.governance?.requiresAcknowledgement
+          ? 'Model publish impact acknowledged in model detail publish dialog'
+          : undefined,
+      });
       showSuccessToast('模型发布成功');
       setShowPublishConfirm(false);
       setPublishPreview(null);
+      setPublishReplayReport(null);
+      setPublishImpactAcknowledged(false);
+      setPublishReplaySampleMemberId('');
+      setPublishReplaySamplePermissionCode('');
+      setPublishReplaySampleRecordPid('');
+      setPublishReplaySampleRecordJson('{}');
+      setPublishReplaySampleError(null);
+      setPublishReplaySlaProcessInstanceId('');
+      setPublishReplaySlaTaskId('');
+      setPublishReplaySlaTenantId('');
+      setPublishReplaySlaProcessKey('');
+      setPublishReplaySlaRecordJson('{}');
+      setPublishReplaySlaSampleError(null);
+      setPublishReplayBpmProcessInstanceId('');
+      setPublishReplayBpmProcessKey('');
+      setPublishReplayBpmRecordPid('');
+      setPublishReplayBpmRecordJson('{}');
+      setPublishReplayBpmSampleError(null);
       // Reload page to refresh model status
       window.location.reload();
     } catch (error) {
@@ -591,7 +1192,7 @@ export default function ModelDetailPage() {
     } finally {
       setPublishLoading(false);
     }
-  }, [pid, showSuccessToast, showErrorToast]);
+  }, [pid, publishImpactAcknowledged, publishPreview, showSuccessToast, showErrorToast]);
 
   /**
    * 取消发布
@@ -824,12 +1425,16 @@ export default function ModelDetailPage() {
               编辑模型
             </button>
             <details className="group relative">
-              <summary className="list-none rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none">
+              <summary
+                data-testid="model-more-actions"
+                className="list-none rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 focus:ring-2 focus:ring-gray-500 focus:outline-none"
+              >
                 更多
               </summary>
               <div className="absolute right-0 z-10 mt-2 w-44 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
                 {model.status === 'draft' && (
                   <button
+                    data-testid="model-publish-action"
                     onClick={handlePublishClick}
                     className="block w-full rounded-lg px-3 py-2 text-left text-sm text-green-700 hover:bg-green-50"
                     disabled={loading || publishLoading}
@@ -1525,14 +2130,538 @@ export default function ModelDetailPage() {
 
       {/* 发布确认对话框 */}
       {showPublishConfirm && publishPreview && (
-        <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black">
+        <div
+          data-testid="model-publish-dialog"
+          className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black"
+        >
           <div className="mx-4 flex max-h-[80vh] w-full max-w-2xl flex-col rounded-lg bg-white shadow-xl">
             <div className="border-b border-gray-200 px-6 py-4">
               <h3 className="text-lg font-semibold text-gray-900">确认发布模型</h3>
-              <p className="mt-1 text-sm text-gray-500">以下 DDL 语句将被执行以创建数据库表：</p>
+              <p className="mt-1 text-sm text-gray-500">发布前请核对表结构变更和规则中心影响。</p>
             </div>
 
             <div className="flex-1 overflow-y-auto px-6 py-4">
+              {publishPreview.governance && (
+                <div
+                  data-testid="model-publish-governance"
+                  className={`mb-4 rounded-md border p-4 ${
+                    publishPreview.governance.requiresAcknowledgement
+                      ? 'border-red-200 bg-red-50'
+                      : 'border-emerald-200 bg-emerald-50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-900">规则中心影响治理</h4>
+                      <p className="mt-1 text-sm text-gray-700">
+                        {publishPreview.governance.requiresAcknowledgement
+                          ? '检测到已发布规则资产或消费方引用了本模型字段，发布前必须确认影响面。'
+                          : '未检测到需要阻断发布的规则中心影响。'}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded px-2 py-1 text-xs font-medium ${
+                        publishPreview.governance.requiresAcknowledgement
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}
+                    >
+                      {publishPreview.governance.requiresAcknowledgement ? '需确认' : '可发布'}
+                    </span>
+                  </div>
+
+                  {publishPreview.governance.schemaChangeKinds?.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {publishPreview.governance.schemaChangeKinds.map((kind) => (
+                        <span
+                          key={kind}
+                          className="rounded border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
+                        >
+                          {kind}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {publishPreview.governance.fieldImpacts?.length ? (
+                    <div className="mt-4 space-y-2">
+                      {publishPreview.governance.fieldImpacts.map((impact) => (
+                        <div
+                          key={impact.fieldRef}
+                          className="rounded border border-white/70 bg-white/80 p-3 text-sm"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="font-medium text-gray-900">{impact.fieldRef}</span>
+                            <span className="text-xs text-gray-500">
+                              {impact.references?.length || 0} 个引用
+                            </span>
+                          </div>
+                          {impact.risk?.summary && (
+                            <p className="mt-1 text-gray-700">{impact.risk.summary}</p>
+                          )}
+                          {impact.risk?.counts && Object.keys(impact.risk.counts).length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {Object.entries(impact.risk.counts).map(([key, value]) => (
+                                <span
+                                  key={key}
+                                  className="rounded bg-gray-100 px-2 py-1 text-xs text-gray-700"
+                                >
+                                  {key}: {value}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {publishPreview.governance.replayPlan?.length ? (
+                    <div
+                      data-testid="model-publish-replay-plan"
+                      className="mt-4 rounded border border-white/70 bg-white/80 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs font-semibold text-gray-600">发布后复核计划</p>
+                          <span className="text-xs text-gray-500">
+                            {publishPreview.governance.replayPlan.length} 个消费方
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          data-testid="model-publish-run-replay"
+                          onClick={() => handlePublishReplay('default')}
+                          className="rounded border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                          disabled={publishReplayLoading}
+                        >
+                          {publishReplayLoading ? '生成中...' : '生成复核报告'}
+                        </button>
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {publishPreview.governance.replayPlan.map((step, index) => {
+                          const source =
+                            step.sourceName ||
+                            step.sourceCode ||
+                            step.sourcePid ||
+                            step.consumerType ||
+                            '未命名消费方';
+                          return (
+                            <div
+                              key={`${step.consumerType || 'consumer'}-${step.sourcePid || step.sourceCode || index}`}
+                              className="rounded border border-gray-100 bg-gray-50 p-3"
+                            >
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700">
+                                  {step.consumerLabel || step.consumerType || '规则消费方'}
+                                </span>
+                                {step.required && (
+                                  <span className="rounded bg-red-50 px-2 py-1 text-xs font-medium text-red-700">
+                                    必做
+                                  </span>
+                                )}
+                                <span className="text-sm font-medium text-gray-900">{source}</span>
+                                {step.sourceVersion && (
+                                  <span className="text-xs text-gray-500">v{step.sourceVersion}</span>
+                                )}
+                              </div>
+                              {(step.fieldRef || step.targetPath || step.binding) && (
+                                <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600">
+                                  {step.fieldRef && <span>字段 {step.fieldRef}</span>}
+                                  {step.targetPath && <span>路径 {step.targetPath}</span>}
+                                  {step.binding && <span>绑定 {step.binding}</span>}
+                                </div>
+                              )}
+                              {step.recommendedAction && (
+                                <p className="mt-2 text-sm text-gray-700">{step.recommendedAction}</p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {permissionReplayStep && (
+                        <div
+                          data-testid="model-publish-permission-sample"
+                          className="mt-4 rounded border border-amber-100 bg-amber-50/80 p-3"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-semibold text-amber-900">权限样本复核</p>
+                              <p className="mt-1 text-xs text-amber-800">
+                                用代表性成员和记录数据执行权限策略复核。
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              data-testid="model-publish-run-permission-replay"
+                              onClick={() => handlePublishReplay('permission')}
+                              className="rounded border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-800 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={publishReplayLoading}
+                            >
+                              {publishReplayLoading ? '执行中...' : '带样本执行'}
+                            </button>
+                          </div>
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <label className="block text-xs font-medium text-gray-700">
+                              成员 ID
+                              <input
+                                data-testid="model-publish-permission-member-id"
+                                aria-label="permission-replay-member-id"
+                                type="number"
+                                min="1"
+                                value={publishReplaySampleMemberId}
+                                onChange={(event) =>
+                                  setPublishReplaySampleMemberId(event.target.value)
+                                }
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                              />
+                            </label>
+                            <label className="block text-xs font-medium text-gray-700">
+                              权限标识
+                              <input
+                                data-testid="model-publish-permission-code"
+                                aria-label="permission-replay-permission-code"
+                                value={publishReplaySamplePermissionCode}
+                                onChange={(event) =>
+                                  setPublishReplaySamplePermissionCode(event.target.value)
+                                }
+                                placeholder={
+                                  metadataString(permissionReplayStep.metadata, 'permissionCode') ||
+                                  permissionReplayStep.sourceCode ||
+                                  'model.order.approve'
+                                }
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                              />
+                            </label>
+                            <label className="block text-xs font-medium text-gray-700">
+                              记录 PID
+                              <input
+                                data-testid="model-publish-permission-record-pid"
+                                aria-label="permission-replay-record-pid"
+                                value={publishReplaySampleRecordPid}
+                                onChange={(event) =>
+                                  setPublishReplaySampleRecordPid(event.target.value)
+                                }
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                              />
+                            </label>
+                            <label className="block text-xs font-medium text-gray-700 md:col-span-2">
+                              记录数据 JSON
+                              <textarea
+                                data-testid="model-publish-permission-record-json"
+                                aria-label="permission-replay-record-json"
+                                value={publishReplaySampleRecordJson}
+                                onChange={(event) =>
+                                  setPublishReplaySampleRecordJson(event.target.value)
+                                }
+                                rows={4}
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 font-mono text-sm text-gray-900"
+                              />
+                            </label>
+                          </div>
+                          {publishReplaySampleError && (
+                            <p
+                              data-testid="model-publish-permission-sample-error"
+                              className="mt-2 text-xs text-red-700"
+                            >
+                              {publishReplaySampleError}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {bpmReplayStep && (
+                        <div
+                          data-testid="model-publish-bpm-sample"
+                          className="mt-4 rounded border border-cyan-100 bg-cyan-50/80 p-3"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-semibold text-cyan-950">BPM 流程样本复核</p>
+                              <p className="mt-1 text-xs text-cyan-900">
+                                用流程实例和业务记录样本复核网关条件、审批人分派等规则绑定。
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              data-testid="model-publish-run-bpm-replay"
+                              onClick={() => handlePublishReplay('bpm')}
+                              className="rounded border border-cyan-300 bg-white px-3 py-1.5 text-xs font-medium text-cyan-900 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={publishReplayLoading}
+                            >
+                              {publishReplayLoading ? '执行中...' : '带流程样本执行'}
+                            </button>
+                          </div>
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <label className="block text-xs font-medium text-gray-700">
+                              流程实例 ID
+                              <input
+                                data-testid="model-publish-bpm-process-instance-id"
+                                aria-label="bpm-replay-process-instance-id"
+                                value={publishReplayBpmProcessInstanceId}
+                                onChange={(event) =>
+                                  setPublishReplayBpmProcessInstanceId(event.target.value)
+                                }
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                              />
+                            </label>
+                            <label className="block text-xs font-medium text-gray-700">
+                              流程标识
+                              <input
+                                data-testid="model-publish-bpm-process-key"
+                                aria-label="bpm-replay-process-key"
+                                value={publishReplayBpmProcessKey}
+                                onChange={(event) => setPublishReplayBpmProcessKey(event.target.value)}
+                                placeholder={
+                                  metadataString(bpmReplayStep.metadata, 'processKey') ||
+                                  bpmReplayStep.sourceCode ||
+                                  'approval_flow'
+                                }
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                              />
+                            </label>
+                            <label className="block text-xs font-medium text-gray-700">
+                              记录 PID
+                              <input
+                                data-testid="model-publish-bpm-record-pid"
+                                aria-label="bpm-replay-record-pid"
+                                value={publishReplayBpmRecordPid}
+                                onChange={(event) => setPublishReplayBpmRecordPid(event.target.value)}
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                              />
+                            </label>
+                            <label className="block text-xs font-medium text-gray-700 md:col-span-2">
+                              记录数据 JSON
+                              <textarea
+                                data-testid="model-publish-bpm-record-json"
+                                aria-label="bpm-replay-record-json"
+                                value={publishReplayBpmRecordJson}
+                                onChange={(event) => setPublishReplayBpmRecordJson(event.target.value)}
+                                rows={3}
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 font-mono text-sm text-gray-900"
+                              />
+                            </label>
+                          </div>
+                          {publishReplayBpmSampleError && (
+                            <p
+                              data-testid="model-publish-bpm-sample-error"
+                              className="mt-2 text-xs text-red-700"
+                            >
+                              {publishReplayBpmSampleError}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {slaNodeReplayStep && (
+                        <div
+                          data-testid="model-publish-sla-node-sample"
+                          className="mt-4 rounded border border-sky-100 bg-sky-50/80 p-3"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-semibold text-sky-900">SLA 节点样本复核</p>
+                              <p className="mt-1 text-xs text-sky-800">
+                                用真实流程实例和任务样本触发节点级 SLA 复核。
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              data-testid="model-publish-run-sla-node-replay"
+                              onClick={() => handlePublishReplay('sla-node')}
+                              className="rounded border border-sky-300 bg-white px-3 py-1.5 text-xs font-medium text-sky-800 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                              disabled={publishReplayLoading}
+                            >
+                              {publishReplayLoading ? '执行中...' : '带流程样本执行'}
+                            </button>
+                          </div>
+                          <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <label className="block text-xs font-medium text-gray-700">
+                              流程实例 ID
+                              <input
+                                data-testid="model-publish-sla-process-instance-id"
+                                aria-label="sla-node-replay-process-instance-id"
+                                value={publishReplaySlaProcessInstanceId}
+                                onChange={(event) =>
+                                  setPublishReplaySlaProcessInstanceId(event.target.value)
+                                }
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                              />
+                            </label>
+                            <label className="block text-xs font-medium text-gray-700">
+                              租户 ID
+                              <input
+                                data-testid="model-publish-sla-tenant-id"
+                                aria-label="sla-node-replay-tenant-id"
+                                type="number"
+                                min="1"
+                                value={publishReplaySlaTenantId}
+                                onChange={(event) => setPublishReplaySlaTenantId(event.target.value)}
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                              />
+                            </label>
+                            <label className="block text-xs font-medium text-gray-700">
+                              任务 ID
+                              <input
+                                data-testid="model-publish-sla-task-id"
+                                aria-label="sla-node-replay-task-id"
+                                value={publishReplaySlaTaskId}
+                                onChange={(event) => setPublishReplaySlaTaskId(event.target.value)}
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                              />
+                            </label>
+                            <label className="block text-xs font-medium text-gray-700">
+                              流程标识
+                              <input
+                                data-testid="model-publish-sla-process-key"
+                                aria-label="sla-node-replay-process-key"
+                                value={publishReplaySlaProcessKey}
+                                onChange={(event) => setPublishReplaySlaProcessKey(event.target.value)}
+                                placeholder={
+                                  metadataString(slaNodeReplayStep.metadata, 'processKey') ||
+                                  'approval_flow'
+                                }
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 text-sm text-gray-900"
+                              />
+                            </label>
+                            <label className="block text-xs font-medium text-gray-700 md:col-span-2">
+                              记录数据 JSON
+                              <textarea
+                                data-testid="model-publish-sla-record-json"
+                                aria-label="sla-node-replay-record-json"
+                                value={publishReplaySlaRecordJson}
+                                onChange={(event) => setPublishReplaySlaRecordJson(event.target.value)}
+                                rows={3}
+                                className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1.5 font-mono text-sm text-gray-900"
+                              />
+                            </label>
+                          </div>
+                          {publishReplaySlaSampleError && (
+                            <p
+                              data-testid="model-publish-sla-node-sample-error"
+                              className="mt-2 text-xs text-red-700"
+                            >
+                              {publishReplaySlaSampleError}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                      {publishReplayReport && (
+                        <div
+                          data-testid="model-publish-replay-report"
+                          className="mt-4 rounded border border-blue-100 bg-blue-50/70 p-3"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs font-semibold text-blue-900">复核报告</p>
+                            <div className="flex flex-wrap gap-2 text-xs text-blue-800">
+                              <span>总数 {publishReplayReport.totalCount ?? 0}</span>
+                              <span>已执行 {publishReplayReport.executedCount ?? 0}</span>
+                              <span>需人工 {publishReplayReport.manualCount ?? 0}</span>
+                              <span>待样本 {publishReplayReport.needsInputCount ?? 0}</span>
+                            </div>
+                          </div>
+                          <div className="mt-3 space-y-2">
+                            {(publishReplayReport.results || []).map((result, index) => {
+                              const step = result.step;
+                              const source =
+                                step?.sourceName ||
+                                step?.sourceCode ||
+                                step?.sourcePid ||
+                                step?.consumerType ||
+                                '未命名消费方';
+                              const displayMessage = getReplayResultMessage(result);
+                              return (
+                                <div
+                                  key={`replay-result-${step?.consumerType || 'consumer'}-${step?.sourcePid || step?.sourceCode || index}`}
+                                  data-testid={`model-publish-replay-result-${step?.consumerType || 'unknown'}`}
+                                  className="rounded border border-blue-100 bg-white p-3"
+                                >
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="rounded bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
+                                      {step?.consumerLabel || step?.consumerType || '规则消费方'}
+                                    </span>
+                                    <span
+                                      className={`rounded px-2 py-1 text-xs font-medium ${getReplayStatusClass(result.status)}`}
+                                    >
+                                      {getReplayStatusLabel(result.status)}
+                                    </span>
+                                    <span className="text-sm font-medium text-gray-900">{source}</span>
+                                    {result.traceId && (
+                                      <span className="font-mono text-xs text-gray-500">
+                                        {result.traceId}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {displayMessage && (
+                                    <p className="mt-2 text-sm text-gray-700">{displayMessage}</p>
+                                  )}
+                                  {result.outputs && Object.keys(result.outputs).length > 0 && (
+                                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-600">
+                                      {Object.entries(result.outputs)
+                                        .filter(([key]) => shouldShowReplayOutput(key))
+                                        .map(([key, value]) => (
+                                          <span key={key} className="rounded bg-gray-100 px-2 py-1">
+                                            {formatReplayOutputLabel(key)}: {formatReplayOutputValue(key, value)}
+                                          </span>
+                                        ))}
+                                    </div>
+                                  )}
+                                  {result.errors?.length ? (
+                                    <ul className="mt-2 list-inside list-disc text-sm text-red-700">
+                                      {result.errors.map((error, errorIndex) => (
+                                        <li key={errorIndex}>{formatReplayError(error, result)}</li>
+                                      ))}
+                                    </ul>
+                                  ) : null}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {publishPreview.governance.migrationPlan && (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold text-gray-600">迁移计划</p>
+                      <p className="mt-1 text-sm text-gray-700">
+                        {publishPreview.governance.migrationPlan}
+                      </p>
+                    </div>
+                  )}
+
+                  {publishPreview.governance.historicalVersionPolicy && (
+                    <div className="mt-4">
+                      <p className="text-xs font-semibold text-gray-600">历史版本策略</p>
+                      <p className="mt-1 text-sm text-gray-700">
+                        {publishPreview.governance.historicalVersionPolicy}
+                      </p>
+                    </div>
+                  )}
+
+                  {publishPreview.governance.warnings?.length ? (
+                    <ul className="mt-3 list-inside list-disc text-sm text-amber-700">
+                      {publishPreview.governance.warnings.map((warning, index) => (
+                        <li key={index}>{warning}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+
+                  {publishPreview.governance.requiresAcknowledgement && (
+                    <label className="mt-4 flex items-start gap-2 text-sm text-gray-800">
+                      <input
+                        data-testid="model-publish-impact-ack"
+                        aria-label="model-publish-impact-ack"
+                        type="checkbox"
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600"
+                        checked={publishImpactAcknowledged}
+                        onChange={(event) => setPublishImpactAcknowledged(event.target.checked)}
+                      />
+                      <span>我已核对受影响的规则资产、迁移计划和历史版本策略。</span>
+                    </label>
+                  )}
+                </div>
+              )}
+
               {publishPreview.riskAssessment && (
                 <div
                   className={`mb-4 rounded-md p-3 ${
@@ -1578,6 +2707,24 @@ export default function ModelDetailPage() {
                 onClick={() => {
                   setShowPublishConfirm(false);
                   setPublishPreview(null);
+                  setPublishReplayReport(null);
+                  setPublishImpactAcknowledged(false);
+                  setPublishReplaySampleMemberId('');
+                  setPublishReplaySamplePermissionCode('');
+                  setPublishReplaySampleRecordPid('');
+                  setPublishReplaySampleRecordJson('{}');
+                  setPublishReplaySampleError(null);
+                  setPublishReplaySlaProcessInstanceId('');
+                  setPublishReplaySlaTaskId('');
+                  setPublishReplaySlaTenantId('');
+                  setPublishReplaySlaProcessKey('');
+                  setPublishReplaySlaRecordJson('{}');
+                  setPublishReplaySlaSampleError(null);
+                  setPublishReplayBpmProcessInstanceId('');
+                  setPublishReplayBpmProcessKey('');
+                  setPublishReplayBpmRecordPid('');
+                  setPublishReplayBpmRecordJson('{}');
+                  setPublishReplayBpmSampleError(null);
                 }}
                 className="rounded-md border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
                 disabled={publishLoading}
@@ -1585,9 +2732,14 @@ export default function ModelDetailPage() {
                 取消
               </button>
               <button
+                data-testid="model-publish-confirm"
                 onClick={handlePublishConfirm}
-                className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700"
-                disabled={publishLoading}
+                className="rounded-md bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-gray-300"
+                disabled={
+                  publishLoading ||
+                  (Boolean(publishPreview.governance?.requiresAcknowledgement) &&
+                    !publishImpactAcknowledged)
+                }
               >
                 {publishLoading ? '发布中...' : '确认发布'}
               </button>

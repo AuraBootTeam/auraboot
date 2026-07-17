@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { PermissionMatrixDTO } from '../../types';
 import type { CapabilityGroup } from '../types';
@@ -12,9 +12,24 @@ vi.mock('~/contexts/I18nContext', () => ({
     },
   }),
 }));
-vi.mock('../../PolicyConfigDialog', () => ({ default: () => null }));
+vi.mock('~/shared/services/permissionService', () => ({
+  permissionService: {
+    getPolicy: vi.fn(),
+  },
+}));
+
+vi.mock('../../PolicyConfigDialog', () => ({
+  default: (props: any) =>
+    props.open ? (
+      <div data-testid="policy-dialog">
+        {props.permissionLabel}
+        <span data-testid="policy-dialog-initial-values">{JSON.stringify(props.initialValues ?? {})}</span>
+      </div>
+    ) : null,
+}));
 
 import AdvancedAtomicActions from '../AdvancedAtomicActions';
+import { permissionService } from '~/shared/services/permissionService';
 
 const matrix: PermissionMatrixDTO = {
   modules: [
@@ -48,6 +63,29 @@ const capabilityGroups: CapabilityGroup[] = [
   },
 ];
 
+const matrixWithPolicy: PermissionMatrixDTO = {
+  ...matrix,
+  modules: matrix.modules.map((module) => ({
+    ...module,
+    resources: module.resources.map((resource) => ({
+      ...resource,
+      actions: resource.actions.map((action) =>
+        action.code === 'crm.account.read'
+          ? {
+              ...action,
+              policySchema: JSON.stringify({
+                dynamicAbac: {
+                  type: 'rule-center',
+                  label: 'Dynamic ABAC',
+                },
+              }),
+            }
+          : action,
+      ),
+    })),
+  })),
+};
+
 function renderAdvanced(overrides: Partial<React.ComponentProps<typeof AdvancedAtomicActions>> = {}) {
   const onToggle = vi.fn();
   const onScopeChange = vi.fn();
@@ -65,7 +103,10 @@ function renderAdvanced(overrides: Partial<React.ComponentProps<typeof AdvancedA
 }
 
 describe('AdvancedAtomicActions', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(permissionService.getPolicy).mockResolvedValue({});
+  });
 
   it('is collapsed by default and expands on click', () => {
     renderAdvanced();
@@ -115,5 +156,30 @@ describe('AdvancedAtomicActions', () => {
     const bodyText = screen.getByTestId('advanced-atomic-body').textContent ?? '';
     expect(bodyText.indexOf('客户管理')).toBeLessThan(bodyText.indexOf('审计'));
     expect(bodyText.indexOf('crm.account.manage')).toBeLessThan(bodyText.indexOf('crm.account.audit'));
+  });
+
+  it('loads saved policy values before opening the policy dialog', async () => {
+    vi.mocked(permissionService.getPolicy).mockResolvedValue({
+      dynamicAbac: {
+        ruleBinding: {
+          consumerType: 'PERMISSION',
+          decisionBinding: {
+            decisionCode: 'permission_department_guard',
+          },
+        },
+      },
+    });
+
+    renderAdvanced({ matrix: matrixWithPolicy });
+    fireEvent.click(screen.getByTestId('advanced-atomic-toggle'));
+    fireEvent.click(screen.getByTestId('atomic-policy-crm.account.read'));
+
+    await waitFor(() => {
+      expect(permissionService.getPolicy).toHaveBeenCalledWith('r1', 'p1');
+    });
+    expect(await screen.findByTestId('policy-dialog')).toBeTruthy();
+    expect(screen.getByTestId('policy-dialog-initial-values').textContent).toContain(
+      'permission_department_guard',
+    );
   });
 });

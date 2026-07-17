@@ -16,16 +16,19 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -111,6 +114,26 @@ class AutomationServiceImplTenantIsolationTest {
                 .isInstanceOf(ValidationException.class);
 
         verify(automationTriggerService, never()).executeAutomation(any(), anyString(), any());
+    }
+
+    @Test
+    void triggerManually_sameTenantAutomationPassesSampleContextToExecutor() {
+        Automation automation = automationOwnedBy(CURRENT_TENANT);
+        when(automationMapper.findByPid("auto-x")).thenReturn(automation);
+
+        service.triggerManually("auto-x", "REQ-LONG-LEAVE-SAMPLE", Map.of(
+                "record", Map.of("wd_req_days", 5),
+                "source", "ui-test-run",
+                "manualTrigger", false));
+
+        ArgumentCaptor<Map<String, Object>> payloadCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(automationTriggerService).executeAutomation(
+                eq(automation),
+                eq("REQ-LONG-LEAVE-SAMPLE"),
+                payloadCaptor.capture());
+        assertThat(payloadCaptor.getValue()).containsEntry("source", "ui-test-run");
+        assertThat(payloadCaptor.getValue()).containsEntry("manualTrigger", true);
+        assertThat(payloadCaptor.getValue()).containsEntry("record", Map.of("wd_req_days", 5));
     }
 
     @Test

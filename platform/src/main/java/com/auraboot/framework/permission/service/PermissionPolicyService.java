@@ -29,10 +29,18 @@ public interface PermissionPolicyService {
      *                         treats recognized Rule Center bindings as guards; unrelated legacy
      *                         policy values remain config-only.
      */
-    record ConditionGuard(Long grantId, String conditionAstJson, String conditionsJson) {
+    record ConditionGuard(
+            Long grantId,
+            String conditionAstJson,
+            String conditionsJson,
+            String validationError) {
 
         public ConditionGuard(Long grantId, String conditionAstJson) {
-            this(grantId, conditionAstJson, null);
+            this(grantId, conditionAstJson, null, null);
+        }
+
+        public ConditionGuard(Long grantId, String conditionAstJson, String conditionsJson) {
+            this(grantId, conditionAstJson, conditionsJson, null);
         }
 
         /** An unconditional grant always satisfies the guard layer. */

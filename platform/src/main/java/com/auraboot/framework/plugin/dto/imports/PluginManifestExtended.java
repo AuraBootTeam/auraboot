@@ -171,6 +171,16 @@ public class PluginManifestExtended extends PluginManifest {
     private List<DecisionDefinitionSeedDTO> decisionDefinitions;
 
     /**
+     * Reusable condition fragments to seed through Rule Center lifecycle services.
+     */
+    private List<ConditionFragmentSeedDTO> conditionFragments;
+
+    /**
+     * EventPolicy definitions and first versions to seed through EventPolicy lifecycle services.
+     */
+    private List<EventPolicySeedDTO> eventPolicies;
+
+    /**
      * Automation definitions to seed through AutomationService.
      */
     private List<AutomationDefinitionDTO> automations;
@@ -361,6 +371,22 @@ public class PluginManifestExtended extends PluginManifest {
         if (decisionDefinitions != null) {
             for (DecisionDefinitionSeedDTO decision : decisionDefinitions) {
                 if (!decision.isValid()) {
+                    return false;
+                }
+            }
+        }
+
+        if (conditionFragments != null) {
+            for (ConditionFragmentSeedDTO fragment : conditionFragments) {
+                if (!fragment.isValid()) {
+                    return false;
+                }
+            }
+        }
+
+        if (eventPolicies != null) {
+            for (EventPolicySeedDTO policy : eventPolicies) {
+                if (!policy.isValid()) {
                     return false;
                 }
             }
@@ -566,6 +592,10 @@ public class PluginManifestExtended extends PluginManifest {
                 NotificationTemplateDefinitionDTO::getUnknownFields, NotificationTemplateDefinitionDTO::getUniqueKey);
         collectUnknownFieldWarnings(warnings, "decisionDefinitions", decisionDefinitions,
                 DecisionDefinitionSeedDTO::getUnknownFields, DecisionDefinitionSeedDTO::getDecisionCode);
+        collectUnknownFieldWarnings(warnings, "conditionFragments", conditionFragments,
+                ConditionFragmentSeedDTO::getUnknownFields, ConditionFragmentSeedDTO::getFragmentCode);
+        collectUnknownFieldWarnings(warnings, "eventPolicies", eventPolicies,
+                EventPolicySeedDTO::getUnknownFields, EventPolicySeedDTO::getPolicyCode);
         collectUnknownFieldWarnings(warnings, "automations", automations,
                 AutomationDefinitionDTO::getUnknownFields, AutomationDefinitionDTO::getAutomationKey);
 
@@ -627,6 +657,8 @@ public class PluginManifestExtended extends PluginManifest {
                 || (rules != null && !rules.isEmpty())
                 || (slaConfigs != null && !slaConfigs.isEmpty())
                 || (decisionDefinitions != null && !decisionDefinitions.isEmpty())
+                || (conditionFragments != null && !conditionFragments.isEmpty())
+                || (eventPolicies != null && !eventPolicies.isEmpty())
                 || (automations != null && !automations.isEmpty());
     }
 
@@ -656,6 +688,8 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("rules", rules != null ? rules.size() : 0),
                 Map.entry("slaConfigs", slaConfigs != null ? slaConfigs.size() : 0),
                 Map.entry("decisionDefinitions", decisionDefinitions != null ? decisionDefinitions.size() : 0),
+                Map.entry("conditionFragments", conditionFragments != null ? conditionFragments.size() : 0),
+                Map.entry("eventPolicies", eventPolicies != null ? eventPolicies.size() : 0),
                 Map.entry("automations", automations != null ? automations.size() : 0)
         );
     }
@@ -688,6 +722,10 @@ public class PluginManifestExtended extends PluginManifest {
         dashboards = sanitized(dashboards, d -> isCommentObject(d.getCode(), d.getUnknownFields()));
         decisionDefinitions = sanitized(decisionDefinitions,
                 d -> isCommentObject(d.getDecisionCode(), d.getUnknownFields()));
+        conditionFragments = sanitized(conditionFragments,
+                f -> isCommentObject(f.getFragmentCode(), f.getUnknownFields()));
+        eventPolicies = sanitized(eventPolicies,
+                p -> isCommentObject(p.getPolicyCode(), p.getUnknownFields()));
         automations = sanitized(automations,
                 a -> isCommentObject(a.getAutomationKey(), a.getUnknownFields()));
         i18nResources = sanitized(i18nResources, i -> i.getKey() == null || i.getKey().isBlank());

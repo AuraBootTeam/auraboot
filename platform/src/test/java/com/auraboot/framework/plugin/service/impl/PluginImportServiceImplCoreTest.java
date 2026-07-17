@@ -8,16 +8,29 @@ import com.auraboot.framework.automation.entity.TriggerConfig;
 import com.auraboot.framework.automation.service.AutomationService;
 import com.auraboot.framework.bpm.rule.DroolsRuleService;
 import com.auraboot.framework.bpm.service.SlaConfigService;
+import com.auraboot.framework.decision.dto.ConditionFragmentCreateRequest;
+import com.auraboot.framework.decision.dto.ConditionFragmentDTO;
 import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtDefinitionDTO;
 import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionDTO;
 import com.auraboot.framework.decision.model.DecisionValidateResult;
+import com.auraboot.framework.decision.service.ConditionFragmentService;
 import com.auraboot.framework.decision.service.DecisionVersionService;
 import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.decision.rule.DecisionBinding;
 import com.auraboot.framework.decision.rule.RuleBindingKind;
 import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.eventpolicy.entity.DrtPolicyDefinitionEntity;
+import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
+import com.auraboot.framework.eventpolicy.model.ConflictStrategy;
+import com.auraboot.framework.eventpolicy.model.DedupStrategy;
+import com.auraboot.framework.eventpolicy.model.ExecutionMode;
+import com.auraboot.framework.eventpolicy.model.FailureStrategy;
+import com.auraboot.framework.eventpolicy.model.MatchMode;
+import com.auraboot.framework.eventpolicy.model.PolicyPhase;
+import com.auraboot.framework.eventpolicy.service.EventPolicyDefinitionService;
+import com.auraboot.framework.eventpolicy.service.EventPolicyVersionService;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.i18n.compiler.I18nCompiler;
 import com.auraboot.framework.i18n.entity.I18nResource;
@@ -39,7 +52,9 @@ import com.auraboot.framework.plugin.config.PlatformProperties;
 import com.auraboot.framework.plugin.dto.PluginManifest;
 import com.auraboot.framework.plugin.dto.imports.AutomationDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.BindingRuleDTO;
+import com.auraboot.framework.plugin.dto.imports.ConditionFragmentSeedDTO;
 import com.auraboot.framework.plugin.dto.imports.DecisionDefinitionSeedDTO;
+import com.auraboot.framework.plugin.dto.imports.EventPolicySeedDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
 import com.auraboot.framework.plugin.dto.imports.ImportExecuteResult;
 import com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO;
@@ -49,6 +64,7 @@ import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.auraboot.framework.plugin.dto.imports.SavedViewDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.RolePermissionPolicyDefinitionDTO;
 import com.auraboot.framework.plugin.entity.PluginImportHistory;
 import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.entity.PluginResource;
@@ -148,6 +164,9 @@ class PluginImportServiceImplCoreTest {
     @Mock private AutomationService automationService;
     @Mock private DrtDefinitionService drtDefinitionService;
     @Mock private DecisionVersionService decisionVersionService;
+    @Mock private ConditionFragmentService conditionFragmentService;
+    @Mock private EventPolicyDefinitionService eventPolicyDefinitionService;
+    @Mock private EventPolicyVersionService eventPolicyVersionService;
     @Mock private JdbcTemplate jdbcTemplate;
 
     @InjectMocks private PluginImportServiceImpl service;
@@ -451,6 +470,157 @@ class PluginImportServiceImplCoreTest {
     }
 
     @Test
+    @DisplayName("importConditionFragments creates validates and publishes reusable condition fragment seeds")
+    void importConditionFragmentsCreatesValidatesAndPublishes() throws Exception {
+        JsonNode conditionSpec = new ObjectMapper().readTree("""
+                {
+                  "root": {
+                    "type": "group",
+                    "op": "AND",
+                    "children": [
+                      {
+                        "type": "compare",
+                        "left": { "type": "path", "scope": "process", "path": "taskKey", "dataType": "string" },
+                        "operator": "EQ",
+                        "right": { "type": "literal", "value": "task_manager_approve", "dataType": "string" }
+                      }
+                    ]
+                  },
+                  "decisionBindings": [
+                    { "decisionCode": "complaint_sla_deadline", "versionPolicy": "LATEST_PUBLISHED" }
+                  ]
+                }
+                """);
+        ConditionFragmentSeedDTO seed = ConditionFragmentSeedDTO.builder()
+                .fragmentCode("leave_sla_node_match")
+                .fragmentName("请假 SLA 节点匹配")
+                .scopeType("SLA")
+                .scopeRef("wd_leave_approval")
+                .ownerModule("workflow-demo")
+                .conditionSpec(conditionSpec)
+                .publish(true)
+                .build();
+        PluginManifestExtended manifest = baseManifest();
+        manifest.setConditionFragments(List.of(seed));
+
+        ConditionFragmentDTO draft = new ConditionFragmentDTO();
+        draft.setPid("fragment-pid");
+        draft.setFragmentCode("leave_sla_node_match");
+        draft.setStatus("DRAFT");
+        when(conditionFragmentService.create(any(ConditionFragmentCreateRequest.class))).thenReturn(draft);
+        ConditionFragmentDTO validated = new ConditionFragmentDTO();
+        validated.setPid("fragment-pid");
+        validated.setFragmentCode("leave_sla_node_match");
+        validated.setStatus("VALIDATED");
+        when(conditionFragmentService.validate("fragment-pid")).thenReturn(validated);
+
+        invokeImportConditionFragments(manifest);
+
+        ArgumentCaptor<ConditionFragmentCreateRequest> createCaptor =
+                ArgumentCaptor.forClass(ConditionFragmentCreateRequest.class);
+        verify(conditionFragmentService).create(createCaptor.capture());
+        assertThat(createCaptor.getValue().getFragmentCode()).isEqualTo("leave_sla_node_match");
+        assertThat(createCaptor.getValue().getScopeType()).isEqualTo("SLA");
+        assertThat(createCaptor.getValue().getConditionSpec().at("/decisionBindings/0/decisionCode").asText())
+                .isEqualTo("complaint_sla_deadline");
+        verify(conditionFragmentService).validate("fragment-pid");
+        verify(conditionFragmentService).publish("fragment-pid", true);
+    }
+
+    @Test
+    @DisplayName("importEventPolicies creates validates and publishes EventPolicy seed versions")
+    void importEventPoliciesCreatesValidatesAndPublishes() throws Exception {
+        JsonNode rulesJson = new ObjectMapper().readTree("""
+                [
+                  {
+                    "ruleCode": "notify_long_leave",
+                    "ruleName": "长假通知",
+                    "priority": 10,
+                    "enabled": true,
+                    "decisionBinding": {
+                      "decisionCode": "leave_request_automation",
+                      "versionPolicy": "LATEST_PUBLISHED"
+                    },
+                    "actions": [
+                      {
+                        "type": "NOTIFY",
+                        "target": "ROLE:wd_manager",
+                        "order": 10,
+                        "payload": { "title": "长假申请提醒" },
+                        "idempotencyKeyTemplate": "${record.pid}:notify_long_leave:NOTIFY"
+                      }
+                    ]
+                  }
+                ]
+                """);
+        EventPolicySeedDTO seed = EventPolicySeedDTO.builder()
+                .policyCode("leave_request_event_policy")
+                .policyName("请假事件动作策略")
+                .eventType("LEAVE_REQUEST_CREATED")
+                .targetType("MODEL")
+                .targetKey("wd_leave_request")
+                .phase("AFTER_COMMIT")
+                .matchMode("COLLECT_ALL")
+                .executionMode("ORDERED")
+                .failureStrategy("CONTINUE_ON_ERROR")
+                .conflictStrategy("REJECT_ON_CONFLICT")
+                .dedupStrategy("BY_IDEMPOTENCY_KEY")
+                .rulesJson(rulesJson)
+                .publish(true)
+                .build();
+        PluginManifestExtended manifest = baseManifest();
+        manifest.setEventPolicies(List.of(seed));
+
+        DrtPolicyDefinitionEntity definition = new DrtPolicyDefinitionEntity();
+        definition.setPolicyCode("leave_request_event_policy");
+        when(eventPolicyDefinitionService.create(
+                eq("leave_request_event_policy"),
+                eq("请假事件动作策略"),
+                eq("LEAVE_REQUEST_CREATED"),
+                eq("MODEL"),
+                eq("wd_leave_request"))).thenReturn(definition);
+
+        DrtPolicyVersionEntity draft = new DrtPolicyVersionEntity();
+        draft.setPid("policy-version-pid");
+        draft.setPolicyCode("leave_request_event_policy");
+        draft.setStatus("DRAFT");
+        when(eventPolicyVersionService.createDraft(
+                eq("leave_request_event_policy"),
+                eq(PolicyPhase.AFTER_COMMIT),
+                eq(MatchMode.COLLECT_ALL),
+                eq(ExecutionMode.ORDERED),
+                eq(FailureStrategy.CONTINUE_ON_ERROR),
+                eq(ConflictStrategy.REJECT_ON_CONFLICT),
+                eq(DedupStrategy.BY_IDEMPOTENCY_KEY),
+                eq(rulesJson))).thenReturn(draft);
+        DrtPolicyVersionEntity validated = new DrtPolicyVersionEntity();
+        validated.setPid("policy-version-pid");
+        validated.setPolicyCode("leave_request_event_policy");
+        validated.setStatus("VALIDATED");
+        when(eventPolicyVersionService.validate("policy-version-pid")).thenReturn(validated);
+
+        invokeImportEventPolicies(manifest);
+
+        verify(eventPolicyDefinitionService).create(
+                "leave_request_event_policy",
+                "请假事件动作策略",
+                "LEAVE_REQUEST_CREATED",
+                "MODEL",
+                "wd_leave_request");
+        verify(eventPolicyVersionService).createDraft(
+                "leave_request_event_policy",
+                PolicyPhase.AFTER_COMMIT,
+                MatchMode.COLLECT_ALL,
+                ExecutionMode.ORDERED,
+                FailureStrategy.CONTINUE_ON_ERROR,
+                ConflictStrategy.REJECT_ON_CONFLICT,
+                DedupStrategy.BY_IDEMPOTENCY_KEY,
+                rulesJson);
+        verify(eventPolicyVersionService).validate("policy-version-pid");
+        verify(eventPolicyVersionService).publish("policy-version-pid");
+    }
+
+    @Test
     @DisplayName("importAutomations creates Automation seed with Rule Center binding")
     void importAutomationsCreatesRuleCenterBoundAutomation() {
         TriggerConfig triggerConfig = new TriggerConfig();
@@ -489,7 +659,8 @@ class PluginImportServiceImplCoreTest {
                         .label("Notify manager")
                         .sequence(0)
                         .continueOnError(true)
-                        .config(Map.of("type", "in_app", "title", "长假申请提醒", "recipients", List.of()))
+                        .config(Map.of("type", "in_app", "title", "长假申请提醒",
+                                "recipients", List.of("ROLE:wd_manager")))
                         .build()))
                 .enabled(true)
                 .build();
@@ -514,6 +685,8 @@ class PluginImportServiceImplCoreTest {
         assertThat(request.getTriggerCondition())
                 .isEqualTo("#decision['outputs']['actionType'] == 'send_notification'");
         assertThat(request.getActions()).hasSize(1);
+        assertThat(request.getActions().get(0).getConfig().get("recipients"))
+                .isEqualTo(List.of("ROLE:wd_manager"));
         assertThat(request.getEnabled()).isTrue();
         assertThat(request.getTriggerConfig().getRuleBinding().consumerType()).isEqualTo("AUTOMATION");
         assertThat(request.getTriggerConfig().getRuleBinding().decisionBinding().decisionCode())
@@ -563,6 +736,52 @@ class PluginImportServiceImplCoreTest {
         RoleDefinitionDTO role = new RoleDefinitionDTO();
         role.setCode("role.x");
         role.setPermissions(List.of("perm.local"));
+        m.setRoles(List.of(role));
+
+        List<String> errors = service.validateManifest(m);
+
+        assertThat(errors).noneMatch(e -> e.contains("perm.local"));
+    }
+
+    @Test
+    @DisplayName("validateManifest flags role permissionPolicies referencing unassigned permission")
+    void validateManifest_rolePermissionPolicyMustReferenceAssignedPermission() {
+        PluginManifestExtended m = baseManifest();
+        PermissionDefinitionDTO perm = new PermissionDefinitionDTO();
+        perm.setCode("perm.local");
+        m.setPermissions(List.of(perm));
+
+        RoleDefinitionDTO role = new RoleDefinitionDTO();
+        role.setCode("role.x");
+        role.setPermissions(List.of("perm.other"));
+        role.setPermissionPolicies(List.of(RolePermissionPolicyDefinitionDTO.builder()
+                .permissionCode("perm.local")
+                .conditions(Map.of("dynamicAbac", Map.of("expectedMatched", true)))
+                .build()));
+        m.setRoles(List.of(role));
+
+        List<String> errors = service.validateManifest(m);
+
+        assertThat(errors).anyMatch(e -> e.contains("permissionPolicies")
+                && e.contains("permission not assigned to role")
+                && e.contains("perm.local"));
+    }
+
+    @Test
+    @DisplayName("validateManifest accepts role permissionPolicies for self-defined assigned permission")
+    void validateManifest_rolePermissionPolicySelfDefinedAssignedPermission() {
+        PluginManifestExtended m = baseManifest();
+        PermissionDefinitionDTO perm = new PermissionDefinitionDTO();
+        perm.setCode("perm.local");
+        m.setPermissions(List.of(perm));
+
+        RoleDefinitionDTO role = new RoleDefinitionDTO();
+        role.setCode("role.x");
+        role.setPermissions(List.of("perm.local"));
+        role.setPermissionPolicies(List.of(RolePermissionPolicyDefinitionDTO.builder()
+                .permissionCode("perm.local")
+                .conditions(Map.of("dynamicAbac", Map.of("expectedMatched", true)))
+                .build()));
         m.setRoles(List.of(role));
 
         List<String> errors = service.validateManifest(m);
@@ -1319,6 +1538,40 @@ class PluginImportServiceImplCoreTest {
         try {
             Method method = PluginImportServiceImpl.class.getDeclaredMethod(
                     "importDecisionDefinitions", PluginManifestExtended.class);
+            method.setAccessible(true);
+            method.invoke(service, manifest);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void invokeImportConditionFragments(PluginManifestExtended manifest) {
+        try {
+            Method method = PluginImportServiceImpl.class.getDeclaredMethod(
+                    "importConditionFragments", PluginManifestExtended.class);
+            method.setAccessible(true);
+            method.invoke(service, manifest);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void invokeImportEventPolicies(PluginManifestExtended manifest) {
+        try {
+            Method method = PluginImportServiceImpl.class.getDeclaredMethod(
+                    "importEventPolicies", PluginManifestExtended.class);
             method.setAccessible(true);
             method.invoke(service, manifest);
         } catch (InvocationTargetException e) {

@@ -6,7 +6,7 @@
  * duplication between DashboardPropertyField and Flow PropertyField.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Check } from 'lucide-react';
 import {
   BaseInput,
@@ -23,18 +23,25 @@ import {
   fetchAutomationOptions,
   fetchCommandOptions,
   fetchModelOptions,
+  fetchFieldOptions,
   fetchSemanticModelOptions,
 } from '~/shared/services/resourceSelectService';
 import { ExpressionEditor } from './expression';
+import type { FieldOption as ExpressionFieldOption } from './expression/types';
 import { DependentFieldSelect } from './DependentFieldSelect';
 import { DependentMultiSelect } from './DependentMultiSelect';
 import { LocalizedTextInput, type LocalizedTextValue } from './LocalizedTextInput';
 import { IconPicker } from '~/plugins/core-designer/components/studio/workbench/panels/property-editors/IconPicker';
 import { ArrayItemEditor } from './ArrayItemEditor';
+import { createDecisionApi } from '~/shared/decision/api/decisionApi';
+import { factCatalogToFieldOptions } from '~/shared/decision/ui/factCatalogAdapter';
+import type { FieldOption as DecisionFieldOption } from '~/shared/decision/ui/ConditionBuilder';
 import {
   DecisionRuleBindingBlock,
+  type DecisionOption,
   type RuleConsumerBindingDraft,
 } from '~/ui/smart/decision/DecisionRuleBindingBlock';
+import { getApiService } from '~/shared/services/ApiService';
 import { dictService } from '~/shared/services/dictService';
 import { toast } from 'sonner';
 import type { FieldAdapter } from '~/ui/field-adapter';
@@ -218,7 +225,8 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
     // ---- Expression / formula ----
     case 'expression':
       return (
-        <ExpressionEditor
+        <ExpressionField
+          schema={schema}
           adapter={adapter as any}
           name={schema.key}
           label={label}
@@ -323,11 +331,14 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
           helpText={helpText}
           mode={schema.ruleBindingMode ?? 'decision'}
           consumerType={schema.ruleBindingConsumerType}
-          consumerCode={schema.ruleBindingConsumerCode}
+          consumerCode={resolveRuleBindingConsumerCode(schema, adapter)}
+          consumerCodeField={schema.ruleBindingConsumerCodeField}
           consumerNodeId={schema.ruleBindingConsumerNodeId}
           showImpactPreview={Boolean(schema.ruleBindingShowImpactPreview)}
           showTestRunner={Boolean(schema.ruleBindingShowTestRunner)}
           initialDecisionCode={schema.ruleBindingInitialDecisionCode}
+          initialContextJson={resolveRuleBindingInitialContextJson(schema, adapter)}
+          fieldCatalogModelCode={resolveRuleBindingModelCode(schema, adapter)}
         />
       );
 
@@ -347,17 +358,15 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         ? (adapter.value as Record<string, unknown>[])
         : [];
 
-      const addLabel =
-        typeof schema.addButtonLabel === 'string' ? schema.addButtonLabel : '+ Add';
+      const addLabel = typeof schema.addButtonLabel === 'string' ? schema.addButtonLabel : '+ Add';
       const emptyPlaceholder =
         typeof schema.placeholder === 'string' ? schema.placeholder : undefined;
 
       const buildDefaultItem = (): Record<string, unknown> => {
         const obj: Record<string, unknown> = {};
         for (const field of schema.itemSchema ?? []) {
-          obj[field.key] = field.defaultValue !== undefined
-            ? field.defaultValue
-            : defaultForType(field.type);
+          obj[field.key] =
+            field.defaultValue !== undefined ? field.defaultValue : defaultForType(field.type);
         }
         return obj;
       };
@@ -423,6 +432,283 @@ export function PropertyFieldRenderer({ schema, adapter }: PropertyFieldRenderer
         />
       );
   }
+}
+
+function ExpressionField({
+  schema,
+  adapter,
+  name,
+  label,
+  helpText,
+}: {
+  schema: PropertySchema<string>;
+  adapter: FieldAdapter<unknown>;
+  name: string;
+  label?: string;
+  helpText?: string;
+}) {
+  const st = useSmartText();
+  const modelCode = resolveExpressionFieldCatalogModelCode(schema, adapter);
+  const [modelFields, setModelFields] = useState<ExpressionFieldOption[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!modelCode) {
+      setModelFields((current) => (current.length === 0 ? current : []));
+      return () => {
+        cancelled = true;
+      };
+    }
+    loadExpressionModelFields(modelCode, st)
+      .then((fields) => {
+        if (cancelled) return;
+        setModelFields(fields);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setModelFields((current) => (current.length === 0 ? current : []));
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [modelCode, st]);
+
+  const fields = useMemo(
+    () => [
+      ...modelFields,
+      ...triggerSampleFields(adapter.context, st),
+      ...decisionOutputFields(adapter.context, st),
+      ...workflowContextFields(adapter.context, st),
+    ],
+    [adapter.context, modelFields, st],
+  );
+
+  return (
+    <ExpressionEditor
+      adapter={adapter as any}
+      name={name}
+      label={label}
+      helpText={helpText}
+      modelFields={fields}
+    />
+  );
+}
+
+async function loadExpressionModelFields(
+  modelCode: string,
+  st: ReturnType<typeof useSmartText>,
+): Promise<ExpressionFieldOption[]> {
+  try {
+    const api = createDecisionFieldCatalogApi();
+    const fields = factCatalogToFieldOptions(await api.getFactCatalog(modelCode))
+      .map((field) => decisionFactFieldToExpressionField(field, st))
+      .filter((field): field is ExpressionFieldOption => Boolean(field));
+    if (fields.length > 0) return fields;
+  } catch (_err) {
+    // Fall back to the legacy meta-model field endpoint for older runtimes.
+  }
+  const legacyFields = await fetchFieldOptions(modelCode);
+  return legacyFields.map((option) => ({
+    code: `record.${option.value}`,
+    name: option.label,
+    category: fieldCategoryFromDataType(option.description),
+    group: st('$i18n:expression.fieldGroup.currentRecord', '当前记录'),
+    insertion: `\${record.${option.value}}`,
+  }));
+}
+
+function createDecisionFieldCatalogApi() {
+  const service = getApiService();
+  return createDecisionApi({
+    get: (endpoint, params) => service.get(endpoint, params),
+    post: (endpoint, body) => service.post(endpoint, body),
+    delete: (endpoint) => service.delete(endpoint),
+  });
+}
+
+function decisionFactFieldToExpressionField(
+  field: DecisionFieldOption,
+  st: ReturnType<typeof useSmartText>,
+): ExpressionFieldOption | undefined {
+  const path = field.path?.trim();
+  if (!path) return undefined;
+  const code = `${field.scope}.${path}`;
+  return {
+    code,
+    name: field.label,
+    category: fieldCategoryFromDataType(field.dataType),
+    group: expressionFieldGroup(field, st),
+    insertion: `\${${code}}`,
+  };
+}
+
+function expressionFieldGroup(
+  field: DecisionFieldOption,
+  st: ReturnType<typeof useSmartText>,
+): string {
+  if (field.scope === 'record') {
+    return field.modelName || st('$i18n:expression.fieldGroup.currentRecord', '当前记录');
+  }
+  const labels: Partial<Record<DecisionFieldOption['scope'], string>> = {
+    actor: st('$i18n:expression.fieldGroup.actorContext', '操作者上下文'),
+    event: st('$i18n:expression.fieldGroup.eventContext', '事件上下文'),
+    process: st('$i18n:expression.fieldGroup.processContext', '流程上下文'),
+    task: st('$i18n:expression.fieldGroup.taskContext', '任务上下文'),
+    sla: st('$i18n:expression.fieldGroup.slaContext', 'SLA 上下文'),
+    tenant: st('$i18n:expression.fieldGroup.tenantContext', '租户上下文'),
+    time: st('$i18n:expression.fieldGroup.timeContext', '时间上下文'),
+    env: st('$i18n:expression.fieldGroup.envContext', '环境上下文'),
+  };
+  return labels[field.scope] || field.modelName || field.scope;
+}
+
+function resolveExpressionFieldCatalogModelCode(
+  schema: PropertySchema<string>,
+  adapter: FieldAdapter<unknown>,
+): string | undefined {
+  if (schema.expressionFieldCatalogModelCode?.trim()) {
+    return schema.expressionFieldCatalogModelCode.trim();
+  }
+  const field = schema.expressionFieldCatalogModelCodeField;
+  if (field) {
+    const value = adapter.context?.[field];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+  const contextModelCode = adapter.context?.modelCode;
+  if (typeof contextModelCode === 'string' && contextModelCode.trim()) {
+    return contextModelCode.trim();
+  }
+  const triggerModelCode = adapter.context?._flowTriggerModelCode;
+  return typeof triggerModelCode === 'string' && triggerModelCode.trim()
+    ? triggerModelCode.trim()
+    : undefined;
+}
+
+function fieldCategoryFromDataType(dataType?: string): ExpressionFieldOption['category'] {
+  const normalized = (dataType || '').toLowerCase();
+  if (['number', 'integer', 'long', 'decimal', 'double', 'float', 'money'].includes(normalized)) {
+    return 'number';
+  }
+  if (['boolean', 'bool'].includes(normalized)) {
+    return 'boolean';
+  }
+  if (['array', 'list', 'multiselect'].includes(normalized)) {
+    return 'array';
+  }
+  return 'string';
+}
+
+function triggerSampleFields(
+  context: Record<string, unknown> | undefined,
+  st: ReturnType<typeof useSmartText>,
+): ExpressionFieldOption[] {
+  const sample = firstPlainObject(context?._flowTriggerTestContext, context?.testContext);
+  const record = firstPlainObject(
+    isPlainObject(sample?.record) ? sample.record.data : undefined,
+    sample?.record,
+  );
+  if (!record) return [];
+  return Object.entries(record)
+    .filter(([, value]) => value == null || ['string', 'number', 'boolean'].includes(typeof value))
+    .map(([key, value]) => ({
+      code: `record.${key}`,
+      name: sampleFieldName(key, value),
+      category: fieldCategoryFromValue(value),
+      group: st('$i18n:expression.fieldGroup.triggerSample', '触发样例'),
+      insertion: `\${record.${key}}`,
+    }));
+}
+
+function decisionOutputFields(
+  context: Record<string, unknown> | undefined,
+  st: ReturnType<typeof useSmartText>,
+): ExpressionFieldOption[] {
+  const binding = parseRuleBindingValue(context?._flowTriggerRuleBinding ?? context?.ruleBinding);
+  const mappings = binding?.decisionBinding?.outputMappings ?? [];
+  return mappings
+    .map((mapping) => mapping.output)
+    .filter((output): output is string => typeof output === 'string' && output.trim().length > 0)
+    .map((output) => ({
+      code: `decision.outputs.${output}`,
+      name: output,
+      category: 'string' as const,
+      group: st('$i18n:expression.fieldGroup.ruleOutputs', '规则输出'),
+      insertion: `\${decision.outputs.${output}}`,
+    }));
+}
+
+function workflowContextFields(
+  context: Record<string, unknown> | undefined,
+  st: ReturnType<typeof useSmartText>,
+): ExpressionFieldOption[] {
+  const fields: ExpressionFieldOption[] = [
+    {
+      code: 'decision.matched',
+      name: st('$i18n:expression.variable.decisionMatched', '规则是否命中'),
+      category: 'boolean',
+      group: st('$i18n:expression.fieldGroup.decisionRuntime', '规则执行'),
+      insertion: '${decision.matched}',
+    },
+    {
+      code: 'decision.status',
+      name: st('$i18n:expression.variable.decisionStatus', '规则状态'),
+      category: 'string',
+      group: st('$i18n:expression.fieldGroup.decisionRuntime', '规则执行'),
+      insertion: '${decision.status}',
+    },
+  ];
+  const triggerType = context?._flowTriggerType;
+  if (triggerType === 'on_bpm_event') {
+    fields.push(
+      {
+        code: 'processKey',
+        name: st('$i18n:expression.variable.processKey', '流程标识'),
+        category: 'string',
+        group: st('$i18n:expression.fieldGroup.bpmContext', 'BPM 上下文'),
+        insertion: '${processKey}',
+      },
+      {
+        code: 'instanceId',
+        name: st('$i18n:expression.variable.instanceId', '流程实例'),
+        category: 'string',
+        group: st('$i18n:expression.fieldGroup.bpmContext', 'BPM 上下文'),
+        insertion: '${instanceId}',
+      },
+      {
+        code: 'taskId',
+        name: st('$i18n:expression.variable.taskId', '任务 ID'),
+        category: 'string',
+        group: st('$i18n:expression.fieldGroup.bpmContext', 'BPM 上下文'),
+        insertion: '${taskId}',
+      },
+    );
+  }
+  return fields;
+}
+
+function firstPlainObject(...values: unknown[]): Record<string, unknown> | undefined {
+  for (const value of values) {
+    if (isPlainObject(value)) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function fieldCategoryFromValue(value: unknown): ExpressionFieldOption['category'] {
+  if (typeof value === 'number') return 'number';
+  if (typeof value === 'boolean') return 'boolean';
+  if (Array.isArray(value)) return 'array';
+  return 'string';
+}
+
+function sampleFieldName(key: string, value: unknown): string {
+  if (value == null || value === '') return key;
+  const rendered = String(value);
+  return rendered.length > 24 ? `${key} · ${rendered.slice(0, 21)}...` : `${key} · ${rendered}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -520,7 +806,7 @@ function StaticMultiSelect({
               setIsOpen(true);
             }}
             onFocus={() => setIsOpen(true)}
-            placeholder={selectedValues.length === 0 ? (placeholder || 'Select...') : ''}
+            placeholder={selectedValues.length === 0 ? placeholder || 'Select...' : ''}
             className="min-w-[80px] flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400 disabled:cursor-not-allowed"
           />
         </div>
@@ -616,6 +902,142 @@ function ResourceSelectField({
   );
 }
 
+const RULE_BINDING_DEFAULT_DECISIONS: DecisionOption[] = [
+  {
+    code: 'approval_routing',
+    name: '审批路由',
+    outputs: [
+      { id: 'severity', label: '审批等级', dataType: 'string' },
+      { id: 'candidateGroups', label: '候选组', dataType: 'collection' },
+      { id: 'assigneeUserId', label: '审批人', dataType: 'string' },
+    ],
+  },
+  {
+    code: 'sla_deadline',
+    name: 'SLA 截止时间',
+    outputs: [
+      { id: 'deadlineMinutes', label: '截止分钟', dataType: 'integer' },
+      { id: 'warningBeforeMinutes', label: '提前提醒分钟', dataType: 'integer' },
+    ],
+  },
+  {
+    code: 'leave_request_automation',
+    name: '请假申请自动化策略',
+    outputs: [
+      { id: 'route', label: '动作路由', dataType: 'string' },
+      { id: 'actions', label: '动作列表', dataType: 'collection' },
+      { id: 'severity', label: '规则等级', dataType: 'string' },
+    ],
+  },
+  {
+    code: 'complaint_sla_deadline',
+    name: '投诉 SLA 截止时间',
+    outputs: [
+      { id: 'deadlineMinutes', label: '截止分钟', dataType: 'integer' },
+      { id: 'warningBeforeMinutes', label: '提前提醒分钟', dataType: 'integer' },
+      { id: 'escalationLevel', label: '升级等级', dataType: 'string' },
+    ],
+  },
+];
+
+function parseRuleBindingValue(value: unknown): RuleConsumerBindingDraft | undefined {
+  if (!value) return undefined;
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return parseRuleBindingValue(parsed);
+    } catch {
+      return undefined;
+    }
+  }
+  return typeof value === 'object' && !Array.isArray(value)
+    ? (value as RuleConsumerBindingDraft)
+    : undefined;
+}
+
+function ruleBindingDecisionOptions(
+  value: unknown,
+  initialDecisionCode?: string,
+): DecisionOption[] {
+  const decisions = [...RULE_BINDING_DEFAULT_DECISIONS];
+  const decisionCode =
+    parseRuleBindingValue(value)?.decisionBinding?.decisionCode ?? initialDecisionCode;
+  if (decisionCode && !decisions.some((decision) => decision.code === decisionCode)) {
+    decisions.push({ code: decisionCode, name: decisionCode });
+  }
+  return decisions;
+}
+
+function resolveRuleBindingModelCode(
+  schema: PropertySchema<string>,
+  adapter: FieldAdapter<unknown>,
+): string | undefined {
+  if (schema.ruleBindingFieldCatalogModelCode?.trim()) {
+    return schema.ruleBindingFieldCatalogModelCode.trim();
+  }
+  const field = schema.ruleBindingFieldCatalogModelCodeField;
+  if (!field) return undefined;
+  const value = adapter.context?.[field];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function resolveRuleBindingConsumerCode(
+  schema: PropertySchema<string>,
+  adapter: FieldAdapter<unknown>,
+): string | undefined {
+  if (schema.ruleBindingConsumerCode?.trim()) {
+    return schema.ruleBindingConsumerCode.trim();
+  }
+  const field = schema.ruleBindingConsumerCodeField;
+  if (!field) return undefined;
+  const value = adapter.context?.[field];
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function normalizeRuleBindingInitialContext(
+  value: Record<string, unknown>,
+): Record<string, unknown> {
+  const normalized = Object.fromEntries(
+    Object.entries(value).filter(([, scopeValue]) => isPlainObject(scopeValue)),
+  );
+  const record = normalized.record;
+  if (!isPlainObject(record)) {
+    return normalized;
+  }
+  if (isPlainObject(record.data)) {
+    return normalized;
+  }
+  return {
+    ...normalized,
+    record: {
+      data: record,
+    },
+  };
+}
+
+function resolveRuleBindingInitialContextJson(
+  schema: PropertySchema<string>,
+  adapter: FieldAdapter<unknown>,
+): string | undefined {
+  if (schema.ruleBindingInitialContextJson?.trim()) {
+    return schema.ruleBindingInitialContextJson.trim();
+  }
+  const field = schema.ruleBindingInitialContextJsonField;
+  if (!field) return undefined;
+  const value = adapter.context?.[field];
+  if (typeof value === 'string' && value.trim()) {
+    return value.trim();
+  }
+  if (isPlainObject(value)) {
+    return JSON.stringify(normalizeRuleBindingInitialContext(value), null, 2);
+  }
+  return undefined;
+}
+
 function RuleBindingField({
   adapter,
   label,
@@ -623,10 +1045,13 @@ function RuleBindingField({
   mode,
   consumerType,
   consumerCode,
+  consumerCodeField,
   consumerNodeId,
   showImpactPreview,
   showTestRunner,
   initialDecisionCode,
+  initialContextJson,
+  fieldCatalogModelCode,
 }: {
   adapter: FieldAdapter<unknown>;
   label?: string;
@@ -634,10 +1059,13 @@ function RuleBindingField({
   mode: 'condition' | 'decision' | 'combined';
   consumerType?: string;
   consumerCode?: string;
+  consumerCodeField?: string;
   consumerNodeId?: string;
   showImpactPreview?: boolean;
   showTestRunner?: boolean;
   initialDecisionCode?: string;
+  initialContextJson?: string;
+  fieldCatalogModelCode?: string;
 }) {
   return (
     <div data-testid="rule-binding-property-field">
@@ -651,10 +1079,15 @@ function RuleBindingField({
             mode,
             consumerType,
             consumerCode,
+            consumerCodeField,
             consumerNodeId,
             initialDecisionCode,
+            decisions: ruleBindingDecisionOptions(adapter.value, initialDecisionCode),
+            fieldCatalogMode: 'merge',
+            fieldCatalogModelCode,
             showImpactPreview,
             showTestRunner,
+            initialContextJson,
           },
         }}
       />
@@ -757,9 +1190,7 @@ function DictSelectField({
       .findAll()
       .then((all) => {
         if (!alive) return;
-        const filtered = dictCodeFilter
-          ? all.filter((d) => dictCodeFilter.includes(d.code))
-          : all;
+        const filtered = dictCodeFilter ? all.filter((d) => dictCodeFilter.includes(d.code)) : all;
         setDicts(filtered as { code: string; name: string }[]);
       })
       .catch((err) => {
@@ -776,14 +1207,14 @@ function DictSelectField({
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
-    return <span className="text-sm text-gray-400">{st('$i18n:common.loading') || 'Loading...'}</span>;
+    return (
+      <span className="text-sm text-gray-400">{st('$i18n:common.loading') || 'Loading...'}</span>
+    );
   }
 
   return (
     <div>
-      {label && (
-        <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
-      )}
+      {label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>}
       <select
         value={(adapter.value as string) ?? ''}
         onChange={(e) => adapter.setValue(e.target.value || undefined)}

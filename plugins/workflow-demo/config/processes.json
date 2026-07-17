@@ -3,7 +3,8 @@
     "key": "wd_leave_approval",
     "name:zh-CN": "请假审批",
     "name:en": "Leave Request Approval",
-    "description": "OSS workflow demo: leave request approval flow with Drools-based routing, SLA on approver tasks, and approved/rejected notification serviceTasks.",
+    "description": "请假申请审批流程：通过规则中心分派审批人，在主管/HR 审批节点启用 SLA，并在通过或驳回后发送通知。",
+    "description:en": "OSS workflow demo: leave request approval flow with Drools-based routing, SLA on approver tasks, and approved/rejected notification serviceTasks.",
     "category": "approval",
     "extension": {
       "modelCode": "wd_leave_request",
@@ -25,6 +26,7 @@
             "y": 240
           },
           "data": {
+            "label": "开始",
             "label:zh-CN": "开始",
             "label:en": "Start"
           }
@@ -37,6 +39,7 @@
             "y": 220
           },
           "data": {
+            "label": "路由规则",
             "label:zh-CN": "路由规则",
             "label:en": "Routing Rule",
             "ruleCode": "wd_leave_routing",
@@ -51,6 +54,7 @@
             "y": 220
           },
           "data": {
+            "label": "审批人分派",
             "label:zh-CN": "审批人分派",
             "label:en": "Approver Dispatch"
           }
@@ -63,6 +67,7 @@
             "y": 110
           },
           "data": {
+            "label": "主管审批",
             "label:zh-CN": "主管审批",
             "label:en": "Manager Approve",
             "formPageKey": "wd_leave_request_detail",
@@ -81,6 +86,7 @@
             "taskActions": [
               {
                 "key": "approve",
+                "label": "通过",
                 "label:zh-CN": "通过",
                 "label:en": "Approve",
                 "type": "complete",
@@ -89,6 +95,7 @@
               },
               {
                 "key": "reject",
+                "label": "驳回",
                 "label:zh-CN": "驳回",
                 "label:en": "Reject",
                 "type": "complete",
@@ -109,6 +116,7 @@
                 "consumerCode": "wd_leave_approval",
                 "consumerNodeId": "task_manager_approve",
                 "bindingKind": "DECISION_REF",
+                "conditionFragmentRefs": ["shared_leave_approval_guard"],
                 "decisionBinding": {
                   "decisionCode": "approval_routing",
                   "versionPolicy": "LATEST_PUBLISHED",
@@ -175,6 +183,7 @@
             "y": 330
           },
           "data": {
+            "label": "HR 审批",
             "label:zh-CN": "HR 审批",
             "label:en": "HR Approve",
             "formPageKey": "wd_leave_request_detail",
@@ -193,6 +202,7 @@
             "taskActions": [
               {
                 "key": "approve",
+                "label": "通过",
                 "label:zh-CN": "通过",
                 "label:en": "Approve",
                 "type": "complete",
@@ -201,6 +211,7 @@
               },
               {
                 "key": "reject",
+                "label": "驳回",
                 "label:zh-CN": "驳回",
                 "label:en": "Reject",
                 "type": "complete",
@@ -221,6 +232,7 @@
                 "consumerCode": "wd_leave_approval",
                 "consumerNodeId": "task_hr_approve",
                 "bindingKind": "DECISION_REF",
+                "conditionFragmentRefs": ["shared_leave_approval_guard"],
                 "decisionBinding": {
                   "decisionCode": "approval_routing",
                   "versionPolicy": "LATEST_PUBLISHED",
@@ -287,6 +299,7 @@
             "y": 220
           },
           "data": {
+            "label": "审批结果",
             "label:zh-CN": "审批结果",
             "label:en": "Decision"
           }
@@ -299,6 +312,7 @@
             "y": 110
           },
           "data": {
+            "label": "更新状态（通过）",
             "label:zh-CN": "更新状态（通过）",
             "label:en": "Set Status Approved",
             "modelCode": "wd_leave_request",
@@ -315,6 +329,7 @@
             "y": 330
           },
           "data": {
+            "label": "更新状态（驳回）",
             "label:zh-CN": "更新状态（驳回）",
             "label:en": "Set Status Rejected",
             "modelCode": "wd_leave_request",
@@ -331,6 +346,7 @@
             "y": 110
           },
           "data": {
+            "label": "通知申请人（通过）",
             "label:zh-CN": "通知申请人（通过）",
             "label:en": "Notify Applicant (Approved)",
             "eventCode": "wd_request_approved",
@@ -346,6 +362,7 @@
             "y": 330
           },
           "data": {
+            "label": "通知申请人（驳回）",
             "label:zh-CN": "通知申请人（驳回）",
             "label:en": "Notify Applicant (Rejected)",
             "eventCode": "wd_request_rejected",
@@ -361,6 +378,7 @@
             "y": 110
           },
           "data": {
+            "label": "审批通过",
             "label:zh-CN": "审批通过",
             "label:en": "Approved"
           }
@@ -373,6 +391,7 @@
             "y": 330
           },
           "data": {
+            "label": "已驳回",
             "label:zh-CN": "已驳回",
             "label:en": "Rejected"
           }
@@ -406,6 +425,7 @@
           "source": "gw_approver",
           "target": "task_manager_approve",
           "data": {
+            "label": "主管",
             "label:zh-CN": "主管",
             "label:en": "Manager",
             "condition": {
@@ -419,6 +439,7 @@
           "source": "gw_approver",
           "target": "task_hr_approve",
           "data": {
+            "label": "HR",
             "label:zh-CN": "HR",
             "label:en": "HR",
             "condition": {
@@ -454,6 +475,7 @@
           "source": "gw_result",
           "target": "svc_set_approved",
           "data": {
+            "label": "通过",
             "label:zh-CN": "通过",
             "label:en": "Approved",
             "condition": {
@@ -467,6 +489,7 @@
           "source": "gw_result",
           "target": "svc_set_rejected",
           "data": {
+            "label": "驳回",
             "label:zh-CN": "驳回",
             "label:en": "Rejected",
             "condition": {

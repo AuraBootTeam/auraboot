@@ -306,7 +306,9 @@ export function BPMNCanvas({ onNodeClick, onEdgeClick }: BPMNCanvasProps) {
   return (
     <div
       ref={reactFlowWrapper}
-      className={`flex-1 transition-all ${isDragOver ? 'ring-2 ring-blue-300 ring-inset' : ''}`}
+      className={`min-w-0 flex-1 overflow-hidden transition-all ${
+        isDragOver ? 'ring-2 ring-blue-300 ring-inset' : ''
+      }`}
       style={{ height: '100%', minHeight: 0 }}
     >
       <ReactFlow<BPMNNode, BPMNEdge>

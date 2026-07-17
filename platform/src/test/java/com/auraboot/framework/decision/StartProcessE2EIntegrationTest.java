@@ -18,6 +18,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +55,7 @@ class StartProcessE2EIntegrationTest extends BaseIntegrationTest {
     @Autowired private EventPolicyDefinitionService definitionService;
     @Autowired private EventPolicyVersionService versionService;
     @Autowired private EventPolicyRuntimeService runtimeService;
+    @Autowired private JdbcTemplate jdbcTemplate;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -94,7 +96,20 @@ class StartProcessE2EIntegrationTest extends BaseIntegrationTest {
         // here means a real process instance was created by the real BPM engine (vs the unit test's
         // mock). This is the deterministic e2e proof.
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");
-        assertThat(result.execution().actions().get(0).status().name()).isEqualTo("SUCCESS");
+        var action = result.execution().actions().get(0);
+        assertThat(action.status().name()).isEqualTo("SUCCESS");
+        assertThat(action.resultPayload())
+                .containsEntry("processDefinitionId", processKey)
+                .containsEntry("businessKey", recordPid)
+                .containsEntry("recordPid", recordPid)
+                .containsKey("processInstanceId");
+        String processInstanceId = String.valueOf(action.resultPayload().get("processInstanceId"));
+        assertThat(processInstanceId).isNotBlank();
+        String processDefinitionIdAndVersion = jdbcTemplate.queryForObject(
+                "SELECT process_definition_id_and_version FROM se_process_instance WHERE id = ?",
+                String.class,
+                Long.parseLong(processInstanceId));
+        assertThat(processDefinitionIdAndVersion).startsWith(processKey + ":");
 
         // best-effort deeper check: the userTask materialized as a todo for the starter (or system).
         // Logged, not asserted — SmartEngine 'starter' assignee resolution is environment-nuanced.

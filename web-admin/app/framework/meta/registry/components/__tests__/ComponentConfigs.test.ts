@@ -33,4 +33,30 @@ describe('ComponentConfigs', () => {
       ]),
     );
   });
+
+  it('exposes decision action plan as a platform-discoverable DSL component', () => {
+    const config = ALL_COMPONENT_CONFIGS.find((component) => component.type === 'decisionactionplan');
+
+    expect(config).toBeDefined();
+    expect(config).toMatchObject({
+      name: 'Decision Action Plan',
+      category: 'display',
+      runtime: expect.objectContaining({
+        componentName: 'DecisionActionPlanBlock',
+      }),
+    });
+    expect(config?.tags).toEqual(
+      expect.arrayContaining(['rule-center', 'action-catalog', 'side-effect']),
+    );
+    expect(config?.propertySchema.map((property) => property.key)).toEqual(
+      expect.arrayContaining([
+        'valueField',
+        'title',
+        'triggerLabel',
+        'defaultTrigger',
+        'logsUrl',
+        'readOnly',
+      ]),
+    );
+  });
 });

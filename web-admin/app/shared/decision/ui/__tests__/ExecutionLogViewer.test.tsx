@@ -11,12 +11,18 @@ const logs: ExecLogEntry[] = [
 describe('ExecutionLogViewer', () => {
   it('renders all log rows with status + count', () => {
     render(<ExecutionLogViewer logs={logs} />);
-    expect(screen.getByTestId('elv-row-trace-aaa')).toHaveAttribute('data-status', 'SUCCESS');
+    const row = screen.getByTestId('elv-row-trace-aaa');
+    expect(row).toHaveAttribute('data-status', 'SUCCESS');
+    const status = row.querySelector('.elv-status');
+    expect(status).toHaveTextContent('成功');
+    expect(status).not.toHaveTextContent('SUCCESS');
     expect(screen.getByTestId('elv-count')).toHaveTextContent('3');
   });
 
   it('filters by status', () => {
     render(<ExecutionLogViewer logs={logs} />);
+    expect(screen.getByLabelText('status-filter')).toHaveTextContent('失败重试中');
+    expect(screen.getByLabelText('status-filter')).not.toHaveTextContent('FAILED_RETRYING');
     fireEvent.change(screen.getByLabelText('status-filter'), { target: { value: 'FAILED_RETRYING' } });
     expect(screen.getByTestId('elv-count')).toHaveTextContent('1');
     expect(screen.getByTestId('elv-row-trace-bbb')).toBeInTheDocument();
@@ -53,8 +59,43 @@ describe('ExecutionLogViewer', () => {
     render(<ExecutionLogViewer logs={logs} />);
     fireEvent.click(screen.getByTestId('elv-open-trace-bbb'));
     expect(screen.getByTestId('elv-detail-drawer')).toHaveTextContent('trace-bbb');
-    expect(screen.getByTestId('elv-detail-drawer')).toHaveTextContent('FAILED_RETRYING');
+    expect(screen.getByTestId('elv-detail-drawer')).toHaveTextContent('失败重试中');
+    expect(screen.getByTestId('elv-detail-drawer')).not.toHaveTextContent('FAILED_RETRYING');
     expect(screen.getByTestId('elv-detail-drawer')).toHaveTextContent('CALL_CONNECTOR');
     expect(screen.getByTestId('elv-detail-drawer')).toHaveTextContent('921ms');
+  });
+
+  it('shows virtual source trace evidence with actual values and unknown reasons', () => {
+    render(<ExecutionLogViewer logs={[
+      {
+        traceId: 'trace-virtual',
+        decisionCode: 'virtual_sla_risk',
+        status: 'UNKNOWN',
+        traceSnapshot: {
+          virtualSources: [
+            {
+              sourceRef: 'virtual.leave_request_summary.v1',
+              modelCode: 'leave_request_summary_v',
+              recordPid: 'REQ-001',
+              status: 'RESOLVED',
+              fields: {
+                slaRiskScore: 91,
+                tenant_id: 1,
+              },
+            },
+          ],
+          unknownReasons: ['Missing record.data.managerLevel'],
+        },
+      },
+    ]} />);
+
+    fireEvent.click(screen.getByTestId('elv-open-trace-virtual'));
+    const drawer = screen.getByTestId('elv-detail-drawer');
+    expect(screen.getByTestId('elv-virtual-sources')).toHaveTextContent('virtual.leave_request_summary.v1');
+    expect(screen.getByTestId('elv-virtual-sources')).toHaveTextContent('RESOLVED');
+    expect(screen.getByTestId('elv-virtual-sources')).toHaveTextContent('slaRiskScore');
+    expect(screen.getByTestId('elv-virtual-sources')).toHaveTextContent('91');
+    expect(screen.getByTestId('elv-unknown-reasons')).toHaveTextContent('Missing record.data.managerLevel');
+    expect(drawer).not.toHaveTextContent('tenant_id');
   });
 });
