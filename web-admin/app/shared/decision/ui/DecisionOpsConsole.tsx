@@ -17,14 +17,16 @@ import { DecisionRolloutMonitor } from './DecisionRolloutMonitor';
 import { StrategyStudioWorkbench } from './StrategyStudioWorkbench';
 import { type FieldOption } from './ConditionBuilder';
 import { type TestSample } from './ConditionTestRunPanel';
+import { factCatalogToFieldOptions, modelFieldsToFieldOptions } from './factCatalogAdapter';
+import { useSmartText } from '~/utils/i18n';
 import type { DecisionTable } from '../table/decisionTable';
 import type {
+  ConditionFragment,
   DecisionApi,
   DecisionTableAnalysis,
   DecisionTableDmnXmlResult,
   EventPolicySummary,
 } from '../api/decisionApi';
-import type { DataType, Scope } from '../ast/conditionAst';
 
 /**
  * DecisionOps console assembly (mockup F1–F8, docs/1.md §22): a tabbed shell composing the console
@@ -63,7 +65,7 @@ export interface DecisionOpsConsoleProps {
 const TABS: { key: ConsoleTab; label: string; description: string }[] = [
   { key: 'studio', label: '策略编排器', description: '跨模块规则复用' },
   { key: 'dashboard', label: '概览', description: '运行态总览' },
-  { key: 'policies', label: 'Event Policy', description: '事件触发策略' },
+  { key: 'policies', label: '事件策略', description: '事件触发策略' },
   { key: 'definitions', label: '决策定义', description: '版本与影响面' },
   { key: 'designer', label: '策略设计器', description: '规则编排' },
   { key: 'tables', label: '决策表', description: 'DMN 表格' },
@@ -100,41 +102,6 @@ const DEFAULT_TABLE: DecisionTable = {
   rules: [],
 };
 
-const FIELD_SCOPES = new Set<Scope>([
-  'meta',
-  'event',
-  'record',
-  'before',
-  'after',
-  'process',
-  'task',
-  'sla',
-  'actor',
-  'tenant',
-  'time',
-  'env',
-]);
-
-const DATA_TYPES = new Set<DataType>([
-  'string',
-  'text',
-  'integer',
-  'decimal',
-  'boolean',
-  'date',
-  'time',
-  'datetime',
-  'duration',
-  'enum',
-  'dict',
-  'user',
-  'role',
-  'group',
-  'department',
-  'collection',
-  'object',
-]);
-
 function asDefinitionList(raw: unknown): DefinitionSummary[] {
   if (Array.isArray(raw)) return raw as DefinitionSummary[];
   if (raw && typeof raw === 'object') {
@@ -145,28 +112,14 @@ function asDefinitionList(raw: unknown): DefinitionSummary[] {
   return [];
 }
 
-function normalizeDataType(value: unknown): DataType {
-  return DATA_TYPES.has(value as DataType) ? (value as DataType) : 'string';
-}
-
-function toFieldOption(field: ModelField): FieldOption {
-  const parts = field.path.split('.');
-  const pathScope = parts[0] as Scope;
-  if (FIELD_SCOPES.has(pathScope) && parts.length > 1) {
-    return {
-      scope: pathScope,
-      path: parts.slice(1).join('.'),
-      label: field.label,
-      dataType: normalizeDataType(field.dataType),
-    };
+function asConditionFragmentList(raw: unknown): ConditionFragment[] {
+  if (Array.isArray(raw)) return raw as ConditionFragment[];
+  if (raw && typeof raw === 'object') {
+    const o = raw as Record<string, unknown>;
+    if (Array.isArray(o.records)) return o.records as ConditionFragment[];
+    if (Array.isArray(o.data)) return o.data as ConditionFragment[];
   }
-  const entityScope = field.entityCode as Scope;
-  return {
-    scope: FIELD_SCOPES.has(entityScope) ? entityScope : 'record',
-    path: field.path,
-    label: field.label,
-    dataType: normalizeDataType(field.dataType),
-  };
+  return [];
 }
 
 export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
@@ -181,6 +134,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     dashboard,
     initialTab = 'studio',
   } = props;
+  const st = useSmartText();
   const [tab, setTab] = useState<ConsoleTab>(initialTab);
   const [selectedPolicy, setSelectedPolicy] = useState<EventPolicySummary | null>(null);
   const [tableDraft, setTableDraft] = useState<DecisionTable>(DEFAULT_TABLE);
@@ -191,6 +145,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
   const [tableDmnBusy, setTableDmnBusy] = useState(false);
   const [tableDmnError, setTableDmnError] = useState<string | null>(null);
   const [tableDmnStatus, setTableDmnStatus] = useState<string | null>(null);
+  const canLoadFactCatalog = typeof api.getFactCatalog === 'function';
   const dashboardQuery = useQuery({
     queryKey: ['decision-dashboard'],
     queryFn: () => api.getDashboard(),
@@ -203,10 +158,20 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     queryFn: () => api.listDefinitions(),
     enabled: tab === 'studio',
   });
+  const conditionFragmentQuery = useQuery({
+    queryKey: ['strategy-studio-condition-fragments'],
+    queryFn: () => api.listConditionFragments({ page: 1, size: 50 }),
+    enabled: tab === 'studio',
+  });
+  const factCatalogQuery = useQuery({
+    queryKey: ['decision-fact-catalog'],
+    queryFn: () => api.getFactCatalog(),
+    enabled: (tab === 'studio' || tab === 'tables') && canLoadFactCatalog,
+  });
   const modelFieldQuery = useQuery({
     queryKey: ['decision-model-fields'],
     queryFn: () => api.getModelFields(),
-    enabled: modelFields == null && (tab === 'model' || tab === 'studio'),
+    enabled: modelFields == null && (tab === 'model' || (tab === 'studio' && !canLoadFactCatalog)),
   });
   const modelFieldData = modelFields ?? modelFieldQuery.data ?? [];
   const strategyDecisions = asDefinitionList(definitionQuery.data)
@@ -215,7 +180,13 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
       code: definition.decisionCode,
       name: definition.decisionName,
     }));
-  const strategyFields = modelFieldData.map(toFieldOption);
+  const factCatalogFields = factCatalogToFieldOptions(factCatalogQuery.data);
+  const legacyStrategyFields = modelFieldsToFieldOptions(modelFieldData);
+  const strategyFields = factCatalogFields.length > 0
+    ? factCatalogFields
+    : legacyStrategyFields.length > 0
+      ? legacyStrategyFields
+      : fields;
   const connectorQuery = useQuery({
     queryKey: ['decision-connectors'],
     queryFn: () => api.listConnectors(),
@@ -229,6 +200,11 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
   });
   const permissionGrantData = permissionGrants ?? permissionQuery.data?.roles ?? [];
   const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
+  const headerEyebrow = st('$i18n:decisionops.header.eyebrow', 'Strategy Studio');
+  const definitionsLabel = st('$i18n:decisionops.header.definitions', 'Definitions');
+  const policiesLabel = st('$i18n:decisionops.header.policies', 'Policies');
+  const todayLabel = st('$i18n:decisionops.header.today', 'Today');
+  const openWorkbenchLabel = st('$i18n:decisionops.header.openWorkbench', '进入工作区');
 
   const handleTableDraftChange = (next: DecisionTable) => {
     setTableDraft(next);
@@ -324,18 +300,21 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     <div className="decisionops-shell" data-testid="decisionops-console">
       <header className="decisionops-page-header">
         <div>
-          <p className="decisionops-eyebrow">Rule Center</p>
-          <h1>策略编排器</h1>
+          <p className="decisionops-eyebrow">{headerEyebrow}</p>
+          <h1>规则中心</h1>
         </div>
         <div className="decisionops-header-meta">
-          <span>Definitions {dashboardData.summary.definitions}</span>
-          <span>Policies {dashboardData.summary.policies}</span>
-          <span>Today {dashboardData.summary.evaluationsToday}</span>
+          <span>{definitionsLabel} {dashboardData.summary.definitions}</span>
+          <span>{policiesLabel} {dashboardData.summary.policies}</span>
+          <span>{todayLabel} {dashboardData.summary.evaluationsToday}</span>
+          <a className="decisionops-workbench-jump" href="#strategy-workbench">
+            {openWorkbenchLabel}
+          </a>
         </div>
       </header>
 
       <div className="decisionops-layout">
-        <nav className="doc-tabs decisionops-nav" role="tablist" aria-label="DecisionOps modules">
+        <nav className="doc-tabs decisionops-nav" role="tablist" aria-label="Rule Center modules">
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -363,8 +342,11 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
             {tab === 'studio' && (
               <StrategyStudioWorkbench
                 api={api}
-                fields={strategyFields.length > 0 ? strategyFields : fields}
+                fields={strategyFields}
                 decisions={strategyDecisions}
+                conditionFragments={asConditionFragmentList(conditionFragmentQuery.data)}
+                conditionFragmentsLoading={conditionFragmentQuery.isLoading}
+                conditionFragmentsError={conditionFragmentQuery.isError}
               />
             )}
             {tab === 'dashboard' && (
@@ -426,6 +408,7 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
                 onExportDmnXml={exportTableDmn}
                 onImportDmnXml={importTableDmn}
                 onRoundTripDmnXml={roundTripTableDmn}
+                fieldOptions={strategyFields}
               />
             )}
             {tab === 'rollouts' && (

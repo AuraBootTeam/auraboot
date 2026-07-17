@@ -3,6 +3,10 @@ package com.auraboot.framework.bpm.listener;
 import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
 import com.auraboot.smart.framework.engine.context.ExecutionContext;
 import com.auraboot.smart.framework.engine.listener.Listener;
+import com.auraboot.smart.framework.engine.bpmn.assembly.task.UserTask;
+import com.auraboot.smart.framework.engine.model.assembly.BaseElement;
+import com.auraboot.smart.framework.engine.model.assembly.IdBasedElement;
+import com.auraboot.smart.framework.engine.model.assembly.ProcessDefinition;
 import com.auraboot.smart.framework.engine.pvm.event.EventConstant;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
 import com.auraboot.framework.bpm.extension.BpmExtensionAccessor;
@@ -86,10 +90,12 @@ public class ProcessEventListener implements Listener {
                             String processKey = executionContext.getProcessInstance() != null
                                     ? executionContext.getProcessInstance().getProcessDefinitionId() : null;
                             if (processKey != null) {
-                                extensionAccessor.getRuleConsumerBinding(processKey, activityId)
-                                        .ifPresent(binding -> ruleBindingRuntimeService.evaluateAndApply(
-                                                binding, processKey, activityId, processInstanceId,
-                                                request != null ? request : Map.of()));
+                                if (!isUserTaskActivity(executionContext, activityId)) {
+                                    extensionAccessor.getRuleConsumerBinding(processKey, activityId)
+                                            .ifPresent(binding -> ruleBindingRuntimeService.evaluateAndApply(
+                                                    binding, processKey, activityId, processInstanceId,
+                                                    request != null ? request : Map.of()));
+                                }
                                 BpmNodeHookService.HookExecutionResult preCheck =
                                         hookService.executePreChecks(processKey, activityId, request != null ? request : Map.of());
                                 if (!preCheck.passed()) {
@@ -133,4 +139,19 @@ public class ProcessEventListener implements Listener {
         }
     }
 
+    private boolean isUserTaskActivity(ExecutionContext executionContext, String activityId) {
+        if (executionContext == null) {
+            return false;
+        }
+        BaseElement baseElement = executionContext.getBaseElement();
+        if (baseElement instanceof UserTask) {
+            return true;
+        }
+        ProcessDefinition processDefinition = executionContext.getProcessDefinition();
+        if (processDefinition == null || activityId == null || processDefinition.getIdBasedElementMap() == null) {
+            return false;
+        }
+        IdBasedElement idBasedElement = processDefinition.getIdBasedElementMap().get(activityId);
+        return idBasedElement instanceof UserTask;
+    }
 }

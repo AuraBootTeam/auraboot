@@ -65,6 +65,12 @@ public final class BpmServiceTaskConstants {
     public static final String ATTR_ACTION = "action";
     /** Optional process-variable name to receive the action's return value. */
     public static final String ATTR_RESULT_VAR = "resultVar";
+    /** JSON object payload passed to the shared Rule Center action handler. */
+    public static final String ATTR_PAYLOAD_JSON = "payloadJson";
+    /** Optional action target expression passed to the shared Rule Center action handler. */
+    public static final String ATTR_TARGET = "target";
+    /** Optional idempotency key passed to the shared Rule Center action handler. */
+    public static final String ATTR_IDEMPOTENCY_KEY = "idempotencyKey";
 
     private BpmServiceTaskConstants() {
         // no instances

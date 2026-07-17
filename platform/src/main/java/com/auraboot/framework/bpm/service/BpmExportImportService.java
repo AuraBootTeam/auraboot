@@ -95,6 +95,7 @@ public class BpmExportImportService {
                 "deadlineMode", s.getDeadlineMode() != null ? s.getDeadlineMode() : "",
                 "deadlineValue", s.getDeadlineValue() != null ? s.getDeadlineValue() : "",
                 "warningRules", s.getWarningRules() != null ? s.getWarningRules() : List.of(),
+                "actionPolicy", s.getActionPolicy() != null ? s.getActionPolicy() : Map.of(),
                 "suspendPolicy", s.getSuspendPolicy() != null ? s.getSuspendPolicy() : "pause",
                 "enabled", Boolean.TRUE.equals(s.getEnabled())
         )).toList());

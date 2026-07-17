@@ -92,6 +92,7 @@ export function SchemaBlockConfigPanel<T extends Record<string, unknown>>({
                   },
                   disabled: readonly,
                   required: schema.required,
+                  context: latestValueRef.current,
                 };
                 const rendererSchema = toRendererSchema(schema);
                 return (

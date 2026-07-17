@@ -37,8 +37,8 @@ describe('EventPolicyListPage', () => {
 
     await waitFor(() => expect(screen.getByTestId('event-policy-list')).toBeInTheDocument());
     expect(screen.getByTestId('epl-row-complaint_form_submit_policy')).toHaveTextContent('投诉表单提交策略');
-    expect(screen.getByTestId('epl-row-complaint_form_submit_policy')).toHaveTextContent('FORM_SUBMITTED');
-    expect(screen.getByTestId('epl-row-complaint_form_submit_policy')).toHaveTextContent('COLLECT_ALL');
+    expect(screen.getByTestId('epl-row-complaint_form_submit_policy')).toHaveTextContent('FORM SUBMITTED');
+    expect(screen.getByTestId('epl-row-complaint_form_submit_policy')).toHaveTextContent('收集全部命中');
   });
 
   it('filters policies by keyword and status on the client', async () => {

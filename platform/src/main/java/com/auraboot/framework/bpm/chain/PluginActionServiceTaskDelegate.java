@@ -1,9 +1,13 @@
 package com.auraboot.framework.bpm.chain;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.bpm.service.ExecutionLogService;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.eventpolicy.executor.ActionExecutionException;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.plugin.extension.ServiceTaskActionExtension;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
+import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
 import com.auraboot.smart.framework.engine.context.ExecutionContext;
 import com.auraboot.smart.framework.engine.delegation.JavaDelegation;
 import com.auraboot.smart.framework.engine.model.assembly.IdBasedElement;
@@ -11,7 +15,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -49,6 +55,7 @@ public class PluginActionServiceTaskDelegate implements JavaDelegation {
     public static final String ERR_ACTION_FAILED = "bpm.action.action_failed";
 
     private final ExtensionRegistry extensionRegistry;
+    private final ExecutionLogService executionLogService;
 
     @Override
     public void execute(ExecutionContext executionContext) {
@@ -85,6 +92,7 @@ public class PluginActionServiceTaskDelegate implements JavaDelegation {
                 .build();
 
         String activityId = resolveActivityId(executionContext);
+        long startedAtNanos = System.nanoTime();
         try {
             Object result = extension.get().execute(context);
             processVars.put("_action_" + activityId + "_success", true);
@@ -95,14 +103,125 @@ public class PluginActionServiceTaskDelegate implements JavaDelegation {
                     processVars.put(resultVar, result);
                 }
             }
+            Map<String, Object> success = successPayload(actionType, result);
+            logActionSuccess(executionContext, activityId, actionType, properties, success,
+                    (System.nanoTime() - startedAtNanos) / 1_000_000);
             log.info("Plugin action serviceTask completed: action={}, node={}", actionType, activityId);
         } catch (BusinessException be) {
             throw be;
         } catch (Exception e) {
             log.error("Plugin action serviceTask failed: action={}, node={}, error={}",
                     actionType, activityId, e.getMessage(), e);
-            throw new BusinessException(ERR_ACTION_FAILED);
+            Map<String, Object> failure = writeFailureVars(processVars, activityId, actionType, properties, e);
+            logActionFailure(executionContext, activityId, actionType, properties, failure, e);
+            throw new BusinessException(ResponseCode.BUSINESS_ERROR, ERR_ACTION_FAILED, e);
         }
+    }
+
+    private void logActionSuccess(ExecutionContext executionContext,
+                                  String activityId,
+                                  String actionType,
+                                  Map<String, String> properties,
+                                  Map<String, Object> success,
+                                  long durationMs) {
+        String executionId = resolveExecutionId(executionContext);
+        if (executionId == null || executionId.isBlank()) {
+            return;
+        }
+
+        Map<String, Object> context = baseActionContext(executionContext, actionType, "SUCCESS");
+        String resultVar = properties.get(BpmServiceTaskConstants.ATTR_RESULT_VAR);
+        if (resultVar != null && !resultVar.isBlank()) {
+            context.put("resultVar", resultVar);
+        }
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("action", success);
+        try {
+            executionLogService.logActionExecuted(executionId, activityId, context, output, durationMs);
+        } catch (Exception logError) {
+            log.warn("Failed to record plugin action serviceTask success: executionId={}, action={}, node={}, error={}",
+                    executionId, actionType, activityId, logError.getMessage(), logError);
+        }
+    }
+
+    private Map<String, Object> writeFailureVars(Map<String, Object> processVars,
+                                                 String activityId,
+                                                 String actionType,
+                                                 Map<String, String> properties,
+                                                 Exception error) {
+        Map<String, Object> result = failurePayload(actionType, error);
+        processVars.put("_action_" + activityId + "_success", false);
+        processVars.put("_action_" + activityId + "_error", result.get("error"));
+        processVars.put("_action_" + activityId + "_result", result);
+        String resultVar = properties.get(BpmServiceTaskConstants.ATTR_RESULT_VAR);
+        if (resultVar != null && !resultVar.isBlank()) {
+            processVars.put(resultVar, result);
+        }
+        return result;
+    }
+
+    private void logActionFailure(ExecutionContext executionContext,
+                                  String activityId,
+                                  String actionType,
+                                  Map<String, String> properties,
+                                  Map<String, Object> failure,
+                                  Exception error) {
+        String executionId = resolveExecutionId(executionContext);
+        if (executionId == null || executionId.isBlank()) {
+            return;
+        }
+
+        Map<String, Object> context = baseActionContext(executionContext, actionType, "FAILED");
+        context.put("action", failure);
+        String resultVar = properties.get(BpmServiceTaskConstants.ATTR_RESULT_VAR);
+        if (resultVar != null && !resultVar.isBlank()) {
+            context.put("resultVar", resultVar);
+        }
+        try {
+            executionLogService.logNodeFailure(executionId, activityId, error, context);
+        } catch (Exception logError) {
+            log.warn("Failed to record plugin action serviceTask failure: executionId={}, action={}, node={}, error={}",
+                    executionId, actionType, activityId, logError.getMessage(), logError);
+        }
+    }
+
+    private Map<String, Object> baseActionContext(ExecutionContext executionContext,
+                                                  String actionType,
+                                                  String status) {
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("actionType", actionType);
+        context.put("status", status);
+        putIfPresent(context, "processKey", resolveProcessKey(executionContext));
+        putIfPresent(context, "businessKey",
+                stringify(processVars(executionContext).get(RequestMapSpecialKeyConstant.PROCESS_BIZ_UNIQUE_ID)));
+        putIfPresent(context, "startUserId",
+                stringify(processVars(executionContext).get(RequestMapSpecialKeyConstant.PROCESS_INSTANCE_START_USER_ID)));
+        putIfPresent(context, "tenantId",
+                stringify(processVars(executionContext).get(RequestMapSpecialKeyConstant.TENANT_ID)));
+        return context;
+    }
+
+    private Map<String, Object> successPayload(String actionType, Object result) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        if (result instanceof Map<?, ?> map) {
+            map.forEach((key, value) -> payload.put(String.valueOf(key), value));
+        } else if (result != null) {
+            payload.put("result", result);
+        }
+        payload.put("status", "SUCCESS");
+        payload.put("actionType", actionType);
+        return Collections.unmodifiableMap(new LinkedHashMap<>(payload));
+    }
+
+    private Map<String, Object> failurePayload(String actionType, Exception error) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        if (error instanceof ActionExecutionException actionFailure && actionFailure.resultPayload() != null) {
+            result.putAll(actionFailure.resultPayload());
+        }
+        result.put("status", "FAILED");
+        result.put("actionType", actionType);
+        result.put("error", error.getMessage() != null ? error.getMessage() : error.getClass().getSimpleName());
+        return Collections.unmodifiableMap(new LinkedHashMap<>(result));
     }
 
     private Map<String, String> resolveProperties(ExecutionContext executionContext) {
@@ -118,5 +237,43 @@ public class PluginActionServiceTaskDelegate implements JavaDelegation {
             return idBased.getId();
         }
         return "bpm:plugin-action";
+    }
+
+    private String resolveProcessKey(ExecutionContext executionContext) {
+        if (executionContext.getProcessDefinition() != null) {
+            return executionContext.getProcessDefinition().getId();
+        }
+        if (executionContext.getProcessInstance() != null) {
+            return executionContext.getProcessInstance().getProcessDefinitionId();
+        }
+        return null;
+    }
+
+    private String resolveExecutionId(ExecutionContext executionContext) {
+        if (executionContext.getProcessInstance() != null) {
+            return executionContext.getProcessInstance().getInstanceId();
+        }
+        if (executionContext.getExecutionInstance() != null) {
+            return executionContext.getExecutionInstance().getInstanceId();
+        }
+        return null;
+    }
+
+    private Map<String, Object> processVars(ExecutionContext executionContext) {
+        Map<String, Object> request = executionContext.getRequest();
+        return request == null ? Collections.emptyMap() : request;
+    }
+
+    private void putIfPresent(Map<String, Object> target, String key, String value) {
+        if (value != null && !value.isBlank()) {
+            target.put(key, value);
+        }
+    }
+
+    private String stringify(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return String.valueOf(value);
     }
 }

@@ -28,7 +28,6 @@ export interface ValidationResult {
 
 const ajv = new Ajv({
   allErrors: true,
-  strict: false,
   useDefaults: true,
   removeAdditional: false,
 })
@@ -48,7 +47,10 @@ function compileOrThrow(record: { type: string; plugin?: string; propsSchema?: P
 function formatErrors(errors: readonly ErrorObject[] | null | undefined): ValidationError[] {
   if (!errors) return []
   return errors.map(e => ({
-    path: e.instancePath || e.schemaPath || '/',
+    path: ((e as ErrorObject & { instancePath?: string; dataPath?: string }).instancePath ||
+      (e as ErrorObject & { instancePath?: string; dataPath?: string }).dataPath ||
+      e.schemaPath ||
+      '/'),
     message: e.message ?? 'invalid',
   }))
 }

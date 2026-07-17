@@ -37,7 +37,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -190,7 +192,7 @@ public class ConditionFragmentServiceImpl implements ConditionFragmentService {
         }
 
         Long tid = requireTenant();
-        List<DecisionImpactRefDTO> incoming = incomingRefs(tid, entity.getFragmentCode());
+        List<DecisionImpactRefDTO> incoming = incomingRefs(tid, entity);
         if (entity.getVersion() != null && entity.getVersion() > 1 && !incoming.isEmpty() && !impactAcknowledged) {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Impact acknowledgement required before publishing condition fragment: "
@@ -254,12 +256,8 @@ public class ConditionFragmentServiceImpl implements ConditionFragmentService {
     @Override
     public ConditionFragmentImpactDTO impact(String fragmentCode) {
         Long tid = requireTenant();
-        loadLatest(fragmentCode);
-        List<DecisionImpactRefDTO> incoming = usageRefMapper
-                .findTargetRefs(tid, TARGET_TYPE_CONDITION_FRAGMENT, fragmentCode)
-                .stream()
-                .map(this::toImpactRef)
-                .toList();
+        ConditionFragmentEntity fragment = loadLatest(fragmentCode);
+        List<DecisionImpactRefDTO> incoming = incomingRefs(tid, fragment);
         ConditionFragmentImpactDTO dto = new ConditionFragmentImpactDTO();
         dto.setFragmentCode(fragmentCode);
         dto.setIncoming(incoming);
@@ -351,26 +349,93 @@ public class ConditionFragmentServiceImpl implements ConditionFragmentService {
     }
 
     private DecisionImpactRefDTO toImpactRef(DecisionUsageRefEntity ref) {
+        Map<String, Object> metadata = metadataFrom(ref.getMetadataJson());
         DecisionImpactRefDTO dto = new DecisionImpactRefDTO();
         dto.setSourceType(ref.getSourceType());
         dto.setSourceCode(ref.getSourceCode());
+        dto.setSourceName(metadata.get("sourceName") instanceof String sourceName ? sourceName : null);
         dto.setSourceVersion(ref.getSourceVersion());
         dto.setSourcePid(ref.getSourcePid());
         dto.setTargetType(ref.getTargetType());
         dto.setTargetCode(ref.getTargetCode());
         dto.setTargetPath(ref.getTargetPath());
         dto.setBinding(ref.getBinding());
-        if (ref.getMetadataJson() != null && !ref.getMetadataJson().isNull()) {
-            dto.setMetadata(objectMapper.convertValue(ref.getMetadataJson(), new TypeReference<Map<String, Object>>() {}));
-        }
+        dto.setMetadata(metadata);
         return dto;
     }
 
-    private List<DecisionImpactRefDTO> incomingRefs(Long tid, String fragmentCode) {
-        return usageRefMapper.findTargetRefs(tid, TARGET_TYPE_CONDITION_FRAGMENT, fragmentCode)
+    private List<DecisionImpactRefDTO> incomingRefs(Long tid, ConditionFragmentEntity fragment) {
+        Map<String, DecisionImpactRefDTO> refs = new LinkedHashMap<>();
+        usageRefMapper.findTargetRefs(tid, TARGET_TYPE_CONDITION_FRAGMENT, fragment.getFragmentCode())
                 .stream()
                 .map(this::toImpactRef)
-                .toList();
+                .forEach(ref -> refs.put(impactKey(ref), ref));
+
+        for (String decisionRef : readStringList(fragment.getDecisionRefsJson())) {
+            usageRefMapper.findTargetRefs(tid, "DECISION", decisionRef)
+                    .stream()
+                    .filter(ref -> matchesFragmentScope(fragment, ref))
+                    .map(this::toImpactRef)
+                    .forEach(ref -> refs.put(impactKey(ref), ref));
+        }
+        return new ArrayList<>(refs.values());
+    }
+
+    private boolean matchesFragmentScope(ConditionFragmentEntity fragment, DecisionUsageRefEntity ref) {
+        String scopeType = normalize(fragment.getScopeType());
+        String scopeRef = fragment.getScopeRef();
+        if (!StringUtils.hasText(scopeType)) {
+            return true;
+        }
+        return switch (scopeType) {
+            case "SLA" -> "SLA_RULE".equals(ref.getSourceType());
+            case "BPM" -> "BPM_PROCESS".equals(ref.getSourceType()) && sourceRefMatches(ref, scopeRef);
+            case "AUTOMATION" -> "AUTOMATION".equals(ref.getSourceType()) && sourceRefMatches(ref, scopeRef);
+            case "EVENT_POLICY" -> "EVENT_POLICY".equals(ref.getSourceType()) && sourceRefMatches(ref, scopeRef);
+            case "PERMISSION" -> "PERMISSION_POLICY".equals(ref.getSourceType()) && sourceRefMatches(ref, scopeRef);
+            case "MODEL" -> sourceRefMatches(ref, scopeRef);
+            default -> scopeType.equals(ref.getSourceType()) && sourceRefMatches(ref, scopeRef);
+        };
+    }
+
+    private boolean sourceRefMatches(DecisionUsageRefEntity ref, String scopeRef) {
+        if (!StringUtils.hasText(scopeRef)) {
+            return true;
+        }
+        if (scopeRef.equals(ref.getSourceCode())) {
+            return true;
+        }
+        return scopeRef.equals(metadataString(ref, "modelCode"))
+                || scopeRef.equals(metadataString(ref, "processKey"))
+                || scopeRef.equals(metadataString(ref, "policyCode"))
+                || scopeRef.equals(metadataString(ref, "targetKey"));
+    }
+
+    private String metadataString(DecisionUsageRefEntity ref, String key) {
+        Object value = metadataFrom(ref.getMetadataJson()).get(key);
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private Map<String, Object> metadataFrom(JsonNode node) {
+        if (node == null || node.isNull()) {
+            return Map.of();
+        }
+        return objectMapper.convertValue(node, new TypeReference<Map<String, Object>>() {});
+    }
+
+    private String impactKey(DecisionImpactRefDTO ref) {
+        return String.join("|",
+                valueOrDefault(ref.getSourceType(), ""),
+                valueOrDefault(ref.getSourceCode(), ""),
+                valueOrDefault(ref.getSourcePid(), ""),
+                valueOrDefault(ref.getTargetType(), ""),
+                valueOrDefault(ref.getTargetCode(), ""),
+                valueOrDefault(ref.getTargetPath(), ""),
+                valueOrDefault(ref.getBinding(), ""));
+    }
+
+    private String normalize(String value) {
+        return value == null ? "" : value.trim().toUpperCase();
     }
 
     private String valueOrDefault(String value, String fallback) {

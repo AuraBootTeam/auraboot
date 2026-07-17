@@ -12,6 +12,7 @@ import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import com.auraboot.framework.decision.rule.RuleEvaluationContext;
 import com.auraboot.framework.decision.rule.RuleEvaluationService;
 import com.auraboot.framework.decision.rule.RuleEvaluationTrace;
+import com.auraboot.framework.decision.rule.RuleMappingTarget;
 import com.auraboot.framework.permission.engine.model.EvaluationStep;
 import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
 import com.auraboot.framework.permission.engine.vocab.PermissionFieldVocabulary;
@@ -27,7 +28,11 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Policy evaluator — enforces the materialized condition-AST guard on a grant
@@ -57,6 +62,8 @@ import java.util.List;
 public class PolicyEvaluator {
 
     private static final String NAME = "Policy";
+    private static final Pattern FIELD_REF_PATTERN =
+            Pattern.compile("\\b(record\\.data\\.[A-Za-z0-9_.-]+)\\b");
 
     private final PermissionPolicyService policyService;
     private final PermissionFieldVocabulary fieldVocabulary;
@@ -81,8 +88,16 @@ public class PolicyEvaluator {
             return new EvaluationStep(NAME, EvaluationVerdict.NOT_APPLICABLE, "No record to guard");
         }
 
-        String permissionCode = resource + ":" + action;
-        List<ConditionGuard> guards = policyService.getConditionGuards(memberId, permissionCode);
+        String permissionCode = null;
+        List<ConditionGuard> guards = List.of();
+        for (String candidate : PermissionCodeCandidates.forResourceAction(resource, action)) {
+            List<ConditionGuard> candidateGuards = policyService.getConditionGuards(memberId, candidate);
+            if (candidateGuards != null && !candidateGuards.isEmpty()) {
+                permissionCode = candidate;
+                guards = candidateGuards;
+                break;
+            }
+        }
 
         if (guards.isEmpty()) {
             // No grant rows surfaced for the guard layer (RBAC already allowed via its own path).
@@ -93,11 +108,21 @@ public class PolicyEvaluator {
         boolean hasConditionalGuard = false;
         DecisionContext ctx = null;
         List<String> denyReasons = new ArrayList<>();
+        List<Map<String, Object>> denyDetails = new ArrayList<>();
 
         for (ConditionGuard guard : guards) {
+            if (guard.validationError() != null && !guard.validationError().isBlank()) {
+                hasConditionalGuard = true;
+                denyReasons.add("grant#" + guard.grantId() + ": " + guard.validationError());
+                denyDetails.add(policyValidationFailureDetails(guard.grantId(), guard.validationError()));
+                continue;
+            }
+
             ParsedRuleBinding parsedBinding = parseRuleBinding(guard);
             if (parsedBinding.error() != null) {
+                hasConditionalGuard = true;
                 denyReasons.add("grant#" + guard.grantId() + ": " + parsedBinding.error());
+                denyDetails.add(policyValidationFailureDetails(guard.grantId(), parsedBinding.error()));
                 continue;
             }
 
@@ -114,6 +139,9 @@ public class PolicyEvaluator {
                     // A grant whose condition_ast cannot be parsed is unsafe to honor → treat as deny
                     // for this grant (default-deny); other grants may still allow.
                     denyReasons.add("grant#" + guard.grantId() + ": unparseable condition_ast");
+                    denyDetails.add(policyValidationFailureDetails(
+                            guard.grantId(),
+                            "unparseable condition_ast"));
                     continue;
                 }
 
@@ -122,8 +150,12 @@ public class PolicyEvaluator {
                 }
                 EvalTrace trace = astEvaluator.evaluate(ast, ctx);
                 if (trace.result() != Truth.TRUE) {
-                    denyReasons.add("grant#" + guard.grantId() + ": "
-                            + trace.result() + " — " + summarize(trace));
+                    String reason = trace.result() + " — " + summarize(trace);
+                    denyReasons.add("grant#" + guard.grantId() + ": " + reason);
+                    denyDetails.add(Map.of(
+                            "grantId", guard.grantId(),
+                            "conditionResult", trace.result().name(),
+                            "unknownReasons", trace.unknownReasons()));
                     continue;
                 }
             }
@@ -133,10 +165,14 @@ public class PolicyEvaluator {
                         ruleBinding, parsedBinding.expectedMatched(), memberId, permissionCode, record);
                 if (!ruleResult.matchedExpected()) {
                     denyReasons.add("grant#" + guard.grantId() + ": " + ruleResult.reason());
+                    Map<String, Object> detail = new LinkedHashMap<>(ruleResult.details());
+                    detail.put("grantId", guard.grantId());
+                    denyDetails.add(detail);
                     continue;
                 }
                 return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
-                        "Rule Center guard satisfied: " + ruleResult.reason());
+                        "Rule Center guard satisfied: " + ruleResult.reason(),
+                        ruleResult.details());
             }
 
             return new EvaluationStep(NAME, EvaluationVerdict.ALLOW,
@@ -149,8 +185,12 @@ public class PolicyEvaluator {
         }
 
         // Every conditional grant was FALSE / UNKNOWN / unparseable → deny by default.
+        Map<String, Object> details = denyDetails.isEmpty()
+                ? Map.of()
+                : Map.of("ruleCenterFailures", List.copyOf(denyDetails));
         return new EvaluationStep(NAME, EvaluationVerdict.DENY,
-                "Condition guard not satisfied: " + String.join("; ", denyReasons));
+                "Condition guard not satisfied: " + String.join("; ", denyReasons),
+                details);
     }
 
     private ConditionNode parseAst(ConditionGuard guard) {
@@ -162,6 +202,60 @@ public class PolicyEvaluator {
             log.warn("Failed to parse condition_ast for grant#{}: {}", guard.grantId(), e.getMessage());
             return null;
         }
+    }
+
+    private Map<String, Object> policyValidationFailureDetails(Long grantId, String error) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        details.put("grantId", grantId);
+        details.put("error", error);
+        Map<String, Object> fieldGovernance = fieldGovernanceEvidence(error);
+        if (!fieldGovernance.isEmpty()) {
+            details.put("fieldGovernance", fieldGovernance);
+        }
+        return details;
+    }
+
+    private Map<String, Object> fieldGovernanceEvidence(String error) {
+        if (error == null || error.isBlank()) {
+            return Map.of();
+        }
+        String fieldRef = extractFieldRef(error);
+        String reason = fieldGovernanceReason(error);
+        if (fieldRef.isBlank() && reason.isBlank()) {
+            return Map.of();
+        }
+        Map<String, Object> evidence = new LinkedHashMap<>();
+        if (!fieldRef.isBlank()) {
+            evidence.put("fieldRef", fieldRef);
+        }
+        if (!reason.isBlank()) {
+            evidence.put("reason", reason);
+        }
+        evidence.put("validation", "DENY");
+        evidence.put("source", "permission-policy-validation");
+        return evidence;
+    }
+
+    private String extractFieldRef(String error) {
+        Matcher matcher = FIELD_REF_PATTERN.matcher(error);
+        return matcher.find() ? matcher.group(1) : "";
+    }
+
+    private String fieldGovernanceReason(String error) {
+        String normalized = error.toLowerCase();
+        if (normalized.contains("masked")) {
+            return "masked";
+        }
+        if (normalized.contains("hidden")) {
+            return "hidden";
+        }
+        if (normalized.contains("out-of-catalog") || normalized.contains("fact catalog")) {
+            return "out-of-catalog";
+        }
+        if (normalized.contains("permission")) {
+            return "permission-change";
+        }
+        return "";
     }
 
     private String summarize(EvalTrace trace) {
@@ -233,7 +327,8 @@ public class PolicyEvaluator {
         RuleEvaluationService ruleEvaluationService = ruleEvaluationServiceProvider.getIfAvailable();
         if (ruleEvaluationService == null) {
             return new RuleGuardResult(false, describe(binding)
-                    + " cannot be evaluated because RuleEvaluationService is unavailable");
+                    + " cannot be evaluated because RuleEvaluationService is unavailable",
+                    Map.of("error", "RULE_EVALUATION_SERVICE_UNAVAILABLE"));
         }
         RuleEvaluationContext context = new RuleEvaluationContext(
                 fieldVocabulary.buildScopes(memberId, record),
@@ -252,8 +347,73 @@ public class PolicyEvaluator {
         }
         boolean expected = expectedMatched == null || expectedMatched;
         boolean matchedExpected = trace.matched() == expected;
+        Map<String, Object> details = buildRuleCenterDetails(binding, trace);
         return new RuleGuardResult(matchedExpected,
-                describe(binding) + " expected matched=" + expected + " but was " + trace.matched());
+                describe(binding) + " expected matched=" + expected + " but was " + trace.matched(),
+                details);
+    }
+
+    private Map<String, Object> buildRuleCenterDetails(RuleConsumerBinding binding, RuleEvaluationTrace trace) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        if (trace.traceId() != null && !trace.traceId().isBlank()) {
+            details.put("ruleTraceId", trace.traceId());
+        }
+        if (trace.bindingKind() != null) {
+            details.put("bindingKind", trace.bindingKind().name());
+        }
+        if (trace.decisionCode() != null && !trace.decisionCode().isBlank()) {
+            details.put("decisionCode", trace.decisionCode());
+        }
+        if (trace.decisionVersion() != null) {
+            details.put("decisionVersion", trace.decisionVersion());
+        }
+        if (trace.decisionStatus() != null) {
+            details.put("decisionStatus", trace.decisionStatus().name());
+        }
+        details.put("matched", trace.matched());
+        details.put("fallbackApplied", trace.fallbackApplied());
+        if (!trace.inputSnapshot().isEmpty()) {
+            details.put("inputSnapshot", trace.inputSnapshot());
+        }
+        if (!trace.outputSnapshot().isEmpty()) {
+            details.put("decisionOutputs", trace.outputSnapshot());
+        }
+        Map<String, Object> permissionContext = mapPermissionContextOutputs(binding, trace);
+        if (!permissionContext.isEmpty()) {
+            details.put("permissionContext", permissionContext);
+        }
+        if (!trace.fieldRefs().isEmpty()) {
+            details.put("fieldRefs", trace.fieldRefs());
+        }
+        if (!trace.decisionRefs().isEmpty()) {
+            details.put("decisionRefs", trace.decisionRefs());
+        }
+        return details;
+    }
+
+    private Map<String, Object> mapPermissionContextOutputs(RuleConsumerBinding binding, RuleEvaluationTrace trace) {
+        DecisionBinding decisionBinding = binding == null ? null : binding.decisionBinding();
+        if (decisionBinding == null || decisionBinding.outputMappings().isEmpty()
+                || trace.outputSnapshot().isEmpty()) {
+            return Map.of();
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        for (DecisionBinding.OutputMapping mapping : decisionBinding.outputMappings()) {
+            if (mapping == null || mapping.output() == null || mapping.output().isBlank()
+                    || mapping.target() == null
+                    || mapping.target().kind() != RuleMappingTarget.Kind.PERMISSION_CONTEXT) {
+                continue;
+            }
+            if (!trace.outputSnapshot().containsKey(mapping.output())) {
+                continue;
+            }
+            String path = mapping.target().path();
+            if (path == null || path.isBlank()) {
+                path = mapping.output();
+            }
+            result.put(path, trace.outputSnapshot().get(mapping.output()));
+        }
+        return result;
     }
 
     private String describe(RuleConsumerBinding binding) {
@@ -297,5 +457,9 @@ public class PolicyEvaluator {
         }
     }
 
-    private record RuleGuardResult(boolean matchedExpected, String reason) {}
+    private record RuleGuardResult(boolean matchedExpected, String reason, Map<String, Object> details) {
+        private RuleGuardResult {
+            details = details == null ? Map.of() : Map.copyOf(details);
+        }
+    }
 }

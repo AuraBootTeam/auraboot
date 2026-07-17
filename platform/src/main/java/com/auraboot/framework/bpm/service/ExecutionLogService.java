@@ -56,6 +56,27 @@ public class ExecutionLogService {
     }
 
     /**
+     * Record a BPM rule binding evaluation without conflating it with node completion.
+     */
+    public void logRuleEvaluated(String executionId, String nodeId, Map<String, Object> output, long durationMs) {
+        insertLog(executionId, nodeId, "ruleBinding", ExecutionEventType.RULE_EVALUATED,
+                null, output, null, null, durationMs);
+    }
+
+    /**
+     * Record a Rule Center action executed by a BPM serviceTask.
+     *
+     * <p>This is intentionally separate from {@link ExecutionEventType#NODE_COMPLETE} so action
+     * evidence can appear in ProcessStatus without changing node completion counts.
+     */
+    public void logActionExecuted(String executionId, String nodeId,
+                                  Map<String, Object> input, Map<String, Object> output,
+                                  long durationMs) {
+        insertLog(executionId, nodeId, "action", ExecutionEventType.ACTION_EXECUTED,
+                input, output, null, null, durationMs);
+    }
+
+    /**
      * Record an execution state change (pause/resume/cancel).
      */
     public void logStateChange(String executionId, String fromState, String toState, String reason) {
@@ -111,6 +132,34 @@ public class ExecutionLogService {
     public List<ExecutionLogEntry> getFailedNodes(String executionId) {
         return executionLogMapper.findFailedNodes(executionId)
                 .stream().map(this::toEntry).toList();
+    }
+
+    /**
+     * Find the latest failed node recorded for an execution id.
+     *
+     * <p>This supports SmartEngine start failures where the process instance
+     * row can be rolled back before it becomes queryable, while the node-level
+     * execution log remains the durable user-facing trace.
+     */
+    public ExecutionLogEntry getLatestFailure(String executionId, Long tenantId) {
+        if (executionId == null || executionId.isBlank()) {
+            return null;
+        }
+        BpmExecutionLog log = executionLogMapper.findLatestFailureByExecutionId(tenantId, executionId);
+        return log == null ? null : toEntry(log);
+    }
+
+    /**
+     * Find the latest failed start snapshot by business key and optional
+     * process key. The lookup uses JSONB fields written into inputData by BPM
+     * delegates; MyBatis still handles entity mapping and JSONB type handlers.
+     */
+    public ExecutionLogEntry getLatestFailureByBusinessKey(Long tenantId, String processKey, String businessKey) {
+        if (businessKey == null || businessKey.isBlank()) {
+            return null;
+        }
+        BpmExecutionLog log = executionLogMapper.findLatestFailureByBusinessKey(tenantId, processKey, businessKey);
+        return log == null ? null : toEntry(log);
     }
 
     /**

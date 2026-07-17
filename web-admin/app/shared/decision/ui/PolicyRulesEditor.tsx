@@ -1,5 +1,6 @@
 import { ConditionBuilder, type FieldOption } from './ConditionBuilder';
 import { group, type GroupNode } from '../ast/conditionAst';
+import type { RuleConsumerBindingDraft } from '~/ui/smart/decision/DecisionRuleBindingBlock';
 
 /**
  * DecisionOps EventPolicy rules editor (mockup 策略设计器 规则集 / F2-F3, docs/2.md §X.4): edit a
@@ -17,6 +18,7 @@ export interface PolicyRuleDraft {
   enabled: boolean;
   condition: GroupNode;
   actions?: unknown[];
+  decisionBinding?: RuleConsumerBindingDraft['decisionBinding'];
 }
 
 export interface PolicyRulesValue {

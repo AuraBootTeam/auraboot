@@ -1,5 +1,6 @@
 package com.auraboot.framework.automation.executor.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import org.junit.jupiter.api.Test;
@@ -50,7 +51,10 @@ class CreateRecordExecutorTest {
     @SuppressWarnings("unchecked")
     void execute_basicFields_createsRecord() {
         Map<String, Object> createdRecord = Map.of("id", 100L, "name", "John", "status", "new");
-        when(dynamicDataService.create(eq("crm_lead"), any())).thenReturn(createdRecord);
+        when(dynamicDataService.create(eq("crm_lead"), any())).thenAnswer(inv -> {
+            assertThat(MetaContext.isDataPermissionBypassed()).isTrue();
+            return createdRecord;
+        });
 
         AutomationAction action = buildAction(Map.of(
                 "modelCode", "crm_lead",
@@ -65,6 +69,7 @@ class CreateRecordExecutorTest {
         assertThat(result.get("record")).isEqualTo(createdRecord);
         verify(dynamicDataService).create(eq("crm_lead"), argThat(fields ->
                 fields.get("name").equals("John") && fields.get("status").equals("new")));
+        assertThat(MetaContext.isDataPermissionBypassed()).isFalse();
     }
 
     @Test

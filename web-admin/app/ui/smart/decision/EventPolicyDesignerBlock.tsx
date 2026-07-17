@@ -4,12 +4,16 @@ import { getApiService } from '~/shared/services/ApiService';
 import {
   createDecisionApi,
   type DecisionApi,
-  type DecisionModelField,
   type EventPolicySummary,
   type HttpClient,
 } from '~/shared/decision/api/decisionApi';
 import { EventPolicyDesignerWorkflow } from '~/shared/decision/ui/EventPolicyDesignerWorkflow';
+import type { TestSample } from '~/shared/decision/ui/ConditionTestRunPanel';
 import type { FieldOption } from '~/shared/decision/ui/ConditionBuilder';
+import {
+  factCatalogToFieldOptions,
+  modelFieldsToFieldOptions,
+} from '~/shared/decision/ui/factCatalogAdapter';
 
 interface EventPolicyDesignerBlockProps {
   block?: {
@@ -30,6 +34,7 @@ interface EventPolicyDesignerBlockProps {
 }
 
 const DEFAULT_FIELDS: FieldOption[] = [
+  { scope: 'event', path: 'type', label: '事件类型', dataType: 'string' },
   {
     scope: 'record',
     path: 'data.priority',
@@ -40,41 +45,13 @@ const DEFAULT_FIELDS: FieldOption[] = [
   { scope: 'record', path: 'data.amount', label: '金额', dataType: 'decimal' },
   { scope: 'record', path: 'data.status', label: '状态', dataType: 'string' },
 ];
-
-const SUPPORTED_SCOPES = new Set<FieldOption['scope']>([
-  'meta',
-  'event',
-  'record',
-  'before',
-  'after',
-  'process',
-  'task',
-  'sla',
-  'actor',
-  'tenant',
-  'time',
-  'env',
-]);
-
-const SUPPORTED_DATA_TYPES = new Set<FieldOption['dataType']>([
-  'string',
-  'text',
-  'integer',
-  'decimal',
-  'boolean',
-  'date',
-  'time',
-  'datetime',
-  'duration',
-  'enum',
-  'dict',
-  'user',
-  'role',
-  'group',
-  'department',
-  'collection',
-  'object',
-]);
+const LEAVE_REQUEST_FIELDS: FieldOption[] = [
+  { scope: 'event', path: 'type', label: '事件类型', dataType: 'string' },
+  { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
+  { scope: 'record', path: 'data.wd_req_no', label: '申请编号', dataType: 'string' },
+  { scope: 'record', path: 'pid', label: '申请记录', dataType: 'string' },
+  { scope: 'actor', path: 'roles', label: '触发人角色', dataType: 'collection' },
+];
 
 function createApi(): DecisionApi {
   const service = getApiService();
@@ -106,19 +83,6 @@ function runtimeRecord(runtime: EventPolicyDesignerBlockProps['runtime']): Recor
   return context?.record ?? context?.row ?? context?.data ?? {};
 }
 
-function toFieldOption(field: DecisionModelField): FieldOption | null {
-  const scope = String(field.entityCode ?? 'record') as FieldOption['scope'];
-  const path = String(field.path ?? '');
-  if (!SUPPORTED_SCOPES.has(scope) || !path) return null;
-  const dataType = String(field.dataType ?? 'object').toLowerCase() as FieldOption['dataType'];
-  return {
-    scope,
-    path,
-    label: field.label || `${scope}.${path}`,
-    dataType: SUPPORTED_DATA_TYPES.has(dataType) ? dataType : 'object',
-  };
-}
-
 function mergeFieldOptions(primary: FieldOption[], fallback: FieldOption[]): FieldOption[] {
   const seen = new Set<string>();
   return [...primary, ...fallback].filter((field) => {
@@ -127,6 +91,80 @@ function mergeFieldOptions(primary: FieldOption[], fallback: FieldOption[]): Fie
     seen.add(key);
     return true;
   });
+}
+
+function defaultFieldsForPolicy(policy: EventPolicySummary | null): FieldOption[] {
+  if (policy?.policyCode === 'leave_request_event_policy' || policy?.targetKey === 'wd_leave_request') {
+    return LEAVE_REQUEST_FIELDS;
+  }
+  return DEFAULT_FIELDS;
+}
+
+function fieldsForPolicy(policy: EventPolicySummary | null, catalogFields: FieldOption[]): FieldOption[] {
+  const targetKey = policy?.targetKey;
+  if (!targetKey) return catalogFields;
+  return catalogFields.filter((field) => {
+    if (field.scope !== 'record') return true;
+    if (!field.modelCode) return true;
+    return field.modelCode === targetKey;
+  });
+}
+
+function leaveRequestSampleContext(recordPid: string): TestSample['context'] {
+  return {
+    record: {
+      entityCode: 'wd_leave_request',
+      recordPid,
+      data: {
+        entityCode: 'wd_leave_request',
+        recordPid,
+        wd_req_no: recordPid,
+        wd_req_days: 5,
+      },
+    },
+  };
+}
+
+function leaveRequestRunContext(): TestSample['context'] {
+  return leaveRequestSampleContext(`REQ-LONG-LEAVE-SAMPLE-RUN-${Date.now().toString(36)}`);
+}
+
+function defaultSamplesForPolicy(policy: EventPolicySummary | null): TestSample[] {
+  if (!policy) return [];
+  if (policy.policyCode === 'leave_request_event_policy' || policy.targetKey === 'wd_leave_request') {
+    const recordPid = 'REQ-LONG-LEAVE-SAMPLE';
+    return [
+      {
+        label: '5天长假申请',
+        context: leaveRequestSampleContext(recordPid),
+        executionContext: leaveRequestRunContext,
+      },
+    ];
+  }
+
+  const targetKey = policy.targetKey || 'record';
+  const recordPid = `TEST-${policy.policyCode || targetKey}`;
+  return [
+    {
+      label: '默认样例',
+      context: {
+        event: {
+          type: policy.eventType,
+        },
+        record: {
+          entityCode: targetKey,
+          recordPid,
+          data: {
+            entityCode: targetKey,
+            recordPid,
+            priority: 'HIGH',
+            amount: 9000,
+            status: 'OPEN',
+          },
+        },
+      },
+    },
+  ];
 }
 
 export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesignerBlockProps) {
@@ -143,8 +181,11 @@ export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesigner
     stringValue(record.policy_code) ??
     stringValue(params.recordPid);
   const [catalogFields, setCatalogFields] = useState<FieldOption[]>([]);
-  const fields = configuredFields ?? mergeFieldOptions(catalogFields, DEFAULT_FIELDS);
   const [policy, setPolicy] = useState<EventPolicySummary | null>(null);
+  const policyTargetKey = policy?.targetKey;
+  const fields = configuredFields
+    ?? mergeFieldOptions(fieldsForPolicy(policy, catalogFields), defaultFieldsForPolicy(policy));
+  const samples = useMemo(() => defaultSamplesForPolicy(policy), [policy]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -153,20 +194,35 @@ export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesigner
       setCatalogFields([]);
       return;
     }
+    if (policyCode && !policy) {
+      setCatalogFields([]);
+      return;
+    }
     let cancelled = false;
-    api
-      .getModelFields()
-      .then((rows) => {
+    const loadFields = async () => {
+      try {
+        const factFields = factCatalogToFieldOptions(await api.getFactCatalog(policyTargetKey));
         if (cancelled) return;
-        setCatalogFields(rows.map(toFieldOption).filter((field): field is FieldOption => Boolean(field)));
-      })
-      .catch(() => {
+        if (factFields.length > 0) {
+          setCatalogFields(factFields);
+          return;
+        }
+      } catch {
+        // Old runtimes may not expose the unified fact catalog yet; keep the legacy field index as fallback.
+      }
+      try {
+        const rows = await api.getModelFields();
+        if (cancelled) return;
+        setCatalogFields(modelFieldsToFieldOptions(rows));
+      } catch {
         if (!cancelled) setCatalogFields([]);
-      });
+      }
+    };
+    loadFields();
     return () => {
       cancelled = true;
     };
-  }, [api, configuredFields]);
+  }, [api, configuredFields, policy, policyCode, policyTargetKey]);
 
   useEffect(() => {
     if (!policyCode) {
@@ -217,7 +273,7 @@ export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesigner
           {error}
         </div>
       )}
-      {policy && <EventPolicyDesignerWorkflow api={api} fields={fields} selectedPolicy={policy} />}
+      {policy && <EventPolicyDesignerWorkflow api={api} fields={fields} selectedPolicy={policy} samples={samples} />}
     </section>
   );
 }

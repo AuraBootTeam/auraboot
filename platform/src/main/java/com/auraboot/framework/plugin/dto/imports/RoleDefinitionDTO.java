@@ -59,6 +59,17 @@ public class RoleDefinitionDTO {
     private List<String> permissions;
 
     /**
+     * Optional policy values attached to specific role-permission bindings.
+     */
+    private List<RolePermissionPolicyDefinitionDTO> permissionPolicies;
+
+    /**
+     * Optional seed member references assigned to this role during plugin import.
+     * Supported value: CURRENT_MEMBER.
+     */
+    private List<String> seedMembers;
+
+    /**
      * Priority for permission conflict resolution.
      */
     @Builder.Default

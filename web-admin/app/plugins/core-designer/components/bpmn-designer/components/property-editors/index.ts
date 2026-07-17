@@ -4,6 +4,7 @@
 
 export { UserTaskEditor } from './UserTaskEditor';
 export { ServiceTaskEditor } from './ServiceTaskEditor';
+export { RuleTaskEditor } from './RuleTaskEditor';
 export { ReceiveTaskEditor } from './ReceiveTaskEditor';
 export { ExclusiveGatewayEditor } from './ExclusiveGatewayEditor';
 export { ParallelGatewayEditor } from './ParallelGatewayEditor';

@@ -1,5 +1,6 @@
 package com.auraboot.framework.eventpolicy;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionDTO;
@@ -20,6 +21,10 @@ import com.auraboot.framework.eventpolicy.service.EventPolicyDefinitionService;
 import com.auraboot.framework.eventpolicy.service.EventPolicyRuntimeService;
 import com.auraboot.framework.eventpolicy.service.EventPolicyVersionService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.auraboot.framework.meta.dto.ModelCapabilities;
+import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -62,6 +67,8 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
     private DecisionVersionService decisionVersionService;
     @Autowired
     private JdbcTemplate jdbcTemplate;
+    @Autowired
+    private MetaModelService metaModelService;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -149,7 +156,20 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
             """).formatted(threshold));
     }
 
+    private JsonNode virtualRiskScoreAst() throws Exception {
+        return mapper.readTree("""
+            { "type": "compare",
+              "left": { "type": "path", "scope": "record", "path": "data.slaRiskScore", "dataType": "integer" },
+              "operator": "GT",
+              "right": { "type": "literal", "value": 80, "dataType": "integer" } }
+            """);
+    }
+
     private void createPublishedDecision(String decisionCode) throws Exception {
+        createPublishedDecision(decisionCode, amountGtAst(10000), "record.data.amount");
+    }
+
+    private void createPublishedDecision(String decisionCode, JsonNode ast, String expectedFieldRef) throws Exception {
         DrtDefinitionCreateRequest def = new DrtDefinitionCreateRequest();
         def.setDecisionCode(decisionCode);
         def.setDecisionName("EventPolicy Decision " + decisionCode);
@@ -160,12 +180,12 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
         DrtVersionCreateRequest version = new DrtVersionCreateRequest();
         version.setKind("SIMPLE_CONDITION");
         version.setRuntimeAdapter("AST_EVALUATOR");
-        version.setContentJson(amountGtAst(10000));
+        version.setContentJson(ast);
         DrtVersionDTO draft = decisionVersionService.createDraft(decisionCode, version);
 
         DecisionValidateResult validation = decisionVersionService.validate(draft.getPid());
         assertThat(validation.valid()).isTrue();
-        assertThat(validation.fieldRefs()).contains("record.data.amount");
+        assertThat(validation.fieldRefs()).contains(expectedFieldRef);
 
         DrtVersionDTO published = decisionVersionService.publish(draft.getPid());
         assertThat(published.getStatus()).isEqualTo(VersionStatus.PUBLISHED.name());
@@ -208,6 +228,71 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
             """).formatted(decisionCode));
     }
 
+    private JsonNode buildVirtualDecisionBindingRulesJson(String decisionCode) throws Exception {
+        return mapper.readTree(("""
+            [
+              {
+                "ruleCode": "R-VIRTUAL",
+                "ruleName": "Virtual risk score decision",
+                "priority": 1,
+                "enabled": true,
+                "decisionBinding": {
+                  "decisionCode": "%s",
+                  "versionPolicy": "LATEST_PUBLISHED",
+                  "inputMappings": [
+                    {
+                      "input": "slaRiskScore",
+                      "source": { "kind": "FIELD", "scope": "record", "path": "data.slaRiskScore" }
+                    }
+                  ],
+                  "fallbackPolicy": {
+                    "mode": "FAIL_CLOSED",
+                    "reason": "Decision evaluation failed"
+                  },
+                  "enabled": true
+                },
+                "actions": [
+                  {
+                    "type": "NOTIFY",
+                    "target": "ROLE:decision_manager",
+                    "order": 1,
+                    "payload": { "template": "virtual_risk_alert" },
+                    "idempotencyKeyTemplate": "${record.data.recordPid}:${rule.ruleCode}:${action.type}"
+                  }
+                ]
+              }
+            ]
+            """).formatted(decisionCode));
+    }
+
+    private JsonNode buildSinglePriorityRule(String ruleCode) throws Exception {
+        return mapper.readTree(("""
+            [
+              {
+                "ruleCode": "%s",
+                "ruleName": "%s",
+                "priority": 1,
+                "enabled": true,
+                "condition": {
+                  "type": "compare",
+                  "left": { "type": "path", "scope": "record", "path": "data.priority", "dataType": "string" },
+                  "operator": "EQ",
+                  "right": { "type": "literal", "value": "HIGH", "dataType": "string" }
+                },
+                "actions": [
+                  {
+                    "type": "NOTIFY",
+                    "target": "ROLE:support_manager",
+                    "order": 1,
+                    "payload": { "template": "%s" },
+                    "idempotencyKeyTemplate": "${record.data.recordPid}:${rule.ruleCode}:${action.type}"
+                  }
+                ]
+              }
+            ]
+            """).formatted(ruleCode, ruleCode, ruleCode));
+    }
+
     /**
      * Helper: create definition + draft + validate + publish, return definition entity.
      */
@@ -242,6 +327,10 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
     }
 
     private void createAndPublishDecisionBoundPolicy(String policyCode, String decisionCode) throws Exception {
+        createAndPublishDecisionBoundPolicy(policyCode, buildDecisionBindingRulesJson(decisionCode));
+    }
+
+    private void createAndPublishDecisionBoundPolicy(String policyCode, JsonNode rulesJson) {
         definitionService.create(policyCode, "Decision Bound Policy",
                 "FORM_SUBMITTED", "FORM", policyCode);
 
@@ -253,13 +342,65 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
                 FailureStrategy.FAIL_FAST,
                 ConflictStrategy.REJECT_ON_CONFLICT,
                 DedupStrategy.BY_IDEMPOTENCY_KEY,
-                buildDecisionBindingRulesJson(decisionCode));
+                rulesJson);
 
         DrtPolicyVersionEntity validated = versionService.validate(draft.getPid());
         assertThat(validated.getStatus()).isEqualTo(VersionStatus.VALIDATED.name());
 
         DrtPolicyVersionEntity published = versionService.publish(validated.getPid());
         assertThat(published.getStatus()).isEqualTo(VersionStatus.PUBLISHED.name());
+    }
+
+    private void createRiskScoreView(String viewName) {
+        jdbcTemplate.execute("""
+                CREATE OR REPLACE VIEW %s AS
+                SELECT id, id AS tenant_id, 91::integer AS "slaRiskScore"
+                FROM ab_tenant
+                """.formatted(viewName));
+    }
+
+    private void saveRiskScoreVirtualModel(String modelCode, String viewName) {
+        List<FieldDefinition> fields = List.of(
+                FieldDefinition.builder()
+                        .code("id")
+                        .name("id")
+                        .displayName("id")
+                        .dataType("integer")
+                        .columnName("id")
+                        .primaryKey(true)
+                        .sortable(true)
+                        .filterable(true)
+                        .build(),
+                FieldDefinition.builder()
+                        .code("tenant_id")
+                        .name("tenant_id")
+                        .displayName("tenant_id")
+                        .dataType("integer")
+                        .columnName("tenant_id")
+                        .build(),
+                FieldDefinition.builder()
+                        .code("slaRiskScore")
+                        .name("slaRiskScore")
+                        .displayName("SLA Risk Score")
+                        .dataType("integer")
+                        .columnName("slaRiskScore")
+                        .build());
+
+        ModelDefinition saved = metaModelService.saveDefinition(ModelDefinition.builder()
+                .code(modelCode)
+                .displayName("EventPolicy Virtual Risk " + modelCode)
+                .modelType("virtual")
+                .sourceType("sqlView")
+                .sourceRef(viewName)
+                .primaryKey("id")
+                .capabilities(ModelCapabilities.virtualReadOnly().toBuilder()
+                        .detailKeyField("id")
+                        .build())
+                .fields(fields)
+                .status("published")
+                .build());
+        assertThat(saved.getSourceType()).isEqualTo("sqlView");
+        assertThat(saved.getSourceRef()).isEqualTo(viewName);
     }
 
     @Test
@@ -377,6 +518,167 @@ class EventPolicyRuntimeIntegrationTest extends BaseIntegrationTest {
         assertThat(notMatched.status()).isEqualTo(EventPolicyResult.Status.NOT_MATCHED);
         assertThat(notMatched.matchedRuleCodes()).isEmpty();
         assertThat(notMatched.actionPlans()).isEmpty();
+    }
+
+    @Test
+    void run_decisionBindingPropagatesMetaVirtualSourcesToDecisionRuntime() throws Exception {
+        String decisionCode = "ep_virtual_decision_" + System.nanoTime();
+        String policyCode = "ep_virtual_policy_" + System.nanoTime();
+        createPublishedDecision(decisionCode, virtualRiskScoreAst(), "record.data.slaRiskScore");
+        createAndPublishDecisionBoundPolicy(policyCode, buildVirtualDecisionBindingRulesJson(decisionCode));
+
+        String suffix = Long.toString(Math.abs(System.nanoTime()), 36);
+        String viewName = "v_ep_src_" + suffix;
+        createRiskScoreView(viewName);
+        saveRiskScoreVirtualModel("ep_virtual_risk_" + suffix, viewName);
+
+        try {
+            EventPolicyResult result = runtimeService.run(
+                    "FORM_SUBMITTED", "FORM", policyCode,
+                    Map.of(
+                            "record", Map.of("data", Map.of(
+                                    "entityCode", "complaint",
+                                    "recordPid", "CMP-VIRTUAL")),
+                            "meta", Map.of("virtualSources", List.of(Map.of(
+                                    "sourceRef", viewName,
+                                    "recordId", MetaContext.getCurrentTenantId().toString())))));
+
+            assertThat(result.status()).isEqualTo(EventPolicyResult.Status.MATCHED);
+            assertThat(result.matchedRuleCodes()).containsExactly("R-VIRTUAL");
+            assertThat(result.actionPlans()).hasSize(1);
+            assertThat(result.primaryDecisionTraceId()).isNotBlank();
+            Integer matchedLogRows = jdbcTemplate.queryForObject(
+                    "select count(*) from ab_drt_log where trace_id = ? and matched = true and status = 'MATCHED'",
+                    Integer.class, result.primaryDecisionTraceId());
+            assertThat(matchedLogRows).isEqualTo(1);
+            String loggedSourceRef = jdbcTemplate.queryForObject(
+                    "select trace_snapshot->'virtualSources'->0->>'sourceRef' from ab_drt_log where trace_id = ?",
+                    String.class, result.primaryDecisionTraceId());
+            Integer loggedRiskScore = jdbcTemplate.queryForObject(
+                    """
+                    select (trace_snapshot->'virtualSources'->0->'fields'->>'slaRiskScore')::int
+                    from ab_drt_log where trace_id = ?
+                    """,
+                    Integer.class, result.primaryDecisionTraceId());
+            assertThat(loggedSourceRef).isEqualTo(viewName);
+            assertThat(loggedRiskScore).isEqualTo(91);
+        } finally {
+            jdbcTemplate.execute("DROP VIEW IF EXISTS " + viewName);
+        }
+    }
+
+    @Test
+    void publish_deprecatesPreviousPublishedVersionAndRuntimeUsesNewestActive() throws Exception {
+        String policyCode = "ep_latest_pub_" + System.nanoTime();
+        definitionService.create(policyCode, "Latest Published Policy",
+                "FORM_SUBMITTED", "FORM", policyCode);
+
+        DrtPolicyVersionEntity draft1 = versionService.createDraft(
+                policyCode,
+                PolicyPhase.AFTER_COMMIT,
+                MatchMode.COLLECT_ALL,
+                ExecutionMode.ORDERED,
+                FailureStrategy.FAIL_FAST,
+                ConflictStrategy.REJECT_ON_CONFLICT,
+                DedupStrategy.BY_IDEMPOTENCY_KEY,
+                buildSinglePriorityRule("R-OLD"));
+        versionService.validate(draft1.getPid());
+        versionService.publish(draft1.getPid());
+
+        DrtPolicyVersionEntity draft2 = versionService.createDraft(
+                policyCode,
+                PolicyPhase.AFTER_COMMIT,
+                MatchMode.COLLECT_ALL,
+                ExecutionMode.ORDERED,
+                FailureStrategy.FAIL_FAST,
+                ConflictStrategy.REJECT_ON_CONFLICT,
+                DedupStrategy.BY_IDEMPOTENCY_KEY,
+                buildSinglePriorityRule("R-LATEST"));
+        versionService.validate(draft2.getPid());
+        versionService.publish(draft2.getPid());
+
+        Integer publishedCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_drt_policy_version WHERE policy_code = ? AND status = 'PUBLISHED'",
+                Integer.class, policyCode);
+        assertThat(publishedCount).isEqualTo(1);
+
+        String oldStatus = jdbcTemplate.queryForObject(
+                "SELECT status FROM ab_drt_policy_version WHERE pid = ?",
+                String.class, draft1.getPid());
+        String latestStatus = jdbcTemplate.queryForObject(
+                "SELECT status FROM ab_drt_policy_version WHERE pid = ?",
+                String.class, draft2.getPid());
+        assertThat(oldStatus).isEqualTo(VersionStatus.DEPRECATED.name());
+        assertThat(latestStatus).isEqualTo(VersionStatus.PUBLISHED.name());
+
+        EventPolicyResult result = runtimeService.run(
+                "FORM_SUBMITTED", "FORM", policyCode,
+                Map.of("record", Map.of(
+                        "data", Map.of(
+                                "priority", "HIGH",
+                                "entityCode", "complaint",
+                                "recordPid", "CMP-LATEST"
+                        )
+                ))
+        );
+
+        assertThat(result.status()).isEqualTo(EventPolicyResult.Status.MATCHED);
+        assertThat(result.matchedRuleCodes()).containsExactly("R-LATEST");
+        assertThat(result.actionPlans().get(0).idempotencyKey()).contains("R-LATEST");
+    }
+
+    @Test
+    void run_usesHighestPublishedVersionWhenLegacyDuplicatePublishedRowsExist() throws Exception {
+        String policyCode = "ep_legacy_dup_pub_" + System.nanoTime();
+        definitionService.create(policyCode, "Legacy Duplicate Published Policy",
+                "FORM_SUBMITTED", "FORM", policyCode);
+
+        DrtPolicyVersionEntity draft1 = versionService.createDraft(
+                policyCode,
+                PolicyPhase.AFTER_COMMIT,
+                MatchMode.COLLECT_ALL,
+                ExecutionMode.ORDERED,
+                FailureStrategy.FAIL_FAST,
+                ConflictStrategy.REJECT_ON_CONFLICT,
+                DedupStrategy.BY_IDEMPOTENCY_KEY,
+                buildSinglePriorityRule("R-OLD"));
+        versionService.validate(draft1.getPid());
+        versionService.publish(draft1.getPid());
+
+        DrtPolicyVersionEntity draft2 = versionService.createDraft(
+                policyCode,
+                PolicyPhase.AFTER_COMMIT,
+                MatchMode.COLLECT_ALL,
+                ExecutionMode.ORDERED,
+                FailureStrategy.FAIL_FAST,
+                ConflictStrategy.REJECT_ON_CONFLICT,
+                DedupStrategy.BY_IDEMPOTENCY_KEY,
+                buildSinglePriorityRule("R-LATEST"));
+        versionService.validate(draft2.getPid());
+        versionService.publish(draft2.getPid());
+
+        // Simulate pre-fix or imported historical data that still has duplicate PUBLISHED rows.
+        jdbcTemplate.update("UPDATE ab_drt_policy_version SET status = 'PUBLISHED' WHERE pid = ?", draft1.getPid());
+
+        Integer publishedCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM ab_drt_policy_version WHERE policy_code = ? AND status = 'PUBLISHED'",
+                Integer.class, policyCode);
+        assertThat(publishedCount).isEqualTo(2);
+
+        EventPolicyResult result = runtimeService.run(
+                "FORM_SUBMITTED", "FORM", policyCode,
+                Map.of("record", Map.of(
+                        "data", Map.of(
+                                "priority", "HIGH",
+                                "entityCode", "complaint",
+                                "recordPid", "CMP-LEGACY-DUP"
+                        )
+                ))
+        );
+
+        assertThat(result.status()).isEqualTo(EventPolicyResult.Status.MATCHED);
+        assertThat(result.matchedRuleCodes()).containsExactly("R-LATEST");
+        assertThat(result.actionPlans().get(0).idempotencyKey()).contains("R-LATEST");
     }
 
     @Test

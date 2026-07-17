@@ -10,6 +10,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -154,5 +155,33 @@ class TriggerConfigTypeHandlerTest {
 
         assertThat(result).isNotNull();
         assertThat(result.getModelCode()).isEqualTo("order");
+    }
+
+    @Test
+    void getNullableResult_testRunSampleFields_preserved() throws SQLException {
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getString("trigger_config")).thenReturn("""
+                {
+                  "modelCode": "wd_leave_request",
+                  "testRecordPid": "REQ-LONG-LEAVE-SAMPLE",
+                  "testContext": {
+                    "record": {
+                      "wd_req_code": "REQ-LONG-LEAVE-SAMPLE",
+                      "wd_req_days": 5
+                    },
+                    "source": "ui-test-run"
+                  }
+                }
+                """);
+
+        TriggerConfig result = handler.getNullableResult(rs, "trigger_config");
+
+        assertThat(result).isNotNull();
+        assertThat(result.getTestRecordPid()).isEqualTo("REQ-LONG-LEAVE-SAMPLE");
+        assertThat(result.getTestContext()).containsEntry("source", "ui-test-run");
+        assertThat(result.getTestContext())
+                .containsEntry("record", Map.of(
+                        "wd_req_code", "REQ-LONG-LEAVE-SAMPLE",
+                        "wd_req_days", 5));
     }
 }

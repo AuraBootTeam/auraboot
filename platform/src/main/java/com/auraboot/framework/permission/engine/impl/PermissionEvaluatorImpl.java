@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Default implementation of the 5-step permission evaluation pipeline.
@@ -67,7 +68,7 @@ public class PermissionEvaluatorImpl implements PermissionEvaluator {
         steps.add(rbacStep);
         if (rbacStep.verdict() == EvaluationVerdict.DENY) {
             PermissionResult denied = PermissionResult.deny(rbacStep.reason(), steps);
-            auditDeny(memberId, resource, action, null, denied);
+            auditDeny(memberId, resource, action, record, denied);
             return denied;
         }
 
@@ -82,7 +83,7 @@ public class PermissionEvaluatorImpl implements PermissionEvaluator {
             steps.add(dataScopeStep);
             if (dataScopeStep.verdict() == EvaluationVerdict.DENY) {
                 PermissionResult denied = PermissionResult.deny(dataScopeStep.reason(), steps);
-                auditDeny(memberId, resource, action, null, denied);
+                auditDeny(memberId, resource, action, record, denied);
                 return denied;
             }
         }
@@ -92,7 +93,7 @@ public class PermissionEvaluatorImpl implements PermissionEvaluator {
         steps.add(policyStep);
         if (policyStep.verdict() == EvaluationVerdict.DENY) {
             PermissionResult denied = PermissionResult.deny(policyStep.reason(), steps);
-            auditDeny(memberId, resource, action, null, denied);
+            auditDeny(memberId, resource, action, record, denied);
             return denied;
         }
 
@@ -109,16 +110,55 @@ public class PermissionEvaluatorImpl implements PermissionEvaluator {
      * <p>Never throws — audit must not interfere with the hot-path result.
      */
     private void auditDeny(Long memberId, String resource, String action,
-                           Long recordId, PermissionResult denied) {
+                           Object record, PermissionResult denied) {
         try {
             Long tenantId = MetaContext.getCurrentTenantId();
+            Long recordId = extractRecordId(record);
+            String recordPid = extractRecordPid(record, recordId);
             PermissionExplanation explanation = new PermissionExplanation(
-                    memberId, resource, action, recordId, false, denied.steps());
+                    memberId, resource, action, recordId, recordPid, false, denied.steps());
             permissionAuditService.logEvaluation(tenantId, explanation);
         } catch (Exception e) {
             // CATCH: MetaContext may be unavailable in background / test call paths; audit must never block
             log.debug("Skipping permission audit — MetaContext unavailable: {}", e.getMessage());
         }
+    }
+
+    private Long extractRecordId(Object record) {
+        if (!(record instanceof Map<?, ?> map)) {
+            return null;
+        }
+        Object value = firstPresent(map, "id", "recordId", "internalId");
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof String text && !text.isBlank()) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ignored) {
+                return null;
+            }
+        }
+        return null;
+    }
+
+    private String extractRecordPid(Object record, Long recordId) {
+        if (record instanceof Map<?, ?> map) {
+            Object value = firstPresent(map, "recordPid", "pid", "record_pid");
+            if (value != null && !value.toString().isBlank()) {
+                return value.toString();
+            }
+        }
+        return recordId != null ? String.valueOf(recordId) : null;
+    }
+
+    private Object firstPresent(Map<?, ?> map, String... keys) {
+        for (String key : keys) {
+            if (map.containsKey(key)) {
+                return map.get(key);
+            }
+        }
+        return null;
     }
 
     @Override

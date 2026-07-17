@@ -77,6 +77,13 @@
     "extension": { "multiline": true }
   },
   {
+    "code": "action_policy",
+    "displayName:zh-CN": "动作策略",
+    "displayName:en": "Action Policy",
+    "dataType": "jsonb",
+    "extension": { "multiline": true }
+  },
+  {
     "code": "model_code",
     "displayName:zh-CN": "关联模型",
     "displayName:en": "Model Code",

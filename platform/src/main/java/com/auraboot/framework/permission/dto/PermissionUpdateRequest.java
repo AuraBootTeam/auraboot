@@ -25,6 +25,7 @@ public class PermissionUpdateRequest {
     // Metadata
     private Map<String, Object> extension;
     private String[] tags;
+    private Map<String, Object> policySchema;
     
     // Note: code, resourceType, resourceCode, action are immutable
 }

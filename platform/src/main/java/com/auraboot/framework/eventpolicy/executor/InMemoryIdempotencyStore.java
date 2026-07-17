@@ -18,7 +18,7 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
     }
 
     @Override
-    public void record(Long tenantId, ActionExecutionResult result) {
+    public void record(Long tenantId, String policyCode, ActionExecutionResult result) {
         if (result.idempotencyKey() != null && result.status() == ActionExecutionStatus.SUCCESS) {
             succeeded.add(key(tenantId, result.idempotencyKey()));
         }

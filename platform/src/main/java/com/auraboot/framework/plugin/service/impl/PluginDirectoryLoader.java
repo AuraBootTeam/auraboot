@@ -353,6 +353,26 @@ public class PluginDirectoryLoader {
             }
         }
 
+        // Load reusable condition fragments
+        if (resourceDirs.containsKey("conditionFragments")) {
+            List<ConditionFragmentSeedDTO> fragments = loadResourceList(
+                    resourcePath(pluginDir, resourceDirs, "conditionFragments"),
+                    ConditionFragmentSeedDTO.class);
+            if (!fragments.isEmpty()) {
+                manifest.setConditionFragments(mergeList(manifest.getConditionFragments(), fragments));
+            }
+        }
+
+        // Load EventPolicy seeds
+        if (resourceDirs.containsKey("eventPolicies")) {
+            List<EventPolicySeedDTO> policies = loadResourceList(
+                    resourcePath(pluginDir, resourceDirs, "eventPolicies"),
+                    EventPolicySeedDTO.class);
+            if (!policies.isEmpty()) {
+                manifest.setEventPolicies(mergeList(manifest.getEventPolicies(), policies));
+            }
+        }
+
         // Load Automation seeds
         if (resourceDirs.containsKey("automations")) {
             List<AutomationDefinitionDTO> automations = loadResourceList(
@@ -632,6 +652,14 @@ public class PluginDirectoryLoader {
         // Decision Runtime definitions
         loadSourceResource(source, resourceDirs, "decisionDefinitions", DecisionDefinitionSeedDTO.class,
                 manifest::getDecisionDefinitions, manifest::setDecisionDefinitions);
+
+        // Reusable condition fragments
+        loadSourceResource(source, resourceDirs, "conditionFragments", ConditionFragmentSeedDTO.class,
+                manifest::getConditionFragments, manifest::setConditionFragments);
+
+        // EventPolicy seeds
+        loadSourceResource(source, resourceDirs, "eventPolicies", EventPolicySeedDTO.class,
+                manifest::getEventPolicies, manifest::setEventPolicies);
 
         // Automation seeds
         loadSourceResource(source, resourceDirs, "automations", AutomationDefinitionDTO.class,

@@ -86,7 +86,7 @@ services:
       redis:
         condition: service_healthy
     build:
-      dockerfile: ${ISOLATED_BACKEND_DOCKERFILE:-Dockerfile}
+      dockerfile: ${ISOLATED_BACKEND_DOCKERFILE:-platform/Dockerfile}
     # Per-container resource cap so concurrent isolated stacks don't fight
     # for the Docker Desktop VM's RAM/CPU budget. Tunable via env if a
     # specific worktree needs more (e.g. heavy plugin import).

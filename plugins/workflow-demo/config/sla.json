@@ -1,7 +1,7 @@
 [
   {
     "slaKey": "wd_manager_approve_sla",
-    "name": "Manager Approval SLA",
+    "name": "主管审批 SLA",
     "name:zh-CN": "主管审批 SLA",
     "name:en": "Manager Approval SLA",
     "targetType": "NODE",
@@ -22,11 +22,64 @@
         "notifyTargets": ["assignee"]
       }
     ],
+    "actionPolicy": {
+      "trigger": "SLA_TIMEOUT",
+      "actions": [
+        {
+          "type": "NOTIFY",
+          "target": "ROLE:wd_manager",
+          "order": 10,
+          "payload": {
+            "channel": "in_app",
+            "title": "主管审批 SLA 超时",
+            "content": "主管审批节点已超时，请立即处理或升级。"
+          },
+          "idempotencyKeyTemplate": "${sla.recordPid}:manager_timeout:NOTIFY"
+        },
+        {
+          "type": "SEND_IM",
+          "target": "ROLE:wd_manager",
+          "order": 20,
+          "payload": {
+            "channel": "im",
+            "title": "主管审批超时提醒",
+            "content": "请假流程主管审批已超过 SLA。"
+          },
+          "idempotencyKeyTemplate": "${sla.recordPid}:manager_timeout:SEND_IM"
+        },
+        {
+          "type": "CREATE_TASK",
+          "target": "ROLE:wd_manager",
+          "order": 30,
+          "payload": {
+            "taskTitle": "处理超时请假审批",
+            "priority": "HIGH",
+            "dueInMinutes": 15
+          },
+          "idempotencyKeyTemplate": "${sla.recordPid}:manager_timeout:CREATE_TASK"
+        },
+        {
+          "type": "WRITE_AUDIT",
+          "target": "MODEL:wd_leave_request",
+          "order": 40,
+          "payload": {
+            "message": "主管审批 SLA 超时动作链已触发",
+            "severity": "warning"
+          },
+          "idempotencyKeyTemplate": "${sla.recordPid}:manager_timeout:WRITE_AUDIT"
+        }
+      ],
+      "executionEffect": {
+        "lastStatus": "SUCCESS",
+        "traceId": "seed-sla-manager-timeout"
+      }
+    },
     "ruleBinding": {
       "consumerType": "SLA",
       "consumerCode": "wd_manager_approve_sla",
       "consumerNodeId": "task_manager_approve",
       "bindingKind": "DECISION_REF",
+      "conditionFragmentRefs": ["shared_leave_approval_guard"],
       "decisionBinding": {
         "decisionCode": "complaint_sla_deadline",
         "versionPolicy": "LATEST_PUBLISHED",
@@ -76,7 +129,7 @@
   },
   {
     "slaKey": "wd_hr_approve_sla",
-    "name": "HR Approval SLA",
+    "name": "HR 审批 SLA",
     "name:zh-CN": "HR 审批 SLA",
     "name:en": "HR Approval SLA",
     "targetType": "NODE",
@@ -97,11 +150,62 @@
         "notifyTargets": ["assignee"]
       }
     ],
+    "actionPolicy": {
+      "trigger": "SLA_TIMEOUT",
+      "actions": [
+        {
+          "type": "NOTIFY",
+          "target": "ROLE:wd_hr",
+          "order": 10,
+          "payload": {
+            "channel": "in_app",
+            "title": "HR 审批 SLA 超时",
+            "content": "HR 审批节点已超时，请跟进。"
+          },
+          "idempotencyKeyTemplate": "${sla.recordPid}:hr_timeout:NOTIFY"
+        },
+        {
+          "type": "SEND_SMS",
+          "target": "ROLE:wd_hr",
+          "order": 20,
+          "payload": {
+            "template": "sla_timeout",
+            "content": "请假流程 HR 审批已超过 SLA。"
+          },
+          "idempotencyKeyTemplate": "${sla.recordPid}:hr_timeout:SEND_SMS"
+        },
+        {
+          "type": "CC_TASK",
+          "target": "ROLE:wd_hr_lead",
+          "order": 30,
+          "payload": {
+            "taskTitle": "抄送 HR 审批超时",
+            "reason": "SLA_TIMEOUT"
+          },
+          "idempotencyKeyTemplate": "${sla.recordPid}:hr_timeout:CC_TASK"
+        },
+        {
+          "type": "WRITE_AUDIT",
+          "target": "MODEL:wd_leave_request",
+          "order": 40,
+          "payload": {
+            "message": "HR 审批 SLA 超时动作链已触发",
+            "severity": "warning"
+          },
+          "idempotencyKeyTemplate": "${sla.recordPid}:hr_timeout:WRITE_AUDIT"
+        }
+      ],
+      "executionEffect": {
+        "lastStatus": "SUCCESS",
+        "traceId": "seed-sla-hr-timeout"
+      }
+    },
     "ruleBinding": {
       "consumerType": "SLA",
       "consumerCode": "wd_hr_approve_sla",
       "consumerNodeId": "task_hr_approve",
       "bindingKind": "DECISION_REF",
+      "conditionFragmentRefs": ["shared_leave_approval_guard"],
       "decisionBinding": {
         "decisionCode": "complaint_sla_deadline",
         "versionPolicy": "LATEST_PUBLISHED",

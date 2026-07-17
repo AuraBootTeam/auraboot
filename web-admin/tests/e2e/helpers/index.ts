@@ -100,10 +100,23 @@ export async function navigateToMenuByClick(page: Page, labels: string[]): Promi
  * the page so the sidebar re-initialises in expanded mode.
  */
 export async function ensureSidebarExpanded(page: Page): Promise<void> {
-  // Remove collapsed flag from localStorage (may not be set yet — that's fine)
-  await page.evaluate(() => {
-    localStorage.removeItem('sidebar-collapsed');
-  });
+  await page.waitForLoadState('domcontentloaded').catch(() => {});
+  // Remove collapsed flag from localStorage (may not be set yet — that's fine).
+  // Some suites call this immediately after login while the app is still settling.
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      await page.evaluate(() => {
+        localStorage.removeItem('sidebar-collapsed');
+      });
+      break;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (attempt === 1 || !message.includes('Execution context was destroyed')) {
+        throw error;
+      }
+      await page.waitForLoadState('domcontentloaded').catch(() => {});
+    }
+  }
   // Reload so the sidebar component picks up the cleared state
   await page.reload({ waitUntil: 'domcontentloaded' });
 }
@@ -164,7 +177,9 @@ async function resolveTableSavedViewPid(
 
     const accessible = await readData(page.request.get(`/api/views/accessible?${params}`));
     const views = Array.isArray(accessible) ? accessible : (accessible?.records ?? []);
-    const tableView = views.find((view: any) => view?.pid && (view.viewType || 'table') === 'table');
+    const tableView = views.find(
+      (view: any) => view?.pid && (view.viewType || 'table') === 'table',
+    );
     if (tableView?.pid) {
       return String(tableView.pid);
     }
@@ -271,7 +286,9 @@ export async function waitForDynamicPageLoad(page: Page, timeout = 10000): Promi
 
   // Wait for any loading spinner to disappear (don't wait for it to appear first)
   const spinner = page.locator('.animate-spin, [data-testid="loading"]');
-  await expect(spinner).not.toBeVisible({ timeout: Math.min(timeout, 5000) }).catch(() => {});
+  await expect(spinner)
+    .not.toBeVisible({ timeout: Math.min(timeout, 5000) })
+    .catch(() => {});
 
   // Dynamic pages often render the outer <main> immediately and mount actual
   // list/form content ~1-2s later after schema + lazy chunks resolve. Waiting
@@ -281,15 +298,51 @@ export async function waitForDynamicPageLoad(page: Page, timeout = 10000): Promi
     .poll(
       async () => {
         const signals = await Promise.all([
-          page.locator('[data-testid="toolbar-more-menu"]').first().isVisible().catch(() => false),
-          page.locator('[data-testid^="toolbar-btn-"]').first().isVisible().catch(() => false),
-          page.locator('nav[aria-label="Tabs"] button').first().isVisible().catch(() => false),
-          page.locator('thead th, [role="columnheader"]').first().isVisible().catch(() => false),
-          page.locator('tbody tr').first().isVisible().catch(() => false),
-          page.locator('[data-testid^="form-field-"]').first().isVisible().catch(() => false),
-          page.locator('form, .ant-form').first().isVisible().catch(() => false),
-          page.locator('.react-flow, [data-testid="flow-canvas"], [data-testid="rf__wrapper"]').first().isVisible().catch(() => false),
-          page.locator('[role="alert"], .text-red-600, .text-red-800').first().isVisible().catch(() => false),
+          page
+            .locator('[data-testid="toolbar-more-menu"]')
+            .first()
+            .isVisible()
+            .catch(() => false),
+          page
+            .locator('[data-testid^="toolbar-btn-"]')
+            .first()
+            .isVisible()
+            .catch(() => false),
+          page
+            .locator('nav[aria-label="Tabs"] button')
+            .first()
+            .isVisible()
+            .catch(() => false),
+          page
+            .locator('thead th, [role="columnheader"]')
+            .first()
+            .isVisible()
+            .catch(() => false),
+          page
+            .locator('tbody tr')
+            .first()
+            .isVisible()
+            .catch(() => false),
+          page
+            .locator('[data-testid^="form-field-"]')
+            .first()
+            .isVisible()
+            .catch(() => false),
+          page
+            .locator('form, .ant-form')
+            .first()
+            .isVisible()
+            .catch(() => false),
+          page
+            .locator('.react-flow, [data-testid="flow-canvas"], [data-testid="rf__wrapper"]')
+            .first()
+            .isVisible()
+            .catch(() => false),
+          page
+            .locator('[role="alert"], .text-red-600, .text-red-800')
+            .first()
+            .isVisible()
+            .catch(() => false),
         ]);
         return signals.some(Boolean);
       },
@@ -336,7 +389,10 @@ export async function waitForTableHydration(
   await expect
     .poll(
       async () => {
-        const rowCount = await page.locator('tbody tr').count().catch(() => 0);
+        const rowCount = await page
+          .locator('tbody tr')
+          .count()
+          .catch(() => 0);
         if (rowCount > 0) return true;
         const emptyVisible = await page
           .locator(
@@ -427,7 +483,10 @@ export async function ensureFilterFormOpen(page: Page, timeout = 5000): Promise<
   const toggleVisible = await toggle.isVisible().catch(() => false);
   if (toggleVisible) {
     await toggle.click();
-    await filterSearch.first().waitFor({ state: 'visible', timeout }).catch(() => {});
+    await filterSearch
+      .first()
+      .waitFor({ state: 'visible', timeout })
+      .catch(() => {});
   }
 }
 
@@ -1085,9 +1144,7 @@ export async function findRowInPaginatedList(
 
   // Strategy 0.5: click search button and use advanced search panel/modal inputs.
   const searchTrigger = page
-    .locator(
-      '[data-testid="filter-search"], [data-testid="table-search-button"]',
-    )
+    .locator('[data-testid="filter-search"], [data-testid="table-search-button"]')
     .first();
   const canOpenSearch = await searchTrigger
     .isVisible({ timeout: Math.min(700, timeLeft()) })

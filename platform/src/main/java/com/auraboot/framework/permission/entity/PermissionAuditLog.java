@@ -1,14 +1,15 @@
 package com.auraboot.framework.permission.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
-import com.baomidou.mybatisplus.annotation.TableField;
+import com.auraboot.framework.application.database.mybatis.JsonbObjectListTypeHandler;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.apache.ibatis.type.JdbcType;
 
 import java.time.Instant;
 import java.util.List;
@@ -44,6 +45,9 @@ public class PermissionAuditLog {
     @Schema(hidden = true)
     private Long recordId;
 
+    /** Public target record PID, nullable for non-record operations. */
+    private String recordPid;
+
     /** Final grant/deny result (true = allowed, false = denied). */
     private Boolean result;
 
@@ -51,7 +55,10 @@ public class PermissionAuditLog {
     private String reason;
 
     /** Full evaluation trace serialized as JSONB. */
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(
+            value = "evaluation_trace",
+            typeHandler = JsonbObjectListTypeHandler.class,
+            jdbcType = JdbcType.OTHER)
     private List<Object> evaluationTrace;
 
     private Instant createdAt;

@@ -32,6 +32,34 @@ describe('ConditionBuilder', () => {
     expect(preview).toHaveTextContent('HIGH');
   });
 
+  it('renders literal option labels in selectors and the natural-language preview', () => {
+    render(
+      <ConditionBuilder
+        value={group('AND', [
+          cmp(path('record', 'data.targetKey', 'string'), 'EQ', lit('task_manager_approve', 'string')),
+        ])}
+        fields={[
+          {
+            scope: 'record',
+            path: 'data.targetKey',
+            label: 'SLA 节点',
+            dataType: 'string',
+            options: ['task_manager_approve', 'task_hr_approve'],
+            valueLabels: {
+              task_manager_approve: '主管审批节点',
+              task_hr_approve: 'HR 审批节点',
+            },
+          },
+        ]}
+        onChange={() => undefined}
+      />,
+    );
+
+    expect(screen.getByLabelText('value-0')).toHaveTextContent('主管审批节点');
+    expect(screen.getByTestId('cb-preview')).toHaveTextContent('主管审批节点');
+    expect(screen.getByTestId('cb-preview')).not.toHaveTextContent('task_manager_approve');
+  });
+
   it('adds and deletes condition rows', () => {
     render(<Harness initial={oneHighPriority()} />);
     fireEvent.click(screen.getByTestId('cb-add'));
@@ -44,10 +72,90 @@ describe('ConditionBuilder', () => {
   it('changing field updates operator options to that data type', () => {
     render(<Harness initial={oneHighPriority()} />);
     // enum operators do NOT include GT
-    expect(screen.getByLabelText('operator-0')).not.toHaveTextContent('GT');
+    expect(screen.getByLabelText('operator-0')).not.toHaveTextContent('大于');
     fireEvent.change(screen.getByLabelText('field-0'), { target: { value: 'record:data.amount' } });
     // decimal operators include GT now
-    expect(screen.getByLabelText('operator-0')).toHaveTextContent('GT');
+    expect(screen.getByLabelText('operator-0')).toHaveTextContent('大于');
+    expect(screen.getByLabelText('operator-0')).not.toHaveTextContent('GT');
+  });
+
+  it('uses fact catalog operator constraints before local data-type defaults', () => {
+    render(
+      <ConditionBuilder
+        value={group('AND', [cmp(path('record', 'data.amount', 'decimal'), 'EQ', lit('100', 'decimal'))])}
+        fields={[
+          {
+            scope: 'record',
+            path: 'data.amount',
+            label: '申请金额',
+            dataType: 'decimal',
+            operators: ['EQ'],
+          },
+        ]}
+        onChange={() => undefined}
+      />,
+    );
+
+    const operator = screen.getByLabelText('operator-0');
+    expect(operator).toHaveTextContent('等于');
+    expect(operator).not.toHaveTextContent('大于');
+  });
+
+  it('shows product labels for operator choices while preserving enum values', () => {
+    render(<Harness initial={oneHighPriority()} />);
+    const operator = screen.getByLabelText('operator-0') as HTMLSelectElement;
+    expect(operator).toHaveTextContent('等于');
+    expect(operator).toHaveTextContent('不等于');
+    expect(operator).not.toHaveTextContent('EQ');
+    expect(operator.value).toBe('EQ');
+  });
+
+  it('filters and groups field candidates by model or runtime scope', () => {
+    const fields: FieldOption[] = [
+      {
+        scope: 'record',
+        path: 'data.wd_req_days',
+        label: '请假申请 / 请假天数',
+        dataType: 'integer',
+        modelCode: 'wd_leave_request',
+        modelName: '请假申请',
+      },
+      {
+        scope: 'record',
+        path: 'data.access_count',
+        label: 'Agent 记忆 / 访问次数',
+        dataType: 'integer',
+        modelCode: 'agent_memory',
+        modelName: 'Agent 记忆',
+      },
+      {
+        scope: 'actor',
+        path: 'departmentId',
+        label: '用户部门',
+        dataType: 'department',
+      },
+    ];
+
+    render(
+      <ConditionBuilder
+        value={group('AND', [cmp(path('record', 'data.wd_req_days', 'integer'), 'GT', lit('1', 'integer'))])}
+        fields={fields}
+        onChange={() => undefined}
+      />,
+    );
+
+    const fieldPicker = screen.getByLabelText('field-0');
+    expect(fieldPicker.querySelector('optgroup[label="请假申请"]')).not.toBeNull();
+    expect(fieldPicker.querySelector('optgroup[label="操作者"]')).not.toBeNull();
+    expect(fieldPicker).toHaveTextContent('Agent 记忆 / 访问次数');
+
+    fireEvent.change(screen.getByLabelText('condition-field-search'), {
+      target: { value: '请假' },
+    });
+
+    expect(screen.getByTestId('cb-field-result-count')).toHaveTextContent('1 / 3');
+    expect(fieldPicker).toHaveTextContent('请假申请 / 请假天数');
+    expect(fieldPicker).not.toHaveTextContent('Agent 记忆 / 访问次数');
   });
 
   it('unary operator hides the value input', () => {
@@ -68,6 +176,10 @@ describe('ConditionBuilder', () => {
       cmp(path('record', 'data.priority', 'enum'), 'EQ', lit('HIGH', 'enum')),
       cmp(path('record', 'data.amount', 'decimal'), 'GT', lit('100', 'decimal')),
     ])} />);
+    expect(screen.getByTestId('op-and')).toHaveTextContent('全部满足');
+    expect(screen.getByTestId('op-or')).toHaveTextContent('任一满足');
+    expect(screen.getByTestId('op-and')).not.toHaveTextContent('AND');
+    expect(screen.getByTestId('op-or')).not.toHaveTextContent('OR');
     expect(screen.getByTestId('cb-preview')).toHaveTextContent('并且');
     fireEvent.click(screen.getByTestId('op-or'));
     expect(screen.getByTestId('cb-preview')).toHaveTextContent('或');

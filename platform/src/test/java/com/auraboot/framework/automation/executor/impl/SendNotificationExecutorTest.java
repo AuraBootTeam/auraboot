@@ -3,9 +3,12 @@ package com.auraboot.framework.automation.executor.impl;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.notification.service.NotificationService;
+import com.auraboot.framework.notification.sms.SmsSendResult;
+import com.auraboot.framework.notification.sms.SmsSenderRouter;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -29,8 +32,15 @@ class SendNotificationExecutorTest {
     @Mock
     private DynamicDataService dynamicDataService;
 
-    @InjectMocks
     private SendNotificationExecutor executor;
+
+    @Mock
+    private SmsSenderRouter smsSenderRouter;
+
+    @BeforeEach
+    void setUp() {
+        executor = new SendNotificationExecutor(notificationService, dynamicDataService, smsSenderRouter);
+    }
 
     // =========================================================
     // supports()
@@ -53,23 +63,23 @@ class SendNotificationExecutorTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void execute_noRecipients_returnsZeroSent() {
+    void execute_noRecipients_throwsValidationError() {
         AutomationAction action = buildAction(Map.of(
                 "type", "in_app",
                 "title", "Test",
                 "content", "Hello"
         ));
 
-        Map<String, Object> result = (Map<String, Object>) executor.execute(action, Map.of());
+        assertThatThrownBy(() -> executor.execute(action, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("recipients");
 
-        assertThat(result.get("success")).isEqualTo(true);
-        assertThat(result.get("sentCount")).isEqualTo(0);
         verifyNoInteractions(notificationService);
     }
 
     @Test
     @SuppressWarnings("unchecked")
-    void execute_emptyRecipients_returnsZeroSent() {
+    void execute_emptyRecipients_throwsValidationError() {
         AutomationAction action = buildAction(Map.of(
                 "type", "in_app",
                 "title", "Alert",
@@ -77,9 +87,10 @@ class SendNotificationExecutorTest {
                 "recipients", List.of()
         ));
 
-        Map<String, Object> result = (Map<String, Object>) executor.execute(action, Map.of());
+        assertThatThrownBy(() -> executor.execute(action, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("recipients");
 
-        assertThat(result.get("sentCount")).isEqualTo(0);
         verifyNoInteractions(notificationService);
     }
 
@@ -108,6 +119,33 @@ class SendNotificationExecutorTest {
         verify(notificationService).sendInApp(eq(200L), any(), any(), any(), any(), any());
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void execute_inAppRoleRecipient_usesUnifiedRecipientResolver() {
+        AutomationAction action = buildAction(Map.of(
+                "type", "in_app",
+                "title", "Manager review",
+                "content", "Long leave request needs attention",
+                "recipients", List.of("ROLE:wd_manager")
+        ));
+        Map<String, Object> context = Map.of("automationPid", "auto-role");
+
+        Map<String, Object> result = (Map<String, Object>) executor.execute(action, context);
+
+        assertThat(result.get("success")).isEqualTo(true);
+        assertThat(result.get("sentCount")).isEqualTo(1);
+        assertThat(result.get("recipientCount")).isEqualTo(1);
+        verify(notificationService).sendInAppToRecipient(
+                eq("role"),
+                eq("wd_manager"),
+                eq("Manager review"),
+                eq("Long leave request needs attention"),
+                eq("automation"),
+                eq("automation"),
+                eq("auto-role"));
+        verify(notificationService, never()).sendInApp(anyLong(), any(), any(), any(), any(), any());
+    }
+
     // =========================================================
     // execute() — template variable substitution in title/content
     // =========================================================
@@ -132,21 +170,50 @@ class SendNotificationExecutorTest {
     }
 
     // =========================================================
-    // execute() — SMS (just logs, still counts)
+    // execute() — SMS
     // =========================================================
 
     @Test
     @SuppressWarnings("unchecked")
-    void execute_sms_logsAndCounts() {
+    void execute_sms_routesThroughRealProviderAndCountsDelivery() {
+        AutomationAction action = buildAction(Map.of(
+                "type", "sms",
+                "template", "approval_timeout",
+                "title", "SLA",
+                "content", "Your code: ${code}",
+                "recipients", List.of("PHONE:+8613800138000")
+        ));
+        when(smsSenderRouter.sendWithRealProvider(eq("+8613800138000"), eq("approval_timeout"), anyMap()))
+                .thenReturn(new SmsSenderRouter.RoutedSmsResult("aliyun_sms", SmsSendResult.ok("msg-sms-1")));
+
+        Map<String, Object> result = (Map<String, Object>) executor.execute(action, Map.of("code", "1234"));
+
+        assertThat(result.get("sentCount")).isEqualTo(1);
+        assertThat(result.get("type")).isEqualTo("sms");
+        verifyNoInteractions(notificationService);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, String>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(smsSenderRouter).sendWithRealProvider(eq("+8613800138000"), eq("approval_timeout"), paramsCaptor.capture());
+        assertThat(paramsCaptor.getValue())
+                .containsEntry("content", "Your code: 1234")
+                .containsEntry("title", "SLA");
+    }
+
+    @Test
+    void execute_smsWithoutRealProviderThrowsInsteadOfFakeCounting() {
         AutomationAction action = buildAction(Map.of(
                 "type", "sms",
                 "content", "Your code: 1234",
                 "recipients", List.of("+8613800138000")
         ));
+        when(smsSenderRouter.sendWithRealProvider(eq("+8613800138000"), anyString(), anyMap()))
+                .thenThrow(new IllegalStateException("No real SMS sender available"));
 
-        Map<String, Object> result = (Map<String, Object>) executor.execute(action, Map.of());
+        assertThatThrownBy(() -> executor.execute(action, Map.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No real SMS sender available");
 
-        assertThat(result.get("sentCount")).isEqualTo(1);
         verifyNoInteractions(notificationService);
     }
 

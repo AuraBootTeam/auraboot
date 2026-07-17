@@ -103,6 +103,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
      * @return 字段信息
      */
     @Select("SELECT * FROM ab_meta_field WHERE pid = #{pid} AND deleted_flag = false")
+    @ResultMap("mybatis-plus_Field")
     Field findByPid(@Param("pid") String pid);
 
     /**
@@ -113,6 +114,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
      * @return 字段信息
      */
     @Select("SELECT * FROM ab_meta_field WHERE pid = #{pid} AND tenant_id = #{tenantId}   AND deleted_flag = false")
+    @ResultMap("mybatis-plus_Field")
     Field selectByPidWithContext(@Param("pid") String pid, @Param("tenantId") Long tenantId       );
 
     /**
@@ -123,6 +125,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
      * @return 当前版本字段
      */
     @Select("SELECT * FROM ab_meta_field WHERE  code = #{code} AND is_current = TRUE AND deleted_flag = false")
+    @ResultMap("mybatis-plus_Field")
     Field findCurrentByCode(@Param("code") String code);
 
     /**
@@ -140,6 +143,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
         AND deleted_flag = false
         </script>
         """)
+    @ResultMap("mybatis-plus_Field")
     List<Field> findByIds(@Param("fieldIds") List<Long> fieldIds);
 
     /**
@@ -151,6 +155,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
      * @return 指定版本字段
      */
     @Select("SELECT * FROM ab_meta_field WHERE  code = #{code} AND version = #{version} AND deleted_flag = false")
+    @ResultMap("mybatis-plus_Field")
     Field findByCodeAndVersion(@Param("code") String code, @Param("version") Integer version);
 
     /**
@@ -160,6 +165,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
      * @return 当前版本字段列表
      */
     @Select("SELECT * FROM ab_meta_field WHERE  is_current = TRUE AND deleted_flag = false ORDER BY created_at DESC")
+    @ResultMap("mybatis-plus_Field")
     List<Field> findCurrentByTenant(       );
 
     /**
@@ -170,6 +176,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
      * @return 字段版本列表
      */
     @Select("SELECT * FROM ab_meta_field WHERE  code = #{code} AND deleted_flag = false ORDER BY version DESC")
+    @ResultMap("mybatis-plus_Field")
     List<Field> findAllVersionsByCode(@Param("code") String code);
 
     /**
@@ -200,6 +207,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
         ORDER BY created_at DESC
         </script>
         """)
+    @ResultMap("mybatis-plus_Field")
     IPage<Field> selectPageList(
         Page<?> page,
         @Param("code") String code,
@@ -324,6 +332,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
      * @return 字段列表
      */
     @Select("SELECT * FROM ab_meta_field WHERE  data_type = #{dataType} AND is_current = TRUE AND deleted_flag = false ORDER BY created_at DESC")
+    @ResultMap("mybatis-plus_Field")
     List<Field> findByDataType(@Param("dataType") String dataType);
 
     /**
@@ -332,6 +341,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
      * @return 字段列表
      */
     @Select("SELECT * FROM ab_meta_field WHERE data_source_id = #{dataSourceId} AND is_current = TRUE AND deleted_flag = false ORDER BY created_at DESC")
+    @ResultMap("mybatis-plus_Field")
     List<Field> findByDataSource(@Param("dataSourceId") Long dataSourceId);
 
     /**
@@ -342,6 +352,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
      * @return 字段列表
      */
     @Select("SELECT * FROM ab_meta_field WHERE  status = #{status} AND is_current = TRUE AND deleted_flag = false ORDER BY created_at DESC")
+    @ResultMap("mybatis-plus_Field")
     List<Field> findByStatus(@Param("status") String status);
 
     /**
@@ -361,6 +372,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
           AND m.deleted_flag = false
         ORDER BY f.field_order, f.code
         """)
+    @ResultMap("mybatis-plus_Field")
     List<Field> findByEntityCode(@Param("entityCode") String entityCode);
 
     /**
@@ -395,6 +407,7 @@ public interface MetaFieldMapper extends BaseMapper<Field> {
         AND is_current = TRUE
         </script>
         """)
+    @ResultMap("mybatis-plus_Field")
     List<Field> findByPids(@Param("pids") List<String> pids);
 
     // ==================== Plugin Import Support ====================

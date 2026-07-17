@@ -25,7 +25,46 @@
     "name:zh-CN": "审批请假申请",
     "name:en": "Approve Leave Request",
     "resourceType": "operation",
-    "module": "workflow-demo"
+    "module": "workflow-demo",
+    "policySchema": {
+      "dynamicAbac": {
+        "type": "rule-center",
+        "label": "Rule Center approval guard",
+        "fieldCatalogModelCode": "wd_leave_request",
+        "decisions": [
+          {
+            "code": "leave_request_automation",
+            "name": "请假申请自动化策略",
+            "outputs": [
+              {
+                "id": "severity",
+                "label": "规则等级",
+                "dataType": "string"
+              },
+              {
+                "id": "message",
+                "label": "消息内容",
+                "dataType": "string"
+              },
+              {
+                "id": "actionType",
+                "label": "动作类型",
+                "dataType": "string"
+              }
+            ]
+          }
+        ],
+        "fields": [
+          {
+            "scope": "record",
+            "path": "data.wd_req_days",
+            "label": "Leave days",
+            "dataType": "decimal",
+            "visible": true
+          }
+        ]
+      }
+    }
   },
   {
     "code": "wd.leave_balance.manage",

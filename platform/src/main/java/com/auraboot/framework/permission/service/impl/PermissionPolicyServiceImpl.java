@@ -5,7 +5,12 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.decision.rule.ConditionSpec;
 import com.auraboot.framework.decision.rule.DecisionBinding;
 import com.auraboot.framework.decision.rule.RuleConsumerBinding;
+import com.auraboot.framework.decision.rule.RuleValueSource;
+import com.auraboot.framework.decision.dto.DecisionFactCatalogDTO;
+import com.auraboot.framework.decision.dto.DecisionFactDTO;
+import com.auraboot.framework.decision.dto.DecisionFactEntityDTO;
 import com.auraboot.framework.decision.service.DecisionUsageIndexService;
+import com.auraboot.framework.decision.service.DecisionModelFieldService;
 import com.auraboot.framework.exception.RootUnCheckedException;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
@@ -45,6 +50,7 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     private final UserRoleService userRoleService;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<DecisionUsageIndexService> usageIndexServiceProvider;
+    private final DecisionModelFieldService decisionModelFieldService;
 
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
@@ -69,7 +75,11 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
 
         List<ConditionGuard> guards = new ArrayList<>(rows.size());
         for (var row : rows) {
-            guards.add(new ConditionGuard(row.getId(), row.getConditionAstJson(), row.getConditionsJson()));
+            guards.add(new ConditionGuard(
+                    row.getId(),
+                    row.getConditionAstJson(),
+                    row.getConditionsJson(),
+                    runtimeValidationError(permission, row.getConditionsJson())));
         }
         return guards;
     }
@@ -133,7 +143,8 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
             log.warn("No role-permission binding found: roleId={}, permissionId={}", roleId, permissionId);
             return;
         }
-        validatePolicyValues(policyValues);
+        Permission permission = permissionMapper.selectById(permissionId);
+        validatePolicyValues(policyValues, permission);
 
         // Use direct SQL update for JSONB column — MyBatis-Plus updateById
         // with JacksonTypeHandler on Object type doesn't reliably serialize JSONB.
@@ -287,37 +298,60 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
         );
     }
 
-    private void validatePolicyValues(Map<String, Object> policyValues) {
+    private void validatePolicyValues(Map<String, Object> policyValues, Permission permission) {
         if (policyValues == null || policyValues.isEmpty()) {
             return;
         }
         JsonNode root = objectMapper.valueToTree(policyValues);
-        validateRuleCenterAbacNode("$", root);
+        PolicyFieldBoundary fieldBoundary = allowedPolicyFieldBoundary(permission, root);
+        validateRuleCenterAbacNode("$", root, fieldBoundary);
     }
 
-    private void validateRuleCenterAbacNode(String path, JsonNode node) {
+    private String runtimeValidationError(Permission permission, String conditionsJson) {
+        if (conditionsJson == null || conditionsJson.isBlank() || "null".equals(conditionsJson.trim())) {
+            return null;
+        }
+        Map<String, Object> policyValues = convertToMap(conditionsJson);
+        if (policyValues == null || policyValues.isEmpty()) {
+            return null;
+        }
+        try {
+            validatePolicyValues(policyValues, permission);
+            return null;
+        } catch (RootUnCheckedException e) {
+            return e.getMessage();
+        } catch (RuntimeException e) {
+            return "Invalid permission ABAC policy: " + e.getMessage();
+        }
+    }
+
+    private void validateRuleCenterAbacNode(String path, JsonNode node, PolicyFieldBoundary fieldBoundary) {
         if (node == null || node.isNull()) {
             return;
         }
         if (node.isObject()) {
-            validateNestedRuleCenterObject(path + ".ruleBinding", node.get("ruleBinding"), RuleConsumerBinding.class);
-            validateNestedRuleCenterObject(path + ".decisionBinding", node.get("decisionBinding"), DecisionBinding.class);
-            validateNestedRuleCenterObject(path + ".conditionSpec", node.get("conditionSpec"), ConditionSpec.class);
+            validateNestedRuleCenterObject(
+                    path + ".ruleBinding", node.get("ruleBinding"), RuleConsumerBinding.class, fieldBoundary);
+            validateNestedRuleCenterObject(
+                    path + ".decisionBinding", node.get("decisionBinding"), DecisionBinding.class, fieldBoundary);
+            validateNestedRuleCenterObject(
+                    path + ".conditionSpec", node.get("conditionSpec"), ConditionSpec.class, fieldBoundary);
             if (node.hasNonNull("decisionCode")) {
-                validateNestedRuleCenterObject(path, node, DecisionBinding.class);
+                validateNestedRuleCenterObject(path, node, DecisionBinding.class, fieldBoundary);
             }
             node.fields().forEachRemaining(entry ->
-                    validateRuleCenterAbacNode(path + "." + entry.getKey(), entry.getValue()));
+                    validateRuleCenterAbacNode(path + "." + entry.getKey(), entry.getValue(), fieldBoundary));
             return;
         }
         if (node.isArray()) {
             for (int i = 0; i < node.size(); i++) {
-                validateRuleCenterAbacNode(path + "[" + i + "]", node.get(i));
+                validateRuleCenterAbacNode(path + "[" + i + "]", node.get(i), fieldBoundary);
             }
         }
     }
 
-    private <T> void validateNestedRuleCenterObject(String path, JsonNode node, Class<T> type) {
+    private <T> void validateNestedRuleCenterObject(
+            String path, JsonNode node, Class<T> type, PolicyFieldBoundary fieldBoundary) {
         if (node == null || node.isNull()) {
             return;
         }
@@ -330,15 +364,186 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
                     && (binding.decisionCode() == null || binding.decisionCode().isBlank())) {
                 throw new IllegalArgumentException("decisionCode is required");
             }
+            if (parsed instanceof DecisionBinding binding) {
+                validateDecisionBindingFieldRefs(path, binding, fieldBoundary);
+            }
             if (parsed instanceof RuleConsumerBinding binding
                     && binding.decisionBinding() != null
                     && (binding.decisionBinding().decisionCode() == null
                     || binding.decisionBinding().decisionCode().isBlank())) {
                 throw new IllegalArgumentException("ruleBinding.decisionBinding.decisionCode is required");
             }
+            if (parsed instanceof RuleConsumerBinding binding && binding.decisionBinding() != null) {
+                validateDecisionBindingFieldRefs(path + ".decisionBinding", binding.decisionBinding(), fieldBoundary);
+            }
         } catch (IllegalArgumentException e) {
             throw new RootUnCheckedException(ResponseCode.BadParam,
                     "Invalid permission ABAC policy at " + path + ": " + e.getMessage(), e);
+        }
+    }
+
+    private PolicyFieldBoundary allowedPolicyFieldBoundary(Permission permission, JsonNode root) {
+        Set<String> allowedRefs = new LinkedHashSet<>();
+        Set<String> blockedMaskedRefs = new LinkedHashSet<>();
+        String modelCode = policyFieldCatalogModelCode(permission);
+        boolean fieldBoundaryDeclared = false;
+        if (modelCode != null && !modelCode.isBlank()) {
+            fieldBoundaryDeclared = true;
+            DecisionFactCatalogDTO catalog = decisionModelFieldService.getFactCatalog(modelCode);
+            if (catalog != null && catalog.getEntities() != null) {
+                for (DecisionFactEntityDTO entity : catalog.getEntities()) {
+                    if (entity == null || entity.getFacts() == null) {
+                        continue;
+                    }
+                    for (DecisionFactDTO fact : entity.getFacts()) {
+                        if (fact == null
+                                || Boolean.FALSE.equals(fact.getVisible())
+                                || fact.getScope() == null
+                                || fact.getPath() == null
+                                || fact.getPath().isBlank()) {
+                            continue;
+                        }
+                        String ref = fact.getScope() + "." + fact.getPath();
+                        if (Boolean.TRUE.equals(fact.getMasked())) {
+                            blockedMaskedRefs.add(ref);
+                            continue;
+                        }
+                        allowedRefs.add(ref);
+                    }
+                }
+            }
+        }
+        fieldBoundaryDeclared |= addPolicySchemaFields(allowedRefs, blockedMaskedRefs, permission);
+        fieldBoundaryDeclared |= addInlineSchemaFields(allowedRefs, blockedMaskedRefs, root);
+        return fieldBoundaryDeclared ? new PolicyFieldBoundary(allowedRefs, blockedMaskedRefs) : null;
+    }
+
+    private String policyFieldCatalogModelCode(Permission permission) {
+        if (permission == null) {
+            return null;
+        }
+        Map<String, Object> schema = convertToMap(permission.getPolicySchema());
+        Object dynamicAbac = schema == null ? null : schema.get("dynamicAbac");
+        if (dynamicAbac instanceof Map<?, ?> map) {
+            Object modelCode = map.get("fieldCatalogModelCode");
+            return modelCode instanceof String str ? str : null;
+        }
+        return null;
+    }
+
+    private boolean addPolicySchemaFields(
+            Set<String> allowedRefs,
+            Set<String> blockedMaskedRefs,
+            Permission permission) {
+        if (permission == null) {
+            return false;
+        }
+        Map<String, Object> schema = convertToMap(permission.getPolicySchema());
+        Object dynamicAbac = schema == null ? null : schema.get("dynamicAbac");
+        if (dynamicAbac instanceof Map<?, ?> map) {
+            return addFieldRefsFromList(allowedRefs, blockedMaskedRefs, map.get("fields"));
+        }
+        return false;
+    }
+
+    private boolean addInlineSchemaFields(
+            Set<String> allowedRefs,
+            Set<String> blockedMaskedRefs,
+            JsonNode root) {
+        JsonNode dynamicAbac = root == null ? null : root.get("dynamicAbac");
+        if (dynamicAbac != null && dynamicAbac.isObject()) {
+            return addFieldRefsFromJson(allowedRefs, blockedMaskedRefs, dynamicAbac.get("fields"));
+        }
+        return false;
+    }
+
+    private boolean addFieldRefsFromList(
+            Set<String> allowedRefs,
+            Set<String> blockedMaskedRefs,
+            Object rawFields) {
+        if (!(rawFields instanceof List<?> fields)) {
+            return false;
+        }
+        for (Object field : fields) {
+            if (field instanceof Map<?, ?> map) {
+                Object scope = map.get("scope");
+                Object path = map.get("path");
+                if (scope instanceof String scopeText
+                        && path instanceof String pathText
+                        && !scopeText.isBlank()
+                        && !pathText.isBlank()) {
+                    if (Boolean.FALSE.equals(map.get("visible"))) {
+                        continue;
+                    }
+                    String ref = scopeText + "." + pathText;
+                    if (Boolean.TRUE.equals(map.get("masked"))) {
+                        blockedMaskedRefs.add(ref);
+                        continue;
+                    }
+                    allowedRefs.add(ref);
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean addFieldRefsFromJson(
+            Set<String> allowedRefs,
+            Set<String> blockedMaskedRefs,
+            JsonNode fieldsNode) {
+        if (fieldsNode == null || !fieldsNode.isArray()) {
+            return false;
+        }
+        for (JsonNode field : fieldsNode) {
+            JsonNode scope = field.get("scope");
+            JsonNode path = field.get("path");
+            if (scope != null && scope.isTextual() && path != null && path.isTextual()) {
+                JsonNode visible = field.get("visible");
+                if (visible != null && visible.isBoolean() && !visible.booleanValue()) {
+                    continue;
+                }
+                String ref = scope.asText() + "." + path.asText();
+                JsonNode masked = field.get("masked");
+                if (masked != null && masked.isBoolean() && masked.booleanValue()) {
+                    blockedMaskedRefs.add(ref);
+                    continue;
+                }
+                allowedRefs.add(ref);
+            }
+        }
+        return true;
+    }
+
+    private void validateDecisionBindingFieldRefs(
+            String path, DecisionBinding binding, PolicyFieldBoundary fieldBoundary) {
+        if (fieldBoundary == null || binding == null) {
+            return;
+        }
+        int index = 0;
+        for (DecisionBinding.InputMapping mapping : binding.inputMappings()) {
+            RuleValueSource source = mapping == null ? null : mapping.source();
+            validateRuleValueSource(path + ".inputMappings[" + index + "].source", source, fieldBoundary);
+            index++;
+        }
+        validateRuleValueSource(path + ".routingKeySource", binding.routingKeySource(), fieldBoundary);
+        validateRuleValueSource(path + ".tenantSegmentSource", binding.tenantSegmentSource(), fieldBoundary);
+    }
+
+    private void validateRuleValueSource(String path, RuleValueSource source, PolicyFieldBoundary fieldBoundary) {
+        if (source == null || source.kind() != RuleValueSource.Kind.FIELD) {
+            return;
+        }
+        String fieldRef = source.fieldRef();
+        if (fieldRef == null || fieldRef.isBlank()) {
+            throw new IllegalArgumentException("field source is missing scope/path");
+        }
+        if (fieldBoundary.blockedMaskedRefs().contains(fieldRef)) {
+            throw new IllegalArgumentException(fieldRef
+                    + " is masked and cannot be used in permission ABAC policy at " + path);
+        }
+        if (!fieldBoundary.allowedRefs().contains(fieldRef)) {
+            throw new IllegalArgumentException(fieldRef
+                    + " is not available in permission ABAC fact catalog at " + path);
         }
     }
 
@@ -404,5 +609,8 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
             return str;
         }
         return null;
+    }
+
+    private record PolicyFieldBoundary(Set<String> allowedRefs, Set<String> blockedMaskedRefs) {
     }
 }

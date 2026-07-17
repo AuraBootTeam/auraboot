@@ -9,8 +9,11 @@ import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.dto.DDLPreviewResult;
 import com.auraboot.framework.meta.dto.MetaModelCreateRequest;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
+import com.auraboot.framework.meta.dto.MetaModelPublishRequest;
+import com.auraboot.framework.meta.dto.MetaModelPublishReplayRequest;
 import com.auraboot.framework.meta.dto.MetaModelUpdateRequest;
 import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.dto.ModelPublishReplayReportDTO;
 import com.auraboot.framework.meta.dto.PageSchemaDTO;
 import com.auraboot.framework.meta.dto.SchemaOperationResult;
 import com.auraboot.framework.meta.dto.SchemaSyncOptions;
@@ -502,10 +505,18 @@ public class ModelController {
     @RequirePermission(MetaPermission.MODEL_MANAGE)
     public ApiResponse<MetaModelDTO> publishModel(
             @Parameter(description = "模型PID") @PathVariable @NotBlank String pid,
-            @Parameter(description = "版本说明") @RequestParam(required = false) String versionNote) {
-        log.info("发布模型: pid={}, versionNote={}", logSafe(pid), logSafe(versionNote));
+            @Parameter(description = "版本说明") @RequestParam(required = false) String versionNote,
+            @RequestBody(required = false) MetaModelPublishRequest request) {
+        String effectiveVersionNote = request != null && request.getVersionNote() != null
+                ? request.getVersionNote()
+                : versionNote;
+        log.info("发布模型: pid={}, versionNote={}", logSafe(pid), logSafe(effectiveVersionNote));
 
-        MetaModelDTO result = metaModelService.publish(pid, versionNote);
+        MetaModelDTO result = metaModelService.publish(
+                pid,
+                effectiveVersionNote,
+                request != null ? request.getImpactAcknowledged() : null,
+                request != null ? request.getAcknowledgementNote() : null);
         return ApiResponse.success(result);
     }
 
@@ -552,6 +563,18 @@ public class ModelController {
         log.info("预览模型发布DDL: pid={}", logSafe(pid));
 
         DDLPreviewResult result = metaModelService.previewPublishDDL(pid);
+        return ApiResponse.success(result);
+    }
+
+    @PostMapping("/{pid}/publish/replay")
+    @Operation(summary = "执行模型发布后复核", description = "根据模型发布治理计划执行可自动化的 replay，并返回手动复核项")
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
+    public ApiResponse<ModelPublishReplayReportDTO> replayPublishImpact(
+            @Parameter(description = "模型PID") @PathVariable @NotBlank String pid,
+            @RequestBody(required = false) MetaModelPublishReplayRequest request) {
+        log.info("执行模型发布后复核: pid={}", logSafe(pid));
+
+        ModelPublishReplayReportDTO result = metaModelService.replayPublishImpact(pid, request);
         return ApiResponse.success(result);
     }
 

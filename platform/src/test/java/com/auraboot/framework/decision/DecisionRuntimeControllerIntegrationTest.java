@@ -645,7 +645,7 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void httpActionCatalogReportsRuntimeHandlersAndDoesNotAdvertiseCreateTask() throws Exception {
+    void httpActionCatalogReportsRuntimeHandlersAndMarksRemainingUnwiredActions() throws Exception {
         String body = mockMvc.perform(get("/api/decision/actions/catalog"))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -658,7 +658,10 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         assertAvailableAction(actions, "PATCH_RECORD");
         assertAvailableAction(actions, "WEBHOOK");
         assertAvailableAction(actions, "WRITE_AUDIT");
-        assertTrue(findCatalogAction(actions, "CREATE_TASK").isMissingNode());
+        assertAvailableAction(actions, "CREATE_TASK");
+        assertAvailableAction(actions, "SEND_IM");
+        assertAvailableAction(actions, "CC_TASK");
+        assertUnavailableAction(actions, "SEND_SMS");
     }
 
     @Test
@@ -743,6 +746,53 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.incomingCount").value(1))
                 .andExpect(jsonPath("$.data.incoming[0].sourceType").value("SLA_RULE"))
                 .andExpect(jsonPath("$.data.incoming[0].targetType").value("CONDITION_FRAGMENT"));
+    }
+
+    @Test
+    void httpConditionFragments_reportDecisionConsumerImpactWhenFragmentReferencesDecision() throws Exception {
+        String code = "it_fragment_decision_" + System.nanoTime();
+        String decisionCode = "approval_routing_" + System.nanoTime();
+        JsonNode conditionSpec = json.readTree("""
+            { "root": { "type": "group", "op": "AND", "children": [] },
+              "decisionBindings": [
+                { "decisionCode": "%s", "versionPolicy": "LATEST_PUBLISHED", "enabled": true }
+              ] }
+            """.formatted(decisionCode));
+
+        mockMvc.perform(post("/api/decision/condition-fragments")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "fragmentCode", code,
+                                "fragmentName", "Approval routing fragment",
+                                "scopeType", "BPM",
+                                "scopeRef", "wd_leave_approval",
+                                "conditionSpec", conditionSpec))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.decisionRefs[0]").value(decisionCode));
+
+        DecisionUsageRefEntity decisionConsumer = new DecisionUsageRefEntity();
+        decisionConsumer.setPid(UniqueIdGenerator.generate());
+        decisionConsumer.setTenantId(getTestTenant().getId());
+        decisionConsumer.setSourceType("BPM_PROCESS");
+        decisionConsumer.setSourceCode("wd_leave_approval");
+        decisionConsumer.setSourcePid(UniqueIdGenerator.generate());
+        decisionConsumer.setTargetType("DECISION");
+        decisionConsumer.setTargetCode(decisionCode);
+        decisionConsumer.setBinding("RULE_BINDING");
+        decisionConsumer.setMetadataJson(json.valueToTree(Map.of(
+                "sourceName", "请假审批流程",
+                "processKey", "wd_leave_approval")));
+        decisionConsumer.setCreatedAt(Instant.now());
+        decisionConsumer.setUpdatedAt(Instant.now());
+        usageRefMapper.insert(decisionConsumer);
+
+        mockMvc.perform(get("/api/decision/condition-fragments/" + code + "/impact"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.incomingCount").value(1))
+                .andExpect(jsonPath("$.data.incoming[0].sourceType").value("BPM_PROCESS"))
+                .andExpect(jsonPath("$.data.incoming[0].sourceName").value("请假审批流程"))
+                .andExpect(jsonPath("$.data.incoming[0].targetType").value("DECISION"))
+                .andExpect(jsonPath("$.data.incoming[0].targetCode").value(decisionCode));
     }
 
     @Test
@@ -961,7 +1011,118 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         JsonNode action = findCatalogAction(actions, actionType);
         assertTrue(!action.isMissingNode());
         assertTrue(action.path("handlerAvailable").asBoolean());
+        assertTrue("AVAILABLE".equals(action.path("availabilityStatus").asText()));
+        assertTrue(action.path("availabilityReason").isMissingNode() || action.path("availabilityReason").isNull());
+        assertTrue(action.path("consumerTypes").isArray());
+        assertTrue(hasArrayText(action.path("consumerTypes"), "EVENT_POLICY"));
+        assertProviderDependencyTypes(action.path("providerDependencies"), expectedProviderTypes(actionType));
+        assertConsumerAvailability(action, "SLA", true);
+        assertConsumerAvailability(action, "EVENT_POLICY", true);
+        assertConsumerAvailability(action, "AUTOMATION", true);
+        assertConsumerAvailability(action, "BPM", true);
         assertTrue(action.path("inputSchema").isObject());
+    }
+
+    private void assertUnavailableAction(JsonNode actions, String actionType) {
+        JsonNode action = findCatalogAction(actions, actionType);
+        assertTrue(!action.isMissingNode());
+        assertTrue(!action.path("handlerAvailable").asBoolean());
+        assertTrue("UNAVAILABLE".equals(action.path("availabilityStatus").asText()));
+        assertTrue(action.path("availabilityReason").asText().length() > 0);
+        assertTrue(action.path("consumerTypes").isArray());
+        assertTrue(hasArrayText(action.path("consumerTypes"), "EVENT_POLICY"));
+        if ("SEND_SMS".equals(actionType)) {
+            assertSmsProviderDependency(action.path("providerDependencies"));
+        }
+        assertProviderDependencyTypes(action.path("providerDependencies"), expectedProviderTypes(actionType));
+        assertConsumerAvailability(action, "SLA", false);
+        assertConsumerAvailability(action, "EVENT_POLICY", false);
+        assertConsumerAvailability(action, "AUTOMATION", false);
+        assertConsumerAvailability(action, "BPM", false);
+        assertTrue(action.path("inputSchema").isObject());
+    }
+
+    private void assertConsumerAvailability(JsonNode action, String consumerType, boolean available) {
+        JsonNode availability = findConsumerAvailability(action.path("consumerAvailability"), consumerType);
+        assertTrue(!availability.isMissingNode());
+        assertTrue(consumerType.equals(availability.path("consumerType").asText()));
+        assertTrue(availability.path("handlerAvailable").asBoolean() == available);
+        assertTrue((available ? "AVAILABLE" : "UNAVAILABLE")
+                .equals(availability.path("availabilityStatus").asText()));
+        if (available) {
+            assertTrue(availability.path("availabilityReason").isMissingNode()
+                    || availability.path("availabilityReason").isNull());
+            assertProviderDependencyTypes(
+                    availability.path("providerDependencies"),
+                    expectedProviderTypes(action.path("actionType").asText()));
+        } else {
+            assertTrue(availability.path("availabilityReason").asText().length() > 0);
+            if ("SEND_SMS".equals(action.path("actionType").asText())) {
+                assertSmsProviderDependency(availability.path("providerDependencies"));
+            }
+            assertProviderDependencyTypes(
+                    availability.path("providerDependencies"),
+                    expectedProviderTypes(action.path("actionType").asText()));
+        }
+    }
+
+    private List<String> expectedProviderTypes(String actionType) {
+        return switch (actionType) {
+            case "NOTIFY" -> List.of("NOTIFICATION");
+            case "SEND_SMS" -> List.of("SMS");
+            case "SEND_IM" -> List.of("IM");
+            case "WEBHOOK" -> List.of("WEBHOOK");
+            case "START_PROCESS" -> List.of("BPM");
+            case "CREATE_TASK" -> List.of("INBOX");
+            case "CC_TASK" -> List.of("INBOX", "BPM");
+            case "ADD_COMMENT" -> List.of("COMMENT");
+            case "UPDATE_RECORD", "PATCH_RECORD" -> List.of("LOWCODE_MODEL");
+            case "WRITE_AUDIT" -> List.of("AUDIT");
+            default -> List.of();
+        };
+    }
+
+    private void assertProviderDependencyTypes(JsonNode providerDependencies, List<String> providerTypes) {
+        assertTrue(providerDependencies.isArray());
+        for (String providerType : providerTypes) {
+            boolean found = false;
+            for (JsonNode dependency : providerDependencies) {
+                if (providerType.equals(dependency.path("providerType").asText())) {
+                    found = true;
+                    assertTrue(dependency.path("label").asText().length() > 0);
+                    assertTrue(dependency.path("required").asBoolean());
+                    assertTrue(dependency.path("availabilityStatus").asText().length() > 0);
+                    break;
+                }
+            }
+            assertTrue(found, "Missing provider dependency type: " + providerType);
+        }
+    }
+
+    private void assertSmsProviderDependency(JsonNode providerDependencies) {
+        assertTrue(providerDependencies.isArray());
+        JsonNode dependency = MissingNode.getInstance();
+        for (JsonNode candidate : providerDependencies) {
+            if ("SMS".equals(candidate.path("providerType").asText())) {
+                dependency = candidate;
+                break;
+            }
+        }
+        assertTrue(!dependency.isMissingNode());
+        assertTrue("真实短信 provider".equals(dependency.path("label").asText()));
+        assertTrue(dependency.path("required").asBoolean());
+        assertTrue(!dependency.path("available").asBoolean());
+        assertTrue("UNAVAILABLE".equals(dependency.path("availabilityStatus").asText()));
+        assertTrue(dependency.path("availabilityReason").asText().contains("真实短信 provider"));
+    }
+
+    private JsonNode findConsumerAvailability(JsonNode availabilityRows, String consumerType) {
+        for (JsonNode row : availabilityRows) {
+            if (consumerType.equals(row.path("consumerType").asText())) {
+                return row;
+            }
+        }
+        return MissingNode.getInstance();
     }
 
     private JsonNode findCatalogAction(JsonNode actions, String actionType) {
@@ -1030,9 +1191,13 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         newest.setKind("SIMPLE_CONDITION");
         newest.setRuntimeAdapter("AST_EVALUATOR");
         newest.setCallerType("AUTOMATION");
+        newest.setCallerRef("policy_" + suffix);
         newest.setRolloutArm("CANDIDATE");
         newest.setMatched(true);
         newest.setStatus("MATCHED");
+        newest.setOutputSnapshot(json.valueToTree(Map.of(
+                "deadlineMinutes", 45,
+                "severity", "warning")));
         newest.setDurationMs(12L);
         newest.setCreatedAt(Instant.now().plusSeconds(120));
         logMapper.insert(newest);
@@ -1049,6 +1214,7 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         mockMvc.perform(get("/api/decision/logs/recent")
                         .param("keyword", suffix)
                         .param("callerType", "automation")
+                        .param("callerRef", newest.getCallerRef())
                         .param("matched", "true")
                         .param("rolloutArm", "candidate")
                         .param("minDurationMs", "10")
@@ -1059,7 +1225,18 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.records.length()").value(1))
                 .andExpect(jsonPath("$.data.records[0].traceId").value(newest.getTraceId()))
                 .andExpect(jsonPath("$.data.records[0].callerType").value("AUTOMATION"))
+                .andExpect(jsonPath("$.data.records[0].callerRef").value(newest.getCallerRef()))
+                .andExpect(jsonPath("$.data.records[0].outputSnapshot.deadlineMinutes").value(45))
+                .andExpect(jsonPath("$.data.records[0].outputSnapshot.severity").value("warning"))
                 .andExpect(jsonPath("$.data.records[0].rolloutArm").value("CANDIDATE"));
+
+        mockMvc.perform(get("/api/decision/logs/recent")
+                        .param("callerType", "automation")
+                        .param("callerRef", "missing_" + suffix)
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records.length()").value(0));
     }
 
     @Test
@@ -1073,7 +1250,10 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                 "detail_own_" + suffix,
                 "MATCHED",
                 true,
-                19L);
+                19L,
+                json.valueToTree(Map.of(
+                        "candidateUserIds", List.of("u-manager"),
+                        "deadlineMinutes", 30)));
         createLog(
                 getTestTenant().getId() + 999_999L,
                 traceId,
@@ -1088,14 +1268,18 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.pid").value(own.getPid()))
                 .andExpect(jsonPath("$.data.traceId").value(traceId))
                 .andExpect(jsonPath("$.data.decisionCode").value("detail_own_" + suffix))
-                .andExpect(jsonPath("$.data.status").value("MATCHED"));
+                .andExpect(jsonPath("$.data.status").value("MATCHED"))
+                .andExpect(jsonPath("$.data.outputSnapshot.candidateUserIds[0]").value("u-manager"))
+                .andExpect(jsonPath("$.data.outputSnapshot.deadlineMinutes").value(30));
 
         mockMvc.perform(get("/api/decision/logs")
                         .param("traceId", traceId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].pid").value(own.getPid()))
-                .andExpect(jsonPath("$.data[0].decisionCode").value("detail_own_" + suffix));
+                .andExpect(jsonPath("$.data[0].decisionCode").value("detail_own_" + suffix))
+                .andExpect(jsonPath("$.data[0].outputSnapshot.candidateUserIds[0]").value("u-manager"))
+                .andExpect(jsonPath("$.data[0].outputSnapshot.deadlineMinutes").value(30));
     }
 
     @Test
@@ -1523,11 +1707,77 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
 
         mockMvc.perform(post("/api/decision/fields/preflight").contentType(MediaType.APPLICATION_JSON)
                         .content(json.writeValueAsString(Map.of(
+                                "fieldRef", "record.data.amount",
+                                "action", "DELETE_DICT_ITEM",
+                                "dictCode", "leave_type",
+                                "dictValue", "annual",
+                                "impactAcknowledged", true,
+                                "note", "dict value migration approved"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.allowed").value(true))
+                .andExpect(jsonPath("$.data.blocked").value(false))
+                .andExpect(jsonPath("$.data.action").value("DELETE_DICT_ITEM"))
+                .andExpect(jsonPath("$.data.dictCode").value("leave_type"))
+                .andExpect(jsonPath("$.data.dictValue").value("annual"))
+                .andExpect(jsonPath("$.data.references[0].sourceType").value("DECISION_VERSION"));
+
+        applyTestMetaContext();
+        List<DecisionImpactAckEntity> dictAcks = impactAckMapper.selectList(
+                new LambdaQueryWrapper<DecisionImpactAckEntity>()
+                        .eq(DecisionImpactAckEntity::getTenantId, getTestTenant().getId())
+                        .eq(DecisionImpactAckEntity::getActionType, "FIELD_DICT_ITEM_DELETE")
+                        .eq(DecisionImpactAckEntity::getTargetPath, "record.data.amount"));
+        assertTrue(dictAcks.stream().anyMatch(ack ->
+                ack.getImpactSummary().contains("decision version")
+                        && "dict value migration approved".equals(ack.getNote())));
+
+        mockMvc.perform(post("/api/decision/fields/preflight").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "fieldRef", "record.data.amount",
+                                "action", "CHANGE_DATA_TYPE",
+                                "currentDataType", "decimal",
+                                "nextDataType", "string"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.allowed").value(false))
+                .andExpect(jsonPath("$.data.blocked").value(true))
+                .andExpect(jsonPath("$.data.requiresAcknowledgement").value(true))
+                .andExpect(jsonPath("$.data.action").value("CHANGE_DATA_TYPE"))
+                .andExpect(jsonPath("$.data.currentDataType").value("decimal"))
+                .andExpect(jsonPath("$.data.nextDataType").value("string"))
+                .andExpect(jsonPath("$.data.references[0].sourceType").value("DECISION_VERSION"));
+
+        mockMvc.perform(post("/api/decision/fields/preflight").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
+                                "fieldRef", "record.data.amount",
+                                "action", "CHANGE_DATA_TYPE",
+                                "currentDataType", "decimal",
+                                "nextDataType", "string",
+                                "impactAcknowledged", true,
+                                "note", "type migration approved"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.allowed").value(true))
+                .andExpect(jsonPath("$.data.blocked").value(false))
+                .andExpect(jsonPath("$.data.requiresAcknowledgement").value(true))
+                .andExpect(jsonPath("$.data.action").value("CHANGE_DATA_TYPE"));
+
+        applyTestMetaContext();
+        List<DecisionImpactAckEntity> typeAcks = impactAckMapper.selectList(
+                new LambdaQueryWrapper<DecisionImpactAckEntity>()
+                        .eq(DecisionImpactAckEntity::getTenantId, getTestTenant().getId())
+                        .eq(DecisionImpactAckEntity::getActionType, "FIELD_TYPE_CHANGE")
+                        .eq(DecisionImpactAckEntity::getTargetPath, "record.data.amount"));
+        assertTrue(typeAcks.stream().anyMatch(ack ->
+                ack.getImpactSummary().contains("decision version")
+                        && "type migration approved".equals(ack.getNote())));
+
+        mockMvc.perform(post("/api/decision/fields/preflight").contentType(MediaType.APPLICATION_JSON)
+                        .content(json.writeValueAsString(Map.of(
                                 "fieldRef", "record.data.unused",
                                 "action", "CHANGE_TYPE",
                                 "currentDataType", "decimal",
                                 "nextDataType", "integer"))))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.action").value("CHANGE_DATA_TYPE"))
                 .andExpect(jsonPath("$.data.allowed").value(true))
                 .andExpect(jsonPath("$.data.blocked").value(false))
                 .andExpect(jsonPath("$.data.requiresAcknowledgement").value(false));
@@ -1894,6 +2144,17 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
             String status,
             Boolean matched,
             Long durationMs) {
+        return createLog(tenantId, traceId, decisionCode, status, matched, durationMs, null);
+    }
+
+    private DrtLogEntity createLog(
+            Long tenantId,
+            String traceId,
+            String decisionCode,
+            String status,
+            Boolean matched,
+            Long durationMs,
+            JsonNode outputSnapshot) {
         DrtLogEntity log = new DrtLogEntity();
         log.setPid(UniqueIdGenerator.generate());
         log.setTenantId(tenantId);
@@ -1906,6 +2167,7 @@ class DecisionRuntimeControllerIntegrationTest extends BaseIntegrationTest {
         log.setCallerType("API");
         log.setMatched(matched);
         log.setStatus(status);
+        log.setOutputSnapshot(outputSnapshot);
         log.setDurationMs(durationMs);
         log.setCreatedAt(Instant.now());
         logMapper.insert(log);

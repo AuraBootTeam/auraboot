@@ -4,19 +4,27 @@
  */
 
 import { get, post, put, del } from '~/shared/services/http-client';
+import type {
+  DecisionLogRecord,
+  DecisionPageResult,
+  EventPolicyActionLogRecord,
+} from '~/shared/decision/api/decisionApi';
 
 // ==================== Types ====================
 
 export interface SlaConfig {
   pid: string;
   name: string;
-  targetType: 'process' | 'node' | 'task';
+  targetType: 'process' | 'node' | 'task' | 'PROCESS' | 'NODE' | 'TASK' | 'RECORD' | string;
   targetKey: string;
+  targetLabel?: string;
   domainCode?: string;
-  deadlineMode: 'fixed' | 'expression' | 'field';
+  deadlineMode: 'fixed' | 'expression' | 'field' | 'FIXED' | 'EXPRESSION' | 'FIELD' | 'RULE' | string;
   deadlineValue: string;
   businessCalendar?: boolean;
   warningRules?: Record<string, unknown>[];
+  ruleBinding?: RuleConsumerBinding;
+  actionPolicy?: SlaActionPolicy;
   modelCode?: string;
   deadlineField?: string;
   priorityField?: string;
@@ -24,6 +32,87 @@ export interface SlaConfig {
   enabled: boolean;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface RuleValueRef {
+  kind?: string;
+  scope?: string;
+  path?: string;
+}
+
+export interface RuleInputMapping {
+  input?: string;
+  source?: RuleValueRef;
+}
+
+export interface RuleOutputMapping {
+  output?: string;
+  target?: RuleValueRef;
+}
+
+export interface RuleDecisionBinding {
+  decisionCode?: string;
+  decisionName?: string;
+  name?: string;
+  label?: string;
+  versionPolicy?: string;
+  inputMappings?: RuleInputMapping[];
+  outputMappings?: RuleOutputMapping[];
+  fallbackPolicy?: Record<string, unknown>;
+  traceMode?: string;
+  enabled?: boolean;
+}
+
+export interface RuleConsumerBinding {
+  consumerType?: string;
+  consumerCode?: string;
+  consumerNodeId?: string;
+  bindingKind?: string;
+  decisionBinding?: RuleDecisionBinding;
+  enabled?: boolean;
+}
+
+export interface SlaAction {
+  type?: string;
+  target?: string;
+  order?: number;
+  payload?: Record<string, unknown>;
+  idempotencyKeyTemplate?: string;
+}
+
+export interface SlaActionPolicy {
+  trigger?: string;
+  failureStrategy?:
+    | 'FAIL_FAST'
+    | 'CONTINUE_ON_ERROR'
+    | 'ALL_OR_NOTHING'
+    | 'RETRY_ASYNC'
+    | 'DEAD_LETTER'
+    | string;
+  actions?: SlaAction[];
+  executionEffect?: {
+    lastStatus?: string;
+    traceId?: string;
+    lastRunAt?: string;
+    summary?: string;
+  };
+}
+
+export type SlaDecisionLog = DecisionLogRecord;
+export type SlaActionLog = EventPolicyActionLogRecord;
+
+export interface SlaDecisionLogFilters {
+  callerType?: string;
+  callerRef?: string;
+  decisionCode?: string;
+  size?: number;
+}
+
+export interface SlaActionLogFilters {
+  policyCode?: string;
+  policyCodePrefix?: string;
+  correlationId?: string;
+  size?: number;
 }
 
 export interface CreateSlaConfigRequest {
@@ -135,6 +224,27 @@ export async function getDashboard(): Promise<DashboardData> {
 export async function getSlaByInstance(processInstanceId: string): Promise<SlaRecord[]> {
   const result = await get<SlaRecord[]>(`/api/bpm/monitor/instances/${processInstanceId}/sla`);
   return result.data ?? [];
+}
+
+export async function listSlaDecisionLogs(
+  params: SlaDecisionLogFilters = { callerType: 'SLA', size: 20 },
+): Promise<SlaDecisionLog[]> {
+  const result = await get<DecisionPageResult<DecisionLogRecord>>('/api/decision/logs/recent', params);
+  return result.data?.records ?? [];
+}
+
+export async function listSlaActionLogs(
+  params: SlaActionLogFilters = { policyCodePrefix: 'SLA_TIMEOUT:', size: 50 },
+): Promise<SlaActionLog[]> {
+  const result = await get<SlaActionLog[]>('/api/event-policy/action-logs', params);
+  return result.data ?? [];
+}
+
+export async function replaySlaActionLog(pid: string): Promise<SlaActionLog> {
+  const result = await post<SlaActionLog>(
+    `/api/event-policy/action-logs/${encodeURIComponent(pid)}/replay`,
+  );
+  return result.data!;
 }
 
 // ==================== SLA Record Drill-down API ====================

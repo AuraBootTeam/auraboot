@@ -673,6 +673,23 @@ export interface BpmAuditEvent {
 }
 
 /**
+ * Execution timeline entry written by `ExecutionLogService` and exposed via
+ * `GET /api/bpm/orchestration/executions/{id}/timeline`.
+ */
+export interface BpmExecutionLogEntry {
+  pid: string;
+  executionId: string;
+  nodeId: string | null;
+  nodeType: string | null;
+  eventType: string;
+  inputData: Record<string, unknown> | null;
+  outputData: Record<string, unknown> | null;
+  errorMessage: string | null;
+  durationMs: number | null;
+  createdAt: string | null;
+}
+
+/**
  * Fetch the process instance status bound to `businessKey` (optionally
  * filtered by `processKey`). Returns `null` when no instance exists.
  *
@@ -722,6 +739,27 @@ export async function listAuditEvents(processInstanceId: string): Promise<BpmAud
   );
   if (!isSuccess(result.code)) {
     throw new Error(result.desc || 'Failed to list audit events');
+  }
+  return result.data || [];
+}
+
+/**
+ * Fetch execution timeline entries for a BPM/SmartEngine process instance.
+ * This is separate from audit history: audit rows describe user/process
+ * lifecycle operations, while execution timeline rows capture node-level
+ * runtime evidence such as rule-binding evaluations and action failures.
+ */
+export async function listExecutionTimeline(
+  processInstanceId: string,
+): Promise<BpmExecutionLogEntry[]> {
+  if (!processInstanceId || processInstanceId.trim().length === 0) {
+    throw new Error('listExecutionTimeline: processInstanceId is required');
+  }
+  const result = await get<BpmExecutionLogEntry[]>(
+    `/api/bpm/orchestration/executions/${processInstanceId}/timeline`,
+  );
+  if (!isSuccess(result.code)) {
+    throw new Error(result.desc || 'Failed to list execution timeline');
   }
   return result.data || [];
 }

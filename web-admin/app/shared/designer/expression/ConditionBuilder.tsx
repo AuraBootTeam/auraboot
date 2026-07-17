@@ -1,6 +1,7 @@
 import React, { useCallback } from 'react';
 import type { ConditionGroup, ConditionRow as ConditionRowType, FieldOption } from './types';
 import { ConditionRow } from './ConditionRow';
+import { useSmartText } from '~/utils/i18n';
 
 interface ConditionBuilderProps {
   group: ConditionGroup;
@@ -14,6 +15,7 @@ function nextId(): string {
 }
 
 export function ConditionBuilder({ group, fields, onChange }: ConditionBuilderProps) {
+  const st = useSmartText();
   const handleRowChange = useCallback(
     (index: number, updated: ConditionRowType) => {
       const newConditions = [...group.conditions];
@@ -60,7 +62,7 @@ export function ConditionBuilder({ group, fields, onChange }: ConditionBuilderPr
               <button
                 className="rounded bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-500 hover:bg-gray-200"
                 onClick={handleToggleOperator}
-                title="Click to toggle AND/OR"
+                title={st('$i18n:expression.tooltip.toggleAndOr', '切换 AND/OR')}
                 data-testid="condition-logic-toggle"
               >
                 {group.operator === 'and' ? 'AND' : 'OR'}
@@ -79,7 +81,7 @@ export function ConditionBuilder({ group, fields, onChange }: ConditionBuilderPr
           <line x1="12" y1="5" x2="12" y2="19" />
           <line x1="5" y1="12" x2="19" y2="12" />
         </svg>
-        Add condition
+        {st('$i18n:expression.action.addCondition', '添加条件')}
       </button>
     </div>
   );

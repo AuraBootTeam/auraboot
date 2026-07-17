@@ -4,11 +4,16 @@ import com.auraboot.framework.bpm.service.ProcessEngineService;
 import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.eventpolicy.executor.ActionHandler;
+import com.auraboot.framework.eventpolicy.executor.ActionExecutionException;
+import com.auraboot.framework.eventpolicy.executor.ActionProviderDependency;
 import com.auraboot.framework.eventpolicy.model.ResolvedActionPlan;
+import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,14 +36,28 @@ public class StartProcessActionHandler implements ActionHandler {
     }
 
     @Override
+    public List<ActionProviderDependency> runtimeProviderDependencies() {
+        return List.of(ActionProviderDependencies.bpmEngine());
+    }
+
+    @Override
     @SuppressWarnings("unchecked")
     public void execute(ResolvedActionPlan plan, DecisionContext context) {
+        executeWithResult(plan, context);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> executeWithResult(ResolvedActionPlan plan, DecisionContext context) {
         Map<String, Object> payload = plan.payload() != null ? plan.payload() : Map.of();
         Object pdId = payload.get("processDefinitionId");
-        if (pdId == null || String.valueOf(pdId).isBlank()) {
-            throw new IllegalArgumentException("START_PROCESS requires payload.processDefinitionId");
-        }
         String recordPid = resolveString(context, "recordPid");
+        if (pdId == null || String.valueOf(pdId).isBlank()) {
+            throw new ActionExecutionException("缺少流程标识，无法启动流程",
+                    failurePayload("process_definition_missing", "payload.processDefinitionId",
+                            null, null, recordPid), null);
+        }
+        String processDefinitionId = String.valueOf(pdId);
         Object bk = payload.get("businessKey");
         String businessKey = bk != null ? String.valueOf(bk) : recordPid;
 
@@ -57,7 +76,45 @@ public class StartProcessActionHandler implements ActionHandler {
         if (userId != null) {
             variables.putIfAbsent("_startUserId", String.valueOf(userId));
         }
-        processEngineService.startProcess(String.valueOf(pdId), businessKey, variables);
+        ProcessInstance processInstance;
+        try {
+            processInstance = processEngineService.startProcess(processDefinitionId, businessKey, variables);
+        } catch (Exception e) {
+            throw new ActionExecutionException("流程启动失败：流程未部署或流程标识不存在",
+                    failurePayload("process_start_failed", null,
+                            processDefinitionId, businessKey, recordPid), e);
+        }
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("processDefinitionId", processDefinitionId);
+        result.put("businessKey", businessKey);
+        if (processInstance != null && processInstance.getInstanceId() != null) {
+            result.put("processInstanceId", processInstance.getInstanceId());
+        }
+        if (recordPid != null) {
+            result.put("recordPid", recordPid);
+        }
+        return result;
+    }
+
+    private static Map<String, Object> failurePayload(String reason, String field,
+                                                      String processDefinitionId,
+                                                      String businessKey,
+                                                      String recordPid) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("failureReason", reason);
+        if (field != null) {
+            result.put("field", field);
+        }
+        if (processDefinitionId != null) {
+            result.put("processDefinitionId", processDefinitionId);
+        }
+        if (businessKey != null) {
+            result.put("businessKey", businessKey);
+        }
+        if (recordPid != null) {
+            result.put("recordPid", recordPid);
+        }
+        return result;
     }
 
     private static String resolveString(DecisionContext context, String field) {

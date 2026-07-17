@@ -45,8 +45,8 @@ class AuditActionHandlerIntegrationTest extends BaseIntegrationTest {
               "condition":{"type":"compare",
                  "left":{"type":"path","scope":"record","path":"data.priority","dataType":"enum"},
                  "operator":"EQ","right":{"type":"literal","value":"HIGH","dataType":"enum"}},
-              "actions":[{"type":"WRITE_AUDIT","target":"AUDIT:%s","order":10,
-                 "payload":{"message":"high-priority complaint received"},
+              "actions":[{"type":"WRITE_AUDIT","target":"AUDIT:${record.entityCode}","order":10,
+                 "payload":{"message":"high-priority ${record.recordPid} received"},
                  "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:AUDIT"}]}]
             """.formatted(targetKey));
         var draft = versionService.createDraft(code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL,
@@ -65,6 +65,12 @@ class AuditActionHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");
         assertThat(result.execution().actions()).hasSize(1);
         assertThat(result.execution().actions().get(0).status().name()).isEqualTo("SUCCESS");
+        assertThat(result.execution().actions().get(0).resultPayload())
+                .containsEntry("ruleCode", "R-AUD")
+                .containsEntry("actionType", "WRITE_AUDIT")
+                .containsEntry("message", "high-priority " + recordPid + " received")
+                .containsEntry("target", "AUDIT:" + targetKey)
+                .containsKey("auditPid");
 
         // a real audit row was written by the production handler
         Map<String, Object> audit = jdbcTemplate.queryForMap(
@@ -74,6 +80,6 @@ class AuditActionHandlerIntegrationTest extends BaseIntegrationTest {
         assertThat(audit.get("rule_code")).isEqualTo("R-AUD");
         assertThat(audit.get("action_type")).isEqualTo("WRITE_AUDIT");
         assertThat(audit.get("target")).isEqualTo("AUDIT:" + targetKey);
-        assertThat(audit.get("message")).isEqualTo("high-priority complaint received");
+        assertThat(audit.get("message")).isEqualTo("high-priority " + recordPid + " received");
     }
 }

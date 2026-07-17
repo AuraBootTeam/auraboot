@@ -13,6 +13,7 @@ import com.auraboot.framework.decision.rule.RuleMappingTarget;
 import com.auraboot.framework.decision.rule.RuleValueSource;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.HashMap;
 import java.util.List;
@@ -20,6 +21,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -27,7 +29,15 @@ import static org.mockito.Mockito.when;
 class BpmRuleBindingRuntimeServiceTest {
 
     private final RuleEvaluationService ruleEvaluationService = mock(RuleEvaluationService.class);
-    private final BpmRuleBindingRuntimeService service = new BpmRuleBindingRuntimeService(ruleEvaluationService);
+    private final ExecutionLogService executionLogService = mock(ExecutionLogService.class);
+    @SuppressWarnings("unchecked")
+    private final ObjectProvider<ExecutionLogService> executionLogServiceProvider = mock(ObjectProvider.class);
+    private final BpmRuleBindingRuntimeService service =
+            new BpmRuleBindingRuntimeService(ruleEvaluationService, executionLogServiceProvider);
+
+    BpmRuleBindingRuntimeServiceTest() {
+        when(executionLogServiceProvider.getIfAvailable()).thenReturn(executionLogService);
+    }
 
     @Test
     void evaluateAndApplyMapsBpmVariablesIntoRuleContextAndWritesTrace() {
@@ -55,6 +65,27 @@ class BpmRuleBindingRuntimeServiceTest {
         assertThat(request).containsEntry("approvalRoute", "HIGH");
         assertThat(request.get("decision")).isInstanceOf(Map.class);
         assertThat(request.get("_rule_gw")).isInstanceOf(Map.class);
+        verify(executionLogService).logRuleEvaluated(eq("pi-1"), eq("gw"), any(), eq(12L));
+    }
+
+    @Test
+    void evaluatePropagatesMetaVirtualSourcesIntoRuleContext() {
+        RuleConsumerBinding binding = binding("gw", List.of());
+        List<Map<String, Object>> virtualSources = List.of(Map.of(
+                "sourceRef", "virtual.leave_request_summary.v1",
+                "recordId", "REQ-1"));
+        Map<String, Object> request = new HashMap<>();
+        request.put("record", Map.of("recordPid", "REQ-1"));
+        request.put("meta", Map.of("virtualSources", virtualSources));
+        when(ruleEvaluationService.evaluateDecisionBinding(any(), any()))
+                .thenReturn(trace(Map.of("route", "HIGH")));
+
+        service.evaluate(binding, "expense", "gw", "pi-virtual", request);
+
+        ArgumentCaptor<RuleEvaluationContext> context = ArgumentCaptor.forClass(RuleEvaluationContext.class);
+        verify(ruleEvaluationService).evaluateDecisionBinding(any(), context.capture());
+        assertThat(context.getValue().toWireContext().get(Scope.META.code()))
+                .containsEntry("virtualSources", virtualSources);
     }
 
     @Test
@@ -126,6 +157,25 @@ class BpmRuleBindingRuntimeServiceTest {
         assertThat(assignment.failClosed()).isTrue();
         assertThat(assignment.userIds()).isEmpty();
         assertThat(assignment.groupIds()).isEmpty();
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> tracePayload = ArgumentCaptor.forClass(Map.class);
+        verify(executionLogService)
+                .logRuleEvaluated(eq("pi-6"), eq("approve"), tracePayload.capture(), eq(12L));
+        assertThat(tracePayload.getValue()).containsKey("ruleBinding");
+        assertThat(tracePayload.getValue().get("ruleBinding")).isInstanceOf(Map.class);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> ruleBindingPayload =
+                (Map<String, Object>) tracePayload.getValue().get("ruleBinding");
+        assertThat(ruleBindingPayload)
+                .containsEntry("traceId", "trace-error")
+                .containsEntry("consumerType", "BPM")
+                .containsEntry("consumerNodeId", "approve")
+                .containsEntry("status", "ERROR")
+                .containsEntry("matched", false)
+                .containsEntry("fallbackApplied", true)
+                .containsEntry("errorCode", "DECISION_EVALUATION_FAILED");
+        assertThat(ruleBindingPayload.get("errors")).isEqualTo(List.of("adapter failed"));
     }
 
     private RuleConsumerBinding binding(String nodeId, List<DecisionBinding.OutputMapping> outputs) {

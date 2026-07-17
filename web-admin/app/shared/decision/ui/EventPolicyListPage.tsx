@@ -72,6 +72,46 @@ function display(value: unknown): string {
   return String(value);
 }
 
+function eventLabel(value: unknown): string {
+  switch (String(value ?? '').toUpperCase()) {
+    case 'LEAVE_REQUEST_CREATED':
+      return '请假申请创建';
+    default:
+      return display(value).replaceAll('_', ' ');
+  }
+}
+
+function targetLabel(policy: EventPolicySummary): string {
+  if (policy.targetType === 'MODEL' && policy.targetKey === 'wd_leave_request') {
+    return '请假申请';
+  }
+  return policy.targetType || policy.targetKey ? '业务对象' : '-';
+}
+
+function phaseLabel(value: unknown): string {
+  switch (String(value ?? '').toUpperCase()) {
+    case 'BEFORE_COMMIT':
+      return '提交前检查';
+    case 'AFTER_COMMIT':
+      return '保存后执行';
+    case 'ASYNC':
+      return '异步执行';
+    default:
+      return display(value).replaceAll('_', ' ');
+  }
+}
+
+function matchModeLabel(value: unknown): string {
+  switch (String(value ?? '').toUpperCase()) {
+    case 'COLLECT_ALL':
+      return '收集全部命中';
+    case 'FIRST_MATCH':
+      return '首个命中';
+    default:
+      return display(value).replaceAll('_', ' ');
+  }
+}
+
 function statusTone(statusValue: unknown): string {
   const normalized = String(statusValue ?? '').toUpperCase();
   if (['PUBLISHED', 'VALIDATED', 'ENABLED', 'SUCCESS'].includes(normalized)) return 'is-success';
@@ -298,13 +338,12 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
             <thead>
               <tr>
                 <th>策略</th>
-                <th>事件 / 目标</th>
+                <th>触发 / 对象</th>
                 <th>阶段</th>
-                <th>matchMode</th>
+                <th>匹配模式</th>
                 <th>版本</th>
                 <th>状态</th>
                 <th>启用</th>
-                <th>负责人</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -313,18 +352,14 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
                 <tr key={policy.policyCode} data-testid={`epl-row-${policy.policyCode}`}>
                   <td>
                     <strong>{display(policy.policyName ?? policy.policyCode)}</strong>
-                    <div className="mono decisionops-code" title={policy.policyCode}>
-                      {policy.policyCode}
-                    </div>
+                    <div className="decisionops-muted-cell">规则中心策略</div>
                   </td>
                   <td>
-                    <span>{display(policy.eventType)}</span>
-                    <div className="mono decisionops-code">
-                      {display(policy.targetType)}:{display(policy.targetKey)}
-                    </div>
+                    <span>{eventLabel(policy.eventType)}</span>
+                    <div className="decisionops-muted-cell">{targetLabel(policy)}</div>
                   </td>
-                  <td>{display(policy.phase)}</td>
-                  <td>{display(policy.matchMode)}</td>
+                  <td>{phaseLabel(policy.phase)}</td>
+                  <td>{matchModeLabel(policy.matchMode)}</td>
                   <td>{policy.version != null ? `v${policy.version}` : '-'}</td>
                   <td>
                     <span className={`decisionops-badge ${statusTone(policy.status)}`}>
@@ -348,7 +383,6 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
                       {policy.enabled === false ? '停用' : '启用'}
                     </button>
                   </td>
-                  <td className="decisionops-muted-cell">{display(policy.owner)}</td>
                   <td>
                     <div className="decisionops-row-actions">
                       <button

@@ -129,6 +129,51 @@ class FieldPermissionServiceImplTest {
     }
 
     @Test
+    void readsFieldPermissionFromNestedExtensionMap() {
+        Role low = new Role();
+        low.setId(7L);
+        low.setCode("low_field_viewer");
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
+        when(roleService.getById(7L)).thenReturn(low);
+
+        Map<String, Object> fieldPermission = Map.of(
+                "view", List.of("full_field_editor"),
+                "edit", List.of("full_field_editor"));
+        when(metaModelService.getModelFields("model.leave"))
+                .thenReturn(List.of(field("leave_type", Map.of(
+                        "extension", Map.of("fieldPermission", fieldPermission)))));
+
+        FieldPermissionSet result = service.getFieldPermissions(1L, "model.leave");
+
+        assertThat(result.hiddenFields()).containsExactly("leave_type");
+        assertThat(result.viewableFields()).isEmpty();
+        assertThat(result.editableFields()).isEmpty();
+    }
+
+    @Test
+    void readsFieldPermissionFromDynamicPropertiesExtensionMap() {
+        Role low = new Role();
+        low.setId(7L);
+        low.setCode("low_field_viewer");
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
+        when(roleService.getById(7L)).thenReturn(low);
+
+        Map<String, Object> fieldPermission = Map.of(
+                "view", List.of("low_field_viewer"),
+                "edit", List.of("full_field_editor"));
+        when(metaModelService.getModelFields("model.leave"))
+                .thenReturn(List.of(field("start_date", Map.of(
+                        "dynamicProperties", Map.of(
+                                "extension", Map.of("fieldPermission", fieldPermission))))));
+
+        FieldPermissionSet result = service.getFieldPermissions(1L, "model.leave");
+
+        assertThat(result.viewableFields()).containsExactly("start_date");
+        assertThat(result.editableFields()).isEmpty();
+        assertThat(result.hiddenFields()).isEmpty();
+    }
+
+    @Test
     void allowsViewButNotEditWhenOnlyInViewList() {
         Role admin = new Role();
         admin.setId(7L);

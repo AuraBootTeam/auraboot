@@ -166,6 +166,47 @@ class AutomationDecisionIntegrationTest {
     }
 
     @Test
+    void withRuleBinding_propagatesMetaVirtualSourcesIntoRuleContext() {
+        when(ruleEvaluationService.evaluateDecisionBinding(any(DecisionBinding.class), any(RuleEvaluationContext.class)))
+                .thenReturn(new RuleEvaluationTrace(
+                        "decision-trace-virtual",
+                        "AUTOMATION",
+                        "auto-rule-1",
+                        "trigger",
+                        RuleBindingKind.DECISION_REF,
+                        "approval_routing",
+                        2,
+                        DecisionVersionPolicy.ROLLOUT,
+                        null,
+                        DecisionStatus.MATCHED,
+                        true,
+                        Map.of(),
+                        Map.of("route", "DIRECTOR"),
+                        false,
+                        5,
+                        null,
+                        List.of(),
+                        List.of(),
+                        List.of("record.data.slaRiskScore"),
+                        List.of("approval_routing")));
+        AutomationTriggerServiceImpl s = service();
+        List<Map<String, Object>> virtualSources = List.of(Map.of(
+                "sourceRef", "virtual.leave_request_summary.v1",
+                "recordId", "REQ-1"));
+
+        s.withDecision(
+                automationWithRuleBinding(),
+                Map.of(
+                        "record", Map.of("amount", 20000, "recordPid", "REQ-1"),
+                        "meta", Map.of("virtualSources", virtualSources)));
+
+        ArgumentCaptor<RuleEvaluationContext> context = ArgumentCaptor.forClass(RuleEvaluationContext.class);
+        verify(ruleEvaluationService).evaluateDecisionBinding(any(DecisionBinding.class), context.capture());
+        assertThat(context.getValue().toWireContext().get(Scope.META.code()))
+                .containsEntry("virtualSources", virtualSources);
+    }
+
+    @Test
     void decisionFailure_degradesToErrorMarker_notCrash() {
         when(decisionService.evaluate(any(DrtEvaluateRequest.class)))
                 .thenThrow(new RuntimeException("decision not found"));

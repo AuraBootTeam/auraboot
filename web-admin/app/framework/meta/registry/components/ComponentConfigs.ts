@@ -1004,6 +1004,77 @@ export const DISPLAY_COMPONENT_CONFIGS: ComponentConfig[] = [
     ],
     tags: ['decisionops', 'rule-center', 'condition', 'decision-binding', 'custom-block'],
   },
+  {
+    type: 'decisionactionplan',
+    name: 'Decision Action Plan',
+    category: 'display',
+    icon: 'workflow',
+    description: 'Rule-center action catalog orchestration block for SLA, Automation, BPM and EventPolicy side effects.',
+    defaultProps: {
+      valueField: 'action_policy',
+      title: 'Action plan',
+      triggerLabel: 'Rule matched',
+      defaultTrigger: 'RULE_MATCHED',
+    },
+    propertySchema: [
+      {
+        key: 'valueField',
+        label: 'Value field',
+        type: 'string',
+        group: 'basic',
+        description: 'DSL form field that stores the action policy JSON.',
+      },
+      {
+        key: 'title',
+        label: 'Title',
+        type: 'string',
+        group: 'basic',
+        description: 'Section title rendered above the action chain.',
+      },
+      {
+        key: 'triggerLabel',
+        label: 'Trigger label',
+        type: 'string',
+        group: 'basic',
+        description: 'Human-readable trigger label, for example SLA timeout.',
+      },
+      {
+        key: 'defaultTrigger',
+        label: 'Default trigger',
+        type: 'string',
+        group: 'advanced',
+        description: 'Machine trigger code written when the policy is created.',
+      },
+      {
+        key: 'consumerType',
+        label: 'Consumer type',
+        type: 'select',
+        options: [
+          { label: 'SLA', value: 'SLA' },
+          { label: 'Automation', value: 'AUTOMATION' },
+          { label: 'BPM', value: 'BPM' },
+          { label: 'Event Policy', value: 'EVENT_POLICY' },
+        ],
+        group: 'advanced',
+        description: 'Consumer family used to read action-catalog availability.',
+      },
+      {
+        key: 'logsUrl',
+        label: 'Logs URL',
+        type: 'string',
+        group: 'advanced',
+        description: 'Optional execution-log link template.',
+      },
+      {
+        key: 'readOnly',
+        label: 'Read only',
+        type: 'boolean',
+        group: 'behavior',
+        description: 'Render the action policy as a read-only summary.',
+      },
+    ],
+    tags: ['decisionops', 'rule-center', 'action-catalog', 'side-effect', 'custom-block'],
+  },
 ];
 
 export const INTERACTION_COMPONENT_CONFIGS: ComponentConfig[] = [

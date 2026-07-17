@@ -544,6 +544,7 @@ function DetailPageContentInner(props: PageContentProps) {
   // dataPath blocks read their rows from here; recordData is the unwrapped master.
   const [rawData, setRawData] = useState<any>(null);
   const [recordLoading, setRecordLoading] = useState(true);
+  const [recordError, setRecordError] = useState<string | null>(null);
   const [modelFieldMap, setModelFieldMap] = useState<Map<string, any>>(new Map());
 
   const hasApiSingletonRecordSource = Boolean(
@@ -555,6 +556,7 @@ function DetailPageContentInner(props: PageContentProps) {
   useEffect(() => {
     if ((!routeRecordPid && !hasApiSingletonRecordSource) || !recordModelCode) {
       setRecordLoading(false);
+      setRecordError(null);
       return;
     }
     const currentRecordPid = routeRecordPid;
@@ -580,32 +582,48 @@ function DetailPageContentInner(props: PageContentProps) {
     }
 
     async function loadRecord(): Promise<void> {
-      const { endpoint, method } = resolveDetailRecordEndpoint(
-        schema,
-        currentModelCode,
-        currentRecordPid,
-      );
-      const result = await fetchResult<RecordData>(endpoint, {
-        method,
-        token: token || undefined,
-      });
-      if (cancelled) return;
-      if (ResultHelper.isSuccess(result) && result.data) {
-        const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
-        const unwrappedRecord = unwrapDetailRecord(result.data, recordPath);
-        setRawData(result.data);
-        if (currentRecordPid && !shouldSkipDetailModelFieldMeta(schema)) {
-          setRecordData(
-            await enrichDetailRecordDisplayFields(
-              currentModelCode,
-              currentRecordPid,
-              unwrappedRecord,
-              token || undefined,
-            ),
-          );
+      try {
+        const { endpoint, method } = resolveDetailRecordEndpoint(
+          schema,
+          currentModelCode,
+          currentRecordPid,
+        );
+        const result = await fetchResult<RecordData>(endpoint, {
+          method,
+          token: token || undefined,
+        });
+        if (cancelled) return;
+        if (ResultHelper.isSuccess(result) && result.data) {
+          const recordPath = (schema as any)?.extension?.dataSource?.recordPath;
+          const unwrappedRecord = unwrapDetailRecord(result.data, recordPath);
+          setRawData(result.data);
+          if (currentRecordPid && !shouldSkipDetailModelFieldMeta(schema)) {
+            setRecordData(
+              await enrichDetailRecordDisplayFields(
+                currentModelCode,
+                currentRecordPid,
+                unwrappedRecord,
+                token || undefined,
+              ),
+            );
+          } else {
+            setRecordData(unwrappedRecord);
+          }
+          setRecordError(null);
         } else {
-          setRecordData(unwrappedRecord);
+          setRawData(null);
+          setRecordData({});
+          setRecordError(
+            (result as any)?.desc || (result as any)?.message || 'The requested record was not found.',
+          );
         }
+      } catch (error) {
+        if (cancelled) return;
+        setRawData(null);
+        setRecordData({});
+        setRecordError(
+          error instanceof Error ? error.message : 'The requested record could not be loaded.',
+        );
       }
     }
 
@@ -933,6 +951,30 @@ function DetailPageContentInner(props: PageContentProps) {
   // Show loading while record is being fetched
   if (recordLoading) {
     return <LoadingSpinner />;
+  }
+
+  if (recordError) {
+    return (
+      <div
+        className="mx-auto w-full px-2 py-3"
+        data-testid={deriveTestId('detail', schema?.modelCode || tableName, 'container')}
+      >
+        <div className="rounded-card bg-panel p-8 shadow-sm">
+          <div className="mx-auto grid max-w-lg gap-3 text-center">
+            <h2 className="text-text text-lg font-semibold">
+              {resolveTextFallback(t, 'common.recordNotFound', 'Record not found')}
+            </h2>
+            <p className="text-text-2 text-sm">{recordError}</p>
+            <Link
+              to={`/p/${tableName}`}
+              className="rounded-control border-border-strong bg-panel text-text-2 hover:bg-hover mx-auto inline-flex border px-3 py-1.5 text-sm font-medium"
+            >
+              {resolveTextFallback(t, 'action.back', 'Back')}
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -1382,7 +1424,7 @@ function resolveChartBlockRecordParams(
   } as BlockConfig;
 }
 
-function readDetailRecordField(recordData: RecordData, fieldCode: string): unknown {
+export function readDetailRecordField(recordData: RecordData, fieldCode: string): unknown {
   if (!fieldCode) return undefined;
   if (Object.prototype.hasOwnProperty.call(recordData, fieldCode)) {
     return recordData[fieldCode];
@@ -1406,15 +1448,34 @@ export function injectDetailRecordValueIntoCustomBlock(
 ): BlockConfig {
   if (block.blockType !== 'custom') return block;
   const props = ((block as any).props || {}) as Record<string, unknown>;
-  if (props.value !== undefined) return block;
+  const propsWithRecord = {
+    ...props,
+    record: props.record ?? recordData,
+  };
+  if (props.value !== undefined) {
+    return {
+      ...block,
+      props: propsWithRecord,
+    } as BlockConfig;
+  }
   const valueField = typeof props.valueField === 'string' ? props.valueField.trim() : '';
-  if (!valueField) return block;
+  if (!valueField) {
+    return {
+      ...block,
+      props: propsWithRecord,
+    } as BlockConfig;
+  }
   const value = readDetailRecordField(recordData, valueField);
-  if (value === undefined) return block;
+  if (value === undefined) {
+    return {
+      ...block,
+      props: propsWithRecord,
+    } as BlockConfig;
+  }
   return {
     ...block,
     props: {
-      ...props,
+      ...propsWithRecord,
       value,
     },
   } as BlockConfig;
@@ -1625,11 +1686,13 @@ function DetailBlockRenderer({
                 const label = resolvedField.label
                   ? getLocalizedText(resolvedField.label as any, locale, t)
                   : field.field;
-                const rawValue = sectionRecord ? sectionRecord[field.field] : undefined;
-                const displayValue =
-                  sectionRecord && sectionRecord[`${field.field}_display`] !== undefined
-                    ? sectionRecord[`${field.field}_display`]
-                    : rawValue;
+                const rawValue = sectionRecord
+                  ? readDetailRecordField(sectionRecord, field.field)
+                  : undefined;
+                const fieldDisplayValue = sectionRecord
+                  ? readDetailRecordField(sectionRecord, `${field.field}_display`)
+                  : undefined;
+                const displayValue = fieldDisplayValue !== undefined ? fieldDisplayValue : rawValue;
                 const valueText =
                   displayValue === null || displayValue === undefined || displayValue === ''
                     ? '—'
@@ -1686,9 +1749,13 @@ function DetailBlockRenderer({
                 >
                   <DynamicField
                     field={enrichedField}
-                    value={sectionRecord ? sectionRecord[field.field] : undefined}
+                    value={
+                      sectionRecord ? readDetailRecordField(sectionRecord, field.field) : undefined
+                    }
                     displayValue={
-                      sectionRecord ? sectionRecord[`${field.field}_display`] : undefined
+                      sectionRecord
+                        ? readDetailRecordField(sectionRecord, `${field.field}_display`)
+                        : undefined
                     }
                     onChange={() => {}}
                     readOnly={true}

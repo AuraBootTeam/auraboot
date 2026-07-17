@@ -8,6 +8,7 @@
 import React from 'react';
 import { Undo2, Redo2, Save, Loader2 } from 'lucide-react';
 import { cn } from '~/utils/cn';
+import { useSmartText } from '~/utils/i18n';
 
 export interface DesignerToolbarProps {
   title: string;
@@ -50,7 +51,15 @@ export function DesignerToolbar({
   testId,
   saveButtonTestId,
 }: DesignerToolbarProps) {
+  const st = useSmartText();
   const showUndoRedo = onUndo || onRedo;
+  const undoLabel = st('$i18n:flow.toolbar.undo') || 'Undo';
+  const redoLabel = st('$i18n:flow.toolbar.redo') || 'Redo';
+  const unsavedLabel = st('$i18n:flow.toolbar.unsaved') || 'Unsaved';
+  const savingLabel = st('$i18n:flow.toolbar.saving') || 'Saving...';
+  const defaultSaveLabel = isSaving
+    ? savingLabel
+    : st('$i18n:flow.toolbar.save') || 'Save';
 
   return (
     <div
@@ -67,19 +76,22 @@ export function DesignerToolbar({
         {status && <StatusBadge status={status} />}
         {isDirty && !isSaving && (
           <span className="rounded bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700">
-            Unsaved
+            {unsavedLabel}
           </span>
         )}
         {isSaving && (
           <span className="flex items-center gap-1 rounded bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
             <Loader2 className="h-3 w-3 animate-spin" />
-            Saving...
+            {savingLabel}
           </span>
         )}
       </div>
 
       {/* Right: Undo/Redo + Custom children + Save */}
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+      <div
+        className="flex w-full shrink-0 flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end"
+        data-testid={testId ? `${testId}-actions` : 'toolbar-actions'}
+      >
         {showUndoRedo && (
           <>
             {onUndo && (
@@ -87,7 +99,7 @@ export function DesignerToolbar({
                 type="button"
                 onClick={onUndo}
                 disabled={!canUndo}
-                title="Undo (Ctrl+Z)"
+                title={`${undoLabel} (Ctrl+Z)`}
                 data-testid={testId ? `${testId}-btn-undo` : 'toolbar-btn-undo'}
                 className="rounded p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-30"
               >
@@ -99,7 +111,7 @@ export function DesignerToolbar({
                 type="button"
                 onClick={onRedo}
                 disabled={!canRedo}
-                title="Redo (Ctrl+Y)"
+                title={`${redoLabel} (Ctrl+Y)`}
                 data-testid={testId ? `${testId}-btn-redo` : 'toolbar-btn-redo'}
                 className="rounded p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-30"
               >
@@ -121,7 +133,7 @@ export function DesignerToolbar({
             className="flex shrink-0 items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium whitespace-nowrap text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            {saveLabel || (isSaving ? 'Saving...' : 'Save')}
+            {saveLabel || defaultSaveLabel}
           </button>
         )}
       </div>

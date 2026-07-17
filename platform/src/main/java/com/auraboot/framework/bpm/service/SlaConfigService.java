@@ -79,6 +79,7 @@ public class SlaConfigService {
                 .businessCalendar(request.businessCalendar() != null ? request.businessCalendar() : false)
                 .warningRules(request.warningRules())
                 .ruleBinding(request.ruleBinding())
+                .actionPolicy(request.actionPolicy())
                 .modelCode(request.modelCode())
                 .deadlineField(request.deadlineField())
                 .priorityField(request.priorityField())
@@ -109,6 +110,7 @@ public class SlaConfigService {
         if (request.businessCalendar() != null) entity.setBusinessCalendar(request.businessCalendar());
         if (request.warningRules() != null) entity.setWarningRules(request.warningRules());
         if (request.ruleBinding() != null) entity.setRuleBinding(request.ruleBinding());
+        if (request.actionPolicy() != null) entity.setActionPolicy(request.actionPolicy());
         if (request.modelCode() != null) entity.setModelCode(request.modelCode());
         if (request.deadlineField() != null) entity.setDeadlineField(request.deadlineField());
         if (request.priorityField() != null) entity.setPriorityField(request.priorityField());
@@ -137,20 +139,36 @@ public class SlaConfigService {
             String deadlineMode, String deadlineValue, Boolean businessCalendar,
             List<Map<String, Object>> warningRules,
             RuleConsumerBinding ruleBinding,
+            Map<String, Object> actionPolicy,
             String modelCode, String deadlineField, String priorityField,
-            String suspendPolicy) {}
+            String suspendPolicy) {
+        public CreateSlaConfigRequest(
+                String name, String targetType, String targetKey, String domainCode,
+                String deadlineMode, String deadlineValue, Boolean businessCalendar,
+                List<Map<String, Object>> warningRules,
+                RuleConsumerBinding ruleBinding,
+                String modelCode, String deadlineField, String priorityField,
+                String suspendPolicy) {
+            this(name, targetType, targetKey, domainCode, deadlineMode, deadlineValue,
+                    businessCalendar, warningRules, ruleBinding, null, modelCode, deadlineField,
+                    priorityField, suspendPolicy);
+        }
+    }
 
     /**
-     * Upsert an SLA config from a plugin import DTO. Uses {@code (tenantId, name)}
-     * as the unique key (the entity has no dedicated code column). Existing rows
-     * are updated in place (preserving pid); missing rows are inserted.
+     * Upsert an SLA config from a plugin import DTO.
+     *
+     * <p>Display names are localized, so import identity must not be based on
+     * {@code name}. Prefer {@code slaKey} / {@code ruleBinding.consumerCode};
+     * fall back to the target tuple for older seeds that do not carry a stable
+     * key. If earlier imports created duplicate rows, keep the oldest row and
+     * soft-delete the later duplicates.
      */
     @Transactional
     public SlaConfigEntity importSlaConfig(SlaConfigDefinitionDTO dto) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        SlaConfigEntity existing = slaConfigMapper.selectOne(new QueryWrapper<SlaConfigEntity>()
-                .eq("tenant_id", tenantId)
-                .eq("name", dto.getName()));
+        List<SlaConfigEntity> matches = findImportMatches(tenantId, dto);
+        SlaConfigEntity existing = matches.isEmpty() ? null : matches.get(0);
 
         Instant now = Instant.now();
         if (existing == null) {
@@ -166,6 +184,7 @@ public class SlaConfigService {
                     .businessCalendar(dto.getBusinessCalendar() != null ? dto.getBusinessCalendar() : Boolean.FALSE)
                     .warningRules(dto.getWarningRules())
                     .ruleBinding(dto.getRuleBinding())
+                    .actionPolicy(dto.getActionPolicy())
                     .modelCode(dto.getModelCode())
                     .deadlineField(dto.getDeadlineField())
                     .priorityField(dto.getPriorityField())
@@ -181,6 +200,17 @@ public class SlaConfigService {
             return entity;
         }
 
+        for (int i = 1; i < matches.size(); i++) {
+            SlaConfigEntity duplicate = matches.get(i);
+            if (duplicate.getId() != null) {
+                slaConfigMapper.deleteById(duplicate.getId());
+                usageIndexService.deleteSource("SLA_RULE", duplicate.getPid());
+                log.warn("Removed duplicate imported SLA config: keptPid={}, duplicatePid={}, name={}",
+                        existing.getPid(), duplicate.getPid(), duplicate.getName());
+            }
+        }
+
+        existing.setName(dto.getName());
         existing.setTargetType(dto.getTargetType());
         existing.setTargetKey(dto.getTargetKey());
         existing.setDomainCode(dto.getDomainCode());
@@ -189,6 +219,7 @@ public class SlaConfigService {
         if (dto.getBusinessCalendar() != null) existing.setBusinessCalendar(dto.getBusinessCalendar());
         existing.setWarningRules(dto.getWarningRules());
         existing.setRuleBinding(dto.getRuleBinding());
+        existing.setActionPolicy(dto.getActionPolicy());
         existing.setModelCode(dto.getModelCode());
         existing.setDeadlineField(dto.getDeadlineField());
         existing.setPriorityField(dto.getPriorityField());
@@ -201,11 +232,75 @@ public class SlaConfigService {
         return existing;
     }
 
+    private List<SlaConfigEntity> findImportMatches(Long tenantId, SlaConfigDefinitionDTO dto) {
+        String stableKey = importStableKey(dto);
+        if (StringUtils.hasText(stableKey)) {
+            List<SlaConfigEntity> byConsumerCode = slaConfigMapper.selectList(new QueryWrapper<SlaConfigEntity>()
+                    .eq("tenant_id", tenantId)
+                    .eq("deleted_flag", false)
+                    .apply("rule_binding ->> 'consumerCode' = {0}", stableKey)
+                    .orderByAsc("id"));
+            if (byConsumerCode != null && !byConsumerCode.isEmpty()) {
+                return byConsumerCode;
+            }
+        }
+
+        if (StringUtils.hasText(dto.getTargetType()) && StringUtils.hasText(dto.getTargetKey())) {
+            QueryWrapper<SlaConfigEntity> targetWrapper = new QueryWrapper<SlaConfigEntity>()
+                    .eq("tenant_id", tenantId)
+                    .eq("deleted_flag", false)
+                    .eq("target_type", dto.getTargetType())
+                    .eq("target_key", dto.getTargetKey())
+                    .orderByAsc("id");
+            if (StringUtils.hasText(dto.getDomainCode())) {
+                targetWrapper.eq("domain_code", dto.getDomainCode());
+            }
+            List<SlaConfigEntity> byTarget = slaConfigMapper.selectList(targetWrapper);
+            if (byTarget != null && !byTarget.isEmpty()) {
+                return byTarget;
+            }
+        }
+
+        if (!StringUtils.hasText(dto.getName())) {
+            return List.of();
+        }
+        List<SlaConfigEntity> byName = slaConfigMapper.selectList(new QueryWrapper<SlaConfigEntity>()
+                .eq("tenant_id", tenantId)
+                .eq("deleted_flag", false)
+                .eq("name", dto.getName())
+                .orderByAsc("id"));
+        return byName == null ? List.of() : byName;
+    }
+
+    private String importStableKey(SlaConfigDefinitionDTO dto) {
+        if (StringUtils.hasText(dto.getSlaKey())) {
+            return dto.getSlaKey();
+        }
+        RuleConsumerBinding binding = dto.getRuleBinding();
+        if (binding != null && StringUtils.hasText(binding.consumerCode())) {
+            return binding.consumerCode();
+        }
+        return null;
+    }
+
     public record UpdateSlaConfigRequest(
             String name, String targetType, String targetKey, String domainCode,
             String deadlineMode, String deadlineValue, Boolean businessCalendar,
             List<Map<String, Object>> warningRules,
             RuleConsumerBinding ruleBinding,
+            Map<String, Object> actionPolicy,
             String modelCode, String deadlineField, String priorityField,
-            String suspendPolicy, Boolean enabled) {}
+            String suspendPolicy, Boolean enabled) {
+        public UpdateSlaConfigRequest(
+                String name, String targetType, String targetKey, String domainCode,
+                String deadlineMode, String deadlineValue, Boolean businessCalendar,
+                List<Map<String, Object>> warningRules,
+                RuleConsumerBinding ruleBinding,
+                String modelCode, String deadlineField, String priorityField,
+                String suspendPolicy, Boolean enabled) {
+            this(name, targetType, targetKey, domainCode, deadlineMode, deadlineValue,
+                    businessCalendar, warningRules, ruleBinding, null, modelCode, deadlineField,
+                    priorityField, suspendPolicy, enabled);
+        }
+    }
 }

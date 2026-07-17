@@ -428,7 +428,9 @@ describe('canonicalizePageSchemaDto', () => {
   it('keeps DecisionOps connector row actions as governance and platform-management links', () => {
     const root = resolve(process.cwd(), '..');
     const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
-    const page = readPages(pagesFile).find((candidate) => candidate.pageKey === 'decisionops_connectors_list');
+    const page = readPages(pagesFile).find(
+      (candidate) => candidate.pageKey === 'decisionops_connectors_list',
+    );
 
     expect(page).toBeDefined();
 
@@ -458,7 +460,9 @@ describe('canonicalizePageSchemaDto', () => {
   it('keeps DecisionOps data-model row actions scoped to field impact', () => {
     const root = resolve(process.cwd(), '..');
     const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
-    const page = readPages(pagesFile).find((candidate) => candidate.pageKey === 'decisionops_model_fields_list');
+    const page = readPages(pagesFile).find(
+      (candidate) => candidate.pageKey === 'decisionops_model_fields_list',
+    );
 
     expect(page).toBeDefined();
 
@@ -480,7 +484,9 @@ describe('canonicalizePageSchemaDto', () => {
     const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
     const pages = readPages(pagesFile);
     const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_webhooks_list');
-    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_webhooks_detail');
+    const detailPage = pages.find(
+      (candidate) => candidate.pageKey === 'decisionops_webhooks_detail',
+    );
 
     expect(listPage).toBeDefined();
     expect(detailPage).toBeDefined();
@@ -505,7 +511,7 @@ describe('canonicalizePageSchemaDto', () => {
         to: '/p/webhook',
       },
     });
-    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+    expect(detailPage!.blocks?.[0] as any).toMatchObject({
       component: 'DecisionIntegrationImpactBlock',
       props: {
         targetType: 'WEBHOOK',
@@ -518,8 +524,12 @@ describe('canonicalizePageSchemaDto', () => {
     const root = resolve(process.cwd(), '..');
     const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
     const pages = readPages(pagesFile);
-    const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_definitions_list');
-    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_definitions_detail');
+    const listPage = pages.find(
+      (candidate) => candidate.pageKey === 'decisionops_definitions_list',
+    );
+    const detailPage = pages.find(
+      (candidate) => candidate.pageKey === 'decisionops_definitions_detail',
+    );
 
     expect(listPage).toBeDefined();
     expect(detailPage).toBeDefined();
@@ -538,7 +548,7 @@ describe('canonicalizePageSchemaDto', () => {
     expect(rowActions.map((action: any) => action.action?.to)).not.toEqual(
       expect.arrayContaining(['/decision-ops']),
     );
-    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+    expect(detailPage!.blocks?.[0] as any).toMatchObject({
       component: 'DecisionDefinitionActionsBlock',
       props: {
         mode: 'detail',
@@ -570,12 +580,30 @@ describe('canonicalizePageSchemaDto', () => {
         valueField: 'rule_binding',
         consumerType: 'SLA',
         initialDecisionCode: 'complaint_sla_deadline',
+        fieldCatalogMode: 'merge',
+      },
+    });
+    expect(schema.blocks.find((block: any) => block.id === 'sla_action_policy')).toMatchObject({
+      blockType: 'custom',
+      component: 'DecisionActionPlanBlock',
+      props: {
+        valueField: 'action_policy',
+        title: '超时后动作',
+        triggerLabel: 'SLA 超时',
+        fieldCatalogModelCodeField: 'model_code',
       },
     });
 
     const detailSchema = canonicalizePageSchemaDto(detailPage!);
     expect(validateStructure(detailSchema)).toEqual([]);
     expect(detailSchema.kind).toBe('detail');
+    expect(detailSchema.extension).toMatchObject({
+      dataSource: {
+        type: 'api',
+        endpoint: '/api/bpm/sla-configs/{pid}',
+        method: 'get',
+      },
+    });
     expect(detailSchema.extension).toMatchObject({
       showShare: false,
       showReport: false,
@@ -603,27 +631,56 @@ describe('canonicalizePageSchemaDto', () => {
       blockType: 'form-section',
       readOnly: true,
     });
-    expect(detailSchema.blocks.find((block: any) => block.id === 'sla_rule_binding')).toMatchObject({
+    expect(detailSchema.blocks.find((block: any) => block.id === 'sla_rule_binding')).toMatchObject(
+      {
+        blockType: 'custom',
+        component: 'DecisionRuleBindingBlock',
+        props: {
+          mode: 'decision',
+          valueField: 'rule_binding',
+          consumerType: 'SLA',
+          readOnly: true,
+          variant: 'summary',
+          showTestRunner: false,
+        },
+      },
+    );
+    expect(
+      detailSchema.blocks.find((block: any) => block.id === 'sla_action_policy'),
+    ).toMatchObject({
       blockType: 'custom',
-      component: 'DecisionRuleBindingBlock',
+      component: 'DecisionActionPlanBlock',
       props: {
-        mode: 'decision',
-        valueField: 'rule_binding',
-        consumerType: 'SLA',
+        valueField: 'action_policy',
         readOnly: true,
-        variant: 'summary',
-        showTestRunner: false,
+        logsUrl: '/p/decisionops_execution_logs?callerType=SLA&callerRef={pid}',
       },
     });
+
+    const fields = JSON.parse(
+      readFileSync(resolve(root, 'plugins/platform-admin/config/fields.json'), 'utf8'),
+    );
+    expect(fields.find((field: any) => field.code === 'action_policy')).toMatchObject({
+      code: 'action_policy',
+      dataType: 'jsonb',
+    });
+
+    const commands = JSON.parse(
+      readFileSync(resolve(root, 'plugins/platform-admin/config/commands.json'), 'utf8'),
+    );
+    expect(
+      commands.find((command: any) => command.code === 'admin:create_sla_config')?.inputFields,
+    ).toContain('action_policy');
+    expect(
+      commands.find((command: any) => command.code === 'admin:update_sla_config')?.inputFields,
+    ).toContain('action_policy');
   });
 
   it('keeps the BPM process list aligned with the imported model field contract', () => {
     const root = resolve(process.cwd(), '..');
     const pagesFile = resolve(root, 'plugins/platform-admin/config/pages.json');
     const pages = readPages(pagesFile);
-    const listPage = pages.find(
-      (candidate) => candidate.pageKey === 'bpm_process_management_list',
-    );
+    const listPage = pages.find((candidate) => candidate.pageKey === 'bpm_process_management_list');
 
     expect(listPage).toBeDefined();
 
@@ -640,7 +697,73 @@ describe('canonicalizePageSchemaDto', () => {
     expect(fields).toEqual(expect.arrayContaining(['process_key', 'process_name', 'deployed_at']));
     expect(fields).not.toEqual(expect.arrayContaining(['processKey', 'processName', 'deployedAt']));
     expect(columns.find((column: any) => column.field === 'status')).toMatchObject({
-      dictCode: 'member_status',
+      dictCode: 'bpm_process_status',
+    });
+    expect(tableBlock.detailUrl).toBe('/p/bpm_process_management/edit/{pid}');
+    expect(tableBlock.rowActions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'configure_rules',
+          action: {
+            type: 'navigate',
+            to: '/p/bpm_process_management/edit/{pid}',
+          },
+        }),
+        expect.objectContaining({
+          code: 'open_bpmn_designer',
+          action: {
+            type: 'navigate',
+            to: '/bpmn-designer?pid={pid}',
+          },
+        }),
+      ]),
+    );
+  });
+
+  it('uses the BPM process status dictionary on the process configuration form', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/platform-admin/config/pages.json');
+    const pages = readPages(pagesFile);
+    const formPage = pages.find((candidate) => candidate.pageKey === 'bpm_process_management_form');
+    const schema = canonicalizePageSchemaDto(formPage!);
+    const formSection = schema.blocks.find((block: any) => block.id === 'process_identity') as any;
+    const statusField = formSection.fields.find((field: any) => field.field === 'status');
+
+    expect(statusField).toMatchObject({
+      dictCode: 'bpm_process_status',
+      readonly: true,
+    });
+  });
+
+  it('keeps the BPM process edit route from falling back to an auto-created stub page', () => {
+    const root = resolve(process.cwd(), '..');
+    const pagesFile = resolve(root, 'plugins/platform-admin/config/pages.json');
+    const pages = readPages(pagesFile);
+    const formPage = pages.find((candidate) => candidate.pageKey === 'bpm_process_management_form');
+
+    expect(formPage).toBeDefined();
+
+    const schema = canonicalizePageSchemaDto(formPage!);
+    const customBlock = schema.blocks.find((block: any) => block.blockType === 'custom') as any;
+    const toolbarBlock = schema.blocks.find((block: any) => block.blockType === 'toolbar') as any;
+
+    expect(customBlock).toMatchObject({
+      component: 'DecisionRuleBindingBlock',
+      props: {
+        consumerType: 'BPM',
+        initialDecisionCode: 'approval_routing',
+        showImpactPreview: true,
+        showTestRunner: true,
+        fieldCatalogMode: 'fallback',
+      },
+    });
+    expect(
+      toolbarBlock.buttons.find((button: any) => button.code === 'open_bpmn_designer'),
+    ).toMatchObject({
+      action: {
+        type: 'navigate',
+        to: '/bpmn-designer?pid={pid}',
+      },
     });
   });
 
@@ -669,9 +792,15 @@ describe('canonicalizePageSchemaDto', () => {
     const root = resolve(process.cwd(), '..');
     const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
     const pages = readPages(pagesFile);
-    const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policies_list');
-    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policies_detail');
-    const designerPage = pages.find((candidate) => candidate.pageKey === 'decisionops_event_policy_designer_list');
+    const listPage = pages.find(
+      (candidate) => candidate.pageKey === 'decisionops_event_policies_list',
+    );
+    const detailPage = pages.find(
+      (candidate) => candidate.pageKey === 'decisionops_event_policies_detail',
+    );
+    const designerPage = pages.find(
+      (candidate) => candidate.pageKey === 'decisionops_event_policy_designer_list',
+    );
 
     expect(listPage).toBeDefined();
     expect(detailPage).toBeDefined();
@@ -680,11 +809,15 @@ describe('canonicalizePageSchemaDto', () => {
     const listSchema = canonicalizePageSchemaDto(listPage!);
     const tableBlock = listSchema.blocks.find((block: any) => block.blockType === 'table') as any;
     const rowActions = tableBlock.table.rowActions;
+    const tableFields = tableBlock.table.columns.map((column: any) => column.field);
 
     expect(listSchema.blocks[0]).toMatchObject({
       component: 'EventPolicyActionsBlock',
       props: { mode: 'list' },
     });
+    expect(tableFields).not.toEqual(
+      expect.arrayContaining(['policyCode', 'targetType', 'targetKey', 'owner']),
+    );
     expect(rowActions.map((action: any) => action.code)).toEqual(['detail', 'design', 'logs']);
     expect(rowActions.find((action: any) => action.code === 'design')).toMatchObject({
       action: {
@@ -695,11 +828,20 @@ describe('canonicalizePageSchemaDto', () => {
     expect(rowActions.map((action: any) => action.action?.to)).not.toEqual(
       expect.arrayContaining(['/decision-ops']),
     );
-    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+    expect(detailPage!.blocks?.[0] as any).toMatchObject({
       component: 'EventPolicyActionsBlock',
       props: { mode: 'detail' },
     });
-    expect((designerPage!.blocks?.[0] as any)).toMatchObject({
+    expect(detailPage!.blocks).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          component: 'EventPolicyDesignerBlock',
+          detailPlacement: 'header',
+          props: { mode: 'detail' },
+        }),
+      ]),
+    );
+    expect(designerPage!.blocks?.[0] as any).toMatchObject({
       component: 'EventPolicyDesignerBlock',
     });
     expect((designerPage!.extension as any).customOnly).toBe(true);
@@ -709,8 +851,12 @@ describe('canonicalizePageSchemaDto', () => {
     const root = resolve(process.cwd(), '..');
     const pagesFile = resolve(root, 'plugins/core-decisionops/config/pages.json');
     const pages = readPages(pagesFile);
-    const listPage = pages.find((candidate) => candidate.pageKey === 'decisionops_execution_logs_list');
-    const detailPage = pages.find((candidate) => candidate.pageKey === 'decisionops_execution_logs_detail');
+    const listPage = pages.find(
+      (candidate) => candidate.pageKey === 'decisionops_execution_logs_list',
+    );
+    const detailPage = pages.find(
+      (candidate) => candidate.pageKey === 'decisionops_execution_logs_detail',
+    );
 
     expect(listPage).toBeDefined();
     expect(detailPage).toBeDefined();
@@ -726,7 +872,7 @@ describe('canonicalizePageSchemaDto', () => {
       },
     });
     expect(JSON.stringify(listPage)).not.toContain('/decision-ops');
-    expect((detailPage!.blocks?.[0] as any)).toMatchObject({
+    expect(detailPage!.blocks?.[0] as any).toMatchObject({
       component: 'ExecutionLogTraceBlock',
       props: { mode: 'detail' },
     });
@@ -753,12 +899,11 @@ describe('canonicalizePageSchemaDto', () => {
     const filterBlock = schema.blocks.find((block: any) => block.blockType === 'filters') as any;
     const tableBlock = schema.blocks.find((block: any) => block.blockType === 'table') as any;
     const columns = tableBlock.table.columns.map((column: any) => column.field);
-    const replayAction = tableBlock.table.rowActions.find((action: any) => action.code === 'replay');
+    const replayAction = tableBlock.table.rowActions.find(
+      (action: any) => action.code === 'replay',
+    );
 
-    expect(filterBlock.fields.map((field: any) => field.field)).toEqual([
-      'reason',
-      'replayStatus',
-    ]);
+    expect(filterBlock.fields.map((field: any) => field.field)).toEqual(['reason', 'replayStatus']);
     expect(columns).toEqual(
       expect.arrayContaining(['reason', 'replayStatus', 'eventId', 'detail', 'rawEvent']),
     );

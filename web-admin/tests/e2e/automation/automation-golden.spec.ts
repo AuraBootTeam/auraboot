@@ -33,19 +33,29 @@
 import { test, expect } from '../../fixtures';
 import { acquireE2etOrderLock, releaseE2etOrderLock } from './_e2et-order-lock';
 import { uniqueId } from '../helpers/index';
+import { BACKEND_URL } from '../../helpers/environments';
 
 const MODEL_CODE = 'e2et_order';
 const CREATE_COMMAND = 'e2eto:create_e2et_order';
 const POLL_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
 
-// A reachable, no-auth, HTTP-200 URL for the real call_api round-trip. Default targets
-// the docker GA E2E stack (backend /actuator/health on the non-blocked port 6444,
-// reached container→host via host.docker.internal). NOTE the backend's own port 6443
-// is in SsrfValidator.BLOCKED_PORTS by design (anti-SSRF) — never target it. For a
-// host-mode run, set E2E_CALLAPI_OK_URL=http://127.0.0.1:3500/health (the BFF; 3500 is
-// not blocked) and start the backend with AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1.
-const CALLAPI_OK_URL = process.env.E2E_CALLAPI_OK_URL || 'http://host.docker.internal:6444/actuator/health';
+function backendUrlForGolden(): URL | null {
+  const raw = BACKEND_URL;
+  if (!raw) return null;
+  try {
+    return new URL(raw);
+  } catch {
+    return null;
+  }
+}
+
+// A reachable, no-auth, HTTP-200 URL for the real call_api round-trip. With
+// BACKEND_URL set, derive the host-mode target from the live backend; otherwise keep
+// the Docker GA default (host.docker.internal:6444). Host-mode runs must start the
+// backend with AURA_SSRF_ALLOWED_PRIVATE_HOSTS containing that host.
+const goldenBackendUrl = backendUrlForGolden();
+const CALLAPI_OK_URL = process.env.E2E_CALLAPI_OK_URL || (goldenBackendUrl ? new URL('/actuator/health', goldenBackendUrl).toString() : 'http://host.docker.internal:6444/actuator/health');
 
 // ---------------------------------------------------------------------------
 // API helpers — setup + poll only. UI assertions are real browser interactions.

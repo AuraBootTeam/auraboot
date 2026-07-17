@@ -44,6 +44,16 @@ describe('runtime component loaders', () => {
     expect(getRuntimeComponentEntry('decision-rule-binding')).toBeDefined();
   });
 
+  it('registers the DecisionOps action plan custom block', () => {
+    expect(getRuntimeComponentEntry('DecisionActionPlanBlock')).toBeDefined();
+    expect(getRuntimeComponentEntry('decision-action-plan')).toBeDefined();
+  });
+
+  it('registers the DecisionOps condition fragment library custom block', () => {
+    expect(getRuntimeComponentEntry('ConditionFragmentLibraryBlock')).toBeDefined();
+    expect(getRuntimeComponentEntry('decision-condition-fragment-library')).toBeDefined();
+  });
+
   it('registers the organization team members custom block', () => {
     expect(getRuntimeComponentEntry('TeamMembersBlock')).toBeDefined();
     expect(getRuntimeComponentEntry('team-members')).toBeDefined();

@@ -1,6 +1,11 @@
 package com.auraboot.framework.eventpolicy;
 
 import com.auraboot.framework.decision.ast.DecisionContext;
+import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
+import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
+import com.auraboot.framework.decision.dto.DrtVersionDTO;
+import com.auraboot.framework.decision.model.VersionStatus;
+import com.auraboot.framework.decision.model.DecisionValidateResult;
 import com.auraboot.framework.eventpolicy.entity.DrtPolicyVersionEntity;
 import com.auraboot.framework.eventpolicy.executor.ActionHandler;
 import com.auraboot.framework.eventpolicy.executor.ActionExecutionStatus;
@@ -14,6 +19,8 @@ import com.auraboot.framework.eventpolicy.model.FailureStrategy;
 import com.auraboot.framework.eventpolicy.model.MatchMode;
 import com.auraboot.framework.eventpolicy.model.PolicyPhase;
 import com.auraboot.framework.eventpolicy.model.ResolvedActionPlan;
+import com.auraboot.framework.decision.service.DecisionVersionService;
+import com.auraboot.framework.decision.service.DrtDefinitionService;
 import com.auraboot.framework.eventpolicy.service.EventPolicyDefinitionService;
 import com.auraboot.framework.eventpolicy.service.EventPolicyRuntimeService;
 import com.auraboot.framework.eventpolicy.service.EventPolicyVersionService;
@@ -54,10 +61,16 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
                 @Override public void execute(ResolvedActionPlan plan, DecisionContext ctx) {
                     NOTIFY_INVOCATIONS.incrementAndGet();
                 }
+                @Override public Map<String, Object> executeWithResult(ResolvedActionPlan plan, DecisionContext ctx) {
+                    NOTIFY_INVOCATIONS.incrementAndGet();
+                    return Map.of("sentCount", 1, "channel", "test", "target", plan.target());
+                }
             };
         }
     }
 
+    @Autowired private DrtDefinitionService decisionDefinitionService;
+    @Autowired private DecisionVersionService decisionVersionService;
     @Autowired private EventPolicyDefinitionService definitionService;
     @Autowired private EventPolicyVersionService versionService;
     @Autowired private EventPolicyRuntimeService runtimeService;
@@ -91,6 +104,73 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
                 "data", Map.of("priority", priority)));
     }
 
+    private JsonNode amountGtAst(int threshold) throws Exception {
+        return mapper.readTree(("""
+            { "type": "compare",
+              "left": { "type": "path", "scope": "record", "path": "data.amount", "dataType": "decimal" },
+              "operator": "GT",
+              "right": { "type": "literal", "value": %d, "dataType": "decimal" } }
+            """).formatted(threshold));
+    }
+
+    private void createPublishedDecision(String decisionCode) throws Exception {
+        DrtDefinitionCreateRequest def = new DrtDefinitionCreateRequest();
+        def.setDecisionCode(decisionCode);
+        def.setDecisionName("Run+Exec Decision " + decisionCode);
+        def.setScopeType("EVENT_POLICY");
+        def.setOwnerModule("decision");
+        decisionDefinitionService.create(def);
+
+        DrtVersionCreateRequest version = new DrtVersionCreateRequest();
+        version.setKind("SIMPLE_CONDITION");
+        version.setRuntimeAdapter("AST_EVALUATOR");
+        version.setContentJson(amountGtAst(10000));
+        DrtVersionDTO draft = decisionVersionService.createDraft(decisionCode, version);
+
+        DecisionValidateResult validation = decisionVersionService.validate(draft.getPid());
+        assertThat(validation.valid()).isTrue();
+
+        DrtVersionDTO published = decisionVersionService.publish(draft.getPid());
+        assertThat(published.getStatus()).isEqualTo(VersionStatus.PUBLISHED.name());
+    }
+
+    private void publishDecisionBoundNotifyPolicy(String code, String targetKey, String decisionCode) throws Exception {
+        definitionService.create(code, "Run+Exec Decision Policy", "FORM_SUBMITTED", "FORM", targetKey);
+
+        JsonNode rulesJson = mapper.readTree(("""
+            [{
+              "ruleCode":"R-DECISION-NOTIFY",
+              "ruleName":"decision matched notify",
+              "priority":100,
+              "enabled":true,
+              "decisionBinding":{
+                "decisionCode":"%s",
+                "versionPolicy":"LATEST_PUBLISHED",
+                "inputMappings":[
+                  {"input":"amount","source":{"kind":"FIELD","scope":"record","path":"data.amount"}}
+                ],
+                "fallbackPolicy":{"mode":"FAIL_CLOSED","reason":"Decision evaluation failed"},
+                "enabled":true
+              },
+              "actions":[{"type":"TEST_NOTIFY","target":"ROLE:mgr","order":10,"payload":{},
+                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:NOTIFY"}]}]
+            """).formatted(decisionCode));
+
+        DrtPolicyVersionEntity draft = versionService.createDraft(
+                code, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL, ExecutionMode.ORDERED,
+                FailureStrategy.CONTINUE_ON_ERROR, ConflictStrategy.REJECT_ON_CONFLICT,
+                DedupStrategy.BY_IDEMPOTENCY_KEY, rulesJson);
+        versionService.validate(draft.getPid());
+        versionService.publish(draft.getPid());
+    }
+
+    private Map<String, Map<String, Object>> decisionCtx(String targetKey, String recordPid, int amount) {
+        return Map.of("record", Map.of(
+                "entityCode", targetKey,
+                "recordPid", recordPid,
+                "data", Map.of("amount", amount)));
+    }
+
     @Test
     void runAndExecute_dispatchesToHandler_andLogsIdempotency() throws Exception {
         int before = NOTIFY_INVOCATIONS.get();
@@ -113,6 +193,48 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
                 "select count(*) from ab_drt_policy_exec_log where tenant_id = ? and idempotency_key = ? and status = 'SUCCESS'",
                 Integer.class, getTestTenant().getId(), key);
         assertThat(rows).isEqualTo(1);
+
+        Integer policyRows = jdbcTemplate.queryForObject(
+                "select count(*) from ab_drt_policy_exec_log where tenant_id = ? and idempotency_key = ? and policy_code = ?",
+                Integer.class, getTestTenant().getId(), key, code);
+        assertThat(policyRows).isEqualTo(1);
+    }
+
+    @Test
+    void runAndExecute_linksActionLogToDecisionTraceAndPolicyCorrelation() throws Exception {
+        int before = NOTIFY_INVOCATIONS.get();
+        String decisionCode = "it_runexec_decision_" + System.nanoTime();
+        String code = "it_runexec_trace_" + System.nanoTime();
+        String targetKey = code + "_form";
+        String recordPid = "CMP-TRACE-" + System.nanoTime();
+        createPublishedDecision(decisionCode);
+        publishDecisionBoundNotifyPolicy(code, targetKey, decisionCode);
+
+        EventPolicyExecutionResult r = runtimeService.runAndExecute(
+                "FORM_SUBMITTED", "FORM", targetKey, decisionCtx(targetKey, recordPid, 20000));
+
+        assertThat(r.policy().status()).isEqualTo(EventPolicyResult.Status.MATCHED);
+        assertThat(r.policy().correlationId()).isNotBlank();
+        assertThat(r.policy().decisionTraceIds()).hasSize(1);
+        assertThat(r.execution().overallStatus()).isEqualTo(PolicyExecutionResult.OverallStatus.ALL_SUCCESS);
+        assertThat(NOTIFY_INVOCATIONS.get()).isEqualTo(before + 1);
+
+        String key = r.execution().actions().get(0).idempotencyKey();
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "select decision_trace_id, correlation_id, result_payload from ab_drt_policy_exec_log "
+                        + "where tenant_id = ? and idempotency_key = ?",
+                getTestTenant().getId(), key);
+        assertThat(row.get("decision_trace_id")).isEqualTo(r.policy().decisionTraceIds().get(0));
+        assertThat(row.get("correlation_id")).isEqualTo(r.policy().correlationId());
+        assertThat(String.valueOf(row.get("result_payload"))).contains("sentCount").contains("channel");
+
+        Integer decisionRows = jdbcTemplate.queryForObject(
+                "select count(*) from ab_drt_log where tenant_id = ? and trace_id = ? and correlation_id = ?",
+                Integer.class,
+                getTestTenant().getId(),
+                r.policy().decisionTraceIds().get(0),
+                r.policy().correlationId());
+        assertThat(decisionRows).isEqualTo(1);
     }
 
     @Test

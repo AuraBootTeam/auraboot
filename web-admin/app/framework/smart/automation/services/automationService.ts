@@ -52,6 +52,7 @@ export interface ActionResult {
  * Automation execution log entry
  */
 export interface AutomationLog {
+  id?: number;
   pid: string;
   automationId: string;
   automationName?: string;

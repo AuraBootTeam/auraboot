@@ -9,7 +9,11 @@
  */
 
 import React from 'react';
-import { profileRegistry, type RenderProfile } from '@auraboot/runtime-kernel';
+import { profileRegistry, type BlockRendererProps, type RenderProfile } from '@auraboot/runtime-kernel';
+import { initBlockRegistry } from '~/ui/schema-renderer/BlockRegistry';
+import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
+
+initBlockRegistry();
 
 // Lazy block renderers — each block type is a separate chunk
 const FormBlockRenderer = React.lazy(() =>
@@ -79,6 +83,19 @@ const DetailPageContent = React.lazy(() =>
     default: m.DetailPageContent,
   })),
 );
+const CustomBlockRenderer = ({ block, runtime }: BlockRendererProps) => {
+  if (!block?.component) {
+    return React.createElement(
+      'div',
+      { className: 'border-status-red bg-status-red-bg rounded border p-4' },
+      React.createElement('p', { className: 'text-red-800' }, 'Custom block missing component'),
+    );
+  }
+  return React.createElement(ComponentLoader, {
+    componentName: block.component,
+    props: { block, runtime },
+  });
+};
 // Skeletons stay static — they're tiny and shown during lazy loading
 import { ListPageSkeleton } from '~/framework/meta/rendering/skeletons/ListPageSkeleton';
 import { FormPageSkeleton } from '~/framework/meta/rendering/skeletons/FormPageSkeleton';
@@ -125,6 +142,7 @@ const adminProfile: RenderProfile = {
     ['chart-card', ChartBlockRenderer],
     ['selection-info', SelectionInfoBlockRenderer],
     ['tabs', TabsBlockRenderer],
+    ['custom', CustomBlockRenderer],
     // tabs, sub-table, monthly-grid are handled inline by page renderers
   ]),
 

@@ -36,11 +36,16 @@ export interface GraphDocumentValidationResult {
   errors: GraphDocumentValidationError[];
 }
 
-const ajv = new Ajv({ allErrors: true, strict: false });
+const ajv = new Ajv({ allErrors: true });
 let compiled: ValidateFunction | null = null;
 function getValidator(): ValidateFunction {
   if (!compiled) compiled = ajv.compile(graphDocumentSchema);
   return compiled;
+}
+
+function ajvPath(err: ErrorObject): string {
+  const compat = err as ErrorObject & { instancePath?: string; dataPath?: string };
+  return compat.instancePath || compat.dataPath || '/';
 }
 
 function ajvErrorToCode(err: ErrorObject): string {
@@ -67,7 +72,7 @@ function ajvErrorToCode(err: ErrorObject): string {
 }
 
 function ajvErrorToMessage(err: ErrorObject): string {
-  if (err.keyword === 'not' && err.instancePath.endsWith('/data')) {
+  if (err.keyword === 'not' && ajvPath(err).endsWith('/data')) {
     return 'data.type sub-discriminator is retired by grammar spec §3.2 (use top-level node.type)';
   }
   if (err.keyword === 'required') {
@@ -228,7 +233,7 @@ export function validateGraphDocument(doc: unknown): GraphDocumentValidationResu
       errors.push({
         code: ajvErrorToCode(err),
         message: ajvErrorToMessage(err),
-        path: err.instancePath || '/',
+        path: ajvPath(err),
       });
     }
   }

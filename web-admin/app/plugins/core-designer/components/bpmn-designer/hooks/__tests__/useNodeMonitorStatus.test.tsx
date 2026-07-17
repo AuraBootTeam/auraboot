@@ -66,6 +66,20 @@ describe('useNodeMonitorStatus (B2c phase3 batch1 — via useBpmFlowStore)', () 
     expect(result.current).toBe('completed');
   });
 
+  it('returns "failed" when node status is failed', () => {
+    act(() => {
+      useBpmFlowStore.setState({
+        viewMode: 'monitor',
+        instanceStatus: {
+          currentNodes: [{ nodeId: 'node-1', status: 'failed' }],
+          completedNodes: [],
+        } as any,
+      });
+    });
+    const { result } = renderHook(() => useNodeMonitorStatus('node-1'));
+    expect(result.current).toBe('failed');
+  });
+
   it('returns "idle" when node is neither current nor completed', () => {
     act(() => {
       useBpmFlowStore.setState({

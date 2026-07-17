@@ -211,6 +211,8 @@
         "namedQueries": { "type": "string" },
         "rules": { "type": "string" },
         "decisionDefinitions": { "type": "string" },
+        "conditionFragments": { "type": "string" },
+        "eventPolicies": { "type": "string" },
         "automations": { "type": "string" },
         "sla": { "type": "string" },
         "savedViews": { "type": "string" },
@@ -725,6 +727,10 @@
         "extension": {
           "type": "object",
           "description": "Extension properties"
+        },
+        "policySchema": {
+          "type": "object",
+          "description": "Policy schema for configurable permission policies and dynamic ABAC"
         }
       },
       "additionalProperties": false
@@ -1549,6 +1555,33 @@
           "type": "array",
           "description": "Permission codes assigned to this role",
           "items": { "type": "string" }
+        },
+        "permissionPolicies": {
+          "type": "array",
+          "description": "Policy values attached to specific role-permission bindings",
+          "items": {
+            "type": "object",
+            "required": ["permissionCode", "conditions"],
+            "properties": {
+              "permissionCode": {
+                "type": "string",
+                "description": "Permission code whose role binding receives the policy conditions"
+              },
+              "conditions": {
+                "type": "object",
+                "description": "Policy values / Rule Center ABAC binding stored in ab_role_permission.conditions"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "seedMembers": {
+          "type": "array",
+          "description": "Optional seed member refs assigned during plugin import. Supported value: CURRENT_MEMBER.",
+          "items": {
+            "type": "string",
+            "enum": ["CURRENT_MEMBER"]
+          }
         },
         "priority": {
           "type": "integer",

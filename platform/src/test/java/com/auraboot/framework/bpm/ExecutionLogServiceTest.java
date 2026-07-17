@@ -253,4 +253,48 @@ class ExecutionLogServiceTest extends BaseIntegrationTest {
 
         log.info("EXECLOG-10 PASSED: errorStack length={} (<=4000)", logEntry.getErrorStack().length());
     }
+
+    @Test
+    @Order(11)
+    @DisplayName("EXECLOG-11: logActionExecuted records action evidence without changing node counts")
+    void execlog11_logActionExecuted() {
+        String executionId = "exec-11-" + System.nanoTime();
+        Map<String, Object> input = Map.of(
+                "actionType", "SEND_IM",
+                "status", "SUCCESS",
+                "processKey", "im_process",
+                "businessKey", "REQ-IM-1");
+        Map<String, Object> output = Map.of(
+                "action", Map.of(
+                        "status", "SUCCESS",
+                        "actionType", "SEND_IM",
+                        "channel", "im",
+                        "sentCount", 1,
+                        "targetUserIds", List.of(1L),
+                        "messageIds", List.of(25L)));
+
+        executionLogService.logActionExecuted(executionId, "send_im", input, output, 21L);
+
+        List<ExecutionLogEntry> timeline = executionLogService.getTimeline(executionId);
+        assertEquals(1, timeline.size(), "Timeline should have 1 action entry");
+        ExecutionLogEntry entry = timeline.getFirst();
+        assertEquals("action_executed", entry.eventType());
+        assertEquals("action", entry.nodeType());
+        assertEquals("send_im", entry.nodeId());
+        assertEquals("SEND_IM", entry.inputData().get("actionType"));
+        assertEquals(21L, entry.durationMs());
+        @SuppressWarnings("unchecked")
+        Map<String, Object> action = (Map<String, Object>) entry.outputData().get("action");
+        assertEquals("SUCCESS", action.get("status"));
+        assertEquals("SEND_IM", action.get("actionType"));
+        assertEquals(1, action.get("sentCount"));
+
+        ExecutionSummaryDTO summary = executionLogService.getExecutionSummary(executionId);
+        assertNotNull(summary);
+        assertEquals(0, summary.totalNodes(), "action_executed must not count as node start");
+        assertEquals(0, summary.completedNodes(), "action_executed must not count as node complete");
+        assertEquals(0, summary.failedNodes(), "action_executed must not count as node failure");
+
+        log.info("EXECLOG-11 PASSED: ACTION_EXECUTED recorded as trace-only evidence");
+    }
 }

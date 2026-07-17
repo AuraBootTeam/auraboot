@@ -4,9 +4,12 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.environment.service.EnvLockGuard;
 import com.auraboot.framework.environment.service.EnvironmentService;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.entity.payload.InstanceDataBean;
 import com.auraboot.framework.meta.entity.payload.MapBean;
+import com.auraboot.framework.permission.mapper.PermissionAuditLogMapper;
 import org.apache.ibatis.executor.Executor;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.MappedStatement;
 import org.apache.ibatis.mapping.SqlCommandType;
@@ -182,6 +185,74 @@ class TypeHandlersAndInterceptorsTest {
         ResultSet rs = mock(ResultSet.class);
         when(rs.getString("c")).thenReturn("###");
         assertThatThrownBy(() -> h.getNullableResult(rs, "c")).isInstanceOf(SQLException.class);
+    }
+
+    // ---------- JsonbObjectListTypeHandler ----------
+    @Test
+    void jsonbObjectListTypeHandler_roundtrip() throws SQLException {
+        JsonbObjectListTypeHandler h = new JsonbObjectListTypeHandler();
+        PreparedStatement ps = mock(PreparedStatement.class);
+        h.setNonNullParameter(ps, 1, List.of(Map.of("evaluatorName", "Policy", "verdict", "DENY")), null);
+        verify(ps).setObject(eq(1), any(PGobject.class));
+
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getString("c")).thenReturn("[{\"evaluatorName\":\"Policy\",\"verdict\":\"DENY\"}]");
+        List<Object> out = h.getNullableResult(rs, "c");
+        assertThat(out).hasSize(1);
+        assertThat(out.get(0)).isInstanceOf(Map.class);
+        Map<?, ?> traceStep = (Map<?, ?>) out.get(0);
+        assertThat(traceStep.get("evaluatorName")).isEqualTo("Policy");
+        assertThat(traceStep.get("verdict")).isEqualTo("DENY");
+    }
+
+    @Test
+    void jsonbObjectListTypeHandler_invalidThrowsSqlException() throws SQLException {
+        JsonbObjectListTypeHandler h = new JsonbObjectListTypeHandler();
+        ResultSet rs = mock(ResultSet.class);
+        when(rs.getString("c")).thenReturn("###");
+        assertThatThrownBy(() -> h.getNullableResult(rs, "c")).isInstanceOf(SQLException.class);
+    }
+
+    @Test
+    void permissionAuditLogMapperReadsUseResultMapForJsonbEvaluationTrace() throws NoSuchMethodException {
+        Method findRecent = PermissionAuditLogMapper.class.getMethod("findRecent", Long.class, int.class);
+        Method findByMember = PermissionAuditLogMapper.class.getMethod("findByMember", Long.class, Long.class, int.class);
+        Method findByResource = PermissionAuditLogMapper.class.getMethod("findByResource", Long.class, String.class, int.class);
+
+        for (Method method : List.of(findRecent, findByMember, findByResource)) {
+            ResultMap resultMap = method.getAnnotation(ResultMap.class);
+            assertThat(resultMap)
+                    .as("%s must use the entity autoResultMap so evaluation_trace JSONB is parsed", method.getName())
+                    .isNotNull();
+            assertThat(resultMap.value()).containsExactly("mybatis-plus_PermissionAuditLog");
+        }
+    }
+
+    @Test
+    void metaFieldMapperReadsUseResultMapForJsonbGovernanceColumns() throws NoSuchMethodException {
+        List<Method> methods = List.of(
+                MetaFieldMapper.class.getMethod("findByPid", String.class),
+                MetaFieldMapper.class.getMethod("selectByPidWithContext", String.class, Long.class),
+                MetaFieldMapper.class.getMethod("findCurrentByCode", String.class),
+                MetaFieldMapper.class.getMethod("findByIds", List.class),
+                MetaFieldMapper.class.getMethod("findByCodeAndVersion", String.class, Integer.class),
+                MetaFieldMapper.class.getMethod("findCurrentByTenant"),
+                MetaFieldMapper.class.getMethod("findAllVersionsByCode", String.class),
+                MetaFieldMapper.class.getMethod("selectPageList", com.baomidou.mybatisplus.extension.plugins.pagination.Page.class,
+                        String.class, String.class, String.class, Boolean.class),
+                MetaFieldMapper.class.getMethod("findByDataType", String.class),
+                MetaFieldMapper.class.getMethod("findByDataSource", Long.class),
+                MetaFieldMapper.class.getMethod("findByStatus", String.class),
+                MetaFieldMapper.class.getMethod("findByEntityCode", String.class),
+                MetaFieldMapper.class.getMethod("findByPids", List.class));
+
+        for (Method method : methods) {
+            ResultMap resultMap = method.getAnnotation(ResultMap.class);
+            assertThat(resultMap)
+                    .as("%s must use the Field autoResultMap so extension/rule_schema JSONB is parsed", method.getName())
+                    .isNotNull();
+            assertThat(resultMap.value()).containsExactly("mybatis-plus_Field");
+        }
     }
 
     // ---------- JsonbObjectTypeHandler ----------

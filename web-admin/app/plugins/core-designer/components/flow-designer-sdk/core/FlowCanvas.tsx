@@ -138,8 +138,14 @@ export function FlowCanvas({
   );
 
   const rfEdges: Edge[] = useMemo(
-    () => edges.map((e) => ({ ...e, selected: e.id === selectedEdgeId })),
-    [edges, selectedEdgeId],
+    () =>
+      edges.map((e) => ({
+        ...e,
+        selected: e.id === selectedEdgeId,
+        selectable: !readOnly,
+        interactionWidth: 24,
+      })),
+    [edges, selectedEdgeId, readOnly],
   );
 
   const onNodesChange = useCallback(
@@ -267,7 +273,7 @@ export function FlowCanvas({
   }, []);
 
   return (
-    <div className={`h-full flex-1 ${className || ''}`}>
+    <div className={`min-h-0 flex-1 ${className || ''}`}>
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
@@ -284,6 +290,7 @@ export function FlowCanvas({
         nodesDraggable={!readOnly}
         nodesConnectable={!readOnly}
         elementsSelectable={!readOnly}
+        edgesFocusable={!readOnly}
         // Only auto-fit when this canvas was mounted with pre-existing nodes
         // (edit mode). On new empty canvases, fitView re-zooms after each
         // drag-drop and pushes newly-added nodes out of the visible viewport.

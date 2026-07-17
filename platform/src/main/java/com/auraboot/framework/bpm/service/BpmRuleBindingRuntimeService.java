@@ -12,6 +12,7 @@ import com.auraboot.framework.decision.rule.RuleMappingTarget;
 import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ import java.util.Optional;
 public class BpmRuleBindingRuntimeService {
 
     private final RuleEvaluationService ruleEvaluationService;
+    private final ObjectProvider<ExecutionLogService> executionLogServiceProvider;
 
     public Optional<RuleEvaluationTrace> evaluateAndApply(
             RuleConsumerBinding binding,
@@ -43,7 +45,10 @@ public class BpmRuleBindingRuntimeService {
             String processInstanceId,
             Map<String, Object> request) {
         Optional<RuleEvaluationTrace> trace = evaluate(binding, processKey, nodeId, processInstanceId, request);
-        trace.ifPresent(t -> applyTrace(binding, nodeId, t, request));
+        trace.ifPresent(t -> {
+            applyTrace(binding, nodeId, t, request);
+            recordTrace(processInstanceId, nodeId, t);
+        });
         return trace;
     }
 
@@ -134,6 +139,9 @@ public class BpmRuleBindingRuntimeService {
         if (tenantId != null) {
             scopes.put(Scope.TENANT, Map.of("tenantId", tenantId.toString()));
         }
+        if (variables.get("meta") instanceof Map<?, ?> meta) {
+            scopes.put(Scope.META, castMap(meta));
+        }
 
         return new RuleEvaluationContext(
                 scopes,
@@ -203,6 +211,47 @@ public class BpmRuleBindingRuntimeService {
                 setPath(request, mapping.target().path(), value);
             }
         }
+    }
+
+    private void recordTrace(String processInstanceId, String nodeId, RuleEvaluationTrace trace) {
+        if (processInstanceId == null || processInstanceId.isBlank() || trace == null) {
+            return;
+        }
+        ExecutionLogService executionLogService = executionLogServiceProvider.getIfAvailable();
+        if (executionLogService == null) {
+            return;
+        }
+        try {
+            executionLogService.logRuleEvaluated(
+                    processInstanceId,
+                    nodeId,
+                    Map.of("ruleBinding", ruleBindingTracePayload(trace)),
+                    trace.durationMs());
+        } catch (RuntimeException e) {
+            log.warn("Failed to persist BPM rule binding trace: processInstanceId={}, nodeId={}, traceId={}",
+                    processInstanceId, nodeId, trace.traceId(), e);
+        }
+    }
+
+    private Map<String, Object> ruleBindingTracePayload(RuleEvaluationTrace trace) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("traceId", trace.traceId() == null ? "" : trace.traceId());
+        payload.put("consumerType", trace.consumerType() == null ? "" : trace.consumerType());
+        payload.put("consumerCode", trace.consumerCode() == null ? "" : trace.consumerCode());
+        payload.put("consumerNodeId", trace.consumerNodeId() == null ? "" : trace.consumerNodeId());
+        payload.put("bindingKind", trace.bindingKind() == null ? "" : trace.bindingKind().name());
+        payload.put("decisionCode", trace.decisionCode() == null ? "" : trace.decisionCode());
+        payload.put("version", trace.decisionVersion());
+        payload.put("versionPolicy", trace.versionPolicy() == null ? "" : trace.versionPolicy().name());
+        payload.put("status", trace.decisionStatus() == null ? "UNKNOWN" : trace.decisionStatus().name());
+        payload.put("matched", trace.matched());
+        payload.put("inputs", trace.inputSnapshot() == null ? Map.of() : trace.inputSnapshot());
+        payload.put("outputs", trace.outputSnapshot() == null ? Map.of() : trace.outputSnapshot());
+        payload.put("fallbackApplied", trace.fallbackApplied());
+        payload.put("durationMs", trace.durationMs());
+        payload.put("errorCode", trace.errorCode() == null ? "" : trace.errorCode());
+        payload.put("errors", trace.errors() == null ? List.of() : trace.errors());
+        return payload;
     }
 
     private TaskAssignmentResult extractTaskAssignment(

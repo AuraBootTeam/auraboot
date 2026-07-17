@@ -85,6 +85,58 @@ class RuleReferenceCollectorTest {
     }
 
     @Test
+    void collectsConditionFragmentRefsFromCompatibleJsonShapes() throws Exception {
+        var json = objectMapper.readTree("""
+                {
+                  "conditionFragmentRef": "shared_leave_guard",
+                  "conditionFragmentRefs": ["shared_priority_guard"],
+                  "conditionFragments": [
+                    "shared_event_guard",
+                    { "fragmentCode": "shared_permission_guard" },
+                    { "conditionFragmentCode": "shared_bpm_guard" }
+                  ],
+                  "conditionSpec": {
+                    "root": {
+                      "type": "group",
+                      "op": "AND",
+                      "children": []
+                    },
+                    "fragmentRefs": ["shared_nested_guard", "shared_leave_guard"]
+                  }
+                }
+                """);
+
+        RuleReferenceSet refs = RuleReferenceCollector.collect(json);
+
+        assertThat(refs.conditionFragmentRefs()).containsExactly(
+                "shared_leave_guard",
+                "shared_priority_guard",
+                "shared_event_guard",
+                "shared_permission_guard",
+                "shared_bpm_guard",
+                "shared_nested_guard");
+    }
+
+    @Test
+    void collectsConditionFragmentRefsFromTypedConsumerBinding() {
+        RuleConsumerBinding consumer = new RuleConsumerBinding(
+                "SLA",
+                "wd_manager_approve_sla",
+                "task_manager_approve",
+                RuleBindingKind.CONDITION,
+                null,
+                null,
+                true,
+                List.of("shared_leave_approval_guard", "shared_escalation_guard"));
+
+        RuleReferenceSet refs = RuleReferenceCollector.collect(consumer);
+
+        assertThat(refs.conditionFragmentRefs()).containsExactly(
+                "shared_leave_approval_guard",
+                "shared_escalation_guard");
+    }
+
+    @Test
     void ignoresDisabledConsumerBinding() {
         RuleConsumerBinding consumer = new RuleConsumerBinding(
                 "SLA",
@@ -112,5 +164,6 @@ class RuleReferenceCollectorTest {
 
         assertThat(refs.fieldRefs()).isEmpty();
         assertThat(refs.decisionRefs()).isEmpty();
+        assertThat(refs.conditionFragmentRefs()).isEmpty();
     }
 }

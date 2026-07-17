@@ -13,6 +13,8 @@ const automationRuleBindingFields: NonNullable<FlowNodeDefinition['configSchema'
     ruleBindingConsumerNodeId: 'trigger',
     ruleBindingShowImpactPreview: true,
     ruleBindingShowTestRunner: true,
+    ruleBindingInitialContextJsonField: 'testContext',
+    ruleBindingFieldCatalogModelCodeField: 'modelCode',
   },
 ];
 

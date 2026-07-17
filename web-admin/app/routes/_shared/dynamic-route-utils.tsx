@@ -205,6 +205,17 @@ interface DynamicFieldProps {
   ) => Array<{ value: string; label: string; extension?: Record<string, any> }>;
 }
 
+function findDictItemByValue(
+  items: Array<{ value: string; label: string; extension?: Record<string, any> }>,
+  value: unknown,
+): { value: string; label: string; extension?: Record<string, any> } | undefined {
+  const exact = items.find((item) => String(item.value) === String(value));
+  if (exact) return exact;
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (!normalized) return undefined;
+  return items.find((item) => String(item.value ?? '').trim().toLowerCase() === normalized);
+}
+
 function getReferenceModel(field: FieldConfig): string {
   const refTarget = {
     ...(field.props?.refTarget || {}),
@@ -580,12 +591,12 @@ export const DynamicField: React.FC<DynamicFieldProps> = ({
         const items = getDictItems(effectiveDictCode);
         const values = parseReadonlyValueList(value, Boolean(field.props?.multiple));
         const labels = values
-          .map((currentValue) => items.find((i) => String(i.value) === currentValue)?.label)
+          .map((currentValue) => findDictItemByValue(items, currentValue)?.label)
           .filter((currentLabel): currentLabel is string => Boolean(currentLabel));
         if (labels.length > 1 || (labels.length === 1 && values.length > 1)) {
           return <div className="py-1 text-sm text-gray-900">{labels.join('、')}</div>;
         }
-        const item = items.find((i) => String(i.value) === String(value));
+        const item = findDictItemByValue(items, value);
         if (item) {
           // §3 / §1.3: dict-coded status renders as 色点 + 文字, not a filled pill.
           return <StatusDot tone={resolveStatusTone(item.extension?.color)} label={item.label} />;

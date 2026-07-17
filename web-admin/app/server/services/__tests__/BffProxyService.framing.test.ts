@@ -61,9 +61,8 @@ function startFramingRecorder(): Promise<{
 
 describe('BffProxyService request framing', () => {
   // End-to-end over a real socket: drive the real proxy and measure what it actually puts
-  // on the wire. A body-less POST is the sharp case — express.json() hands the proxy `{}`,
-  // so it writes 2 bytes; if the client's `content-length: 0` were forwarded, those 2 bytes
-  // would be stranded in the socket and corrupt whatever request reuses it next.
+  // on the wire. A body-less POST is the sharp case: the proxy must not forward the
+  // client's stale `content-length: 0` with a different re-serialized body.
   it('declares a Content-Length matching the bytes it actually writes (body-less POST)', async () => {
     const backend = await startFramingRecorder();
     const service = new BffProxyService({ target: `http://127.0.0.1:${backend.port}` });
@@ -99,8 +98,7 @@ describe('BffProxyService request framing', () => {
     const { declared, actual } = await backend.received;
     backend.close();
 
-    expect(actual).toBe(2); // the `{}` axios serializes from req.body
-    expect(declared).toBe(actual); // …and it must say so, or the socket is left dirty
+    expect(declared).toBe(actual); // stale framing must never leave the socket dirty
   });
 
 });

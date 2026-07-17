@@ -17,6 +17,24 @@ export interface DecisionFieldImpactPanelProps {
   autoLoad?: boolean;
 }
 
+const SOURCE_TYPE_LABELS: Record<string, string> = {
+  AUTOMATION: '自动化',
+  SLA_RULE: 'SLA 规则',
+  EVENT_POLICY: '事件策略',
+  BPM_PROCESS: 'BPM 流程',
+  DECISION_VERSION: '决策版本',
+  NAMED_QUERY: '命名查询',
+  PERMISSION: '权限策略',
+};
+
+const ACTION_LABELS: Record<DecisionFieldPreflightAction, string> = {
+  DELETE_FIELD: '删除字段',
+  CHANGE_DATA_TYPE: '变更数据类型',
+  DELETE_DICT_ITEM: '删除字典值',
+  CHANGE_PERMISSION: '变更字段权限',
+  CHANGE_VIRTUAL_SOURCE: '变更虚拟来源',
+};
+
 function formatReference(ref: DecisionImpactRef): string {
   const title = ref.sourceName || ref.sourceCode || ref.targetPath || ref.sourceType;
   const parts = [ref.sourceType, title];
@@ -27,6 +45,29 @@ function formatReference(ref: DecisionImpactRef): string {
     parts.push(ref.targetPath);
   }
   return parts.filter(Boolean).join(' / ');
+}
+
+function sourceTypeLabel(sourceType?: string): string {
+  if (!sourceType) return '-';
+  return SOURCE_TYPE_LABELS[sourceType] ?? sourceType;
+}
+
+function displaySummary(summary?: string): string {
+  if (!summary) return '暂无影响';
+  return summary
+    .replace('Field change requires impact acknowledgement: ', '字段变更需要确认影响面：')
+    .replace('Field change allowed after impact acknowledgement: ', '确认影响面后可执行字段变更：')
+    .replace('Field change allowed', '字段变更可执行')
+    .replace('No schema type change detected', '未检测到字段类型变化')
+    .replace('No field consumers', '暂无字段消费方')
+    .replace(/Used by /g, '影响 ')
+    .replace(/(\d+) automations?/g, '$1 个自动化')
+    .replace(/(\d+) SLA rules?/g, '$1 条 SLA 规则')
+    .replace(/(\d+) EventPolicies/g, '$1 条事件策略')
+    .replace(/(\d+) EventPolicy/g, '$1 条事件策略')
+    .replace(/(\d+) decision versions?/g, '$1 个决策版本')
+    .replace(/(\d+) NamedQueries/g, '$1 个命名查询')
+    .replace(/(\d+) NamedQuery/g, '$1 个命名查询');
 }
 
 function riskCounts(counts?: Record<string, number>) {
@@ -50,6 +91,10 @@ export function DecisionFieldImpactPanel({
   const [impactError, setImpactError] = useState('');
   const [preflightAction, setPreflightAction] =
     useState<DecisionFieldPreflightAction>('DELETE_FIELD');
+  const [dictCode, setDictCode] = useState('');
+  const [dictValue, setDictValue] = useState('');
+  const [nextPermission, setNextPermission] = useState('');
+  const [nextSourceRef, setNextSourceRef] = useState('');
   const [impactAcknowledged, setImpactAcknowledged] = useState(false);
   const [preflight, setPreflight] = useState<DecisionFieldPreflight | null>(null);
   const [preflightLoading, setPreflightLoading] = useState(false);
@@ -107,9 +152,21 @@ export function DecisionFieldImpactPanel({
         action: preflightAction,
         currentDataType: currentDataType.trim() || undefined,
         nextDataType:
-          preflightAction === 'CHANGE_TYPE' && nextDataType.trim()
+          preflightAction === 'CHANGE_DATA_TYPE' && nextDataType.trim()
             ? nextDataType.trim()
             : undefined,
+        ...(preflightAction === 'DELETE_DICT_ITEM'
+          ? {
+            dictCode: dictCode.trim() || undefined,
+            dictValue: dictValue.trim() || undefined,
+          }
+          : {}),
+        ...(preflightAction === 'CHANGE_PERMISSION'
+          ? { nextPermission: nextPermission.trim() || undefined }
+          : {}),
+        ...(preflightAction === 'CHANGE_VIRTUAL_SOURCE'
+          ? { nextSourceRef: nextSourceRef.trim() || undefined }
+          : {}),
         impactAcknowledged,
         note: impactAcknowledged
           ? 'DecisionOps field impact acknowledged in DSL field-impact block'
@@ -173,7 +230,7 @@ export function DecisionFieldImpactPanel({
               }
               data-testid="field-impact-risk"
             >
-              {impact.risk.summary}
+              {displaySummary(impact.risk.summary)}
             </div>
             <dl>
               <div>
@@ -189,7 +246,7 @@ export function DecisionFieldImpactPanel({
               <div className="decision-field-impact-counts" data-testid="field-impact-counts">
                 {counts.map(([key, count]) => (
                   <span key={key}>
-                    {key}: {count}
+                    {sourceTypeLabel(key)}: {count}
                   </span>
                 ))}
               </div>
@@ -207,11 +264,12 @@ export function DecisionFieldImpactPanel({
                   setPreflightAction(event.currentTarget.value as DecisionFieldPreflightAction)
                 }
               >
-                <option value="DELETE_FIELD">删除字段</option>
-                <option value="CHANGE_TYPE">变更类型</option>
+                {Object.entries(ACTION_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
               </select>
             </label>
-            {preflightAction === 'CHANGE_TYPE' && (
+            {preflightAction === 'CHANGE_DATA_TYPE' && (
               <label>
                 目标类型
                 <input
@@ -219,6 +277,50 @@ export function DecisionFieldImpactPanel({
                   value={nextDataType}
                   placeholder="decimal"
                   onChange={(event) => setNextDataType(event.currentTarget.value)}
+                />
+              </label>
+            )}
+            {preflightAction === 'DELETE_DICT_ITEM' && (
+              <div className="decision-field-impact-inline">
+                <label>
+                  字典
+                  <input
+                    aria-label="field-impact-dict-code"
+                    value={dictCode}
+                    placeholder="leave_type"
+                    onChange={(event) => setDictCode(event.currentTarget.value)}
+                  />
+                </label>
+                <label>
+                  字典值
+                  <input
+                    aria-label="field-impact-dict-value"
+                    value={dictValue}
+                    placeholder="annual"
+                    onChange={(event) => setDictValue(event.currentTarget.value)}
+                  />
+                </label>
+              </div>
+            )}
+            {preflightAction === 'CHANGE_PERMISSION' && (
+              <label>
+                目标权限
+                <input
+                  aria-label="field-impact-next-permission"
+                  value={nextPermission}
+                  placeholder="manager.visible"
+                  onChange={(event) => setNextPermission(event.currentTarget.value)}
+                />
+              </label>
+            )}
+            {preflightAction === 'CHANGE_VIRTUAL_SOURCE' && (
+              <label>
+                目标来源
+                <input
+                  aria-label="field-impact-next-source-ref"
+                  value={nextSourceRef}
+                  placeholder="virtual.leave_request_summary.v2"
+                  onChange={(event) => setNextSourceRef(event.currentTarget.value)}
                 />
               </label>
             )}
@@ -254,9 +356,9 @@ export function DecisionFieldImpactPanel({
                     : 'decision-field-impact-preflight'
                 }
                 data-testid="field-preflight-result"
-              >
-                {preflight.blocked ? '已阻断' : '可执行'} ·{' '}
-                {preflight.message || preflight.risk.summary}
+            >
+              {preflight.blocked ? '已阻断' : '可执行'} ·{' '}
+                {displaySummary(preflight.message || preflight.risk.summary)}
               </p>
             )}
           </div>
@@ -281,7 +383,7 @@ export function DecisionFieldImpactPanel({
               <tbody>
                 {impact.references.map((ref, index) => (
                   <tr key={`${formatReference(ref)}-${index}`} data-testid={`field-impact-ref-${index}`}>
-                    <td>{ref.sourceType}</td>
+                    <td title={ref.sourceType}>{sourceTypeLabel(ref.sourceType)}</td>
                     <td className="mono">{ref.sourceName || ref.sourceCode}</td>
                     <td>{ref.sourceVersion ? `v${ref.sourceVersion}` : '-'}</td>
                     <td className="mono">{ref.targetPath || '-'}</td>

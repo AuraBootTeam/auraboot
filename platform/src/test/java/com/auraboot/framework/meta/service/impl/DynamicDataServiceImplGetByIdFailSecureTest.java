@@ -13,6 +13,12 @@ import com.auraboot.framework.meta.service.*;
 import com.auraboot.framework.meta.service.executor.ExecutorRegistry;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
 import com.auraboot.framework.permission.service.FieldPermissionService;
+import com.auraboot.framework.permission.engine.model.EvaluationStep;
+import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
+import com.auraboot.framework.permission.engine.model.PermissionResult;
+import com.auraboot.framework.permission.service.PermissionFacade;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -62,6 +68,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
     private static final String RECORD_ID = "rec-001";
     private static final Long TENANT_ID = 1L;
     private static final Long USER_ID = 42L;
+    private static final Long FALLBACK_MEMBER_ID = 4200L;
 
     // ---- all constructor dependencies as mocks ----
     @Mock private MetaModelService metadataService;
@@ -86,6 +93,8 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
     @Mock private PayloadTemporalNormalizer payloadTemporalNormalizer;
     @Mock private FieldPermissionService fieldPermissionService;
     @Mock private ExecutorRegistry executorRegistry;
+    @Mock private PermissionFacade permissionFacade;
+    @Mock private TenantMemberService tenantMemberService;
 
     @InjectMocks
     private DynamicDataServiceImpl service;
@@ -96,6 +105,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
     @BeforeEach
     void setUpContext() {
         MetaContext.setContext(TENANT_ID, USER_ID, "pid-42", "tester");
+        MetaContext.setMemberId(USER_ID);
     }
 
     @AfterEach
@@ -145,6 +155,22 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         when(dynamicDataMapper.selectByQuery(anyString(), anyMap())).thenReturn(List.of(rawRecord));
     }
 
+    private void wireRuleCenterPermissionAllows() {
+        when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        when(permissionFacade.canOperate(eq(USER_ID), eq(MODEL_CODE), eq("read"), anyMap()))
+                .thenReturn(PermissionResult.allow(List.of(
+                        new EvaluationStep("RolePermission", EvaluationVerdict.ALLOW, "rbac ok"))));
+    }
+
+    private TenantMember tenantMember(Long memberId) {
+        TenantMember member = new TenantMember();
+        member.setId(memberId);
+        member.setTenantId(TENANT_ID);
+        member.setUserId(USER_ID);
+        member.setStatus("ACTIVE");
+        return member;
+    }
+
     // =====================================================================
     // Test (a): row-ACL check throws → getById must NOT return the record
     // =====================================================================
@@ -153,6 +179,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
     @DisplayName("row-ACL engine throws RuntimeException → getById throws MetaServiceException (fail-secure, §P4)")
     void getById_rowAclEngineThrows_throwsMetaServiceException() {
         wireHappyPathDbStubs();
+        wireRuleCenterPermissionAllows();
 
         // Simulate an internal error in the permission engine (e.g. DB timeout, NPE in policy eval)
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
@@ -168,6 +195,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
     @DisplayName("row-ACL engine returns false → getById throws MetaServiceException (access denied)")
     void getById_rowAclDenied_throwsMetaServiceException() {
         wireHappyPathDbStubs();
+        wireRuleCenterPermissionAllows();
 
         // Explicit deny (policy says this user may not see this row)
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
@@ -190,6 +218,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         // ACL check passes
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
                 .thenReturn(true);
+        wireRuleCenterPermissionAllows();
 
         // Simulate internal error while fetching masking rules
         when(dataPermissionEngine.getFieldMaskRules(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID)))
@@ -209,6 +238,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         // ACL check passes
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
                 .thenReturn(true);
+        wireRuleCenterPermissionAllows();
 
         // Masking rules are loaded successfully...
         List<FieldMaskRule> rules = List.of(mock(FieldMaskRule.class));
@@ -239,6 +269,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         // ACL + policy/configurable masking all pass, so control reaches the field-permission filter
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
                 .thenReturn(true);
+        wireRuleCenterPermissionAllows();
         when(dataPermissionEngine.getFieldMaskRules(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID)))
                 .thenReturn(List.of());
         when(fieldMaskService.applyMaskingForDetail(eq(MODEL_CODE), anyMap(), eq(USER_ID)))
@@ -266,6 +297,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         // ACL check passes
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
                 .thenReturn(true);
+        wireRuleCenterPermissionAllows();
 
         // Policy-driven masking: no rules to apply (safe to skip that step)
         when(dataPermissionEngine.getFieldMaskRules(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID)))
@@ -294,6 +326,7 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
         // ACL check passes
         when(dataPermissionEngine.canAccessRecord(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID), anyMap()))
                 .thenReturn(true);
+        wireRuleCenterPermissionAllows();
 
         // No policy mask rules
         when(dataPermissionEngine.getFieldMaskRules(eq(TENANT_ID), eq(MODEL_CODE), eq(USER_ID)))
@@ -310,5 +343,67 @@ class DynamicDataServiceImplGetByIdFailSecureTest {
 
         Map<String, Object> result = service.getById(MODEL_CODE, RECORD_ID);
         org.assertj.core.api.Assertions.assertThat(result).containsKey("pid");
+    }
+
+    @Test
+    @DisplayName("Rule Center permission facade returns DENY → getById throws before masking")
+    void getById_ruleCenterPermissionDenies_throwsBeforeMasking() {
+        wireHappyPathDbStubs();
+
+        when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        when(permissionFacade.canOperate(eq(USER_ID), eq(MODEL_CODE), eq("read"), anyMap()))
+                .thenReturn(PermissionResult.deny(
+                        "Condition guard not satisfied",
+                        List.of(new EvaluationStep("Policy", EvaluationVerdict.DENY, "Condition guard not satisfied"))));
+
+        assertThatThrownBy(() -> service.getById(MODEL_CODE, RECORD_ID))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("Access denied");
+
+        verify(dataPermissionEngine, never()).canAccessRecord(anyLong(), anyString(), anyLong(), anyMap());
+        verify(dataPermissionEngine, never()).getFieldMaskRules(anyLong(), anyString(), anyLong());
+        verify(fieldMaskService, never()).applyMaskingForDetail(anyString(), anyMap(), anyLong());
+    }
+
+    @Test
+    @DisplayName("Rule Center DENY runs before legacy row ACL so audit-capable permission pipeline is not bypassed")
+    void getById_ruleCenterDenyPrecedesLegacyRowAcl() {
+        wireHappyPathDbStubs();
+
+        when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        when(permissionFacade.canOperate(eq(USER_ID), eq(MODEL_CODE), eq("read"), anyMap()))
+                .thenReturn(PermissionResult.deny(
+                        "Condition guard not satisfied",
+                        List.of(new EvaluationStep("Policy", EvaluationVerdict.DENY, "Condition guard not satisfied"))));
+
+        assertThatThrownBy(() -> service.getById(MODEL_CODE, RECORD_ID))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("Access denied");
+
+        verify(permissionFacade).canOperate(eq(USER_ID), eq(MODEL_CODE), eq("read"), anyMap());
+        verify(dataPermissionEngine, never()).canAccessRecord(anyLong(), anyString(), anyLong(), anyMap());
+    }
+
+    @Test
+    @DisplayName("Rule Center permission resolves tenant member id when MetaContext memberId is missing")
+    void getById_ruleCenterPermissionResolvesTenantMemberWhenContextMemberMissing() {
+        wireHappyPathDbStubs();
+        MetaContext.setMemberId(null);
+
+        when(applicationContext.getBean(TenantMemberService.class)).thenReturn(tenantMemberService);
+        when(tenantMemberService.findByTenantIdAndUserId(TENANT_ID, USER_ID))
+                .thenReturn(tenantMember(FALLBACK_MEMBER_ID));
+        when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        when(permissionFacade.canOperate(eq(FALLBACK_MEMBER_ID), eq(MODEL_CODE), eq("read"), anyMap()))
+                .thenReturn(PermissionResult.deny(
+                        "Condition guard not satisfied",
+                        List.of(new EvaluationStep("Policy", EvaluationVerdict.DENY, "Condition guard not satisfied"))));
+
+        assertThatThrownBy(() -> service.getById(MODEL_CODE, RECORD_ID))
+                .isInstanceOf(MetaServiceException.class)
+                .hasMessageContaining("Access denied");
+
+        verify(permissionFacade).canOperate(eq(FALLBACK_MEMBER_ID), eq(MODEL_CODE), eq("read"), anyMap());
+        verify(dataPermissionEngine, never()).canAccessRecord(anyLong(), anyString(), anyLong(), anyMap());
     }
 }

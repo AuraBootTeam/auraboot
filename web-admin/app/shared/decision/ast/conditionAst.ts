@@ -343,13 +343,15 @@ export const parse = (json: string): ConditionNode => JSON.parse(json) as Condit
 
 // ── natural-language preview (mockup previewNode) ─────────────────────────────
 
-const OP_LABEL: Record<Operator, string> = {
+export const OP_LABEL: Record<Operator, string> = {
   EQ: '等于', NE: '不等于', GT: '大于', GTE: '大于等于', LT: '小于', LTE: '小于等于',
   IN: '属于集合', NOT_IN: '不在集合', BETWEEN: '介于', CONTAINS_TEXT: '包含文本',
   CONTAINS_ELEMENT: '包含元素', STARTS_WITH: '开头是', ENDS_WITH: '结尾是',
   IS_NULL: '为空', IS_NOT_NULL: '不为空', IS_EMPTY: '为空', IS_NOT_EMPTY: '不为空',
   CHANGED: '发生变化', MATCHES: '匹配',
 };
+
+export const operatorLabel = (operator: Operator): string => OP_LABEL[operator] ?? operator;
 
 function operandLabel(op: Operand | undefined, labelOf?: (o: PathOperand) => string): string {
   if (!op) return '';
@@ -362,7 +364,7 @@ function operandLabel(op: Operand | undefined, labelOf?: (o: PathOperand) => str
 export function toNaturalLanguage(node: ConditionNode, labelOf?: (o: PathOperand) => string): string {
   if (node.type === 'compare') {
     const l = operandLabel(node.left, labelOf);
-    const opl = OP_LABEL[node.operator] ?? node.operator;
+    const opl = operatorLabel(node.operator);
     const r = UNARY_OPERATORS.has(node.operator) ? '' : ` ${operandLabel(node.right, labelOf)}`;
     return `【${l} ${opl}${r}】`;
   }

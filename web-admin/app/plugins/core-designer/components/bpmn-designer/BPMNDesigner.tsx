@@ -4,6 +4,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { PanelLeft, PanelRight, X } from 'lucide-react';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { BPMNPalette } from '~/plugins/core-designer/components/bpmn-designer/components/BPMNPalette';
@@ -28,6 +29,223 @@ import {
   serializeDesignerJson,
   validateDesignerJson,
 } from '~/plugins/core-designer/components/bpmn-designer/services/bpmnService';
+import { cn } from '~/utils/cn';
+
+const COMPACT_DESIGNER_QUERY = '(max-width: 1599px)';
+const WIDE_WORKSPACE_MIN_WIDTH = 1440;
+
+function readCompactDesignerViewport(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (typeof window.matchMedia === 'function') {
+    return window.matchMedia(COMPACT_DESIGNER_QUERY).matches;
+  }
+  return window.innerWidth < 1600;
+}
+
+export interface BPMNDesignerWorkspaceProps {
+  palette: React.ReactNode;
+  canvas: React.ReactNode;
+  propertyPanel: React.ReactNode;
+  labels: {
+    components: string;
+    properties: string;
+    close: string;
+  };
+  inspectorFocusKey?: string | null;
+}
+
+export function BPMNDesignerWorkspace({
+  palette,
+  canvas,
+  propertyPanel,
+  labels,
+  inspectorFocusKey,
+}: BPMNDesignerWorkspaceProps) {
+  const initialCompact = readCompactDesignerViewport();
+  const [isCompact, setIsCompact] = useState(initialCompact);
+  const [paletteOpen, setPaletteOpen] = useState(() => !initialCompact);
+  const [inspectorOpen, setInspectorOpen] = useState(() => !initialCompact);
+  const workspaceRef = React.useRef<HTMLDivElement | null>(null);
+  const layoutModeRef = React.useRef(initialCompact);
+  const previousInspectorFocusKey = React.useRef<string | null | undefined>(inspectorFocusKey);
+
+  const applyViewportMode = React.useCallback((compact: boolean) => {
+    if (layoutModeRef.current === compact) {
+      setIsCompact(compact);
+      return;
+    }
+
+    layoutModeRef.current = compact;
+    setIsCompact(compact);
+    setPaletteOpen(!compact);
+    setInspectorOpen(!compact);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    if (typeof window.matchMedia !== 'function') {
+      applyViewportMode(window.innerWidth < 1600);
+      return;
+    }
+
+    const media = window.matchMedia(COMPACT_DESIGNER_QUERY);
+    applyViewportMode(media.matches);
+
+    const handleChange = (event: MediaQueryListEvent) => applyViewportMode(event.matches);
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', handleChange);
+      return () => media.removeEventListener('change', handleChange);
+    }
+
+    media.addListener(handleChange);
+    return () => media.removeListener(handleChange);
+  }, [applyViewportMode]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof ResizeObserver === 'undefined') return;
+    const workspace = workspaceRef.current;
+    if (!workspace) return;
+
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0;
+      if (width > 0) {
+        applyViewportMode(width < WIDE_WORKSPACE_MIN_WIDTH);
+      }
+    });
+
+    observer.observe(workspace);
+    return () => observer.disconnect();
+  }, [applyViewportMode]);
+
+  useEffect(() => {
+    const previous = previousInspectorFocusKey.current;
+    previousInspectorFocusKey.current = inspectorFocusKey;
+
+    if (!isCompact || !inspectorFocusKey || inspectorFocusKey === previous) return;
+    setPaletteOpen(false);
+    setInspectorOpen(true);
+  }, [inspectorFocusKey, isCompact]);
+
+  const paletteVisible = !isCompact || paletteOpen;
+  const inspectorVisible = !isCompact || inspectorOpen;
+  const closeDrawers = () => {
+    setPaletteOpen(false);
+    setInspectorOpen(false);
+  };
+
+  return (
+    <div
+      ref={workspaceRef}
+      className="relative flex flex-1 overflow-hidden"
+      data-testid="bpmn-designer-workspace"
+      data-layout={isCompact ? 'compact' : 'wide'}
+    >
+      {isCompact && (
+        <div className="pointer-events-none absolute top-3 left-3 z-50 flex gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setPaletteOpen((open) => !open);
+              setInspectorOpen(false);
+            }}
+            className={cn(
+              'pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium shadow-sm',
+              paletteOpen
+                ? 'border-blue-300 bg-blue-50 text-blue-700'
+                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
+            )}
+            title={labels.components}
+            data-testid="bpmn-toggle-palette"
+          >
+            <PanelLeft className="h-4 w-4" />
+            <span>{labels.components}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setInspectorOpen((open) => !open);
+              setPaletteOpen(false);
+            }}
+            className={cn(
+              'pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-sm font-medium shadow-sm',
+              inspectorOpen
+                ? 'border-blue-300 bg-blue-50 text-blue-700'
+                : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50',
+            )}
+            title={labels.properties}
+            data-testid="bpmn-toggle-inspector"
+          >
+            <PanelRight className="h-4 w-4" />
+            <span>{labels.properties}</span>
+          </button>
+        </div>
+      )}
+
+      {isCompact && (paletteOpen || inspectorOpen) && (
+        <button
+          type="button"
+          aria-label={labels.close}
+          onClick={closeDrawers}
+          className="absolute inset-0 z-30 bg-gray-900/20"
+          data-testid="bpmn-drawer-backdrop"
+        />
+      )}
+
+      <div
+        className={cn(
+          isCompact
+            ? 'absolute inset-y-0 left-0 z-40 w-64 max-w-[calc(100vw-2rem)] shadow-2xl'
+            : 'relative z-20 flex shrink-0',
+          !paletteVisible && 'hidden',
+        )}
+        data-testid="bpmn-palette-shell"
+        data-open={paletteVisible ? 'true' : 'false'}
+      >
+        {isCompact && (
+          <button
+            type="button"
+            onClick={() => setPaletteOpen(false)}
+            className="absolute top-3 right-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700"
+            title={labels.close}
+            data-testid="bpmn-close-palette"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+        {palette}
+      </div>
+
+      <div className="flex min-w-0 flex-1 overflow-hidden" data-testid="bpmn-canvas-shell">
+        {canvas}
+      </div>
+
+      <div
+        className={cn(
+          isCompact
+            ? 'absolute inset-y-0 right-0 z-40 max-w-[calc(100vw-2rem)] shadow-2xl'
+            : 'relative z-20 flex shrink-0',
+          !inspectorVisible && 'hidden',
+        )}
+        data-testid="bpmn-inspector-shell"
+        data-open={inspectorVisible ? 'true' : 'false'}
+      >
+        {isCompact && (
+          <button
+            type="button"
+            onClick={() => setInspectorOpen(false)}
+            className="absolute top-3 right-3 z-30 inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 shadow-sm hover:bg-gray-50 hover:text-gray-700"
+            title={labels.close}
+            data-testid="bpmn-close-inspector"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+        {propertyPanel}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Return undefined when the aura block has no active fields so we don't persist
@@ -57,6 +275,8 @@ export function BPMNDesigner() {
     viewingVersionId,
     viewMode,
     monitorInstanceId,
+    selectedNodeId,
+    selectedEdgeId,
     setSelectedNode,
     setSaving,
     setDirty,
@@ -604,53 +824,55 @@ export function BPMNDesigner() {
         </div>
       )}
 
-      {/* Main content area */}
-      <div className="relative flex flex-1 overflow-hidden">
-        {/* Palette */}
-        <BPMNPalette onDragStart={handleDragStart} />
-
-        {/* Canvas */}
-        <BPMNCanvas />
-
-        {/* Property panel */}
-        <BPMNPropertyPanel
-          processMetadata={{
-            name: processName,
-            processKey,
-            description: processDescription,
-            category: processCategory,
-            isExisting: !!processDefinition?.id,
-            withdrawPolicy: processAura?.withdrawPolicy,
-            ccPolicy: processAura?.ccPolicy,
-            onNameChange: (v) => {
-              setProcessName(v);
-              setDirty(true);
-            },
-            onProcessKeyChange: (v) => {
-              if (!processDefinition?.id) {
-                setProcessKey(v);
+      <BPMNDesignerWorkspace
+        labels={{
+          components: t('bpmn.designer.components_panel'),
+          properties: t('bpmn.designer.properties_panel'),
+          close: t('bpmn.designer.close_panel'),
+        }}
+        inspectorFocusKey={selectedNodeId ?? selectedEdgeId ?? null}
+        palette={<BPMNPalette onDragStart={handleDragStart} className="h-full w-64" />}
+        canvas={<BPMNCanvas />}
+        propertyPanel={
+          <BPMNPropertyPanel
+            processMetadata={{
+              name: processName,
+              processKey,
+              description: processDescription,
+              category: processCategory,
+              isExisting: !!processDefinition?.id,
+              withdrawPolicy: processAura?.withdrawPolicy,
+              ccPolicy: processAura?.ccPolicy,
+              onNameChange: (v) => {
+                setProcessName(v);
                 setDirty(true);
-              }
-            },
-            onDescriptionChange: (v) => {
-              setProcessDescription(v);
-              setDirty(true);
-            },
-            onCategoryChange: (v) => {
-              setProcessCategory(v);
-              setDirty(true);
-            },
-            onWithdrawPolicyChange: (v: WithdrawPolicy | undefined) => {
-              setProcessAura((prev) => normalizeAura({ ...prev, withdrawPolicy: v }));
-              setDirty(true);
-            },
-            onCcPolicyChange: (v: CcPolicy | undefined) => {
-              setProcessAura((prev) => normalizeAura({ ...prev, ccPolicy: v }));
-              setDirty(true);
-            },
-          }}
-        />
-      </div>
+              },
+              onProcessKeyChange: (v) => {
+                if (!processDefinition?.id) {
+                  setProcessKey(v);
+                  setDirty(true);
+                }
+              },
+              onDescriptionChange: (v) => {
+                setProcessDescription(v);
+                setDirty(true);
+              },
+              onCategoryChange: (v) => {
+                setProcessCategory(v);
+                setDirty(true);
+              },
+              onWithdrawPolicyChange: (v: WithdrawPolicy | undefined) => {
+                setProcessAura((prev) => normalizeAura({ ...prev, withdrawPolicy: v }));
+                setDirty(true);
+              },
+              onCcPolicyChange: (v: CcPolicy | undefined) => {
+                setProcessAura((prev) => normalizeAura({ ...prev, ccPolicy: v }));
+                setDirty(true);
+              },
+            }}
+          />
+        }
+      />
 
       {/* Version History Panel (shared) */}
       <VersionHistoryPanel

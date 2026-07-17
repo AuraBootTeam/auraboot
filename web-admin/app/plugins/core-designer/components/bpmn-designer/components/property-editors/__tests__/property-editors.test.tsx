@@ -9,7 +9,10 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { BPMNPropertyPanel } from '../../BPMNPropertyPanel';
+import { useBpmFlowStore } from '~/plugins/core-designer/components/bpm-designer-sdk/store/useBpmFlowStore';
+import { BPMNNodeType } from '~/plugins/core-designer/components/bpmn-designer/types';
 import { ServiceTaskEditor } from '../ServiceTaskEditor';
 import { StartEventEditor, EndEventEditor } from '../EventEditor';
 import { ExclusiveGatewayEditor } from '../ExclusiveGatewayEditor';
@@ -35,6 +38,16 @@ function processMetadata(overrides: Record<string, unknown> = {}) {
 }
 
 describe('ProcessMetadataPanel — process binding', () => {
+  it('keeps the BPMN property panel above the canvas overflow layer', () => {
+    useBpmFlowStore.getState().reset();
+
+    render(<BPMNPropertyPanel processMetadata={processMetadata() as any} />);
+
+    expect(screen.getByTestId('bpmn-property-panel')).toHaveClass('relative');
+    expect(screen.getByTestId('bpmn-property-panel')).toHaveClass('z-20');
+    expect(screen.getByTestId('bpmn-property-panel')).toHaveClass('shrink-0');
+  });
+
   it('binds process key for new processes from the property panel', () => {
     const onProcessKeyChange = vi.fn();
     render(<ProcessMetadataPanel metadata={processMetadata({ onProcessKeyChange }) as any} />);
@@ -72,6 +85,86 @@ describe('ServiceTaskEditor — property binding', () => {
     render(<ServiceTaskEditor config={{ serviceType: 'command' } as any} onChange={onChange} />);
     fireEvent.click(screen.getByTestId('servicetask-async'));
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ async: true }));
+  });
+
+  it('action serviceType consumes rule-center action catalog availability and binds action config', async () => {
+    const onChange = vi.fn();
+    const api = {
+      getActionCatalog: vi.fn(async () => ({
+        actions: [
+          {
+            actionType: 'SEND_SMS',
+            label: '发送短信',
+            description: '向手机号发送短信',
+            category: 'messaging',
+            consumerTypes: ['BPM'],
+            consumerAvailability: [
+              {
+                consumerType: 'BPM',
+                handlerAvailable: false,
+                availabilityStatus: 'UNAVAILABLE',
+                availabilityReason: '当前环境未配置真实短信 provider',
+                providerDependencies: [
+                  {
+                    providerType: 'SMS',
+                    label: '真实短信 provider',
+                    required: true,
+                    available: false,
+                    availabilityStatus: 'UNAVAILABLE',
+                    availabilityReason: '当前环境未配置真实短信 provider',
+                  },
+                ],
+              },
+              {
+                consumerType: 'SLA',
+                handlerAvailable: true,
+                availabilityStatus: 'AVAILABLE',
+              },
+            ],
+          },
+          {
+            actionType: 'WEBHOOK',
+            label: '发送 Webhook',
+            category: 'integration',
+            consumerTypes: ['SLA'],
+          },
+        ],
+      })),
+    };
+
+    render(
+      <ServiceTaskEditor
+        config={{ serviceType: 'action', actionType: 'SEND_SMS' } as any}
+        onChange={onChange}
+        api={api}
+      />,
+    );
+
+    await waitFor(() => expect(api.getActionCatalog).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.getByTestId('servicetask-action-availability')).toHaveTextContent(
+        '当前环境未配置真实短信 provider',
+      ),
+    );
+    expect(screen.getByTestId('servicetask-action-provider')).toHaveTextContent(
+      '依赖：真实短信 provider · 未配置',
+    );
+    expect(screen.getByTestId('servicetask-action-type')).toHaveTextContent('发送短信（不可用）');
+    expect(screen.getByTestId('servicetask-action-type')).not.toHaveTextContent('发送 Webhook');
+
+    fireEvent.change(screen.getByTestId('servicetask-action-target'), { target: { value: 'PHONE:${record.phone}' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ actionTarget: 'PHONE:${record.phone}' }));
+
+    fireEvent.change(screen.getByTestId('servicetask-action-payload'), {
+      target: { value: '{"content":"流程通知"}' },
+    });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ actionPayloadJson: '{"content":"流程通知"}' }));
+
+    fireEvent.change(screen.getByTestId('servicetask-action-result-var'), { target: { value: 'smsResult' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ actionResultVar: 'smsResult' }));
+
+    fireEvent.change(screen.getByTestId('servicetask-action-idempotency'), { target: { value: 'bpm:${process.id}' } });
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ actionIdempotencyKey: 'bpm:${process.id}' }));
   });
 });
 
@@ -145,5 +238,37 @@ describe('ReceiveTaskEditor — GAP-252 message binding (now supported)', () => 
     const desc = container.querySelector('textarea') as HTMLTextAreaElement;
     fireEvent.change(desc, { target: { value: 'await msg' } });
     expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ description: 'await msg' }));
+  });
+});
+
+describe('BPMNPropertyPanel — rule-task rule center routing', () => {
+  it('renders a shared rule binding editor for selected rule-task nodes', () => {
+    useBpmFlowStore.getState().reset();
+    useBpmFlowStore.setState({
+      nodes: [
+        {
+          id: 'svc_rule_route',
+          type: 'rule-task',
+          position: { x: 0, y: 0 },
+          data: {
+            type: BPMNNodeType.RULE_TASK,
+            label: 'Routing Rule',
+            ruleCode: 'wd_leave_routing',
+            factsVars: 'days,type',
+          },
+        } as any,
+      ],
+      edges: [],
+      selectedNodeId: 'svc_rule_route',
+      selectedEdgeId: null,
+    });
+
+    render(<BPMNPropertyPanel processMetadata={processMetadata({ processKey: 'wd_leave_approval' }) as any} />);
+
+    expect(screen.getByDisplayValue('wd_leave_routing')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('days,type')).toBeInTheDocument();
+    expect(screen.getByTestId('ruletask-rule-binding-toggle')).toBeInTheDocument();
+    expect(screen.getByTestId('ruletask-rule-binding-editor')).toHaveTextContent('请假审批分派');
+    expect(screen.getByTestId('decision-test-runner')).toBeInTheDocument();
   });
 });

@@ -172,14 +172,18 @@ export default function CapabilityRoleEditor({ rolePid }: CapabilityRoleEditorPr
   }, [groups, matrix]);
 
   if (loading) {
-    return <div data-testid="capability-editor-loading">{t('common.loading', undefined, '加载中…')}</div>;
+    return (
+      <div data-testid="capability-editor-loading" data-role-pid={rolePid}>
+        {t('common.loading', undefined, '加载中…')}
+      </div>
+    );
   }
 
   const primarySelected = selected.filter((code) => primaryCodes.has(code));
   const dirty = isDirty(capabilityView.primaryGroups, primarySelected);
 
   return (
-    <div data-testid="capability-role-editor" className="flex flex-col gap-4">
+    <div data-testid="capability-role-editor" data-role-pid={rolePid} className="flex flex-col gap-4">
       {/* ② data scope */}
       <DataScopeBar rolePid={rolePid} matrix={matrix} onScopeApplied={() => void loadMatrix()} />
 

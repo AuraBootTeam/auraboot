@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Executes the resolved action plans of an {@link EventPolicyResult} (docs/2.md §7, §8): in order,
@@ -47,6 +48,15 @@ public class PolicyExecutor {
 
     public PolicyExecutionResult execute(EventPolicyResult policyResult, DecisionContext context,
                                          FailureStrategy strategy, Long tenantId) {
+        return execute(policyResult, context, strategy, tenantId, null, null);
+    }
+
+    public PolicyExecutionResult execute(EventPolicyResult policyResult,
+                                         DecisionContext context,
+                                         FailureStrategy strategy,
+                                         Long tenantId,
+                                         String decisionTraceId,
+                                         String correlationId) {
         List<ResolvedActionPlan> plans = policyResult.actionPlans();
         if (plans == null || plans.isEmpty()) {
             return new PolicyExecutionResult(policyResult.policyCode(),
@@ -58,11 +68,22 @@ public class PolicyExecutor {
         boolean stopped = false;
         for (ResolvedActionPlan plan : plans) {
             if (stopped) {
-                results.add(ActionExecutionResult.of(plan.ruleCode(), plan.type(), plan.idempotencyKey(),
-                        ActionExecutionStatus.NOT_EXECUTED));
+                ActionExecutionResult skipped = ActionExecutionResult.of(
+                        plan.ruleCode(), plan.type(), plan.idempotencyKey(),
+                        ActionExecutionStatus.NOT_EXECUTED);
+                recordSafe(tenantId, policyResult.policyCode(), skipped, decisionTraceId, correlationId,
+                        plan, fs, context);
+                results.add(skipped);
                 continue;
             }
-            ActionExecutionResult r = executeOne(plan, context, fs, tenantId);
+            ActionExecutionResult r = executeOne(
+                    policyResult.policyCode(),
+                    plan,
+                    context,
+                    fs,
+                    tenantId,
+                    decisionTraceId,
+                    correlationId);
             results.add(r);
             if (r.isFailure() && (fs == FailureStrategy.FAIL_FAST || fs == FailureStrategy.ALL_OR_NOTHING)) {
                 if (fs == FailureStrategy.ALL_OR_NOTHING) {
@@ -75,8 +96,9 @@ public class PolicyExecutor {
         return new PolicyExecutionResult(policyResult.policyCode(), overall(results), results);
     }
 
-    private ActionExecutionResult executeOne(ResolvedActionPlan plan, DecisionContext context,
-                                             FailureStrategy fs, Long tenantId) {
+    private ActionExecutionResult executeOne(String policyCode, ResolvedActionPlan plan, DecisionContext context,
+                                             FailureStrategy fs, Long tenantId,
+                                             String decisionTraceId, String correlationId) {
         String key = plan.idempotencyKey();
         if (key != null && idempotencyStore != null && idempotencyStore.alreadySucceeded(tenantId, key)) {
             return ActionExecutionResult.of(plan.ruleCode(), plan.type(), key, ActionExecutionStatus.SKIPPED);
@@ -85,14 +107,13 @@ public class PolicyExecutor {
         if (handler == null) {
             ActionExecutionResult r = new ActionExecutionResult(plan.ruleCode(), plan.type(), key,
                     ActionExecutionStatus.NO_HANDLER, "no handler for action type " + plan.type());
-            recordSafe(tenantId, r);
+            recordSafe(tenantId, policyCode, r, decisionTraceId, correlationId, plan, fs, context);
             return r;
         }
         try {
-            handler.execute(plan, context);
-            ActionExecutionResult r = ActionExecutionResult.of(plan.ruleCode(), plan.type(), key,
-                    ActionExecutionStatus.SUCCESS);
-            recordSafe(tenantId, r);
+            Map<String, Object> resultPayload = handler.executeWithResult(plan, context);
+            ActionExecutionResult r = ActionExecutionResult.success(plan.ruleCode(), plan.type(), key, resultPayload);
+            recordSafe(tenantId, policyCode, r, decisionTraceId, correlationId, plan, fs, context);
             return r;
         } catch (Exception e) {
             ActionExecutionStatus status = switch (fs) {
@@ -102,15 +123,22 @@ public class PolicyExecutor {
             };
             String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             log.warn("Action {} (rule {}) failed: {}", plan.type(), plan.ruleCode(), msg);
-            ActionExecutionResult r = new ActionExecutionResult(plan.ruleCode(), plan.type(), key, status, msg);
-            recordSafe(tenantId, r);
+            Map<String, Object> resultPayload = e instanceof ActionExecutionException actionFailure
+                    ? actionFailure.resultPayload()
+                    : Map.of();
+            ActionExecutionResult r = new ActionExecutionResult(plan.ruleCode(), plan.type(), key,
+                    status, msg, resultPayload);
+            recordSafe(tenantId, policyCode, r, decisionTraceId, correlationId, plan, fs, context);
             return r;
         }
     }
 
-    private void recordSafe(Long tenantId, ActionExecutionResult r) {
+    private void recordSafe(Long tenantId, String policyCode, ActionExecutionResult r,
+                            String decisionTraceId, String correlationId,
+                            ResolvedActionPlan plan, FailureStrategy failureStrategy, DecisionContext context) {
         if (idempotencyStore != null) {
-            idempotencyStore.record(tenantId, r);
+            idempotencyStore.record(tenantId, policyCode, r, decisionTraceId, correlationId,
+                    plan, failureStrategy, context);
         }
     }
 

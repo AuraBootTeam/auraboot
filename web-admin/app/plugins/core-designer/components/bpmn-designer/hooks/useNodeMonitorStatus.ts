@@ -1,7 +1,7 @@
 /**
  * Hook for node components to resolve their monitor-mode status.
  *
- * Returns 'active' | 'completed' | 'idle' based on the global
+ * Returns 'active' | 'completed' | 'failed' | 'idle' based on the global
  * instanceStatus in the store, or null when not in monitor mode.
  */
 
@@ -15,6 +15,11 @@ export function useNodeMonitorStatus(nodeId: string): NodeMonitorStatus | null {
   if (viewMode !== 'monitor' || !instanceStatus) {
     return null;
   }
+
+  const isFailed =
+    instanceStatus.currentNodes.some((n) => n.nodeId === nodeId && n.status === 'failed') ||
+    instanceStatus.completedNodes.some((n) => n.nodeId === nodeId && n.status === 'failed');
+  if (isFailed) return 'failed';
 
   const isActive = instanceStatus.currentNodes.some((n) => n.nodeId === nodeId);
   if (isActive) return 'active';
@@ -34,6 +39,8 @@ export function getMonitorStatusClasses(status: NodeMonitorStatus | null): strin
       return 'ring-2 ring-blue-500 animate-pulse';
     case 'completed':
       return 'ring-2 ring-green-500';
+    case 'failed':
+      return 'ring-2 ring-red-500';
     case 'idle':
       return 'opacity-50';
     default:

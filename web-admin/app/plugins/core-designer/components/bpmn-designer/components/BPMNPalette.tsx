@@ -11,6 +11,7 @@ import type { PaletteItem } from '~/shared/designer';
 
 interface BPMNPaletteProps {
   onDragStart: (event: React.DragEvent, item: BPMNPaletteItem) => void;
+  className?: string;
 }
 
 // i18n key mapping for palette item types — resolved at render time via t()
@@ -26,7 +27,7 @@ const PALETTE_ITEM_I18N: Record<string, { label: string; description: string }> 
   CALL_ACTIVITY: { label: 'bpmn.palette.callActivity', description: 'bpmn.palette.callActivityDesc' },
 };
 
-export function BPMNPalette({ onDragStart }: BPMNPaletteProps) {
+export function BPMNPalette({ onDragStart, className = 'w-64' }: BPMNPaletteProps) {
   const { t } = useI18n();
 
   const categoryLabels: Record<string, string> = useMemo(() => ({
@@ -61,7 +62,7 @@ export function BPMNPalette({ onDragStart }: BPMNPaletteProps) {
       onItemDragStart={(e, paletteItem) => {
         onDragStart(e, paletteItem.data as BPMNPaletteItem);
       }}
-      className="w-64"
+      className={className}
       testId="bpmn-palette"
     />
   );

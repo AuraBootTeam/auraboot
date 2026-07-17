@@ -18,6 +18,7 @@ export interface TableInput {
   path: string;
   dataType: DataType;
   allowedValues?: unknown[];
+  valueLabels?: Record<string, string>;
 }
 
 export interface TableOutput {
@@ -25,6 +26,7 @@ export interface TableOutput {
   label: string;
   dataType: DataType;
   allowedValues?: unknown[];
+  valueLabels?: Record<string, string>;
 }
 
 export interface TableCell {

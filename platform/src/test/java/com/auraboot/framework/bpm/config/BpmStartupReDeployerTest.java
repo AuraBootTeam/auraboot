@@ -60,6 +60,11 @@ class BpmStartupReDeployerTest extends BaseIntegrationTest {
             </definitions>
             """;
 
+    private static String versionedBpmn(String processKey, int version) {
+        return SIMPLE_BPMN.formatted(processKey)
+                .replace("<process id=", "<process version=\"" + version + ".0.0\" id=");
+    }
+
     @Test
     @DisplayName("Deployed process gets re-registered when listener fires")
     void reRegistersDeployedProcess() {
@@ -107,6 +112,57 @@ class BpmStartupReDeployerTest extends BaseIntegrationTest {
         reDeployer.reDeployPersistedProcessesOnStartup();
         reDeployer.reDeployPersistedProcessesOnStartup();
         // If we reach here without exception the idempotency contract holds.
+    }
+
+    @Test
+    @DisplayName("Already-cached older version does not skip a newer deployed version")
+    void cachedOlderVersionDoesNotSkipNewerVersion() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String processKey = "redeploy-version-" + System.nanoTime();
+
+        BpmProcessDefinition v1 = deploymentService.create(
+                new ProcessDeploymentService.CreateProcessRequest(
+                        processKey,
+                        "Startup Re-Deploy Version Test",
+                        "desc",
+                        "test",
+                        versionedBpmn(processKey, 1),
+                        null,
+                        null,
+                        null));
+        deploymentService.deploy(v1.getPid());
+
+        mapper.clearCurrentVersion(tenantId, processKey);
+        BpmProcessDefinition v2 = BpmProcessDefinition.builder()
+                .pid(UlidGenerator.generate())
+                .tenantId(tenantId)
+                .processKey(processKey)
+                .processName("Startup Re-Deploy Version Test")
+                .description("desc")
+                .category("test")
+                .bpmnContent(versionedBpmn(processKey, 2))
+                .status("deployed")
+                .deploymentId(processKey + ":2")
+                .version(2)
+                .isCurrent(true)
+                .deployedAt(Instant.now())
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .build();
+        mapper.insert(v2);
+
+        reDeployer.reDeployPersistedProcessesOnStartup();
+
+        List<String> cachedVersions = smartEngine.getRepositoryQueryService()
+                .getAllCachedProcessDefinition()
+                .stream()
+                .filter(pd -> processKey.equals(pd.getId()))
+                .map(pd -> pd.getVersion())
+                .toList();
+
+        assertThat(cachedVersions)
+                .as("startup re-deploy must cache every deployed version for %s", processKey)
+                .contains("1.0.0", "2.0.0");
     }
 
     @Test

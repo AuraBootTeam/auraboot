@@ -20,6 +20,7 @@ public interface AutomationLogMapper extends BaseMapper<AutomationLog> {
      * Find log by PID
      */
     @Select("SELECT * FROM ab_automation_log WHERE pid = #{pid}")
+    @ResultMap("mybatis-plus_AutomationLog")
     AutomationLog findByPid(@Param("pid") String pid);
 
     /**
@@ -31,6 +32,7 @@ public interface AutomationLogMapper extends BaseMapper<AutomationLog> {
         ORDER BY created_at DESC
         LIMIT #{limit}
         """)
+    @ResultMap("mybatis-plus_AutomationLog")
     List<AutomationLog> findByAutomationId(
             @Param("automationId") String automationId,
             @Param("limit") int limit);
@@ -44,6 +46,7 @@ public interface AutomationLogMapper extends BaseMapper<AutomationLog> {
         ORDER BY created_at DESC
         LIMIT #{limit}
         """)
+    @ResultMap("mybatis-plus_AutomationLog")
     List<AutomationLog> findByStatus(
             @Param("status") String status,
             @Param("limit") int limit);
@@ -57,6 +60,7 @@ public interface AutomationLogMapper extends BaseMapper<AutomationLog> {
         ORDER BY created_at DESC
         LIMIT #{limit}
         """)
+    @ResultMap("mybatis-plus_AutomationLog")
     List<AutomationLog> findByTriggerRecordPid(
             @Param("recordPid") String recordPid,
             @Param("limit") int limit);

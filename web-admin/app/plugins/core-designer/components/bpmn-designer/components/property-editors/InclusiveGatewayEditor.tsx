@@ -107,6 +107,7 @@ export function InclusiveGatewayEditor({
         title="规则中心路由"
         enabledLabel=""
         enabled={Boolean(config?.ruleBinding)}
+        defaultEnabled
         value={config?.ruleBinding}
         mode="combined"
         consumerCode={processKey}

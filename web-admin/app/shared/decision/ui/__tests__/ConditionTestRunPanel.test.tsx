@@ -45,4 +45,55 @@ describe('ConditionTestRunPanel', () => {
     expect(screen.getByTestId('trp-nl')).toHaveTextContent('优先级');
     expect(screen.getByTestId('trp-note')).toHaveTextContent('以后端 test-run 为准');
   });
+
+  it('renders fact catalog value labels in preview and sample context while preserving raw context values', () => {
+    const leaveCondition: ConditionNode = group('AND', [
+      cmp(path('record', 'data.wd_req_type', 'dict'), 'EQ', lit('annual', 'dict')),
+    ]);
+    render(
+      <ConditionTestRunPanel
+        condition={leaveCondition}
+        samples={[
+          {
+            label: '年假样例',
+            context: { record: { data: { wd_req_type: 'annual' } } },
+          },
+        ]}
+        fields={[
+          {
+            scope: 'record',
+            path: 'data.wd_req_type',
+            label: '请假类型',
+            dataType: 'dict',
+            options: ['annual', 'sick'],
+            valueLabels: {
+              annual: '年假',
+              sick: '病假',
+            },
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByTestId('trp-nl')).toHaveTextContent('请假类型');
+    expect(screen.getByTestId('trp-nl')).toHaveTextContent('年假');
+    expect(screen.getByTestId('trp-nl')).not.toHaveTextContent('annual');
+    expect(screen.getByTestId('trp-context')).toHaveTextContent('请假类型');
+    expect(screen.getByTestId('trp-context')).toHaveTextContent('年假');
+    expect(screen.getByTestId('trp-context')).not.toHaveTextContent('annual');
+    expect(screen.getByTestId('trp-result')).toHaveAttribute('data-truth', 'TRUE');
+  });
+
+  it('can hide empty group preview when a host relies on backend test-run results', () => {
+    render(
+      <ConditionTestRunPanel
+        condition={group('AND', [])}
+        samples={samples}
+        emptyPreviewLabel="当前版本以已发布策略条件为准"
+      />,
+    );
+
+    expect(screen.getByTestId('trp-nl')).toHaveTextContent('当前版本以已发布策略条件为准');
+    expect(screen.queryByTestId('trp-result')).not.toBeInTheDocument();
+  });
 });

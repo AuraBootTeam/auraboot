@@ -2,16 +2,32 @@
   {
     "automationKey": "wd_leave_high_value_notify",
     "name": "长假申请提醒",
-    "description": "When a leave request is created, evaluate the shared Rule Center decision and notify only when the decision matches.",
+    "description": "请假申请创建后先评估规则中心决策，命中长假条件时通知主管。",
     "modelCode": "wd_leave_request",
     "triggerType": "on_record_create",
     "triggerConfig": {
       "modelCode": "wd_leave_request",
+      "testRecordPid": "REQ-LONG-LEAVE-SAMPLE",
+      "testContext": {
+        "record": {
+          "wd_req_code": "REQ-LONG-LEAVE-SAMPLE",
+          "wd_req_applicant": "u_sales_001",
+          "wd_req_type": "annual",
+          "wd_req_days": 5,
+          "wd_req_start_date": "2026-07-06",
+          "wd_req_start_slot": "AM",
+          "wd_req_end_date": "2026-07-10",
+          "wd_req_end_slot": "PM",
+          "status": "submitted"
+        },
+        "source": "ui-test-run"
+      },
       "ruleBinding": {
         "consumerType": "AUTOMATION",
         "consumerCode": "wd_leave_high_value_notify",
         "consumerNodeId": "trigger",
         "bindingKind": "DECISION_REF",
+        "conditionFragmentRefs": ["shared_leave_approval_guard"],
         "enabled": true,
         "decisionBinding": {
           "decisionCode": "leave_request_automation",
@@ -64,14 +80,14 @@
     "actions": [
       {
         "type": "send_notification",
-        "label": "Notify manager",
+        "label": "通知主管",
         "sequence": 0,
         "continueOnError": true,
         "config": {
           "type": "in_app",
           "title": "长假申请提醒",
-          "content": "${recordPid} needs manager attention",
-          "recipients": []
+          "content": "长假申请需要主管关注",
+          "recipients": ["ROLE:wd_manager"]
         }
       }
     ],

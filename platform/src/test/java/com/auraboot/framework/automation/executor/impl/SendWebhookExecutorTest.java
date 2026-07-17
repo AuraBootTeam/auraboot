@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -130,6 +131,15 @@ class SendWebhookExecutorTest {
                 .hasMessageContaining("port");
     }
 
+    @Test
+    void execute_urlTemplateMissingValue_throwsClearResolvedUrlError() {
+        AutomationAction action = buildAction(Map.of("url", "${webhookUrl}"));
+
+        assertThatThrownBy(() -> executor.execute(action, Map.of()))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("resolved url");
+    }
+
     // =========================================================
     // execute() — hostname that doesn't resolve fails fast (pinning)
     // =========================================================
@@ -146,6 +156,97 @@ class SendWebhookExecutorTest {
         assertThatThrownBy(() -> executor.execute(action, Map.of()))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("could not be resolved");
+    }
+
+    // =========================================================
+    // buildPayloadJson() — Rule Center WEBHOOK payload contract
+    // =========================================================
+
+    @Test
+    void buildPayloadJson_mapPayload_injectsEventTypeAndResolvesTemplates() throws Exception {
+        Map<String, Object> config = Map.of(
+                "eventType", "automation.${event}",
+                "payload", Map.of(
+                        "eventType", "payload.value.must.not.win",
+                        "recordPid", "${recordPid}",
+                        "summary", "Updated ${recordPid}",
+                        "record", "${record}",
+                        "nested", Map.of("title", "${record.title}"),
+                        "lines", java.util.List.of("${recordPid}", "${record.title}")
+                )
+        );
+        Map<String, Object> context = Map.of(
+                "event", "record.updated",
+                "recordPid", "REQ-1",
+                "record", Map.of("status", "approved", "title", "请假单")
+        );
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = new ObjectMapper().readValue(executor.buildPayloadJson(config, context), Map.class);
+
+        assertThat(body)
+                .containsEntry("eventType", "automation.record.updated")
+                .containsEntry("recordPid", "REQ-1")
+                .containsEntry("summary", "Updated REQ-1");
+        assertThat(body.get("record")).isEqualTo(Map.of("status", "approved", "title", "请假单"));
+        assertThat(body.get("nested")).isEqualTo(Map.of("title", "请假单"));
+        assertThat(body.get("lines")).isEqualTo(java.util.List.of("REQ-1", "请假单"));
+    }
+
+    @Test
+    void buildPayloadJson_stringPayload_resolvesNestedTriggerPathsAndRecordIdAlias() throws Exception {
+        Map<String, Object> config = Map.of(
+                "payload", "{\"event\":\"e2e.designer.webhook\",\"orderId\":\"${recordId}\",\"title\":\"${trigger.record.title}\"}"
+        );
+        Map<String, Object> context = Map.of(
+                "recordId", "REC-1",
+                "trigger", Map.of(
+                        "recordPid", "REC-1",
+                        "record", Map.of("title", "订单 1"))
+        );
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = new ObjectMapper().readValue(executor.buildPayloadJson(config, context), Map.class);
+
+        assertThat(body)
+                .containsEntry("event", "e2e.designer.webhook")
+                .containsEntry("orderId", "REC-1")
+                .containsEntry("title", "订单 1");
+    }
+
+    @Test
+    void buildPayloadJson_defaultPayload_injectsEventType() throws Exception {
+        Map<String, Object> config = Map.of("eventType", "automation.${event}");
+        Map<String, Object> context = Map.of(
+                "event", "record.created",
+                "automationPid", "AUTO-1",
+                "recordPid", "REC-1"
+        );
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> body = new ObjectMapper().readValue(executor.buildPayloadJson(config, context), Map.class);
+
+        assertThat(body)
+                .containsEntry("eventType", "automation.record.created")
+                .containsEntry("automationPid", "AUTO-1")
+                .containsEntry("recordPid", "REC-1")
+                .containsEntry("event", "record.created");
+    }
+
+    @Test
+    void buildSuccessResult_returnsDirectHttpDeliveryEvidence() {
+        String responseBody = "{\"accepted\":true}";
+
+        Map<String, Object> result = executor.buildSuccessResult(
+                "https://hooks.example/a", 202, responseBody);
+
+        assertThat(result)
+                .containsEntry("success", true)
+                .containsEntry("deliveryMode", "direct_http")
+                .containsEntry("statusCode", 202)
+                .containsEntry("url", "https://hooks.example/a")
+                .containsEntry("responseBodyPreview", responseBody)
+                .containsEntry("responseBytes", responseBody.getBytes(StandardCharsets.UTF_8).length);
     }
 
     // =========================================================

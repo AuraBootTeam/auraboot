@@ -80,4 +80,71 @@ class SmsSenderRouterTest {
         assertThatThrownBy(() -> router.send("+8613800138000", "tpl001", Map.of()))
                 .isInstanceOf(IllegalStateException.class);
     }
+
+    @Test
+    void hasRealSender_falseWhenOnlyNoopSenderIsAvailable() {
+        SmsSenderRouter router = new SmsSenderRouter(List.of(new NoOpSmsSender()));
+
+        assertThat(router.hasRealSender()).isFalse();
+        assertThat(router.realSenderAvailability().available()).isFalse();
+        assertThat(router.realSenderAvailability().providerCodes()).isEmpty();
+        assertThat(router.realSenderAvailability().reason()).contains("未配置真实短信 provider");
+    }
+
+    @Test
+    void realSenderAvailability_reportsConfiguredProviderWhenUnavailable() {
+        SmsSender realSender = mock(SmsSender.class);
+        when(realSender.getProviderCode()).thenReturn("aliyun_sms");
+        when(realSender.isAvailable()).thenReturn(false);
+
+        SmsSenderRouter router = new SmsSenderRouter(List.of(new NoOpSmsSender(), realSender));
+
+        SmsSenderRouter.SmsProviderAvailability availability = router.realSenderAvailability();
+
+        assertThat(availability.available()).isFalse();
+        assertThat(availability.providerCodes()).containsExactly("aliyun_sms");
+        assertThat(availability.reason()).contains("真实短信 provider 当前不可用");
+    }
+
+    @Test
+    void realSenderAvailability_reportsAvailableRealProviderCodes() {
+        SmsSender realSender = mock(SmsSender.class);
+        when(realSender.getProviderCode()).thenReturn("tencent_sms");
+        when(realSender.isAvailable()).thenReturn(true);
+
+        SmsSenderRouter router = new SmsSenderRouter(List.of(new NoOpSmsSender(), realSender));
+
+        SmsSenderRouter.SmsProviderAvailability availability = router.realSenderAvailability();
+
+        assertThat(availability.available()).isTrue();
+        assertThat(availability.providerCodes()).containsExactly("tencent_sms");
+        assertThat(availability.reason()).isNull();
+    }
+
+    @Test
+    void sendWithRealProvider_rejectsNoopFallback() {
+        SmsSenderRouter router = new SmsSenderRouter(List.of(new NoOpSmsSender()));
+
+        assertThatThrownBy(() -> router.sendWithRealProvider("+8613800138000", "tpl001", Map.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No real SMS sender available");
+    }
+
+    @Test
+    void sendWithRealProvider_usesAvailableNonNoopSender() {
+        SmsSender realSender = mock(SmsSender.class);
+        when(realSender.getProviderCode()).thenReturn("tencent_sms");
+        when(realSender.isAvailable()).thenReturn(true);
+        when(realSender.send(eq("+8613800138000"), eq("tpl001"), eq(Map.of("content", "hello"))))
+                .thenReturn(SmsSendResult.ok("msg-real-001"));
+
+        SmsSenderRouter router = new SmsSenderRouter(List.of(new NoOpSmsSender(), realSender));
+
+        SmsSenderRouter.RoutedSmsResult result =
+                router.sendWithRealProvider("+8613800138000", "tpl001", Map.of("content", "hello"));
+
+        assertThat(result.providerCode()).isEqualTo("tencent_sms");
+        assertThat(result.sendResult().getMessageId()).isEqualTo("msg-real-001");
+        verify(realSender).send("+8613800138000", "tpl001", Map.of("content", "hello"));
+    }
 }

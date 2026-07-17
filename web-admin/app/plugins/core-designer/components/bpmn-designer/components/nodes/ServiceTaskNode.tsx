@@ -63,6 +63,13 @@ export const ServiceTaskNode = memo(({ id, data, selected }: NodeProps<BPMNNode>
               </div>
             );
           }
+          if (cfg?.serviceType === 'action') {
+            return (
+              <div className="mt-0.5 w-full truncate px-1 text-center text-[10px] text-gray-400">
+                {cfg.actionType || '平台动作'}
+              </div>
+            );
+          }
           if (cfg?.serviceType) {
             return (
               <div className="mt-0.5 text-center text-[10px] text-gray-400">{cfg.serviceType}</div>
@@ -77,6 +84,11 @@ export const ServiceTaskNode = memo(({ id, data, selected }: NodeProps<BPMNNode>
           <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
           </svg>
+        </div>
+      )}
+      {monitorStatus === 'failed' && (
+        <div className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[11px] font-bold text-white">
+          !
         </div>
       )}
     </div>

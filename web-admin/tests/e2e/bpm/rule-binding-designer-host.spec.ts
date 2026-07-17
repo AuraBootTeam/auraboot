@@ -1,5 +1,5 @@
-import { test, expect, type APIResponse, type Page } from '@playwright/test';
-import { ensureSidebarExpanded, waitForDynamicPageLoad } from '../helpers';
+import { test, expect, type APIResponse, type Locator, type Page } from '@playwright/test';
+import { clickRowActionByLocator, ensureSidebarExpanded, waitForDynamicPageLoad } from '../helpers';
 
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const ADMIN_PASSWORD = 'Test2026x';
@@ -8,6 +8,7 @@ const PROCESS_KEY = `rc_bpm_${TS}`;
 const PROCESS_NAME = `Rule Center BPM ${TS}`;
 const GATEWAY_ID = 'route_gateway';
 const TASK_ID = 'manual_review';
+const SERVICE_TASK_ID = 'notify_via_action';
 const TASK_ASSIGNMENT_DECISION = 'task_assignee';
 
 type ApiEnvelope<T> = {
@@ -230,15 +231,90 @@ function buildDesignerJson(processKey = PROCESS_KEY) {
   };
 }
 
-async function openDesigner(page: Page, pid: string): Promise<void> {
-  await page.goto(`/bpmn-designer?pid=${pid}`, { waitUntil: 'domcontentloaded' });
+function buildServiceTaskActionDesignerJson(processKey = `${PROCESS_KEY}_action`) {
+  return {
+    key: processKey,
+    name: `${PROCESS_NAME} Service Action`,
+    nodes: [
+      {
+        id: 'start',
+        type: 'startEvent',
+        position: { x: 80, y: 180 },
+        data: { type: 'startEvent', label: 'Start', config: {} },
+      },
+      {
+        id: SERVICE_TASK_ID,
+        type: 'serviceTask',
+        position: { x: 310, y: 180 },
+        data: {
+          type: 'serviceTask',
+          label: 'Notify via Action',
+          config: {
+            name: 'Notify via Action',
+            description: 'BPM consumes Rule Center action catalog',
+          },
+        },
+      },
+      {
+        id: 'end',
+        type: 'endEvent',
+        position: { x: 560, y: 180 },
+        data: { type: 'endEvent', label: 'End', config: {} },
+      },
+    ],
+    edges: [
+      {
+        id: 'e_start_action',
+        source: 'start',
+        target: SERVICE_TASK_ID,
+        type: 'smoothstep',
+        data: {},
+      },
+      {
+        id: 'e_action_end',
+        source: SERVICE_TASK_ID,
+        target: 'end',
+        type: 'smoothstep',
+        data: {},
+      },
+    ],
+  };
+}
+
+async function openDesigner(page: Page, pid: string, expectedNodeCount = 5): Promise<void> {
+  await page.goto('/home', { waitUntil: 'domcontentloaded' });
+  await ensureSidebarExpanded(page);
+  const nav = page.locator('nav, aside, [role="navigation"]').first();
+  const link = nav
+    .locator('a[href="/p/bpm_process_management"]')
+    .or(nav.getByRole('link', { name: /流程定义|BPM Process|Process Definition/i }))
+    .first();
+  const parent = nav
+    .getByRole('button', { name: /流程管理|BPM|Process Management|管理|Admin/i })
+    .or(nav.getByRole('link', { name: /流程管理|BPM|Process Management|管理|Admin/i }))
+    .first();
+  if (!(await link.isVisible({ timeout: 1000 }).catch(() => false))) {
+    await parent.click().catch(() => undefined);
+  }
+  await expect(link).toBeVisible({ timeout: 15_000 });
+  await link.click();
+  await expect(page).toHaveURL(/\/p\/bpm_process_management(?:$|\?)/, { timeout: 15_000 });
+  await waitForDynamicPageLoad(page);
+
+  await page.getByTestId('list-search-input').fill(PROCESS_NAME);
+  await page.getByTestId('list-search-input').press('Enter');
+  const row = page.locator('tbody tr').filter({ hasText: PROCESS_NAME }).first();
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await clickRowActionByLocator(page, row, 'open_bpmn_designer', '设计流程');
   await expect(page.locator('.react-flow')).toBeVisible({ timeout: 15_000 });
   await page.waitForFunction(
     () => Boolean((window as unknown as { __bpmnDesignerStore?: unknown }).__bpmnDesignerStore),
     undefined,
     { timeout: 10_000 },
   );
-  await expect(page.locator('.react-flow__node')).toHaveCount(5, { timeout: 10_000 });
+  await expect(page.locator('.react-flow__node')).toHaveCount(expectedNodeCount, {
+    timeout: 10_000,
+  });
 }
 
 async function selectGateway(page: Page): Promise<void> {
@@ -284,6 +360,28 @@ async function selectUserTask(page: Page): Promise<void> {
   });
 }
 
+async function selectServiceTask(page: Page): Promise<void> {
+  await page.evaluate((nodeId) => {
+    const store = (
+      window as unknown as {
+        __bpmnDesignerStore?: { getState: () => Record<string, (...args: unknown[]) => unknown> };
+      }
+    ).__bpmnDesignerStore;
+    if (!store) throw new Error('BPMN store missing');
+    const state = store.getState() as unknown as {
+      setSelectedEdge: (id: string | null) => void;
+      setSelectedNode: (id: string | null) => void;
+    };
+    state.setSelectedEdge(null);
+    state.setSelectedNode(nodeId);
+  }, SERVICE_TASK_ID);
+
+  await page.locator('[data-testid="servicetask-service-type"]').waitFor({
+    state: 'visible',
+    timeout: 5_000,
+  });
+}
+
 async function saveViaUI(page: Page, pid: string): Promise<void> {
   const saveBtn = page.locator('[data-testid="bpmn-toolbar-btn-save"]');
   await expect(saveBtn).toBeVisible({ timeout: 5_000 });
@@ -307,6 +405,127 @@ async function saveViaUI(page: Page, pid: string): Promise<void> {
   ]);
   expect(response.status(), 'save PUT must succeed').toBeLessThan(400);
   await expect(dialog).toBeHidden({ timeout: 5_000 });
+}
+
+async function expectCompiledBpmnRuleBinding(
+  page: Page,
+  pid: string,
+  expectedFragments: string[],
+): Promise<string> {
+  const bpmnXml = await readApi<string>(
+    await page.request.get(`/api/bpm/process-definitions/${pid}/bpmn`),
+  );
+  expect(bpmnXml, 'compiled BPMN XML must be persisted').toBeTruthy();
+  expect(bpmnXml).toContain('name="aura.ruleBinding"');
+  for (const fragment of expectedFragments) {
+    expect(bpmnXml).toContain(fragment);
+  }
+  return bpmnXml;
+}
+
+async function expectImpactPreviewAccessible(ruleSection: Locator): Promise<void> {
+  await ruleSection.locator('[data-testid="decision-rule-section-tab-impact"]').click();
+  await expect(ruleSection.locator('[data-testid="decision-impact-preview"]')).toBeVisible();
+  await expect(ruleSection.locator('[data-testid="decision-impact-preview"]')).toContainText(
+    '影响预览',
+  );
+  await ruleSection.locator('[data-testid="decision-rule-section-tab-decision"]').click();
+  await expect(ruleSection.locator('[data-testid="decision-binding-editor"]')).toBeVisible();
+}
+
+async function configureAmountInputMapping(ruleSection: Locator): Promise<void> {
+  await ruleSection.getByRole('button', { name: '添加映射' }).click();
+  await ruleSection.locator('input[aria-label="mapping-input-0"]').fill('amount');
+  await ruleSection.locator('select[aria-label="mapping-field-0"]').selectOption('record:amount');
+}
+
+async function expectAmountMappingPreview(ruleSection: Locator, decisionName: string): Promise<void> {
+  const preview = ruleSection.locator('[data-testid="decision-binding-preview"]');
+  await expect(preview).toContainText(decisionName);
+  await expect(preview).toContainText('灰度发布');
+  await expect(preview).toContainText('amount');
+  await expect(preview).toContainText('流程金额');
+}
+
+async function expectGatewayBindingReloaded(page: Page, pid: string): Promise<void> {
+  await openDesigner(page, pid);
+  await selectGateway(page);
+
+  const ruleSection = page.locator('[data-testid="exclusivegateway-rule-binding"]');
+  await expect(ruleSection.locator('[data-testid="exclusivegateway-rule-binding-toggle"]')).toBeChecked();
+  await expect(ruleSection.locator('[data-testid="decision-rule-binding-block"]')).toBeVisible();
+  await ruleSection.locator('[data-testid="decision-rule-section-tab-decision"]').click();
+  await expect(ruleSection.locator('select[aria-label="decision-code"]')).toHaveValue(
+    'approval_routing',
+  );
+  await expect(ruleSection.locator('select[aria-label="version-policy"]')).toHaveValue('ROLLOUT');
+  await expect(ruleSection.locator('input[aria-label="mapping-input-0"]')).toHaveValue('amount');
+  await expect(ruleSection.locator('select[aria-label="mapping-field-0"]')).toHaveValue(
+    'record:amount',
+  );
+  await expectAmountMappingPreview(ruleSection, '请假审批分派');
+}
+
+async function expectUserTaskBindingReloaded(page: Page, pid: string): Promise<void> {
+  await openDesigner(page, pid);
+  await selectUserTask(page);
+
+  const ruleSection = page.locator('[data-testid="usertask-rule-binding"]');
+  await expect(ruleSection.locator('[data-testid="usertask-rule-binding-toggle"]')).toBeChecked();
+  await expect(ruleSection.locator('[data-testid="decision-rule-binding-block"]')).toBeVisible();
+  await ruleSection.locator('[data-testid="decision-rule-section-tab-decision"]').click();
+  await expect(ruleSection.locator('select[aria-label="decision-code"]')).toHaveValue(
+    TASK_ASSIGNMENT_DECISION,
+  );
+  await expect(ruleSection.locator('select[aria-label="version-policy"]')).toHaveValue('ROLLOUT');
+  await expect(ruleSection.locator('input[aria-label="mapping-input-0"]')).toHaveValue('amount');
+  await expect(ruleSection.locator('select[aria-label="mapping-field-0"]')).toHaveValue(
+    'record:amount',
+  );
+  await expect(ruleSection.locator('input[aria-label="output-mapping-output-0"]')).toHaveValue(
+    'candidateUserIds',
+  );
+  await expect(ruleSection.locator('select[aria-label="output-mapping-kind-0"]')).toHaveValue(
+    'ACTION_PARAM',
+  );
+  await expect(ruleSection.locator('input[aria-label="output-mapping-path-0"]')).toHaveValue(
+    'candidateUsers',
+  );
+  await expectAmountMappingPreview(ruleSection, '任务分派');
+  await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
+    '候选审批人',
+  );
+  await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
+    '动作参数',
+  );
+}
+
+async function expectServiceTaskActionReloaded(page: Page, pid: string): Promise<void> {
+  await openDesigner(page, pid, 3);
+  await selectServiceTask(page);
+
+  await expect(page.locator('[data-testid="servicetask-service-type"]')).toHaveValue('action');
+  await expect(page.locator('[data-testid="servicetask-action-panel"]')).toBeVisible();
+  await expect(page.locator('[data-testid="servicetask-action-type"]')).toHaveValue('SEND_SMS');
+  await expect(page.locator('[data-testid="servicetask-action-summary"]')).toContainText('不可用');
+  await expect(page.locator('[data-testid="servicetask-action-availability"]')).toContainText(
+    '当前环境未配置真实短信 provider',
+  );
+  await expect(page.locator('[data-testid="servicetask-action-provider"]')).toContainText(
+    '依赖：真实短信 provider · 未配置',
+  );
+  await expect(page.locator('[data-testid="servicetask-action-target"]')).toHaveValue(
+    'PHONE:${record.phone}',
+  );
+  await expect(page.locator('[data-testid="servicetask-action-payload"]')).toHaveValue(
+    '{"content":"流程 ${process.businessKey} 需要审批"}',
+  );
+  await expect(page.locator('[data-testid="servicetask-action-result-var"]')).toHaveValue(
+    'smsResult',
+  );
+  await expect(page.locator('[data-testid="servicetask-action-idempotency"]')).toHaveValue(
+    '${process.instanceId}:${nodeId}:SEND_SMS',
+  );
 }
 
 test('BPM gateway property panel hosts the rule center binding editor and persists it @golden', async ({
@@ -344,17 +563,11 @@ test('BPM gateway property panel hosts the rule center binding editor and persis
     await expect(ruleSection.locator('[data-testid="decision-binding-editor"]')).toContainText(
       '引用规则中心',
     );
-    await expect(ruleSection.locator('[data-testid="decision-impact-preview"]')).toBeVisible();
+    await expectImpactPreviewAccessible(ruleSection);
 
     await ruleSection.locator('select[aria-label="version-policy"]').selectOption('ROLLOUT');
-    await ruleSection.getByRole('button', { name: '添加映射' }).click();
-    await ruleSection.locator('input[aria-label="mapping-input-0"]').fill('amount');
-    await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
-      '"versionPolicy": "ROLLOUT"',
-    );
-    await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
-      '"input": "amount"',
-    );
+    await configureAmountInputMapping(ruleSection);
+    await expectAmountMappingPreview(ruleSection, '请假审批分派');
 
     await page.screenshot({
       path: testInfo.outputPath('bpm-rule-binding-designer-host.png'),
@@ -391,6 +604,191 @@ test('BPM gateway property panel hosts the rule center binding editor and persis
           },
         ],
       },
+    });
+
+    await expectCompiledBpmnRuleBinding(page, pid, [
+      '&quot;decisionCode&quot;:&quot;approval_routing&quot;',
+      '&quot;versionPolicy&quot;:&quot;ROLLOUT&quot;',
+      '&quot;consumerNodeId&quot;:&quot;route_gateway&quot;',
+      '&quot;input&quot;:&quot;amount&quot;',
+    ]);
+    await expectGatewayBindingReloaded(page, pid);
+    await page.screenshot({
+      path: testInfo.outputPath('bpm-rule-binding-designer-reloaded.png'),
+      fullPage: true,
+    });
+  } finally {
+    await page.request.delete(`/api/bpm/process-definitions/${pid}`);
+  }
+});
+
+test('BPM serviceTask consumes action catalog availability and persists platform action config @golden', async ({
+  page,
+  baseURL,
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
+  const resolvedBaseURL = baseURL ?? 'http://127.0.0.1:5212';
+  await loginAsAdmin(page, resolvedBaseURL);
+
+  const processKey = `${PROCESS_KEY}_action`;
+  const processName = `${PROCESS_NAME} Action ServiceTask`;
+  const createResp = await page.request.post('/api/bpm/process-definitions', {
+    data: {
+      processKey,
+      processName,
+      description: 'Rule Center BPM action catalog availability E2E',
+      category: 'e2e-test',
+      bpmnContent: '',
+      designerJson: JSON.stringify(buildServiceTaskActionDesignerJson(processKey)),
+    },
+  });
+  expect(createResp.ok(), `draft create: ${createResp.status()} ${await createResp.text()}`).toBe(
+    true,
+  );
+  const createBody = await createResp.json();
+  const pid = String(createBody?.data?.pid ?? createBody?.data?.id ?? '');
+  expect(pid, 'create must return pid').toBeTruthy();
+
+  try {
+    await openDesigner(page, pid, 3);
+    const catalogResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/decision/actions/catalog') && response.status() < 400,
+      { timeout: 15_000 },
+    );
+    await selectServiceTask(page);
+    await catalogResponse;
+
+    await page.locator('[data-testid="servicetask-service-type"]').selectOption('action');
+    await expect(page.locator('[data-testid="servicetask-action-panel"]')).toBeVisible();
+    await expect(page.locator('[data-testid="servicetask-action-type"]')).toContainText(
+      '发送短信（不可用）',
+    );
+    await page.locator('[data-testid="servicetask-action-type"]').selectOption('SEND_SMS');
+    await expect(page.locator('[data-testid="servicetask-action-summary"]')).toContainText('不可用');
+    await expect(page.locator('[data-testid="servicetask-action-availability"]')).toContainText(
+      '当前环境未配置真实短信 provider',
+    );
+    await expect(page.locator('[data-testid="servicetask-action-provider"]')).toContainText(
+      '依赖：真实短信 provider · 未配置',
+    );
+    await page.locator('[data-testid="servicetask-action-target"]').fill('PHONE:${record.phone}');
+    await page
+      .locator('[data-testid="servicetask-action-payload"]')
+      .fill('{"content":"流程 ${process.businessKey} 需要审批"}');
+    await page.locator('[data-testid="servicetask-action-result-var"]').fill('smsResult');
+    await page
+      .locator('[data-testid="servicetask-action-idempotency"]')
+      .fill('${process.instanceId}:${nodeId}:SEND_SMS');
+
+    await page.screenshot({
+      path: testInfo.outputPath('bpm-servicetask-action-availability.png'),
+      fullPage: true,
+    });
+
+    await saveViaUI(page, pid);
+
+    const getResp = await page.request.get(`/api/bpm/process-definitions/${pid}`);
+    expect(getResp.ok(), `detail get: ${getResp.status()}`).toBe(true);
+    const detail = await getResp.json();
+    const designerJsonText = String(detail?.data?.designerJson ?? '');
+    expect(designerJsonText, 'designerJson must be persisted').toBeTruthy();
+    const designerJson = JSON.parse(designerJsonText) as {
+      nodes: Array<{ id: string; data?: { config?: Record<string, unknown> } }>;
+    };
+    const serviceTask = designerJson.nodes.find((node) => node.id === SERVICE_TASK_ID);
+    expect(serviceTask?.data?.config).toMatchObject({
+      serviceType: 'action',
+      actionType: 'SEND_SMS',
+      actionTarget: 'PHONE:${record.phone}',
+      actionPayloadJson: '{"content":"流程 ${process.businessKey} 需要审批"}',
+      actionResultVar: 'smsResult',
+      actionIdempotencyKey: '${process.instanceId}:${nodeId}:SEND_SMS',
+    });
+
+    const bpmnXml = await readApi<string>(
+      await page.request.get(`/api/bpm/process-definitions/${pid}/bpmn`),
+    );
+    expect(bpmnXml).toContain('smart:class="pluginActionServiceTaskDelegate"');
+    expect(bpmnXml).toContain('smart:action="SEND_SMS"');
+    expect(bpmnXml).toContain('smart:target="PHONE:${record.phone}"');
+    expect(bpmnXml).toContain('smart:resultVar="smsResult"');
+    expect(bpmnXml).toContain('smart:idempotencyKey="${process.instanceId}:${nodeId}:SEND_SMS"');
+    expect(bpmnXml).toContain(
+      'smart:payloadJson="{&quot;content&quot;:&quot;流程 ${process.businessKey} 需要审批&quot;}"',
+    );
+
+    await expectServiceTaskActionReloaded(page, pid);
+    await page.screenshot({
+      path: testInfo.outputPath('bpm-servicetask-action-reloaded.png'),
+      fullPage: true,
+    });
+  } finally {
+    await page.request.delete(`/api/bpm/process-definitions/${pid}`);
+  }
+});
+
+test('BPMN designer compact viewport uses overlay drawers without squeezing the canvas @golden', async ({
+  page,
+  baseURL,
+}, testInfo) => {
+  testInfo.setTimeout(60_000);
+  const resolvedBaseURL = baseURL ?? 'http://127.0.0.1:5212';
+  await loginAsAdmin(page, resolvedBaseURL);
+
+  const processKey = `${PROCESS_KEY}_compact`;
+  const processName = `${PROCESS_NAME} Compact Workspace`;
+  const createResp = await page.request.post('/api/bpm/process-definitions', {
+    data: {
+      processKey,
+      processName,
+      description: 'BPMN compact workspace E2E',
+      category: 'e2e-test',
+      bpmnContent: '',
+      designerJson: JSON.stringify(buildDesignerJson(processKey)),
+    },
+  });
+  expect(createResp.ok(), `draft create: ${createResp.status()} ${await createResp.text()}`).toBe(
+    true,
+  );
+  const createBody = await createResp.json();
+  const pid = String(createBody?.data?.pid ?? createBody?.data?.id ?? '');
+  expect(pid, 'create must return pid').toBeTruthy();
+
+  try {
+    await openDesigner(page, pid);
+    await page.setViewportSize({ width: 632, height: 900 });
+
+    const workspace = page.getByTestId('bpmn-designer-workspace');
+    await expect(workspace).toHaveAttribute('data-layout', 'compact', { timeout: 10_000 });
+    await expect(page.getByTestId('bpmn-palette-shell')).toHaveAttribute('data-open', 'false');
+    await expect(page.getByTestId('bpmn-inspector-shell')).toHaveAttribute('data-open', 'false');
+    await expect(page.getByTestId('bpmn-canvas-shell')).toBeVisible();
+    await expect(page.locator('.react-flow')).toBeVisible();
+    const canvasBox = await page.getByTestId('bpmn-canvas-shell').boundingBox();
+    expect(canvasBox?.width ?? 0, 'compact canvas keeps usable width').toBeGreaterThan(420);
+
+    await page.screenshot({
+      path: testInfo.outputPath('bpmn-compact-canvas.png'),
+      fullPage: true,
+    });
+
+    await page.getByTestId('bpmn-toggle-palette').click();
+    await expect(page.getByTestId('bpmn-palette-shell')).toHaveAttribute('data-open', 'true');
+    await expect(page.getByTestId('bpmn-inspector-shell')).toHaveAttribute('data-open', 'false');
+    await expect(page.getByTestId('bpmn-drawer-backdrop')).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath('bpmn-compact-palette-drawer.png'),
+      fullPage: true,
+    });
+
+    await page.getByTestId('bpmn-toggle-inspector').click();
+    await expect(page.getByTestId('bpmn-palette-shell')).toHaveAttribute('data-open', 'false');
+    await expect(page.getByTestId('bpmn-inspector-shell')).toHaveAttribute('data-open', 'true');
+    await expect(page.getByTestId('bpmn-drawer-backdrop')).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath('bpmn-compact-inspector-drawer.png'),
+      fullPage: true,
     });
   } finally {
     await page.request.delete(`/api/bpm/process-definitions/${pid}`);
@@ -438,22 +836,19 @@ test('BPM userTask property panel hosts rule center assignment and exposes impac
     await expect(ruleSection.locator('select[aria-label="decision-code"]')).toHaveValue(
       TASK_ASSIGNMENT_DECISION,
     );
-    await expect(ruleSection.locator('[data-testid="decision-impact-preview"]')).toBeVisible();
+    await expectImpactPreviewAccessible(ruleSection);
 
     await ruleSection.locator('select[aria-label="version-policy"]').selectOption('ROLLOUT');
-    await ruleSection.getByRole('button', { name: '添加映射' }).click();
-    await ruleSection.locator('input[aria-label="mapping-input-0"]').fill('amount');
-    await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
-      `"decisionCode": "${TASK_ASSIGNMENT_DECISION}"`,
-    );
-    await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
-      '"versionPolicy": "ROLLOUT"',
-    );
-    await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
-      '"input": "amount"',
-    );
+    await configureAmountInputMapping(ruleSection);
+    await expectAmountMappingPreview(ruleSection, '任务分派');
     await ruleSection.getByRole('button', { name: '添加输出' }).click();
-    await ruleSection.locator('input[aria-label="output-mapping-output-0"]').fill(
+    await expect(
+      ruleSection.locator('select[aria-label="output-mapping-output-picker-0"]'),
+    ).toContainText('候选审批人');
+    await ruleSection.locator('select[aria-label="output-mapping-output-picker-0"]').selectOption(
+      'candidateUserIds',
+    );
+    await expect(ruleSection.locator('input[aria-label="output-mapping-output-0"]')).toHaveValue(
       'candidateUserIds',
     );
     await ruleSection.locator('select[aria-label="output-mapping-kind-0"]').selectOption(
@@ -461,13 +856,13 @@ test('BPM userTask property panel hosts rule center assignment and exposes impac
     );
     await ruleSection.locator('input[aria-label="output-mapping-path-0"]').fill('candidateUsers');
     await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
-      '"output": "candidateUserIds"',
+      '候选审批人',
     );
     await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
-      '"kind": "ACTION_PARAM"',
+      '动作参数',
     );
     await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
-      '"path": "candidateUsers"',
+      'candidateUsers',
     );
 
     await page.screenshot({
@@ -511,6 +906,19 @@ test('BPM userTask property panel hosts rule center assignment and exposes impac
           },
         ],
       },
+    });
+
+    await expectCompiledBpmnRuleBinding(page, pid, [
+      '&quot;decisionCode&quot;:&quot;task_assignee&quot;',
+      '&quot;versionPolicy&quot;:&quot;ROLLOUT&quot;',
+      '&quot;consumerNodeId&quot;:&quot;manual_review&quot;',
+      '&quot;output&quot;:&quot;candidateUserIds&quot;',
+      '&quot;path&quot;:&quot;candidateUsers&quot;',
+    ]);
+    await expectUserTaskBindingReloaded(page, pid);
+    await page.screenshot({
+      path: testInfo.outputPath('bpm-usertask-rule-binding-reloaded.png'),
+      fullPage: true,
     });
 
     await readApi(await page.request.post('/api/decision/usage-index/rebuild'));

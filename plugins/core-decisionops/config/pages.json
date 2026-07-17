@@ -313,15 +313,50 @@
     ]
   },
   {
+    "pageKey": "decisionops_condition_fragments_list",
+    "name:zh-CN": "条件片段库",
+    "name:en": "Condition Fragments",
+    "modelCode": "condition_fragment",
+    "kind": "list",
+    "profile": "admin",
+    "schemaVersion": 4,
+    "title": {
+      "zh-CN": "条件片段库",
+      "en-US": "Condition Fragments"
+    },
+    "layout": {
+      "type": "stack",
+      "gap": 12
+    },
+    "extension": {
+      "customOnly": true,
+      "skipFieldMeta": true,
+      "hideSavedViews": true,
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true
+    },
+    "blocks": [
+      {
+        "id": "condition_fragment_library",
+        "blockType": "custom",
+        "component": "ConditionFragmentLibraryBlock",
+        "props": {
+          "defaultScopeType": "SLA"
+        }
+      }
+    ]
+  },
+  {
     "pageKey": "decisionops_event_policies_list",
-    "name:zh-CN": "Event Policy",
+    "name:zh-CN": "事件策略",
     "name:en": "Event Policy",
     "modelCode": "event_policy_definition",
     "kind": "list",
     "profile": "admin",
     "schemaVersion": 4,
     "title": {
-      "zh-CN": "Event Policy",
+      "zh-CN": "事件策略",
       "en-US": "Event Policy"
     },
     "layout": {
@@ -372,35 +407,13 @@
               "width": 220
             },
             {
-              "field": "policyCode",
-              "label": {
-                "zh-CN": "策略编码",
-                "en-US": "Policy Code"
-              },
-              "width": 220
-            },
-            {
               "field": "eventType",
               "label": {
-                "zh-CN": "事件",
+                "zh-CN": "触发事件",
                 "en-US": "Event"
               },
-              "width": 180
-            },
-            {
-              "field": "targetType",
-              "label": {
-                "zh-CN": "目标类型",
-                "en-US": "Target Type"
-              },
-              "width": 140
-            },
-            {
-              "field": "targetKey",
-              "label": {
-                "zh-CN": "目标",
-                "en-US": "Target"
-              },
+              "renderType": "tag",
+              "dictCode": "decisionops_event_type",
               "width": 180
             },
             {
@@ -409,6 +422,8 @@
                 "zh-CN": "阶段",
                 "en-US": "Phase"
               },
+              "renderType": "tag",
+              "dictCode": "decisionops_event_phase",
               "width": 150
             },
             {
@@ -417,6 +432,8 @@
                 "zh-CN": "匹配模式",
                 "en-US": "Match Mode"
               },
+              "renderType": "tag",
+              "dictCode": "decisionops_match_mode",
               "width": 150
             },
             {
@@ -433,6 +450,8 @@
                 "zh-CN": "状态",
                 "en-US": "Status"
               },
+              "renderType": "tag",
+              "dictCode": "decisionops_policy_status",
               "width": 130
             },
             {
@@ -442,14 +461,6 @@
                 "en-US": "Enabled"
               },
               "width": 100
-            },
-            {
-              "field": "owner",
-              "label": {
-                "zh-CN": "负责人",
-                "en-US": "Owner"
-              },
-              "width": 180
             }
           ],
           "rowActions": [
@@ -497,14 +508,14 @@
   },
   {
     "pageKey": "decisionops_event_policies_detail",
-    "name:zh-CN": "Event Policy 详情",
+    "name:zh-CN": "事件策略详情",
     "name:en": "Event Policy Detail",
     "modelCode": "event_policy_definition",
     "kind": "detail",
     "profile": "admin",
     "schemaVersion": 4,
     "title": {
-      "zh-CN": "Event Policy 详情",
+      "zh-CN": "事件策略详情",
       "en-US": "Event Policy Detail"
     },
     "layout": {
@@ -535,6 +546,15 @@
         }
       },
       {
+        "id": "event_policy_definition_workflow",
+        "blockType": "custom",
+        "component": "EventPolicyDesignerBlock",
+        "detailPlacement": "header",
+        "props": {
+          "mode": "detail"
+        }
+      },
+      {
         "id": "event_policy_definition_overview",
         "blockType": "form-section",
         "title": {
@@ -550,26 +570,12 @@
             }
           },
           {
-            "field": "policyCode",
-            "label": {
-              "zh-CN": "策略编码",
-              "en-US": "Policy Code"
-            }
-          },
-          {
             "field": "enabled",
             "label": {
               "zh-CN": "启用",
               "en-US": "Enabled"
             },
             "component": "switch"
-          },
-          {
-            "field": "pid",
-            "label": {
-              "zh-CN": "策略 PID",
-              "en-US": "Policy PID"
-            }
           }
         ]
       },
@@ -586,21 +592,24 @@
             "label": {
               "zh-CN": "事件",
               "en-US": "Event"
-            }
+            },
+            "dictCode": "decisionops_event_type"
           },
           {
             "field": "targetType",
             "label": {
               "zh-CN": "目标类型",
               "en-US": "Target Type"
-            }
+            },
+            "dictCode": "decisionops_target_type"
           },
           {
             "field": "targetKey",
             "label": {
               "zh-CN": "目标",
               "en-US": "Target"
-            }
+            },
+            "dictCode": "decisionops_event_target"
           }
         ]
       },

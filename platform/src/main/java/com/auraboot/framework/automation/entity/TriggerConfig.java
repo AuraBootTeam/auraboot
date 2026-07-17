@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Trigger configuration for automation rules
@@ -26,6 +27,15 @@ public class TriggerConfig {
      * Model code (for data-triggered automations)
      */
     private String modelCode;
+
+    /**
+     * Optional business sample used by the designer Test Run action. This keeps the
+     * product-level verification context with the trigger instead of hard-coding demo
+     * payloads in the frontend.
+     */
+    private String testRecordPid;
+
+    private Map<String, Object> testContext;
 
     // ==================== DecisionRuntime integration (M4) ====================
 

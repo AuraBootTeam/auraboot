@@ -1,0 +1,65 @@
+[
+  {
+    "policyCode": "leave_request_event_policy",
+    "policyName": "请假事件动作策略",
+    "eventType": "LEAVE_REQUEST_CREATED",
+    "targetType": "MODEL",
+    "targetKey": "wd_leave_request",
+    "enabled": true,
+    "phase": "AFTER_COMMIT",
+    "matchMode": "COLLECT_ALL",
+    "executionMode": "ORDERED",
+    "failureStrategy": "CONTINUE_ON_ERROR",
+    "conflictStrategy": "REJECT_ON_CONFLICT",
+    "dedupStrategy": "BY_IDEMPOTENCY_KEY",
+    "publish": true,
+    "rulesJson": [
+      {
+        "ruleCode": "notify_long_leave",
+        "ruleName": "长假通知",
+        "conditionFragmentRef": "shared_leave_approval_guard",
+        "priority": 10,
+        "enabled": true,
+        "decisionBinding": {
+          "decisionCode": "leave_request_automation",
+          "versionPolicy": "LATEST_PUBLISHED",
+          "inputMappings": [
+            {
+              "input": "leaveDays",
+              "source": {
+                "kind": "FIELD",
+                "scope": "record",
+                "path": "data.wd_req_days"
+              }
+            }
+          ],
+          "traceMode": "ALWAYS",
+          "enabled": true
+        },
+        "actions": [
+          {
+            "type": "NOTIFY",
+            "target": "ROLE:wd_manager",
+            "order": 10,
+            "payload": {
+              "channel": "in_app",
+              "title": "长假申请提醒",
+              "content": "长假申请需要主管关注"
+            },
+            "idempotencyKeyTemplate": "${record.data.wd_req_no}:notify_long_leave:NOTIFY"
+          },
+          {
+            "type": "WRITE_AUDIT",
+            "target": "MODEL:wd_leave_request",
+            "order": 20,
+            "payload": {
+              "message": "长假申请事件策略已命中",
+              "severity": "info"
+            },
+            "idempotencyKeyTemplate": "${record.data.wd_req_no}:notify_long_leave:WRITE_AUDIT"
+          }
+        ]
+      }
+    ]
+  }
+]
