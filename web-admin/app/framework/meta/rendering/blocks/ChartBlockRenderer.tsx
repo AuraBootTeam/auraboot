@@ -131,13 +131,13 @@ export const ChartBlockRenderer: React.FC<ChartBlockRendererProps> = ({ block, r
 
   if (!ChartComponent) {
     return (
-      <div className="rounded-card flex h-64 items-center justify-center border border-yellow-200 bg-yellow-50">
+      <div className="rounded-card border-status-amber bg-status-amber-bg flex h-64 items-center justify-center border">
         <div className="text-center">
-          <p className="font-medium text-yellow-800">Unsupported chart type</p>
-          <p className="mt-1 text-sm text-yellow-600">
-            <code className="rounded bg-yellow-100 px-1 py-0.5">{chartType}</code>
+          <p className="text-status-amber font-medium">Unsupported chart type</p>
+          <p className="text-status-amber mt-1 text-sm">
+            <code className="bg-status-amber-bg rounded px-1 py-0.5">{chartType}</code>
           </p>
-          <p className="mt-2 text-xs text-yellow-500">
+          <p className="text-text-3 mt-2 text-xs">
             Supported: {getSupportedChartTypes().join(', ')}
           </p>
         </div>

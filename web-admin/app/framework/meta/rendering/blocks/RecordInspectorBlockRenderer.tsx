@@ -63,7 +63,7 @@ export const RecordInspectorBlockRenderer: React.FC<RecordInspectorBlockRenderer
   return (
     <aside className="rounded-card border-border bg-panel border" data-testid="record-inspector">
       {title && (
-        <div className="border-b border-gray-100 px-4 py-3">
+        <div className="border-b border-border px-4 py-3">
           <h3 className="text-text text-sm font-semibold">{title}</h3>
         </div>
       )}

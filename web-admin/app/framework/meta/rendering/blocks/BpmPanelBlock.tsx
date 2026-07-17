@@ -141,7 +141,7 @@ export function BpmPanelBlock({ block, record, recordPid }: BpmPanelBlockProps) 
       <div
         data-testid="bpm-panel"
         data-state="error"
-        className="bg-status-red-bg rounded border border-red-200 p-6 text-sm text-red-700"
+        className="bg-status-red-bg rounded border border-status-red p-6 text-sm text-status-red"
       >
         Failed to load workflow state: {error.message}
       </div>

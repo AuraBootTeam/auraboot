@@ -218,7 +218,7 @@ export const TraceGraphBlockRenderer: React.FC<TraceGraphBlockRendererProps> = (
       <div
         role="alert"
         data-testid="trace-graph-error"
-        className="bg-status-red-bg text-status-red rounded border border-red-200 p-4 text-sm"
+        className="bg-status-red-bg text-status-red rounded border border-status-red p-4 text-sm"
       >
         {message || 'Failed to load trace data'}
       </div>

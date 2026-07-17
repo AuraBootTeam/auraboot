@@ -31,9 +31,9 @@ const CATEGORY_ICONS: Record<string, string> = {
 };
 
 const PRIORITY_STYLES: Record<string, string> = {
-  HIGH: 'border-l-red-500 bg-red-50',
-  MEDIUM: 'border-l-amber-500 bg-amber-50',
-  LOW: 'border-l-blue-500 bg-blue-50',
+  HIGH: 'border-l-status-red bg-status-red-bg',
+  MEDIUM: 'border-l-status-amber bg-status-amber-bg',
+  LOW: 'border-l-status-blue bg-status-blue-bg',
 };
 
 export function NbaSuggestionBar({ modelCode, recordPid, token }: NbaSuggestionBarProps) {
@@ -74,7 +74,7 @@ export function NbaSuggestionBar({ modelCode, recordPid, token }: NbaSuggestionB
   if (loading || dismissed || suggestions.length === 0) return null;
 
   return (
-    <div className="border-b border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-3">
+    <div className="border-border bg-subtle border-b px-6 py-3">
       <div className="mb-2 flex items-center justify-between">
         <div className="text-accent flex items-center gap-1.5 text-xs font-medium">
           <svg

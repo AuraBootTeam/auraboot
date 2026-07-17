@@ -105,23 +105,23 @@ function resolveMappedLabel(
 }
 
 const statusToneClass: Record<string, string> = {
-  default: 'border-gray-200 bg-gray-50 text-gray-700',
-  gray: 'border-gray-200 bg-gray-50 text-gray-700',
-  blue: 'border-blue-200 bg-blue-50 text-blue-700',
-  green: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-  amber: 'border-amber-200 bg-amber-50 text-amber-700',
-  red: 'border-rose-200 bg-rose-50 text-rose-700',
-  purple: 'border-purple-200 bg-purple-50 text-purple-700',
+  default: 'border-status-gray bg-status-gray-bg text-status-gray',
+  gray: 'border-status-gray bg-status-gray-bg text-status-gray',
+  blue: 'border-status-blue bg-status-blue-bg text-status-blue',
+  green: 'border-status-green bg-status-green-bg text-status-green',
+  amber: 'border-status-amber bg-status-amber-bg text-status-amber',
+  red: 'border-status-red bg-status-red-bg text-status-red',
+  purple: 'border-status-blue bg-status-blue-bg text-status-blue',
 };
 
 const statusDotClass: Record<string, string> = {
-  default: 'bg-gray-400',
-  gray: 'bg-gray-400',
-  blue: 'bg-blue-500',
-  green: 'bg-emerald-500',
-  amber: 'bg-amber-500',
-  red: 'bg-rose-500',
-  purple: 'bg-purple-500',
+  default: 'bg-status-gray',
+  gray: 'bg-status-gray',
+  blue: 'bg-status-blue',
+  green: 'bg-status-green',
+  amber: 'bg-status-amber',
+  red: 'bg-status-red',
+  purple: 'bg-status-blue',
 };
 
 export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProps> = ({
@@ -267,7 +267,7 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
               aria-pressed={active}
               className={`rounded-card w-full border p-3 text-left transition ${
                 active
-                  ? 'bg-accent-weak border-blue-400 shadow-sm'
+                  ? 'bg-accent-weak border-accent shadow-card'
                   : 'border-border bg-panel hover:bg-subtle'
               }`}
             >
@@ -276,7 +276,7 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
                   <div className="flex min-w-0 flex-wrap items-center gap-2">
                     <div className="text-text truncate text-sm font-semibold">{String(title)}</div>
                     {domain && (
-                      <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600">
+                      <span className="rounded-pill border-border bg-subtle text-text-2 border px-2 py-0.5 text-xs font-medium">
                         {String(domain)}
                       </span>
                     )}
@@ -295,7 +295,7 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
                     </span>
                   )}
                   {score !== undefined && (
-                    <span className="rounded-full bg-emerald-50 px-2 py-1 text-xs text-emerald-700">
+                    <span className="rounded-pill bg-status-green-bg text-status-green px-2 py-1 text-xs">
                       {String(score)}
                     </span>
                   )}
@@ -333,7 +333,7 @@ export const CandidateListBlockRenderer: React.FC<CandidateListBlockRendererProp
         })}
       </div>
       {actions.length > 0 && (
-        <div className="flex flex-wrap gap-2 border-t border-gray-100 pt-3">
+        <div className="border-border flex flex-wrap gap-2 border-t pt-3">
           {actions.map((actionConfig: any) => {
             if (actionConfig.visibleWhen) {
               const visible = evaluator.evaluateCondition(actionConfig.visibleWhen, context);

@@ -16,19 +16,19 @@ export interface StatusBannerBlockRendererProps {
 }
 
 const toneClass: Record<string, string> = {
-  blue: 'border-blue-200 bg-blue-50 text-blue-900',
-  amber: 'border-amber-200 bg-amber-50 text-amber-900',
-  red: 'border-rose-200 bg-rose-50 text-rose-900',
-  green: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-  gray: 'border-gray-200 bg-gray-50 text-gray-900',
+  blue: 'border-status-blue bg-status-blue-bg text-status-blue',
+  amber: 'border-status-amber bg-status-amber-bg text-status-amber',
+  red: 'border-status-red bg-status-red-bg text-status-red',
+  green: 'border-status-green bg-status-green-bg text-status-green',
+  gray: 'border-status-gray bg-status-gray-bg text-status-gray',
 };
 
 const dotClass: Record<string, string> = {
-  blue: 'bg-blue-500',
-  amber: 'bg-amber-500',
-  red: 'bg-rose-500',
-  green: 'bg-emerald-500',
-  gray: 'bg-gray-500',
+  blue: 'bg-status-blue',
+  amber: 'bg-status-amber',
+  red: 'bg-status-red',
+  green: 'bg-status-green',
+  gray: 'bg-status-gray',
 };
 
 function readLocalizedMapValue(
@@ -275,7 +275,7 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
       <div
         role="alert"
         data-testid={`status-banner-${block.id || 'block'}-error`}
-        className="rounded-card border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800"
+        className="rounded-card border-status-red bg-status-red-bg text-status-red border p-3 text-sm"
       >
         {message}
       </div>
@@ -359,7 +359,7 @@ export const StatusBannerBlockRenderer: React.FC<StatusBannerBlockRendererProps>
                 >
                   {href ? (
                     <a
-                      className="text-accent inline-block max-w-full cursor-pointer break-words underline decoration-blue-500 underline-offset-2 hover:text-blue-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+                      className="text-accent inline-block max-w-full cursor-pointer break-words underline decoration-accent underline-offset-2 hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
                       href={href}
                       onClick={(event) => handleSummaryLinkClick(event, href)}
                     >

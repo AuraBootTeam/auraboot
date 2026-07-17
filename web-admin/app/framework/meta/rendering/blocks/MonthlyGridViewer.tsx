@@ -158,7 +158,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
               metrics.map((metric) => (
                 <th
                   key={`metric-${m}-${metric.field}`}
-                  className="text-text-2 border-l border-gray-100 px-2 py-2 text-right text-xs font-medium"
+                  className="text-text-2 border-l border-border px-2 py-2 text-right text-xs font-medium"
                 >
                   {metric.label ? getLocalizedText(metric.label as any, locale, t) : metric.field}
                 </th>
@@ -167,7 +167,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
             {metrics.map((metric) => (
               <th
                 key={`total-${metric.field}`}
-                className="text-text-2 border-l border-gray-100 px-2 py-2 text-right text-xs font-medium"
+                className="text-text-2 border-l border-border px-2 py-2 text-right text-xs font-medium"
               >
                 {metric.label ? getLocalizedText(metric.label as any, locale, t) : metric.field}
               </th>
@@ -195,7 +195,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
                     return (
                       <td
                         key={`${parentPid}-${month}-${metric.field}`}
-                        className="text-text-2 border-l border-gray-100 px-2 py-2 text-right text-sm"
+                        className="text-text-2 border-l border-border px-2 py-2 text-right text-sm"
                       >
                         {formatNumber(value)}
                       </td>
@@ -230,7 +230,7 @@ export const MonthlyGridViewer: React.FC<MonthlyGridViewerProps> = ({
                 return (
                   <td
                     key={`summary-${month}-${metric.field}`}
-                    className="text-text border-l border-gray-100 px-2 py-2 text-right text-sm font-semibold"
+                    className="text-text border-l border-border px-2 py-2 text-right text-sm font-semibold"
                   >
                     {formatNumber(monthTotal)}
                   </td>
