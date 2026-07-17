@@ -903,6 +903,28 @@ async function seedQuoteScaffold(
   }
 }
 
+/**
+ * A non-standard / templateless customer BOM: header on row 1 (index 0), arbitrary column order and
+ * Chinese names — NOT the fixed 12-column standard deliverable. The upload entry auto-detects this as
+ * a "quick" import (qo_bi_source_mode='quick'), captures the raw columns for the Yunhan upload-bom lane
+ * (qo_bi_raw_head / qo_bir_raw_cells), and parses lines via header-scan + Chinese-alias detection.
+ * D1 uses a real MPN (1N4148W) the Yunhan sandbox catalog prices, so a live pricing leg can assert > 0.
+ */
+export function createNonStandardBomWorkbook(filePath: string): string {
+  mkdirSync(path.dirname(filePath), { recursive: true });
+  const workbook = XLSXUtils.book_new();
+  const worksheet = XLSXUtils.aoa_to_sheet([
+    ['位号', '规格描述', '封装', '数量', '品牌', '料号'],
+    ['R1,R2', '10kΩ ±1% 贴片电阻', '0603', 2, 'YAGEO', 'RC0603FR-0710KL'],
+    ['C1', '0.1uF 50V X7R 贴片电容', '0603', 1, 'SAMSUNG', 'CL10B104KB8NNNC'],
+    ['D1', '开关二极管', 'SOD-123', 10, 'MDD', '1N4148W'],
+  ]);
+  XLSXUtils.book_append_sheet(workbook, worksheet, 'BOM');
+  const bytes = write(workbook, { bookType: 'xlsx', type: 'buffer' });
+  writeFileSync(filePath, bytes);
+  return filePath;
+}
+
 export async function seedQuoteForCorrectedBomUpload(page: Page): Promise<CreatedRows> {
   return seedQuoteScaffold(page, 'CBOM', [], 'consumer');
 }
