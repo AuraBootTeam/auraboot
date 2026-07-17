@@ -209,11 +209,11 @@ compileTestJava {
 
 // 版本管理
 ext {
-    jacksonVersion = '2.21.3'
-    sentryVersion = '6.28.0'
+    jacksonVersion = '2.22.1'
+    sentryVersion = '6.34.0'
     jwtVersion = '0.13.0'
-    mybatisPlusVersion = '3.5.16'
-    lombokVersion = '1.18.40'
+    mybatisPlusVersion = '3.5.17'
+    lombokVersion = '1.18.46'
     aspectjVersion = '1.9.25.1'
     reflectasmVersion = '1.11.3'
     validationApiVersion = '2.0.1.Final'
@@ -222,9 +222,9 @@ ext {
     pf4jSpringVersion = '0.10.0'
     // Drools Rule Engine
     droolsVersion = '8.44.2.Final'
-    xxlJobVersion = '3.4.0'
+    xxlJobVersion = '3.4.2'
     springKafkaVersion = '3.2.0'
-    kafkaClientsVersion = '3.7.0'
+    kafkaClientsVersion = '3.9.2'
     testWorkerNum = project.findProperty('workerNum') ?: '1'
 }
 
@@ -290,7 +290,7 @@ dependencies {
     // Pulled in transitively only when the iot-tdengine bean profile is
     // active; HikariCP + spring-jdbc come from spring-boot-starter-jdbc
     // already on the classpath.
-    implementation 'com.taosdata.jdbc:taos-jdbcdriver:3.3.3'
+    implementation 'com.taosdata.jdbc:taos-jdbcdriver:3.9.0'
 
     // Micrometer Prometheus registry for metrics export
     implementation 'io.micrometer:micrometer-registry-prometheus'
@@ -359,23 +359,23 @@ dependencies {
     }
 
     // 数据库 — PostgreSQL (default) and MySQL (optional)
-    implementation 'org.postgresql:postgresql:42.7.11'
+    implementation 'org.postgresql:postgresql:42.7.13'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
     // Apache POI for Excel export + RAG document parsing (docx / pptx / xlsx)
     implementation 'org.apache.poi:poi:5.5.1'
     implementation 'org.apache.poi:poi-ooxml:5.5.1'
-    implementation 'org.apache.pdfbox:pdfbox:2.0.36'
+    implementation 'org.apache.pdfbox:pdfbox:2.0.37'
 
     // Legacy binary Office formats (.ppt / .xls) for RAG ingestion — HSLF / HSSF live here,
     // not in poi-ooxml. Users have decks that predate OOXML and uploading them used to be refused.
     implementation 'org.apache.poi:poi-scratchpad:5.5.1'
 
     // HTML parsing for RAG document ingestion (DocumentParserService)
-    implementation 'org.jsoup:jsoup:1.17.2'
+    implementation 'org.jsoup:jsoup:1.22.2'
 
     // Firebase Admin SDK for FCM push notifications (APNs + FCM unified)
-    implementation('com.google.firebase:firebase-admin:9.9.0') {
+    implementation('com.google.firebase:firebase-admin:9.10.0') {
         exclude group: 'com.google.guava', module: 'listenablefuture'
     }
 
@@ -395,7 +395,7 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
 
     // Swagger/OpenAPI 3
-    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.8'
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17'
 
     // Jakarta注解
     implementation 'jakarta.annotation:jakarta.annotation-api'
@@ -423,11 +423,11 @@ dependencies {
     // approach for CGLIB-proxied Spring beans, which mis-attributes coverage across the many
     // @SpringBootTest contexts in the full suite (proxy class IDs differ per evicted/recreated
     // context, so the dumped proxy no longer matches the exec — the bundle then reads ~5%).
-    jacocoAnt 'org.jacoco:org.jacoco.ant:0.8.12'
-    jacocoRuntime 'org.jacoco:org.jacoco.agent:0.8.12:runtime'
+    jacocoAnt 'org.jacoco:org.jacoco.ant:0.8.15'
+    jacocoRuntime 'org.jacoco:org.jacoco.agent:0.8.15:runtime'
 
     // PostgreSQL 数据库用于测试
-    testImplementation 'org.postgresql:postgresql:42.7.11'
+    testImplementation 'org.postgresql:postgresql:42.7.13'
 
     // TestContainers — ephemeral MySQL for connector SDK tests
     testImplementation platform('org.testcontainers:testcontainers-bom:1.21.4')
@@ -440,7 +440,7 @@ dependencies {
     testImplementation 'org.awaitility:awaitility:4.3.0'
 
     // Avro schema compatibility tests for Kafka-backed telemetry contracts.
-    testImplementation 'org.apache.avro:avro:1.11.3'
+    testImplementation 'org.apache.avro:avro:1.12.1'
 
     // JUnit 5 Platform
     testImplementation 'org.junit.jupiter:junit-jupiter-api'
@@ -466,7 +466,7 @@ dependencies {
     // Google OAuth (for ID token verification) + Gmail API
     implementation 'com.google.api-client:google-api-client:2.9.0'
     implementation 'com.google.apis:google-api-services-gmail:v1-rev20240520-2.0.0'
-    implementation 'com.google.http-client:google-http-client-jackson2:1.44.1'
+    implementation 'com.google.http-client:google-http-client-jackson2:1.47.1'
 
     // Drools Rule Engine
     implementation "org.drools:drools-core:${droolsVersion}"

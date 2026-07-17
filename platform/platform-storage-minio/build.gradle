@@ -30,11 +30,11 @@ dependencies {
     compileOnly 'org.slf4j:slf4j-api:2.0.18'
 
     // MinIO SDK
-    implementation 'io.minio:minio:8.5.7'
+    implementation 'io.minio:minio:8.6.0'
 
     // Lombok
-    compileOnly 'org.projectlombok:lombok:1.18.40'
-    annotationProcessor 'org.projectlombok:lombok:1.18.40'
+    compileOnly 'org.projectlombok:lombok:1.18.46'
+    annotationProcessor 'org.projectlombok:lombok:1.18.46'
 
     // Test against root platform classes only; avoid pulling the full root runtime graph
     testImplementation(project(':')) {
@@ -46,8 +46,8 @@ dependencies {
     testImplementation 'org.springframework:spring-beans:6.2.18'
     testImplementation 'org.springframework.boot:spring-boot:3.5.14'
     testImplementation 'org.slf4j:slf4j-api:2.0.18'
-    testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.21'
-    testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.16'
+    testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.22'
+    testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.17'
 
     testImplementation 'org.junit.jupiter:junit-jupiter:5.14.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.14.4'
