@@ -375,7 +375,7 @@ dependencies {
     implementation 'org.jsoup:jsoup:1.17.2'
 
     // Firebase Admin SDK for FCM push notifications (APNs + FCM unified)
-    implementation('com.google.firebase:firebase-admin:9.9.0') {
+    implementation('com.google.firebase:firebase-admin:9.10.0') {
         exclude group: 'com.google.guava', module: 'listenablefuture'
     }
 
