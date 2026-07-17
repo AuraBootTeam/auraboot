@@ -226,6 +226,48 @@
     "visible": true
   },
   {
+    "code": "ops_troubleshooting",
+    "parentCode": "system_management",
+    "name": "鹰眼排障台",
+    "name:zh-CN": "鹰眼排障台",
+    "name:en": "Troubleshooting",
+    "path": "/ops/troubleshooting",
+    "component": null,
+    "icon": "search-check",
+    "type": 1,
+    "permissionCode": "system_management",
+    "orderNo": 90,
+    "visible": true
+  },
+  {
+    "code": "ops_error_board",
+    "parentCode": "system_management",
+    "name": "错误看板",
+    "name:zh-CN": "错误看板",
+    "name:en": "Error Board",
+    "path": "/ops/errors",
+    "component": null,
+    "icon": "alert-triangle",
+    "type": 1,
+    "permissionCode": "system_management",
+    "orderNo": 91,
+    "visible": true
+  },
+  {
+    "code": "ops_runtime_metrics",
+    "parentCode": "system_management",
+    "name": "运行时指标",
+    "name:zh-CN": "运行时指标",
+    "name:en": "Runtime Metrics",
+    "path": "/ops/runtime",
+    "component": null,
+    "icon": "activity",
+    "type": 1,
+    "permissionCode": "system_management",
+    "orderNo": 92,
+    "visible": true
+  },
+  {
     "code": "cloud_config_manage",
     "parentCode": "system_management",
     "name": "云服务配置",

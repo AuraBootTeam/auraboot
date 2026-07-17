@@ -267,6 +267,14 @@ export default function App() {
     setFederationRuntimeProfile(data.runtimeProfile);
   }, [data.runtimeProfile, setFederationRuntimeProfile]);
 
+  // Capture uncaught front-end errors → /api/client-errors so they surface in the
+  // in-app troubleshooting center (/ops/errors) instead of vanishing.
+  useEffect(() => {
+    void import('~/shared/observability/clientErrorReporter').then(({ installClientErrorReporter }) =>
+      installClientErrorReporter(),
+    );
+  }, []);
+
   const appFrame = (
     <>
       {data.bootstrapStatus && !data.bootstrapStatus.initialized && (

@@ -31,4 +31,22 @@ export const RESOURCES: PluginResource[] = [
     menu: { order: 50, group: 'ops' },
     file: './plugins/core-ops/pages/documents/index.tsx',
   },
+  {
+    key: 'ops.troubleshooting', path: '/ops/troubleshooting',
+    title: { en: 'Troubleshooting', zh: '鹰眼排障台' }, icon: 'search-check',
+    menu: { order: 60, group: 'ops' },
+    file: './plugins/core-ops/pages/troubleshooting/index.tsx',
+  },
+  {
+    key: 'ops.error-board', path: '/ops/errors',
+    title: { en: 'Error Board', zh: '错误看板' }, icon: 'alert-triangle',
+    menu: { order: 70, group: 'ops' },
+    file: './plugins/core-ops/pages/errors/index.tsx',
+  },
+  {
+    key: 'ops.runtime-metrics', path: '/ops/runtime',
+    title: { en: 'Runtime Metrics', zh: '运行时指标' }, icon: 'activity',
+    menu: { order: 80, group: 'ops' },
+    file: './plugins/core-ops/pages/runtime/index.tsx',
+  },
 ]

@@ -7,6 +7,8 @@ import com.auraboot.framework.audit.entity.AdminEventLog;
 import com.auraboot.framework.audit.mapper.AdminEventLogMapper;
 import com.auraboot.framework.behavior.entity.BehaviorEvent;
 import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
+import com.auraboot.framework.meta.entity.CommandAuditLog;
+import com.auraboot.framework.meta.mapper.CommandAuditLogMapper;
 import com.auraboot.framework.observability.dto.CorrelationView;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +33,8 @@ import static org.mockito.Mockito.when;
 class CorrelationQueryServiceTest {
 
     @Mock
+    private CommandAuditLogMapper commandAuditLogMapper;
+    @Mock
     private GenAiUsageMapper genAiUsageMapper;
     @Mock
     private BehaviorEventMapper behaviorEventMapper;
@@ -51,8 +55,12 @@ class CorrelationQueryServiceTest {
     }
 
     @Test
-    @DisplayName("byTrace assembles all three domains for the given trace id")
+    @DisplayName("byTrace assembles all four domains for the given trace id")
     void byTraceAssemblesAllDomains() {
+        CommandAuditLog cmd = new CommandAuditLog();
+        cmd.setCommandCode("demo.create");
+        cmd.setTraceId("trace-abc");
+        when(commandAuditLogMapper.findByTraceId(7L, "trace-abc")).thenReturn(List.of(cmd));
         when(genAiUsageMapper.selectList(any())).thenReturn(List.of(new GenAiUsageRecord()));
         when(behaviorEventMapper.selectList(any())).thenReturn(List.of(new BehaviorEvent()));
         when(adminEventLogMapper.selectList(any())).thenReturn(List.of(new AdminEventLog()));
@@ -60,6 +68,9 @@ class CorrelationQueryServiceTest {
         CorrelationView view = service.byTrace("trace-abc");
 
         assertThat(view.getTraceId()).isEqualTo("trace-abc");
+        assertThat(view.getCommandAudits()).hasSize(1);
+        assertThat(view.getCommandAudits().get(0).getCommandCode()).isEqualTo("demo.create");
+        assertThat(view.getCommandAudits().get(0).getTraceId()).isEqualTo("trace-abc");
         assertThat(view.getLlmUsage()).hasSize(1);
         assertThat(view.getBehaviorEvents()).hasSize(1);
         assertThat(view.getAuditEvents()).hasSize(1);
