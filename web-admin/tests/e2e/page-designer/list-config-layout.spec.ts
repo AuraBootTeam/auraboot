@@ -18,15 +18,18 @@ test.beforeAll(async ({ browser }) => {
       modelCode: 'tenant',
       blocks: [
         {
+          id: 'blk_filters_1',
           blockType: 'filters',
           fields: ['name'],
           actions: ['search', 'reset'],
         },
         {
+          id: 'blk_toolbar_2',
           blockType: 'toolbar',
           buttons: [{ preset: 'create' }],
         },
         {
+          id: 'blk_table_3',
           blockType: 'table',
           dataSource: 'tableData',
           columns: [{ field: 'name', width: 180 }, 'createdAt'],

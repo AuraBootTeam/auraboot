@@ -196,7 +196,7 @@ async function seedLeaveDraft(
   const body = await resp.json();
   expect(String(body?.code)).toBe('0');
   const recordId = String(
-    body?.data?.data?.recordId ?? body?.data?.data?.pid ?? body?.data?.data?.id ?? '',
+    body?.data?.data?.recordPid ?? body?.data?.data?.pid ?? body?.data?.data?.id ?? '',
   );
   expect(recordId, 'create must return a recordId').toBeTruthy();
 
@@ -208,7 +208,7 @@ async function seedLeaveDraft(
     {
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       data: {
-        targetRecordId: recordId,
+        targetRecordPid: recordId,
         operationType: 'UPDATE',
         payload: {
           wd_req_applicant: applicantUserId,

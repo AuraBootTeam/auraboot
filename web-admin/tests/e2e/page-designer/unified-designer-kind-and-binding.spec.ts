@@ -2795,6 +2795,13 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   test('undoes and redoes a list action-bar subtree move-before between tab and list root', async ({
     page,
   }) => {
+    // Deep cross-container tree: with the taller WYSIWYG previews it no longer
+    // fits the default 720px-tall viewport, which pushes the drag source (the
+    // candidate, nested deep in the tab) below the fold so the pointer press
+    // never starts the @dnd-kit drag. Render tall enough that source + target
+    // both stay on-screen and out of the auto-scroll edge zones. Set before the
+    // designer mounts so @dnd-kit measures its droppable rects at this size.
+    await page.setViewportSize({ width: 1280, height: 2200 });
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'action-bar', {
       source: 'tab',
     });
@@ -2898,6 +2905,13 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
   test('undoes and redoes a list widget move-before between tab and list root', async ({
     page,
   }) => {
+    // Deep cross-container tree: with the taller WYSIWYG previews it no longer
+    // fits the default 720px-tall viewport, which pushes the drag source (the
+    // candidate, nested deep in the tab) below the fold so the pointer press
+    // never starts the @dnd-kit drag. Render tall enough that source + target
+    // both stay on-screen and out of the auto-scroll edge zones. Set before the
+    // designer mounts so @dnd-kit measures its droppable rects at this size.
+    await page.setViewportSize({ width: 1280, height: 2200 });
     const { pageKey: listKey, pid } = await createCrossContainerListBlockPage(page, 'widget', {
       source: 'tab',
     });
@@ -2996,6 +3010,13 @@ test.describe('Unified designer — kind collapse, i18n, model binding', () => {
     test(`undoes and redoes moving a ${blockType} leaf before another ${blockType}`, async ({
       page,
     }) => {
+      // Deep cross-container tree: with the taller WYSIWYG previews it no longer
+      // fits the default 720px-tall viewport, so the drag source/target land in
+      // @dnd-kit's auto-scroll edge zone where the geometry shifts mid-drag and
+      // the leaf drop lands on the wrong sibling. Render tall enough that the
+      // whole tree fits on-screen. Set before the designer mounts so @dnd-kit
+      // measures its droppable rects at this size.
+      await page.setViewportSize({ width: 1280, height: 2200 });
       const isColumn = blockType === 'column';
       const sourceParentId = isColumn ? 'table_source' : 'filter_bar_source';
       const targetParentId = isColumn ? 'table_target' : 'filter_bar_target';

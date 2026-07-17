@@ -115,7 +115,7 @@ async function seedAndSubmitLeave(
   const createBody = await createResp.json();
   expect(String(createBody?.code)).toBe('0');
   const pid = String(
-    createBody?.data?.data?.recordId ??
+    createBody?.data?.data?.recordPid ??
       createBody?.data?.data?.pid ??
       createBody?.data?.data?.id ??
       '',
@@ -133,7 +133,7 @@ async function seedAndSubmitLeave(
     {
       headers: { Authorization: `Bearer ${adminToken}` },
       data: {
-        targetRecordId: pid,
+        targetRecordPid: pid,
         payload: {
           wd_req_applicant: adminUserId,
           wd_req_type: 'annual',

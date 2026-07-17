@@ -254,10 +254,17 @@ async function triggerAgentScenario(
   expect(toolResult, JSON.stringify(resumeEvents)).toBeTruthy();
   expect(toolResult.success, JSON.stringify(toolResult)).toBe(true);
   expect(toolResult.result?.success, JSON.stringify(toolResult)).toBe(true);
-  expect(toolResult.result?.recordId, JSON.stringify(toolResult)).toBeTruthy();
+  // Public-record pid-only contract: the created artifact's pid is surfaced at
+  // recordPid (recordId, the internal BIGINT, is no longer returned). Depending on
+  // the command it sits directly on result or nested under result.data.
+  const artifactPid =
+    toolResult.result?.recordPid ??
+    toolResult.result?.data?.recordPid ??
+    toolResult.result?.recordId;
+  expect(artifactPid, JSON.stringify(toolResult)).toBeTruthy();
 
   return {
-    artifactPid: toolResult.result.recordId,
+    artifactPid,
     title,
     content,
     startEvents,

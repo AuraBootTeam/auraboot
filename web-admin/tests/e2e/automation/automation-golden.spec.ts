@@ -742,7 +742,7 @@ test.describe('Automation Golden — Layer B behavioral matrix (Phase 2)', () =>
     } catch {
       raw = await resp.text().catch(() => null);
     }
-    return { ok: String(raw?.code) === '0', recordId: raw?.data?.data?.recordId as string | undefined, raw };
+    return { ok: String(raw?.code) === '0', recordId: raw?.data?.data?.recordPid as string | undefined, raw };
   }
 
   /** Poll GET /api/dynamic/{model}/{id} until `field` equals `expected` (or timeout); returns the last value. */
@@ -1065,7 +1065,7 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     });
     const raw = await resp.json();
     expect(String(raw?.code), `create order failed: ${JSON.stringify(raw)}`).toBe('0');
-    return raw.data.data.recordId as string;
+    return raw.data.data.recordPid as string;
   }
 
   async function updateOrder(page: import('@playwright/test').Page, orderId: string, fields: Record<string, unknown>) {
@@ -1078,7 +1078,7 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
     // `null IN [draft,rejected]` is false → "仅草稿或已退回状态可编辑" even for a draft
     // order. (Root cause of golden FINDING-2; the order IS draft — verified.)
     const resp = await page.request.post(`/api/meta/commands/execute/e2et:update_order`, {
-      data: { operationType: 'update', targetRecordId: orderId, payload: { ...fields } },
+      data: { operationType: 'update', targetRecordPid: orderId, payload: { ...fields } },
     });
     let raw: any = null;
     try {
@@ -1223,7 +1223,7 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
   /** Run a state_transition command (e.g. e2et:cancel_order draft→cancelled). targetRecordId top-level. */
   async function stateTransitionOrder(page: import('@playwright/test').Page, commandCode: string, orderId: string) {
     const resp = await page.request.post(`/api/meta/commands/execute/${commandCode}`, {
-      data: { operationType: 'state_transition', targetRecordId: orderId, payload: {} },
+      data: { operationType: 'state_transition', targetRecordPid: orderId, payload: {} },
     });
     let raw: any = null;
     try {

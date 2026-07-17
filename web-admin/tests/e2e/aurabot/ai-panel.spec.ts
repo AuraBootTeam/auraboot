@@ -360,10 +360,11 @@ test.describe('AuraBot Panel', () => {
     await page.goto('/aurabot/providers');
     await page.waitForLoadState('domcontentloaded');
 
-    // The page title or heading should reference LLM providers
+    // The page title or heading should reference LLM providers. The heading is
+    // localized: en "LLM Providers" / zh "模型服务" (Model Service). Match either.
     const heading = page.locator('h1, h2, [data-testid="page-title"]').first();
     await expect(heading).toBeVisible({ timeout: 5000 });
-    await expect(heading).toContainText(/LLM|Provider/i);
+    await expect(heading).toContainText(/LLM|Provider|模型服务/i);
   });
 
   // -------------------------------------------------------------------------

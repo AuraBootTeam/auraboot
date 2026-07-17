@@ -62,7 +62,12 @@ test.describe('chat-bi browser golden (AuraBot chat renders a chart)', () => {
   // The stub emits the SANITIZED LLM name aurabot_chat-bi (provider code aurabot:chat-bi),
   // which routes to the real ChatBiSkill over the real crm_lead model.
   test('agent chat-bi tool over crm_lead renders a chart card inline', async ({ page }) => {
-    await page.goto('/');
+    // Navigate to the concrete /home page, not '/': the '/' index route redirects
+    // to /home, and on client hydration react-router re-runs that loader and fires a
+    // LATE client-side navigation to /home that races with — and wipes — the chat
+    // panel content (the ChatBiResultCard vanishes mid-assertion). Landing directly
+    // on /home avoids the redirect race (same pattern as the other stable panel specs).
+    await page.goto('/home');
     const panel = await openAuraBotPanel(page);
     await ensureFreshSession(page, panel);
 

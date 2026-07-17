@@ -52,8 +52,8 @@ async function seedShowcaseGalleryRecord(
   const body = await resp.json().catch(async () => resp.text().catch(() => null));
   expect(resp.ok(), `Create showcase gallery seed failed: ${resp.status()} ${JSON.stringify(body)}`).toBe(true);
   expect((body as { code?: string })?.code, `Create showcase seed non-zero: ${JSON.stringify(body)}`).toBe('0');
-  const pid = (body as { data?: { data?: { recordId?: string } } })?.data?.data?.recordId;
-  expect(pid, `Created showcase gallery seed missing recordId: ${JSON.stringify(body)}`).toBeTruthy();
+  const pid = (body as { data?: { data?: { recordPid?: string } } })?.data?.data?.recordPid;
+  expect(pid, `Created showcase gallery seed missing recordPid: ${JSON.stringify(body)}`).toBeTruthy();
   return { pid: pid!, scName };
 }
 

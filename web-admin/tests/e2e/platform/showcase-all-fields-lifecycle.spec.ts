@@ -69,7 +69,7 @@ const DESCRIPTION = `Showcase test description ${UID}`;
 const START_DATE = dateOffsetStr(7);
 const END_DATE = dateOffsetStr(14);
 const MODEL_CODE = 'showcase_all_fields';
-const PAGE_KEY = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields_list';
 
 // ---------------------------------------------------------------------------
 // Navigation helper — MUST use sidebar menu, NOT page.goto  [D1]

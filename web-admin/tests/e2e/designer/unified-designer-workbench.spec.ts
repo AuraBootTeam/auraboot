@@ -1307,7 +1307,11 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-widgetType').selectOption('line-chart');
     await page.getByTestId('inspector-field-props.title').fill(advancedWidgetTitle);
     await page.getByTestId('inspector-field-props.subtitle').fill(advancedWidgetSubtitle);
-    await page.getByTestId('inspector-field-dataSource.model').fill(modelCode);
+    // The model inspector field is now a 'model' picker (a <select> from the
+    // published meta-model list) plus a free-text manual-entry fallback. Bind the
+    // model code through the manual input (the intended free-text path), which
+    // also avoids racing the async model-options load.
+    await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
     await page.getByTestId('inspector-field-dataSource.metric').fill(advancedWidgetMetric);
     await page.getByTestId('inspector-field-dataSource.query').fill(JSON.stringify(query));
     await applyJsonField(page, 'inspector-json-field-apply-dataSource.query');
@@ -1380,8 +1384,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('runtime-widget-subtitle-widget_pipeline')).toContainText(
       advancedWidgetSubtitle,
     );
-    await expect(page.getByTestId('runtime-widget-value-widget_pipeline')).toContainText(
-      advancedWidgetValue,
+    // A line-chart is a body widget: the E1 chart-parity renderer suppresses the
+    // number-card value box (props.value) in favour of the chart body / empty
+    // state, so with no live data the configured empty text renders here instead
+    // of the value. (props.value persistence is still asserted above.)
+    await expect(page.getByTestId('runtime-widget-value-widget_pipeline')).toHaveCount(0);
+    await expect(page.getByTestId('runtime-widget-empty-widget_pipeline')).toContainText(
+      advancedWidgetEmptyText,
     );
     await expect(page.getByTestId('runtime-widget-meta-widget_pipeline')).toContainText(
       `${modelCode} / ${advancedWidgetMetric}`,

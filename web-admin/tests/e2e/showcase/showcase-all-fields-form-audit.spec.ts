@@ -16,7 +16,7 @@ import {
 test.describe.configure({ mode: 'serial' });
 
 const MODEL_CODE = 'showcase_all_fields';
-const PAGE_KEY = 'showcase_all_fields';
+const PAGE_KEY = 'showcase_all_fields_list';
 const LIST_URL = `/p/${MODEL_CODE}`;
 
 const ALL_FIELD_CODES = [
@@ -185,12 +185,12 @@ async function navigateToShowcaseListViaMenu(page: Page): Promise<void> {
 async function deleteRecord(request: APIRequestContext, pid: string): Promise<void> {
   await request
     .post('/api/meta/commands/execute/sc:archive_showcase', {
-      data: { payload: {}, operationType: 'update', targetRecordId: pid },
+      data: { payload: {}, operationType: 'update', targetRecordPid: pid },
     })
     .catch(() => null);
   await request
     .post('/api/meta/commands/execute/sc:delete_showcase', {
-      data: { operationType: 'delete', targetRecordId: pid },
+      data: { operationType: 'delete', targetRecordPid: pid },
     })
     .catch(() => null);
 }

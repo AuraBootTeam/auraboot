@@ -57,7 +57,7 @@ const MODEL_CODE = 'showcase_all_fields';
 const LIST_URL = `/p/${MODEL_CODE}`;
 const DETAIL_URL_RE = new RegExp(`/p/${MODEL_CODE}/view/[^/?#]+`);
 const DETAIL_PAGE_KEY = `${MODEL_CODE}_detail`;
-const SAVED_VIEW_PAGE_KEY = MODEL_CODE;
+const SAVED_VIEW_PAGE_KEY = `${MODEL_CODE}_list`;
 
 interface SeededRecord {
   pid: string;
@@ -98,7 +98,7 @@ async function seedRecord(request: APIRequestContext): Promise<SeededRecord> {
   expect(resp.ok(), `seed create status=${resp.status()}`).toBe(true);
   const body = await resp.json();
   expect(body?.code).toBe('0');
-  const pid: string | undefined = body?.data?.data?.recordId;
+  const pid: string | undefined = body?.data?.data?.recordPid;
   expect(pid, 'seed should return recordId').toBeTruthy();
   return { pid: pid!, sc_name };
 }
@@ -349,7 +349,7 @@ test.describe('D — Detail-kind block/layout coverage', () => {
       const pid = createdPids.pop()!;
       await request
         .post('/api/meta/commands/execute/sc:delete_showcase', {
-          data: { operationType: 'delete', targetRecordId: pid },
+          data: { operationType: 'delete', targetRecordPid: pid },
         })
         .catch(() => null);
     }
@@ -817,7 +817,7 @@ test.describe('D — Detail-kind block/layout coverage', () => {
       expect(resp.ok(), `monthly seed M${month} status=${resp.status()}`).toBe(true);
       const body = await resp.json();
       expect(body?.code).toBe('0');
-      const pid = body?.data?.data?.recordId;
+      const pid = body?.data?.data?.recordPid;
       if (pid) createdMetricIds.push(pid);
     }
     expect(createdMetricIds.length, 'all 12 monthly seeds should return a pid').toBe(12);
@@ -895,7 +895,7 @@ test.describe('D — Detail-kind block/layout coverage', () => {
     for (const metricPid of createdMetricIds) {
       await request
         .post('/api/meta/commands/execute/sc:delete_monthly_metric', {
-          data: { operationType: 'delete', targetRecordId: metricPid },
+          data: { operationType: 'delete', targetRecordPid: metricPid },
         })
         .catch(() => null);
     }

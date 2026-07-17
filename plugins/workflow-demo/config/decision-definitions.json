@@ -101,8 +101,8 @@
           "label": "BPM node",
           "expr": {
             "type": "path",
-            "scope": "process",
-            "path": "nodeId",
+            "scope": "record",
+            "path": "data.nodeId",
             "dataType": "string"
           }
         }

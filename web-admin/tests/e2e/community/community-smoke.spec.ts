@@ -144,10 +144,14 @@ test.describe('Community Edition Smoke', () => {
   });
 
   /**
-   * CM-05: ChatBI health endpoint is not 404 or 500
+   * CM-05: ChatBI API is wired (not 404 / not 500)
+   *
+   * The legacy /api/ai/chat-bi API was retired — ChatBI now runs through the agent
+   * runtime (chat_bi skill) and the ChatBiV2Controller at /api/chatbi/v2. Verify the
+   * v2 conversations endpoint is reachable instead of the removed health path.
    */
-  test('CM-05: ChatBI health endpoint exists and does not error', async ({ page }) => {
-    const resp = await page.request.get('/api/ai/chat-bi/health');
+  test('CM-05: ChatBI v2 API exists and does not error', async ({ page }) => {
+    const resp = await page.request.get('/api/chatbi/v2/conversations');
 
     // Endpoint should exist (not 404) and not crash (not 500)
     expect(resp.status()).not.toBe(404);

@@ -382,7 +382,8 @@ async function fillPageSchemaForm(
 
 function extractCommandRecordId(body: Record<string, any>): string {
   const resultData = body?.data?.data ?? body?.data ?? {};
-  return String(resultData.recordId ?? resultData.pid ?? resultData.id ?? '');
+  // pid-only public contract: create commands return recordPid (data-and-api.md §Public Record).
+  return String(resultData.recordPid ?? resultData.recordId ?? resultData.pid ?? resultData.id ?? '');
 }
 
 async function createE2etOrder(page: Page, title: string): Promise<string> {

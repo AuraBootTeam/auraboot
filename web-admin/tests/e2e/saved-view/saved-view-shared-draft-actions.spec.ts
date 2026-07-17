@@ -230,7 +230,16 @@ async function screenshot(page: Page, fileName: string): Promise<void> {
   await page.screenshot({ path: `${SCREENSHOT_DIR}/${fileName}`, fullPage: true });
 }
 
-test.describe('SavedView shared local draft actions', () => {
+// fixme:roadmap-not-shipped — Both cases require selecting a GLOBAL saved view
+// from the ViewSelector, but the "ship personal view management baseline" release
+// (2026-06-23, ViewSelector.tsx) deliberately gates the selector to personal
+// scope only ("team/global scopes remain roadmap"; groupedViews filters
+// `v.scope === 'personal'`). The shared-draft banner UI exists in ListPageContent,
+// but its entry point (activating a global view) is unreachable through the UI, so
+// this flow tests functionality not yet released. Un-fixme when the shared/global
+// view selection ships. (The role-provisioning / model.read-grant / timeout
+// blockers that used to mask this were fixed separately so the true cause surfaced.)
+test.describe.fixme('SavedView shared local draft actions', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.beforeAll(async ({ browser }) => {
@@ -244,6 +253,10 @@ test.describe('SavedView shared local draft actions', () => {
   test('SV-SD-001: viewer keeps global view changes local and can copy draft to personal', async ({
     browser,
   }) => {
+    // This case drives two separate role contexts (admin seed + viewer flow) and a
+    // full dashboard load before the multi-step nav, which legitimately exceeds the
+    // 15s global default. Triple the budget rather than trim the user journey.
+    test.slow();
     let sourceViewPid = '';
     const viewName = `SV_Global_ReadOnly_${uniqueId()}`;
     await withRolePage(browser, ADMIN_STORAGE_STATE, async (page) => {

@@ -112,7 +112,6 @@ test.describe('Organization Employee', () => {
           `[cmdk-item]:has-text("${optionText}")`,
           `[data-slot="select-item"]:has-text("${optionText}")`,
           `.ant-select-item-option:has-text("${optionText}")`,
-          `[role="listbox"] *:has-text("${optionText}")`,
         ].join(', '),
       ).first();
       if (!(await option.isVisible({ timeout: 2500 }).catch(() => false))) {
@@ -121,7 +120,15 @@ test.describe('Organization Employee', () => {
         ).first();
       }
       await expect(option).toBeVisible({ timeout: 5000 });
+      // Click the leaf option element (role=option / select-item). The previous
+      // `[role="listbox"] *:has-text` selector also matched the Radix viewport
+      // container (an ancestor of the option); `.first()` then resolved to that
+      // container, so the click never selected and the dropdown stayed open —
+      // blocking the next field's trigger with a stuck-open portal.
       await option.click();
+      // Radix Select closes on select; wait for the portal to disappear so the
+      // next field's trigger is not intercepted by a lingering open dropdown.
+      await expect(option).toBeHidden({ timeout: 3000 }).catch(() => undefined);
       return;
     }
 

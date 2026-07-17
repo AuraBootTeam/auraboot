@@ -31,8 +31,8 @@ test.beforeAll(async ({ browser }) => {
       kind: 'form',
       modelCode: 'tenant',
       blocks: [
-        { blockType: 'form-section', label: 'Main', fields: [] },
-        { blockType: 'form-buttons', label: 'Buttons', actions: [] },
+        { id: 'sc-main-section', blockType: 'form-section', label: 'Main', fields: [] },
+        { id: 'sc-main-buttons', blockType: 'form-buttons', label: 'Buttons', actions: [] },
       ],
       metaInfo: { componentCount: 3 },
       semver: '0.1.0',

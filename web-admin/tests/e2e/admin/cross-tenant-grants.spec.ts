@@ -76,7 +76,7 @@ async function gotoPage(page: Page): Promise<void> {
 
 test.describe.serial('Cross-Tenant Grants admin page', () => {
   // Track ids created via the UI/API so we can clean up even if a test mid-fails.
-  const createdIds: number[] = [];
+  const createdIds: (string | number)[] = [];
 
   test.afterAll(async ({ browser }) => {
     if (createdIds.length === 0) return;
@@ -136,8 +136,13 @@ test.describe.serial('Cross-Tenant Grants admin page', () => {
     const resp = await createResp;
     expect(resp.ok(), 'POST /api/admin/cross-tenant-grants should succeed').toBeTruthy();
     const body = await resp.json().catch(() => null);
+    // The grant id is a BIGINT serialized as a string (JS precision-safe), not a
+    // JS number — assert it carries a non-empty id and use it as-is for the row testid.
     const newId = body?.data?.id;
-    expect(typeof newId === 'number', 'created grant must carry numeric id').toBeTruthy();
+    expect(
+      newId !== undefined && newId !== null && String(newId).length > 0,
+      'created grant must carry an id',
+    ).toBeTruthy();
     createdIds.push(newId);
 
     // Modal closes; refreshed list contains the new row.

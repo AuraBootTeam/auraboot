@@ -116,7 +116,13 @@ test.describe('Page Designer upload attachment artifact runtime', () => {
     });
 
     await input.setInputFiles(rejectedPath);
-    await expect(attachmentField).not.toContainText('designer-upload-too-large.zip');
+    // The oversized file is rejected inline (standard §4: inline validation, not
+    // toast) — surfaced in the dedicated rejections panel with the size-limit
+    // reason, never added to the upload list nor sent to the upload API.
+    const rejections = attachmentField.getByTestId('upload-rejections-runtime_attachment');
+    await expect(rejections).toContainText('designer-upload-too-large.zip');
+    await expect(rejections).toContainText('1MB');
+    await expect(attachmentField.getByTestId('upload-file-runtime_attachment')).toHaveCount(0);
     expect(uploadRequests, 'oversized file must be rejected before upload API').toHaveLength(0);
 
     const uploadRespPromise = page.waitForResponse(
@@ -136,7 +142,8 @@ test.describe('Page Designer upload attachment artifact runtime', () => {
     );
 
     await expect(attachmentField).toContainText('designer-upload-proof.zip', { timeout: 10_000 });
-    await expect(attachmentField).toContainText('1/1 files uploaded');
+    // The upload upgrade (#708) localized the count hint (was "1/1 files uploaded").
+    await expect(attachmentField).toContainText('已上传 1/1');
     await expect(page.getByTestId('upload-area-runtime_attachment')).toHaveCount(0);
 
     await attachmentField.getByText('designer-upload-proof.zip').click();

@@ -14,7 +14,7 @@ import {
 } from './helpers/default-table-view';
 
 const SHOWCASE_MODEL_CODE = 'showcase_all_fields';
-const SHOWCASE_PAGE_KEY = 'showcase_all_fields';
+const SHOWCASE_PAGE_KEY = 'showcase_all_fields_list';
 let defaultTableView: DefaultTableViewState | null = null;
 
 async function getAccountWithLinkedContact(

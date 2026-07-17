@@ -165,10 +165,18 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
     const isStillOnForm = page.url().includes('/new') || page.url().includes('/edit');
     expect(isStillOnForm, 'UFV-001: form must stay on /new when validation fails').toBe(true);
 
-    // Layer 2 (Data): at least one inline error message visible
-    // DSL form uses .text-red-500 / .text-red-600 for field-level errors
-    // Ant Design uses .ant-form-item-explain-error
+    // Layer 2 (Data): at least one inline error message visible near a field.
+    // The DSL form renders field-level errors via FieldError → ErrorText with the
+    // design-token class `text-aux text-status-red dark:text-red-400`
+    // (app/ui/ui/error-text.tsx), NOT `.text-red-500/600`. So match the real error
+    // element first, and — crucially — require NON-EMPTY text: the page also
+    // carries unrelated visible-but-empty red elements (icon wrappers), so breaking
+    // on the first *visible* match regardless of its text is wrong (it hits an empty
+    // element and asserts against it).
     const inlineErrorSelectors = [
+      '.text-status-red.text-aux', // DSL FieldError (ErrorText)
+      '.text-status-red',
+      '.text-red-400',
       '.text-red-500',
       '.text-red-600',
       '[class*="error"]:not([class*="boundary"])',
@@ -179,22 +187,23 @@ test.describe('UX Form Validation — Inline Errors and Field Types', () => {
 
     let inlineErrorFound = false;
     for (const selector of inlineErrorSelectors) {
-      const el = page.locator(selector).first();
-      const visible = await el.isVisible({ timeout: 2_000 }).catch(() => false);
-      if (visible) {
+      const matches = page.locator(selector);
+      const count = await matches.count();
+      for (let i = 0; i < Math.min(count, 10); i += 1) {
+        const el = matches.nth(i);
+        const visible = await el.isVisible({ timeout: 500 }).catch(() => false);
+        if (!visible) continue;
+        const text = ((await el.textContent().catch(() => '')) || '').trim();
+        if (text.length === 0) continue; // skip visible-but-empty red elements
         inlineErrorFound = true;
-        const text = await el.textContent().catch(() => '');
-        expect(
-          (text || '').trim().length,
-          `UFV-001: error element (${selector}) must have non-empty text`,
-        ).toBeGreaterThan(0);
         break;
       }
+      if (inlineErrorFound) break;
     }
 
     expect(
       inlineErrorFound,
-      'UFV-001: at least one inline error message must be visible near a form field after submitting empty required fields',
+      'UFV-001: at least one non-empty inline error message must be visible near a form field after submitting empty required fields',
     ).toBe(true);
   });
 

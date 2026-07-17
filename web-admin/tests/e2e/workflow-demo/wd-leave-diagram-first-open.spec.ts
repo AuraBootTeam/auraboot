@@ -57,11 +57,22 @@ async function createSubmittedLeave(
       wd_req_reason: reason,
     },
   });
-  const recordId = String(createBody?.data?.data?.recordId ?? '');
+  const recordId = String(createBody?.data?.data?.recordPid ?? '');
   expect(recordId).toBeTruthy();
 
+  // Annual leave submit runs wd_leave_validation, which requires an annual-balance
+  // row for the applicant; ensure one exists (idempotent — ignore if already present).
+  await executeCommand(request, token, 'wd:create_leave_balance', {
+    payload: {
+      wd_bal_employee: userId,
+      wd_bal_year: new Date().getFullYear(),
+      wd_bal_annual_remaining: 20,
+      wd_bal_sick_used: 0,
+    },
+  }).catch(() => undefined);
+
   await executeCommand(request, token, 'wd:submit_leave_request', {
-    targetRecordId: recordId,
+    targetRecordPid: recordId,
     payload: {
       wd_req_applicant: userId,
       wd_req_type: 'annual',

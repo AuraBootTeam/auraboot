@@ -202,7 +202,7 @@ test.describe('workflow-demo — leave request form page', () => {
       const submitBody = await submitResp.json();
       expect(String(submitBody?.code)).toBe('0');
 
-      const recordId = String(submitBody?.data?.data?.recordId ?? '');
+      const recordId = String(submitBody?.data?.data?.recordPid ?? '');
       expect(recordId).toBeTruthy();
 
       await page.waitForURL(/\/p\/wd_leave_request(?:$|\?|\/$)/, { timeout: 15_000 });

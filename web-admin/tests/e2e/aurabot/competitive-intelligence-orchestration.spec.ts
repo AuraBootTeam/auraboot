@@ -130,7 +130,16 @@ async function runConfirmedCommand(
   expect(toolResult, JSON.stringify(resumeEvents)).toBeTruthy();
   expect(toolResult.success, JSON.stringify(toolResult)).toBe(true);
   expect(toolResult.result?.success, JSON.stringify(toolResult)).toBe(true);
-  const recordId = toolResult.result?.recordId ?? resultContract?.data?.recordId;
+  // Public-record pid-only contract: command responses expose the new record's
+  // pid at `data.data.recordPid` (recordId is the internal BIGINT, no longer
+  // surfaced). The tool_result nests it under result.data; the result_contract
+  // under data. Keep the legacy recordId fallbacks for resilience.
+  const recordId =
+    toolResult.result?.data?.recordPid ??
+    toolResult.result?.recordPid ??
+    toolResult.result?.recordId ??
+    resultContract?.data?.recordPid ??
+    resultContract?.data?.recordId;
   expect(recordId, JSON.stringify(resumeEvents)).toBeTruthy();
 
   evidence.push({

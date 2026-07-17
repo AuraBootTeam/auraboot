@@ -34,7 +34,7 @@ const createdPids: string[] = [];
 async function deleteRecord(request: APIRequestContext, pid: string): Promise<void> {
   await request
     .post('/api/meta/commands/execute/sc:delete_showcase', {
-      data: { operationType: 'delete', targetRecordId: pid },
+      data: { operationType: 'delete', targetRecordPid: pid },
     })
     .catch(() => null);
 }
@@ -57,7 +57,7 @@ async function seedRecord(
   expect(resp.ok(), `seed create failed: ${resp.status()}`).toBe(true);
   const body = await resp.json();
   expect(body?.code, `seed create non-zero code: ${JSON.stringify(body)}`).toBe('0');
-  const pid: string | undefined = body?.data?.data?.recordId;
+  const pid: string | undefined = body?.data?.data?.recordPid;
   expect(pid).toBeTruthy();
   return pid!;
 }
@@ -254,7 +254,7 @@ test.describe('D11 — showcase_all_fields error paths', () => {
 
       // Sanity: ensure no recordId came back (i.e. the create did not actually
       // execute even partially).
-      const newPid = body?.data?.data?.recordId;
+      const newPid = body?.data?.data?.recordPid;
       expect(newPid, 'anon request must not return a recordId').toBeFalsy();
     } finally {
       await anonRequest.dispose();

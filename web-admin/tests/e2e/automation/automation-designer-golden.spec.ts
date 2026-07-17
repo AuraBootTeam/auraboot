@@ -498,6 +498,10 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     // The condition node's own expression field is required by the save-gate
     // (validateFlow) even though the gateway routes on the edge conditions.
     await fillNodeConfig(page, condition, { expression: "record['e2et_order_amount'] > 1000" });
+    // The update-record node's target field is `recordPid` (pid-only contract;
+    // prop-field-recordPid, placeholder ${trigger.recordPid}). ${recordPid}
+    // resolves against the automation process vars to the trigger record's pid
+    // (AutomationProcessRuntime → UpdateRecordExecutor).
     await fillNodeConfig(page, actHigh, {
       modelCode: MODEL_LABEL,
       recordPid: '${trigger.recordPid}',
