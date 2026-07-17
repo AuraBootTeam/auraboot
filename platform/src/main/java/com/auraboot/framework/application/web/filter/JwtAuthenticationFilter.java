@@ -17,6 +17,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -167,6 +168,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     MetaContext.setMemberId(memberId);
                 }
 
+                // Surface tenant/user in every log line for this request (log pattern reads
+                // %X{tenantId}/%X{userId}). Cleared in the finally below so a pooled thread
+                // never leaks one request's identity into the next.
+                if (tenantId != null) {
+                    MDC.put("tenantId", String.valueOf(tenantId));
+                }
+                if (userDetails.getUserId() != null) {
+                    MDC.put("userId", String.valueOf(userDetails.getUserId()));
+                }
+
                 setAuthenticationContext(request, userDetails);
             }
         }
@@ -175,6 +186,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } finally {
             MetaContext.clear();
+            MDC.remove("tenantId");
+            MDC.remove("userId");
         }
     }
 

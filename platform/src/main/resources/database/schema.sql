@@ -8093,6 +8093,28 @@ CREATE INDEX IF NOT EXISTS idx_mobile_log_tenant_time ON ab_mobile_client_log(te
 CREATE INDEX IF NOT EXISTS idx_mobile_log_category_time
     ON ab_mobile_client_log (category, client_timestamp DESC);
 
+-- Web front-end client error log (mirror of db/migration/core/V20260715100000__web_client_error_log.sql).
+-- Uncaught JS errors / unhandled promise rejections reported by the browser, surfaced in the
+-- in-app troubleshooting center (/ops/errors) so front-end failures don't vanish.
+CREATE TABLE IF NOT EXISTS ab_web_client_error (
+    id                  BIGSERIAL PRIMARY KEY,
+    tenant_id           BIGINT,
+    user_id             BIGINT,
+    session_id          VARCHAR(128),
+    trace_id            VARCHAR(128),
+    error_type          VARCHAR(30),
+    message             TEXT,
+    stack               TEXT,
+    page_url            TEXT,
+    user_agent          VARCHAR(512),
+    app_version         VARCHAR(50),
+    client_timestamp    TIMESTAMPTZ,
+    created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_web_client_error_tenant_time ON ab_web_client_error(tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_web_client_error_trace ON ab_web_client_error(trace_id);
+
 -- ═══════════════════════════════════════════════════════════════
 -- Push Device Token
 -- ═══════════════════════════════════════════════════════════════

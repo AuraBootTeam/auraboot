@@ -13956,6 +13956,46 @@ ALTER TABLE public.ab_watch ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
 
 
 --
+-- Name: ab_web_client_error; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.ab_web_client_error (
+    id bigint NOT NULL,
+    tenant_id bigint,
+    user_id bigint,
+    session_id character varying(128),
+    trace_id character varying(128),
+    error_type character varying(30),
+    message text,
+    stack text,
+    page_url text,
+    user_agent character varying(512),
+    app_version character varying(50),
+    client_timestamp timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: ab_web_client_error_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.ab_web_client_error_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: ab_web_client_error_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.ab_web_client_error_id_seq OWNED BY public.ab_web_client_error.id;
+
+
+--
 -- Name: ab_webhook_delivery_log; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -15587,6 +15627,13 @@ ALTER TABLE ONLY public.ab_sod_rule ALTER COLUMN id SET DEFAULT nextval('public.
 --
 
 ALTER TABLE ONLY public.ab_sod_violation_log ALTER COLUMN id SET DEFAULT nextval('public.ab_sod_violation_log_id_seq'::regclass);
+
+
+--
+-- Name: ab_web_client_error id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_web_client_error ALTER COLUMN id SET DEFAULT nextval('public.ab_web_client_error_id_seq'::regclass);
 
 
 --
@@ -19363,6 +19410,14 @@ ALTER TABLE ONLY public.ab_verification_code
 
 ALTER TABLE ONLY public.ab_watch
     ADD CONSTRAINT ab_watch_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ab_web_client_error ab_web_client_error_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ab_web_client_error
+    ADD CONSTRAINT ab_web_client_error_pkey PRIMARY KEY (id);
 
 
 --
@@ -25044,6 +25099,20 @@ CREATE INDEX idx_watch_record_pid ON public.ab_watch USING btree (tenant_id, mod
 --
 
 CREATE INDEX idx_watch_user ON public.ab_watch USING btree (tenant_id, user_id);
+
+
+--
+-- Name: idx_web_client_error_tenant_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_web_client_error_tenant_time ON public.ab_web_client_error USING btree (tenant_id, created_at DESC);
+
+
+--
+-- Name: idx_web_client_error_trace; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_web_client_error_trace ON public.ab_web_client_error USING btree (trace_id);
 
 
 --

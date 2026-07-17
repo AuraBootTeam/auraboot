@@ -35,6 +35,10 @@ public interface CommandAuditLogMapper extends BaseMapper<CommandAuditLog> {
     @Select("SELECT * FROM ab_command_audit_log WHERE tenant_id = #{tenantId} AND command_code = #{commandCode} ORDER BY created_at DESC LIMIT #{limit}")
     List<CommandAuditLog> findByCommandCode(@Param("tenantId") Long tenantId, @Param("commandCode") String commandCode, @Param("limit") int limit);
 
+    /** All command executions stamped with the given OTel trace id (eagle-eye correlation). */
+    @Select("SELECT * FROM ab_command_audit_log WHERE tenant_id = #{tenantId} AND trace_id = #{traceId} ORDER BY created_at ASC")
+    List<CommandAuditLog> findByTraceId(@Param("tenantId") Long tenantId, @Param("traceId") String traceId);
+
     @Select("""
         <script>
         SELECT * FROM ab_command_audit_log
