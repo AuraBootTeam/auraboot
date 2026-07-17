@@ -138,6 +138,26 @@ function extractCodeLoginError(result: unknown, fallback: string): string {
   return fallback;
 }
 
+/**
+ * A specific, server-supplied reason to refuse a password login — as opposed to a plain
+ * wrong-password. The backend puts a business reason (e.g. a suspended organization) in a structured
+ * {@code context} object with a localized {@code detail}; an ordinary credential failure carries a
+ * bare string. Return the former, so the user is told WHY, and let the caller fall back to the
+ * generic "invalid credentials" for the latter (which stays localized via its i18n key).
+ */
+function extractBusinessLoginError(result: unknown): string | null {
+  const context = (result as { context?: unknown })?.context;
+  if (context && typeof context === 'object') {
+    for (const key of ['detail', 'error', 'message', 'reason']) {
+      const value = (context as Record<string, unknown>)[key];
+      if (typeof value === 'string' && value.trim().length > 0) {
+        return value.trim();
+      }
+    }
+  }
+  return null;
+}
+
 async function handleEmailPasswordLogin(
   formData: FormData,
   request: Request,
@@ -168,7 +188,14 @@ async function handleEmailPasswordLogin(
   );
 
   if (!ResultHelper.isSuccess(result)) {
-    return data({ errors: { general: 'auth.error.invalidCredentials' } }, { status: 400 });
+    // A suspended organization (and any other specific server refusal) must reach the user as its
+    // own reason, not be flattened to "wrong password" — the same contract the SMS / email-code
+    // paths already honor via extractCodeLoginError. Plain credential failures still fall back to
+    // the localized generic key.
+    return data(
+      { errors: { general: extractBusinessLoginError(result) ?? 'auth.error.invalidCredentials' } },
+      { status: 400 },
+    );
   }
 
   return completeLogin(result.data as User, request, redirectTo, remember);

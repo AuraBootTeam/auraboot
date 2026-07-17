@@ -1367,6 +1367,7 @@ tenant:
     not_in_tenant: 用户未加入任何租户
     not_found: "成员不存在: {0}"
   not_found: "租户不存在: {0}"
+  suspended: "该组织已被暂停，请联系管理员。"
   name_exists: "租户名称已存在: {0}"
 
 role:

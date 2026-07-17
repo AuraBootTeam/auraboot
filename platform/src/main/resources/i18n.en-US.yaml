@@ -1243,6 +1243,7 @@ tenant:
     not_in_tenant: User does not belong to any tenant
     not_found: "Member not found: {0}"
   not_found: "Tenant not found: {0}"
+  suspended: "This organization is suspended. Please contact your administrator."
   name_exists: "Tenant name already exists: {0}"
 
 role:
