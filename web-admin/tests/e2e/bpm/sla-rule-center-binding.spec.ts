@@ -8,6 +8,7 @@ import {
   uniqueId,
   waitForDynamicPageLoad,
 } from '../helpers';
+import { BACKEND_URL } from '../../helpers/environments';
 
 type ApiEnvelope<T> = {
   code?: number | string;
@@ -125,21 +126,15 @@ function apiEndpoint(endpoint: string): string {
   if (/^https?:\/\//i.test(endpoint)) {
     return endpoint;
   }
-  const backendUrl = process.env.BACKEND_URL?.replace(/\/+$/, '');
-  if (!backendUrl) {
-    return endpoint;
-  }
+  const backendUrl = BACKEND_URL.replace(/\/+$/, '');
   return `${backendUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
 }
 
 function shouldUseBackendAuth(endpoint: string): boolean {
-  if (!process.env.BACKEND_URL) {
-    return false;
-  }
   if (!/^https?:\/\//i.test(endpoint)) {
     return true;
   }
-  return endpoint.startsWith(process.env.BACKEND_URL.replace(/\/+$/, ''));
+  return endpoint.startsWith(BACKEND_URL.replace(/\/+$/, ''));
 }
 
 async function backendAuthHeaders(

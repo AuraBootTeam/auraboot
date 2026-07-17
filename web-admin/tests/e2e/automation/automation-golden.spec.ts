@@ -33,6 +33,7 @@
 import { test, expect } from '../../fixtures';
 import { acquireE2etOrderLock, releaseE2etOrderLock } from './_e2et-order-lock';
 import { uniqueId } from '../helpers/index';
+import { BACKEND_URL } from '../../helpers/environments';
 
 const MODEL_CODE = 'e2et_order';
 const CREATE_COMMAND = 'e2eto:create_e2et_order';
@@ -40,7 +41,7 @@ const POLL_TIMEOUT_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
 
 function backendUrlForGolden(): URL | null {
-  const raw = process.env.BACKEND_URL;
+  const raw = BACKEND_URL;
   if (!raw) return null;
   try {
     return new URL(raw);

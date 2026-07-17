@@ -32,7 +32,7 @@ import type { AddressInfo } from 'node:net';
 import { test, expect, type Page } from '@playwright/test';
 import { Client } from 'pg';
 import { uniqueId } from '../helpers';
-import { PG_CONN } from '../../helpers/environments';
+import { BACKEND_URL, BASE_URL, PG_CONN } from '../../helpers/environments';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { acquireE2etOrderLock, releaseE2etOrderLock } from './_e2et-order-lock';
 import {
@@ -88,7 +88,7 @@ async function loginAsAdmin(page: Page, baseURL: string): Promise<void> {
 }
 
 function backendUrlForGolden(): URL | null {
-  const raw = process.env.BACKEND_URL;
+  const raw = BACKEND_URL;
   if (!raw) return null;
   try {
     return new URL(raw);
@@ -462,7 +462,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     if (!createdPids.length) return;
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
-    await loginAsAdmin(page, process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5194');
+    await loginAsAdmin(page, BASE_URL);
     for (const pid of createdPids) await deleteViaApi(page, pid);
     await page.close();
     await ctx.close();

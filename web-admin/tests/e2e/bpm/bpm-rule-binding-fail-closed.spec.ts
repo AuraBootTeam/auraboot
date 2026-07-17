@@ -24,6 +24,7 @@ import {
   startProcessInstance,
 } from './_helpers/bpm-lifecycle';
 import { uniqueId } from '../helpers';
+import { BASE_URL } from '../../helpers/environments';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -754,7 +755,7 @@ test('BPM userTask fail-closed blocks static assignee and renders localized Rule
   });
   expect(trace?.outputs).toEqual({});
 
-  await loginWebAsAdmin(page, baseURL ?? process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5194');
+  await loginWebAsAdmin(page, baseURL ?? BASE_URL);
   await page.goto(`/bpm/process-status?processInstanceId=${encodeURIComponent(instanceId)}`, {
     waitUntil: 'domcontentloaded',
   });
@@ -807,7 +808,7 @@ test('BPM serviceTask action provider failure renders productized ProcessStatus 
   });
   expect(actionTrace?.targetPhones).toEqual(['+8613800138000']);
 
-  await loginWebAsAdmin(page, baseURL ?? process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5194');
+  await loginWebAsAdmin(page, baseURL ?? BASE_URL);
   await page.goto(`/bpm/process-status?processInstanceId=${encodeURIComponent(actionInstanceId)}`, {
     waitUntil: 'domcontentloaded',
   });
@@ -865,7 +866,7 @@ test('BPM serviceTask action success renders productized ProcessStatus trace', a
   expect(Array.isArray(actionTrace?.messageIds)).toBe(true);
   expect((actionTrace?.messageIds as unknown[]).length).toBeGreaterThan(0);
 
-  await loginWebAsAdmin(page, baseURL ?? process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5194');
+  await loginWebAsAdmin(page, baseURL ?? BASE_URL);
   await page.goto(`/bpm/process-status?processInstanceId=${encodeURIComponent(actionSuccessInstanceId)}`, {
     waitUntil: 'domcontentloaded',
   });
@@ -927,7 +928,7 @@ test('BPM serviceTask modern action failure renders productized ProcessStatus tr
     field: 'target',
   });
 
-  await loginWebAsAdmin(page, baseURL ?? process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5194');
+  await loginWebAsAdmin(page, baseURL ?? BASE_URL);
   await page.goto(`/bpm/process-status?processInstanceId=${encodeURIComponent(actionModernFailureInstanceId)}`, {
     waitUntil: 'domcontentloaded',
   });
