@@ -133,7 +133,7 @@
     "@tiptap/extension-placeholder": "^3.25.0",
     "@tiptap/pm": "^3.25.0",
     "@tiptap/react": "^3.25.0",
-    "@tiptap/starter-kit": "^3.25.0",
+    "@tiptap/starter-kit": "^3.28.0",
     "@types/busboy": "^1.5.4",
     "@types/compression": "^1.8.1",
     "@types/html2canvas": "^0.5.35",
