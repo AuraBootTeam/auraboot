@@ -30,7 +30,7 @@ dependencies {
 
     // Spring conditional
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.14'
-    compileOnly 'org.springframework:spring-context:6.2.18'
+    compileOnly 'org.springframework:spring-context:6.2.19'
 
     // Spring Boot Actuator (HealthIndicator SPI) — runtime optional
     compileOnly 'org.springframework.boot:spring-boot-actuator:3.5.14'
@@ -46,7 +46,7 @@ dependencies {
     testImplementation(project(':')) {
         transitive = false
     }
-    testImplementation 'org.springframework:spring-beans:6.2.18'
+    testImplementation 'org.springframework:spring-beans:6.2.19'
     testImplementation 'org.springframework.boot:spring-boot:3.5.14'
     testImplementation 'org.springframework.boot:spring-boot-actuator:3.5.14'
     testImplementation 'org.slf4j:slf4j-api:2.0.18'
