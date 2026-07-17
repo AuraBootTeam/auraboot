@@ -1,12 +1,6 @@
 # Dependabot configuration for AuraBoot OSS
 # Reduces time-to-patch on third-party CVEs without flooding the team.
-#
-# ⏸ PAUSED (2026-07-02): open-pull-requests-limit is 0 on every ecosystem to
-# stop Dependabot regenerating branches during the planned git-history rewrite
-# (internal-doc purge). Version updates are on hold until the rewrite window
-# closes. TO RE-ENABLE after the rewrite: restore the previous limits
-# (github-actions: 5, gradle: 8, npm: 8, docker: default) — see this file's
-# git history.
+# Tune after launch — first month we may want fewer auto-PRs.
 
 version: 2
 
@@ -17,7 +11,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "tuesday"
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 5
     labels:
       - "dependencies"
       - "ci"
@@ -30,7 +24,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "tuesday"
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 8
     labels:
       - "dependencies"
       - "area: backend"
@@ -47,7 +41,7 @@ updates:
     schedule:
       interval: "weekly"
       day: "tuesday"
-    open-pull-requests-limit: 0
+    open-pull-requests-limit: 8
     labels:
       - "dependencies"
       - "area: frontend"
@@ -63,7 +57,6 @@ updates:
     schedule:
       interval: "weekly"
       day: "tuesday"
-    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "area: devops"
@@ -75,7 +68,6 @@ updates:
     schedule:
       interval: "weekly"
       day: "tuesday"
-    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "area: devops"
