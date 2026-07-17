@@ -4,8 +4,11 @@ import com.auraboot.framework.auth.dto.AuthenticationResponse;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -30,6 +33,9 @@ class LoginCompletionHelperTest {
     private TenantMemberService tenantMemberService;
 
     @Mock
+    private TenantService tenantService;
+
+    @Mock
     private SessionManagementService sessionManagementService;
 
     @Mock
@@ -50,6 +56,7 @@ class LoginCompletionHelperTest {
         TenantMember member = new TenantMember();
         member.setStatus("active");
         when(tenantMemberService.findByTenantIdAndUserId(100L, 1L)).thenReturn(member);
+        when(tenantService.getById(100L)).thenReturn(tenantWithStatus("active"));
         when(jwtUtil.generateTokenWithTenantId(any(), any(), any(), any(), anyInt())).thenReturn("jwt-token-abc");
         when(passwordManagementService.isPasswordExpired(user)).thenReturn(false);
 
@@ -83,12 +90,65 @@ class LoginCompletionHelperTest {
         TenantMember member = new TenantMember();
         member.setStatus("pending");
         when(tenantMemberService.findByTenantIdAndUserId(200L, 3L)).thenReturn(member);
+        when(tenantService.getById(200L)).thenReturn(tenantWithStatus("active"));
         when(jwtUtil.generateTokenWithTenantId(any(), any(), any(), any(), anyInt())).thenReturn("jwt-token-ghi");
         when(passwordManagementService.isPasswordExpired(user)).thenReturn(false);
 
         AuthenticationResponse result = helper.completeLogin(user, null, null);
 
         assertThat(result.getTenantStatus()).isEqualTo("pending");
+    }
+
+    // =========================================================
+    // completeLogin — suspended organization is blocked
+    // =========================================================
+
+    @Test
+    void completeLogin_suspendedTenant_refusesLoginAndMintsNothing() {
+        User user = buildUser(10L, "user-pid-010", null, false, false);
+
+        when(tenantMemberService.getTenantIdByUserId(10L)).thenReturn(300L);
+        TenantMember member = new TenantMember();
+        member.setStatus("active"); // the member is fine; the ORG is suspended
+        when(tenantMemberService.findByTenantIdAndUserId(300L, 10L)).thenReturn(member);
+        when(tenantService.getById(300L)).thenReturn(tenantWithStatus("suspended"));
+
+        assertThatThrownBy(() -> helper.completeLogin(user, "127.0.0.1", "Mozilla/5.0"))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("tenant.suspended");
+
+        // The block sits before any token or session is minted — a suspended tenant must not walk
+        // away with a usable credential.
+        verify(jwtUtil, never()).generateTokenWithTenantId(any(), any(), any(), any(), anyInt());
+        verify(sessionManagementService, never()).createSession(anyLong(), anyString(), any(), any());
+    }
+
+    @Test
+    void completeLogin_suspendedStatusIsCaseInsensitive() {
+        User user = buildUser(11L, "user-pid-011", null, false, false);
+
+        when(tenantMemberService.getTenantIdByUserId(11L)).thenReturn(301L);
+        when(tenantService.getById(301L)).thenReturn(tenantWithStatus("SUSPENDED"));
+
+        assertThatThrownBy(() -> helper.completeLogin(user, null, null))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("tenant.suspended");
+    }
+
+    @Test
+    void completeLogin_inactiveTenant_isNotBlocked() {
+        // Only SUSPENDED is a hard block. An inactive (deactivated) tenant is a softer state and is
+        // intentionally left to log in, so this change cannot silently widen the lockout.
+        User user = buildUser(12L, "user-pid-012", null, false, false);
+
+        when(tenantMemberService.getTenantIdByUserId(12L)).thenReturn(302L);
+        when(tenantService.getById(302L)).thenReturn(tenantWithStatus("inactive"));
+        when(jwtUtil.generateTokenWithTenantId(any(), any(), any(), any(), anyInt())).thenReturn("jwt-inactive");
+        when(passwordManagementService.isPasswordExpired(user)).thenReturn(false);
+
+        AuthenticationResponse result = helper.completeLogin(user, null, null);
+
+        assertThat(result.getJwt()).isEqualTo("jwt-inactive");
     }
 
     // =========================================================
@@ -192,6 +252,12 @@ class LoginCompletionHelperTest {
     // =========================================================
     // Helper
     // =========================================================
+
+    private Tenant tenantWithStatus(String status) {
+        Tenant tenant = new Tenant();
+        tenant.setStatus(status);
+        return tenant;
+    }
 
     private User buildUser(Long id, String pid, String nickName,
                            boolean mustChangePassword, boolean accountLocked) {

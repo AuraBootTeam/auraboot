@@ -5,8 +5,12 @@ import com.auraboot.framework.auth.dto.CustomUserDetails;
 import com.auraboot.framework.auth.service.PasswordManagementService;
 import com.auraboot.framework.auth.service.SessionManagementService;
 import com.auraboot.framework.auth.util.JwtUtil;
+import com.auraboot.framework.common.constant.StatusConstants;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.tenant.dao.entity.Tenant;
 import com.auraboot.framework.tenant.dao.entity.TenantMember;
 import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.tenant.service.TenantService;
 import com.auraboot.framework.user.dao.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +40,7 @@ public class LoginCompletionHelper {
 
     private final JwtUtil jwtUtil;
     private final TenantMemberService tenantMemberService;
+    private final TenantService tenantService;
     private final SessionManagementService sessionManagementService;
     private final PasswordManagementService passwordManagementService;
 
@@ -80,6 +85,21 @@ public class LoginCompletionHelper {
             log.info("Found tenant {} with status {} and memberId {} for user {}", tenantId, tenantStatus, memberId, user.getId());
         } catch (Exception e) {
             log.warn("Failed to get tenant for user {}: {}", user.getId(), e.getMessage());
+        }
+
+        // A suspended organization must not be able to log in. The gate reads the TENANT's status
+        // (the organization), not the member's: a member row can be "active" inside an org that has
+        // been suspended platform-side, and the block above only ever inspected the member row and
+        // wrote it to a log. Resolved OUTSIDE the swallow-catch on purpose — a genuine suspension
+        // must propagate, not be logged and ignored like a lookup blip — and placed before any JWT
+        // or session is minted, so a suspended tenant leaves with an error, never a usable token.
+        // Users with no tenant (tenantId == null) are unaffected.
+        if (tenantId != null) {
+            Tenant tenant = tenantService.getById(tenantId);
+            if (tenant != null && StatusConstants.SUSPENDED.equalsIgnoreCase(tenant.getStatus())) {
+                log.warn("Login refused for user {}: tenant {} is suspended", user.getId(), tenantId);
+                throw BusinessException.i18n("tenant.suspended");
+            }
         }
 
         // Set memberId on userDetails for downstream use
