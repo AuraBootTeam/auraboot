@@ -73,19 +73,19 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Prepare Docker image cache directory
         run: mkdir -p "$PLAYWRIGHT_IMAGE_CACHE_DIR"
 
       - name: Restore Playwright Docker image cache
         id: playwright-image-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.PLAYWRIGHT_IMAGE_CACHE_DIR }}
           key: ${{ runner.os }}-docker-playwright-v1.59.1-noble
@@ -103,7 +103,7 @@ jobs:
 
       - name: Save Playwright Docker image cache
         if: steps.playwright-image-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         continue-on-error: true
         with:
           path: ${{ env.PLAYWRIGHT_IMAGE_CACHE_DIR }}

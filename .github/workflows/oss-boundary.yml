@@ -11,7 +11,7 @@ jobs:
     name: Verify OSS does not reference enterprise code
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Run OSS boundary check
         run: bash scripts/check-oss-boundary.sh
@@ -20,7 +20,7 @@ jobs:
     name: Gitleaks secret scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
