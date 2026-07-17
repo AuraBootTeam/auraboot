@@ -47,18 +47,18 @@ const MIN_DRAWER_HEIGHT = 500;
 const DRAWER_STORAGE_PREFIX = 'auraboot:review-drawer-layout';
 
 const toneClass: Record<Tone, string> = {
-  green: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  amber: 'bg-amber-50 text-amber-700 border-amber-200',
-  red: 'bg-rose-50 text-rose-700 border-rose-200',
-  blue: 'bg-blue-50 text-blue-700 border-blue-200',
-  purple: 'bg-violet-50 text-violet-700 border-violet-200',
-  gray: 'bg-gray-100 text-gray-700 border-gray-200',
+  green: 'bg-status-green-bg text-status-green border-status-green',
+  amber: 'bg-status-amber-bg text-status-amber border-status-amber',
+  red: 'bg-status-red-bg text-status-red border-status-red',
+  blue: 'bg-status-blue-bg text-status-blue border-status-blue',
+  purple: 'bg-status-blue-bg text-status-blue border-status-blue',
+  gray: 'bg-status-gray-bg text-status-gray border-status-gray',
 };
 
 const buttonClass: Record<string, string> = {
-  primary: 'bg-blue-600 text-white hover:bg-blue-700',
-  secondary: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50',
-  danger: 'bg-rose-600 text-white hover:bg-rose-700',
+  primary: 'bg-accent text-white hover:opacity-90',
+  secondary: 'border border-border bg-panel text-text hover:bg-hover',
+  danger: 'bg-status-red text-white hover:opacity-90',
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -234,15 +234,15 @@ function comparisonStatusLabel(
 function comparisonStatusClass(status: unknown): string {
   switch (String(status ?? '')) {
     case 'matched':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+      return 'border-status-green bg-status-green-bg text-status-green';
     case 'mismatch':
-      return 'border-rose-200 bg-rose-50 text-rose-700';
+      return 'border-status-red bg-status-red-bg text-status-red';
     case 'missing_source':
     case 'missing_candidate':
     case 'missing_both':
-      return 'border-amber-200 bg-amber-50 text-amber-700';
+      return 'border-status-amber bg-status-amber-bg text-status-amber';
     default:
-      return 'border-gray-200 bg-gray-50 text-gray-700';
+      return 'border-status-gray bg-status-gray-bg text-status-gray';
   }
 }
 
@@ -268,7 +268,7 @@ function ComparisonList({
             data-testid={`review-drawer-comparison-${index}`}
             className="rounded-control border-border bg-panel overflow-hidden border"
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-2.5 py-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-border border-b px-2.5 py-1.5">
               <span className="text-text min-w-0 break-words text-xs font-semibold">{key}</span>
               <span
                 className={`rounded-pill shrink-0 border px-2 py-0.5 text-[11px] font-semibold ${comparisonStatusClass(
@@ -345,14 +345,14 @@ function candidateKey(candidate: any, index: number): string {
 function scoreToneClass(color: unknown): string {
   switch (String(color ?? '').toLowerCase()) {
     case 'green':
-      return 'bg-emerald-50 text-emerald-700';
+      return 'bg-status-green-bg text-status-green';
     case 'yellow':
     case 'amber':
-      return 'bg-amber-50 text-amber-700';
+      return 'bg-status-amber-bg text-status-amber';
     case 'red':
-      return 'bg-rose-50 text-rose-700';
+      return 'bg-status-red-bg text-status-red';
     default:
-      return 'bg-emerald-50 text-emerald-700';
+      return 'bg-status-green-bg text-status-green';
   }
 }
 
@@ -400,7 +400,7 @@ function FieldRows({
   t: (key: string) => string;
 }) {
   return (
-    <div className="divide-y divide-gray-100">
+    <div className="divide-border divide-y">
       {fields.map((field) => {
         const key = String(field.key || field.field || field.label);
         const label = getLocalizedText(field.label || key, locale, t);
@@ -681,7 +681,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     return (
       <button
         type="button"
-        className="rounded-control bg-panel text-text fixed right-4 bottom-4 z-50 border border-blue-200 px-4 py-2 text-sm font-medium shadow-lg hover:bg-blue-50"
+        className="rounded-control bg-panel text-text shadow-pop fixed right-4 bottom-4 z-50 border border-border px-4 py-2 text-sm font-medium hover:bg-hover"
         data-testid="review-drawer-minimized"
         onClick={() => setDismissedRecordKey('')}
       >
@@ -771,7 +771,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     <section
       data-testid="review-drawer"
       style={drawerStyle}
-      className="rounded-card bg-panel fixed z-50 grid min-h-[500px] max-w-[calc(100vw-24px)] grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden border border-blue-300 shadow-2xl"
+      className="rounded-card bg-panel shadow-pop fixed z-50 grid min-h-[500px] max-w-[calc(100vw-24px)] grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden border border-border"
     >
       <div
         className="bg-accent flex min-h-12 cursor-move items-center justify-between gap-3 overflow-hidden px-4 text-white"
@@ -859,7 +859,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           t,
                           'Raw',
                         )}
-                        <span className="rounded-pill border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                        <span className="rounded-pill border border-status-blue bg-status-blue-bg px-2 py-0.5 text-xs font-medium text-status-blue">
                           {localized(locale, t, '只读证据', 'Read-only evidence')}
                         </span>
                       </header>
@@ -867,8 +867,8 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                     </section>
                   )}
                   {canonicalFields.length > 0 && (
-                    <section className="rounded-card overflow-hidden border border-blue-100 bg-blue-50/40">
-                      <header className="text-text-2 flex items-center justify-between gap-3 border-b border-blue-100 bg-white/75 px-3 py-2 text-sm font-semibold">
+                    <section className="rounded-card border-border bg-panel overflow-hidden border">
+                      <header className="border-border bg-panel text-text-2 flex items-center justify-between gap-3 border-b px-3 py-2 text-sm font-semibold">
                         {sectionLabel(
                           compareConfig.canonicalTitle
                             ? { title: compareConfig.canonicalTitle }
@@ -877,7 +877,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           t,
                           'Canonical',
                         )}
-                        <span className="rounded-pill border border-violet-200 bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700">
+                        <span className="rounded-pill border border-status-blue bg-status-blue-bg px-2 py-0.5 text-xs font-medium text-status-blue">
                           {localized(locale, t, '转换结果', 'Canonical result')}
                         </span>
                       </header>
@@ -928,7 +928,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       return (
                         <span
                           key={key}
-                          className="rounded-control text-text-2 inline-flex min-h-8 max-w-full items-center gap-1.5 border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs"
+                          className="rounded-control text-text-2 inline-flex min-h-8 max-w-full items-center gap-1.5 border border-border bg-subtle px-2.5 py-1 text-xs"
                         >
                           <span className="text-text-2 shrink-0 font-medium">{label}</span>
                           <span
@@ -958,7 +958,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       'Parse evidence and Profile / LLM policy',
                     )}
                   </summary>
-                  <div className="space-y-3 border-t border-gray-100 p-3">
+                  <div className="border-border space-y-3 border-t p-3">
                     {sourceCards.length > 0 && (
                       <div
                         data-testid="review-drawer-source-cards"
@@ -1029,7 +1029,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                     {sourceConfig.jsonField && (
                       <pre
                         data-testid="review-drawer-source-json"
-                        className="rounded-card max-h-64 overflow-auto border border-slate-700 bg-slate-950 p-3 text-xs text-blue-100"
+                        className="rounded-card border-inverse-border bg-inverse text-inverse-muted max-h-64 overflow-auto border p-3 text-xs"
                       >
                         {JSON.stringify(
                           parseJsonValue(readPath(sourceRecord, sourceConfig.jsonField)),
@@ -1055,7 +1055,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       'Decision history and export impact',
                     )}
                   </summary>
-                  <div className="space-y-3 border-t border-gray-100 p-3">
+                  <div className="border-border space-y-3 border-t p-3">
                     {exportFields.length > 0 && (
                       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                         {exportFields.map((field: any) => {
@@ -1082,7 +1082,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       </div>
                     )}
                     {exportRows.length > 0 && (
-                      <ol className="rounded-card border-border bg-panel divide-y divide-gray-100 border">
+                      <ol className="rounded-card border-border divide-border bg-panel divide-y border">
                         {exportRows.map((row: any, index: number) => (
                           <li
                       key={String(row.pid ?? index)}
@@ -1116,7 +1116,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             data-testid="review-drawer-tab-candidates"
             className="rounded-card border-border bg-panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden border"
           >
-            <header className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-3 py-2">
+            <header className="border-border flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
               <h3 className="text-text min-w-0 flex-1 truncate text-sm font-semibold">
                 {getLocalizedText(
                   candidatesConfig.title || {
@@ -1194,7 +1194,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       }}
                       className={`rounded-card block w-full border p-3 text-left ${
                         active
-                          ? 'bg-accent-weak border-blue-400'
+                          ? 'bg-accent-weak border-accent'
                           : 'border-border bg-panel hover:bg-hover'
                       }`}
                     >
@@ -1252,7 +1252,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             </div>
             <section
               data-testid="review-drawer-decision-panel"
-              className="bg-subtle max-h-[48%] shrink-0 overflow-auto border-t border-gray-100 p-2.5"
+              className="bg-subtle border-border max-h-[48%] shrink-0 overflow-auto border-t p-2.5"
             >
               <h3 className="text-text text-sm font-semibold">
                 {getLocalizedText(
@@ -1390,7 +1390,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             event.preventDefault();
           }}
         >
-          <span className="absolute right-1 bottom-1 h-2 w-2 border-r-2 border-b-2 border-blue-400" />
+          <span className="border-accent absolute right-1 bottom-1 h-2 w-2 border-r-2 border-b-2" />
         </button>
       )}
     </section>

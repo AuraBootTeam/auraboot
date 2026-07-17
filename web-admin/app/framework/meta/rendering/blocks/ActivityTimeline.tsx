@@ -44,16 +44,18 @@ export interface ActivityTimelineProps {
 }
 
 // Activity type → [icon, zh label, en label, dot color class]
+// Dot colors fold onto the 5 semantic status tones (§1.3): purple/teal/indigo
+// have no status token so they collapse onto blue; yellow/orange → amber.
 const ACTIVITY_TYPE_CONFIG: Record<string, [React.ReactNode, string, string, string]> = {
-  CREATE: [<PlusIcon key="c" />, 'Created', 'Created', 'bg-green-500'],
-  UPDATE: [<PencilIcon key="u" />, 'Updated', 'Updated', 'bg-blue-500'],
-  STATE_CHANGE: [<ArrowPathIcon key="s" />, 'State Change', 'State Change', 'bg-purple-500'],
-  DELETE: [<TrashIcon key="d" />, 'Deleted', 'Deleted', 'bg-red-500'],
-  NOTE: [<NoteIcon key="n" />, 'Note', 'Note', 'bg-yellow-500'],
-  CALL: [<PhoneIcon key="p" />, 'Call', 'Call', 'bg-teal-500'],
-  EMAIL: [<EmailIcon key="e" />, 'Email', 'Email', 'bg-indigo-500'],
-  MEETING: [<MeetingIcon key="m" />, 'Meeting', 'Meeting', 'bg-orange-500'],
-  SYSTEM: [<SystemIcon key="sys" />, 'System', 'System', 'bg-gray-500'],
+  CREATE: [<PlusIcon key="c" />, 'Created', 'Created', 'bg-status-green'],
+  UPDATE: [<PencilIcon key="u" />, 'Updated', 'Updated', 'bg-status-blue'],
+  STATE_CHANGE: [<ArrowPathIcon key="s" />, 'State Change', 'State Change', 'bg-status-blue'],
+  DELETE: [<TrashIcon key="d" />, 'Deleted', 'Deleted', 'bg-status-red'],
+  NOTE: [<NoteIcon key="n" />, 'Note', 'Note', 'bg-status-amber'],
+  CALL: [<PhoneIcon key="p" />, 'Call', 'Call', 'bg-status-blue'],
+  EMAIL: [<EmailIcon key="e" />, 'Email', 'Email', 'bg-status-blue'],
+  MEETING: [<MeetingIcon key="m" />, 'Meeting', 'Meeting', 'bg-status-amber'],
+  SYSTEM: [<SystemIcon key="sys" />, 'System', 'System', 'bg-status-gray'],
 };
 
 export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
@@ -106,7 +108,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
         className="text-text-3 flex items-center justify-center py-12"
         data-testid="activity-timeline-loading"
       >
-        <div className="rounded-pill border-border-strong mr-2 h-5 w-5 animate-spin border-2 border-t-blue-500" />
+        <div className="rounded-pill border-border-strong mr-2 h-5 w-5 animate-spin border-2 border-t-accent" />
         {locale === 'zh-CN' ? '加载活动记录...' : 'Loading activities...'}
       </div>
     );
@@ -137,7 +139,7 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
   return (
     <div className="relative" data-testid="activity-timeline">
       {/* Timeline line */}
-      <div className="absolute top-0 bottom-0 left-4 w-px bg-gray-200" />
+      <div className="absolute top-0 bottom-0 left-4 w-px bg-border-strong" />
 
       <div className="space-y-6 pl-10">
         {groups.map((group) => (
@@ -171,14 +173,14 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
                     {/* Timeline dot */}
                     <div className={`absolute top-1.5 -left-10 h-3 w-3 rounded-full ${dotColor}`} />
 
-                    <div className="rounded-card bg-subtle border border-gray-100 px-4 py-3">
+                    <div className="rounded-card bg-subtle border border-border px-4 py-3">
                       {/* Header: icon + type badge + actor + time */}
                       <div className="flex items-center gap-2 text-sm">
                         <span className="text-text-3 flex-shrink-0">{icon}</span>
                         <ActivityTypeBadge type={activityType} locale={locale} />
                         <span className="text-text-2 font-medium">{actorLabel}</span>
                         {actorType === 'agent' && (
-                          <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-medium text-violet-700">
+                          <span className="rounded bg-status-blue-bg px-1.5 py-0.5 text-[10px] font-medium text-status-blue">
                             AI
                           </span>
                         )}
@@ -218,17 +220,17 @@ export const ActivityTimeline: React.FC<ActivityTimelineProps> = ({
 
 function ActivityTypeBadge({ type, locale }: { type: string; locale: string }) {
   const labels: Record<string, [string, string, string]> = {
-    CREATE: ['创建', 'Created', 'bg-green-100 text-green-700'],
-    UPDATE: ['更新', 'Updated', 'bg-blue-100 text-blue-700'],
-    STATE_CHANGE: ['状态变更', 'State Change', 'bg-purple-100 text-purple-700'],
-    DELETE: ['删除', 'Deleted', 'bg-red-100 text-red-700'],
-    NOTE: ['备注', 'Note', 'bg-yellow-100 text-yellow-700'],
-    CALL: ['通话', 'Call', 'bg-teal-100 text-teal-700'],
-    EMAIL: ['邮件', 'Email', 'bg-indigo-100 text-indigo-700'],
-    MEETING: ['会议', 'Meeting', 'bg-orange-100 text-orange-700'],
-    SYSTEM: ['系统', 'System', 'bg-gray-100 text-gray-600'],
+    CREATE: ['创建', 'Created', 'bg-status-green-bg text-status-green'],
+    UPDATE: ['更新', 'Updated', 'bg-status-blue-bg text-status-blue'],
+    STATE_CHANGE: ['状态变更', 'State Change', 'bg-status-blue-bg text-status-blue'],
+    DELETE: ['删除', 'Deleted', 'bg-status-red-bg text-status-red'],
+    NOTE: ['备注', 'Note', 'bg-status-amber-bg text-status-amber'],
+    CALL: ['通话', 'Call', 'bg-status-blue-bg text-status-blue'],
+    EMAIL: ['邮件', 'Email', 'bg-status-blue-bg text-status-blue'],
+    MEETING: ['会议', 'Meeting', 'bg-status-amber-bg text-status-amber'],
+    SYSTEM: ['系统', 'System', 'bg-status-gray-bg text-status-gray'],
   };
-  const [zh, en, cls] = labels[type] || ['—', '—', 'bg-gray-100 text-gray-600'];
+  const [zh, en, cls] = labels[type] || ['—', '—', 'bg-status-gray-bg text-status-gray'];
   return (
     <span
       className={`inline-block flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${cls}`}
@@ -298,7 +300,7 @@ function MetadataDisplay({ metadata, locale }: { metadata: string; locale: strin
       }
       return (
         <div className="mt-1.5 flex items-center gap-1.5 text-xs">
-          <span className="rounded bg-gray-100 px-1.5 py-0.5 text-gray-600">{fromState}</span>
+          <span className="rounded bg-status-gray-bg px-1.5 py-0.5 text-status-gray">{fromState}</span>
           <svg
             className="text-text-3 h-3 w-3 flex-shrink-0"
             fill="none"
@@ -308,7 +310,7 @@ function MetadataDisplay({ metadata, locale }: { metadata: string; locale: strin
           >
             <path d="M5 12h14m-4-4 4 4-4 4" />
           </svg>
-          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-700">{toState}</span>
+          <span className="rounded bg-status-blue-bg px-1.5 py-0.5 text-status-blue">{toState}</span>
         </div>
       );
     }

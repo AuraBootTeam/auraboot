@@ -92,6 +92,7 @@
           },
           "valueField": "draft_count",
           "tone": "amber",
+          "icon": "Inbox",
           "onClick": {
             "action": "state.set",
             "args": {
@@ -109,6 +110,7 @@
           },
           "valueField": "approved_count",
           "tone": "blue",
+          "icon": "CircleCheck",
           "onClick": {
             "action": "state.set",
             "args": {
@@ -126,6 +128,7 @@
           },
           "valueField": "published_count",
           "tone": "green",
+          "icon": "BookUp",
           "onClick": {
             "action": "state.set",
             "args": {
@@ -143,6 +146,7 @@
           },
           "valueField": "rejected_count",
           "tone": "default",
+          "icon": "CircleX",
           "onClick": {
             "action": "state.set",
             "args": {

@@ -107,14 +107,14 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
         value === null || value === undefined || value === '' ? '—' : String(value);
       const isLongText = displayValue.includes('\n') || displayValue.length > 56;
       const toneClass = isPositiveDisplayValue(displayValue)
-        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+        ? 'border-status-green bg-status-green-bg text-status-green'
         : isNegativeDisplayValue(displayValue)
-          ? 'border-slate-200 bg-slate-100 text-slate-600'
-          : 'border-blue-200 bg-blue-50 text-blue-700';
+          ? 'border-status-gray bg-status-gray-bg text-status-gray'
+          : 'border-status-blue bg-status-blue-bg text-status-blue';
 
       if (isLongText) {
         return (
-          <p className="mt-2 text-sm leading-6 whitespace-pre-line text-slate-700">
+          <p className="mt-2 text-sm leading-6 whitespace-pre-line text-text-2">
             {displayValue}
           </p>
         );
@@ -122,7 +122,7 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
 
       return (
         <span
-          className={`mt-2 inline-flex w-fit max-w-full items-center rounded-md border px-2.5 py-1 text-sm font-medium ${toneClass}`}
+          className={`mt-2 inline-flex w-fit max-w-full items-center rounded-control border px-2.5 py-1 text-sm font-medium ${toneClass}`}
         >
           {displayValue}
         </span>
@@ -130,14 +130,14 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
     };
 
     return (
-      <section className="mb-4 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-start gap-3 border-b border-slate-100 bg-slate-50 px-5 py-4">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-600 ring-1 ring-blue-100">
+      <section className="mb-4 overflow-hidden rounded-card border border-border bg-panel shadow-card">
+        <div className="flex items-start gap-3 border-b border-border bg-subtle px-5 py-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-accent-weak text-accent">
             <Icon className="h-4 w-4" aria-hidden="true" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-            {description ? <p className="mt-1 text-sm text-slate-500">{description}</p> : null}
+            <h3 className="text-base font-semibold text-text">{title}</h3>
+            {description ? <p className="mt-1 text-sm text-text-3">{description}</p> : null}
           </div>
         </div>
         <div className="p-4 sm:p-5" style={cardGridStyle}>
@@ -149,10 +149,10 @@ export const FormSectionBlockRenderer: React.FC<FormSectionBlockRendererProps> =
             return (
               <div
                 key={field.field}
-                className="min-w-0 rounded-md border border-slate-100 bg-white px-4 py-3 ring-1 ring-slate-50"
+                className="min-w-0 rounded-control border border-border bg-panel px-4 py-3"
                 style={{ gridColumn: `span ${Math.min(12, Math.max(1, colSpan))}` }}
               >
-                <div className="text-xs font-medium text-slate-500">{label}</div>
+                <div className="text-xs font-medium text-text-3">{label}</div>
                 {renderValue(field)}
               </div>
             );

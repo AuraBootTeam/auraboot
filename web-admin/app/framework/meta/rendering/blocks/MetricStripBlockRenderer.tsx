@@ -2,6 +2,7 @@ import React from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { resolveIcon, hasIcon } from '~/utils/icon-resolver';
 import {
   executeSimpleWorkbenchAction,
   readDataSourceRecord,
@@ -16,22 +17,39 @@ export interface MetricStripBlockRendererProps {
   runtime: SchemaRuntime;
 }
 
-const toneClass: Record<string, string> = {
-  green: 'border-emerald-200 bg-emerald-50 text-emerald-900',
-  amber: 'border-amber-200 bg-amber-50 text-amber-900',
-  red: 'border-rose-200 bg-rose-50 text-rose-900',
-  blue: 'border-blue-200 bg-blue-50 text-blue-900',
-  purple: 'border-violet-200 bg-violet-50 text-violet-900',
-  default: 'border-gray-200 bg-white text-gray-900',
+// Design-system semantic tones (§1.3). Cards are white-surfaced (bg-panel) per
+// §1.2 "no large tinted fills"; the tone tints only the icon chip and the active
+// ring, so the strip reads as a set of quiet metric cards, not color blocks.
+interface ToneToken {
+  icon: string; // text color for the icon glyph
+  iconBg: string; // soft chip background behind the icon
+  ring: string; // ring color when the metric is the active filter
+}
+
+const toneToken: Record<string, ToneToken> = {
+  green: { icon: 'text-status-green', iconBg: 'bg-status-green-bg', ring: 'ring-status-green' },
+  amber: { icon: 'text-status-amber', iconBg: 'bg-status-amber-bg', ring: 'ring-status-amber' },
+  red: { icon: 'text-status-red', iconBg: 'bg-status-red-bg', ring: 'ring-status-red' },
+  blue: { icon: 'text-status-blue', iconBg: 'bg-status-blue-bg', ring: 'ring-status-blue' },
+  gray: { icon: 'text-status-gray', iconBg: 'bg-status-gray-bg', ring: 'ring-status-gray' },
+  default: { icon: 'text-text-2', iconBg: 'bg-subtle', ring: 'ring-border-strong' },
 };
 
-const activeToneClass: Record<string, string> = {
-  green: 'ring-2 ring-emerald-300 ring-offset-1',
-  amber: 'ring-2 ring-amber-300 ring-offset-1',
-  red: 'ring-2 ring-rose-300 ring-offset-1',
-  blue: 'ring-2 ring-blue-300 ring-offset-1',
-  purple: 'ring-2 ring-violet-300 ring-offset-1',
-  default: 'ring-2 ring-gray-300 ring-offset-1',
+// purple/violet are not among the 5 semantic status colors; fold onto blue so
+// existing configs keep a stable hue instead of silently greying out.
+const toneAlias: Record<string, string> = { purple: 'blue', violet: 'blue' };
+
+function resolveTone(tone: string): ToneToken {
+  const key = toneAlias[tone] || tone;
+  return toneToken[key] || toneToken.default;
+}
+
+// Trend delta color follows the direction, not the metric tone: up is good
+// (green), down is bad (red), flat is neutral — same language as StatCard.
+const trendClass: Record<string, string> = {
+  up: 'text-status-green',
+  down: 'text-status-red',
+  flat: 'text-text-2',
 };
 
 function mappedMetricValue(
@@ -110,7 +128,7 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
       <div
         role="alert"
         data-testid="metric-strip-error"
-        className="rounded-control bg-status-red-bg text-status-red border border-red-200 p-3 text-sm"
+        className="rounded-control bg-status-red-bg text-status-red border-status-red border p-3 text-sm"
       >
         {message || 'Failed to load metrics'}
       </div>
@@ -151,11 +169,22 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
       const subText = metric.subTextField ? readPath(record, metric.subTextField) : metric.subText;
       const displaySubText = renderMetricAuxText(subText, locale, t);
       const tone = metric.tone || 'default';
+      const tk = resolveTone(tone);
+      const iconName: string | undefined = typeof metric.icon === 'string' ? metric.icon : undefined;
+      const showIcon = Boolean(iconName && hasIcon(iconName));
       const clickable = Boolean(metric.onClick);
       const active = metric.activeWhen
         ? evaluator.evaluateCondition(metric.activeWhen, context)
         : false;
       const displayValue = mappedMetricValue(value, metric, locale, t);
+
+      const trendRaw = metric.trendField ? readPath(record, metric.trendField) : metric.trend;
+      const trend = renderMetricAuxText(trendRaw, locale, t);
+      const trendDirection: string = String(
+        (metric.trendDirectionField
+          ? readPath(record, metric.trendDirectionField)
+          : metric.trendDirection) || 'flat',
+      );
 
       if (variant === 'chips') {
         return (
@@ -169,14 +198,21 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
               });
             }}
             disabled={!clickable}
-            className={`rounded-pill inline-flex min-h-9 items-center gap-2 border px-3 py-1.5 text-sm ${
-              toneClass[tone] || toneClass.default
-            } ${active ? activeToneClass[tone] || activeToneClass.default : ''} ${
-              clickable ? 'cursor-pointer hover:shadow-sm' : 'cursor-default'
-            } ${metric.align === 'end' ? 'ml-auto' : ''}`}
+            className={`rounded-pill border-border bg-panel text-text inline-flex min-h-9 items-center gap-2 border px-3 py-1.5 text-sm ${
+              active ? `ring-2 ring-offset-1 ${tk.ring}` : ''
+            } ${clickable ? 'hover:border-border-strong cursor-pointer' : 'cursor-default'} ${
+              metric.align === 'end' ? 'ml-auto' : ''
+            }`}
           >
+            {showIcon && (
+              <span className={tk.icon} aria-hidden="true">
+                {resolveIcon(iconName, label, 15)}
+              </span>
+            )}
             <span className="font-medium">{label}</span>
-            <span className="rounded-pill bg-white/70 px-2 py-0.5 text-xs font-semibold">
+            <span
+              className={`rounded-pill px-2 py-0.5 text-xs font-semibold ${tk.iconBg} ${tk.icon}`}
+            >
               {displayValue}
               {unit ? ` ${String(unit)}` : ''}
             </span>
@@ -195,26 +231,44 @@ export const MetricStripBlockRenderer: React.FC<MetricStripBlockRendererProps> =
             });
           }}
           disabled={!clickable}
-          className={`rounded-card h-28 min-h-28 overflow-hidden border p-3 text-left shadow-sm ${toneClass[tone] || toneClass.default} ${
-            active ? activeToneClass[tone] || activeToneClass.default : ''
-          } ${clickable ? 'cursor-pointer hover:shadow' : 'cursor-default'}`}
+          className={`rounded-card border-border bg-panel shadow-card h-28 overflow-hidden border p-4 text-left transition-shadow ${
+            active ? `ring-2 ring-offset-1 ${tk.ring}` : ''
+          } ${clickable ? 'hover:shadow-pop cursor-pointer' : 'cursor-default'}`}
         >
-          <div className="text-text-2 truncate text-xs font-medium" title={label}>
-            {label}
+          <div className="flex items-center gap-2">
+            {showIcon && (
+              <span
+                className={`rounded-control inline-flex h-7 w-7 flex-none items-center justify-center ${tk.iconBg} ${tk.icon}`}
+                aria-hidden="true"
+              >
+                {resolveIcon(iconName, label, 16)}
+              </span>
+            )}
+            <div className="text-text-2 min-w-0 flex-1 truncate text-xs font-medium" title={label}>
+              {label}
+            </div>
           </div>
-          <div className="mt-1 flex min-w-0 items-baseline gap-1 overflow-hidden">
+          <div className="mt-2 flex min-w-0 items-baseline gap-1.5 overflow-hidden">
             <span
-              className="min-w-0 truncate text-2xl font-semibold"
+              className="text-text min-w-0 truncate text-2xl font-semibold tabular-nums"
               data-testid={`metric-strip-value-${key}`}
               title={displayValue}
             >
               {displayValue}
             </span>
             {unit && <span className="text-text-2 flex-shrink-0 text-xs">{String(unit)}</span>}
+            {trend && (
+              <span
+                className={`ml-auto flex-shrink-0 text-xs font-medium ${trendClass[trendDirection] || trendClass.flat}`}
+                data-testid={`metric-strip-trend-${key}`}
+              >
+                {trend}
+              </span>
+            )}
           </div>
           {displaySubText && (
             <div
-              className="text-text-2 mt-1 line-clamp-2 text-xs break-words"
+              className="text-text-3 mt-1 line-clamp-2 text-xs break-words"
               data-testid={`metric-strip-subtext-${key}`}
               title={displaySubText}
             >

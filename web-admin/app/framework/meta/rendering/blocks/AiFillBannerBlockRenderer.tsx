@@ -103,11 +103,11 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
   return (
     <div
       data-testid="ai-fill-banner"
-      className="rounded-control bg-accent-weak mb-4 border border-blue-200 p-4"
+      className="rounded-control bg-accent-weak mb-4 border border-status-blue p-4"
     >
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="font-medium text-blue-900">
+          <div className="font-medium text-text">
             {t('ai.fill.banner_title') || (locale === 'zh-CN' ? '智能填写' : 'AI Fill')}
           </div>
           <div className="text-accent text-sm">
@@ -170,7 +170,7 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
             {error && (
               <div
                 data-testid="ai-fill-error"
-                className="bg-status-red-bg mb-3 rounded p-2 text-sm text-red-700"
+                className="bg-status-red-bg mb-3 rounded p-2 text-sm text-status-red"
               >
                 {error}
               </div>
@@ -189,7 +189,7 @@ export const AiFillBannerBlockRenderer: React.FC<AiFillBannerBlockProps> = ({ bl
                 data-testid="ai-fill-confirm"
                 onClick={onSubmit}
                 disabled={loading || !nlInput.trim()}
-                className="bg-accent hover:bg-accent-hover rounded px-3 py-1.5 text-sm text-white disabled:bg-blue-300"
+                className="bg-accent hover:bg-accent-hover rounded px-3 py-1.5 text-sm text-white disabled:bg-accent-weak"
               >
                 {loading
                   ? t('ai.fill.parsing') || (locale === 'zh-CN' ? '解析中…' : 'Parsing…')

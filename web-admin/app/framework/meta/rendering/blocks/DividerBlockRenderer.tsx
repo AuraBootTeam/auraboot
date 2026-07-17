@@ -31,9 +31,9 @@ export const DividerBlockRenderer: React.FC<DividerBlockRendererProps> = ({ bloc
         data-block-type="divider"
         role="separator"
       >
-        <span className="h-px flex-1 bg-gray-200" />
+        <span className="bg-border h-px flex-1" />
         <span className="text-text-2 text-xs font-medium tracking-wider uppercase">{label}</span>
-        <span className="h-px flex-1 bg-gray-200" />
+        <span className="bg-border h-px flex-1" />
       </div>
     );
   }

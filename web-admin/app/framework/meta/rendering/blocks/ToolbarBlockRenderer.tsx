@@ -141,7 +141,7 @@ export const ToolbarBlockRenderer: React.FC<ToolbarBlockRendererProps> = ({ bloc
               button.variant === 'primary'
                 ? 'bg-accent hover:bg-accent-hover text-white'
                 : button.variant === 'danger'
-                  ? 'bg-red-600 text-white hover:bg-red-700'
+                  ? 'bg-status-red hover:opacity-90 text-white'
                   : 'border-border-strong bg-panel text-text-2 hover:bg-hover border'
             } ${isDisabled ? 'cursor-not-allowed opacity-50' : ''}`}
           >

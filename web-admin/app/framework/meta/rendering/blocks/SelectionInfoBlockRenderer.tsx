@@ -66,7 +66,7 @@ export const SelectionInfoBlockRenderer: React.FC<SelectionInfoBlockRendererProp
 
   return (
     <div
-      className={`selection-info-block rounded-control border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900 ${block.className || ''}`}
+      className={`selection-info-block rounded-control border border-border bg-subtle px-4 py-3 text-sm text-text ${block.className || ''}`}
       data-testid="selection-info-block"
       data-block-type="selection-info"
     >
@@ -77,7 +77,7 @@ export const SelectionInfoBlockRenderer: React.FC<SelectionInfoBlockRendererProp
         {summary.count}
       </div>
       {summary.label && (
-        <div className="mt-1 truncate text-blue-700" data-testid="selection-info-label">
+        <div className="mt-1 truncate text-text-2" data-testid="selection-info-label">
           {summary.label}
         </div>
       )}

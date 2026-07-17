@@ -154,7 +154,7 @@ function renderArrayValue(
       {values.map((entry, index) => (
         <span
           key={`${String(entry)}-${index}`}
-          className="rounded-full border border-gray-200 bg-white px-2 py-1 text-xs text-gray-700"
+          className="rounded-pill border border-border bg-panel px-2 py-1 text-xs text-text-2"
         >
           {formatSemanticValue(entry, { ...item, format: undefined, unit: undefined }, locale, t)}
         </span>
@@ -223,7 +223,7 @@ function renderSemanticItems(
         return (
           <div
             key={key}
-            className={`rounded-lg border px-3 py-2.5 ${toneClasses.card}`}
+            className={`rounded-card border px-3 py-2.5 ${toneClasses.card}`}
             data-testid={`evidence-panel-item-${key}`}
           >
             <div className="flex items-center justify-between gap-3">
@@ -243,34 +243,34 @@ function getToneClasses(tone: string | undefined) {
   switch (tone) {
     case 'success':
       return {
-        card: 'border-emerald-200 bg-emerald-50/70',
-        value: 'text-emerald-700',
-        marker: 'bg-emerald-500',
+        card: 'border-status-green bg-status-green-bg',
+        value: 'text-status-green',
+        marker: 'bg-status-green',
       };
     case 'warning':
       return {
-        card: 'border-amber-200 bg-amber-50/70',
-        value: 'text-amber-700',
-        marker: 'bg-amber-500',
+        card: 'border-status-amber bg-status-amber-bg',
+        value: 'text-status-amber',
+        marker: 'bg-status-amber',
       };
     case 'danger':
     case 'error':
       return {
-        card: 'border-red-200 bg-red-50/70',
-        value: 'text-red-700',
-        marker: 'bg-red-500',
+        card: 'border-status-red bg-status-red-bg',
+        value: 'text-status-red',
+        marker: 'bg-status-red',
       };
     case 'info':
       return {
-        card: 'border-blue-200 bg-blue-50/70',
-        value: 'text-blue-700',
-        marker: 'bg-blue-500',
+        card: 'border-status-blue bg-status-blue-bg',
+        value: 'text-status-blue',
+        marker: 'bg-status-blue',
       };
     default:
       return {
-        card: 'border-border bg-subtle/40',
+        card: 'border-border bg-subtle',
         value: 'text-text',
-        marker: 'bg-gray-300',
+        marker: 'bg-status-gray',
       };
   }
 }
@@ -314,15 +314,15 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
   }
 
   return (
-    <section className="rounded-lg border border-gray-200 bg-white" data-testid="evidence-panel">
-      <div className="border-b border-gray-100 px-5 py-4">
+    <section className="rounded-card border border-border bg-panel" data-testid="evidence-panel">
+      <div className="border-b border-border px-5 py-4">
         <h3 className="text-text text-base font-semibold">{title}</h3>
         {description && <p className="text-text-2 mt-1 text-sm">{description}</p>}
       </div>
       <div className="space-y-4 p-5">
         {note && note !== '-' && (
           <div
-            className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900"
+            className="rounded-card border border-status-blue bg-status-blue-bg px-4 py-3 text-sm leading-6 text-status-blue"
             data-testid="evidence-panel-note"
           >
             {note}
@@ -354,7 +354,7 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
               return (
                 <div
                   key={key}
-                  className={`rounded-lg border px-4 py-3 ${toneClasses.card}`}
+                  className={`rounded-card border px-4 py-3 ${toneClasses.card}`}
                   data-testid={`evidence-panel-summary-${key}`}
                 >
                   <div className="flex items-center justify-between gap-3">
@@ -383,7 +383,7 @@ export const EvidencePanelBlockRenderer: React.FC<EvidencePanelBlockRendererProp
             return (
               <div
                 key={key}
-                className="rounded-lg border border-gray-100 bg-gray-50/60 p-3"
+                className="rounded-card border border-border bg-subtle p-3"
                 data-testid={`evidence-panel-section-${key}`}
               >
                 <div className="text-text-2 text-xs font-medium">{label}</div>

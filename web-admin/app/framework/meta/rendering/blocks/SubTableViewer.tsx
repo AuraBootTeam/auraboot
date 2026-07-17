@@ -1185,7 +1185,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
       {/* Cross-row validation errors banner */}
       {crossRowErrors.length > 0 && (
         <div
-          className="bg-status-red-bg text-status-red border-b border-red-200 px-4 py-2 text-sm"
+          className="bg-status-red-bg text-status-red border-status-red border-b px-4 py-2 text-sm"
           data-testid="subtable-cross-row-errors"
           role="alert"
         >
@@ -1210,7 +1210,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             <button
               onClick={() => setIsAdding(true)}
               data-testid="subtable-empty-action"
-              className="rounded-control bg-accent-weak text-accent mt-5 border border-blue-200 px-4 py-2 text-sm font-medium transition-colors hover:border-blue-300 hover:bg-blue-100"
+              className="rounded-control bg-accent-weak text-accent border-border hover:bg-hover mt-5 border px-4 py-2 text-sm font-medium transition-colors"
             >
               {emptyStateActionLabel}
             </button>
@@ -1250,7 +1250,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
               )}
             </tr>
           </thead>
-          <tbody className="bg-panel divide-y divide-gray-100">
+          <tbody className="bg-panel divide-border divide-y">
             <DndSubTableWrapper
               items={dndItems}
               onDragEnd={handleDragEnd}
@@ -1290,7 +1290,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                         return (
                           <td
                             key={col.field}
-                            className={`px-4 py-1.5 ${cellAlign} bg-blue-50/40 transition-colors`}
+                            className={`px-4 py-1.5 ${cellAlign} bg-accent-weak transition-colors`}
                           >
                             <InlineEditableCell
                               col={col}
@@ -1330,7 +1330,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                         <td
                           key={col.field}
                           className={`text-text-2 px-4 py-2 text-sm ${cellAlign}${
-                            canInlineEdit ? 'cursor-pointer hover:bg-gray-50/50' : ''
+                            canInlineEdit ? 'cursor-pointer hover:bg-hover' : ''
                           }`}
                           onDoubleClick={canInlineEdit ? () => handleStartEdit(row) : undefined}
                         >
@@ -1353,7 +1353,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                               onClick={handleSaveEdit}
                               disabled={editSaving}
                               data-testid={`subtable-edit-save-${rowIndex}`}
-                              className="text-accent mr-2 text-xs hover:text-blue-800 disabled:opacity-50"
+                              className="text-accent mr-2 text-xs hover:text-accent disabled:opacity-50"
                             >
                               {editSaving
                                 ? '...'
@@ -1392,8 +1392,8 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                                     data-testid={`subtable-row-action-${button.code}-${rowIndex}`}
                                     className={`text-xs disabled:cursor-not-allowed disabled:opacity-40 ${
                                       button.danger || button.variant === 'danger'
-                                        ? 'text-status-red hover:text-red-700'
-                                        : 'text-accent hover:text-blue-700'
+                                        ? 'text-status-red hover:text-status-red'
+                                        : 'text-accent hover:text-accent'
                                     }`}
                                     title={resolveButtonLabel(button)}
                                   >
@@ -1406,7 +1406,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                                 onClick={() => handleStartEdit(row)}
                                 disabled={!!editingRowId}
                                 data-testid={`subtable-edit-${rowIndex}`}
-                                className="text-accent text-xs hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-30"
+                                className="text-accent hover:text-accent text-xs disabled:cursor-not-allowed disabled:opacity-30"
                                 title={
                                   t('common.edit') !== 'common.edit' ? t('common.edit') : 'Edit'
                                 }
@@ -1433,7 +1433,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                                   deletingId === getLegacyCompatibleRecordPid(row) || !!editingRowId
                                 }
                                 data-testid={`subtable-delete-${rowIndex}`}
-                                className="text-status-red text-xs hover:text-red-700 disabled:opacity-50"
+                                className="text-status-red hover:text-status-red text-xs disabled:opacity-50"
                               >
                                 {deletingId === getLegacyCompatibleRecordPid(row)
                                   ? '...'
@@ -1454,7 +1454,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
             {/* Inline add form row */}
             {isEditable && isAdding && (
               <tr
-                className="border-t border-blue-100 bg-blue-50/30"
+                className="border-border bg-accent-weak border-t"
                 data-testid="subtable-add-form"
               >
                 {effectiveColumns.map((col: EnrichedColumnConfig) => (
@@ -1491,8 +1491,8 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                           data-testid={`subtable-add-${col.field}`}
                           className={`w-full rounded border px-2 py-1 text-sm focus:ring-1 focus:outline-none ${
                             addErrors[col.field]
-                              ? 'border-status-red focus:ring-red-400'
-                              : 'border-border-strong focus:ring-blue-400'
+                              ? 'border-status-red focus:ring-status-red'
+                              : 'border-border-strong focus:ring-accent'
                           }`}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleAddRow();
@@ -1520,7 +1520,7 @@ export const SubTableViewer: React.FC<SubTableViewerProps> = ({
                     onClick={handleAddRow}
                     disabled={saving}
                     data-testid="subtable-save-btn"
-                    className="text-accent mr-2 text-xs hover:text-blue-800 disabled:opacity-50"
+                    className="text-accent mr-2 text-xs hover:text-accent disabled:opacity-50"
                   >
                     {saving
                       ? '...'

@@ -73,14 +73,14 @@ export const StatCardBlockRenderer: React.FC<StatCardBlockRendererProps> = ({ bl
   const trendDirection: 'up' | 'down' | 'flat' = cfg.trendDirection || 'flat';
   const trendClass =
     trendDirection === 'up'
-      ? 'text-emerald-600'
+      ? 'text-status-green'
       : trendDirection === 'down'
-        ? 'text-rose-600'
-        : 'text-gray-500';
+        ? 'text-status-red'
+        : 'text-status-gray';
 
   return (
     <div
-      className={`stat-card-block rounded-card border-border bg-panel border p-4 shadow-sm ${block.className || ''}`}
+      className={`stat-card-block rounded-card border-border bg-panel border p-4 shadow-card ${block.className || ''}`}
       data-testid="stat-card-block"
       data-block-type="stat-card"
     >
