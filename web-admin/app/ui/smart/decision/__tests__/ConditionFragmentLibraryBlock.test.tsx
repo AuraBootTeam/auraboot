@@ -390,7 +390,7 @@ describe('ConditionFragmentLibraryBlock', () => {
     render(<ConditionFragmentLibraryBlock />);
 
     await screen.findByTestId('cfl-row-leave_sla_node_match');
-    expect(screen.getByTestId('cfl-validate-selected')).not.toBeDisabled();
+    await waitFor(() => expect(screen.getByTestId('cfl-validate-selected')).not.toBeDisabled());
     expect(screen.getByTestId('cfl-publish-selected')).toBeDisabled();
 
     fireEvent.click(screen.getByTestId('cfl-validate-selected'));
@@ -478,8 +478,8 @@ describe('ConditionFragmentLibraryBlock', () => {
     const ack = screen.getByTestId('cfl-impact-ack') as HTMLInputElement;
     expect(ack.checked).toBe(false);
     fireEvent.click(ack);
-    expect(ack.checked).toBe(true);
-    expect(publish).not.toBeDisabled();
+    await waitFor(() => expect(ack.checked).toBe(true));
+    await waitFor(() => expect(publish).not.toBeDisabled());
 
     fireEvent.click(publish);
     await waitFor(() =>

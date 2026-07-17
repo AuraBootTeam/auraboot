@@ -508,11 +508,25 @@ export class ExpressionParser {
    * 求值混合表达式（包含文本和 ${...} 表达式）
    */
   private evaluateMixedExpression(expression: string): string {
-    return expression.replace(/\$\{([^}]+)\}/g, (match, code) => {
+    let output = '';
+    let cursor = 0;
+    while (cursor < expression.length) {
+      const open = expression.indexOf('${', cursor);
+      if (open < 0) {
+        output += expression.slice(cursor);
+        break;
+      }
+      const close = expression.indexOf('}', open + 2);
+      if (close < 0) {
+        output += expression.slice(cursor);
+        break;
+      }
+      output += expression.slice(cursor, open);
+      const code = expression.slice(open + 2, close);
       try {
         const ast = jsep(code.trim());
         const result = this.evaluateNode(ast);
-        return String(result);
+        output += String(result);
       } catch (error) {
         throw new ExpressionRuntimeError(
           `混合表达式中的 JavaScript 代码求值失败: ${error instanceof Error ? error.message : String(error)}`,
@@ -520,7 +534,9 @@ export class ExpressionParser {
           error instanceof Error ? error : undefined,
         );
       }
-    });
+      cursor = close + 1;
+    }
+    return output;
   }
 
   /**
