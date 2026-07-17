@@ -76,7 +76,7 @@ describe('ExecutionLogViewer', () => {
             {
               sourceRef: 'virtual.leave_request_summary.v1',
               modelCode: 'leave_request_summary_v',
-              recordId: 'REQ-001',
+              recordPid: 'REQ-001',
               status: 'RESOLVED',
               fields: {
                 slaRiskScore: 91,

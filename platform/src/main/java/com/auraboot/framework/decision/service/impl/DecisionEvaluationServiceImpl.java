@@ -391,7 +391,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         Map<String, Object> trace = new LinkedHashMap<>();
         putIfPresent(trace, "sourceRef", stringValue(selector.get("sourceRef")));
         putIfPresent(trace, "modelCode", StringUtils.hasText(modelCode) ? modelCode : stringValue(selector.get("modelCode")));
-        putIfPresent(trace, "recordId", firstText(selector, "recordId", "recordPid", "id", "primaryKeyValue"));
+        putIfPresent(trace, "recordPid", firstText(selector, "recordPid", "recordId", "pid", "id", "primaryKeyValue"));
         trace.put("status", status);
         if (StringUtils.hasText(reason)) {
             trace.put("reason", reason);

@@ -219,7 +219,7 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
       .then((body) => {
         if (cancelled) return;
         const rows = Array.isArray(body?.data) ? body.data as AutomationLog[] : [];
-        const selected = rows.find((row) => String(row.id) === String(logIdParam) || row.pid === logIdParam) ?? null;
+        const selected = rows.find((row) => row.pid === logIdParam) ?? null;
         setRuntimeLog(selected);
       })
       .catch(() => {

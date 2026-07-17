@@ -30,7 +30,7 @@ export interface ExecLogEntry {
 export interface ExecVirtualSourceTrace {
   sourceRef?: string;
   modelCode?: string;
-  recordId?: string;
+  recordPid?: string;
   status?: string;
   reason?: string;
   fields?: Record<string, unknown>;
@@ -187,7 +187,7 @@ export function ExecutionLogViewer({ logs, initialStatus = 'ALL' }: ExecutionLog
                   <dl>
                     <dt>sourceRef</dt><dd className="mono">{source.sourceRef ?? '—'}</dd>
                     <dt>model</dt><dd>{source.modelCode ?? '—'}</dd>
-                    <dt>record</dt><dd className="mono">{source.recordId ?? '—'}</dd>
+                    <dt>record</dt><dd className="mono">{source.recordPid ?? '—'}</dd>
                     {source.reason ? <><dt>原因</dt><dd>{source.reason}</dd></> : null}
                   </dl>
                   {fieldEntries(source.fields).length ? (

@@ -491,11 +491,6 @@ export function AutomationEditor({
     showSuccessToast('Automation exported');
   }, [flowData, name, description, showSuccessToast]);
 
-  // Debug mode: show debugger instead of editor
-  if (isDebugMode) {
-    return <AutomationDebugger />;
-  }
-
   const config = useMemo(
     () => ({
       nodeDefinitions: applyActionCatalogAvailabilityToAutomationNodes(automationNodes, actionCatalog),
@@ -505,6 +500,11 @@ export function AutomationEditor({
     }),
     [actionCatalog],
   );
+
+  // Debug mode: show debugger instead of editor
+  if (isDebugMode) {
+    return <AutomationDebugger />;
+  }
 
   const title = automationId
     ? `${st('$i18n:automation.editor.edit') || 'Edit Automation'}: ${name}`

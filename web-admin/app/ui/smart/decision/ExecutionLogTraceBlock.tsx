@@ -1342,7 +1342,7 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                             <span>{display(source.status)}</span>
                             <span className="mono">{display(source.sourceRef)}</span>
                             <span>{display(source.modelCode)}</span>
-                            <span className="mono">{display(source.recordId)}</span>
+                            <span className="mono">{display(source.recordPid)}</span>
                           </div>
                           {source.reason ? (
                             <div className="elta-chain-error">{source.reason}</div>

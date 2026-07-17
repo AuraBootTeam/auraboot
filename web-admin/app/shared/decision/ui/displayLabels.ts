@@ -141,7 +141,7 @@ export function valueKey(value: unknown): string {
 export function allowedValueValue(value: unknown): unknown {
   const record = recordOf(value);
   if (!record) return value;
-  return record.value ?? record.code ?? record.id ?? record.key ?? value;
+  return record.value ?? record.code ?? record['id'] ?? record.key ?? value;
 }
 
 export function valueLabel(value: unknown, valueLabels?: ValueLabels | null): string {

@@ -54,7 +54,7 @@ function fieldFromSource(value: unknown): DecisionOutputSchemaField | null {
   const record = recordOf(value);
   if (!record) return null;
   const id =
-    stringValue(record.id) ??
+    stringValue(record['id']) ??
     stringValue(record.code) ??
     stringValue(record.output) ??
     stringValue(record.name);

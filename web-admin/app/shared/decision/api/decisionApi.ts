@@ -51,7 +51,7 @@ export interface DecisionResult {
 export interface DecisionVirtualSourceTrace {
   sourceRef?: string;
   modelCode?: string;
-  recordId?: string;
+  recordPid?: string;
   status?: string;
   reason?: string;
   fields?: Record<string, unknown>;
