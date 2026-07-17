@@ -61,6 +61,7 @@ Options:
   --page-field <field>        Required field in runtime page schema; repeatable
   --hotload-upload            Upload and hot-load the local backend jar before import
   --import                    Run import-directory-sync using JSON {path}
+  --offline-metadata-only      Validate plugin.json/local artifact metadata without contacting backend
   --conflict-strategy <name>  Import conflict strategy (default: OVERWRITE)
   --defer-reference-validation  Pass deferReferenceValidation=true to import
   --json                      Print machine-readable JSON only
@@ -229,6 +230,7 @@ async function main() {
     import: null,
     pageSchema: null,
     failures: [],
+    skippedChecks: [],
   };
 
   const fail = (message) => {
@@ -245,11 +247,19 @@ async function main() {
   if (!pluginId) throw new Error('plugin.json is missing pluginId');
   evidence.pluginId = pluginId;
   evidence.pluginType = manifest.pluginType || 'config';
+  const backendJarRequired =
+    evidence.pluginType === 'hybrid' ||
+    Boolean(args['hotload-upload']) ||
+    values(args, 'expect-extension').length > 0;
 
   const jarPath = manifest.backend?.jarPath ? resolve(pluginRoot, manifest.backend.jarPath) : '';
   if (jarPath) {
     if (!existsSync(jarPath)) {
-      fail(`backend jar not found: ${jarPath}`);
+      if (backendJarRequired) {
+        fail(`backend jar not found: ${jarPath}`);
+      } else {
+        evidence.skippedChecks.push('config plugin backend jar not required');
+      }
     } else {
       const extensionIndex = readZipEntry(jarPath, 'META-INF/extensions.idx');
       const expectedExtensions = values(args, 'expect-extension');
@@ -266,6 +276,12 @@ async function main() {
     }
   } else if (evidence.pluginType === 'hybrid') {
     fail('hybrid plugin has no backend.jarPath in plugin.json');
+  }
+
+  if (args['offline-metadata-only']) {
+    evidence.ok = evidence.failures.length === 0;
+    console.log(JSON.stringify(evidence, null, 2));
+    process.exit(evidence.ok ? 0 : 1);
   }
 
   const baseUrl = normalizeBackend(args.backend);

@@ -8,10 +8,15 @@ import com.auraboot.framework.decision.runtime.ResolvedDecision;
 import com.auraboot.framework.plugin.dto.imports.BpmRuleDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.AgentDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.CapabilityDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.ConditionFragmentSeedDTO;
 import com.auraboot.framework.plugin.dto.imports.DecisionDefinitionSeedDTO;
+import com.auraboot.framework.plugin.dto.imports.EventPolicySeedDTO;
 import com.auraboot.framework.plugin.dto.imports.FieldMaskDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.auraboot.framework.plugin.dto.imports.ProcessDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.RolePermissionPolicyDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.SlaConfigDefinitionDTO;
 import com.auraboot.framework.plugin.exception.PluginException;
 import org.junit.jupiter.api.DisplayName;
@@ -112,7 +117,19 @@ class PluginDirectoryLoaderRulesSlaTest {
                     "targetType": "NODE",
                     "targetKey": "user_manager_approval",
                     "deadlineMode": "FIXED",
-                    "deadlineValue": "PT30S" }
+                    "deadlineValue": "PT30S",
+                    "actionPolicy": {
+                      "trigger": "SLA_TIMEOUT",
+                      "actions": [
+                        {
+                          "type": "SEND_IM",
+                          "target": "ROLE:wd_manager",
+                          "order": 10,
+                          "payload": { "title": "SLA 超时提醒" }
+                        }
+                      ],
+                      "executionEffect": { "lastStatus": "SUCCESS", "traceId": "seed-trace" }
+                    } }
                 ]
                 """);
         writeManifest(pluginDir, """
@@ -128,6 +145,11 @@ class PluginDirectoryLoaderRulesSlaTest {
         SlaConfigDefinitionDTO sla = manifest.getSlaConfigs().get(0);
         assertThat(sla.getName()).isEqualTo("wd_manager_approval_sla");
         assertThat(sla.getDeadlineValue()).isEqualTo("PT30S");
+        assertThat(sla.getActionPolicy())
+                .containsEntry("trigger", "SLA_TIMEOUT")
+                .extractingByKey("actions")
+                .asList()
+                .hasSize(1);
     }
 
     @Test
@@ -178,6 +200,116 @@ class PluginDirectoryLoaderRulesSlaTest {
         assertThat(decision.getContentJson().at("/outputs/deadlineMinutes").asInt()).isEqualTo(30);
         assertThat(decision.isPublish()).isTrue();
         assertThat(decision.isValid()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Loader reads conditionFragments.json into reusable condition-fragment seeds")
+    void loadsConditionFragments(@TempDir Path pluginDir) throws IOException {
+        Files.writeString(pluginDir.resolve("conditionFragments.json"), """
+                [
+                  {
+                    "fragmentCode": "leave_sla_node_match",
+                    "fragmentName": "请假 SLA 节点匹配",
+                    "scopeType": "SLA",
+                    "scopeRef": "wd_leave_approval",
+                    "ownerModule": "workflow-demo",
+                    "publish": true,
+                    "conditionSpec": {
+                      "root": {
+                        "type": "group",
+                        "op": "AND",
+                        "children": [
+                          {
+                            "type": "compare",
+                            "left": { "type": "path", "scope": "process", "path": "taskKey", "dataType": "string" },
+                            "operator": "EQ",
+                            "right": { "type": "literal", "value": "task_manager_approve", "dataType": "string" }
+                          }
+                        ]
+                      },
+                      "decisionBindings": [
+                        { "decisionCode": "complaint_sla_deadline", "versionPolicy": "LATEST_PUBLISHED" }
+                      ]
+                    }
+                  }
+                ]
+                """);
+        writeManifest(pluginDir, """
+                { "pluginId": "com.demo",
+                  "namespace": "demo",
+                  "version": "1.0.0",
+                  "resourceDirs": { "conditionFragments": "conditionFragments.json" } }
+                """);
+
+        PluginManifestExtended manifest = loader.loadFromDirectory(pluginDir);
+
+        assertThat(manifest.getConditionFragments()).hasSize(1);
+        ConditionFragmentSeedDTO fragment = manifest.getConditionFragments().get(0);
+        assertThat(fragment.getFragmentCode()).isEqualTo("leave_sla_node_match");
+        assertThat(fragment.getConditionSpec().at("/decisionBindings/0/decisionCode").asText())
+                .isEqualTo("complaint_sla_deadline");
+        assertThat(fragment.isPublish()).isTrue();
+        assertThat(fragment.isValid()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Loader reads eventPolicies.json into EventPolicy seed definitions")
+    void loadsEventPolicies(@TempDir Path pluginDir) throws IOException {
+        Files.writeString(pluginDir.resolve("eventPolicies.json"), """
+                [
+                  {
+                    "policyCode": "leave_request_event_policy",
+                    "policyName": "请假事件动作策略",
+                    "eventType": "LEAVE_REQUEST_CREATED",
+                    "targetType": "MODEL",
+                    "targetKey": "wd_leave_request",
+                    "phase": "AFTER_COMMIT",
+                    "matchMode": "COLLECT_ALL",
+                    "executionMode": "ORDERED",
+                    "failureStrategy": "CONTINUE_ON_ERROR",
+                    "conflictStrategy": "REJECT_ON_CONFLICT",
+                    "dedupStrategy": "BY_IDEMPOTENCY_KEY",
+                    "publish": true,
+                    "rulesJson": [
+                      {
+                        "ruleCode": "notify_long_leave",
+                        "ruleName": "长假通知",
+                        "priority": 10,
+                        "enabled": true,
+                        "decisionBinding": {
+                          "decisionCode": "leave_request_automation",
+                          "versionPolicy": "LATEST_PUBLISHED"
+                        },
+                        "actions": [
+                          {
+                            "type": "NOTIFY",
+                            "target": "ROLE:wd_manager",
+                            "order": 10,
+                            "payload": { "title": "长假申请提醒" },
+                            "idempotencyKeyTemplate": "${record.pid}:notify_long_leave:NOTIFY"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+                """);
+        writeManifest(pluginDir, """
+                { "pluginId": "com.demo",
+                  "namespace": "demo",
+                  "version": "1.0.0",
+                  "resourceDirs": { "eventPolicies": "eventPolicies.json" } }
+                """);
+
+        PluginManifestExtended manifest = loader.loadFromDirectory(pluginDir);
+
+        assertThat(manifest.getEventPolicies()).hasSize(1);
+        EventPolicySeedDTO policy = manifest.getEventPolicies().get(0);
+        assertThat(policy.getPolicyCode()).isEqualTo("leave_request_event_policy");
+        assertThat(policy.getRulesJson().get(0).at("/decisionBinding/decisionCode").asText())
+                .isEqualTo("leave_request_automation");
+        assertThat(policy.isPublish()).isTrue();
+        assertThat(policy.isValid()).isTrue();
     }
 
     @Test
@@ -304,6 +436,9 @@ class PluginDirectoryLoaderRulesSlaTest {
         assertThat(manifest.getDecisionDefinitions())
                 .extracting(DecisionDefinitionSeedDTO::getDecisionCode)
                 .contains("complaint_sla_deadline", "approval_routing");
+        assertThat(manifest.getConditionFragments())
+                .extracting(ConditionFragmentSeedDTO::getFragmentCode)
+                .contains("shared_leave_approval_guard", "leave_sla_node_match");
         DecisionDefinitionSeedDTO slaDecision = manifest.getDecisionDefinitions().stream()
                 .filter(d -> "complaint_sla_deadline".equals(d.getDecisionCode()))
                 .findFirst()
@@ -327,10 +462,12 @@ class PluginDirectoryLoaderRulesSlaTest {
         }
 
         SlaConfigDefinitionDTO managerSla = manifest.getSlaConfigs().stream()
-                .filter(s -> "wd_manager_approve_sla".equals(s.getUnknownFields().get("slaKey")))
+                .filter(s -> "wd_manager_approve_sla".equals(s.getSlaKey()))
                 .findFirst()
                 .orElseThrow();
         assertThat(managerSla.getRuleBinding()).isNotNull();
+        assertThat(managerSla.getRuleBinding().conditionFragmentRefs())
+                .containsExactly("shared_leave_approval_guard");
         assertThat(managerSla.getRuleBinding().decisionBinding().decisionCode())
                 .isEqualTo("complaint_sla_deadline");
         assertThat(managerSla.getRuleBinding().decisionBinding().outputMappings())
@@ -368,8 +505,93 @@ class PluginDirectoryLoaderRulesSlaTest {
         Object ruleBinding = invokeGetter(triggerConfig, "getRuleBinding");
         assertThat(invokeGetter(ruleBinding, "consumerType")).isEqualTo("AUTOMATION");
         assertThat(invokeGetter(ruleBinding, "consumerCode")).isEqualTo("wd_leave_high_value_notify");
+        List<?> automationFragmentRefs = (List<?>) invokeGetter(ruleBinding, "conditionFragmentRefs");
+        assertThat(automationFragmentRefs).hasSize(1);
+        assertThat(automationFragmentRefs.get(0)).isEqualTo("shared_leave_approval_guard");
         Object decisionBinding = invokeGetter(ruleBinding, "decisionBinding");
         assertThat(invokeGetter(decisionBinding, "decisionCode")).isEqualTo("leave_request_automation");
+        List<?> actions = (List<?>) invokeGetter(automation, "getActions");
+        assertThat(actions).hasSize(1);
+        Object action = actions.get(0);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> config = (Map<String, Object>) invokeGetter(action, "getConfig");
+        assertThat(config.get("recipients")).isEqualTo(List.of("ROLE:wd_manager"));
+    }
+
+    @Test
+    @DisplayName("workflow-demo wires shared condition fragment into permission role policies")
+    void workflowDemoDeclaresPermissionRolePolicySeed() throws Exception {
+        PluginManifestExtended manifest = loader.loadFromDirectory(workflowDemoDir());
+
+        PermissionDefinitionDTO approvePermission = manifest.getPermissions().stream()
+                .filter(permission -> "wd.leave_request.approve".equals(permission.getCode()))
+                .findFirst()
+                .orElseThrow();
+        assertThat(approvePermission.getPolicySchema())
+                .containsKey("dynamicAbac");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> dynamicAbacSchema =
+                (Map<String, Object>) approvePermission.getPolicySchema().get("dynamicAbac");
+        assertThat(dynamicAbacSchema)
+                .containsEntry("fieldCatalogModelCode", "wd_leave_request");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> schemaDecisions =
+                (List<Map<String, Object>>) dynamicAbacSchema.get("decisions");
+        assertThat(schemaDecisions)
+                .anySatisfy(decision -> {
+                    assertThat(decision).containsEntry("code", "leave_request_automation");
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> outputs =
+                            (List<Map<String, Object>>) decision.get("outputs");
+                    assertThat(outputs)
+                            .extracting(output -> output.get("id"))
+                            .contains("severity", "message", "actionType");
+                });
+
+        RoleDefinitionDTO manager = manifest.getRoles().stream()
+                .filter(role -> "wd_manager".equals(role.getCode()))
+                .findFirst()
+                .orElseThrow();
+        RolePermissionPolicyDefinitionDTO policy = manager.getPermissionPolicies().stream()
+                .filter(candidate -> "wd.leave_request.approve".equals(candidate.getPermissionCode()))
+                .findFirst()
+                .orElseThrow();
+
+        @SuppressWarnings("unchecked")
+        Map<String, Object> dynamicAbac =
+                (Map<String, Object>) policy.getConditions().get("dynamicAbac");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> ruleBinding =
+                (Map<String, Object>) dynamicAbac.get("ruleBinding");
+        assertThat(ruleBinding)
+                .containsEntry("consumerType", "PERMISSION")
+                .containsEntry("bindingKind", "DECISION_REF");
+        assertThat(ruleBinding.get("conditionFragmentRefs"))
+                .isEqualTo(List.of("shared_leave_approval_guard"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> decisionBinding =
+                (Map<String, Object>) ruleBinding.get("decisionBinding");
+        assertThat(decisionBinding).containsEntry("decisionCode", "leave_request_automation");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> outputMappings =
+                (List<Map<String, Object>>) decisionBinding.get("outputMappings");
+        assertThat(outputMappings)
+                .anySatisfy(mapping -> {
+                    assertThat(mapping).containsEntry("output", "severity");
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> target = (Map<String, Object>) mapping.get("target");
+                    assertThat(target)
+                            .containsEntry("kind", "PERMISSION_CONTEXT")
+                            .containsEntry("path", "severity");
+                })
+                .anySatisfy(mapping -> {
+                    assertThat(mapping).containsEntry("output", "message");
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> target = (Map<String, Object>) mapping.get("target");
+                    assertThat(target)
+                            .containsEntry("kind", "PERMISSION_CONTEXT")
+                            .containsEntry("path", "message");
+                });
     }
 
     private void writeManifest(Path pluginDir, String json) throws IOException {
@@ -406,6 +628,9 @@ class PluginDirectoryLoaderRulesSlaTest {
         assertThat(ruleBinding).isNotNull();
         assertThat(ruleBinding.get("consumerType")).isEqualTo("BPM");
         assertThat(ruleBinding.get("consumerNodeId")).isEqualTo(nodeId);
+        List<?> conditionFragmentRefs = (List<?>) ruleBinding.get("conditionFragmentRefs");
+        assertThat(conditionFragmentRefs).hasSize(1);
+        assertThat(conditionFragmentRefs.get(0)).isEqualTo("shared_leave_approval_guard");
         Map<String, Object> decisionBinding = (Map<String, Object>) ruleBinding.get("decisionBinding");
         assertThat(decisionBinding.get("decisionCode")).isEqualTo("approval_routing");
         List<Map<String, Object>> outputMappings =

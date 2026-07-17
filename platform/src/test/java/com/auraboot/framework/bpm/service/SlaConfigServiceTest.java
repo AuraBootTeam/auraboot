@@ -10,6 +10,7 @@ import com.auraboot.framework.decision.rule.RuleBindingKind;
 import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import com.auraboot.framework.decision.rule.RuleValueSource;
 import com.auraboot.framework.decision.service.DecisionUsageIndexService;
+import com.auraboot.framework.plugin.dto.imports.SlaConfigDefinitionDTO;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,8 +21,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -78,6 +81,43 @@ class SlaConfigServiceTest {
         verify(usageIndexService).deleteSource("SLA_RULE", "sla-1");
     }
 
+    @Test
+    void importSlaConfigUsesStableConsumerCodeInsteadOfLocalizedDisplayName() {
+        SlaConfigEntity existing = sla("sla-old");
+        existing.setId(10L);
+        existing.setName("Manager Approval SLA");
+        existing.setTargetType("NODE");
+        existing.setTargetKey("task_manager_approve");
+        existing.setRuleBinding(ruleBinding("wd_manager_approve_sla"));
+        SlaConfigEntity duplicate = sla("sla-duplicate");
+        duplicate.setId(11L);
+        duplicate.setName("主管审批 SLA");
+        duplicate.setTargetType("NODE");
+        duplicate.setTargetKey("task_manager_approve");
+        duplicate.setRuleBinding(ruleBinding("wd_manager_approve_sla"));
+        when(slaConfigMapper.selectList(any())).thenReturn(List.of(existing, duplicate));
+
+        service.importSlaConfig(SlaConfigDefinitionDTO.builder()
+                .slaKey("wd_manager_approve_sla")
+                .name("主管审批 SLA")
+                .targetType("NODE")
+                .targetKey("task_manager_approve")
+                .deadlineMode("FIXED")
+                .deadlineValue("PT30S")
+                .businessCalendar(false)
+                .warningRules(List.of())
+                .ruleBinding(ruleBinding("wd_manager_approve_sla"))
+                .suspendPolicy("pause")
+                .enabled(true)
+                .build());
+
+        assertThat(existing.getName()).isEqualTo("主管审批 SLA");
+        verify(slaConfigMapper).updateById(existing);
+        verify(slaConfigMapper).deleteById(11L);
+        verify(usageIndexService).deleteSource("SLA_RULE", "sla-duplicate");
+        verify(slaConfigMapper, never()).insert(any(SlaConfigEntity.class));
+    }
+
     private SlaConfigEntity sla(String pid) {
         return SlaConfigEntity.builder()
                 .pid(pid)
@@ -91,9 +131,13 @@ class SlaConfigServiceTest {
     }
 
     private RuleConsumerBinding ruleBinding() {
+        return ruleBinding("sla-1");
+    }
+
+    private RuleConsumerBinding ruleBinding(String consumerCode) {
         return new RuleConsumerBinding(
                 "SLA",
-                "sla-1",
+                consumerCode,
                 "deadline",
                 RuleBindingKind.DECISION_REF,
                 null,

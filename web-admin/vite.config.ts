@@ -11,6 +11,15 @@ const allowedHosts = process.env.VITE_ALLOWED_HOSTS
   ?.split(',')
   .map((host) => host.trim())
   .filter(Boolean);
+const viteCacheKey = (
+  process.env.AURA_VITE_CACHE_KEY ||
+  process.env.AURA_RUNTIME_NAME ||
+  process.env.AURA_WORKSPACE_SLOT ||
+  process.env.WEB_PORT ||
+  process.env.VITE_PORT ||
+  'local'
+).replace(/[^a-zA-Z0-9._-]/g, '-');
+const viteCacheDir = process.env.AURA_VITE_CACHE_DIR || `.vite/${viteCacheKey}`;
 
 // @originjs/vite-plugin-federation 1.4.x does not support SSR — its virtual
 // imports (`__federation_fn_satisfy`, etc.) are emitted unconditionally and
@@ -42,20 +51,29 @@ const clientOnlyFederationPlugin: Plugin = {
   },
 };
 
+const e2eCoveragePlugin = e2eCoverageEnabled
+  ? (istanbul({
+      include: 'app/**/*',
+      exclude: ['node_modules', 'tests', 'test-results'],
+      extension: ['.js', '.ts', '.tsx'],
+      requireEnv: false,
+    }) as unknown as Plugin)
+  : null;
+
 export default defineConfig({
+  // node_modules is shared across AuraBoot worktrees, so keeping Vite's
+  // optimizer cache there can mix stale React chunks between runtimes.
+  cacheDir: viteCacheDir,
   plugins: [
-    e2eCoverageEnabled &&
-      istanbul({
-        include: 'app/**/*',
-        exclude: ['node_modules', 'tests', 'test-results'],
-        extension: ['.js', '.ts', '.tsx'],
-        requireEnv: false,
-      }),
+    e2eCoveragePlugin,
     tailwindcss(),
     reactRouter(),
     tsconfigPaths(),
     clientOnlyFederationPlugin,
-  ].filter(Boolean),
+  ].filter((plugin): plugin is Plugin => Boolean(plugin)),
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
   server: {
     host: '0.0.0.0',
     port: Number(process.env.VITE_PORT || 5173),
@@ -128,30 +146,54 @@ export default defineConfig({
     // imported module"), which makes the designer golden suites flaky when run
     // cold/in isolation. Same rationale as the original react-grid-layout entry.
     include: [
+      'react',
+      'react-dom',
+      'react-dom/client',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
       'react-grid-layout',
       'react-draggable',
       'react-resizable',
+      'html2canvas',
       'jsbarcode',
+      'jspdf',
       'zustand',
       'zustand/middleware',
       'zustand/middleware/immer',
       '@dnd-kit/core',
+      '@dnd-kit/sortable',
+      '@dnd-kit/utilities',
+      '@fullcalendar/daygrid',
+      '@fullcalendar/interaction',
+      '@fullcalendar/list',
+      '@fullcalendar/react',
+      '@fullcalendar/timegrid',
+      '@radix-ui/react-checkbox',
       '@radix-ui/react-dialog',
       '@radix-ui/react-label',
+      '@radix-ui/react-popover',
       '@radix-ui/react-select',
+      '@radix-ui/react-slot',
       '@radix-ui/react-switch',
       '@tanstack/react-query',
+      '@tanstack/react-virtual',
       '@heroicons/react/24/outline',
       '@messageformat/core',
+      'dayjs/plugin/relativeTime',
       'dayjs/plugin/timezone',
       'dayjs/plugin/utc',
       'class-variance-authority',
       'clsx',
+      'dompurify',
+      'gantt-task-react',
       'lucide-react',
+      'papaparse',
       'sonner',
+      'xlsx',
       'dayjs',
       'jsep',
       'ajv',
+      'zod',
     ],
   },
   build: {

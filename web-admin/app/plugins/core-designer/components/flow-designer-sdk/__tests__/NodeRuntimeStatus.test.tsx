@@ -125,4 +125,30 @@ describe('G5 — NodeRuntimeStatusContext + DefaultFlowNode overlay', () => {
     expect(screen.queryByTestId('flow-node-other-status-badge')).toBeNull();
     expect(screen.getByTestId('flow-node-other').getAttribute('data-runtime-status')).toBeNull();
   });
+
+  it('renders string lucide icon names as icons rather than leaking icon codes', () => {
+    nodeRegistry.register({
+      type: 'action-send-webhook',
+      label: '发送 Webhook',
+      icon: 'Send',
+      category: 'action',
+      defaultConfig: {},
+    });
+
+    render(
+      <NodeRuntimeStatusProvider statuses={null}>
+        <DefaultFlowNode
+          id="webhook"
+          type="action-send-webhook"
+          data={{ label: '发送 Webhook', config: {} } as any}
+          selected={false}
+          {...({} as any)}
+        />
+      </NodeRuntimeStatusProvider>,
+    );
+
+    const node = screen.getByTestId('flow-node-webhook');
+    expect(node).not.toHaveTextContent('Send');
+    expect(node.querySelector('svg')).not.toBeNull();
+  });
 });

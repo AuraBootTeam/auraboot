@@ -102,6 +102,19 @@ describe('decisionApi client', () => {
     });
   });
 
+  it('listDefinitions passes pagination filters for asset pickers', async () => {
+    const { http, calls } = fakeHttp();
+    const api = createDecisionApi(http);
+
+    await api.listDefinitions({ keyword: 'sla', page: 1, size: 200 });
+
+    expect(calls[0]).toMatchObject({
+      method: 'get',
+      endpoint: '/decision/definitions',
+      params: { keyword: 'sla', page: 1, size: 200 },
+    });
+  });
+
   it('getLogs passes traceId as a query param', async () => {
     const { http, calls } = fakeHttp();
     const api = createDecisionApi(http);
@@ -147,6 +160,38 @@ describe('decisionApi client', () => {
     expect(calls[0]).toMatchObject({ method: 'get', endpoint: '/decision/logs/log-pid-1' });
   });
 
+  it('getEventPolicyActionLogs fetches action evidence by trace and correlation ids', async () => {
+    const { http, calls } = fakeHttp();
+    const api = createDecisionApi(http);
+    await api.getEventPolicyActionLogs({
+      decisionTraceId: 'trace-ep-1',
+      correlationId: 'policy-run-1',
+      policyCodePrefix: 'SLA_TIMEOUT:',
+      size: 50,
+    });
+    expect(calls[0]).toMatchObject({
+      method: 'get',
+      endpoint: '/event-policy/action-logs',
+      params: {
+        decisionTraceId: 'trace-ep-1',
+        correlationId: 'policy-run-1',
+        policyCodePrefix: 'SLA_TIMEOUT:',
+        size: 50,
+      },
+    });
+  });
+
+  it('replayEventPolicyActionLog posts to the failed action replay endpoint', async () => {
+    const { http, calls } = fakeHttp();
+    const api = createDecisionApi(http);
+    await api.replayEventPolicyActionLog('action-log-3');
+    expect(calls[0]).toMatchObject({
+      method: 'post',
+      endpoint: '/event-policy/action-logs/action-log-3/replay',
+      body: undefined,
+    });
+  });
+
   it('getDashboard fetches the DecisionOps dashboard summary', async () => {
     const { http, calls } = fakeHttp();
     const api = createDecisionApi(http) as unknown as { getDashboard: () => Promise<unknown> };
@@ -159,6 +204,25 @@ describe('decisionApi client', () => {
     const api = createDecisionApi(http) as unknown as { getModelFields: () => Promise<unknown> };
     await api.getModelFields();
     expect(calls[0]).toMatchObject({ method: 'get', endpoint: '/decision/model/fields' });
+  });
+
+  it('getFactCatalog fetches the unified low-code fact catalog with an optional model filter', async () => {
+    const { http, calls } = fakeHttp();
+    const api = createDecisionApi(http) as unknown as {
+      getFactCatalog: (modelCode?: string) => Promise<unknown>;
+    };
+    await api.getFactCatalog('wd_leave_request');
+    await api.getFactCatalog();
+    expect(calls[0]).toMatchObject({
+      method: 'get',
+      endpoint: '/decision/facts/catalog',
+      params: { modelCode: 'wd_leave_request' },
+    });
+    expect(calls[1]).toMatchObject({
+      method: 'get',
+      endpoint: '/decision/facts/catalog',
+      params: undefined,
+    });
   });
 
   it('getActionCatalog fetches runtime-backed action definitions', async () => {
@@ -258,7 +322,9 @@ describe('decisionApi client', () => {
     const api = createDecisionApi(http);
     await api.preflightFieldChange({
       fieldRef: 'record.data.amount',
-      action: 'DELETE_FIELD',
+      action: 'DELETE_DICT_ITEM',
+      dictCode: 'leave_type',
+      dictValue: 'annual',
       impactAcknowledged: true,
     });
     expect(calls[0]).toMatchObject({
@@ -266,10 +332,97 @@ describe('decisionApi client', () => {
       endpoint: '/decision/fields/preflight',
       body: {
         fieldRef: 'record.data.amount',
-        action: 'DELETE_FIELD',
+        action: 'DELETE_DICT_ITEM',
+        dictCode: 'leave_type',
+        dictValue: 'annual',
         impactAcknowledged: true,
       },
     });
+  });
+
+  it('routes condition-fragment catalog, lifecycle, impact, and evaluation calls', async () => {
+    const { http, calls } = fakeHttp();
+    const api = createDecisionApi(http);
+    const conditionSpec = {
+      root: {
+        type: 'predicate',
+        left: { type: 'field', scope: 'record', path: 'data.amount' },
+        operator: 'GT',
+        right: { type: 'literal', value: 1000 },
+      },
+    };
+
+    await api.listConditionFragments({ keyword: 'approval', scopeType: 'BPM', page: 2, size: 10 });
+    await api.createConditionFragment({
+      fragmentCode: 'approval_high_amount',
+      fragmentName: 'High amount approval',
+      scopeType: 'BPM',
+      scopeRef: 'wd_leave_approval',
+      conditionSpec,
+    });
+    await api.createConditionFragmentVersion('approval_high_amount', {
+      fragmentName: 'High amount approval v2',
+      conditionSpec,
+    });
+    await api.listConditionFragmentVersions('approval_high_amount');
+    await api.evaluateConditionFragment('approval_high_amount', {
+      record: { data: { amount: 2000 } },
+    });
+    await api.getConditionFragmentImpact('approval_high_amount');
+    await api.validateConditionFragmentVersion('fragment-pid');
+    await api.publishConditionFragmentVersion('fragment-pid', { impactAcknowledged: true });
+
+    expect(calls).toEqual([
+      {
+        method: 'get',
+        endpoint: '/decision/condition-fragments',
+        params: { keyword: 'approval', scopeType: 'BPM', page: 2, size: 10 },
+      },
+      {
+        method: 'post',
+        endpoint: '/decision/condition-fragments',
+        body: {
+          fragmentCode: 'approval_high_amount',
+          fragmentName: 'High amount approval',
+          scopeType: 'BPM',
+          scopeRef: 'wd_leave_approval',
+          conditionSpec,
+        },
+      },
+      {
+        method: 'post',
+        endpoint: '/decision/condition-fragments/approval_high_amount/versions',
+        body: {
+          fragmentName: 'High amount approval v2',
+          conditionSpec,
+        },
+      },
+      {
+        method: 'get',
+        endpoint: '/decision/condition-fragments/approval_high_amount/versions',
+        params: undefined,
+      },
+      {
+        method: 'post',
+        endpoint: '/decision/condition-fragments/approval_high_amount/evaluate',
+        body: { context: { record: { data: { amount: 2000 } } } },
+      },
+      {
+        method: 'get',
+        endpoint: '/decision/condition-fragments/approval_high_amount/impact',
+        params: undefined,
+      },
+      {
+        method: 'post',
+        endpoint: '/decision/condition-fragment-versions/fragment-pid/validate',
+        body: undefined,
+      },
+      {
+        method: 'post',
+        endpoint: '/decision/condition-fragment-versions/fragment-pid/publish',
+        body: { impactAcknowledged: true },
+      },
+    ]);
   });
 
   it('analyzeTable posts the editable DMN table model to the stateless analysis endpoint', async () => {

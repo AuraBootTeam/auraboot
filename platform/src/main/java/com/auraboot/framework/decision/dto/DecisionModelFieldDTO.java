@@ -9,6 +9,8 @@ import java.util.List;
  */
 @Data
 public class DecisionModelFieldDTO {
+    private String modelCode;
+    private String modelName;
     private String entityCode;
     private String path;
     private String label;

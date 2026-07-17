@@ -59,6 +59,15 @@ vi.mock('~/plugins/core-bpm/components/panel/BpmHistorySection', () => ({
   ),
 }));
 
+// Rule trace has dedicated coverage in BpmRuleTraceSection.test.tsx. At panel
+// level we only verify that the history slot mounts it with the process
+// instance id.
+vi.mock('~/plugins/core-bpm/components/panel/BpmRuleTraceSection', () => ({
+  BpmRuleTraceSection: ({ processInstanceId }: { processInstanceId: string | null }) => (
+    <div data-testid="bpm-rule-trace-stub" data-instance-id={processInstanceId ?? ''} />
+  ),
+}));
+
 import { BpmPanelBlock } from '../BpmPanelBlock';
 
 const READY_INSTANCE = {
@@ -144,6 +153,10 @@ describe('BpmPanelBlock', () => {
     expect(screen.getByTestId('bpm-section-diagram')).toBeInTheDocument();
     expect(screen.getByTestId('bpm-section-operations')).toBeInTheDocument();
     expect(screen.getByTestId('bpm-section-history')).toBeInTheDocument();
+    expect(screen.getByTestId('bpm-rule-trace-stub')).toHaveAttribute(
+      'data-instance-id',
+      'pi-123',
+    );
   });
 
   it('only renders sections listed in config.sections', async () => {

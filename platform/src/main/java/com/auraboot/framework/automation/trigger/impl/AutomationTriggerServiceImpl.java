@@ -20,6 +20,10 @@ import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import com.auraboot.framework.decision.rule.RuleEvaluationContext;
 import com.auraboot.framework.decision.rule.RuleEvaluationService;
 import com.auraboot.framework.decision.rule.RuleEvaluationTrace;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.expression.Expression;
@@ -63,6 +67,12 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private RuleEvaluationService ruleEvaluationService;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private UserMapper userMapper;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private TenantMemberService tenantMemberService;
 
     private final ExpressionParser spelParser = new SpelExpressionParser();
 
@@ -293,7 +303,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                                            Map<String, Object> triggerPayload) {
         log.info("Executing automation: pid={}, recordPid={}", automation.getPid(), recordPid);
 
-        Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : automation.getTenantId();
+        Long tenantId = MetaContext.exists() && MetaContext.getCurrentTenantId() != null
+                ? MetaContext.getCurrentTenantId()
+                : automation.getTenantId();
 
         // Establish tenant context for the whole run when the caller has none. Triggers that
         // ride a JWT-exempt path (the webhook receiver) or an @Async worker thread arrive with
@@ -302,12 +314,14 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         // relied on AutomationProcessRuntime.run() setting then clearing MetaContext internally,
         // which left updateStatus() below it uncovered. Scope the whole method here; clear in
         // finally only when we are the one who set it.
-        boolean tenantContextSet = false;
-        if (!MetaContext.exists() && tenantId != null) {
-            MetaContext.setContext(tenantId, null, automation.getCreatedBy(), null);
-            tenantContextSet = true;
+        MetaContextSnapshot metaContextSnapshot = null;
+        if (!hasUsableAutomationActorContext() && tenantId != null) {
+            metaContextSnapshot = MetaContextSnapshot.capture();
+            establishAutomationMetaContext(automation, tenantId);
         }
         try {
+            Map<String, Object> executionPayload = prepareExecutionTriggerPayload(automation, triggerPayload);
+
             // Create log entry
             AutomationLog logEntry = new AutomationLog();
             logEntry.setPid(UniqueIdGenerator.generate());
@@ -315,7 +329,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             logEntry.setAutomationId(automation.getPid());
             logEntry.setTriggerType(automation.getTriggerType());
             logEntry.setTriggerRecordPid(recordPid);
-            logEntry.setTriggerPayload(triggerPayload);
+            logEntry.setTriggerPayload(executionPayload);
             logEntry.setStatus(StatusConstants.RUNNING);
             logEntry.setStartedAt(Instant.now());
             logEntry.setCreatedAt(Instant.now());
@@ -325,24 +339,33 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             // T2: every automation runs on SmartEngine. The compiler synthesizes a linear flow
             // from triggerType + actions[] when there is no visual flowConfig, so the flat
             // sequential executor has been removed.
+            List<ActionResult> actionResults = List.of();
             try {
                 // Pass the log id through so AutomationActionServiceTaskDelegate can persist
                 // per-node execution rows linked to this run (G5 runtime overlay).
-                automationProcessRuntime.run(automation, recordPid, triggerPayload, logEntry.getId());
-                logEntry.setStatus("success");
+                actionResults = automationProcessRuntime.run(
+                        automation, recordPid, executionPayload, logEntry.getId());
+                logEntry.setStatus(StatusConstants.SUCCESS);
+            } catch (AutomationProcessRuntime.AutomationProcessRunException e) {
+                actionResults = e.getActionResults();
+                log.error("Automation run failed: pid={}, error={}",
+                        automation.getPid(), e.getMessage(), e);
+                logEntry.setStatus(StatusConstants.FAILED);
+                logEntry.setErrorMessage(e.getMessage());
             } catch (Exception e) {
                 log.error("Automation run failed: pid={}, error={}",
                         automation.getPid(), e.getMessage(), e);
                 logEntry.setStatus(StatusConstants.FAILED);
                 logEntry.setErrorMessage(e.getMessage());
             }
+            logEntry.setActionResults(actionResults);
             logEntry.setCompletedAt(Instant.now());
             automationLogMapper.updateStatus(logEntry);
             automationMapper.updateTriggerStats(automation.getPid());
             return logEntry;
         } finally {
-            if (tenantContextSet) {
-                MetaContext.clear();
+            if (metaContextSnapshot != null) {
+                metaContextSnapshot.restore();
             }
         }
     }
@@ -381,6 +404,99 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     // ==================== Private Helper Methods ====================
 
+    private boolean hasUsableAutomationActorContext() {
+        if (!MetaContext.exists()) {
+            return false;
+        }
+        return MetaContext.getCurrentUserId() != null && MetaContext.getCurrentMemberId() != null;
+    }
+
+    private void establishAutomationMetaContext(Automation automation, Long tenantId) {
+        String actorPid = automation.getCreatedBy();
+        Long actorUserId = resolveAutomationActorUserId(tenantId, actorPid);
+        User actor = actorUserId != null && userMapper != null ? userMapper.selectById(actorUserId) : null;
+        String username = actor != null
+                ? firstNonBlank(actor.getUserName(), actor.getEmail(), actor.getNickName())
+                : null;
+
+        MetaContext.setContext(tenantId, actorUserId, actorPid, username);
+
+        if (actorUserId != null && tenantMemberService != null) {
+            TenantMember member = tenantMemberService.findByTenantIdAndUserId(tenantId, actorUserId);
+            if (member != null && member.getId() != null) {
+                MetaContext.setMemberId(member.getId());
+            } else {
+                log.warn("Automation actor has no tenant member: automationPid={}, tenantId={}, userId={}",
+                        automation.getPid(), tenantId, actorUserId);
+            }
+        }
+    }
+
+    private Long resolveAutomationActorUserId(Long tenantId, String actorPid) {
+        if (!StringUtils.hasText(actorPid) || userMapper == null) {
+            return null;
+        }
+        try {
+            Long userId = userMapper.findUserIdInTenantByPid(tenantId, actorPid);
+            if (userId == null) {
+                log.warn("Automation actor pid not found in tenant: tenantId={}, actorPid={}", tenantId, actorPid);
+            }
+            return userId;
+        } catch (Exception e) {
+            log.warn("Failed to resolve automation actor: tenantId={}, actorPid={}",
+                    tenantId, actorPid, e);
+            return null;
+        }
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (StringUtils.hasText(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private record MetaContextSnapshot(
+            boolean existed,
+            Long tenantId,
+            Long userId,
+            String userPid,
+            String username,
+            Set<Long> roleIds,
+            Long memberId,
+            Long environmentId,
+            String otelTraceId) {
+
+        static MetaContextSnapshot capture() {
+            if (!MetaContext.exists()) {
+                return new MetaContextSnapshot(false, null, null, null, null, Set.of(), null, null, null);
+            }
+            return new MetaContextSnapshot(
+                    true,
+                    MetaContext.getCurrentTenantId(),
+                    MetaContext.getCurrentUserId(),
+                    MetaContext.getCurrentUserPid(),
+                    MetaContext.getCurrentUsername(),
+                    MetaContext.getCurrentRoleIds(),
+                    MetaContext.getCurrentMemberId(),
+                    MetaContext.getCurrentEnvironmentId(),
+                    MetaContext.getOtelTraceId());
+        }
+
+        void restore() {
+            if (!existed) {
+                MetaContext.clear();
+                return;
+            }
+            MetaContext.setContext(tenantId, userId, userPid, username, roleIds);
+            MetaContext.setMemberId(memberId);
+            MetaContext.setEnvironmentId(environmentId);
+            MetaContext.setOtelTraceId(otelTraceId);
+        }
+    }
+
     private void executeAutomationAsync(Automation automation, String recordPid,
                                         Map<String, Object> triggerPayload) {
         // Evict stale entries when map grows too large.
@@ -418,6 +534,13 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         String condition = automation.getTriggerCondition();
         Map<String, Object> enrichedPayload = withDecision(automation, payload);
         return evaluateCondition(condition, enrichedPayload) ? enrichedPayload : null;
+    }
+
+    private Map<String, Object> prepareExecutionTriggerPayload(Automation automation, Map<String, Object> payload) {
+        if (payload != null && payload.get("decision") instanceof Map<?, ?>) {
+            return payload;
+        }
+        return withDecision(automation, payload);
     }
 
     /**
@@ -463,13 +586,15 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
             req.setContext(Map.of("record", Map.of("data", data)));
             com.auraboot.framework.decision.model.DecisionResult result = decisionEvaluationService.evaluate(req);
             enriched.put("decision", Map.of(
+                    "decisionCode", cfg.getDecisionRef(),
                     "matched", result.matched(),
                     "status", result.status().name(),
                     "outputs", result.outputs() != null ? result.outputs() : Map.of()));
         } catch (RuntimeException e) {
             log.warn("Decision '{}' evaluation failed for automation {}: {}",
                     cfg.getDecisionRef(), automation.getId(), e.getMessage());
-            enriched.put("decision", Map.of("matched", false, "status", "ERROR", "error",
+            enriched.put("decision", Map.of("decisionCode", cfg.getDecisionRef(),
+                    "matched", false, "status", "ERROR", "error",
                     e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), "outputs", Map.of()));
         }
         return enriched;
@@ -485,6 +610,7 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
                     binding,
                     buildRuleEvaluationContext(automation, payload));
             enriched.put("decision", Map.of(
+                    "decisionCode", binding.decisionCode() == null ? "" : binding.decisionCode(),
                     "matched", trace.matched(),
                     "status", trace.decisionStatus() == null ? "UNKNOWN" : trace.decisionStatus().name(),
                     "outputs", trace.outputSnapshot(),
@@ -493,7 +619,8 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         } catch (RuntimeException e) {
             log.warn("Rule binding decision '{}' evaluation failed for automation {}: {}",
                     binding.decisionCode(), automation.getId(), e.getMessage());
-            enriched.put("decision", Map.of("matched", false, "status", "ERROR", "error",
+            enriched.put("decision", Map.of("decisionCode", binding.decisionCode() == null ? "" : binding.decisionCode(),
+                    "matched", false, "status", "ERROR", "error",
                     e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), "outputs", Map.of()));
         }
         return enriched;
@@ -513,6 +640,9 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         }
         if (payload != null && payload.get("event") != null) {
             scopes.put(Scope.EVENT, Map.of("type", payload.get("event")));
+        }
+        if (payload != null && payload.get("meta") instanceof Map<?, ?> meta) {
+            scopes.put(Scope.META, castMap(meta));
         }
         return new RuleEvaluationContext(
                 scopes,

@@ -22,7 +22,7 @@
  *     therefore FAILS at runtime — see PB-1 in the session report.
  *   - The gateway condition expression binds process variables as top-level names
  *     with map indexing: `record['e2et_order_amount'] > 1000`.
- *   - `action-update-record` with recordId `${recordId}` updates the trigger
+ *   - `action-update-record` with recordPid `${trigger.recordPid}` updates the trigger
  *     record (a reliably-assertable persisted side effect).
  *
  * @since Phase 1 (Layer A)
@@ -30,7 +30,10 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { test, expect, type Page } from '@playwright/test';
+import { Client } from 'pg';
 import { uniqueId } from '../helpers';
+import { PG_CONN } from '../../helpers/environments';
+import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { acquireE2etOrderLock, releaseE2etOrderLock } from './_e2et-order-lock';
 import {
   dragNodeToCanvas,
@@ -38,6 +41,7 @@ import {
   fillNodeConfig,
   setEdgeCondition,
   saveAutomation,
+  clickDesignerSave,
   enableViaListToggle,
   latestLog,
   pollNodeStatuses,
@@ -50,17 +54,60 @@ const MODEL_CODE = 'e2et_order';
 const MODEL_LABEL = '测试订单'; // e2et_order displayName — model-select options render by label.
 const CREATE_COMMAND = 'e2eto:create_e2et_order';
 
-// Reachable URLs for the real call_api round-trips. Defaults target the docker GA E2E
-// stack (backend on the non-blocked port 6444, reached container→host via
-// host.docker.internal). The backend's own port 6443 is in SsrfValidator.BLOCKED_PORTS
-// by design (anti-SSRF) — never target it. OUTBOUND_HOST is the host the backend uses to
-// reach the in-process webhook receiver (an ephemeral, non-blocked port). For a host-mode
-// run set E2E_OUTBOUND_HOST=127.0.0.1, E2E_CALLAPI_OK_URL=http://127.0.0.1:3500/health,
-// E2E_CALLAPI_404_URL=http://127.0.0.1:3500/api/this-endpoint-does-not-exist-404 and start
-// the backend with AURA_SSRF_ALLOWED_PRIVATE_HOSTS=127.0.0.1 (3500 = BFF, not blocked).
-const OUTBOUND_HOST = process.env.E2E_OUTBOUND_HOST || 'host.docker.internal';
-const CALLAPI_OK_URL = process.env.E2E_CALLAPI_OK_URL || 'http://host.docker.internal:6444/actuator/health';
-const CALLAPI_404_URL = process.env.E2E_CALLAPI_404_URL || 'http://host.docker.internal:6444/api/this-endpoint-does-not-exist-404';
+async function loginAsAdmin(page: Page, baseURL: string): Promise<void> {
+  const response = await page.request.post(`${baseURL}/login`, {
+    form: {
+      channelCode: 'email_password',
+      identifier: DEFAULT_TEST_ACCOUNT.email,
+      password: DEFAULT_TEST_ACCOUNT.password,
+      remember: 'on',
+      redirectTo: '/',
+    },
+    maxRedirects: 0,
+  });
+
+  expect(response.status(), `login failed: HTTP ${response.status()}`).toBe(302);
+  const sessionCookie = response.headers()['set-cookie']?.match(/__session=([^;]+)/)?.[1];
+  expect(sessionCookie, 'BFF login must return a __session cookie').toEqual(expect.any(String));
+
+  const hostname = new URL(baseURL).hostname;
+  const cookieBase = {
+    name: '__session',
+    value: sessionCookie!,
+    httpOnly: true,
+    secure: false,
+    sameSite: 'Lax' as const,
+    expires: Math.floor(Date.now() / 1000) + 60 * 60,
+  };
+  await page.context().addCookies([
+    { ...cookieBase, url: baseURL },
+    { ...cookieBase, domain: hostname, path: '/' },
+    { ...cookieBase, domain: 'localhost', path: '/' },
+    { ...cookieBase, domain: '127.0.0.1', path: '/' },
+  ]);
+}
+
+function backendUrlForGolden(): URL | null {
+  const raw = process.env.BACKEND_URL;
+  if (!raw) return null;
+  try {
+    return new URL(raw);
+  } catch {
+    return null;
+  }
+}
+
+const goldenBackendUrl = backendUrlForGolden();
+
+// Reachable URLs for real outbound round-trips. With BACKEND_URL set, derive host-mode
+// targets from that live backend; otherwise keep the Docker GA default
+// (host.docker.internal:6444). Host-mode runs must start the backend with
+// AURA_SSRF_ALLOWED_PRIVATE_HOSTS containing the derived host.
+const OUTBOUND_HOST = process.env.E2E_OUTBOUND_HOST || goldenBackendUrl?.hostname || 'host.docker.internal';
+const CALLAPI_OK_URL = process.env.E2E_CALLAPI_OK_URL || (goldenBackendUrl ? new URL('/actuator/health', goldenBackendUrl).toString() : 'http://host.docker.internal:6444/actuator/health');
+const CALLAPI_404_URL =
+  process.env.E2E_CALLAPI_404_URL ||
+  (goldenBackendUrl ? new URL('/actuator/this-endpoint-does-not-exist-404', goldenBackendUrl).toString() : 'http://host.docker.internal:6444/api/this-endpoint-does-not-exist-404');
 
 async function delay(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
@@ -101,7 +148,16 @@ async function fireCreate(
   });
   const body = await resp.json();
   expect(String(body.code), `create command failed: ${JSON.stringify(body)}`).toBe('0');
-  return body.data.data.recordId as string;
+  const recordId =
+    body.data?.data?.recordId ??
+    body.data?.data?.recordPid ??
+    body.data?.data?.pid ??
+    body.data?.recordId ??
+    body.data?.recordPid ??
+    body.data?.pid ??
+    body.data?.id;
+  expect(recordId, `create command did not return a record id: ${JSON.stringify(body)}`).toEqual(expect.any(String));
+  return String(recordId);
 }
 
 /** GET the e2et_order record's persisted fields via the dynamic data API. */
@@ -135,22 +191,193 @@ async function readFlowConfig(page: Page, pid: string): Promise<any> {
 }
 
 /** Poll the automation's latest log (started >= firedAt) until terminal. */
+type AutomationRunLog = {
+  id: number;
+  status: string;
+  triggerRecordPid?: string;
+  errorMessage?: string;
+  actionResults?: any[];
+};
+
+type ApiEnvelope<T> = {
+  code?: string | number | null;
+  success?: boolean;
+  data?: T;
+  message?: string;
+};
+
+type JsonResponseLike = {
+  ok(): boolean;
+  status(): number;
+  url(): string;
+  json(): Promise<unknown>;
+  text(): Promise<string>;
+};
+
+type CurrentUserInfo = {
+  user?: {
+    id?: string;
+    email?: string;
+  };
+};
+
+type ImMessageRecord = {
+  id?: number;
+  conversationId?: number;
+  senderType?: string;
+  content?: string;
+  cardPayload?: unknown;
+};
+
 async function pollLogTerminal(
   page: Page,
   pid: string,
   firedAt: number,
   timeoutMs = 30_000,
-): Promise<{ id: number; status: string; errorMessage?: string } | null> {
+): Promise<AutomationRunLog | null> {
   const deadline = Date.now() + timeoutMs;
-  let last: { id: number; status: string; errorMessage?: string } | null = null;
+  let last: AutomationRunLog | null = null;
   while (Date.now() < deadline) {
-    last = await latestLog(page, pid, firedAt);
+    last = (await latestLog(page, pid, firedAt)) as AutomationRunLog | null;
     if (last && ['success', 'failed', 'partial_success'].includes(String(last.status).toLowerCase())) {
       return last;
     }
     await delay(1_000);
   }
   return last;
+}
+
+function isApiSuccess<T>(body: ApiEnvelope<T> | null | undefined): body is ApiEnvelope<T> {
+  if (!body) return false;
+  if (body.success === false) return false;
+  const code = body.code;
+  return code === undefined || code === null || String(code) === '0';
+}
+
+async function readApi<T>(response: JsonResponseLike): Promise<T> {
+  const body = (await response.json().catch(async () => ({
+    message: await response.text().catch(() => ''),
+  }))) as ApiEnvelope<T>;
+  expect(response.ok(), `HTTP ${response.status()} ${response.url()}: ${JSON.stringify(body)}`).toBe(
+    true,
+  );
+  expect(isApiSuccess(body), `API failed: ${JSON.stringify(body)}`).toBe(true);
+  return body.data as T;
+}
+
+type ActionAuditRow = {
+  pid: string;
+  rule_code: string;
+  action_type: string;
+  target: string | null;
+  message: string | null;
+  payload_json: Record<string, unknown>;
+};
+
+type RecordCommentRow = {
+  pid: string;
+  model_code: string;
+  record_pid: string;
+  content: string;
+  mentions: string | null;
+  created_by: string | null;
+};
+
+type InboxItemRow = {
+  id: string;
+  user_id: string;
+  item_type: string;
+  title: string;
+  subtitle: string | null;
+  priority: string;
+  status: string;
+  source_type: string | null;
+  source_id: string | null;
+  model_code: string | null;
+  record_pid: string | null;
+  deep_link: string | null;
+  card_payload: Record<string, unknown> | null;
+  client_item_id: string | null;
+};
+
+async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  const client = new Client(PG_CONN);
+  await client.connect();
+  try {
+    return await fn(client);
+  } finally {
+    await client.end();
+  }
+}
+
+async function waitForActionAuditRow(auditPid: string, timeoutMs = 15_000): Promise<ActionAuditRow | null> {
+  const deadline = Date.now() + timeoutMs;
+  let row: ActionAuditRow | null = null;
+  while (Date.now() < deadline) {
+    row = await withDb(async (client) => {
+      const result = await client.query<ActionAuditRow>(
+        `
+        select pid, rule_code, action_type, target, message, payload_json
+        from ab_drt_action_audit
+        where pid = $1
+        order by created_at desc, id desc
+        limit 1
+        `,
+        [auditPid],
+      );
+      return result.rows[0] ?? null;
+    });
+    if (row) return row;
+    await delay(500);
+  }
+  return row;
+}
+
+async function waitForRecordCommentRow(commentPid: string, timeoutMs = 15_000): Promise<RecordCommentRow | null> {
+  const deadline = Date.now() + timeoutMs;
+  let row: RecordCommentRow | null = null;
+  while (Date.now() < deadline) {
+    row = await withDb(async (client) => {
+      const result = await client.query<RecordCommentRow>(
+        `
+        select pid, model_code, record_pid, content, mentions, created_by
+        from ab_record_comment
+        where pid = $1
+          and (deleted_flag = false or deleted_flag is null)
+        order by created_at desc, id desc
+        limit 1
+        `,
+        [commentPid],
+      );
+      return result.rows[0] ?? null;
+    });
+    if (row) return row;
+    await delay(500);
+  }
+  return row;
+}
+
+async function waitForInboxItemRow(itemId: string | number, timeoutMs = 15_000): Promise<InboxItemRow | null> {
+  const deadline = Date.now() + timeoutMs;
+  let row: InboxItemRow | null = null;
+  while (Date.now() < deadline) {
+    row = await withDb(async (client) => {
+      const result = await client.query<InboxItemRow>(
+        `
+        select id::text, user_id::text, item_type, title, subtitle, priority, status,
+               source_type, source_id, model_code, record_pid, deep_link, card_payload, client_item_id
+        from ab_inbox_item
+        where id = $1
+        limit 1
+        `,
+        [String(itemId)],
+      );
+      return result.rows[0] ?? null;
+    });
+    if (row) return row;
+    await delay(500);
+  }
+  return row;
 }
 
 // Bootstrap a designer canvas at /automation/new with the palette + pane ready.
@@ -165,7 +392,7 @@ async function openNewDesigner(page: Page): Promise<void> {
   await page
     .locator('[data-testid="automation-editor-name-input"]')
     .waitFor({ state: 'visible', timeout: 30_000 });
-  await page.locator('[data-testid="flow-palette"]').waitFor({ state: 'visible', timeout: 20_000 });
+  await page.locator('[data-testid="flow-palette"]').waitFor({ state: 'attached', timeout: 20_000 });
   await page.locator('.react-flow__pane').waitFor({ state: 'visible', timeout: 10_000 });
 }
 
@@ -227,16 +454,15 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   // the persistence + overlay cases reuse the same saved automation.
   const h1: { pid?: string; logId?: number; nodeIds?: string[] } = {};
 
+  test.beforeEach(async ({ page, baseURL }) => {
+    await loginAsAdmin(page, baseURL ?? 'http://127.0.0.1:5194');
+  });
+
   test.afterAll(async ({ browser }) => {
     if (!createdPids.length) return;
-    const ctx = await browser.newContext({
-      storageState:
-        process.env.PW_ADMIN_STORAGE_STATE ||
-        (process.env.PW_STORAGE_DIR
-          ? `${process.env.PW_STORAGE_DIR}/admin.json`
-          : 'tests/storage/admin.json'),
-    });
+    const ctx = await browser.newContext();
     const page = await ctx.newPage();
+    await loginAsAdmin(page, process.env.PLAYWRIGHT_BASE_URL ?? 'http://127.0.0.1:5194');
     for (const pid of createdPids) await deleteViaApi(page, pid);
     await page.close();
     await ctx.close();
@@ -274,12 +500,12 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await fillNodeConfig(page, condition, { expression: "record['e2et_order_amount'] > 1000" });
     await fillNodeConfig(page, actHigh, {
       modelCode: MODEL_LABEL,
-      recordId: '${recordId}',
+      recordPid: '${trigger.recordPid}',
       fields: '{"e2et_order_title":"AUTOMATION_FIRED_HIGH"}',
     });
     await fillNodeConfig(page, actLow, {
       modelCode: MODEL_LABEL,
-      recordId: '${recordId}',
+      recordPid: '${trigger.recordPid}',
       fields: '{"e2et_order_title":"AUTOMATION_FIRED_LOW"}',
     });
 
@@ -416,7 +642,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
         wroteApi = true;
       }
     });
-    await page.locator('[data-testid="designer-save"]').click();
+    await clickDesignerSave(page);
 
     // The errored node is auto-selected and its required field renders a
     // field-level error in the property panel — NOT just a generic toast.
@@ -468,12 +694,12 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await fillNodeConfig(page, condition, { expression: 'dangerous' });
     await fillNodeConfig(page, actHigh, {
       modelCode: MODEL_LABEL,
-      recordId: '${recordId}',
+      recordPid: '${trigger.recordPid}',
       fields: '{"e2et_order_title":"S2_SHOULD_NOT_HAPPEN"}',
     });
     await fillNodeConfig(page, actLow, {
       modelCode: MODEL_LABEL,
-      recordId: '${recordId}',
+      recordPid: '${trigger.recordPid}',
       fields: '{"e2et_order_title":"S2_LOW"}',
     });
     // Dangerous TRUE-branch expression (SpEL type reference / code-exec attempt).
@@ -681,10 +907,10 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(items.length, `child order_item '${itemName}' created by the create-record action`).toBeGreaterThanOrEqual(1);
   });
 
-  /** Fire a record UPDATE (top-level targetRecordId — FINDING-2). Fires on_record_update. */
+  /** Fire a record UPDATE (top-level targetRecordPid). Fires on_record_update. */
   async function fireUpdate(page: Page, orderId: string, fields: Record<string, unknown>): Promise<void> {
     const resp = await page.request.post(`/api/meta/commands/execute/e2et:update_order`, {
-      data: { operationType: 'update', targetRecordId: orderId, payload: fields },
+      data: { operationType: 'update', targetRecordPid: orderId, payload: fields },
     });
     const body = await resp.json();
     expect(String(body.code), `update fire failed: ${JSON.stringify(body)}`).toBe('0');
@@ -795,6 +1021,39 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       const parsed = JSON.parse(hit.body);
       expect(parsed.event, 'payload event field delivered').toBe('e2e.designer.webhook');
       expect(parsed.orderId, '${recordId} resolved in the delivered payload').toBeTruthy();
+
+      const actionResult = (log!.actionResults ?? []).find((item: any) => item.actionType === 'send_webhook');
+      expect(actionResult?.status, `send_webhook actionResult returned: ${JSON.stringify(log!.actionResults)}`).toBe('success');
+      expect(actionResult?.result).toMatchObject({
+        success: true,
+        deliveryMode: 'direct_http',
+        statusCode: 200,
+      });
+
+      await page.goto(`/automation/${pid}?logId=${log!.id}`);
+      await expect(page.locator(`[data-testid="flow-node-${action}"]`)).toHaveAttribute(
+        'data-runtime-status',
+        'completed',
+        { timeout: 15_000 },
+      );
+      const actionCard = page.getByTestId('automation-action-result-1');
+      await expect(actionCard).toContainText(/发送 Webhook|Send Webhook/);
+      await expect(actionCard).toContainText(/投递方式|Delivery Mode/);
+      await expect(actionCard).toContainText(/直连 HTTP|Direct HTTP/);
+      await expect(actionCard).toContainText(/HTTP 状态|HTTP Status/);
+      await expect(actionCard).toContainText('200');
+      await expect(actionCard).toContainText(/目标地址|Target URL/);
+      await expect(actionCard).toContainText(`/hook`);
+      await expect(actionCard).toContainText(/响应摘要|Response Preview/);
+      await expect(actionCard).toContainText('{"ok":true}');
+      const evidence = actionCard.getByTestId('automation-action-evidence');
+      await expect(evidence).not.toContainText('deliveryMode');
+      await expect(evidence).not.toContainText('responseBodyPreview');
+      await expect(evidence).not.toContainText('responseBytes');
+      await page.screenshot({
+        path: 'test-results/artifacts/automation-designer-N-send-webhook-outbound-status-overlay.png',
+        fullPage: false,
+      });
     } finally {
       await receiver.close();
     }
@@ -831,6 +1090,27 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
       expect(node?.errorMessage ?? '', 'failure references the upstream status').toMatch(/Webhook POST failed|500|status/i);
       // The POST physically reached the receiver even though it 500'd (proves real outbound).
       expect(receiver.received.length, 'the POST reached the receiver before the 500').toBeGreaterThanOrEqual(1);
+
+      const actionResult = (log!.actionResults ?? []).find((item: any) => item.actionType === 'send_webhook');
+      expect(actionResult?.status, `send_webhook actionResult returned: ${JSON.stringify(log!.actionResults)}`).toBe('failed');
+      expect(actionResult?.errorMessage ?? '', 'send_webhook action result exposes upstream failure').toMatch(
+        /Webhook POST failed|500|status/i,
+      );
+
+      await page.goto(`/automation/${pid}?logId=${log!.id}`);
+      await expect(page.locator(`[data-testid="flow-node-${action}"]`)).toHaveAttribute(
+        'data-runtime-status',
+        'failed',
+        { timeout: 15_000 },
+      );
+      const actionCard = page.getByTestId('automation-action-result-1');
+      await expect(actionCard).toContainText(/发送 Webhook|Send Webhook/);
+      await expect(actionCard).toContainText(/失败|Failed/);
+      await expect(actionCard).toContainText(/Webhook POST failed|500|status/i);
+      await page.screenshot({
+        path: 'test-results/artifacts/automation-designer-N-send-webhook-sad-status-overlay.png',
+        fullPage: false,
+      });
     } finally {
       await receiver.close();
     }
@@ -839,7 +1119,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   /** Fire a state_transition command (cancel: draft→cancelled). Fires on_state_change. */
   async function fireCancel(page: Page, orderId: string): Promise<void> {
     const resp = await page.request.post(`/api/meta/commands/execute/e2et:cancel_order`, {
-      data: { operationType: 'state_transition', targetRecordId: orderId, payload: {} },
+      data: { operationType: 'state_transition', targetRecordPid: orderId, payload: {} },
     });
     const body = await resp.json();
     expect(String(body.code), `cancel fire failed: ${JSON.stringify(body)}`).toBe('0');
@@ -1241,8 +1521,8 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     const eFalse = await connectEdge(page, condition, actLow, 'false');
     await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
     await fillNodeConfig(page, condition, { expression: "record['e2et_order_amount'] > 1000" });
-    await fillNodeConfig(page, actHigh, { modelCode: MODEL_LABEL, recordId: '${recordId}', fields: '{"e2et_order_title":"EDGE_TRUE"}' });
-    await fillNodeConfig(page, actLow, { modelCode: MODEL_LABEL, recordId: '${recordId}', fields: '{"e2et_order_title":"EDGE_FALSE"}' });
+    await fillNodeConfig(page, actHigh, { modelCode: MODEL_LABEL, recordPid: '${trigger.recordPid}', fields: '{"e2et_order_title":"EDGE_TRUE"}' });
+    await fillNodeConfig(page, actLow, { modelCode: MODEL_LABEL, recordPid: '${trigger.recordPid}', fields: '{"e2et_order_title":"EDGE_FALSE"}' });
     await setEdgeCondition(page, eTrue, "record['e2et_order_amount'] > 1000");
     await setEdgeCondition(page, eFalse, "record['e2et_order_amount'] <= 1000");
     const { pid } = await saveAutomation(page);
@@ -1292,6 +1572,655 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'send-notification node completed').toBe(true);
   });
 
+  test('N-SEND-SMS-PROVIDER-UNAVAILABLE: drag trigger-record-create→action-send-sms, configure phone+content, fire without a real provider → node fails with provider evidence (sad) @golden', async ({
+    page,
+  }) => {
+    const marker = `SMS_${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-SEND-SMS ${uniqueId()}`);
+
+    await expect(page.getByTestId('palette-node-action-send-sms-status')).toContainText(
+      /不可用|Unavailable/,
+      { timeout: 15_000 },
+    );
+    await expect(page.getByTestId('palette-node-action-send-sms-status-text')).toContainText(
+      '当前环境未配置真实短信 provider',
+    );
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-send-sms', { x: 150, y: 240 });
+    await expect(page.getByTestId(`flow-node-${action}-availability-badge`)).toContainText(
+      /不可用|Unavailable/,
+    );
+    await page.getByTestId(`flow-node-${action}`).click();
+    await expect(page.getByTestId(`flow-node-availability-badge-${action}`)).toContainText(
+      /不可用|Unavailable/,
+    );
+    await expect(page.getByTestId(`flow-node-availability-${action}`)).toContainText(
+      '当前环境未配置真实短信 provider',
+    );
+    await page.screenshot({
+      path: 'test-results/artifacts/automation-designer-N-send-sms-provider-availability-config.png',
+      fullPage: false,
+    });
+    const closeInspector = page.getByTestId('flow-close-inspector');
+    if (await closeInspector.isVisible().catch(() => false)) {
+      await closeInspector.click();
+    }
+
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      target: 'PHONE:+8613800138000',
+      template: 'automation_timeout',
+      content: `Automation SMS ${marker} for \${recordId}`,
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const savedAction = saved.flowConfig.nodes.find((n: any) => n.id === action);
+    expect(savedAction.data.config.actionType, 'send-sms action type persisted').toBe('send_sms');
+    expect(savedAction.data.config.target, 'sms target persisted').toBe('PHONE:+8613800138000');
+    expect(savedAction.data.config.content, 'sms content template persisted').toBe(
+      `Automation SMS ${marker} for \${recordId}`,
+    );
+
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-SMS-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(['failed', 'partial_success'], `N-SEND-SMS run should fail without provider: ${JSON.stringify(log)}`).toContain(
+      String(log!.status).toLowerCase(),
+    );
+    const actionResult = (log!.actionResults ?? []).find((item: any) => item.actionType === 'send_sms');
+    expect(actionResult?.status, `send_sms actionResult returned: ${JSON.stringify(log!.actionResults)}`).toBe('failed');
+    expect(String(actionResult?.errorMessage ?? log!.errorMessage ?? ''), 'failure explains provider availability').toMatch(
+      /No real SMS sender available|send_sms failed via/i,
+    );
+
+    const node = (await pollNodeStatuses(page, log!.id, 30_000)).find((status) => status.nodeId === action);
+    expect(node?.status, 'send-sms node should be failed without a real provider').toBe('failed');
+    expect(node?.errorMessage ?? '', 'node error explains SMS provider failure').toMatch(
+      /No real SMS sender available|send_sms failed via/i,
+    );
+
+    await page.goto(`/automation/${pid}?logId=${log!.id}`);
+    await expect(page.locator(`[data-testid="flow-node-${action}"]`)).toHaveAttribute(
+      'data-runtime-status',
+      'failed',
+      { timeout: 15_000 },
+    );
+    const smsRuntimeCard = page.getByTestId('automation-action-result-1');
+    await expect(smsRuntimeCard).toBeVisible({ timeout: 15_000 });
+    await expect(smsRuntimeCard).toContainText(/发送短信|Send Sms|Send SMS/i);
+    await expect(smsRuntimeCard).toContainText(/失败|Failed/i);
+    await expect(smsRuntimeCard).toContainText(/通道|Channel/i);
+    await expect(smsRuntimeCard).toContainText(/短信|SMS/i);
+    await expect(smsRuntimeCard).toContainText(/短信模板|SMS Template/i);
+    await expect(smsRuntimeCard).toContainText('automation_timeout');
+    await expect(smsRuntimeCard).toContainText(/发送数|Sent/i);
+    await expect(smsRuntimeCard).toContainText('0');
+    await expect(smsRuntimeCard).toContainText(/手机号|Phone Targets/i);
+    await expect(smsRuntimeCard).toContainText('+8613800138000');
+    await expect(smsRuntimeCard).toContainText(/失败原因|Failure Reason/i);
+    await expect(smsRuntimeCard).toContainText(/短信发送失败|SMS delivery failed/i);
+    await expect(smsRuntimeCard).toContainText(/错误信息|Error Message/i);
+    await expect(smsRuntimeCard).toContainText(/No real SMS sender available|send_sms failed via/i);
+    const smsRuntimeEvidence = smsRuntimeCard.getByTestId('automation-action-evidence');
+    await expect(smsRuntimeEvidence).not.toContainText('failureReason');
+    await expect(smsRuntimeEvidence).not.toContainText('sms_delivery_failed');
+    await expect(smsRuntimeEvidence).not.toContainText('targetPhones');
+    await expect(smsRuntimeEvidence).not.toContainText('errorMessage');
+    await smsRuntimeCard.screenshot({
+      path: 'test-results/artifacts/automation-designer-N-send-sms-provider-unavailable-runtime-action-evidence.png',
+    });
+    await page.screenshot({
+      path: 'test-results/artifacts/automation-designer-N-send-sms-provider-unavailable-status-overlay.png',
+      fullPage: false,
+    });
+  });
+
+  test('N-SEND-IM: drag trigger-record-create→action-send-im, configure current user target, fire → actionResults returns message ids and IM API exposes the bot message (happy) @golden', async ({
+    page,
+  }) => {
+    const currentUser = await readApi<CurrentUserInfo>(await page.request.get('/api/auth/me'));
+    const targetUserId = currentUser.user?.id;
+    if (!targetUserId) {
+      throw new Error(`Current user id is required for send_im target: ${JSON.stringify(currentUser)}`);
+    }
+    expect(targetUserId).toMatch(/^\d+$/);
+
+    const marker = `IM_${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-SEND-IM ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-send-im', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      target: `USER:${targetUserId}`,
+      channel: 'im',
+      content: `Automation IM ${marker} for \${recordId}`,
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const savedAction = saved.flowConfig.nodes.find((n: any) => n.id === action);
+    expect(savedAction.data.config.actionType, 'send-im action type persisted').toBe('send_im');
+    expect(savedAction.data.config.target, 'im target persisted').toBe(`USER:${targetUserId}`);
+    expect(savedAction.data.config.content, 'im content template persisted').toBe(
+      `Automation IM ${marker} for \${recordId}`,
+    );
+
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-IM-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-SEND-IM run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'send-im node completed').toBe(true);
+    const recordId = log!.triggerRecordPid;
+    expect(recordId, `send_im log should carry triggerRecordPid: ${JSON.stringify(log)}`).toEqual(expect.any(String));
+
+    const actionResult = (log!.actionResults ?? []).find((item: any) => item.actionType === 'send_im');
+    expect(actionResult?.status, `send_im actionResult returned: ${JSON.stringify(log!.actionResults)}`).toBe('success');
+    const resultPayload = actionResult?.result as Record<string, unknown> | undefined;
+    expect(resultPayload).toMatchObject({
+      success: true,
+      channel: 'im',
+      sentCount: 1,
+      modelCode: MODEL_CODE,
+      recordPid: recordId,
+    });
+    expect(resultPayload?.targetUserIds, 'send_im target users').toEqual([Number(targetUserId)]);
+    const conversationIds = resultPayload?.conversationIds as unknown[] | undefined;
+    const messageIds = resultPayload?.messageIds as unknown[] | undefined;
+    expect(conversationIds, `send_im result exposes conversationIds: ${JSON.stringify(resultPayload)}`).toEqual([
+      expect.any(Number),
+    ]);
+    expect(messageIds, `send_im result exposes messageIds: ${JSON.stringify(resultPayload)}`).toEqual([
+      expect.any(Number),
+    ]);
+
+    const messages = await readApi<ImMessageRecord[]>(
+      await page.request.get(`/api/im/conversations/${conversationIds![0]}/messages`, {
+        params: { limit: '10' },
+      }),
+    );
+    const imMessage = messages.find((message) => message.id === messageIds![0]);
+    expect(imMessage, `send_im bot message must be queryable via IM API: ${JSON.stringify(messages)}`).toBeTruthy();
+    expect(imMessage).toMatchObject({
+      id: messageIds![0],
+      conversationId: conversationIds![0],
+      senderType: 'system',
+      content: `Automation IM ${marker} for ${recordId}`,
+    });
+    expect(JSON.stringify(imMessage?.cardPayload)).toContain('send_im');
+    expect(JSON.stringify(imMessage?.cardPayload)).toContain(pid);
+    expect(JSON.stringify(imMessage?.cardPayload)).toContain(recordId);
+
+    await page.goto(`/automation/${pid}?logId=${log!.id}`);
+    await expect(page.locator(`[data-testid="flow-node-${action}"]`)).toHaveAttribute(
+      'data-runtime-status',
+      'completed',
+      { timeout: 15_000 },
+    );
+    const actionCard = page.getByTestId('automation-action-result-1');
+    await expect(actionCard).toContainText(/发送 IM|Send IM/);
+    await expect(actionCard).toContainText(/通道|Channel/);
+    await expect(actionCard).toContainText(/IM 消息|IM message/);
+    await expect(actionCard).toContainText(/发送数|Sent/);
+    await expect(actionCard).toContainText(/接收用户|Target Users/);
+    await expect(actionCard).toContainText(/会话 ID|Conversation IDs/);
+    await expect(actionCard).toContainText(String(conversationIds![0]));
+    await expect(actionCard).toContainText(/消息 ID|Message IDs/);
+    await expect(actionCard).toContainText(String(messageIds![0]));
+    const actionEvidence = actionCard.getByTestId('automation-action-evidence');
+    await expect(actionEvidence).not.toContainText('targetUserIds');
+    await expect(actionEvidence).not.toContainText('conversationIds');
+    await expect(actionEvidence).not.toContainText('messageIds');
+    await expect(actionEvidence).not.toContainText('channel');
+    await page.screenshot({
+      path: 'test-results/artifacts/automation-designer-N-send-im-runtime-action-evidence.png',
+      fullPage: false,
+    });
+  });
+
+  test('N-WRITE-AUDIT: drag trigger-record-create→action-write-audit, configure message+payload, fire → actionResults returns auditPid and DB audit row persists (happy) @golden', async ({
+    page,
+  }) => {
+    const marker = `AUD_${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-WRITE-AUDIT ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-write-audit', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      message: `Audit ${marker} for \${recordId}`,
+      payload: `{"marker":"${marker}","recordPid":"\${recordId}","source":"automation-designer-golden"}`,
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const savedAction = saved.flowConfig.nodes.find((n: any) => n.id === action);
+    expect(savedAction.data.config.actionType, 'write-audit action type persisted').toBe('write_audit');
+    expect(savedAction.data.config.payload, 'write-audit JSON payload persisted as structured config').toMatchObject({
+      marker,
+      source: 'automation-designer-golden',
+    });
+
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-AUDIT-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-WRITE-AUDIT run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'write-audit node completed').toBe(true);
+    const recordId = log!.triggerRecordPid;
+    expect(recordId, `write_audit log should carry triggerRecordPid: ${JSON.stringify(log)}`).toEqual(expect.any(String));
+
+    const actionResult = (log!.actionResults ?? []).find((item: any) => item.actionType === 'write_audit');
+    expect(actionResult?.status, `write_audit actionResult returned: ${JSON.stringify(log!.actionResults)}`).toBe('success');
+    const resultPayload = actionResult?.result as Record<string, unknown> | undefined;
+    expect(resultPayload?.auditPid, 'write_audit actionResult returns persisted audit pid').toEqual(expect.any(String));
+    expect(resultPayload?.ruleCode, 'write_audit actionResult is tied to the automation pid').toBe(pid);
+    expect(resultPayload?.message, 'write_audit actionResult resolves the recordId template').toBe(
+      `Audit ${marker} for ${recordId}`,
+    );
+
+    const auditRow = await waitForActionAuditRow(String(resultPayload!.auditPid));
+    expect(auditRow, 'ab_drt_action_audit row must exist for the returned auditPid').toBeTruthy();
+    expect(auditRow!.rule_code, 'audit row references the automation pid').toBe(pid);
+    expect(auditRow!.action_type, 'audit row action type').toBe('write_audit');
+    expect(auditRow!.message, 'audit row message resolves runtime variables').toBe(`Audit ${marker} for ${recordId}`);
+    expect(auditRow!.payload_json, 'audit row payload resolves JSON field variables').toMatchObject({
+      marker,
+      recordPid: recordId,
+      automationPid: pid,
+      source: 'automation-designer-golden',
+    });
+
+    await page.goto(`/automation/${pid}?logId=${log!.id}`);
+    await expect(page.locator(`[data-testid="flow-node-${action}"]`)).toHaveAttribute(
+      'data-runtime-status',
+      'completed',
+      { timeout: 15_000 },
+    );
+    const actionCard = page.getByTestId('automation-action-result-1');
+    await expect(actionCard).toContainText(/写入审计|Write Audit/);
+    await expect(actionCard).toContainText(/审计记录|Audit Entry/);
+    await expect(actionCard).toContainText(String(resultPayload!.auditPid));
+    await expect(actionCard).toContainText(/规则 \/ 自动化|Rule \/ Automation/);
+    await expect(actionCard).toContainText(pid);
+    await expect(actionCard).toContainText(/消息|Message/);
+    await expect(actionCard).toContainText(`Audit ${marker} for ${recordId}`);
+    const actionEvidence = actionCard.getByTestId('automation-action-evidence');
+    await expect(actionEvidence).not.toContainText('auditPid');
+    await expect(actionEvidence).not.toContainText('ruleCode');
+    await page.screenshot({
+      path: 'test-results/artifacts/automation-designer-N-write-audit-runtime-action-evidence.png',
+      fullPage: false,
+    });
+  });
+
+  test('N-ADD-COMMENT: drag trigger-record-create→action-add-comment, configure content+mentions, fire → actionResults returns commentPid and DB comment row persists (happy) @golden', async ({
+    page,
+  }) => {
+    const marker = `CMT_${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-ADD-COMMENT ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-add-comment', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      content: `Comment ${marker} for \${recordId}`,
+      mentions: 'ROLE:wd_manager',
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const savedAction = saved.flowConfig.nodes.find((n: any) => n.id === action);
+    expect(savedAction.data.config.actionType, 'add-comment action type persisted').toBe('add_comment');
+    expect(savedAction.data.config.content, 'comment content template persisted').toBe(
+      `Comment ${marker} for \${recordId}`,
+    );
+    expect(savedAction.data.config.mentions, 'comment mentions persisted').toBe('ROLE:wd_manager');
+
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-COMMENT-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-ADD-COMMENT run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'add-comment node completed').toBe(true);
+    const recordId = log!.triggerRecordPid;
+    expect(recordId, `add_comment log should carry triggerRecordPid: ${JSON.stringify(log)}`).toEqual(expect.any(String));
+
+    const actionResult = (log!.actionResults ?? []).find((item: any) => item.actionType === 'add_comment');
+    expect(actionResult?.status, `add_comment actionResult returned: ${JSON.stringify(log!.actionResults)}`).toBe('success');
+    const resultPayload = actionResult?.result as Record<string, unknown> | undefined;
+    expect(resultPayload?.success, 'add_comment actionResult reports success').toBe(true);
+    expect(resultPayload?.modelCode, 'add_comment actionResult keeps trigger model').toBe(MODEL_CODE);
+    expect(resultPayload?.recordPid, 'add_comment actionResult keeps trigger record pid').toBe(recordId);
+    expect(resultPayload?.commentPid, 'add_comment actionResult returns persisted comment pid').toEqual(expect.any(String));
+
+    const commentRow = await waitForRecordCommentRow(String(resultPayload!.commentPid));
+    expect(commentRow, 'ab_record_comment row must exist for the returned commentPid').toBeTruthy();
+    expect(commentRow!.model_code, 'comment row model').toBe(MODEL_CODE);
+    expect(commentRow!.record_pid, 'comment row record pid').toBe(recordId);
+    expect(commentRow!.content, 'comment row content resolves runtime variables').toBe(
+      `Comment ${marker} for ${recordId}`,
+    );
+    expect(commentRow!.mentions, 'comment row mentions').toBe('ROLE:wd_manager');
+
+    await page.goto(`/automation/${pid}?logId=${log!.id}`);
+    await expect(page.locator(`[data-testid="flow-node-${action}"]`)).toHaveAttribute(
+      'data-runtime-status',
+      'completed',
+      { timeout: 15_000 },
+    );
+    const actionCard = page.getByTestId('automation-action-result-1');
+    await expect(actionCard).toContainText(/添加评论|Add Comment/);
+    await expect(actionCard).toContainText(/评论|Comment/);
+    await expect(actionCard).toContainText(String(resultPayload!.commentPid));
+    await expect(actionCard).toContainText(/内容|Content/);
+    await expect(actionCard).toContainText(`Comment ${marker} for ${recordId}`);
+    await expect(actionCard).toContainText(/业务记录|Record/);
+    await expect(actionCard).toContainText(String(recordId));
+    await expect(actionCard).toContainText(/提及对象|Mentions/);
+    await expect(actionCard).toContainText('ROLE:wd_manager');
+    const actionEvidence = actionCard.getByTestId('automation-action-evidence');
+    await expect(actionEvidence).not.toContainText('commentPid');
+    await expect(actionEvidence).not.toContainText('recordPid');
+    await expect(actionEvidence).not.toContainText('mentions');
+    await page.screenshot({
+      path: 'test-results/artifacts/automation-designer-N-add-comment-runtime-action-evidence.png',
+      fullPage: false,
+    });
+  });
+
+  test('N-CREATE-TASK: drag trigger-record-create→action-create-task, configure assignee+title, fire → actionResults returns inbox item id and DB inbox task persists (happy) @golden', async ({
+    page,
+  }) => {
+    const marker = `TASK_${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CREATE-TASK ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-create-task', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      assignee: 'USER:1',
+      title: `Task ${marker} for \${recordId}`,
+      dueDate: '2026-07-15T00:00:00Z',
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const savedAction = saved.flowConfig.nodes.find((n: any) => n.id === action);
+    expect(savedAction.data.config.actionType, 'create-task action type persisted').toBe('create_task');
+    expect(savedAction.data.config.assignee, 'task assignee persisted').toBe('USER:1');
+    expect(savedAction.data.config.title, 'task title template persisted').toBe(
+      `Task ${marker} for \${recordId}`,
+    );
+
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-TASK-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-CREATE-TASK run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'create-task node completed').toBe(true);
+    const recordId = log!.triggerRecordPid;
+    expect(recordId, `create_task log should carry triggerRecordPid: ${JSON.stringify(log)}`).toEqual(expect.any(String));
+
+    const actionResult = (log!.actionResults ?? []).find((item: any) => item.actionType === 'create_task');
+    expect(actionResult?.status, `create_task actionResult returned: ${JSON.stringify(log!.actionResults)}`).toBe('success');
+    const resultPayload = actionResult?.result as Record<string, unknown> | undefined;
+    expect(resultPayload?.success, 'create_task actionResult reports success').toBe(true);
+    expect(resultPayload?.delivery, 'create_task uses inbox delivery').toBe('inbox');
+    expect(resultPayload?.itemType, 'create_task actionResult item type').toBe('task');
+    expect(resultPayload?.createdCount, 'create_task creates one inbox item for USER:1').toBe(1);
+    expect(resultPayload?.modelCode, 'create_task actionResult keeps trigger model').toBe(MODEL_CODE);
+    expect(resultPayload?.recordPid, 'create_task actionResult keeps trigger record pid').toBe(recordId);
+    const inboxIds = resultPayload?.inboxItemIds as unknown[] | undefined;
+    expect(inboxIds, 'create_task actionResult returns inbox item ids').toEqual([expect.any(Number)]);
+
+    const inboxRow = await waitForInboxItemRow(String(inboxIds![0]));
+    expect(inboxRow, 'ab_inbox_item row must exist for the returned inbox item id').toBeTruthy();
+    expect(inboxRow!.user_id, 'inbox item user').toBe('1');
+    expect(inboxRow!.item_type, 'inbox item type').toBe('task');
+    expect(inboxRow!.title, 'inbox title resolves runtime variables').toBe(`Task ${marker} for ${recordId}`);
+    expect(inboxRow!.priority, 'default task priority').toBe('normal');
+    expect(inboxRow!.status, 'new task status').toBe('pending');
+    expect(inboxRow!.source_type, 'task source type').toBe('automation');
+    expect(inboxRow!.source_id, 'task source id references automation').toBe(pid);
+    expect(inboxRow!.model_code, 'task model').toBe(MODEL_CODE);
+    expect(inboxRow!.record_pid, 'task record pid').toBe(recordId);
+    expect(inboxRow!.deep_link, 'task deep link points to the trigger record').toBe(`/p/${MODEL_CODE}/view/${recordId}`);
+    expect(inboxRow!.card_payload, 'task card payload keeps runtime context').toMatchObject({
+      actionType: 'create_task',
+      automationPid: pid,
+      title: `Task ${marker} for ${recordId}`,
+      modelCode: MODEL_CODE,
+      recordPid: recordId,
+      dueDate: '2026-07-15T00:00:00Z',
+    });
+
+    await page.goto(`/automation/${pid}?logId=${log!.id}`);
+    await expect(page.locator(`[data-testid="flow-node-${action}"]`)).toHaveAttribute(
+      'data-runtime-status',
+      'completed',
+      { timeout: 15_000 },
+    );
+    const actionCard = page.getByTestId('automation-action-result-1');
+    await expect(actionCard).toContainText(/创建任务|Create Task/);
+    await expect(actionCard).toContainText(/投递方式|Delivery/);
+    await expect(actionCard).toContainText(/待办中心|Inbox/);
+    await expect(actionCard).toContainText(/待办类型|Inbox Type/);
+    await expect(actionCard).toContainText(/待办任务|Task/);
+    await expect(actionCard).toContainText(/创建数量|Created/);
+    await expect(actionCard).toContainText(/负责人|Assignees/);
+    await expect(actionCard).toContainText(/待办项 ID|Inbox Item IDs/);
+    await expect(actionCard).toContainText(String(inboxIds![0]));
+    const actionEvidence = actionCard.getByTestId('automation-action-evidence');
+    await expect(actionEvidence).not.toContainText('inboxItemIds');
+    await expect(actionEvidence).not.toContainText('assigneeUserIds');
+    await expect(actionEvidence).not.toContainText('createdCount');
+    await expect(actionEvidence).not.toContainText('itemType');
+    await page.screenshot({
+      path: 'test-results/artifacts/automation-designer-N-create-task-runtime-action-evidence.png',
+      fullPage: false,
+    });
+  });
+
+  test('N-CC-TASK: drag trigger-record-create→action-cc-task, configure target+message, fire → actionResults returns inbox mention id and DB mention persists (happy) @golden', async ({
+    page,
+  }) => {
+    const marker = `CC_${uniqueId()}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-CC-TASK ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-cc-task', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      target: 'USER:1',
+      message: `CC ${marker} for \${recordId}`,
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const savedAction = saved.flowConfig.nodes.find((n: any) => n.id === action);
+    expect(savedAction.data.config.actionType, 'cc-task action type persisted').toBe('cc_task');
+    expect(savedAction.data.config.target, 'cc target persisted').toBe('USER:1');
+    expect(savedAction.data.config.message, 'cc message template persisted').toBe(
+      `CC ${marker} for \${recordId}`,
+    );
+
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    await fireCreate(page, 100, `N-CC-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-CC-TASK run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'cc-task node completed').toBe(true);
+    const recordId = log!.triggerRecordPid;
+    expect(recordId, `cc_task log should carry triggerRecordPid: ${JSON.stringify(log)}`).toEqual(expect.any(String));
+
+    const actionResult = (log!.actionResults ?? []).find((item: any) => item.actionType === 'cc_task');
+    expect(actionResult?.status, `cc_task actionResult returned: ${JSON.stringify(log!.actionResults)}`).toBe('success');
+    const resultPayload = actionResult?.result as Record<string, unknown> | undefined;
+    expect(resultPayload?.success, 'cc_task actionResult reports success').toBe(true);
+    expect(resultPayload?.delivery, 'cc_task uses inbox delivery without taskId').toBe('inbox');
+    expect(resultPayload?.itemType, 'cc_task actionResult item type').toBe('mention');
+    expect(resultPayload?.ccCount, 'cc_task creates one mention for USER:1').toBe(1);
+    expect(resultPayload?.targetUserIds, 'cc_task target users').toEqual([1]);
+    expect(resultPayload?.modelCode, 'cc_task actionResult keeps trigger model').toBe(MODEL_CODE);
+    expect(resultPayload?.recordPid, 'cc_task actionResult keeps trigger record pid').toBe(recordId);
+    const inboxIds = resultPayload?.inboxItemIds as unknown[] | undefined;
+    expect(inboxIds, 'cc_task actionResult returns inbox item ids').toEqual([expect.any(Number)]);
+
+    const inboxRow = await waitForInboxItemRow(String(inboxIds![0]));
+    expect(inboxRow, 'ab_inbox_item row must exist for the returned mention id').toBeTruthy();
+    expect(inboxRow!.user_id, 'mention user').toBe('1');
+    expect(inboxRow!.item_type, 'mention item type').toBe('mention');
+    expect(inboxRow!.title, 'mention title').toBe('任务抄送');
+    expect(inboxRow!.subtitle, 'mention subtitle resolves runtime variables').toBe(
+      `CC ${marker} for ${recordId}`,
+    );
+    expect(inboxRow!.priority, 'mention priority').toBe('normal');
+    expect(inboxRow!.status, 'new mention status').toBe('pending');
+    expect(inboxRow!.source_type, 'mention source type').toBe('automation');
+    expect(inboxRow!.source_id, 'mention source id references automation').toBe(pid);
+    expect(inboxRow!.model_code, 'mention model').toBe(MODEL_CODE);
+    expect(inboxRow!.record_pid, 'mention record pid').toBe(recordId);
+    expect(inboxRow!.deep_link, 'mention deep link points to the trigger record').toBe(`/p/${MODEL_CODE}/view/${recordId}`);
+    expect(inboxRow!.card_payload, 'mention card payload keeps runtime context').toMatchObject({
+      actionType: 'cc_task',
+      automationPid: pid,
+      title: '任务抄送',
+      message: `CC ${marker} for ${recordId}`,
+      modelCode: MODEL_CODE,
+      recordPid: recordId,
+    });
+
+    await page.goto(`/automation/${pid}?logId=${log!.id}`);
+    await expect(page.locator(`[data-testid="flow-node-${action}"]`)).toHaveAttribute(
+      'data-runtime-status',
+      'completed',
+      { timeout: 15_000 },
+    );
+    const actionCard = page.getByTestId('automation-action-result-1');
+    await expect(actionCard).toContainText(/抄送任务|CC Task/);
+    await expect(actionCard).toContainText(/投递方式|Delivery/);
+    await expect(actionCard).toContainText(/待办中心|Inbox/);
+    await expect(actionCard).toContainText(/待办类型|Inbox Type/);
+    await expect(actionCard).toContainText(/抄送提醒|Mention/);
+    await expect(actionCard).toContainText(/抄送数量|CC Count/);
+    await expect(actionCard).toContainText(/接收用户|Target Users/);
+    await expect(actionCard).toContainText(/待办项 ID|Inbox Item IDs/);
+    await expect(actionCard).toContainText(String(inboxIds![0]));
+    const actionEvidence = actionCard.getByTestId('automation-action-evidence');
+    await expect(actionEvidence).not.toContainText('inboxItemIds');
+    await expect(actionEvidence).not.toContainText('targetUserIds');
+    await expect(actionEvidence).not.toContainText('ccCount');
+    await page.screenshot({
+      path: 'test-results/artifacts/automation-designer-N-cc-task-runtime-action-evidence.png',
+      fullPage: false,
+    });
+  });
+
+  test('N-UPDATE-RECORD-HAPPY: drag trigger-record-create→action-update-record, configure fields, fire → actionResults exposes updated fields and trigger record mutates (happy) @golden', async ({
+    page,
+  }) => {
+    const marker = `UPD_${uniqueId()}`;
+    const updatedTitle = `Updated ${marker}`;
+    const updatedRemark = `Remark ${marker}`;
+    await openNewDesigner(page);
+    await setAutomationName(page, `N-UPDATE-RECORD-HAPPY ${uniqueId()}`);
+
+    const trigger = await dragNodeToCanvas(page, 'trigger-record-create', { x: 150, y: 80 });
+    const action = await dragNodeToCanvas(page, 'action-update-record', { x: 150, y: 240 });
+    await page.locator('.react-flow__pane').click({ position: { x: 5, y: 5 } });
+    await connectEdge(page, trigger, action);
+    await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
+    await fillNodeConfig(page, action, {
+      modelCode: MODEL_LABEL,
+      recordPid: '${trigger.recordPid}',
+      fields: JSON.stringify({
+        e2et_order_title: updatedTitle,
+        e2et_order_remark: updatedRemark,
+      }),
+    });
+
+    const { pid } = await saveAutomation(page);
+    createdPids.push(pid);
+    const saved = await readFlowConfig(page, pid);
+    const savedAction = saved.flowConfig.nodes.find((n: any) => n.id === action);
+    expect(savedAction.data.config.actionType, 'update-record action type persisted').toBe('update_record');
+    expect(savedAction.data.config.modelCode, 'update-record model persisted').toBe(MODEL_CODE);
+    expect(savedAction.data.config.recordPid, 'update-record target pid template persisted').toBe('${trigger.recordPid}');
+    expect(savedAction.data.config.fields, 'update-record fields persisted').toMatchObject({
+      e2et_order_title: updatedTitle,
+      e2et_order_remark: updatedRemark,
+    });
+
+    await enableViaListToggle(page, pid);
+
+    const firedAt = Date.now();
+    const recordId = await fireCreate(page, 100, `N-UPD-order ${uniqueId()}`);
+    const log = await pollLogTerminal(page, pid, firedAt);
+    expect(String(log!.status).toLowerCase(), `N-UPDATE-RECORD-HAPPY run: ${JSON.stringify(log)}`).toBe('success');
+    expect(statusesNodeCompleted(await pollNodeStatuses(page, log!.id, 30_000), action), 'update-record node completed').toBe(true);
+    expect(log!.triggerRecordPid, 'update_record log keeps trigger record pid').toBe(recordId);
+
+    const actionResult = (log!.actionResults ?? []).find((item: any) => item.actionType === 'update_record');
+    expect(actionResult?.status, `update_record actionResult returned: ${JSON.stringify(log!.actionResults)}`).toBe('success');
+    const resultPayload = actionResult?.result as Record<string, unknown> | undefined;
+    expect(resultPayload?.success, 'update_record actionResult reports success').toBe(true);
+    expect(resultPayload?.actionType, 'update_record result action type').toBe('update_record');
+    expect(resultPayload?.recordPid, 'update_record result record pid').toBe(recordId);
+    expect(resultPayload?.updatedFields, 'update_record result lists changed fields').toEqual(
+      expect.arrayContaining(['e2et_order_title', 'e2et_order_remark']),
+    );
+
+    const record = await pollRecordField(page, recordId, 'e2et_order_title', updatedTitle);
+    expect(record.e2et_order_title, 'trigger record title mutates via DynamicDataService').toBe(updatedTitle);
+    expect(record.e2et_order_remark, 'trigger record remark mutates via DynamicDataService').toBe(updatedRemark);
+
+    await page.goto(`/automation/${pid}?logId=${log!.id}`);
+    await expect(page.locator(`[data-testid="flow-node-${action}"]`)).toHaveAttribute(
+      'data-runtime-status',
+      'completed',
+      { timeout: 15_000 },
+    );
+    await page.screenshot({
+      path: 'test-results/artifacts/automation-designer-N-update-record-happy-status-overlay.png',
+      fullPage: false,
+    });
+  });
+
   // ── golden SAD path (real UI) — update-record targeting a nonexistent field fails ──
   test('N-UPDATE-RECORD-SAD: drag trigger-record-create→action-update-record with a nonexistent field, save, enable, fire → the node FAILS at runtime with an error (sad) @golden', async ({
     page,
@@ -1306,7 +2235,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     await fillNodeConfig(page, trigger, { modelCode: MODEL_LABEL });
     await fillNodeConfig(page, action, {
       modelCode: MODEL_LABEL,
-      recordId: '${recordId}',
+      recordPid: '${trigger.recordPid}',
       fields: '{"e2et_order_nonexistent_zzz":"boom"}',
     });
     const { pid } = await saveAutomation(page);
@@ -1505,7 +2434,7 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
     });
     await fillNodeConfig(page, upd, {
       modelCode: MODEL_LABEL,
-      recordId: '${recordId}',
+      recordPid: '${trigger.recordPid}',
       fields: '{"e2et_order_remark":"${llmOutput}"}',
     });
     const { pid } = await saveAutomation(page);

@@ -12,8 +12,44 @@ public record EventPolicyResult(
         List<String> matchedRuleCodes,
         List<String> skippedRuleCodes,
         List<ResolvedActionPlan> actionPlans,
-        List<String> errors
+        List<String> errors,
+        String correlationId,
+        List<String> decisionTraceIds
 ) {
+    public EventPolicyResult(
+            String policyCode,
+            Status status,
+            List<String> matchedRuleCodes,
+            List<String> skippedRuleCodes,
+            List<ResolvedActionPlan> actionPlans,
+            List<String> errors) {
+        this(policyCode, status, matchedRuleCodes, skippedRuleCodes, actionPlans, errors, null, List.of());
+    }
+
+    public EventPolicyResult {
+        matchedRuleCodes = matchedRuleCodes == null ? List.of() : List.copyOf(matchedRuleCodes);
+        skippedRuleCodes = skippedRuleCodes == null ? List.of() : List.copyOf(skippedRuleCodes);
+        actionPlans = actionPlans == null ? List.of() : List.copyOf(actionPlans);
+        errors = errors == null ? List.of() : List.copyOf(errors);
+        decisionTraceIds = decisionTraceIds == null ? List.of() : List.copyOf(decisionTraceIds);
+    }
+
+    public EventPolicyResult withRuntimeTrace(String nextCorrelationId, List<String> nextDecisionTraceIds) {
+        return new EventPolicyResult(
+                policyCode,
+                status,
+                matchedRuleCodes,
+                skippedRuleCodes,
+                actionPlans,
+                errors,
+                nextCorrelationId,
+                nextDecisionTraceIds);
+    }
+
+    public String primaryDecisionTraceId() {
+        return decisionTraceIds.isEmpty() ? null : decisionTraceIds.get(0);
+    }
+
     public enum Status {
         /** At least one rule matched and action plans were resolved. */
         MATCHED,

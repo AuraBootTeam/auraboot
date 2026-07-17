@@ -1,8 +1,10 @@
 package com.auraboot.framework.permission.entity;
 
+import com.auraboot.framework.application.database.mybatis.JsonbObjectTypeHandler;
+import com.auraboot.framework.application.database.mybatis.StringArrayTypeHandler;
 import com.baomidou.mybatisplus.annotation.*;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
 import java.time.Instant;
 
 /**
@@ -21,7 +23,7 @@ import java.time.Instant;
  * @since 2025-01-07
  */
 @Data
-@TableName("ab_permission")
+@TableName(value = "ab_permission", autoResultMap = true)
 public class Permission {
     
     /**
@@ -138,7 +140,7 @@ public class Permission {
     /**
      * Data Scope Config (JSONB)
      */
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(value = "data_scope_config", typeHandler = JsonbObjectTypeHandler.class, jdbcType = JdbcType.OTHER)
     private Object dataScopeConfig;
     
     // ========================================================================
@@ -148,19 +150,20 @@ public class Permission {
     /**
      * Extension (扩展字段, JSONB)
      */
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(value = "extension", typeHandler = JsonbObjectTypeHandler.class, jdbcType = JdbcType.OTHER)
     private Object extension;
 
     /**
      * Tags (标签数组)
      */
+    @TableField(typeHandler = StringArrayTypeHandler.class, jdbcType = JdbcType.OTHER)
     private String[] tags;
 
     /**
      * Policy Schema (JSONB) - defines configurable parameters for this permission.
      * Example: {"maxApprovalAmount": {"type": "number", "label": "Max Approval Amount"}}
      */
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(value = "policy_schema", typeHandler = JsonbObjectTypeHandler.class, jdbcType = JdbcType.OTHER)
     private Object policySchema;
 
     /**

@@ -1,6 +1,7 @@
 package com.auraboot.framework.decision.rule;
 
 import com.auraboot.framework.decision.ast.ConditionAstEvaluator;
+import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.EvalTrace;
 import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.decision.dto.DrtEvaluateRequest;
@@ -114,7 +115,13 @@ public class RuleEvaluationServiceImpl implements RuleEvaluationService {
         request.setCorrelationId(context.traceId());
         request.setRoutingKey(stringValue(context.resolve(binding.routingKeySource()), context.routingKey()));
         request.setTenantSegment(stringValue(context.resolve(binding.tenantSegmentSource()), context.tenantSegment()));
-        request.setContext(Map.of(Scope.RECORD.code(), Map.of("data", inputSnapshot)));
+        Map<String, Map<String, Object>> requestContext = new LinkedHashMap<>();
+        requestContext.put(Scope.RECORD.code(), Map.of("data", inputSnapshot));
+        Map<String, Object> meta = context.toWireContext().get(Scope.META.code());
+        if (meta != null && !meta.isEmpty()) {
+            requestContext.put(Scope.META.code(), new LinkedHashMap<>(meta));
+        }
+        request.setContext(requestContext);
         return request;
     }
 
@@ -127,7 +134,15 @@ public class RuleEvaluationServiceImpl implements RuleEvaluationService {
             if (mapping == null || mapping.input() == null || mapping.input().isBlank()) {
                 continue;
             }
-            input.put(mapping.input(), context.resolve(mapping.source()));
+            if (mapping.source() != null && mapping.source().kind() == RuleValueSource.Kind.FIELD) {
+                DecisionContext.PathValue value = context.resolvePath(mapping.source());
+                if (!value.present()) {
+                    continue;
+                }
+                input.put(mapping.input(), value.value());
+            } else {
+                input.put(mapping.input(), context.resolve(mapping.source()));
+            }
         }
         return input;
     }

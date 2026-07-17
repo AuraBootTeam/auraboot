@@ -187,7 +187,8 @@ describe('bpm-designer-sdk batch2 (B2b)', () => {
       expect(screen.getByTestId('bpm-sdk-user-task')).toBeInTheDocument();
       expect(screen.getByText('👤')).toBeInTheDocument();
       expect(screen.getByText('Approve')).toBeInTheDocument();
-      expect(screen.getByText('Role: mgr,ops')).toBeInTheDocument();
+      expect(screen.getByText('角色: mgr,ops')).toBeInTheDocument();
+      expect(screen.queryByText('Role: mgr,ops')).not.toBeInTheDocument();
     });
 
     it('8) UserTaskNode renders multi-instance indicator when enabled', () => {
@@ -208,7 +209,8 @@ describe('bpm-designer-sdk batch2 (B2b)', () => {
       const mi = screen.getByTestId('bpm-sdk-user-task-mi-indicator');
       expect(mi).toBeInTheDocument();
       expect(mi.textContent).toContain('|||');
-      expect(mi.textContent).toContain('Countersign');
+      expect(mi.textContent).toContain('会签');
+      expect(mi.textContent).not.toContain('Countersign');
     });
   });
 

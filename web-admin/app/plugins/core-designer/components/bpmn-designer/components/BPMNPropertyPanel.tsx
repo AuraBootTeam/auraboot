@@ -10,6 +10,7 @@ import { confirmDialog } from '~/utils/confirmDialog';
 import type {
   UserTaskConfig,
   ServiceTaskConfig,
+  RuleTaskConfig,
   ReceiveTaskConfig,
   ExclusiveGatewayConfig,
   ParallelGatewayConfig,
@@ -23,6 +24,7 @@ import type {
 import {
   UserTaskEditor,
   ServiceTaskEditor,
+  RuleTaskEditor,
   ReceiveTaskEditor,
   ExclusiveGatewayEditor,
   ParallelGatewayEditor,
@@ -53,6 +55,9 @@ export interface ProcessMetadataProps {
   onWithdrawPolicyChange: (value: WithdrawPolicy | undefined) => void;
   onCcPolicyChange: (value: CcPolicy | undefined) => void;
 }
+
+const PANEL_CLASS =
+  'relative z-20 h-full w-96 max-w-[calc(100vw-2rem)] shrink-0 overflow-y-auto border-l border-gray-200 bg-white p-4';
 
 export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: ProcessMetadataProps }) {
   const { t } = useI18n();
@@ -104,7 +109,7 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
   // No selection — show process metadata or placeholder
   if (!selectedNode && !selectedEdge) {
     return (
-      <div className="w-80 overflow-y-auto border-l border-gray-200 bg-white p-4">
+      <div className={PANEL_CLASS} data-testid="bpmn-property-panel">
         <h2 className="mb-4 text-lg font-semibold">{t('bpmn.prop.processProperties')}</h2>
         {processMetadata && <ProcessMetadataPanel metadata={processMetadata} />}
         {!processMetadata && (
@@ -118,9 +123,29 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
   if (selectedNode) {
     const nodeType = selectedNode.data.type;
     const handleConfigChange = (config: any) => updateNode(selectedNode.id, { config });
+    const handleRuleTaskConfigChange = (config: RuleTaskConfig) =>
+      updateNode(selectedNode.id, {
+        config,
+        ruleCode: config.ruleCode,
+        factsVars: config.factsVars,
+      });
+    const ruleTaskConfig = {
+      name: selectedNode.data.label,
+      ...((selectedNode.data.config as RuleTaskConfig | undefined) ?? {}),
+      ruleCode: String(
+        (selectedNode.data.config as RuleTaskConfig | undefined)?.ruleCode
+          ?? selectedNode.data.ruleCode
+          ?? '',
+      ),
+      factsVars: String(
+        (selectedNode.data.config as RuleTaskConfig | undefined)?.factsVars
+          ?? selectedNode.data.factsVars
+          ?? '',
+      ),
+    } satisfies RuleTaskConfig;
 
     return (
-      <div className="w-80 overflow-y-auto border-l border-gray-200 bg-white p-4">
+      <div className={PANEL_CLASS} data-testid="bpmn-property-panel">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t('bpmn.prop.nodeProperties')}</h2>
           <button
@@ -176,6 +201,15 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
           />
         )}
 
+        {nodeType === BPMNNodeType.RULE_TASK && (
+          <RuleTaskEditor
+            config={ruleTaskConfig}
+            processKey={processMetadata?.processKey}
+            nodeId={selectedNode.id}
+            onChange={handleRuleTaskConfigChange}
+          />
+        )}
+
         {nodeType === BPMNNodeType.RECEIVE_TASK && (
           <ReceiveTaskEditor
             config={selectedNode.data.config as ReceiveTaskConfig}
@@ -223,7 +257,7 @@ export function BPMNPropertyPanel({ processMetadata }: { processMetadata?: Proce
   // Edge selected
   if (selectedEdge) {
     return (
-      <div className="w-80 overflow-y-auto border-l border-gray-200 bg-white p-4">
+      <div className={PANEL_CLASS} data-testid="bpmn-property-panel">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">{t('bpmn.prop.edgeProperties')}</h2>
           <button

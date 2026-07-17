@@ -439,6 +439,58 @@
     ]
   },
   {
+    "code": "bpm_process_status",
+    "name": "BPM Process Status",
+    "name:zh-CN": "BPM 流程状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "draft",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "color": "#8c8c8c",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "deployed",
+        "label": "Deployed",
+        "label:zh-CN": "已部署",
+        "sortNo": 20,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "suspended",
+        "label": "Suspended",
+        "label:zh-CN": "已暂停",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "orange"
+        }
+      },
+      {
+        "value": "archived",
+        "label": "Archived",
+        "label:zh-CN": "已归档",
+        "sortNo": 40,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
     "code": "scheduled_task_type",
     "name": "Scheduled Task Type",
     "name:zh-CN": "定时任务类型",

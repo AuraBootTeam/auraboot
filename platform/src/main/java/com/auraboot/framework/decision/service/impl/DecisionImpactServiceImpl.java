@@ -30,7 +30,13 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class DecisionImpactServiceImpl implements DecisionImpactService {
 
-    private static final Set<String> SUPPORTED_FIELD_CHANGE_ACTIONS = Set.of("DELETE_FIELD", "CHANGE_TYPE");
+    private static final Set<String> SUPPORTED_FIELD_CHANGE_ACTIONS = Set.of(
+            "DELETE_FIELD",
+            "CHANGE_TYPE",
+            "CHANGE_DATA_TYPE",
+            "DELETE_DICT_ITEM",
+            "CHANGE_PERMISSION",
+            "CHANGE_VIRTUAL_SOURCE");
 
     private final DecisionUsageIndexService usageIndexService;
     private final DecisionImpactAckService impactAckService;
@@ -72,7 +78,7 @@ public class DecisionImpactServiceImpl implements DecisionImpactService {
     public DecisionFieldPreflightDTO preflightFieldChange(DecisionFieldPreflightRequest request) {
         String action = normalizeFieldChangeAction(request.getAction());
         DecisionFieldImpactDTO impact = getFieldImpact(request.getFieldRef());
-        boolean noOpTypeChange = "CHANGE_TYPE".equals(action)
+        boolean noOpTypeChange = "CHANGE_DATA_TYPE".equals(action)
                 && sameDataType(request.getCurrentDataType(), request.getNextDataType());
         DecisionImpactRiskDTO risk = noOpTypeChange
                 ? nonBlockingRisk("No schema type change detected")
@@ -86,6 +92,10 @@ public class DecisionImpactServiceImpl implements DecisionImpactService {
         dto.setAction(action);
         dto.setCurrentDataType(request.getCurrentDataType());
         dto.setNextDataType(request.getNextDataType());
+        dto.setDictCode(request.getDictCode());
+        dto.setDictValue(request.getDictValue());
+        dto.setNextPermission(request.getNextPermission());
+        dto.setNextSourceRef(request.getNextSourceRef());
         dto.setReferences(impact.getReferences());
         dto.setRisk(risk);
         dto.setRequiresAcknowledgement(requiresAcknowledgement);
@@ -94,7 +104,7 @@ public class DecisionImpactServiceImpl implements DecisionImpactService {
         dto.setMessage(preflightMessage(blocked, requiresAcknowledgement, risk));
         if (requiresAcknowledgement && acknowledged && !blocked) {
             impactAckService.recordAcknowledgement(
-                    "DELETE_FIELD".equals(action) ? "FIELD_DELETE" : "FIELD_TYPE_CHANGE",
+                    acknowledgementActionType(action),
                     "FIELD",
                     null,
                     null,
@@ -148,7 +158,18 @@ public class DecisionImpactServiceImpl implements DecisionImpactService {
             throw new ValidationException(ResponseCode.CommonValidationFailed,
                     "Unsupported field preflight action: " + action);
         }
-        return normalized;
+        return "CHANGE_TYPE".equals(normalized) ? "CHANGE_DATA_TYPE" : normalized;
+    }
+
+    private String acknowledgementActionType(String action) {
+        return switch (action) {
+            case "DELETE_FIELD" -> "FIELD_DELETE";
+            case "CHANGE_DATA_TYPE" -> "FIELD_TYPE_CHANGE";
+            case "DELETE_DICT_ITEM" -> "FIELD_DICT_ITEM_DELETE";
+            case "CHANGE_PERMISSION" -> "FIELD_PERMISSION_CHANGE";
+            case "CHANGE_VIRTUAL_SOURCE" -> "FIELD_VIRTUAL_SOURCE_CHANGE";
+            default -> "FIELD_CHANGE";
+        };
     }
 
     private boolean sameDataType(String left, String right) {

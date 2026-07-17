@@ -119,4 +119,9 @@ public interface AutomationService {
      * Manually trigger an automation for testing
      */
     AutomationLogDTO triggerManually(String pid, String recordPid);
+
+    /**
+     * Manually trigger an automation for testing with an explicit sample context.
+     */
+    AutomationLogDTO triggerManually(String pid, String recordPid, Map<String, Object> context);
 }

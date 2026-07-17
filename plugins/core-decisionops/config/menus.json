@@ -2,9 +2,9 @@
   {
     "code": "decisionops_console",
     "parentCode": null,
-    "name": "决策中心",
-    "name:zh-CN": "决策中心",
-    "name:en": "DecisionOps",
+    "name": "规则中心",
+    "name:zh-CN": "规则中心",
+    "name:en": "Rule Center",
     "path": "/decision-ops",
     "component": null,
     "icon": "partition",
@@ -51,7 +51,7 @@
     "icon": "table",
     "type": 1,
     "permissionCode": "decision.definition.manage",
-    "orderNo": 25,
+    "orderNo": 26,
     "visible": true,
     "extension": {
       "platforms": [
@@ -64,10 +64,34 @@
     }
   },
   {
+    "code": "decisionops_condition_fragments",
+    "parentCode": "decisionops_console",
+    "name": "条件片段库",
+    "name:zh-CN": "条件片段库",
+    "name:en": "Condition Fragments",
+    "path": "/p/decisionops_condition_fragments",
+    "pageKey": "decisionops_condition_fragments_list",
+    "component": null,
+    "icon": "blocks",
+    "type": 1,
+    "permissionCode": "decision.definition.manage",
+    "orderNo": 25,
+    "visible": true,
+    "extension": {
+      "platforms": [
+        "web"
+      ],
+      "implementation": "dsl",
+      "customBlocks": [
+        "ConditionFragmentLibraryBlock"
+      ]
+    }
+  },
+  {
     "code": "decisionops_event_policies",
     "parentCode": "decisionops_console",
-    "name": "Event Policy",
-    "name:zh-CN": "Event Policy",
+    "name": "事件策略",
+    "name:zh-CN": "事件策略",
     "name:en": "Event Policy",
     "path": "/p/decisionops_event_policies",
     "pageKey": "decisionops_event_policies_list",
@@ -75,7 +99,7 @@
     "icon": "bolt",
     "type": 1,
     "permissionCode": "decision.policy.read",
-    "orderNo": 26,
+    "orderNo": 27,
     "visible": true,
     "extension": {
       "platforms": [
@@ -96,7 +120,7 @@
     "icon": "split",
     "type": 1,
     "permissionCode": "decision.definition.read",
-    "orderNo": 27,
+    "orderNo": 28,
     "visible": true,
     "extension": {
       "platforms": [
@@ -120,7 +144,7 @@
     "icon": "activity",
     "type": 1,
     "permissionCode": "decision.definition.read",
-    "orderNo": 28,
+    "orderNo": 29,
     "visible": true,
     "extension": {
       "platforms": [
@@ -141,7 +165,7 @@
     "icon": "database",
     "type": 1,
     "permissionCode": "decision.definition.read",
-    "orderNo": 29,
+    "orderNo": 30,
     "visible": true,
     "extension": {
       "platforms": [
@@ -162,7 +186,7 @@
     "icon": "plug",
     "type": 1,
     "permissionCode": "sys.connector.update",
-    "orderNo": 30,
+    "orderNo": 31,
     "visible": true,
     "extension": {
       "platforms": [
@@ -183,7 +207,7 @@
     "icon": "webhook",
     "type": 1,
     "permissionCode": "admin_webhook",
-    "orderNo": 31,
+    "orderNo": 32,
     "visible": true,
     "extension": {
       "platforms": [

@@ -22,10 +22,10 @@ export default function ProcessStatusPage() {
     return (
       <div className="bg-bg flex h-screen items-center justify-center">
         <div className="text-text-2 text-center">
-          <p className="mb-2 text-lg font-medium">Missing parameters</p>
+          <p className="mb-2 text-lg font-medium">缺少流程查询参数</p>
           <p className="text-sm">
-            Provide <code>processInstanceId</code> or <code>businessKey</code> (+ optional{' '}
-            <code>processKey</code>) as query parameters.
+            请在查询参数中提供 <code>processInstanceId</code> 或 <code>businessKey</code>
+            （可选 <code>processKey</code>）。
           </p>
         </div>
       </div>

@@ -168,6 +168,7 @@ export function UserTaskEditor({
         title="规则中心分派"
         enabledLabel=""
         enabled={Boolean(config?.assignmentRuleBinding)}
+        defaultEnabled
         value={config?.assignmentRuleBinding}
         mode="decision"
         consumerCode={processKey}

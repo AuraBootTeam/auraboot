@@ -8,8 +8,9 @@ import java.util.Map;
 /**
  * Standard, immutable-by-convention input snapshot for decision evaluation
  * (docs/1.md §11). Each scope (record / before / after / process / task / sla / actor /
- * tenant / time / event / meta / env) holds a nested map. Rule evaluation does not touch
- * the database; external info must be injected up-front through whitelisted resolvers.
+ * tenant / time / event / meta / env) holds a nested map. The pure AST runtime does not
+ * touch the database; service-layer whitelisted resolvers may enrich this snapshot before
+ * evaluation starts.
  *
  * <p>Path resolution distinguishes <em>missing</em> from <em>present-but-null</em>, which
  * the three-valued logic depends on: a missing field yields UNKNOWN, while IS_NULL of a

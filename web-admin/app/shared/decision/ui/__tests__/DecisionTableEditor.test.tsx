@@ -79,6 +79,125 @@ describe('DecisionTableEditor', () => {
     expect(dump.inputs[1].path).toBe('data.risk');
   });
 
+  it('selects a fact field for a DMN input and migrates existing rule cells', () => {
+    function FieldPickerHarness() {
+      const [v, setV] = useState<DecisionTable>({
+        ...base(),
+        rules: [
+          {
+            ruleId: 'row-1',
+            priority: 10,
+            when: { amount: { operator: 'EQ', value: '', feel: '> 30' } },
+            then: { route: 'escalate' },
+          },
+        ],
+      });
+      return (
+        <>
+          <DecisionTableEditor
+            value={v}
+            onChange={setV}
+            fieldOptions={[
+              {
+                scope: 'sla',
+                path: 'deadlineMinutes',
+                label: '截止分钟',
+                dataType: 'integer',
+                options: ['30', '60', '120'],
+              },
+              {
+                scope: 'record',
+                path: 'data.targetKey',
+                label: 'SLA 节点',
+                dataType: 'string',
+                modelName: 'SLA 配置',
+              },
+            ]}
+          />
+          <div data-testid="dump">{JSON.stringify(v)}</div>
+        </>
+      );
+    }
+
+    render(<FieldPickerHarness />);
+
+    fireEvent.click(screen.getByTestId('dt-input-field-picker-0'));
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('SLA 上下文');
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('整数');
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).not.toHaveTextContent('sla.deadlineMinutes');
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).not.toHaveTextContent('record.data.targetKey');
+    fireEvent.change(screen.getByLabelText('input-field-search-0'), {
+      target: { value: '截止' },
+    });
+    fireEvent.click(screen.getByTestId('dt-input-field-option-0-sla-deadlineMinutes'));
+
+    const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as DecisionTable;
+    expect(dump.inputs[0]).toMatchObject({
+      id: 'sla_deadlineMinutes',
+      label: '截止分钟',
+      scope: 'sla',
+      path: 'deadlineMinutes',
+      dataType: 'integer',
+      allowedValues: ['30', '60', '120'],
+    });
+    expect(dump.rules[0].when.sla_deadlineMinutes).toMatchObject({
+      operator: 'EQ',
+      value: '',
+      feel: '> 30',
+    });
+    expect(dump.rules[0].when.amount).toBeUndefined();
+  });
+
+  it('renders fact catalog value labels in DMN cells while preserving raw dict values', () => {
+    function DictLabelHarness() {
+      const [v, setV] = useState<DecisionTable>(base());
+      return (
+        <>
+          <DecisionTableEditor
+            value={v}
+            onChange={setV}
+            fieldOptions={[
+              {
+                scope: 'record',
+                path: 'data.wd_req_type',
+                label: '请假类型',
+                dataType: 'dict',
+                options: ['annual', 'sick'],
+                valueLabels: {
+                  annual: '年假',
+                  sick: '病假',
+                },
+              },
+            ]}
+          />
+          <div data-testid="dump">{JSON.stringify(v)}</div>
+        </>
+      );
+    }
+
+    render(<DictLabelHarness />);
+
+    fireEvent.click(screen.getByTestId('dt-input-field-picker-0'));
+    fireEvent.click(screen.getByTestId('dt-input-field-option-0-record-data_wd_req_type'));
+    fireEvent.click(screen.getByTestId('dt-add-rule'));
+
+    const selector = screen.getByLabelText('val-0-record_data_wd_req_type') as HTMLSelectElement;
+    expect(selector).toHaveTextContent('年假');
+    expect(selector).toHaveTextContent('病假');
+    expect(selector).not.toHaveTextContent('annual');
+
+    fireEvent.change(selector, { target: { value: 'annual' } });
+
+    const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as DecisionTable;
+    expect(dump.inputs[0]).toMatchObject({
+      id: 'record_data_wd_req_type',
+      label: '请假类型',
+      allowedValues: ['annual', 'sick'],
+      valueLabels: { annual: '年假', sick: '病假' },
+    });
+    expect(dump.rules[0].when.record_data_wd_req_type.value).toBe('annual');
+  });
+
   it('exposes temporal FEEL data types for input columns', () => {
     render(<Harness />);
     fireEvent.click(screen.getByTestId('dt-add-input'));
@@ -145,13 +264,14 @@ describe('DecisionTableEditor', () => {
 
     expect(onAnalyze).toHaveBeenCalledOnce();
     expect(screen.getByTestId('dt-analysis-panel')).toHaveTextContent('存在阻断问题');
-    expect(screen.getByTestId('dt-metric-gap')).toHaveTextContent('Gap 1');
-    expect(screen.getByTestId('dt-metric-conflict')).toHaveTextContent('Conflict 1');
-    expect(screen.getByTestId('dt-analysis-issue-0')).toHaveTextContent('DMN_CONFLICT');
-    expect(screen.getByTestId('dt-analysis-issue-0')).toHaveTextContent('rules r1,r2');
-    expect(screen.getByTestId('dt-analysis-issue-1')).toHaveTextContent('DMN_CONTINUOUS_GAP');
-    expect(screen.getByTestId('dt-analysis-metadata-1')).toHaveTextContent('gapRanges: [10..20]');
-    expect(screen.getByTestId('dt-analysis-panel')).toHaveTextContent('continuous inputs 1');
+    expect(screen.getByTestId('dt-metric-gap')).toHaveTextContent('缺口 1');
+    expect(screen.getByTestId('dt-metric-conflict')).toHaveTextContent('冲突 1');
+    expect(screen.getByTestId('dt-analysis-issue-0')).toHaveTextContent('输出冲突');
+    expect(screen.getByTestId('dt-analysis-issue-0')).not.toHaveTextContent('DMN_CONFLICT');
+    expect(screen.getByTestId('dt-analysis-issue-0')).toHaveTextContent('规则 r1,r2');
+    expect(screen.getByTestId('dt-analysis-issue-1')).toHaveTextContent('连续区间缺口');
+    expect(screen.getByTestId('dt-analysis-metadata-1')).toHaveTextContent('缺口范围: [10..20]');
+    expect(screen.getByTestId('dt-analysis-panel')).toHaveTextContent('连续输入 1');
     expect(screen.getByTestId('dt-analysis-panel')).toHaveTextContent('12ms');
   });
 

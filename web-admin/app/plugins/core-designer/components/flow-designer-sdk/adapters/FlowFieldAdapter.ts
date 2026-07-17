@@ -36,6 +36,13 @@ export function useFlowFieldAdapter<T>(props: FlowFieldAdapterProps<T>): FieldAd
   const node = nodes.find((n) => n.id === targetNodeId);
 
   const value = node?.data.config?.[fieldKey] as T;
+  const context = useMemo(
+    () => ({
+      ...(node?.data.config ?? {}),
+      ...deriveFlowExpressionContext(nodes, targetNodeId),
+    }),
+    [node?.data.config, nodes, targetNodeId],
+  );
 
   const setValue = useCallback(
     (newValue: T) => {
@@ -58,9 +65,30 @@ export function useFlowFieldAdapter<T>(props: FlowFieldAdapterProps<T>): FieldAd
       disabled,
       required,
       readOnly,
+      context,
     }),
-    [value, setValue, fieldError?.message, disabled, required, readOnly],
+    [value, setValue, fieldError?.message, disabled, required, readOnly, context],
   );
 
   return adapter;
+}
+
+function deriveFlowExpressionContext(
+  nodes: ReturnType<typeof useFlowStore.getState>['nodes'],
+  targetNodeId: string | null,
+): Record<string, unknown> {
+  const selected = nodes.find((node) => node.id === targetNodeId);
+  const trigger = selected && isTriggerNode(selected) ? selected : nodes.find(isTriggerNode);
+  if (!trigger) return {};
+  const config = trigger.data.config ?? {};
+  return {
+    _flowTriggerType: config.triggerType,
+    _flowTriggerModelCode: config.modelCode,
+    _flowTriggerTestContext: config.testContext,
+    _flowTriggerRuleBinding: config.ruleBinding,
+  };
+}
+
+function isTriggerNode(node: ReturnType<typeof useFlowStore.getState>['nodes'][number]): boolean {
+  return node.type.startsWith('trigger-') || typeof node.data.config?.triggerType === 'string';
 }

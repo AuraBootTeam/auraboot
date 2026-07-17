@@ -8,6 +8,8 @@ import {
   type NodeRuntimeStatus,
 } from '../runtime/NodeRuntimeStatusContext';
 import { cn } from '~/utils/cn';
+import { resolveIcon } from '~/utils/icon-resolver';
+import type { FlowNodeAvailabilityMetadata, FlowNodeDefinition } from '../nodes/types';
 
 const categoryColors: Record<string, string> = {
   trigger: 'border-green-500 bg-green-50',
@@ -36,12 +38,44 @@ const runtimeStatusBadge: Record<NodeRuntimeStatus, { label: string; cls: string
   skipped: { label: '–', cls: 'bg-gray-400 text-white' },
 };
 
+function renderNodeIcon(icon: unknown, label: string) {
+  if (React.isValidElement(icon)) return icon;
+  if (typeof icon === 'string') {
+    const trimmed = icon.trim();
+    if (trimmed.length > 0 && trimmed.length <= 2 && !/[A-Za-z0-9_-]/.test(trimmed)) {
+      return <span aria-hidden="true">{trimmed}</span>;
+    }
+    return resolveIcon(trimmed || null, label, 22);
+  }
+  return resolveIcon(null, label, 22);
+}
+
+function resolveSmartText(
+  st: (key: string) => string,
+  key: string,
+  fallback: string,
+) {
+  const value = st(key);
+  return value && value !== key ? value : fallback;
+}
+
+function nodeAvailability(
+  definition: FlowNodeDefinition | undefined,
+): FlowNodeAvailabilityMetadata | undefined {
+  const availability = definition?.metadata?.availability;
+  return availability && typeof availability === 'object' ? availability : undefined;
+}
+
 export function DefaultFlowNode({ id, data, selected, type }: NodeProps) {
   const st = useSmartText();
   const definition = nodeRegistry.get(type || (data.type as string));
   const runtimeStatus = useNodeRuntimeStatus(id);
+  const availability = nodeAvailability(definition);
+  const unavailable = availability?.unavailable === true;
 
   const categoryColor = categoryColors[definition?.category || 'default'] || categoryColors.default;
+  const label = st(definition?.label || (data.label as string) || type || 'Unknown')
+    || String((data.label as string | undefined) || type || 'Unknown');
 
   return (
     <div
@@ -71,6 +105,16 @@ export function DefaultFlowNode({ id, data, selected, type }: NodeProps) {
         </span>
       )}
 
+      {unavailable && (
+        <span
+          data-testid={`flow-node-${id}-availability-badge`}
+          title={availability?.reason}
+          className="absolute -top-2 left-3 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 shadow-sm"
+        >
+          {resolveSmartText(st, '$i18n:flow.availability.unavailable', '不可用')}
+        </span>
+      )}
+
       {/* Input handle - not for triggers */}
       {definition?.category !== 'trigger' && (
         <Handle
@@ -83,10 +127,12 @@ export function DefaultFlowNode({ id, data, selected, type }: NodeProps) {
 
       {/* Node content */}
       <div className="flex items-center gap-2">
-        <span className="text-xl">{definition?.icon || '📦'}</span>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/70 text-gray-700 shadow-sm">
+          {renderNodeIcon(definition?.icon, label)}
+        </span>
         <div>
           <div className="text-sm font-medium text-gray-900">
-            {st(definition?.label || (data.label as string) || type || 'Unknown')}
+            {label}
           </div>
           {definition?.description && (
             <div className="text-xs text-gray-500">{st(definition.description)}</div>

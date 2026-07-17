@@ -1,14 +1,16 @@
 import { expect, type Browser, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import { loginViaUI } from '../../../helpers/wd-fixtures';
+import { ensureSidebarExpanded } from '../../helpers/index';
 
 export async function navigateToTaskCenter(page: Page): Promise<void> {
   await page.goto('/dashboards', { waitUntil: 'domcontentloaded' });
+  await ensureSidebarExpanded(page);
 
-  const nav = page.locator('nav').first();
-  await nav.waitFor({ state: 'visible', timeout: 10_000 });
+  const nav = page.locator('nav');
+  await nav.first().waitFor({ state: 'visible', timeout: 10_000 });
 
   const bpmParent = nav
-    .getByRole('button', { name: /流程管理|Process Management/i })
+    .getByRole('button', { name: /流程管理|Process Management|menu\.bpm_management|BPM/i })
     .first();
   if (await bpmParent.isVisible({ timeout: 5_000 }).catch(() => false)) {
     await bpmParent.scrollIntoViewIfNeeded();
@@ -17,9 +19,13 @@ export async function navigateToTaskCenter(page: Page): Promise<void> {
 
   const taskCenterLink = nav.locator('a[href*="task-center"]').first();
   await taskCenterLink.waitFor({ state: 'attached', timeout: 8_000 });
-  await taskCenterLink.evaluate((el: HTMLElement) => el.click());
+  await taskCenterLink.scrollIntoViewIfNeeded();
+  await Promise.all([
+    page.waitForURL(/\/bpm\/task-center/, { timeout: 20_000 }),
+    taskCenterLink.evaluate((el: HTMLElement) => el.click()),
+  ]);
+  await page.waitForLoadState('domcontentloaded');
 
-  await page.waitForURL(/task-center/, { timeout: 20_000 });
   await expect(page.locator('h1:has-text("任务中心")')).toBeVisible({ timeout: 10_000 });
 
   const tableOrEmpty = page.locator('table').or(page.locator('text=暂无任务'));

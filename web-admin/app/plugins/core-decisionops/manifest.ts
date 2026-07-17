@@ -2,9 +2,9 @@ import type { PluginManifest } from '@auraboot/plugin-sdk'
 
 export const manifest: PluginManifest = {
   code: 'core.decisionops',
-  name: 'DecisionOps',
+  name: 'Rule Center',
   version: '0.1.0',
-  description: 'DecisionOps console — decision definitions, condition designer, execution logs, governance.',
+  description: 'Rule Center console — condition fragments, strategy studio, decision definitions, execution logs, governance.',
   kind: 'core',
   visibility: 'public',
   permissions: ['decision.definition.read'],

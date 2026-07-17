@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { TaskInstance, ProcessInstance, WorkbenchData } from '../services/bpmWorkbenchService';
 import * as workbenchService from '../services/bpmWorkbenchService';
+import * as bpmFormService from '../services/bpmFormService';
 import * as slaService from '../services/slaService';
 import * as notifyService from '../services/bpmNotifyService';
 import type { DashboardData } from '../services/slaService';
@@ -153,7 +154,12 @@ export function useTaskCenter() {
     async (comment: string) => {
       if (!dialog.task) return;
       try {
-        await workbenchService.approveTask(dialog.task.taskId, comment);
+        const formData = await bpmFormService.getTaskForm(dialog.task.taskId);
+        const variables = bpmFormService.resolveTaskActionVariables(
+          formData.taskActions,
+          'approve',
+        );
+        await workbenchService.approveTask(dialog.task.taskId, comment, variables);
         toastRef.current.showSuccessToast('任务已通过');
         closeDialog();
         fetchData();
@@ -168,7 +174,12 @@ export function useTaskCenter() {
     async (comment: string) => {
       if (!dialog.task) return;
       try {
-        await workbenchService.rejectTask(dialog.task.taskId, comment);
+        const formData = await bpmFormService.getTaskForm(dialog.task.taskId);
+        const variables = bpmFormService.resolveTaskActionVariables(
+          formData.taskActions,
+          'reject',
+        );
+        await workbenchService.rejectTask(dialog.task.taskId, comment, variables);
         toastRef.current.showSuccessToast('任务已驳回');
         closeDialog();
         fetchData();

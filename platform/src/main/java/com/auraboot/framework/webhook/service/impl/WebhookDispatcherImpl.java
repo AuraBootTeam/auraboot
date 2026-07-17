@@ -8,6 +8,7 @@ import com.auraboot.framework.webhook.entity.WebhookDeliveryLog;
 import com.auraboot.framework.webhook.entity.WebhookSubscription;
 import com.auraboot.framework.webhook.mapper.WebhookDeliveryLogMapper;
 import com.auraboot.framework.webhook.mapper.WebhookSubscriptionMapper;
+import com.auraboot.framework.webhook.service.WebhookDispatchResult;
 import com.auraboot.framework.webhook.service.WebhookDispatcher;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -71,24 +72,39 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
     @Override
     @Async("eventTaskExecutor")
     public void dispatch(String eventType, Map<String, Object> payload, Long tenantId) {
+        dispatchInternal(eventType, payload, tenantId);
+    }
+
+    @Override
+    public WebhookDispatchResult dispatchTracked(String eventType, Map<String, Object> payload, Long tenantId) {
+        return dispatchInternal(eventType, payload, tenantId);
+    }
+
+    private WebhookDispatchResult dispatchInternal(String eventType, Map<String, Object> payload, Long tenantId) {
         List<WebhookSubscription> subscriptions =
                 subscriptionMapper.findByEventType(tenantId, eventType);
 
+        List<WebhookDispatchResult.Receipt> receipts = new ArrayList<>();
         for (WebhookSubscription subscription : subscriptions) {
-            deliverWithRetry(subscription, payload);
+            WebhookDispatchResult.Receipt receipt = deliverWithRetry(subscription, payload);
+            if (receipt != null) {
+                receipts.add(receipt);
+            }
         }
+        return new WebhookDispatchResult(receipts);
     }
 
-    private void deliverWithRetry(WebhookSubscription subscription, Map<String, Object> payload) {
+    private WebhookDispatchResult.Receipt deliverWithRetry(WebhookSubscription subscription, Map<String, Object> payload) {
         if (!matchesFilter(subscription, payload)) {
             log.debug("Webhook filtered out: subscription={}, filter={}",
                     subscription.getPid(), subscription.getFilterExpression());
-            return;
+            return null;
         }
-        deliverAttempt(subscription, payload, 0);
+        WebhookDeliveryLog logEntry = deliverAttempt(subscription, payload, 0);
+        return receiptFrom(subscription, logEntry);
     }
 
-    private void deliverAttempt(WebhookSubscription subscription, Map<String, Object> payload, int retryCount) {
+    private WebhookDeliveryLog deliverAttempt(WebhookSubscription subscription, Map<String, Object> payload, int retryCount) {
         int maxRetries = subscription.getMaxRetries() != null ? subscription.getMaxRetries() : 3;
 
         WebhookDeliveryLog logEntry = new WebhookDeliveryLog();
@@ -187,6 +203,21 @@ public class WebhookDispatcherImpl implements WebhookDispatcher {
                         maxRetries, subscription.getTargetUrl());
             }
         }
+        return logEntry;
+    }
+
+    private WebhookDispatchResult.Receipt receiptFrom(WebhookSubscription subscription, WebhookDeliveryLog logEntry) {
+        if (logEntry == null) {
+            return null;
+        }
+        return new WebhookDispatchResult.Receipt(
+                subscription.getPid(),
+                logEntry.getPid(),
+                logEntry.getEventId(),
+                logEntry.getDeliveryStatus(),
+                "success".equalsIgnoreCase(logEntry.getDeliveryStatus()),
+                logEntry.getErrorMessage()
+        );
     }
 
     private boolean matchesFilter(WebhookSubscription sub, Map<String, Object> payload) {

@@ -33,6 +33,7 @@ import {
   getProcessInstanceStatusByBusinessKey,
   type ProcessInstanceNodeStatus,
 } from '~/plugins/core-designer/components/bpmn-designer/services/bpmnService';
+import { BpmRuleTraceSection } from '~/plugins/core-bpm/components/panel/BpmRuleTraceSection';
 import { ResultHelper } from '~/utils/type';
 
 const nodeTypes: NodeTypes = {
@@ -95,7 +96,7 @@ export function ProcessStatusViewer({
         } else if (businessKey) {
           statusResult = await getProcessInstanceStatusByBusinessKey(businessKey, processKey);
         } else {
-          setError('Missing processInstanceId or businessKey');
+          setError('缺少流程实例 ID 或业务键');
           setLoading(false);
           return;
         }
@@ -103,7 +104,7 @@ export function ProcessStatusViewer({
         if (cancelled) return;
 
         if (!ResultHelper.isSuccess(statusResult) || !statusResult.data) {
-          setError(statusResult.desc || 'Failed to load process instance status');
+          setError(statusResult.desc || '流程实例状态加载失败');
           setLoading(false);
           return;
         }
@@ -114,7 +115,7 @@ export function ProcessStatusViewer({
         // 2. Load process definition to get the visual layout
         const processDefId = status.processDefinitionId;
         if (!processDefId) {
-          setError('Process definition ID not found in status');
+          setError('状态中缺少流程定义 ID');
           setLoading(false);
           return;
         }
@@ -123,7 +124,7 @@ export function ProcessStatusViewer({
         if (cancelled) return;
 
         if (!ResultHelper.isSuccess(defResult) || !defResult.data) {
-          setError('Failed to load process definition layout');
+          setError('流程定义布局加载失败');
           setLoading(false);
           return;
         }
@@ -142,7 +143,7 @@ export function ProcessStatusViewer({
         });
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Unknown error');
+          setError(err instanceof Error ? err.message : '未知错误');
         }
       } finally {
         if (!cancelled) {
@@ -171,17 +172,19 @@ export function ProcessStatusViewer({
       const completedNode = instanceStatus.completedNodes.find((n) => n.nodeId === node.id);
 
       if (activeNode) {
+        const nodeStatus = activeNode.status === 'failed' ? 'failed' : 'active';
         setSelectedNodeDetail({
           nodeId: node.id,
           name: node.data.label,
-          status: 'active',
+          status: nodeStatus,
           assignee: activeNode.assignee,
         });
       } else if (completedNode) {
+        const nodeStatus = completedNode.status === 'failed' ? 'failed' : 'completed';
         setSelectedNodeDetail({
           nodeId: node.id,
           name: node.data.label,
-          status: 'completed',
+          status: nodeStatus,
           completedAt: completedNode.completedAt,
           completedBy: completedNode.completedBy,
         });
@@ -199,7 +202,7 @@ export function ProcessStatusViewer({
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
-        <div className="text-gray-500">Loading process status...</div>
+        <div className="text-gray-500">正在加载流程状态...</div>
       </div>
     );
   }
@@ -223,7 +226,10 @@ export function ProcessStatusViewer({
       {/* Header bar */}
       <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-semibold text-gray-800">Process Status</h2>
+          <h2 className="text-lg font-semibold text-gray-800">
+            流程状态
+            <span className="sr-only">Process Status</span>
+          </h2>
           {instanceStatus?.instanceId && (
             <span className="text-sm text-gray-500">{instanceStatus.instanceId}</span>
           )}
@@ -260,64 +266,83 @@ export function ProcessStatusViewer({
         {selectedNodeDetail && (
           <div className="w-72 overflow-auto border-l border-gray-200 bg-white p-4">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-gray-700">Node Detail</h3>
+              <h3 className="text-sm font-semibold text-gray-700">
+                节点详情
+                <span className="sr-only">Node Detail</span>
+              </h3>
               <button
                 onClick={() => setSelectedNodeDetail(null)}
                 className="text-sm text-gray-400 hover:text-gray-600"
               >
-                Close
+                关闭
               </button>
             </div>
 
             <div className="space-y-3">
               <DetailRow
-                label="Name"
+                label="名称"
                 value={selectedNodeDetail.name || selectedNodeDetail.nodeId}
               />
-              <DetailRow label="Node ID" value={selectedNodeDetail.nodeId} />
+              <DetailRow label="节点 ID" value={selectedNodeDetail.nodeId} />
               <DetailRow
-                label="Status"
+                label="状态"
                 value={<StatusBadge status={selectedNodeDetail.status} />}
               />
               {selectedNodeDetail.assignee && (
-                <DetailRow label="Assignee" value={selectedNodeDetail.assignee} />
+                <DetailRow label="当前处理人" value={selectedNodeDetail.assignee} />
               )}
               {selectedNodeDetail.completedAt && (
                 <DetailRow
-                  label="Completed At"
+                  label="完成时间"
                   value={formatDateTime(selectedNodeDetail.completedAt)}
                 />
               )}
               {selectedNodeDetail.completedBy && (
-                <DetailRow label="Completed By" value={selectedNodeDetail.completedBy} />
+                <DetailRow label="完成人" value={selectedNodeDetail.completedBy} />
               )}
             </div>
           </div>
         )}
       </div>
+
+      {instanceStatus?.instanceId && (
+        <div
+          data-testid="bpm-process-status-rule-trace"
+          className="max-h-72 overflow-auto border-t border-gray-200 bg-gray-50 p-3"
+        >
+          <BpmRuleTraceSection processInstanceId={instanceStatus.instanceId} compact />
+        </div>
+      )}
     </div>
   );
 }
 
 function StatusBadge({ status }: { status: string }) {
   const normalized = (status ?? '').toLowerCase();
-  const config: Record<string, { label: string; bg: string; text: string }> = {
-    running: { label: 'Running', bg: 'bg-blue-100', text: 'text-blue-700' },
-    completed: { label: 'Completed', bg: 'bg-green-100', text: 'text-green-700' },
-    suspended: { label: 'Suspended', bg: 'bg-yellow-100', text: 'text-yellow-700' },
-    terminated: { label: 'Terminated', bg: 'bg-red-100', text: 'text-red-700' },
-    aborted: { label: 'Terminated', bg: 'bg-red-100', text: 'text-red-700' },
-    cancelled: { label: 'Cancelled', bg: 'bg-red-100', text: 'text-red-700' },
-    active: { label: 'Active', bg: 'bg-blue-100', text: 'text-blue-700' },
-    idle: { label: 'Not Reached', bg: 'bg-gray-100', text: 'text-gray-500' },
+  const config: Record<string, { label: string; compatLabel: string; bg: string; text: string }> = {
+    running: { label: '运行中', compatLabel: 'Running', bg: 'bg-blue-100', text: 'text-blue-700' },
+    completed: { label: '已完成', compatLabel: 'Completed', bg: 'bg-green-100', text: 'text-green-700' },
+    suspended: { label: '已挂起', compatLabel: 'Suspended', bg: 'bg-yellow-100', text: 'text-yellow-700' },
+    terminated: { label: '已终止', compatLabel: 'Terminated', bg: 'bg-red-100', text: 'text-red-700' },
+    aborted: { label: '已终止', compatLabel: 'Terminated', bg: 'bg-red-100', text: 'text-red-700' },
+    cancelled: { label: '已取消', compatLabel: 'Cancelled', bg: 'bg-red-100', text: 'text-red-700' },
+    failed: { label: '失败关闭', compatLabel: 'Failed', bg: 'bg-red-100', text: 'text-red-700' },
+    active: { label: '进行中', compatLabel: 'Active', bg: 'bg-blue-100', text: 'text-blue-700' },
+    idle: { label: '未到达', compatLabel: 'Not Reached', bg: 'bg-gray-100', text: 'text-gray-500' },
   };
-  const c = config[normalized] ?? { label: status, bg: 'bg-gray-100', text: 'text-gray-700' };
+  const c = config[normalized] ?? {
+    label: status,
+    compatLabel: status,
+    bg: 'bg-gray-100',
+    text: 'text-gray-700',
+  };
 
   return (
     <span
       className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${c.bg} ${c.text}`}
     >
-      {c.label}
+      <span aria-hidden="true">{c.label}</span>
+      <span className="sr-only">{c.compatLabel}</span>
     </span>
   );
 }
@@ -333,7 +358,7 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
 
 function formatDateTime(iso: string): string {
   try {
-    return new Date(iso).toLocaleString();
+    return new Date(iso).toLocaleString('zh-CN');
   } catch {
     return iso;
   }

@@ -219,6 +219,10 @@ public class MetaContext {
         MEMBER_ID.set(memberId);
     }
 
+    public static void clearMemberId() {
+        MEMBER_ID.remove();
+    }
+
     /**
      * Set tenant-scoped context for system/background work with no user identity.
      */

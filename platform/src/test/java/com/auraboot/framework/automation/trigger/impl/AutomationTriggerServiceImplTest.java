@@ -7,12 +7,18 @@ import com.auraboot.framework.automation.entity.TriggerConfig;
 import com.auraboot.framework.automation.executor.ActionExecutor;
 import com.auraboot.framework.automation.mapper.AutomationLogMapper;
 import com.auraboot.framework.automation.mapper.AutomationMapper;
+import com.auraboot.framework.tenant.dao.entity.TenantMember;
+import com.auraboot.framework.tenant.service.TenantMemberService;
+import com.auraboot.framework.user.dao.entity.User;
+import com.auraboot.framework.user.mapper.UserMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -38,12 +44,25 @@ class AutomationTriggerServiceImplTest {
     @Mock
     private com.auraboot.framework.automation.bpm.AutomationProcessRuntime automationProcessRuntime;
 
+    @Mock
+    private UserMapper userMapper;
+
+    @Mock
+    private TenantMemberService tenantMemberService;
+
     private AutomationTriggerServiceImpl service;
 
     @BeforeEach
     void setUp() {
         service = new AutomationTriggerServiceImpl(
                 automationMapper, automationLogMapper, automationProcessRuntime);
+        ReflectionTestUtils.setField(service, "userMapper", userMapper);
+        ReflectionTestUtils.setField(service, "tenantMemberService", tenantMemberService);
+    }
+
+    @AfterEach
+    void tearDown() {
+        com.auraboot.framework.application.tenant.MetaContext.clear();
     }
 
     // =========================================================
@@ -189,10 +208,109 @@ class AutomationTriggerServiceImplTest {
     }
 
     @Test
+    void executeAutomation_noCallerContext_restoresActorUserAndMemberContext() {
+        com.auraboot.framework.application.tenant.MetaContext.clear();
+
+        Automation automation = new Automation();
+        automation.setPid("AUTO-ASYNC-1");
+        automation.setTenantId(7L);
+        automation.setTriggerType("on_record_create");
+        automation.setCreatedBy("USER-PID-1");
+
+        User user = new User();
+        user.setId(99L);
+        user.setPid("USER-PID-1");
+        user.setEmail("actor@example.com");
+        TenantMember member = new TenantMember();
+        member.setId(123L);
+        member.setTenantId(7L);
+        member.setUserId(99L);
+
+        when(userMapper.findUserIdInTenantByPid(7L, "USER-PID-1")).thenReturn(99L);
+        when(userMapper.selectById(99L)).thenReturn(user);
+        when(tenantMemberService.findByTenantIdAndUserId(7L, 99L)).thenReturn(member);
+
+        final Long[] tenantDuringRun = {null};
+        final Long[] userDuringRun = {null};
+        final String[] userPidDuringRun = {null};
+        final Long[] memberDuringRun = {null};
+        doAnswer(inv -> {
+            tenantDuringRun[0] = com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId();
+            userDuringRun[0] = com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId();
+            userPidDuringRun[0] = com.auraboot.framework.application.tenant.MetaContext.getCurrentUserPid();
+            memberDuringRun[0] = com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId();
+            return List.of();
+        }).when(automationProcessRuntime).run(any(), any(), any(), any());
+
+        AutomationLog result = service.executeAutomation(automation, "rec-1", Map.of("event", "create"));
+
+        assertThat(tenantDuringRun[0]).isEqualTo(7L);
+        assertThat(userDuringRun[0]).isEqualTo(99L);
+        assertThat(userPidDuringRun[0]).isEqualTo("USER-PID-1");
+        assertThat(memberDuringRun[0]).isEqualTo(123L);
+        assertThat(result.getStatus()).isEqualTo("success");
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isFalse();
+    }
+
+    @Test
+    void executeAutomation_tenantOnlyCallerContext_upgradesActorContextAndRestoresTenantOnlyContext() {
+        com.auraboot.framework.application.tenant.MetaContext.setSystemTenantContext(7L);
+        com.auraboot.framework.application.tenant.MetaContext.setEnvironmentId(88L);
+        com.auraboot.framework.application.tenant.MetaContext.setOtelTraceId("trace-tenant-only");
+
+        Automation automation = new Automation();
+        automation.setPid("AUTO-ASYNC-TENANT-ONLY");
+        automation.setTenantId(7L);
+        automation.setTriggerType("on_record_create");
+        automation.setCreatedBy("USER-PID-1");
+
+        User user = new User();
+        user.setId(99L);
+        user.setPid("USER-PID-1");
+        user.setUserName("automation-owner");
+        TenantMember member = new TenantMember();
+        member.setId(123L);
+        member.setTenantId(7L);
+        member.setUserId(99L);
+
+        when(userMapper.findUserIdInTenantByPid(7L, "USER-PID-1")).thenReturn(99L);
+        when(userMapper.selectById(99L)).thenReturn(user);
+        when(tenantMemberService.findByTenantIdAndUserId(7L, 99L)).thenReturn(member);
+
+        final Long[] tenantDuringRun = {null};
+        final Long[] userDuringRun = {null};
+        final String[] usernameDuringRun = {null};
+        final Long[] memberDuringRun = {null};
+        doAnswer(inv -> {
+            tenantDuringRun[0] = com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId();
+            userDuringRun[0] = com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId();
+            usernameDuringRun[0] = com.auraboot.framework.application.tenant.MetaContext.getCurrentUsername();
+            memberDuringRun[0] = com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId();
+            return List.of();
+        }).when(automationProcessRuntime).run(any(), any(), any(), any());
+
+        AutomationLog result = service.executeAutomation(automation, "rec-tenant-only", Map.of("event", "create"));
+
+        assertThat(tenantDuringRun[0]).isEqualTo(7L);
+        assertThat(userDuringRun[0]).isEqualTo(99L);
+        assertThat(usernameDuringRun[0]).isEqualTo("automation-owner");
+        assertThat(memberDuringRun[0]).isEqualTo(123L);
+        assertThat(result.getStatus()).isEqualTo("success");
+
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isTrue();
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId()).isEqualTo(7L);
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId()).isNull();
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId()).isNull();
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentEnvironmentId()).isEqualTo(88L);
+        assertThat(com.auraboot.framework.application.tenant.MetaContext.getOtelTraceId()).isEqualTo("trace-tenant-only");
+    }
+
+    @Test
     void executeAutomation_existingCallerContext_isLeftIntact() {
         // The record-trigger path already carries a MetaContext (the firing user). executeAutomation
         // must not clear a context it did not create.
         com.auraboot.framework.application.tenant.MetaContext.setContext(7L, 99L, "user-pid", "alice");
+        com.auraboot.framework.application.tenant.MetaContext.setMemberId(123L);
         try {
             Automation automation = new Automation();
             automation.setPid("AUTO-REC-1");
@@ -204,6 +322,9 @@ class AutomationTriggerServiceImplTest {
             // Caller's context survives.
             assertThat(com.auraboot.framework.application.tenant.MetaContext.exists()).isTrue();
             assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentTenantId()).isEqualTo(7L);
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentUserId()).isEqualTo(99L);
+            assertThat(com.auraboot.framework.application.tenant.MetaContext.getCurrentMemberId()).isEqualTo(123L);
+            verify(userMapper, never()).findUserIdInTenantByPid(any(), any());
         } finally {
             com.auraboot.framework.application.tenant.MetaContext.clear();
         }

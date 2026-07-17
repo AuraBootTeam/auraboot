@@ -25,6 +25,9 @@ public class PermissionAuditRecordPidResolver {
     private final DynamicDataMapper dynamicDataMapper;
 
     public String resolve(PermissionAuditLog logEntry) {
+        if (StringUtils.hasText(logEntry.getRecordPid())) {
+            return logEntry.getRecordPid();
+        }
         Long internalNumericId = logEntry.getRecordId();
         if (internalNumericId == null || !StringUtils.hasText(logEntry.getResourceCode())) {
             return null;

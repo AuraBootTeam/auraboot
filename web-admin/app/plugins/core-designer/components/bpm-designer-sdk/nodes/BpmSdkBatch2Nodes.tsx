@@ -206,6 +206,15 @@ ReceiveTaskNode.displayName = 'ReceiveTaskNode';
 // userTask
 // ---------------------------------------------------------------------------
 
+const ASSIGNEE_LABELS = {
+  role: '角色',
+  user: '用户',
+  dept: '部门',
+  starter: '发起人',
+  multi: '会签',
+  sequential: '顺序',
+} as const;
+
 /**
  * NOTE: the legacy UserTaskNode reads `useBPMNStore.instanceStatus` to look
  * up the LIVE assignee currently servicing the task in monitor mode (e.g.
@@ -234,25 +243,25 @@ export const UserTaskNode = memo(({ id, data, selected }: NodeProps) => {
   if (assignee?.type === 'role' && assignee.roleIds?.length) {
     assigneeSubtitle = (
       <div className="mt-0.5 w-full truncate px-1 text-center text-[10px] text-gray-500">
-        Role: {assignee.roleIds.join(',')}
+        {ASSIGNEE_LABELS.role}: {assignee.roleIds.join(',')}
       </div>
     );
   } else if (assignee?.type === 'user' && assignee.userIds?.length) {
     assigneeSubtitle = (
       <div className="mt-0.5 w-full truncate px-1 text-center text-[10px] text-gray-500">
-        User: {assignee.userIds.join(',')}
+        {ASSIGNEE_LABELS.user}: {assignee.userIds.join(',')}
       </div>
     );
   } else if (assignee?.type === 'dept' && assignee.deptIds?.length) {
     assigneeSubtitle = (
       <div className="mt-0.5 w-full truncate px-1 text-center text-[10px] text-gray-500">
-        Dept: {assignee.deptIds.join(',')}
+        {ASSIGNEE_LABELS.dept}: {assignee.deptIds.join(',')}
       </div>
     );
   } else if (assignee?.type === 'starter') {
     assigneeSubtitle = (
       <div className="mt-0.5 w-full truncate px-1 text-center text-[10px] text-gray-500">
-        Starter
+        {ASSIGNEE_LABELS.starter}
       </div>
     );
   } else if (assignee?.type === 'expression' && assignee.expression) {
@@ -289,9 +298,9 @@ export const UserTaskNode = memo(({ id, data, selected }: NodeProps) => {
             <span>{multiInstance.sequential ? '≡' : '|||'}</span>
             <span>
               {assignee?.assigneeMode === 'multi'
-                ? 'Countersign'
+                ? ASSIGNEE_LABELS.multi
                 : assignee?.assigneeMode === 'sequential'
-                  ? 'Sequential'
+                  ? ASSIGNEE_LABELS.sequential
                   : ''}
             </span>
           </div>

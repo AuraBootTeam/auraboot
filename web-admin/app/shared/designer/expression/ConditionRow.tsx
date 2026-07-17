@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ConditionRow as ConditionRowType, FieldOption, FieldCategory } from './types';
 import { OPERATORS_BY_CATEGORY } from './types';
+import { useSmartText } from '~/utils/i18n';
 
 interface ConditionRowProps {
   row: ConditionRowType;
@@ -10,6 +11,7 @@ interface ConditionRowProps {
 }
 
 export function ConditionRow({ row, fields, onChange, onDelete }: ConditionRowProps) {
+  const st = useSmartText();
   const selectedField = fields.find((f) => f.code === row.field);
   const category: FieldCategory = selectedField?.category ?? 'string';
   const operators = OPERATORS_BY_CATEGORY[category];
@@ -28,7 +30,7 @@ export function ConditionRow({ row, fields, onChange, onDelete }: ConditionRowPr
         onChange={(e) => onChange({ ...row, field: e.target.value })}
         data-testid="condition-field"
       >
-        <option value="">Select field...</option>
+        <option value="">{st('$i18n:expression.placeholder.selectField', '选择字段...')}</option>
         {groupedOptions(fields)}
       </select>
 
@@ -47,14 +49,14 @@ export function ConditionRow({ row, fields, onChange, onDelete }: ConditionRowPr
         className="h-7 flex-1 min-w-0 rounded border border-gray-300 bg-white px-1.5 text-xs focus:border-blue-500 focus:outline-none"
         value={row.value}
         onChange={(e) => onChange({ ...row, value: e.target.value })}
-        placeholder="Value..."
+        placeholder={st('$i18n:expression.placeholder.value', '输入值...')}
         data-testid="condition-value"
       />
 
       <button
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded text-gray-400 hover:bg-red-50 hover:text-red-500"
         onClick={onDelete}
-        title="Delete condition"
+        title={st('$i18n:expression.tooltip.deleteCondition', '删除条件')}
         data-testid="condition-delete"
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildFormCommandPayload,
+  collectFormFieldDataTypes,
   getFormFieldValueWithAlias,
   mergeLoadedRecordWithDirtyFields,
   normalizeCommandPayloadValue,
@@ -129,6 +130,35 @@ describe('shouldBypassFormSubmit', () => {
   it('treats refresh as a non-submit form button action', () => {
     expect(shouldBypassFormSubmit({ code: 'refresh' }, '')).toBe(true);
     expect(shouldBypassFormSubmit({ code: 'reload', action: 'refresh' }, 'refresh')).toBe(true);
+  });
+});
+
+describe('collectFormFieldDataTypes', () => {
+  it('keeps schema-declared fields even before async model metadata provides data types', () => {
+    expect(
+      collectFormFieldDataTypes(
+        [
+          {
+            blockType: 'form-section',
+            fields: [
+              { field: 'process_name' },
+              { field: 'process_key' },
+              { field: 'deployed_at' },
+            ],
+          },
+        ],
+        {
+          status: { dataType: 'string' },
+          version: { dataType: 'integer' },
+        },
+      ),
+    ).toEqual({
+      process_name: '',
+      process_key: '',
+      deployed_at: '',
+      status: 'string',
+      version: 'integer',
+    });
   });
 });
 
@@ -358,6 +388,32 @@ describe('JSON-like form values', () => {
     });
   });
 
+  it('adds snake_case aliases for declared form fields when custom APIs return camelCase DTOs', () => {
+    const loadedRecord = normalizeLoadedRecordForForm(
+      {
+        pid: 'process-1',
+        processName: '长假审批',
+        processKey: 'wd_leave_approval',
+        deployedAt: '2026-07-05T10:30:00',
+      },
+      {
+        process_name: 'string',
+        process_key: 'string',
+        deployed_at: 'datetime',
+      },
+    );
+
+    expect(loadedRecord).toMatchObject({
+      pid: 'process-1',
+      processName: '长假审批',
+      processKey: 'wd_leave_approval',
+      deployedAt: '2026-07-05T10:30:00',
+      process_name: '长假审批',
+      process_key: 'wd_leave_approval',
+      deployed_at: '2026-07-05T10:30:00',
+    });
+  });
+
   it('unwraps ApiResponse.data for singleton recordSource forms', () => {
     const loadedRecord = normalizeLoadedRecordResponseForForm(
       {
@@ -457,6 +513,23 @@ describe('resolveEditRecordEndpoint', () => {
         'system_preferences_form',
       ),
     ).toBe('/api/admin/system-preferences');
+  });
+
+  it('supports BPM process definition edit forms backed by the BPM API', () => {
+    expect(
+      resolveEditRecordEndpoint(
+        {
+          extension: {
+            recordSource: {
+              endpoint: '/api/bpm/process-definitions/{pid}',
+              method: 'get',
+            },
+          },
+        },
+        'bpm_process_management',
+        'process-1',
+      ),
+    ).toBe('/api/bpm/process-definitions/process-1');
   });
 });
 

@@ -1,4 +1,11 @@
-import { test, expect, type APIResponse, type Browser, type Page, type TestInfo } from '@playwright/test';
+import {
+  test,
+  expect,
+  type APIResponse,
+  type Browser,
+  type Page,
+  type TestInfo,
+} from '@playwright/test';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { ensureSidebarExpanded, uniqueId, waitForDynamicPageLoad } from '../helpers';
@@ -30,6 +37,18 @@ type WebhookRecord = {
   event_type?: string;
 };
 
+type DecisionLogRecord = {
+  pid?: string;
+  traceId?: string;
+  correlationId?: string;
+  decisionCode?: string;
+  outputSnapshot?: Record<string, unknown>;
+};
+
+type DecisionLogPage = {
+  records?: DecisionLogRecord[];
+};
+
 type FailedResponse = {
   method: string;
   status: number;
@@ -37,20 +56,54 @@ type FailedResponse = {
   body?: string;
 };
 
-const HIGH_VALUE_AST = {
-  type: 'compare',
-  left: {
-    type: 'path',
-    scope: 'record',
-    path: 'data.amount',
-    dataType: 'decimal',
-  },
-  operator: 'GT',
-  right: {
-    type: 'literal',
-    value: 10000,
-    dataType: 'decimal',
-  },
+const DECISION_OUTPUT_TABLE = {
+  hitPolicy: 'FIRST',
+  inputs: [
+    {
+      id: 'amount',
+      label: 'Amount',
+      scope: 'record',
+      path: 'data.amount',
+      dataType: 'decimal',
+    },
+  ],
+  outputs: [
+    { id: 'deadlineMinutes', label: 'Deadline minutes', dataType: 'integer' },
+    { id: 'severity', label: 'Severity', dataType: 'string' },
+    { id: 'notificationTemplate', label: 'Notification template', dataType: 'string' },
+  ],
+  rules: [
+    {
+      ruleId: 'high_value_deadline',
+      priority: 10,
+      when: {
+        amount: { operator: 'EQ', value: '', feel: '> 10000' },
+      },
+      then: {
+        deadlineMinutes: 45,
+        severity: 'warning',
+        notificationTemplate: 'High value request ${record.data.amount}',
+      },
+    },
+    {
+      ruleId: 'standard_deadline',
+      priority: 20,
+      when: {},
+      then: {
+        deadlineMinutes: 120,
+        severity: 'normal',
+        notificationTemplate: 'Standard request',
+      },
+    },
+  ],
+};
+
+const DECISION_OUTPUT_SCHEMA = {
+  outputs: DECISION_OUTPUT_TABLE.outputs.map((output) => ({
+    id: output.id,
+    label: output.label,
+    dataType: output.dataType,
+  })),
 };
 
 const ignoredConsolePatterns = [
@@ -60,7 +113,10 @@ const ignoredConsolePatterns = [
 ];
 
 function assertApiSuccess<T>(response: APIResponse, body: ApiEnvelope<T>): T {
-  expect(response.ok(), `HTTP ${response.status()} ${response.url()}: ${JSON.stringify(body)}`).toBe(true);
+  expect(
+    response.ok(),
+    `HTTP ${response.status()} ${response.url()}: ${JSON.stringify(body)}`,
+  ).toBe(true);
   const code = body.code;
   if (code !== undefined && code !== null && String(code) !== '0') {
     throw new Error(`API returned non-success code ${String(code)}: ${JSON.stringify(body)}`);
@@ -93,8 +149,13 @@ async function capture(page: Page, testInfo: TestInfo, name: string): Promise<vo
   });
 }
 
-async function expectNoLegacyConsoleLinks(page: Page): Promise<void> {
-  await expect(page.getByTestId('decisionops-console')).toHaveCount(0);
+async function expectNoLegacyConsoleLinks(
+  page: Page,
+  options: { allowConsoleContainer?: boolean } = {},
+): Promise<void> {
+  if (!options.allowConsoleContainer) {
+    await expect(page.getByTestId('decisionops-console')).toHaveCount(0);
+  }
   const legacyLinks = await page.evaluate(() =>
     Array.from(document.querySelectorAll('a, button'))
       .map((element) => {
@@ -107,7 +168,9 @@ async function expectNoLegacyConsoleLinks(page: Page): Promise<void> {
         };
       })
       .filter((entry) =>
-        [entry.href, entry.dataHref, entry.onClick].some((value) => value.includes('/decision-ops')),
+        [entry.href, entry.dataHref, entry.onClick].some((value) =>
+          value.includes('/decision-ops'),
+        ),
       ),
   );
   expect(legacyLinks).toEqual([]);
@@ -128,12 +191,17 @@ async function seedDecision(page: Page, decisionCode: string): Promise<DecisionV
     enabled: true,
   });
 
-  return postApi<DecisionVersion>(page, `/api/decision/definitions/${encodeURIComponent(decisionCode)}/versions`, {
-    kind: 'SIMPLE_CONDITION',
-    runtimeAdapter: 'AST_EVALUATOR',
-    versionTag: `golden-${Date.now()}`,
-    contentJson: HIGH_VALUE_AST,
-  });
+  return postApi<DecisionVersion>(
+    page,
+    `/api/decision/definitions/${encodeURIComponent(decisionCode)}/versions`,
+    {
+      kind: 'DECISION_TABLE',
+      runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+      versionTag: `golden-${Date.now()}`,
+      contentJson: DECISION_OUTPUT_TABLE,
+      outputSchemaJson: DECISION_OUTPUT_SCHEMA,
+    },
+  );
 }
 
 async function seedConnector(page: Page, name: string): Promise<ConnectorRecord> {
@@ -218,7 +286,7 @@ test.describe.serial('DecisionOps full-app golden', () => {
   test('covers DSL module actions, negative states, reuse links, and legacy console retirement', async ({
     browser,
     page,
-    }, testInfo) => {
+  }, testInfo) => {
     test.setTimeout(180_000);
     const consoleErrors: string[] = [];
     const failedResponseDetails: Array<Promise<FailedResponse>> = [];
@@ -264,44 +332,90 @@ test.describe.serial('DecisionOps full-app golden', () => {
     await expect(page.getByTestId(`dda-version-${draft.pid}`)).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId(`dda-publish-${draft.pid}`)).toHaveCount(0);
     await page.getByTestId(`dda-validate-${draft.pid}`).click();
-    await expect(page.getByTestId('dda-message')).toContainText(/校验成功|validated/i, { timeout: 15000 });
+    await expect(page.getByTestId('dda-message')).toContainText(/校验成功|validated/i, {
+      timeout: 15000,
+    });
     await capture(page, testInfo, 'decisionops-definition-detail');
 
-    await postApi<DecisionVersion>(page, `/api/decision/versions/${encodeURIComponent(draft.pid)}/publish`, {
-      impactAcknowledged: true,
-      note: 'DecisionOps full golden publish',
-    });
-    const evaluate = await postApi<{ matched?: boolean; status?: string; traceId?: string }>(
+    await postApi<DecisionVersion>(
       page,
-      '/api/decision/evaluate',
+      `/api/decision/versions/${encodeURIComponent(draft.pid)}/publish`,
       {
-        decisionCode,
-        binding: 'LATEST',
-        callerType: 'E2E',
-        callerRef: 'decisionops-full-golden',
-        correlationId: `golden-${suffix}`,
-        routingKey: `golden-${suffix}`,
-        context: {
-          record: {
-            data: {
-              amount: 20000,
-            },
+        impactAcknowledged: true,
+        note: 'DecisionOps full golden publish',
+      },
+    );
+    const correlationId = `golden-${suffix}`;
+    const evaluate = await postApi<{
+      matched?: boolean;
+      status?: string;
+      traceId?: string;
+      outputs?: Record<string, unknown>;
+    }>(page, '/api/decision/evaluate', {
+      decisionCode,
+      binding: 'LATEST',
+      callerType: 'E2E',
+      callerRef: 'decisionops-full-golden',
+      correlationId,
+      routingKey: `golden-${suffix}`,
+      context: {
+        record: {
+          data: {
+            amount: 20000,
           },
         },
       },
-    );
+    });
     expect(evaluate.matched).toBe(true);
     expect(String(evaluate.status ?? '')).toMatch(/MATCHED|SUCCESS/i);
-
-    await page.goto(`/p/decisionops_execution_logs?decisionCode=${encodeURIComponent(decisionCode)}`, {
-      waitUntil: 'domcontentloaded',
+    expect(evaluate.traceId).toBeTruthy();
+    expect(evaluate.outputs).toMatchObject({
+      deadlineMinutes: 45,
+      severity: 'warning',
+      notificationTemplate: 'High value request ${record.data.amount}',
     });
+
+    const decisionLogPage = await getApi<DecisionLogPage>(
+      page,
+      `/api/decision/logs/recent?decisionCode=${encodeURIComponent(decisionCode)}&keyword=${encodeURIComponent(
+        evaluate.traceId ?? correlationId,
+      )}&size=5`,
+    );
+    const outputLog = decisionLogPage.records?.find(
+      (log) => log.traceId === evaluate.traceId || log.correlationId === correlationId,
+    );
+    expect(outputLog?.pid).toBeTruthy();
+    expect(outputLog?.outputSnapshot).toMatchObject({
+      deadlineMinutes: 45,
+      severity: 'warning',
+      notificationTemplate: 'High value request ${record.data.amount}',
+    });
+    const outputLogPid = outputLog!.pid!;
+
+    await page.goto(
+      `/p/decisionops_execution_logs?decisionCode=${encodeURIComponent(decisionCode)}&traceId=${encodeURIComponent(
+        evaluate.traceId!,
+      )}`,
+      { waitUntil: 'domcontentloaded' },
+    );
     await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId('elta-filters')).toBeVisible();
-    await expect(page.locator('[data-testid^="elta-row-"]').first()).toBeVisible({ timeout: 15000 });
-    await page.locator('[data-testid^="elta-open-trace-"]').first().click();
+    await expect(page.getByTestId(`elta-row-${outputLogPid}`)).toBeVisible({ timeout: 15000 });
+    await page.getByTestId(`elta-open-trace-${outputLogPid}`).click();
     await expect(page.getByTestId('elta-trace-drawer')).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId('elta-trace-chain')).toBeVisible();
+    await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).toContainText(
+      'DMN 输出',
+    );
+    await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).toContainText(
+      'deadlineMinutes',
+    );
+    await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).toContainText('45');
+    await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).toContainText(
+      'severity',
+    );
+    await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).toContainText('warning');
+    await capture(page, testInfo, 'decisionops-execution-log-dmn-output');
     await expectNoLegacyConsoleLinks(page);
 
     await page.goto('/p/decisionops_event_policies', { waitUntil: 'domcontentloaded' });
@@ -328,11 +442,16 @@ test.describe.serial('DecisionOps full-app golden', () => {
     await page.getByLabel('policy-code').fill(policyCopyCode);
     await page.getByLabel('policy-name').fill(`Golden Policy Copy ${suffix}`);
     await page.getByTestId('epa-save-policy').click();
-    await expect(page).toHaveURL(new RegExp(`/p/decisionops_event_policies/view/${policyCopyCode}`), {
-      timeout: 15000,
-    });
+    await expect(page).toHaveURL(
+      new RegExp(`/p/decisionops_event_policies/view/${policyCopyCode}`),
+      {
+        timeout: 15000,
+      },
+    );
     await page.getByTestId('epa-open-logs').click();
-    await expect(page).toHaveURL(/\/p\/decisionops_execution_logs\?policyCode=/, { timeout: 10000 });
+    await expect(page).toHaveURL(/\/p\/decisionops_execution_logs\?policyCode=/, {
+      timeout: 10000,
+    });
     await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 10000 });
     await page.goto(`/p/decisionops_event_policies/view/${encodeURIComponent(policyCopyCode)}`, {
       waitUntil: 'domcontentloaded',
@@ -347,17 +466,24 @@ test.describe.serial('DecisionOps full-app golden', () => {
     await expectNoLegacyConsoleLinks(page);
 
     await page.goto('/p/decisionops_tables', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('decision-table-workbench-block')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('decision-table-workbench-block')).toBeVisible({
+      timeout: 15000,
+    });
     await expect(page.getByTestId('decision-table-editor')).toBeVisible();
     await page.getByTestId('dtw-test-run').click();
-    await expect(page.getByTestId('dtw-test-result')).toContainText(/MATCHED|matched/i, {
+    await expect(page.getByTestId('dtw-test-result')).not.toContainText(/NOT_MATCHED|未命中/i, {
       timeout: 15000,
     });
+    await expect(page.getByTestId('dtw-test-result')).toContainText(/MATCHED|命中/i, {
+      timeout: 15000,
+    });
+    await expect(page.getByTestId('dtw-test-result')).toContainText(/route|director/i);
     await page.getByLabel('feel-1-amount').fill('< 5000');
     await page.getByTestId('dt-analyze').click();
-    await expect(page.getByTestId('dt-analysis-panel')).toContainText('DMN_CONTINUOUS_GAP', {
-      timeout: 15000,
-    });
+    await expect(page.getByTestId('dt-analysis-panel')).toContainText(
+      /DMN_CONTINUOUS_GAP|连续区间缺口/,
+      { timeout: 15000 },
+    );
     await expect(page.getByTestId('dt-analysis-panel')).toContainText('[5000..10000]');
     await capture(page, testInfo, 'decisionops-dmn-gap');
 
@@ -365,7 +491,10 @@ test.describe.serial('DecisionOps full-app golden', () => {
     await page.getByLabel('input-label-1').fill('Submitted On');
     await page.getByLabel('input-path-1').fill('data.submittedOn');
     await page.getByLabel('input-data-type-1').selectOption('date');
-    const dateInputTestId = await page.locator('[data-testid^="dt-in-"]').nth(1).getAttribute('data-testid');
+    const dateInputTestId = await page
+      .locator('[data-testid^="dt-in-"]')
+      .nth(1)
+      .getAttribute('data-testid');
     expect(dateInputTestId).toBeTruthy();
     const dateInputId = dateInputTestId!.replace('dt-in-', '');
     await page.getByLabel(`feel-0-${dateInputId}`).fill('< 2026-06-01');
@@ -376,7 +505,9 @@ test.describe.serial('DecisionOps full-app golden', () => {
     });
     await expect(page.getByTestId('dt-analysis-panel')).toContainText('dataType: date');
     await expect(page.getByTestId('dt-analysis-panel')).toContainText('[2026-06-01..2026-06-10)');
-    await expect(page.getByTestId('dt-analysis-panel')).toContainText(/continuous inputs [2-9]/);
+    await expect(page.getByTestId('dt-analysis-panel')).toContainText(
+      /continuous inputs [2-9]|连续输入 [2-9]/i,
+    );
     await capture(page, testInfo, 'decisionops-dmn-complex-date-gap');
     await expectNoLegacyConsoleLinks(page);
 
@@ -395,18 +526,27 @@ test.describe.serial('DecisionOps full-app golden', () => {
     });
     await expect(page.getByTestId('decision-integration-impact')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('integration-impact-refresh')).toBeVisible();
-    await expect(page.getByTestId('integration-impact-manage')).toHaveAttribute('href', '/p/api_connector');
+    await expect(page.getByTestId('integration-impact-manage')).toHaveAttribute(
+      'href',
+      '/p/api_connector',
+    );
     await expect(page.getByTestId('integration-impact-risk')).toBeVisible({ timeout: 15000 });
     await page.getByTestId('integration-impact-refresh').click();
     await expect(page.getByTestId('integration-impact-risk')).toBeVisible({ timeout: 15000 });
 
     const webhookTargetCode = webhook.eventType ?? webhook.event_type ?? 'record_created';
-    await getApi(page, `/api/decision/integrations/impact?targetType=WEBHOOK&targetCode=${encodeURIComponent(webhookTargetCode)}`);
+    await getApi(
+      page,
+      `/api/decision/integrations/impact?targetType=WEBHOOK&targetCode=${encodeURIComponent(webhookTargetCode)}`,
+    );
     await page.goto(`/p/decisionops_webhooks/view/${encodeURIComponent(webhook.pid)}`, {
       waitUntil: 'domcontentloaded',
     });
     await expect(page.getByTestId('decision-integration-impact')).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('integration-impact-manage')).toHaveAttribute('href', '/p/webhook');
+    await expect(page.getByTestId('integration-impact-manage')).toHaveAttribute(
+      'href',
+      '/p/webhook',
+    );
     await expect(page.getByTestId('integration-impact-risk')).toBeVisible({ timeout: 15000 });
     await capture(page, testInfo, 'decisionops-integration-impact');
     await expectNoLegacyConsoleLinks(page);
@@ -419,9 +559,18 @@ test.describe.serial('DecisionOps full-app golden', () => {
       .poll(
         async () => {
           const states = await Promise.all([
-            page.getByTestId('rollout-create').isVisible().catch(() => false),
-            page.getByTestId('rollout-empty').isVisible().catch(() => false),
-            page.getByTestId('rollout-permission-hint').isVisible().catch(() => false),
+            page
+              .getByTestId('rollout-create')
+              .isVisible()
+              .catch(() => false),
+            page
+              .getByTestId('rollout-empty')
+              .isVisible()
+              .catch(() => false),
+            page
+              .getByTestId('rollout-permission-hint')
+              .isVisible()
+              .catch(() => false),
           ]);
           return states.some(Boolean);
         },
@@ -431,17 +580,23 @@ test.describe.serial('DecisionOps full-app golden', () => {
     await expectNoLegacyConsoleLinks(page);
 
     await page.goto('/decision-ops', { waitUntil: 'domcontentloaded' });
-    await expect(page).toHaveURL(/\/p\/decisionops_rollouts(?:$|\?)/, { timeout: 10000 });
-    await expectNoLegacyConsoleLinks(page);
+    await expect(page).toHaveURL(/\/decision-ops(?:$|\?)/, { timeout: 10000 });
+    await expect(page.getByTestId('decisionops-console')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('doc-panel-studio')).toBeVisible({ timeout: 15000 });
+    await expectNoLegacyConsoleLinks(page, { allowConsoleContainer: true });
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/p/decisionops_tables', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByTestId('decision-table-workbench-block')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('decision-table-workbench-block')).toBeVisible({
+      timeout: 15000,
+    });
     await expect(page.getByTestId('decision-table-editor')).toBeVisible();
     await capture(page, testInfo, 'decisionops-mobile-table');
 
     const failedResponses = await Promise.all(failedResponseDetails);
-    const unexpectedFailedResponses = failedResponses.filter((response) => !isExpectedFailedResponse(response));
+    const unexpectedFailedResponses = failedResponses.filter(
+      (response) => !isExpectedFailedResponse(response),
+    );
     expect(unexpectedFailedResponses).toEqual([]);
     expect(consoleErrors).toEqual([]);
   });

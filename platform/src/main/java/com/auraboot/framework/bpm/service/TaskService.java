@@ -7,9 +7,10 @@ import com.auraboot.smart.framework.engine.model.instance.TaskAssigneeCandidateI
 import com.auraboot.smart.framework.engine.model.instance.TaskInstance;
 import com.auraboot.smart.framework.engine.service.param.query.PendingTaskQueryParam;
 import com.auraboot.smart.framework.engine.service.param.query.TaskInstanceQueryByAssigneeParam;
-import com.auraboot.smart.framework.engine.service.param.query.TaskInstanceQueryParam;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
+import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.mapper.RoleMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -19,9 +20,10 @@ import com.auraboot.smart.framework.engine.model.instance.TaskAssigneeInstance;
 import com.auraboot.smart.framework.engine.model.instance.VariableInstance;
 
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import com.auraboot.framework.common.constant.StatusConstants;
+import java.util.Set;
 
 /**
  * 任务服务
@@ -37,6 +39,7 @@ public class TaskService {
     private final SmartEngine smartEngine;
     private final BpmAuditService bpmAuditService;
     private final BpmTaskActionsResolver taskActionsResolver;
+    private final RoleMapper roleMapper;
 
     /** Key for the approve action in designerJson taskActions declarations. */
     private static final String ACTION_KEY_APPROVE = "approve";
@@ -50,10 +53,15 @@ public class TaskService {
     public List<TaskInstance> getTodoTasks(String userId) {
         String tenantId = MetaContext.getCurrentTenantIdAsString();
         
-        log.debug("Querying todo tasks: userId={}, tenantId={}", userId, tenantId);
+        List<String> assigneeGroupIds = currentAssigneeGroupIds();
+        log.debug("Querying todo tasks: userId={}, tenantId={}, assigneeGroupIds={}",
+                userId, tenantId, assigneeGroupIds);
 
         PendingTaskQueryParam queryParam = new PendingTaskQueryParam();
         queryParam.setAssigneeUserId(userId);
+        if (!assigneeGroupIds.isEmpty()) {
+            queryParam.setAssigneeGroupIdList(assigneeGroupIds);
+        }
         queryParam.setTenantId(tenantId);
 
         List<TaskInstance> tasks = smartEngine.getTaskQueryService().findPendingTaskList(queryParam);
@@ -68,15 +76,15 @@ public class TaskService {
     public List<TaskInstance> getCompletedTasks(TaskInstanceQueryByAssigneeParam param) {
         String tenantId = MetaContext.getCurrentTenantIdAsString();
 
-        //如果是群组,该怎么办?
-        
         log.debug("Querying completed tasks: param={}", param);
 
         param.setTenantId(tenantId);
-        TaskInstanceQueryParam queryParam = new TaskInstanceQueryParam();
-        // 设置查询已完成的任务
-        // queryParam.setAssignee(userId);
-        // queryParam.setStatus(StatusConstants.COMPLETED);
+        if (param.getAssigneeGroupIdList() == null || param.getAssigneeGroupIdList().isEmpty()) {
+            List<String> assigneeGroupIds = currentAssigneeGroupIds();
+            if (!assigneeGroupIds.isEmpty()) {
+                param.setAssigneeGroupIdList(assigneeGroupIds);
+            }
+        }
 
         List<TaskInstance> tasks = smartEngine.getTaskQueryService().findTaskListByAssignee(param);
 
@@ -426,10 +434,12 @@ public class TaskService {
             return true;
         }
 
+        List<String> assigneeGroupIds = currentAssigneeGroupIds();
+
         // Check inline assignee list (populated during process start)
         if (task.getTaskAssigneeInstanceList() != null && !task.getTaskAssigneeInstanceList().isEmpty()) {
             return task.getTaskAssigneeInstanceList().stream()
-                    .anyMatch(assignee -> userId.equals(assignee.getAssigneeId()));
+                    .anyMatch(assignee -> matchesTaskAssignee(assignee, userId, assigneeGroupIds));
         }
 
         // Inline list may be empty when task is queried later; load from DB
@@ -440,10 +450,68 @@ public class TaskService {
         List<TaskAssigneeInstance> assignees = assigneeMap.get(task.getInstanceId());
         if (assignees != null) {
             return assignees.stream()
-                    .anyMatch(assignee -> userId.equals(assignee.getAssigneeId()));
+                    .anyMatch(assignee -> matchesTaskAssignee(assignee, userId, assigneeGroupIds));
         }
 
         return false;
+    }
+
+    private boolean matchesTaskAssignee(TaskAssigneeInstance assignee, String userId,
+                                        List<String> assigneeGroupIds) {
+        if (assignee == null || assignee.getAssigneeId() == null) {
+            return false;
+        }
+        if (assignee.getAssigneeId().equals(userId)) {
+            return true;
+        }
+        return isGroupOrRoleAssignee(assignee.getAssigneeType())
+                && assigneeGroupIds.contains(assignee.getAssigneeId());
+    }
+
+    private boolean isGroupOrRoleAssignee(String assigneeType) {
+        if (assigneeType == null || assigneeType.isBlank()) {
+            return false;
+        }
+        String normalized = assigneeType.toLowerCase().replace("-", "_");
+        return normalized.contains("group") || normalized.contains("role");
+    }
+
+    private List<String> currentAssigneeGroupIds() {
+        if (!MetaContext.exists()) {
+            return List.of();
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Set<String> roleCodes = new LinkedHashSet<>();
+        Long memberId = MetaContext.getCurrentMemberId();
+        if (tenantId != null && memberId != null) {
+            List<Role> roles = roleMapper.findByMemberIdAndTenantId(memberId, tenantId);
+            addRoleCodes(roleCodes, roles);
+        }
+        if (tenantId != null && !MetaContext.getCurrentRoleIds().isEmpty()) {
+            for (Long roleId : MetaContext.getCurrentRoleIds()) {
+                if (roleId == null) {
+                    continue;
+                }
+                addRoleCode(roleCodes, roleMapper.findByTenantIdAndId(tenantId, roleId));
+            }
+        }
+        return List.copyOf(roleCodes);
+    }
+
+    private void addRoleCodes(Set<String> roleCodes, List<Role> roles) {
+        if (roles == null || roles.isEmpty()) {
+            return;
+        }
+        for (Role role : roles) {
+            addRoleCode(roleCodes, role);
+        }
+    }
+
+    private void addRoleCode(Set<String> roleCodes, Role role) {
+        if (role == null || role.getCode() == null || role.getCode().isBlank()) {
+            return;
+        }
+        roleCodes.add(role.getCode());
     }
 
     /**

@@ -121,7 +121,10 @@ export const bpmnVersionService = (() => {
     }
   }
 
-  function toVersionEntry(dto: BpmnVersionDTO): VersionEntry {
+  function toVersionEntry(
+    dto: BpmnVersionDTO,
+    options: { includeProcessDescription?: boolean } = {},
+  ): VersionEntry {
     let schemaSnapshot: Record<string, unknown> | undefined;
     if (dto.designerJson) {
       try {
@@ -139,7 +142,7 @@ export const bpmnVersionService = (() => {
       operation: mapStatusToOperation(dto.status),
       operationBy: '',
       operationAt: dto.updatedAt || dto.createdAt || '',
-      description: dto.description || undefined,
+      description: options.includeProcessDescription ? dto.description || undefined : undefined,
       schemaSnapshot,
     };
   }
@@ -147,13 +150,13 @@ export const bpmnVersionService = (() => {
   return {
     async getHistory(processKey: string): Promise<VersionEntry[]> {
       const dtos = await request<BpmnVersionDTO[]>(`${apiBase}/key/${processKey}/versions`);
-      return dtos.map(toVersionEntry);
+      return dtos.map((dto) => toVersionEntry(dto));
     },
 
     async getVersion(processKey: string, versionPid: string): Promise<VersionEntry> {
       // Fetch full definition by pid to get the designerJson snapshot
       const dto = await request<BpmnVersionDTO>(`${apiBase}/${versionPid}`);
-      return toVersionEntry(dto);
+      return toVersionEntry(dto, { includeProcessDescription: true });
     },
 
     async rollback(_processKey: string, _versionPid: string): Promise<VersionEntry> {

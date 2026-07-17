@@ -1,5 +1,6 @@
 package com.auraboot.framework.automation.executor.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -58,10 +59,13 @@ public class UpdateRecordExecutor implements ActionExecutor {
         log.info("Updating record: modelCode={}, recordPid={}, fields={}",
                 modelCode, recordPid, processedUpdates.keySet());
 
-        Map<String, Object> result = dynamicDataService.update(modelCode, recordPid, processedUpdates);
+        String targetRecordPid = recordPid;
+        MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.update(modelCode, targetRecordPid, processedUpdates));
 
         return Map.of(
                 "success", true,
+                "actionType", action.getType(),
                 "recordPid", recordPid,
                 "updatedFields", processedUpdates.keySet()
         );
@@ -69,7 +73,7 @@ public class UpdateRecordExecutor implements ActionExecutor {
 
     @Override
     public boolean supports(String actionType) {
-        return "update_record".equals(actionType);
+        return "update_record".equals(actionType) || "patch_record".equals(actionType);
     }
 
     private Map<String, Object> processFieldValues(Map<String, Object> fields, Map<String, Object> context) {

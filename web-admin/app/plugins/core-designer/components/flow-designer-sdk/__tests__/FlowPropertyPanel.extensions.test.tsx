@@ -65,6 +65,62 @@ describe('FlowPropertyPanel extension points (G1 + G2)', () => {
     expect(screen.getByTestId('custom-node-editor')).toBeTruthy();
   });
 
+  it('renders string lucide icon names as icons rather than raw codes in the panel header', () => {
+    nodeRegistry.register({
+      type: 'action-send-webhook',
+      label: '发送 Webhook',
+      icon: 'Send',
+      category: 'action',
+    });
+    const id = useFlowStore.getState().addNode({
+      type: 'action-send-webhook',
+      position: { x: 0, y: 0 },
+      data: { label: '发送 Webhook', config: {} },
+    });
+    act(() => useFlowStore.getState().selectNode(id));
+
+    render(<FlowPropertyPanel />);
+
+    expect(screen.queryByText('Send')).toBeNull();
+    expect(screen.getByText('发送 Webhook').closest('.p-4')?.querySelector('svg')).not.toBeNull();
+  });
+
+  it('renders provider availability metadata in the selected node inspector', () => {
+    nodeRegistry.register({
+      type: 'action-send-sms',
+      label: '发送短信',
+      icon: 'MessageSquareText',
+      category: 'action',
+      metadata: {
+        availability: {
+          unavailable: true,
+          reason: '当前环境未配置真实短信 provider',
+          providerSummary: '依赖：真实短信 provider · 未配置',
+          source: 'decision-action-catalog',
+          actionType: 'SEND_SMS',
+        },
+      },
+    });
+    const id = useFlowStore.getState().addNode({
+      type: 'action-send-sms',
+      position: { x: 0, y: 0 },
+      data: { label: '发送短信', config: { actionType: 'send_sms' } },
+    });
+    act(() => useFlowStore.getState().selectNode(id));
+
+    render(<FlowPropertyPanel />);
+
+    expect(screen.getByTestId(`flow-node-availability-badge-${id}`)).toHaveTextContent(
+      '不可用',
+    );
+    expect(screen.getByTestId(`flow-node-availability-${id}`)).toHaveTextContent(
+      '当前环境未配置真实短信 provider',
+    );
+    expect(screen.getByTestId(`flow-node-availability-${id}`)).toHaveTextContent(
+      '依赖：真实短信 provider · 未配置',
+    );
+  });
+
   it('G1: selecting an edge renders the built-in condition editor and edits the condition', () => {
     const a = useFlowStore.getState().addNode({
       type: 'a',

@@ -7,6 +7,7 @@ import {
   getByDataPath,
   injectDetailRecordValueIntoCustomBlock,
   mergeDetailDisplayFields,
+  readDetailRecordField,
   resolveActiveDetailTab,
   resolveDetailFieldComponent,
   resolveDetailRecordEndpoint,
@@ -96,6 +97,16 @@ describe('shouldRenderDefaultDetailEditAction', () => {
 });
 
 describe('injectDetailRecordValueIntoCustomBlock', () => {
+  it('reads camelCase API values for snake_case detail field codes', () => {
+    const record = {
+      targetKey: 'task_manager_approve',
+      targetKeyDisplay: '主管审批节点',
+    };
+
+    expect(readDetailRecordField(record, 'target_key')).toBe('task_manager_approve');
+    expect(readDetailRecordField(record, 'target_key_display')).toBe('主管审批节点');
+  });
+
   it('passes a detail record valueField into custom block props', () => {
     const block = {
       id: 'sla_rule_binding',
@@ -120,6 +131,7 @@ describe('injectDetailRecordValueIntoCustomBlock', () => {
 
     expect((injected as any).props.value).toBe(ruleBinding);
     expect((injected as any).props.valueField).toBe('rule_binding');
+    expect((injected as any).props.record.pid).toBe('record-1');
   });
 
   it('does not overwrite an explicit custom block value', () => {
@@ -139,6 +151,24 @@ describe('injectDetailRecordValueIntoCustomBlock', () => {
     });
 
     expect((injected as any).props.value).toBe(explicit);
+    expect((injected as any).props.record.rule_binding.bindingKind).toBe('OTHER');
+  });
+
+  it('passes the detail record into custom blocks without valueField', () => {
+    const block = {
+      id: 'sla_action_policy',
+      blockType: 'custom',
+      component: 'DecisionActionPlanBlock',
+      props: {
+        logsUrl: '/p/decisionops_execution_logs?callerRef={name}',
+      },
+    } as any;
+
+    const injected = injectDetailRecordValueIntoCustomBlock(block, {
+      name: { value: 'Manager Approval SLA' },
+    });
+
+    expect((injected as any).props.record.name.value).toBe('Manager Approval SLA');
   });
 });
 

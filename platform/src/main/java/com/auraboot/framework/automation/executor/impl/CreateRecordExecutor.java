@@ -1,5 +1,6 @@
 package com.auraboot.framework.automation.executor.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -45,7 +46,8 @@ public class CreateRecordExecutor implements ActionExecutor {
 
         log.info("Creating record: modelCode={}, fields={}", modelCode, processedFields.keySet());
 
-        Map<String, Object> created = dynamicDataService.create(modelCode, processedFields);
+        Map<String, Object> created = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.create(modelCode, processedFields));
 
         return Map.of(
                 "success", true,

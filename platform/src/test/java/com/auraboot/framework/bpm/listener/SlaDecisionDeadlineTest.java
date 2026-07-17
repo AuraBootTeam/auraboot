@@ -1,6 +1,7 @@
 package com.auraboot.framework.bpm.listener;
 
 import com.auraboot.framework.bpm.entity.SlaConfigEntity;
+import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.decision.dto.DrtEvaluateRequest;
 import com.auraboot.framework.decision.model.DecisionResult;
 import com.auraboot.framework.decision.model.DecisionStatus;
@@ -11,6 +12,7 @@ import com.auraboot.framework.decision.rule.RuleConsumerBinding;
 import com.auraboot.framework.decision.rule.RuleEvaluationContext;
 import com.auraboot.framework.decision.rule.RuleEvaluationService;
 import com.auraboot.framework.decision.rule.RuleEvaluationTrace;
+import com.auraboot.framework.decision.rule.RuleValueSource;
 import com.auraboot.framework.decision.service.DecisionEvaluationService;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -170,6 +172,85 @@ class SlaDecisionDeadlineTest {
         ArgumentCaptor<DecisionBinding> binding = ArgumentCaptor.forClass(DecisionBinding.class);
         verify(ruleEvaluationService).evaluateDecisionBinding(binding.capture(), any(RuleEvaluationContext.class));
         assertThat(binding.getValue().decisionCode()).isEqualTo("complaint_sla_deadline");
+    }
+
+    @Test
+    void recordCreateRuleDeadlinePropagatesRecordDataAndMetaVirtualSources() {
+        when(ruleEvaluationService.evaluateDecisionBinding(any(DecisionBinding.class), any(RuleEvaluationContext.class)))
+                .thenReturn(new RuleEvaluationTrace(
+                        "decision-trace-sla-record",
+                        "SLA",
+                        "sla-record-binding-1",
+                        "wd_leave_request",
+                        RuleBindingKind.DECISION_REF,
+                        "leave_sla_deadline",
+                        3,
+                        DecisionVersionPolicy.LATEST_PUBLISHED,
+                        null,
+                        DecisionStatus.MATCHED,
+                        true,
+                        Map.of("leaveDays", 7),
+                        Map.of("deadlineMinutes", 60),
+                        false,
+                        4,
+                        null,
+                        List.of(),
+                        List.of(),
+                        List.of("record.data.wd_req_days", "meta.virtualSources"),
+                        List.of("leave_sla_deadline")));
+        SlaConfigEntity cfg = config();
+        cfg.setPid("sla-record-binding-1");
+        cfg.setTargetType("RECORD");
+        cfg.setTargetKey("wd_leave_request");
+        cfg.setModelCode("wd_leave_request");
+        cfg.setRuleBinding(new RuleConsumerBinding(
+                "SLA",
+                "sla-record-binding-1",
+                "deadline",
+                RuleBindingKind.DECISION_REF,
+                null,
+                new DecisionBinding(
+                        "leave_sla_deadline",
+                        DecisionVersionPolicy.LATEST_PUBLISHED,
+                        null,
+                        null,
+                        null,
+                        List.of(new DecisionBinding.InputMapping(
+                                "leaveDays",
+                                RuleValueSource.field(Scope.RECORD, "data.wd_req_days"))),
+                        List.of(),
+                        DecisionBinding.FallbackPolicy.failClosed(),
+                        200,
+                        DecisionBinding.TraceMode.SAMPLED,
+                        true,
+                        null,
+                        null),
+                true));
+
+        Map<String, Object> recordData = new java.util.LinkedHashMap<>();
+        recordData.put("pid", "REQ-1");
+        recordData.put("wd_req_days", 7);
+        recordData.put("_meta", Map.of(
+                "virtualSources", List.of(Map.of(
+                        "sourceRef", "wd_leave_request.days",
+                        "field", "wd_req_days"))));
+
+        java.time.Instant deadline = ReflectionTestUtils.invokeMethod(
+                listenerWithRuleEvaluation(), "computeDeadline", cfg, recordData);
+
+        assertThat(deadline).isNotNull();
+        ArgumentCaptor<RuleEvaluationContext> context = ArgumentCaptor.forClass(RuleEvaluationContext.class);
+        verify(ruleEvaluationService).evaluateDecisionBinding(any(DecisionBinding.class), context.capture());
+        RuleEvaluationContext captured = context.getValue();
+        assertThat(captured.consumerType()).isEqualTo("SLA");
+        assertThat(captured.resolvePath(RuleValueSource.field(Scope.RECORD, "data.wd_req_days")).value())
+                .isEqualTo(7);
+        assertThat(captured.resolvePath(RuleValueSource.field(Scope.RECORD, "data.targetKey")).value())
+                .isEqualTo("wd_leave_request");
+        assertThat(captured.resolvePath(RuleValueSource.field(Scope.RECORD, "data._meta")).present())
+                .isFalse();
+        assertThat(captured.resolvePath(RuleValueSource.field(Scope.META, "virtualSources")).present())
+                .isTrue();
     }
 
     @Test

@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
+import { BASE_URL } from '../../helpers/environments';
 
 /**
  * Permission v2 smoke — the raw resource×action matrix is retired as a standalone tab; it now lives
@@ -6,6 +7,44 @@ import { test, expect } from '@playwright/test';
  * the page loads with the capability editor as the default surface, the retired tabs are gone, and a
  * grant toggle in ③ hits the batch API.
  */
+async function createSmokeRole(page: Page): Promise<{ pid: string; code: string }> {
+  const suffix = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+  const code = `e2e_perm_smoke_${suffix}`;
+  const response = await page.request.post(`${BASE_URL}/api/roles`, {
+    data: {
+      code,
+      name: `Permission Smoke ${suffix}`,
+      description: 'Permission matrix smoke role',
+      type: 'custom',
+    },
+  });
+  expect(response.ok()).toBeTruthy();
+  return (await response.json()).data as { pid: string; code: string };
+}
+
+async function selectRole(page: Page, code: string): Promise<void> {
+  await page.getByTestId('role-search-input').fill(code);
+  const roleItem = page.getByTestId(`role-item-${code}`);
+  await expect(roleItem).toBeVisible({ timeout: 10000 });
+  await roleItem.scrollIntoViewIfNeeded();
+  await roleItem.click();
+  await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 10000 });
+}
+
+async function firstAtomicCheckboxByState(page: Page, checked: boolean): Promise<Locator> {
+  const checkboxes = page.locator('[data-testid^="atomic-checkbox-"]');
+  await expect(checkboxes.first()).toBeVisible({ timeout: 10000 });
+  const count = await checkboxes.count();
+  for (let index = 0; index < count; index += 1) {
+    const checkbox = checkboxes.nth(index);
+    if ((await checkbox.isChecked()) === checked) {
+      const testId = await checkbox.getAttribute('data-testid');
+      if (testId) return page.getByTestId(testId);
+    }
+  }
+  throw new Error(`Permission smoke requires at least one ${checked ? 'checked' : 'unchecked'} atomic permission`);
+}
+
 test.describe('Permission v2 — Smoke', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/enterprise/permissions');
@@ -45,13 +84,18 @@ test.describe('Permission v2 — Smoke', () => {
   });
 
   test('toggling an atomic permission in ③ hits the batch API', async ({ page }) => {
+    const role = await createSmokeRole(page);
+    await page.goto('/enterprise/permissions');
+    await expect(page.getByTestId('permission-page')).toBeVisible({ timeout: 10000 });
+    await selectRole(page, role.code);
+
     await expect(page.getByTestId('capability-role-editor')).toBeVisible({ timeout: 10000 });
     await page.getByTestId('advanced-atomic-toggle').click();
     await expect(page.getByTestId('advanced-atomic-body')).toBeVisible();
 
-    const checkbox = page.locator('[data-testid^="atomic-checkbox-"]').first();
+    const checkbox = await firstAtomicCheckboxByState(page, false);
     await expect(checkbox).toBeVisible({ timeout: 10000 });
-    const wasChecked = await checkbox.isChecked();
+    await expect(checkbox).not.toBeChecked();
 
     const responsePromise = page.waitForResponse(
       (resp) => resp.url().includes('/api/permissions/matrix/') && resp.url().includes('/batch'),
@@ -60,6 +104,7 @@ test.describe('Permission v2 — Smoke', () => {
     await checkbox.click();
     const response = await responsePromise;
     expect(response.status()).toBe(200);
+    await expect(checkbox).toBeChecked({ timeout: 10000 });
 
     // Restore original state (and settle the rollback request).
     const restorePromise = page.waitForResponse(
@@ -69,6 +114,6 @@ test.describe('Permission v2 — Smoke', () => {
     await checkbox.click();
     const restore = await restorePromise;
     expect(restore.status()).toBe(200);
-    expect(await checkbox.isChecked()).toBe(wasChecked);
+    await expect(checkbox).not.toBeChecked({ timeout: 10000 });
   });
 });

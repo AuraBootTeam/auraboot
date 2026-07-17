@@ -380,8 +380,9 @@ public class PermissionController {
      * Query permission audit log.
      *
      * <p>Returns DENY decisions logged by the evaluation pipeline, filtered
-     * by optional memberId or resourceCode. Useful for compliance review.
+     * by optional traceId, memberId or resourceCode. Useful for compliance review.
      *
+     * @param traceId      optional — filter by Rule Center decision trace ID
      * @param memberId     optional — filter by member (user) ID
      * @param resourceCode optional — filter by resource code
      * @param limit        max results to return (default 50, max 500)
@@ -389,6 +390,7 @@ public class PermissionController {
      */
     @GetMapping("/audit")
     public ApiResponse<List<PermissionAuditLogDTO>> getAuditLog(
+            @RequestParam(required = false) String traceId,
             @RequestParam(required = false) Long memberId,
             @RequestParam(required = false) String resourceCode,
             @RequestParam(defaultValue = "50") int limit) {
@@ -397,7 +399,9 @@ public class PermissionController {
         Long tenantId = MetaContext.getCurrentTenantId();
 
         List<PermissionAuditLog> logs;
-        if (memberId != null) {
+        if (traceId != null && !traceId.isBlank()) {
+            logs = permissionAuditService.getLogsByTraceId(tenantId, traceId.trim(), safeLimit);
+        } else if (memberId != null) {
             logs = permissionAuditService.getLogsByMember(tenantId, memberId, safeLimit);
         } else if (resourceCode != null && !resourceCode.isBlank()) {
             logs = permissionAuditService.getLogsByResource(tenantId, resourceCode, safeLimit);

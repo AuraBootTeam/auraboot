@@ -8,6 +8,7 @@ import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +33,9 @@ class ProcessEngineServiceIT extends BaseIntegrationTest {
 
     @Autowired
     private ProcessEngineService processEngineService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static final String BPMN = """
             <?xml version="1.0" encoding="UTF-8"?>
@@ -75,6 +79,41 @@ class ProcessEngineServiceIT extends BaseIntegrationTest {
         ProcessInstance fetched = processEngineService.getProcessInstance(instance.getInstanceId());
         assertNotNull(fetched, "same-tenant read returns the instance");
         assertEquals(instance.getInstanceId(), fetched.getInstanceId());
+    }
+
+    @Test
+    @DisplayName("startProcess chooses the semantic latest cached version")
+    void startUsesSemanticLatestVersion() {
+        String processKey = "pes-it-version-" + System.nanoTime();
+        String actor = com.auraboot.framework.bpm.util.BpmSecurityUtil.getCurrentUserId();
+        BpmProcessDefinition v1 = deploymentService.create(
+                new ProcessDeploymentService.CreateProcessRequest(
+                        processKey,
+                        "PES IT version",
+                        "pes it",
+                        "test",
+                        String.format(BPMN, processKey, actor),
+                        null,
+                        null,
+                        null));
+        deploymentService.deploy(v1.getPid());
+
+        for (int expectedVersion = 2; expectedVersion <= 10; expectedVersion++) {
+            BpmProcessDefinition next = deploymentService.createNewVersion(
+                    processKey,
+                    String.format(BPMN, processKey, actor),
+                    null);
+            assertThat(next.getVersion()).isEqualTo(expectedVersion);
+            deploymentService.deploy(next.getPid());
+        }
+
+        ProcessInstance instance = start(processKey);
+        String processDefinitionIdAndVersion = jdbcTemplate.queryForObject(
+                "SELECT process_definition_id_and_version FROM se_process_instance WHERE id = ?",
+                String.class,
+                Long.parseLong(instance.getInstanceId()));
+
+        assertThat(processDefinitionIdAndVersion).isEqualTo(processKey + ":10.0.0");
     }
 
     @Test

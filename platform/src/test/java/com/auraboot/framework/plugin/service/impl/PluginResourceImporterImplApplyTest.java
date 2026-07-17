@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.dashboard.service.DashboardService;
 import com.auraboot.framework.environment.service.EnvironmentService;
@@ -26,6 +27,7 @@ import com.auraboot.framework.meta.service.NamedQueryService;
 import com.auraboot.framework.meta.service.PageSchemaService;
 import com.auraboot.framework.meta.service.SchemaManagementService;
 import com.auraboot.framework.meta.service.impl.CommandMetadataCacheService;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.dto.PermissionCreateRequest;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
@@ -39,14 +41,18 @@ import com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ResourceAction;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.RolePermissionPolicyDefinitionDTO;
 import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.rbac.entity.Role;
+import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.service.RoleService;
+import com.auraboot.framework.rbac.service.UserRoleService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -56,6 +62,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
@@ -94,6 +101,7 @@ class PluginResourceImporterImplApplyTest {
     @Mock private PermissionService permissionService;
     @Mock private RolePermissionService rolePermissionService;
     @Mock private RoleService roleService;
+    @Mock private UserRoleService userRoleService;
     @Mock private MenuService menuService;
     @Mock private PageSchemaService pageSchemaService;
     @Mock private NamedQueryService namedQueryService;
@@ -110,6 +118,8 @@ class PluginResourceImporterImplApplyTest {
     @Mock private BindingRuleMapper bindingRuleMapper;
     @Mock private PermissionMapper permissionMapper;
     @Mock private RolePermissionMapper rolePermissionMapper;
+    @Mock private ObjectProvider<DecisionUsageIndexService> usageIndexServiceProvider;
+    @Mock private DecisionUsageIndexService usageIndexService;
     @Mock private PageSchemaMapper pageSchemaMapper;
     @Mock private DictMapper dictMapper;
     @Mock private NamedQueryMapper namedQueryMapper;
@@ -122,6 +132,13 @@ class PluginResourceImporterImplApplyTest {
     @Mock private com.auraboot.smart.framework.engine.SmartEngine smartEngine;
 
     @InjectMocks private PluginResourceImporterImpl importer;
+
+    @AfterEach
+    void clearMetaContext() {
+        if (MetaContext.exists()) {
+            MetaContext.clear();
+        }
+    }
 
     // ==================== importPermission CREATE / UPDATE ====================
 
@@ -183,8 +200,69 @@ class PluginResourceImporterImplApplyTest {
         verify(permissionMapper).updateForPluginImport(
                 eq("Perm Upd"), eq("d"), any(), any(), any(), any(),
                 any(), any(), any(), any(),
+                any(),
                 eq("plugin-2"), eq(2L), eq("perm.upd"));
         verify(permissionService, never()).create(any());
+    }
+
+    @Test
+    @DisplayName("importPermission CREATE carries policySchema through service path")
+    void importPermission_create_carriesPolicySchema() {
+        when(permissionService.findByCode("perm.abac")).thenReturn(null);
+        when(jdbcTemplate.queryForObject(anyString(), eq(String.class), any(), any())).thenReturn(null);
+
+        PermissionDTO created = new PermissionDTO();
+        created.setPid("perm-abac-pid");
+        created.setId(102L);
+        when(permissionService.create(any(PermissionCreateRequest.class))).thenReturn(created);
+
+        Map<String, Object> policySchema = Map.of(
+                "dynamicAbac", Map.of(
+                        "type", "rule-center",
+                        "fieldCatalogModelCode", "wd_leave_request"));
+        PermissionDefinitionDTO dto = PermissionDefinitionDTO.builder()
+                .code("perm.abac")
+                .name("Permission ABAC")
+                .policySchema(policySchema)
+                .build();
+
+        importer.importPermission(dto, "plugin-abac", "imp-abac", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        ArgumentCaptor<PermissionCreateRequest> captor = ArgumentCaptor.forClass(PermissionCreateRequest.class);
+        verify(permissionService).create(captor.capture());
+        assertThat(captor.getValue().getPolicySchema()).isEqualTo(policySchema);
+    }
+
+    @Test
+    @DisplayName("importPermission UPDATE persists policySchema through mapper JSONB contract")
+    void importPermission_update_persistsPolicySchema() throws Exception {
+        PermissionDTO existing = new PermissionDTO();
+        existing.setPid("perm-abac-pid");
+        existing.setId(8L);
+        when(permissionService.findByCode("perm.abac")).thenReturn(existing);
+
+        Map<String, Object> policySchema = Map.of(
+                "dynamicAbac", Map.of(
+                        "type", "rule-center",
+                        "fieldCatalogModelCode", "wd_leave_request"));
+        when(objectMapper.writeValueAsString(policySchema))
+                .thenReturn("{\"dynamicAbac\":{\"type\":\"rule-center\"}}");
+
+        PermissionDefinitionDTO dto = PermissionDefinitionDTO.builder()
+                .code("perm.abac")
+                .name("Permission ABAC")
+                .policySchema(policySchema)
+                .build();
+
+        importer.importPermission(dto, "plugin-abac", "imp-abac", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        verify(permissionMapper).updateForPluginImport(
+                eq("Permission ABAC"), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(),
+                eq("{\"dynamicAbac\":{\"type\":\"rule-center\"}}"),
+                eq("plugin-abac"), eq(1L), eq("perm.abac"));
     }
 
     @Test
@@ -232,6 +310,30 @@ class PluginResourceImporterImplApplyTest {
         assertThat(result.getResourceId()).isEqualTo(99L);
         verify(roleService).createRole(any(Role.class));
         verify(roleMapper).updatePluginPidById("plugin-r", 99L);
+    }
+
+    @Test
+    @DisplayName("importRole CREATE assigns CURRENT_MEMBER seed membership")
+    void importRole_create_assignsCurrentMemberSeedMembership() {
+        MetaContext.setContext(1L, 100L, "U-1", "tester");
+        MetaContext.setMemberId(300L);
+        when(roleMapper.existsByCode(1L, "wd_manager")).thenReturn(false);
+
+        Role created = new Role();
+        created.setPid("role-pid-manager");
+        created.setId(55L);
+        when(roleService.createRole(any(Role.class))).thenReturn(created);
+
+        RoleDefinitionDTO dto = RoleDefinitionDTO.builder()
+                .code("wd_manager")
+                .name("Manager")
+                .seedMembers(List.of("CURRENT_MEMBER"))
+                .build();
+
+        importer.importRole(dto, "plugin-r", "imp-r", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        verify(userRoleService).assignRolesToMember(300L, List.of(55L), 1L, 100L);
     }
 
     @Test
@@ -284,6 +386,27 @@ class PluginResourceImporterImplApplyTest {
     }
 
     @Test
+    @DisplayName("importRole UPDATE assigns CURRENT_MEMBER seed membership")
+    void importRole_update_assignsCurrentMemberSeedMembership() {
+        MetaContext.setContext(1L, 100L, "U-1", "tester");
+        MetaContext.setMemberId(300L);
+        when(roleMapper.existsByCode(1L, "wd_manager")).thenReturn(true);
+        when(roleMapper.findIdByCode(1L, "wd_manager")).thenReturn(77L);
+        when(roleMapper.findPidByCode(1L, "wd_manager")).thenReturn("role-pid-existing-manager");
+
+        RoleDefinitionDTO dto = RoleDefinitionDTO.builder()
+                .code("wd_manager")
+                .name("Manager Updated")
+                .seedMembers(List.of("CURRENT_MEMBER"))
+                .build();
+
+        importer.importRole(dto, "plugin-r", "imp-r", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        verify(userRoleService).assignRolesToMember(300L, List.of(77L), 1L, 100L);
+    }
+
+    @Test
     @DisplayName("importRole UPDATE passes default data scope to role mapper")
     void importRole_update_passesDefaultDataScopeType() {
         when(roleMapper.existsByCode(1L, "tester")).thenReturn(true);
@@ -331,6 +454,56 @@ class PluginResourceImporterImplApplyTest {
 
         assertThat(result.getAction()).isEqualTo(ResourceAction.CREATE.code());
         verify(rolePermissionService).assignPermissionsToRole(200L, List.of(1001L));
+    }
+
+    @Test
+    @DisplayName("importRole CREATE with permissionPolicies writes role-permission conditions and refreshes usage index")
+    void importRole_create_withPermissionPolicies() throws Exception {
+        when(roleMapper.existsByCode(1L, "rwp")).thenReturn(false);
+        Role created = new Role();
+        created.setPid("rp-pid");
+        created.setId(200L);
+        when(roleService.createRole(any(Role.class))).thenReturn(created);
+
+        PermissionDTO permission = new PermissionDTO();
+        permission.setId(1001L);
+        permission.setCode("p.approve");
+        when(permissionService.findByCode("p.approve")).thenReturn(permission);
+        when(rolePermissionMapper.countByRoleAndPermission(200L, 1001L, 1L)).thenReturn(0);
+
+        RolePermission binding = new RolePermission();
+        binding.setId(7001L);
+        binding.setPid("rp-policy-pid");
+        when(rolePermissionMapper.findByRoleAndPermission(200L, 1001L)).thenReturn(binding);
+
+        Map<String, Object> conditions = Map.of("dynamicAbac", Map.of(
+                "ruleBinding", Map.of(
+                        "bindingKind", "DECISION_REF",
+                        "conditionFragmentRefs", List.of("shared_leave_approval_guard"),
+                        "decisionBinding", Map.of("decisionCode", "leave_request_automation"))));
+        when(objectMapper.writeValueAsString(conditions))
+                .thenReturn("{\"dynamicAbac\":{\"ruleBinding\":{\"conditionFragmentRefs\":[\"shared_leave_approval_guard\"]}}}");
+        when(usageIndexServiceProvider.getIfAvailable()).thenReturn(usageIndexService);
+
+        RoleDefinitionDTO dto = RoleDefinitionDTO.builder()
+                .code("rwp")
+                .name("RoleWithPolicy")
+                .permissions(List.of("p.approve"))
+                .permissionPolicies(List.of(RolePermissionPolicyDefinitionDTO.builder()
+                        .permissionCode("p.approve")
+                        .conditions(conditions)
+                        .build()))
+                .build();
+
+        PluginResource result = importer.importRole(dto, "plg", "imp", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        assertThat(result.getAction()).isEqualTo(ResourceAction.CREATE.code());
+        verify(rolePermissionService).assignPermissionsToRole(200L, List.of(1001L));
+        verify(rolePermissionMapper).updateConditionsById(
+                eq(7001L),
+                eq("{\"dynamicAbac\":{\"ruleBinding\":{\"conditionFragmentRefs\":[\"shared_leave_approval_guard\"]}}}"));
+        verify(usageIndexService).refreshSource("PERMISSION_POLICY", "rp-policy-pid");
     }
 
     @Test

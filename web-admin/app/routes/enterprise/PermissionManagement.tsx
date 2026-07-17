@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation } from 'react-router';
 import {
   ShieldCheckIcon,
   PlusIcon,
@@ -7,6 +8,7 @@ import {
   MagnifyingGlassIcon,
   UsersIcon,
   PowerIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import { useI18n } from '~/contexts/I18nContext';
 import { useToastContext } from '~/contexts/ToastContext';
@@ -17,6 +19,7 @@ import ConfirmDialog from '~/ui/ConfirmDialog';
 import RoleFormDialog from './permission/RoleFormDialog';
 import CapabilityRoleEditor from './permission/capability/CapabilityRoleEditor';
 import RoleMemberTab from './permission/RoleMemberTab';
+import PermissionAuditTab from './permission/PermissionAuditTab';
 import type { Role } from './permission/types';
 import {
   isRecommendedBomRole,
@@ -30,8 +33,9 @@ import {
 
 // v2 IA: capability is the primary, business-language grant surface (the raw matrix is folded into
 // the capability editor as a collapsed "advanced" escape hatch); the separate flat "assignments"
-// tab is retired. Two surfaces per role remain: capabilities (default) and members.
-type RightTabKey = 'capabilities' | 'members';
+// tab is retired. The role surface keeps capabilities and members, with audit as the
+// operator-facing trace view for permission DENY decisions.
+type RightTabKey = 'capabilities' | 'members' | 'audit';
 
 const TYPE_BADGE: Record<string, string> = {
   SYSTEM: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
@@ -47,6 +51,9 @@ export default function PermissionManagement() {
   const { t } = useI18n();
   const { showSuccessToast, showErrorToast } = useToastContext();
   const { handleSubmitResult } = useFormSubmit();
+  const location = useLocation();
+  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const auditDeepLink = searchParams.get('tab') === 'audit' || Boolean(searchParams.get('traceId'));
 
   // Role list state
   const [roles, setRoles] = useState<Role[]>([]);
@@ -55,7 +62,9 @@ export default function PermissionManagement() {
   const [selectedRolePid, setSelectedRolePid] = useState<string | null>(null);
 
   // Right panel tab state — capability editor is the default surface.
-  const [activeRightTab, setActiveRightTab] = useState<RightTabKey>('capabilities');
+  const [activeRightTab, setActiveRightTab] = useState<RightTabKey>(
+    auditDeepLink ? 'audit' : 'capabilities',
+  );
 
   // Dialog state
   const [showRoleForm, setShowRoleForm] = useState(false);
@@ -89,6 +98,12 @@ export default function PermissionManagement() {
   useEffect(() => {
     fetchRoles();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (auditDeepLink) {
+      setActiveRightTab('audit');
+    }
+  }, [auditDeepLink]);
 
   const filteredRoles = useMemo(() => {
     const q = searchQuery.toLowerCase();
@@ -363,6 +378,9 @@ export default function PermissionManagement() {
         <div className="border-b border-gray-200 px-6 dark:border-gray-700">
           <nav className="-mb-px flex space-x-6">
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeRightTab === 'capabilities'}
               data-testid="permission-right-tab-capabilities"
               onClick={() => setActiveRightTab('capabilities')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
@@ -375,6 +393,9 @@ export default function PermissionManagement() {
               {t('admin.permission.tab.capabilities') || 'Capabilities'}
             </button>
             <button
+              type="button"
+              role="tab"
+              aria-selected={activeRightTab === 'members'}
               data-testid="permission-right-tab-members"
               onClick={() => setActiveRightTab('members')}
               className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
@@ -385,6 +406,21 @@ export default function PermissionManagement() {
             >
               <UsersIcon className="mr-1.5 h-4 w-4" />
               {t('admin.permission.tab.members') || 'Members'}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeRightTab === 'audit'}
+              data-testid="permission-right-tab-audit"
+              onClick={() => setActiveRightTab('audit')}
+              className={`flex items-center border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
+                activeRightTab === 'audit'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400'
+              }`}
+            >
+              <ClockIcon className="mr-1.5 h-4 w-4" />
+              {t('admin.permission.tab.audit', undefined, '审计')}
             </button>
           </nav>
         </div>
@@ -403,11 +439,12 @@ export default function PermissionManagement() {
 
           {activeRightTab === 'capabilities' &&
             (selectedRole ? (
-              <CapabilityRoleEditor rolePid={selectedRole.pid} />
+              <CapabilityRoleEditor key={selectedRole.pid} rolePid={selectedRole.pid} />
             ) : (
               <div className="text-sm text-gray-400">{t('admin.permission.selectRole') || 'Select a role'}</div>
             ))}
           {activeRightTab === 'members' && <RoleMemberTab rolePid={selectedRolePid} />}
+          {activeRightTab === 'audit' && <PermissionAuditTab />}
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { DecisionOpsConsole } from '../DecisionOpsConsole';
 import { type FieldOption } from '../ConditionBuilder';
 import type { DecisionApi } from '../../api/decisionApi';
+import { I18nProvider } from '~/contexts/I18nContext';
 
 const FIELDS: FieldOption[] = [
   {
@@ -13,7 +14,20 @@ const FIELDS: FieldOption[] = [
     dataType: 'enum',
     options: ['HIGH', 'LOW'],
   },
+  {
+    scope: 'process',
+    path: 'nodeId',
+    label: 'nodeId',
+    dataType: 'string',
+  },
 ];
+
+const DECISIONOPS_ZH = {
+  'decisionops.header.eyebrow': '策略工作台',
+  'decisionops.header.definitions': '规则定义',
+  'decisionops.header.policies': '事件策略',
+  'decisionops.header.today': '今日评估',
+};
 
 function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
   return {
@@ -159,6 +173,31 @@ function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
         { actionType: 'WEBHOOK', label: 'Webhook', handlerAvailable: true, category: 'integration' },
         { actionType: 'WRITE_AUDIT', label: 'Write audit', handlerAvailable: true, category: 'governance' },
       ],
+    })),
+    listConditionFragments: vi.fn(async () => ({
+      records: [
+        {
+          fragmentCode: 'leave_sla_node_match',
+          fragmentName: '请假 SLA 节点匹配',
+          scopeType: 'SLA',
+          scopeRef: 'wd_leave_approval',
+          version: 1,
+          status: 'PUBLISHED',
+          fieldRefs: ['record.data.targetKey'],
+          decisionRefs: ['complaint_sla_deadline'],
+          conditionSpec: {
+            root: {
+              type: 'predicate',
+              left: { type: 'field', scope: 'record', path: 'data.targetKey' },
+              operator: 'EQ',
+              right: { type: 'literal', value: 'task_manager_approve' },
+            },
+          },
+        },
+      ],
+      total: 1,
+      current: 1,
+      size: 20,
     })),
     ...overrides,
   } as unknown as DecisionApi;
@@ -344,16 +383,126 @@ function renderConsoleWithoutPermissionGrants(apiOverrides: Partial<DecisionApi>
 }
 
 describe('DecisionOpsConsole', () => {
-  it('renders the tab bar + the Strategy Studio as the default product entry', () => {
+  it('localizes the product header summary in zh-CN instead of leaking English counters', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <I18nProvider initialData={DECISIONOPS_ZH} initialLocale="zh-CN">
+        <QueryClientProvider client={client}>
+          <DecisionOpsConsole
+            api={api()}
+            fields={FIELDS}
+            dashboard={{
+              summary: {
+                definitions: 5,
+                policies: 2,
+                evaluationsToday: 10,
+                matched: 8,
+                failed: 0,
+                retrying: 0,
+              },
+              exceptions: [],
+            }}
+          />
+        </QueryClientProvider>
+      </I18nProvider>,
+    );
+
+    expect(screen.getAllByText('策略工作台').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('规则定义 5')).toBeInTheDocument();
+    expect(screen.getByText('事件策略 2')).toBeInTheDocument();
+    expect(screen.getByText('今日评估 10')).toBeInTheDocument();
+    expect(screen.queryByText(/^Strategy Studio$/i)).toBeNull();
+    expect(screen.queryByText(/Definitions/i)).toBeNull();
+    expect(screen.queryByText(/Policies/i)).toBeNull();
+    expect(screen.queryByText(/^Today/i)).toBeNull();
+  });
+
+  it('renders the tab bar + the Strategy Studio as the default product entry', async () => {
     renderConsole();
     expect(screen.getByTestId('doc-tab-studio')).toBeInTheDocument();
     expect(screen.getByTestId('doc-tab-definitions')).toBeInTheDocument();
     expect(screen.getByTestId('strategy-studio')).toBeInTheDocument();
+    expect(screen.getByTestId('strategy-studio').querySelector('.strategy-studio-header h3')).toHaveTextContent('主管审批 SLA');
     expect(screen.getByTestId('strategy-scenario-SLA')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('优先级');
-    expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('高价值');
-    expect(screen.getByTestId('strategy-action-plan')).toHaveTextContent('NOTIFY');
+    expect(screen.getByTestId('strategy-scenario-SLA')).toHaveTextContent('进入审批节点');
+    expect(screen.getByTestId('strategy-scenario-SLA')).not.toHaveTextContent('task.enter.approval');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('SLA 节点');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('流程节点');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('当前记录');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('文本');
+    expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('record.data.targetKey');
+    expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('sla.deadlineMinutes');
+    expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('优先级');
+    expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('请假审批 SLA 截止时间');
+    expect(screen.getByTestId('strategy-dmn-panel')).not.toHaveTextContent('complaint_sla_deadline');
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('请假 SLA 节点匹配'),
+    );
+    expect(screen.getByTestId('strategy-action-plan')).toHaveTextContent('发送通知');
+    expect(screen.getByTestId('strategy-action-plan')).not.toHaveTextContent('NOTIFY');
     expect(screen.getByTestId('decision-rule-binding-block')).toBeInTheDocument();
+  });
+
+  it('uses business field labels instead of fragment reference paths in Strategy Studio conditions', async () => {
+    renderConsole();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('请假 SLA 节点匹配'),
+    );
+
+    const fieldSelect = screen.getByLabelText('field-0') as HTMLSelectElement;
+    expect(fieldSelect.selectedOptions[0]).toHaveTextContent('SLA 节点');
+    expect(fieldSelect.selectedOptions[0]).not.toHaveTextContent('record.data.targetKey');
+    expect(screen.getByTestId('cb-preview')).toHaveTextContent('SLA 节点');
+    expect(screen.getByTestId('cb-preview')).toHaveTextContent('主管审批节点');
+    expect(screen.getByTestId('cb-preview')).not.toHaveTextContent('record.data.targetKey');
+    expect(screen.getByTestId('cb-preview')).not.toHaveTextContent('task_manager_approve');
+  });
+
+  it('exposes a direct Strategy Studio workbench jump from the console header', () => {
+    renderConsole();
+    expect(screen.getByRole('link', { name: '进入工作区' })).toHaveAttribute(
+      'href',
+      '#strategy-workbench',
+    );
+    expect(screen.getByTestId('strategy-studio')).toHaveAttribute('id', 'strategy-workbench');
+  });
+
+  it('keeps compact Strategy Studio work focused on one workspace panel at a time', () => {
+    renderConsole();
+
+    expect(screen.getByTestId('strategy-workspace-tab-rule')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveAttribute('data-active', 'false');
+    expect(screen.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'false');
+    expect(screen.getByTestId('strategy-workspace-panel-review')).toHaveAttribute('data-active', 'false');
+
+    fireEvent.click(screen.getByTestId('strategy-workspace-tab-dmn'));
+
+    expect(screen.getByTestId('strategy-workspace-tab-dmn')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'false');
+    expect(screen.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'true');
+
+    fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+
+    expect(screen.getByTestId('strategy-workspace-tab-rule')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'false');
+  });
+
+  it('keeps Strategy Studio action output labels in the content column', async () => {
+    renderConsole();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-action-NOTIFY')).toHaveTextContent('发送通知'),
+    );
+
+    const action = screen.getByTestId('strategy-action-NOTIFY');
+    const copy = action.querySelector('.strategy-action-copy');
+
+    expect(copy).not.toBeNull();
+    expect(copy?.querySelector('strong')).toHaveTextContent('发送通知');
+    expect(copy?.querySelector('span')).toHaveTextContent('消息');
   });
 
   it('hydrates Strategy Studio decisions and fact fields from the Decision Runtime APIs', async () => {
@@ -364,33 +513,149 @@ describe('DecisionOpsConsole', () => {
         enabled: true,
       },
     ]);
-    const getModelFields = vi.fn(async () => [
-      {
-        entityCode: 'wd_leave_request',
-        path: 'record.data.amount',
-        label: '申请金额',
-        dataType: 'decimal',
-        refs: 4,
-      },
-    ]);
+    const getFactCatalog = vi.fn(async () => ({
+      entities: [
+        {
+          entityCode: 'wd_leave_request',
+          modelCode: 'wd_leave_request',
+          label: '请假申请',
+          facts: [
+            {
+              factKey: 'wd_leave_request.amount',
+              scope: 'record',
+              path: 'record.data.amount',
+              label: '申请金额',
+              dataType: 'decimal',
+              operators: ['EQ', 'GT'],
+            },
+          ],
+        },
+        {
+          entityCode: 'agent_memory',
+          modelCode: 'agent_memory',
+          label: 'Agent 记忆',
+          facts: [
+            {
+              scope: 'record',
+              path: 'record.data.access_count',
+              label: '访问次数',
+              dataType: 'integer',
+            },
+          ],
+        },
+      ],
+    }));
+    const getModelFields = vi.fn(async () => {
+      throw new Error('Strategy Studio must use fact catalog before legacy model fields');
+    });
 
     renderStudioWithoutModelFields({
       listDefinitions,
+      getFactCatalog,
       getModelFields,
     } as unknown as Partial<DecisionApi>);
 
     await waitFor(() => expect(listDefinitions).toHaveBeenCalledOnce());
-    await waitFor(() => expect(getModelFields).toHaveBeenCalledOnce());
+    await waitFor(() => expect(getFactCatalog).toHaveBeenCalledOnce());
+    expect(getModelFields).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
 
     await waitFor(() =>
       expect(screen.getByLabelText('decision-code')).toHaveTextContent(
-        'API 审批路由 (approval_routing)',
+        'API 审批路由',
       ),
     );
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('申请金额');
-    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('record.data.amount');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('请假申请');
+    expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('小数');
+    expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('record.data.amount');
+    expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('访问次数');
+  });
+
+  it('hydrates the Strategy Studio condition-fragment library from the runtime API', async () => {
+    const listConditionFragments = vi.fn(async () => ({
+      records: [
+        {
+          fragmentCode: 'approval_high_amount',
+          fragmentName: '高金额审批条件',
+          scopeType: 'BPM',
+          scopeRef: 'wd_leave_approval',
+          version: 3,
+          status: 'PUBLISHED',
+          fieldRefs: ['record.data.wd_req_days', 'process.nodeId'],
+          decisionRefs: ['approval_routing'],
+          conditionSpec: {
+            root: {
+              type: 'predicate',
+              left: { type: 'field', scope: 'record', path: 'data.wd_req_days' },
+              operator: 'GTE',
+              right: { type: 'literal', value: 3 },
+            },
+          },
+        },
+      ],
+      total: 1,
+      current: 1,
+      size: 20,
+    }));
+
+    renderConsole(undefined, { listConditionFragments } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() =>
+      expect(listConditionFragments).toHaveBeenCalledWith({ page: 1, size: 50 }),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('高金额审批条件'),
+    );
+    expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('BPM');
+    expect(screen.queryByText('高价值紧急客诉 v3')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('strategy-fragment-approval_high_amount'));
+
+    expect(screen.getByTestId('strategy-scenario-BPM')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent(
+      '已加载共享片段 · 高金额审批条件',
+    );
+    expect(screen.getByLabelText('decision-code')).toHaveValue('approval_routing');
+  });
+
+  it('shows only the latest Strategy Studio condition-fragment version per fragment code', async () => {
+    const listConditionFragments = vi.fn(async () => ({
+      records: [
+        {
+          fragmentCode: 'leave_sla_node_match',
+          fragmentName: '请假 SLA 节点匹配',
+          scopeType: 'SLA',
+          scopeRef: 'wd_leave_approval',
+          version: 1,
+          status: 'PUBLISHED',
+          fieldRefs: ['record.data.targetKey'],
+          decisionRefs: ['complaint_sla_deadline'],
+        },
+        {
+          fragmentCode: 'leave_sla_node_match',
+          fragmentName: '请假 SLA 节点匹配',
+          scopeType: 'SLA',
+          scopeRef: 'wd_leave_approval',
+          version: 2,
+          status: 'VALIDATED',
+          fieldRefs: ['record.data.targetKey', 'sla.deadlineMinutes'],
+          decisionRefs: ['complaint_sla_deadline'],
+        },
+      ],
+      total: 2,
+      current: 1,
+      size: 20,
+    }));
+
+    renderConsole(undefined, { listConditionFragments } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId('strategy-fragment-leave_sla_node_match')).toHaveLength(1),
+    );
+    expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('v2');
+    expect(screen.getByTestId('strategy-fragment-library')).not.toHaveTextContent('v1');
   });
 
   it('runs Strategy Studio header actions through the Decision Runtime APIs', async () => {
@@ -435,7 +700,7 @@ describe('DecisionOpsConsole', () => {
       expect.objectContaining({
         decisionCode: 'complaint_sla_deadline',
         callerType: 'SLA',
-        callerRef: 'SLA_ESCALATE_HIGH_VALUE',
+        callerRef: 'wd_manager_approve_sla',
       }),
     );
     expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('trace-studio');
@@ -455,13 +720,13 @@ describe('DecisionOpsConsole', () => {
         contentJson: expect.objectContaining({
           hitPolicy: 'FIRST',
           inputs: expect.arrayContaining([
-            expect.objectContaining({ id: 'sla_overdueMinutes', scope: 'sla', path: 'overdueMinutes' }),
+            expect.objectContaining({ id: 'sla_deadlineMinutes', scope: 'sla', path: 'deadlineMinutes' }),
           ]),
         }),
         outputSchemaJson: expect.objectContaining({
           actions: expect.arrayContaining([
             expect.objectContaining({ actionType: 'NOTIFY' }),
-            expect.objectContaining({ actionType: 'PATCH_RECORD' }),
+            expect.objectContaining({ actionType: 'WRITE_AUDIT' }),
           ]),
         }),
       }),
@@ -480,9 +745,9 @@ describe('DecisionOpsConsole', () => {
         contentJson: expect.objectContaining({
           inputs: expect.arrayContaining([
             expect.objectContaining({
-              id: 'process_taskKey',
+              id: 'process_nodeId',
               scope: 'process',
-              path: 'taskKey',
+              path: 'nodeId',
             }),
           ]),
         }),
@@ -493,7 +758,7 @@ describe('DecisionOpsConsole', () => {
         }),
         outputSchemaJson: expect.objectContaining({
           actions: expect.arrayContaining([
-            expect.objectContaining({ actionType: 'START_PROCESS' }),
+            expect.objectContaining({ actionType: 'ADD_COMMENT' }),
             expect.objectContaining({ actionType: 'WRITE_AUDIT' }),
           ]),
         }),
@@ -515,7 +780,7 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('decision-table-editor')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('dt-add-rule'));
-    fireEvent.change(screen.getByLabelText('feel-0-sla_overdueMinutes'), {
+    fireEvent.change(screen.getByLabelText('feel-0-sla_deadlineMinutes'), {
       target: { value: '> 30' },
     });
     fireEvent.change(screen.getByLabelText('out-0-route'), {
@@ -533,13 +798,29 @@ describe('DecisionOpsConsole', () => {
         rules: [
           {
             when: {
-              sla_overdueMinutes: { feel: '> 30' },
+              sla_deadlineMinutes: { feel: '> 30' },
             },
             then: { route: 'escalate' },
           },
         ],
       },
     });
+  });
+
+  it('exposes the scenario fact catalog inside the Strategy Studio DMN input picker', () => {
+    renderConsole();
+
+    fireEvent.click(screen.getByTestId('dt-input-field-picker-0'));
+
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('SLA 节点');
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('SLA 上下文');
+
+    fireEvent.change(screen.getByLabelText('input-field-search-0'), {
+      target: { value: '截止' },
+    });
+
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('截止分钟');
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).not.toHaveTextContent('SLA 节点');
   });
 
   it('runs Strategy Studio DMN analysis and XML round-trip from the scenario table editor', async () => {
@@ -570,10 +851,10 @@ describe('DecisionOpsConsole', () => {
         hitPolicy: 'FIRST',
         inputs: [
           {
-            id: 'sla_overdueMinutes',
-            label: '超时分钟',
+            id: 'sla_deadlineMinutes',
+            label: '截止分钟',
             scope: 'sla',
-            path: 'overdueMinutes',
+            path: 'deadlineMinutes',
             dataType: 'integer',
           },
         ],
@@ -582,7 +863,7 @@ describe('DecisionOpsConsole', () => {
           {
             ruleId: 'warn',
             priority: 10,
-            when: { sla_overdueMinutes: { operator: 'EQ', value: '', feel: '> 30' } },
+            when: { sla_deadlineMinutes: { operator: 'EQ', value: '', feel: '> 30' } },
             then: { route: 'escalate' },
           },
         ],
@@ -598,7 +879,7 @@ describe('DecisionOpsConsole', () => {
     } as unknown as Partial<DecisionApi>);
 
     fireEvent.click(screen.getByTestId('dt-add-rule'));
-    fireEvent.change(screen.getByLabelText('feel-0-sla_overdueMinutes'), {
+    fireEvent.change(screen.getByLabelText('feel-0-sla_deadlineMinutes'), {
       target: { value: '> 30' },
     });
     fireEvent.click(screen.getByTestId('dt-analyze'));
@@ -607,7 +888,7 @@ describe('DecisionOpsConsole', () => {
     expect(analyzeTable).toHaveBeenCalledWith(
       expect.objectContaining({
         inputs: expect.arrayContaining([
-          expect.objectContaining({ id: 'sla_overdueMinutes', path: 'overdueMinutes' }),
+          expect.objectContaining({ id: 'sla_deadlineMinutes', path: 'deadlineMinutes' }),
         ]),
       }),
       'complaint_sla_deadline',
@@ -624,7 +905,7 @@ describe('DecisionOpsConsole', () => {
     fireEvent.click(screen.getByTestId('dt-roundtrip-dmn'));
     await waitFor(() => expect(roundTripTableDmn).toHaveBeenCalledOnce());
     await waitFor(() =>
-      expect(screen.getByLabelText('feel-0-sla_overdueMinutes')).toHaveValue('> 30'),
+      expect(screen.getByLabelText('feel-0-sla_deadlineMinutes')).toHaveValue('> 30'),
     );
     expect(screen.getByTestId('dt-dmn-status')).toHaveTextContent('Round-trip 通过');
   });
@@ -699,19 +980,45 @@ describe('DecisionOpsConsole', () => {
 
     expect(screen.getByTestId('strategy-scenario-BPM')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent('BPM');
-    expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent('task.enter.approval');
+    expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent('进入审批节点');
+    expect(screen.getByTestId('strategy-consumer-summary')).not.toHaveTextContent('task.enter.approval');
     expect(screen.getByLabelText('decision-code')).toHaveValue('approval_routing');
     expect(screen.getByTestId('decision-binding-editor')).toBeInTheDocument();
   });
 
   it('reuses a shared condition fragment to switch consumers and shows operation feedback', async () => {
-    renderConsole();
+    const listConditionFragments = vi.fn(async () => ({
+      records: [
+        {
+          fragmentCode: 'approval_high_amount',
+          fragmentName: '高金额审批条件',
+          scopeType: 'BPM',
+          scopeRef: 'wd_leave_approval',
+          version: 3,
+          status: 'PUBLISHED',
+          fieldRefs: ['record.data.wd_req_days', 'process.nodeId'],
+          decisionRefs: ['approval_routing'],
+          conditionSpec: {
+            root: {
+              type: 'predicate',
+              left: { type: 'field', scope: 'record', path: 'data.wd_req_days' },
+              operator: 'GTE',
+              right: { type: 'literal', value: 3 },
+            },
+          },
+        },
+      ],
+      total: 1,
+      current: 1,
+      size: 20,
+    }));
+    renderConsole(undefined, { listConditionFragments } as unknown as Partial<DecisionApi>);
 
-    fireEvent.click(screen.getByTestId('strategy-fragment-BPM'));
+    await waitFor(() => expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('高金额审批条件'));
+    fireEvent.click(screen.getByTestId('strategy-fragment-approval_high_amount'));
 
     expect(screen.getByTestId('strategy-scenario-BPM')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent('BPM');
-    expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('高金额审批升级');
     expect(screen.getByLabelText('decision-code')).toHaveValue('approval_routing');
 
     fireEvent.click(screen.getByTestId('strategy-run-test'));
@@ -867,6 +1174,93 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByLabelText('out-0-route')).toHaveValue('director');
   });
 
+  it('loads unified fact catalog fields into the independent Decision Tables tab', async () => {
+    const getFactCatalog = vi.fn(async () => ({
+      entities: [
+        {
+          entityCode: 'wd_leave_request',
+          modelCode: 'wd_leave_request',
+          label: '请假申请',
+          facts: [
+            {
+              factKey: 'wd_leave_request.wd_leave_type',
+              scope: 'record',
+              path: 'record.data.wd_leave_type',
+              label: '请假类型',
+              dataType: 'dict',
+              dictCode: 'wd_leave_type',
+              allowedValues: [
+                { value: 'annual', label: '年假' },
+                { value: 'sick', label: '病假' },
+              ],
+            },
+          ],
+        },
+      ],
+    }));
+    const getModelFields = vi.fn(async () => [
+      {
+        entityCode: 'record',
+        path: 'data.legacyOnly',
+        label: '旧字段目录',
+        dataType: 'string' as const,
+      },
+    ]);
+    const analyzeTable = vi.fn(async () => ({
+      valid: true,
+      metrics: {
+        ruleCount: 0,
+        gapCount: 0,
+        overlapCount: 0,
+        conflictCount: 0,
+        unreachableRuleCount: 0,
+        finiteCombinationCount: 2,
+        finiteDomainComplete: true,
+      },
+      errors: [],
+      warnings: [],
+    }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    render(
+      <QueryClientProvider client={client}>
+        <DecisionOpsConsole
+          api={api({ getFactCatalog, getModelFields, analyzeTable } as unknown as Partial<DecisionApi>)}
+          fields={[]}
+          initialTab="tables"
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(getFactCatalog).toHaveBeenCalledOnce());
+    expect(getModelFields).not.toHaveBeenCalled();
+
+    fireEvent.click(await screen.findByTestId('dt-input-field-picker-0'));
+    await waitFor(() =>
+      expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('请假类型'),
+    );
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).not.toHaveTextContent('旧字段目录');
+
+    fireEvent.click(screen.getByTestId('dt-input-field-option-0-record-data_wd_leave_type'));
+    fireEvent.click(screen.getByTestId('dt-analyze'));
+
+    await waitFor(() => expect(analyzeTable).toHaveBeenCalledOnce());
+    expect(analyzeTable).toHaveBeenCalledWith(
+      expect.objectContaining({
+        inputs: expect.arrayContaining([
+          expect.objectContaining({
+            id: 'record_data_wd_leave_type',
+            label: '请假类型',
+            scope: 'record',
+            path: 'data.wd_leave_type',
+            dataType: 'dict',
+            allowedValues: ['annual', 'sick'],
+          }),
+        ]),
+      }),
+    );
+  });
+
   it('runs DMN table analysis from the Decision Tables tab and renders issue metrics', async () => {
     const analyzeTable = vi.fn(async () => ({
       valid: false,
@@ -906,9 +1300,10 @@ describe('DecisionOpsConsole', () => {
       }),
     );
     await waitFor(() =>
-      expect(screen.getByTestId('dt-analysis-panel')).toHaveTextContent('DMN_GAP'),
+      expect(screen.getByTestId('dt-analysis-panel')).toHaveTextContent('规则缺口'),
     );
-    expect(screen.getByTestId('dt-metric-gap')).toHaveTextContent('Gap 1');
+    expect(screen.getByTestId('dt-analysis-panel')).not.toHaveTextContent('DMN_GAP');
+    expect(screen.getByTestId('dt-metric-gap')).toHaveTextContent('缺口 1');
     expect(screen.getByTestId('dt-analysis-summary')).toHaveTextContent('规则 1');
   });
 
@@ -1006,6 +1401,17 @@ describe('DecisionOpsConsole', () => {
         decisionCode: 'complaint_sla_deadline',
         status: 'MATCHED',
         matchedRulesJson: [{ ruleId: 'R-101' }],
+        traceSnapshot: {
+          virtualSources: [
+            {
+              sourceRef: 'virtual.leave_request_summary.v1',
+              modelCode: 'leave_request_summary_v',
+              recordId: 'REQ-001',
+              status: 'RESOLVED',
+              fields: { slaRiskScore: 91 },
+            },
+          ],
+        },
         durationMs: 18,
         createdAt: '2026-06-08T14:10:00Z',
       },
@@ -1017,9 +1423,14 @@ describe('DecisionOpsConsole', () => {
 
     await waitFor(() => expect(getLogs).toHaveBeenCalledWith('trace-live'));
     expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('complaint_sla_deadline');
-    expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('MATCHED');
+    expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('命中');
+    expect(screen.getByTestId('elv-row-trace-live')).not.toHaveTextContent('MATCHED');
     expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('R-101');
     expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('18ms');
+    fireEvent.click(screen.getByTestId('elv-open-trace-live'));
+    expect(screen.getByTestId('elv-virtual-sources')).toHaveTextContent('virtual.leave_request_summary.v1');
+    expect(screen.getByTestId('elv-virtual-sources')).toHaveTextContent('slaRiskScore');
+    expect(screen.getByTestId('elv-virtual-sources')).toHaveTextContent('91');
   });
 
   it('honors initialTab', () => {

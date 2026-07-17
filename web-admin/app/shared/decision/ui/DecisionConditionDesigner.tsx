@@ -76,7 +76,7 @@ export function DecisionConditionDesigner({
       )}
 
       {samples.length > 0 && (
-        <ConditionTestRunPanel condition={condition} samples={samples} labelOf={labelOf} />
+        <ConditionTestRunPanel condition={condition} samples={samples} fields={fields} labelOf={labelOf} />
       )}
 
       <pre data-testid="dcd-ast" className="dcd-ast">{serialize(condition)}</pre>

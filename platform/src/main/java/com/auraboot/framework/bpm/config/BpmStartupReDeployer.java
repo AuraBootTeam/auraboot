@@ -34,9 +34,11 @@ import java.util.List;
  * finishing startup.
  *
  * <p>Idempotency: re-running this listener is safe because
- * {@link #isAlreadyCached(RepositoryQueryService, String)} skips any process
- * whose id is already present in the engine cache. That makes both cold-start
- * and any hypothetical second invocation side-effect-free.
+ * {@link #isAlreadyCached(RepositoryQueryService, String, Integer)} skips any
+ * process version that is already present in the engine cache. The version
+ * check is required because SmartEngine can hold multiple versions for the
+ * same process id; skipping only by process id leaves stale versions cached
+ * and makes new process instances start an older definition after restart.
  */
 @Slf4j
 @Component
@@ -106,8 +108,9 @@ public class BpmStartupReDeployer {
             return DeployOutcome.EMPTY_BPMN;
         }
 
-        if (isAlreadyCached(queryService, processKey)) {
-            log.debug("BPM startup re-deploy: process {} already cached, skipping", processKey);
+        if (isAlreadyCached(queryService, processKey, def.getVersion())) {
+            log.debug("BPM startup re-deploy: process {} version {} already cached, skipping",
+                    processKey, def.getVersion());
             return DeployOutcome.ALREADY_CACHED;
         }
 
@@ -136,11 +139,12 @@ public class BpmStartupReDeployer {
         }
     }
 
-    private boolean isAlreadyCached(RepositoryQueryService queryService, String processKey) {
+    private boolean isAlreadyCached(RepositoryQueryService queryService, String processKey, Integer version) {
         try {
             return queryService.getAllCachedProcessDefinition()
                     .stream()
-                    .anyMatch(pd -> processKey.equals(pd.getId()));
+                    .anyMatch(pd -> processKey.equals(pd.getId())
+                            && sameMajorVersion(pd.getVersion(), version));
         } catch (Exception e) {
             // If the cache query itself fails we conservatively treat the process as
             // not cached so the caller will attempt a deploy. A real "already
@@ -148,6 +152,26 @@ public class BpmStartupReDeployer {
             // reDeployPersistedProcessesOnStartup, which is logged and isolated.
             log.warn("BPM startup re-deploy: cache lookup failed for {}: {}", processKey, e.getMessage());
             return false;
+        }
+    }
+
+    private boolean sameMajorVersion(String cachedVersion, Integer persistedVersion) {
+        if (persistedVersion == null) {
+            return false;
+        }
+        Integer cachedMajor = parseMajorVersion(cachedVersion);
+        return cachedMajor != null && cachedMajor.equals(persistedVersion);
+    }
+
+    private Integer parseMajorVersion(String version) {
+        if (!org.springframework.util.StringUtils.hasText(version)) {
+            return null;
+        }
+        String major = version.split("\\.", 2)[0];
+        try {
+            return Integer.parseInt(major);
+        } catch (NumberFormatException e) {
+            return null;
         }
     }
 

@@ -5,6 +5,7 @@ import com.auraboot.framework.automation.executor.ActionExecutor;
 import com.auraboot.framework.common.util.PinnedHttpRequests;
 import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.exception.BusinessException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,8 +14,9 @@ import org.springframework.stereotype.Component;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -41,6 +43,7 @@ import java.util.Map;
 public class SendWebhookExecutor implements ActionExecutor {
 
     private final ObjectMapper objectMapper;
+    private static final int RESPONSE_BODY_PREVIEW_CHARS = 500;
 
     private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -57,11 +60,14 @@ public class SendWebhookExecutor implements ActionExecutor {
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("SEND_WEBHOOK action requires url");
         }
-        url = processTemplate(url, context);
+        url = AutomationActionValueResolver.resolveString(url, context);
+        if (url == null || url.isBlank()) {
+            throw new IllegalArgumentException("SEND_WEBHOOK action requires resolved url");
+        }
 
         // Build the JSON body from the configured payload (Map or JSON string),
         // or fall back to the trigger context essentials.
-        String bodyJson = buildPayloadJson(config.get("payload"), context);
+        String bodyJson = buildPayloadJson(config, context);
 
         // Validate URL + capture the resolved IP so the HTTP call uses the same IP
         // that passed the block-list check (P3-E #1 DNS rebinding TOCTOU) — mirrors
@@ -84,7 +90,8 @@ public class SendWebhookExecutor implements ActionExecutor {
             @SuppressWarnings("unchecked")
             Map<String, String> headers = (Map<String, String>) config.get("headers");
             if (headers != null) {
-                headers.forEach((k, v) -> requestBuilder.header(k, processTemplate(v, context)));
+                headers.forEach((k, v) -> requestBuilder.header(k,
+                        AutomationActionValueResolver.resolveString(v, context)));
             }
 
             requestBuilder.POST(bodyJson != null
@@ -102,11 +109,7 @@ public class SendWebhookExecutor implements ActionExecutor {
                         "Webhook POST failed with status " + statusCode + ": " + response.body());
             }
 
-            Map<String, Object> result = new HashMap<>();
-            result.put("success", true);
-            result.put("statusCode", statusCode);
-            result.put("url", url);
-            return result;
+            return buildSuccessResult(url, statusCode, response.body());
 
         } catch (BusinessException e) {
             // Already a clear, surfaced reason — propagate as-is (no double-wrap).
@@ -121,27 +124,58 @@ public class SendWebhookExecutor implements ActionExecutor {
         return "send_webhook".equals(actionType);
     }
 
+    Map<String, Object> buildSuccessResult(String url, int statusCode, String responseBody) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", true);
+        result.put("deliveryMode", "direct_http");
+        result.put("statusCode", statusCode);
+        result.put("url", url);
+        if (responseBody != null) {
+            result.put("responseBodyPreview", previewResponseBody(responseBody));
+            result.put("responseBytes", responseBody.getBytes(StandardCharsets.UTF_8).length);
+        }
+        return result;
+    }
+
+    private String previewResponseBody(String responseBody) {
+        if (responseBody.length() <= RESPONSE_BODY_PREVIEW_CHARS) {
+            return responseBody;
+        }
+        return responseBody.substring(0, RESPONSE_BODY_PREVIEW_CHARS) + "...";
+    }
+
     /**
      * Serialize the configured payload to a JSON body, resolving {@code ${...}}
      * placeholders against the run context. Accepts a Map (per-value substitution,
      * preserving non-string types) or a JSON String (partial template substitution),
      * and falls back to the trigger context when no payload is configured.
      */
-    private String buildPayloadJson(Object payloadConfig, Map<String, Object> context) {
+    String buildPayloadJson(Map<String, Object> config, Map<String, Object> context) {
         try {
+            Object payloadConfig = config.get("payload");
+            String eventType = resolveEventType(config, context);
             if (payloadConfig instanceof Map<?, ?> mapPayload) {
-                Map<String, Object> processed = new HashMap<>();
-                for (Map.Entry<?, ?> entry : mapPayload.entrySet()) {
-                    processed.put(String.valueOf(entry.getKey()), resolveValue(entry.getValue(), context));
-                }
+                Map<String, Object> processed = AutomationActionValueResolver.resolveMap(mapPayload, context);
+                applyEventType(processed, eventType);
                 return objectMapper.writeValueAsString(processed);
             }
             if (payloadConfig instanceof String strPayload) {
                 // A JSON string with ${...} placeholders → substitute then send verbatim.
-                return processTemplate(strPayload, context);
+                String processed = AutomationActionValueResolver.resolveString(strPayload, context);
+                if (eventType == null) {
+                    return processed;
+                }
+                try {
+                    Map<String, Object> parsed = objectMapper.readValue(processed, new TypeReference<>() {});
+                    applyEventType(parsed, eventType);
+                    return objectMapper.writeValueAsString(parsed);
+                } catch (Exception ignored) {
+                    return processed;
+                }
             }
             // Default: emit the trigger context essentials.
-            Map<String, Object> def = new HashMap<>();
+            Map<String, Object> def = new LinkedHashMap<>();
+            applyEventType(def, eventType);
             def.put("automationPid", context.get("automationPid"));
             def.put("recordPid", context.get("recordPid"));
             def.put("event", context.get("event"));
@@ -156,45 +190,18 @@ public class SendWebhookExecutor implements ActionExecutor {
         }
     }
 
-    /**
-     * Resolve a single payload value: an exact single-placeholder string
-     * ({@code ${a.b}}) resolves to the raw context value (preserving type and
-     * supporting nested map access); any other string runs partial template
-     * substitution; non-strings pass through unchanged.
-     */
-    private Object resolveValue(Object value, Map<String, Object> context) {
-        if (!(value instanceof String str)) {
-            return value;
+    private String resolveEventType(Map<String, Object> config, Map<String, Object> context) {
+        Object value = AutomationActionValueResolver.resolveValue(config.get("eventType"), context);
+        if (value == null || String.valueOf(value).isBlank()) {
+            return null;
         }
-        if (str.startsWith("${") && str.endsWith("}") && str.indexOf("${", 2) == -1) {
-            return resolveVariable(str.substring(2, str.length() - 1), context);
-        }
-        return processTemplate(str, context);
+        return String.valueOf(value);
     }
 
-    private Object resolveVariable(String varName, Map<String, Object> context) {
-        String[] parts = varName.split("\\.");
-        Object current = context;
-        for (String part : parts) {
-            if (current instanceof Map) {
-                current = ((Map<?, ?>) current).get(part);
-            } else {
-                return null;
-            }
+    private void applyEventType(Map<String, Object> body, String eventType) {
+        if (eventType != null && !eventType.isBlank()) {
+            body.put("eventType", eventType);
         }
-        return current;
     }
 
-    private String processTemplate(String template, Map<String, Object> context) {
-        if (template == null) return null;
-        String result = template;
-        for (Map.Entry<String, Object> entry : context.entrySet()) {
-            String placeholder = "${" + entry.getKey() + "}";
-            if (result.contains(placeholder)) {
-                result = result.replace(placeholder,
-                        entry.getValue() != null ? entry.getValue().toString() : "");
-            }
-        }
-        return result;
-    }
 }

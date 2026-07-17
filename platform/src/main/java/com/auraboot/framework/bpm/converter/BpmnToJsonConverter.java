@@ -1,5 +1,6 @@
 package com.auraboot.framework.bpm.converter;
 
+import com.auraboot.framework.bpm.chain.BpmServiceTaskConstants;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -303,8 +304,26 @@ public class BpmnToJsonConverter {
 
         String smartClass = getSmartAttribute(element, "class");
         if (smartClass != null && !smartClass.isEmpty()) {
-            config.put("serviceType", "java");
-            config.put("className", smartClass);
+            if (BpmServiceTaskConstants.BEAN_PLUGIN_ACTION_DELEGATE.equals(smartClass)) {
+                config.put("serviceType", "action");
+                putSmartAttribute(config, element, BpmServiceTaskConstants.ATTR_ACTION, "actionType");
+                putSmartAttribute(config, element, BpmServiceTaskConstants.ATTR_TARGET, "actionTarget");
+                putSmartAttribute(config, element, BpmServiceTaskConstants.ATTR_RESULT_VAR, "actionResultVar");
+                putSmartAttribute(config, element, BpmServiceTaskConstants.ATTR_IDEMPOTENCY_KEY, "actionIdempotencyKey");
+                putSmartAttribute(config, element, BpmServiceTaskConstants.ATTR_RULE_CODE, "actionRuleCode");
+                String payloadJson = getSmartAttribute(element, BpmServiceTaskConstants.ATTR_PAYLOAD_JSON);
+                if (payloadJson != null && !payloadJson.isBlank()) {
+                    config.put("actionPayloadJson", payloadJson);
+                    try {
+                        config.set("actionPayload", objectMapper.readTree(payloadJson));
+                    } catch (Exception ignored) {
+                        // Keep actionPayloadJson as the editable source if a legacy payload is not JSON.
+                    }
+                }
+            } else {
+                config.put("serviceType", "java");
+                config.put("className", smartClass);
+            }
         }
 
         String async = getSmartAttribute(element, "async");
@@ -320,6 +339,13 @@ public class BpmnToJsonConverter {
         }
 
         return config;
+    }
+
+    private void putSmartAttribute(ObjectNode target, Element element, String smartAttribute, String jsonField) {
+        String value = getSmartAttribute(element, smartAttribute);
+        if (value != null && !value.isBlank()) {
+            target.put(jsonField, value);
+        }
     }
 
     private ObjectNode buildReceiveTaskConfig(Element element) {

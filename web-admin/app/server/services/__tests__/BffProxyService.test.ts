@@ -37,12 +37,17 @@ describe('BffProxyService', () => {
     vi.unstubAllGlobals();
   });
 
-  it('does not forward empty JSON bodies on GET or HEAD requests', () => {
-    expect(shouldForwardRequestBody('GET')).toBe(false);
-    expect(shouldForwardRequestBody('head')).toBe(false);
-    expect(shouldForwardRequestBody('POST')).toBe(true);
-    expect(shouldForwardRequestBody('PUT')).toBe(true);
-    expect(shouldForwardRequestBody('DELETE')).toBe(true);
+  it('only forwards non-empty request bodies on body-capable methods', () => {
+    expect(shouldForwardRequestBody('GET', { q: 'ignored' })).toBe(false);
+    expect(shouldForwardRequestBody('head', { q: 'ignored' })).toBe(false);
+    expect(shouldForwardRequestBody('POST')).toBe(false);
+    expect(shouldForwardRequestBody('POST', {})).toBe(false);
+    expect(shouldForwardRequestBody('DELETE', {})).toBe(false);
+    expect(shouldForwardRequestBody('PUT', '')).toBe(false);
+    expect(shouldForwardRequestBody('PATCH', Buffer.alloc(0))).toBe(false);
+    expect(shouldForwardRequestBody('POST', { value: 1 })).toBe(true);
+    expect(shouldForwardRequestBody('PUT', 'raw')).toBe(true);
+    expect(shouldForwardRequestBody('PATCH', Buffer.from('raw'))).toBe(true);
   });
 
   it('does not forward browser CORS headers to the Spring backend', async () => {

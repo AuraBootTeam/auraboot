@@ -172,12 +172,23 @@ public class CompletionPhase implements CommandPhase {
             }
             domainEventPublisher.publishCommandCompleted(
                     ctx.getCommand().getCode(),
-                    ctx.getRequest() != null ? ctx.getRequest().getOperationType() : "unknown",
+                    resolveOperationType(ctx),
                     ctx.getTenantId(), recordId, ctx.getCommand().getModelCode(), ctx.getPayload(),
                     ctx.getUserId(), actorName, extraMeta);
         } catch (Exception e) {
             log.warn("Failed to publish domain event for command {}: {}", ctx.getCommand().getCode(), e.getMessage());
         }
+    }
+
+    private String resolveOperationType(CommandPipelineContext ctx) {
+        if (ctx.getRequest() != null && StringUtils.hasText(ctx.getRequest().getOperationType())) {
+            return ctx.getRequest().getOperationType();
+        }
+        Object configuredType = ctx.getExecConfig() != null ? ctx.getExecConfig().get("type") : null;
+        if (configuredType instanceof String type && StringUtils.hasText(type)) {
+            return type;
+        }
+        return "unknown";
     }
 
     @SuppressWarnings("unchecked")

@@ -98,7 +98,8 @@ public class NotificationServiceImpl implements NotificationService {
 
         // Resolve recipient(s) per recipientType: user (default), role, or group/team.
         // recipientId is a numeric userId (user), a role code (role) or a team pid (group).
-        List<Long> recipientUserIds = resolveRecipientUserIds(request, tenantId);
+        List<Long> recipientUserIds = resolveRecipientUserIds(
+                request.getRecipientType(), request.getRecipientId(), tenantId);
 
         NotificationMessage message = NotificationMessage.builder()
                 .tenantId(tenantId)
@@ -128,12 +129,12 @@ public class NotificationServiceImpl implements NotificationService {
      *   <li>{@code user} (default) — the single user id (recipientId parsed as a long)</li>
      * </ul>
      */
-    private List<Long> resolveRecipientUserIds(NotificationSendRequest request, Long tenantId) {
-        String recipient = request.getRecipientId();
+    private List<Long> resolveRecipientUserIds(String recipientType, String recipientId, Long tenantId) {
+        String recipient = recipientId;
         if (recipient == null || recipient.isBlank()) {
             return List.of();
         }
-        String type = request.getRecipientType();
+        String type = recipientType;
         String normalized = (type == null || type.isBlank()) ? "user" : type.trim().toLowerCase();
         switch (normalized) {
             case "role" -> {
@@ -261,6 +262,25 @@ public class NotificationServiceImpl implements NotificationService {
     public void sendInApp(Long userId, String title, String content,
                           String category, String sourceType, String sourceId) {
         Long tenantId = MetaContext.getCurrentTenantId();
+        sendInAppToUserIds(tenantId, List.of(userId), title, content, category, sourceType, sourceId);
+    }
+
+    @Override
+    @Transactional
+    public List<Long> sendInAppToRecipient(String recipientType, String recipientId, String title, String content,
+                                           String category, String sourceType, String sourceId) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        List<Long> userIds = resolveRecipientUserIds(recipientType, recipientId, tenantId);
+        if (userIds.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "No notification recipients resolved for " + recipientType + ":" + recipientId);
+        }
+        sendInAppToUserIds(tenantId, userIds, title, content, category, sourceType, sourceId);
+        return List.copyOf(userIds);
+    }
+
+    private void sendInAppToUserIds(Long tenantId, List<Long> userIds, String title, String content,
+                                    String category, String sourceType, String sourceId) {
         NotificationChannel inApp = channelMap.get("in_app");
         if (inApp == null) {
             log.error("InAppChannel not registered");
@@ -269,7 +289,7 @@ public class NotificationServiceImpl implements NotificationService {
 
         inApp.send(NotificationMessage.builder()
                 .tenantId(tenantId)
-                .recipientUserIds(List.of(userId))
+                .recipientUserIds(userIds)
                 .subject(title)
                 .body(content)
                 .category(category)

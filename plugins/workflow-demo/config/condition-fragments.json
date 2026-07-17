@@ -1,0 +1,153 @@
+[
+  {
+    "fragmentCode": "shared_leave_approval_guard",
+    "fragmentName": "共享请假审批准入条件",
+    "description": "SLA、BPM、Automation、事件策略和权限策略复用的请假申请条件片段。",
+    "scopeType": "MODEL",
+    "scopeRef": "wd_leave_request",
+    "ownerModule": "workflow-demo",
+    "enabled": true,
+    "publish": true,
+    "conditionSpec": {
+      "root": {
+        "type": "group",
+        "op": "AND",
+        "children": [
+          {
+            "type": "compare",
+            "left": { "type": "path", "scope": "record", "path": "data.wd_req_days", "dataType": "decimal" },
+            "operator": "GTE",
+            "right": { "type": "literal", "value": 3, "dataType": "decimal" }
+          }
+        ]
+      },
+      "decisionBindings": []
+    }
+  },
+  {
+    "fragmentCode": "leave_sla_node_match",
+    "fragmentName": "请假 SLA 节点匹配",
+    "description": "主管/HR 审批节点进入 SLA 计时前复用的条件片段。",
+    "scopeType": "SLA",
+    "scopeRef": "wd_leave_approval",
+    "ownerModule": "workflow-demo",
+    "enabled": true,
+    "publish": true,
+    "conditionSpec": {
+      "root": {
+        "type": "group",
+        "op": "OR",
+        "children": [
+          {
+            "type": "compare",
+            "left": { "type": "path", "scope": "record", "path": "data.targetKey", "dataType": "string" },
+            "operator": "EQ",
+            "right": { "type": "literal", "value": "task_manager_approve", "dataType": "string" }
+          },
+          {
+            "type": "compare",
+            "left": { "type": "path", "scope": "record", "path": "data.targetKey", "dataType": "string" },
+            "operator": "EQ",
+            "right": { "type": "literal", "value": "task_hr_approve", "dataType": "string" }
+          }
+        ]
+      },
+      "decisionBindings": [
+        { "decisionCode": "complaint_sla_deadline", "versionPolicy": "LATEST_PUBLISHED" }
+      ]
+    }
+  },
+  {
+    "fragmentCode": "leave_bpm_approval_route",
+    "fragmentName": "请假审批路由条件",
+    "description": "BPM 主管/HR 审批节点共用的审批人分派条件片段。",
+    "scopeType": "BPM",
+    "scopeRef": "wd_leave_approval",
+    "ownerModule": "workflow-demo",
+    "enabled": true,
+    "publish": true,
+    "conditionSpec": {
+      "root": {
+        "type": "group",
+        "op": "OR",
+        "children": [
+          {
+            "type": "compare",
+            "left": { "type": "path", "scope": "process", "path": "nodeId", "dataType": "string" },
+            "operator": "EQ",
+            "right": { "type": "literal", "value": "task_manager_approve", "dataType": "string" }
+          },
+          {
+            "type": "compare",
+            "left": { "type": "path", "scope": "process", "path": "nodeId", "dataType": "string" },
+            "operator": "EQ",
+            "right": { "type": "literal", "value": "task_hr_approve", "dataType": "string" }
+          }
+        ]
+      },
+      "decisionBindings": [
+        { "decisionCode": "approval_routing", "versionPolicy": "LATEST_PUBLISHED" }
+      ]
+    }
+  },
+  {
+    "fragmentCode": "leave_automation_long_leave",
+    "fragmentName": "长假自动通知条件",
+    "description": "请假天数达到 3 天后复用的自动化触发条件片段。",
+    "scopeType": "AUTOMATION",
+    "scopeRef": "wd_leave_request",
+    "ownerModule": "workflow-demo",
+    "enabled": true,
+    "publish": true,
+    "conditionSpec": {
+      "root": {
+        "type": "group",
+        "op": "AND",
+        "children": [
+          {
+            "type": "compare",
+            "left": { "type": "path", "scope": "record", "path": "data.wd_req_days", "dataType": "decimal" },
+            "operator": "GTE",
+            "right": { "type": "literal", "value": 3, "dataType": "decimal" }
+          }
+        ]
+      },
+      "decisionBindings": [
+        { "decisionCode": "leave_request_automation", "versionPolicy": "LATEST_PUBLISHED" }
+      ]
+    }
+  },
+  {
+    "fragmentCode": "leave_event_policy_action",
+    "fragmentName": "请假事件动作条件",
+    "description": "请假申请创建事件后复用的动作策略条件片段。",
+    "scopeType": "EVENT_POLICY",
+    "scopeRef": "leave_request_event_policy",
+    "ownerModule": "workflow-demo",
+    "enabled": true,
+    "publish": true,
+    "conditionSpec": {
+      "root": {
+        "type": "group",
+        "op": "AND",
+        "children": [
+          {
+            "type": "compare",
+            "left": { "type": "path", "scope": "event", "path": "type", "dataType": "string" },
+            "operator": "EQ",
+            "right": { "type": "literal", "value": "LEAVE_REQUEST_CREATED", "dataType": "string" }
+          },
+          {
+            "type": "compare",
+            "left": { "type": "path", "scope": "record", "path": "data.wd_req_days", "dataType": "decimal" },
+            "operator": "GTE",
+            "right": { "type": "literal", "value": 3, "dataType": "decimal" }
+          }
+        ]
+      },
+      "decisionBindings": [
+        { "decisionCode": "leave_request_automation", "versionPolicy": "LATEST_PUBLISHED" }
+      ]
+    }
+  }
+]

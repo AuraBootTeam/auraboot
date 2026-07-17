@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -366,6 +367,12 @@ public class AutomationServiceImpl implements AutomationService {
     @Transactional
     @Override
     public AutomationLogDTO triggerManually(String pid, String recordPid) {
+        return triggerManually(pid, recordPid, Map.of());
+    }
+
+    @Transactional
+    @Override
+    public AutomationLogDTO triggerManually(String pid, String recordPid, Map<String, Object> context) {
         log.info("Manually triggering automation: pid={}, recordPid={}", pid, recordPid);
 
         Automation automation = loadOwnedAutomation(pid);
@@ -373,9 +380,18 @@ public class AutomationServiceImpl implements AutomationService {
         AutomationLog logEntry = automationTriggerService.executeAutomation(
                 automation,
                 recordPid,
-                Map.of("manualTrigger", true));
+                buildManualTriggerPayload(context));
 
         return toLogDTO(logEntry);
+    }
+
+    private Map<String, Object> buildManualTriggerPayload(Map<String, Object> context) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        if (context != null) {
+            payload.putAll(context);
+        }
+        payload.put("manualTrigger", true);
+        return payload;
     }
 
     // ==================== Toggle / Duplicate / Validate ====================

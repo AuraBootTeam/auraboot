@@ -78,6 +78,58 @@ class JsonToBpmnConverterTest {
     }
 
     @Test
+    @DisplayName("should compile BPM serviceTask action catalog config to plugin action delegate and restore it")
+    void shouldCompileActionCatalogServiceTaskAndRestoreConfig() throws Exception {
+        String json = """
+            {
+              "key": "bpm_action_catalog",
+              "name": "BPM Action Catalog",
+              "nodes": [
+                {"id": "start", "type": "startEvent", "data": {"type": "startEvent", "label": "Start"}},
+                {"id": "send_sms", "type": "serviceTask", "data": {
+                  "type": "serviceTask",
+                  "label": "Send SMS",
+                  "config": {
+                    "serviceType": "action",
+                    "actionType": "SEND_SMS",
+                    "actionTarget": "PHONE:${record.phone}",
+                    "actionPayloadJson": "{\\"content\\":\\"流程短信\\"}",
+                    "actionResultVar": "smsResult",
+                    "actionIdempotencyKey": "bpm:${process.instanceId}:SEND_SMS",
+                    "actionRuleCode": "bpm-node-action"
+                  }
+                }},
+                {"id": "end", "type": "endEvent", "data": {"type": "endEvent", "label": "End"}}
+              ],
+              "edges": [
+                {"id": "e1", "source": "start", "target": "send_sms", "data": {}},
+                {"id": "e2", "source": "send_sms", "target": "end", "data": {}}
+              ]
+            }
+            """;
+
+        String xml = jsonToBpmn.convert(json);
+
+        assertTrue(xml.contains("smart:class=\"pluginActionServiceTaskDelegate\""), xml);
+        assertTrue(xml.contains("smart:action=\"SEND_SMS\""), xml);
+        assertTrue(xml.contains("smart:target=\"PHONE:${record.phone}\""), xml);
+        assertTrue(xml.contains("smart:payloadJson=\"{&quot;content&quot;:&quot;流程短信&quot;}\""), xml);
+        assertTrue(xml.contains("smart:resultVar=\"smsResult\""), xml);
+        assertTrue(xml.contains("smart:idempotencyKey=\"bpm:${process.instanceId}:SEND_SMS\""), xml);
+        assertTrue(xml.contains("smart:ruleCode=\"bpm-node-action\""), xml);
+
+        JsonNode restored = objectMapper.readTree(bpmnToJson.convert(xml));
+        JsonNode config = restored.path("nodes").get(1).path("data").path("config");
+        assertEquals("action", config.path("serviceType").asText());
+        assertEquals("SEND_SMS", config.path("actionType").asText());
+        assertEquals("PHONE:${record.phone}", config.path("actionTarget").asText());
+        assertEquals("{\"content\":\"流程短信\"}", config.path("actionPayloadJson").asText());
+        assertEquals("流程短信", config.path("actionPayload").path("content").asText());
+        assertEquals("smsResult", config.path("actionResultVar").asText());
+        assertEquals("bpm:${process.instanceId}:SEND_SMS", config.path("actionIdempotencyKey").asText());
+    }
+
+    @Test
     @DisplayName("should emit rule-center binding smart property for gateway")
     void shouldEmitRuleBindingForGateway() {
         String json = """

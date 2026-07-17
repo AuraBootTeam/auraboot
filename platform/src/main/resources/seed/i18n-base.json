@@ -3066,5 +3066,20 @@
     "key": "semantic.lineage.picker.empty",
     "zh-CN": "无匹配结果",
     "en-US": "No items found"
+  },
+  {
+    "key": "flow.availability.unavailable",
+    "zh-CN": "不可用",
+    "en-US": "Unavailable"
+  },
+  {
+    "key": "flow.availability.providerStatus",
+    "zh-CN": "动作可用性",
+    "en-US": "Provider availability"
+  },
+  {
+    "key": "flow.availability.reasonFallback",
+    "zh-CN": "当前环境未提供该动作的可用服务。",
+    "en-US": "The action provider is not available in the current environment."
   }
 ]

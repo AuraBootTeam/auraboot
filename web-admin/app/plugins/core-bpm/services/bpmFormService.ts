@@ -67,6 +67,8 @@ export interface BpmTaskActionDef {
   requireComment?: boolean;
 }
 
+export type BpmTaskActionDecision = 'approve' | 'reject';
+
 /**
  * Shape returned by GET /api/bpm/forms/task/{taskId}. Mirrors backend
  * {@link com.auraboot.framework.bpm.dto.TaskFormResponse} exactly — adding or
@@ -91,6 +93,30 @@ export interface TaskFormData {
 
 function isSuccess(code: string): boolean {
   return code === ErrorCodes.SUCCESS;
+}
+
+/**
+ * Extract process variables declared by designer-authored taskActions.
+ *
+ * Approve/reject buttons complete the current BPM task, and downstream
+ * gateway conditions often depend on variables such as taskResult. The
+ * designer persists those variables as taskActions[*].resultVariable /
+ * resultValue; callers must forward them to task approve/reject APIs.
+ */
+export function resolveTaskActionVariables(
+  actions: BpmTaskActionDef[] | null | undefined,
+  decisionKey: BpmTaskActionDecision,
+): Record<string, unknown> | undefined {
+  if (!Array.isArray(actions) || actions.length === 0) {
+    return undefined;
+  }
+  const match = actions.find(
+    (action) => action && action.type === 'complete' && action.key === decisionKey,
+  );
+  if (!match?.resultVariable) {
+    return undefined;
+  }
+  return { [match.resultVariable]: match.resultValue };
 }
 
 // ==================== API Functions ====================

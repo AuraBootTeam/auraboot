@@ -41,9 +41,18 @@ export function isBinaryDownloadPath(path: string): boolean {
   );
 }
 
-export function shouldForwardRequestBody(method: string): boolean {
+function hasNonEmptyBody(body: unknown): boolean {
+  if (body === undefined || body === null) return false;
+  if (Buffer.isBuffer(body)) return body.length > 0;
+  if (typeof body === 'string') return body.length > 0;
+  if (Array.isArray(body)) return body.length > 0;
+  if (typeof body === 'object') return Object.keys(body as Record<string, unknown>).length > 0;
+  return true;
+}
+
+export function shouldForwardRequestBody(method: string, body?: unknown): boolean {
   const normalized = method.toUpperCase();
-  return normalized !== 'GET' && normalized !== 'HEAD';
+  return normalized !== 'GET' && normalized !== 'HEAD' && hasNonEmptyBody(body);
 }
 
 type ResponseHeaderValue = string | number | readonly string[];
@@ -198,7 +207,7 @@ export class BffProxyService {
         httpsAgent: noProxyHttpsAgent,
         proxy: false as const, // Disable axios built-in proxy detection
       };
-      if (shouldForwardRequestBody(req.method)) {
+      if (shouldForwardRequestBody(req.method, req.body)) {
         axiosConfig.data = req.body;
       }
 
@@ -279,7 +288,7 @@ export class BffProxyService {
         headers,
         signal: controller.signal,
       };
-      if (shouldForwardRequestBody(req.method)) {
+      if (shouldForwardRequestBody(req.method, req.body)) {
         requestInit.body =
           typeof req.body === 'string'
             ? req.body

@@ -97,6 +97,18 @@ public class DrtLogEntity {
                 jdbcType = JdbcType.OTHER)
     private JsonNode matchedRulesJson;
 
+    /** Serialised DecisionResult.outputs for Trace UI readability */
+    @TableField(value = "output_snapshot",
+                typeHandler = JsonNodeTypeHandler.class,
+                jdbcType = JdbcType.OTHER)
+    private JsonNode outputSnapshot;
+
+    /** Trace diagnostics for UI readability without storing the full input context */
+    @TableField(value = "trace_snapshot",
+                typeHandler = JsonNodeTypeHandler.class,
+                jdbcType = JdbcType.OTHER)
+    private JsonNode traceSnapshot;
+
     @TableField("duration_ms")
     private Long durationMs;
 

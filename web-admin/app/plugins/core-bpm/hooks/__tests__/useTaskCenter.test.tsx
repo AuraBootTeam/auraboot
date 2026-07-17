@@ -48,12 +48,22 @@ vi.mock('~/plugins/core-bpm/services/bpmNotifyService', () => ({
   sendUrge: vi.fn(),
 }));
 
+vi.mock('~/plugins/core-bpm/services/bpmFormService', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('~/plugins/core-bpm/services/bpmFormService')>();
+  return {
+    ...actual,
+    getTaskForm: vi.fn(),
+  };
+});
+
 // ── Now import under-test and mocked modules ─────────────────────────────────
 
 import { useTaskCenter } from '../useTaskCenter';
 import * as workbenchService from '~/plugins/core-bpm/services/bpmWorkbenchService';
 import * as slaService from '~/plugins/core-bpm/services/slaService';
 import * as notifyService from '~/plugins/core-bpm/services/bpmNotifyService';
+import * as bpmFormService from '~/plugins/core-bpm/services/bpmFormService';
 import { useToastContext } from '~/contexts/ToastContext';
 import type { TaskInstance } from '~/plugins/core-bpm/services/bpmWorkbenchService';
 
@@ -73,6 +83,7 @@ const mockResumeProcess = vi.mocked(workbenchService.resumeProcess);
 const mockTerminateProcess = vi.mocked(workbenchService.terminateProcess);
 const mockBatchProcessTasks = vi.mocked(workbenchService.batchProcessTasks);
 const mockSendUrge = vi.mocked(notifyService.sendUrge);
+const mockGetTaskForm = vi.mocked(bpmFormService.getTaskForm);
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -137,6 +148,13 @@ describe('useTaskCenter', () => {
     vi.clearAllMocks();
     mockGetWorkbench.mockResolvedValue(makeWorkbench());
     mockGetDashboard.mockResolvedValue(makeSla());
+    mockGetTaskForm.mockResolvedValue({
+      taskId: 'task-1',
+      processInstanceId: 'proc-1',
+      nodeId: 'review',
+      formBinding: null,
+      taskActions: null,
+    });
   });
 
   // ── Initial load ───────────────────────────────────────────────────────────
@@ -460,7 +478,46 @@ describe('useTaskCenter', () => {
         await result.current.approveTask('looks good');
       });
 
-      expect(mockApproveTask).toHaveBeenCalledWith('task-1', 'looks good');
+      expect(mockGetTaskForm).toHaveBeenCalledWith('task-1');
+      expect(mockApproveTask).toHaveBeenCalledWith('task-1', 'looks good', undefined);
+    });
+
+    it('forwards taskActions resultVariable/resultValue as process variables', async () => {
+      mockApproveTask.mockResolvedValue(undefined);
+      mockGetTaskForm.mockResolvedValue({
+        taskId: 'task-1',
+        processInstanceId: 'proc-1',
+        nodeId: 'task_manager_approve',
+        formBinding: null,
+        taskActions: [
+          {
+            key: 'approve',
+            type: 'complete',
+            resultVariable: 'taskResult',
+            resultValue: 'approved',
+          },
+          {
+            key: 'reject',
+            type: 'complete',
+            resultVariable: 'taskResult',
+            resultValue: 'rejected',
+          },
+        ],
+      });
+
+      const { result } = renderHook(() => useTaskCenter());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      act(() => result.current.openDialog('approve', makeTask()));
+
+      await act(async () => {
+        await result.current.approveTask('looks good');
+      });
+
+      expect(mockGetTaskForm).toHaveBeenCalledWith('task-1');
+      expect(mockApproveTask).toHaveBeenCalledWith('task-1', 'looks good', {
+        taskResult: 'approved',
+      });
     });
   });
 
@@ -477,7 +534,46 @@ describe('useTaskCenter', () => {
         await result.current.rejectTask('missing info');
       });
 
-      expect(mockRejectTask).toHaveBeenCalledWith('task-1', 'missing info');
+      expect(mockGetTaskForm).toHaveBeenCalledWith('task-1');
+      expect(mockRejectTask).toHaveBeenCalledWith('task-1', 'missing info', undefined);
+    });
+
+    it('forwards taskActions resultVariable/resultValue as process variables', async () => {
+      mockRejectTask.mockResolvedValue(undefined);
+      mockGetTaskForm.mockResolvedValue({
+        taskId: 'task-1',
+        processInstanceId: 'proc-1',
+        nodeId: 'task_manager_approve',
+        formBinding: null,
+        taskActions: [
+          {
+            key: 'approve',
+            type: 'complete',
+            resultVariable: 'taskResult',
+            resultValue: 'approved',
+          },
+          {
+            key: 'reject',
+            type: 'complete',
+            resultVariable: 'taskResult',
+            resultValue: 'rejected',
+          },
+        ],
+      });
+
+      const { result } = renderHook(() => useTaskCenter());
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      act(() => result.current.openDialog('reject', makeTask()));
+
+      await act(async () => {
+        await result.current.rejectTask('missing info');
+      });
+
+      expect(mockGetTaskForm).toHaveBeenCalledWith('task-1');
+      expect(mockRejectTask).toHaveBeenCalledWith('task-1', 'missing info', {
+        taskResult: 'rejected',
+      });
     });
   });
 

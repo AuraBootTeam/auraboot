@@ -22,5 +22,6 @@ public class DecisionFactDTO {
     private Boolean required;
     private Boolean visible;
     private Boolean editable;
+    private Boolean masked;
     private String permission;
 }

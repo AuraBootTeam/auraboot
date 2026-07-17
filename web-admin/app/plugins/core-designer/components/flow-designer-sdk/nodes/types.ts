@@ -35,6 +35,20 @@ export interface NodePropertyEditorProps {
   readOnly?: boolean;
 }
 
+export interface FlowNodeAvailabilityMetadata {
+  unavailable?: boolean;
+  status?: string;
+  reason?: string;
+  providerSummary?: string;
+  source?: string;
+  actionType?: string;
+}
+
+export interface FlowNodeMetadata {
+  availability?: FlowNodeAvailabilityMetadata;
+  [key: string]: unknown;
+}
+
 export interface FlowNodeDefinition {
   type: string;
   label: I18nText;
@@ -43,6 +57,7 @@ export interface FlowNodeDefinition {
   description?: I18nText;
   configSchema?: PropertySchema[];
   defaultConfig?: Record<string, unknown>;
+  metadata?: FlowNodeMetadata;
   component?: React.ComponentType<any>;
   validation?: NodeValidation;
   /**

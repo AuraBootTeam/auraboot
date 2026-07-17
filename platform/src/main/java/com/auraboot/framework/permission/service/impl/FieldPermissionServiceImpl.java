@@ -122,9 +122,32 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
         if (extraProps == null) {
             return null;
         }
-        Object fp = extraProps.get("fieldPermission");
+        Object fp = findFieldPermission(extraProps);
         if (fp instanceof Map) {
             return (Map<String, Object>) fp;
+        }
+        return null;
+    }
+
+    private Object findFieldPermission(Map<String, Object> extraProps) {
+        Object direct = extraProps.get("fieldPermission");
+        if (direct != null) {
+            return direct;
+        }
+        Object nested = extraProps.get("extension");
+        if (nested instanceof Map<?, ?> nestedMap) {
+            return nestedMap.get("fieldPermission");
+        }
+        Object dynamic = extraProps.get("dynamicProperties");
+        if (dynamic instanceof Map<?, ?> dynamicMap) {
+            Object dynamicDirect = dynamicMap.get("fieldPermission");
+            if (dynamicDirect != null) {
+                return dynamicDirect;
+            }
+            Object dynamicNested = dynamicMap.get("extension");
+            if (dynamicNested instanceof Map<?, ?> dynamicNestedMap) {
+                return dynamicNestedMap.get("fieldPermission");
+            }
         }
         return null;
     }

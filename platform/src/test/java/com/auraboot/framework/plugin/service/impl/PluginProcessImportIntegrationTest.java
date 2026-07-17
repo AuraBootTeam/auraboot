@@ -121,6 +121,12 @@ class PluginProcessImportIntegrationTest extends BaseIntegrationTest {
         assertThat(row).isNotNull();
         assertThat(row.getProcessKey()).isEqualTo(key);
         assertThat(row.getStatus()).isEqualTo("deployed");
+        assertThat(row.getDeploymentId())
+                .as("auto-deployed process rows must carry the same deployment id shape as manual deploy")
+                .isEqualTo(key + ":1");
+        assertThat(row.getDeployedAt())
+                .as("auto-deployed process rows must expose deployment time in BPM list/detail pages")
+                .isNotNull();
         assertThat(row.getVersion()).isEqualTo(1);
         assertThat(row.getIsCurrent()).isTrue();
         assertThat(row.getBpmnContent()).isNotNull(); // empty string by builder default
@@ -170,6 +176,12 @@ class PluginProcessImportIntegrationTest extends BaseIntegrationTest {
         assertThat(current.getVersion())
                 .as("re-import should bump version")
                 .isGreaterThanOrEqualTo(2);
+        assertThat(current.getDeploymentId())
+                .as("current imported version must expose its deployment id")
+                .isEqualTo(key + ":" + current.getVersion());
+        assertThat(current.getDeployedAt())
+                .as("current imported version must expose deployment time")
+                .isNotNull();
         assertThat(current.getIsCurrent()).isTrue();
     }
 

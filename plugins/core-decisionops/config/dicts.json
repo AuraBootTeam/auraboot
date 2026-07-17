@@ -1,0 +1,138 @@
+[
+  {
+    "code": "decisionops_event_type",
+    "name": "DecisionOps Event Type",
+    "name:zh-CN": "规则中心事件类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "LEAVE_REQUEST_CREATED",
+        "label": "Leave request created",
+        "label:zh-CN": "请假申请创建",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "color": "blue" }
+      }
+    ]
+  },
+  {
+    "code": "decisionops_event_phase",
+    "name": "DecisionOps Event Phase",
+    "name:zh-CN": "规则中心事件阶段",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "BEFORE_COMMIT",
+        "label": "Before commit",
+        "label:zh-CN": "提交前",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "color": "amber" }
+      },
+      {
+        "value": "AFTER_COMMIT",
+        "label": "After commit",
+        "label:zh-CN": "提交后",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": { "color": "green" }
+      },
+      {
+        "value": "ASYNC",
+        "label": "Async",
+        "label:zh-CN": "异步",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": { "color": "blue" }
+      }
+    ]
+  },
+  {
+    "code": "decisionops_match_mode",
+    "name": "DecisionOps Match Mode",
+    "name:zh-CN": "规则中心匹配模式",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "COLLECT_ALL",
+        "label": "Collect all",
+        "label:zh-CN": "全部命中",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "color": "blue" }
+      },
+      {
+        "value": "FIRST_MATCH",
+        "label": "First match",
+        "label:zh-CN": "首个命中",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": { "color": "amber" }
+      }
+    ]
+  },
+  {
+    "code": "decisionops_policy_status",
+    "name": "DecisionOps Policy Status",
+    "name:zh-CN": "规则中心策略状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "DRAFT",
+        "label": "Draft",
+        "label:zh-CN": "草稿",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "color": "gray" }
+      },
+      {
+        "value": "PUBLISHED",
+        "label": "Published",
+        "label:zh-CN": "已发布",
+        "sortNo": 20,
+        "status": "enabled",
+        "extension": { "color": "green" }
+      },
+      {
+        "value": "DISABLED",
+        "label": "Disabled",
+        "label:zh-CN": "已停用",
+        "sortNo": 30,
+        "status": "enabled",
+        "extension": { "color": "gray" }
+      }
+    ]
+  },
+  {
+    "code": "decisionops_target_type",
+    "name": "DecisionOps Target Type",
+    "name:zh-CN": "规则中心目标类型",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "MODEL",
+        "label": "Model",
+        "label:zh-CN": "业务对象",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "color": "blue" }
+      }
+    ]
+  },
+  {
+    "code": "decisionops_event_target",
+    "name": "DecisionOps Event Target",
+    "name:zh-CN": "规则中心事件目标",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "wd_leave_request",
+        "label": "Leave request",
+        "label:zh-CN": "请假申请",
+        "sortNo": 10,
+        "status": "enabled",
+        "extension": { "color": "blue" }
+      }
+    ]
+  }
+]

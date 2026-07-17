@@ -23,6 +23,7 @@ public final class RuleReferenceCollector {
         RefAccumulator acc = new RefAccumulator();
         collect(binding.conditionSpec(), acc);
         collect(binding.decisionBinding(), acc);
+        binding.conditionFragmentRefs().forEach(ref -> addConditionFragmentRef(ref, acc));
         return acc.toSet();
     }
 
@@ -137,6 +138,8 @@ public final class RuleReferenceCollector {
             addDecisionRef(decisionCode.asText(), acc);
         }
 
+        collectConditionFragmentRefs(node, acc);
+
         if (looksLikeFieldSource(node)) {
             Scope scope = parseScope(text(node.get("scope")));
             String path = text(node.get("path"));
@@ -159,9 +162,57 @@ public final class RuleReferenceCollector {
                 && (node.has("scope") || "path".equals(type));
     }
 
+    private static void collectConditionFragmentRefs(JsonNode node, RefAccumulator acc) {
+        addConditionFragmentRef(text(node.get("conditionFragmentRef")), acc);
+        addConditionFragmentRef(text(node.get("conditionFragmentCode")), acc);
+
+        JsonNode conditionFragment = node.get("conditionFragment");
+        if (conditionFragment != null && conditionFragment.isTextual()) {
+            addConditionFragmentRef(conditionFragment.asText(), acc);
+        }
+
+        collectConditionFragmentRefList(node.get("conditionFragmentRefs"), acc);
+        collectConditionFragmentRefList(node.get("conditionFragments"), acc);
+        if (looksLikeConditionSpec(node)) {
+            collectConditionFragmentRefList(node.get("fragmentRefs"), acc);
+        }
+    }
+
+    private static boolean looksLikeConditionSpec(JsonNode node) {
+        return node.has("root")
+                || node.has("conditionSpec")
+                || node.has("bindingKind")
+                || node.has("decisionBindings");
+    }
+
+    private static void collectConditionFragmentRefList(JsonNode node, RefAccumulator acc) {
+        if (node == null || node.isNull()) {
+            return;
+        }
+        if (node.isTextual()) {
+            addConditionFragmentRef(node.asText(), acc);
+            return;
+        }
+        if (node.isArray()) {
+            node.forEach(item -> collectConditionFragmentRefList(item, acc));
+            return;
+        }
+        if (node.isObject()) {
+            addConditionFragmentRef(text(node.get("conditionFragmentRef")), acc);
+            addConditionFragmentRef(text(node.get("conditionFragmentCode")), acc);
+            addConditionFragmentRef(text(node.get("fragmentCode")), acc);
+        }
+    }
+
     private static void addDecisionRef(String decisionCode, RefAccumulator acc) {
         if (decisionCode != null && !decisionCode.isBlank()) {
             acc.decisionRefs.add(decisionCode);
+        }
+    }
+
+    private static void addConditionFragmentRef(String fragmentCode, RefAccumulator acc) {
+        if (fragmentCode != null && !fragmentCode.isBlank()) {
+            acc.conditionFragmentRefs.add(fragmentCode);
         }
     }
 
@@ -190,9 +241,10 @@ public final class RuleReferenceCollector {
     private static final class RefAccumulator {
         private final Set<String> fieldRefs = new LinkedHashSet<>();
         private final Set<String> decisionRefs = new LinkedHashSet<>();
+        private final Set<String> conditionFragmentRefs = new LinkedHashSet<>();
 
         private RuleReferenceSet toSet() {
-            return RuleReferenceSet.of(fieldRefs, decisionRefs);
+            return RuleReferenceSet.of(fieldRefs, decisionRefs, conditionFragmentRefs);
         }
     }
 }

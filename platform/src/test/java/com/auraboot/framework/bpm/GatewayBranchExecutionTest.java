@@ -1,7 +1,9 @@
 package com.auraboot.framework.bpm;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.bpm.dto.ExecutionLogEntry;
 import com.auraboot.framework.bpm.dto.ProcessInstanceStatusDTO;
+import com.auraboot.framework.bpm.service.ExecutionLogService;
 import com.auraboot.framework.bpm.service.ProcessDeploymentService;
 import com.auraboot.framework.bpm.service.ProcessEngineService;
 import com.auraboot.framework.bpm.service.TaskService;
@@ -29,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -62,6 +65,9 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
 
     @Autowired
     private SmartEngine smartEngine;
+
+    @Autowired
+    private ExecutionLogService executionLogService;
 
     @Autowired
     private DrtDefinitionService definitionService;
@@ -332,6 +338,12 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
         assertThat(branchTask.getProcessDefinitionActivityId())
                 .as("Rule-bound routed branch for amount=%s", amount)
                 .isEqualTo(expectedBranchTaskId);
+        assertRuleBindingTrace(
+                instance.getInstanceId(),
+                "gw",
+                decisionCode,
+                "route",
+                expectedBranchTaskId);
 
         completeTaskDirect(branchTask.getInstanceId(), new HashMap<>());
 
@@ -451,6 +463,45 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
                 "enabled", true));
     }
 
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> ruleBindingTrace(String processInstanceId, String nodeId) {
+        List<ExecutionLogEntry> timeline = executionLogService.getTimeline(processInstanceId);
+        assertThat(timeline)
+                .as("BPM execution log timeline for %s", processInstanceId)
+                .isNotEmpty();
+        Map<String, Object> trace = timeline.stream()
+                .filter(entry -> "rule_evaluated".equals(entry.eventType()))
+                .filter(entry -> nodeId.equals(entry.nodeId()))
+                .map(ExecutionLogEntry::outputData)
+                .filter(Map.class::isInstance)
+                .map(output -> (Map<String, Object>) output.get("ruleBinding"))
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElseThrow(() -> new AssertionError(
+                        "Missing BPM ruleBinding trace for node " + nodeId + " in " + processInstanceId));
+        return trace;
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertRuleBindingTrace(
+            String processInstanceId,
+            String nodeId,
+            String decisionCode,
+            String outputKey,
+            Object expectedOutputValue) {
+        Map<String, Object> trace = ruleBindingTrace(processInstanceId, nodeId);
+        assertThat(trace).containsEntry("decisionCode", decisionCode);
+        assertThat(trace).containsEntry("consumerType", "BPM");
+        assertThat(trace).containsEntry("consumerNodeId", nodeId);
+        assertThat(trace).containsEntry("status", "MATCHED");
+        assertThat(trace).containsEntry("matched", true);
+        assertThat(trace.get("traceId")).as("decision trace id").isInstanceOf(String.class);
+        assertThat((String) trace.get("traceId")).as("decision trace id").isNotBlank();
+        Object outputs = trace.get("outputs");
+        assertThat(outputs).isInstanceOf(Map.class);
+        assertThat((Map<String, Object>) outputs).containsEntry(outputKey, expectedOutputValue);
+    }
+
     private List<TaskAssigneeInstance> taskAssignees(TaskInstance task) {
         if (task.getTaskAssigneeInstanceList() != null
                 && !task.getTaskAssigneeInstanceList().isEmpty()) {
@@ -526,6 +577,43 @@ class GatewayBranchExecutionTest extends BaseIntegrationTest {
                 .containsExactlyInAnyOrder("finance-managers", "risk-owners");
         assertThat(assignees).extracting(TaskAssigneeInstance::getAssigneeId)
                 .doesNotContain("static-fallback-user");
+        assertRuleBindingTrace(
+                instance.getInstanceId(),
+                "approve",
+                decisionCode,
+                "primaryAssignee",
+                "rule-primary-user");
+    }
+
+    @Test
+    @DisplayName("userTask aura.ruleBinding fail-closed blocks static fallback when decision is unavailable")
+    void ruleBindingUserTaskFailsClosedWithoutStaticFallbackWhenDecisionUnavailable() throws Exception {
+        String missingDecisionCode = "it_bpm_missing_assignment_" + System.nanoTime();
+
+        ProcessInstance instance = deployRuleBoundAssignmentAndStart("failclosed", missingDecisionCode, 20000);
+        TaskInstance approve = currentTask(instance.getInstanceId());
+        assertThat(approve.getProcessDefinitionActivityId()).isEqualTo("approve");
+
+        List<TaskAssigneeInstance> assignees = taskAssignees(approve);
+        assertThat(assignees)
+                .as("fail-closed rule binding must not fall back to smart:assigneeId=static-fallback-user")
+                .isEmpty();
+
+        Map<String, Object> trace = ruleBindingTrace(instance.getInstanceId(), "approve");
+        assertThat(trace)
+                .containsEntry("decisionCode", missingDecisionCode)
+                .containsEntry("consumerType", "BPM")
+                .containsEntry("consumerNodeId", "approve")
+                .containsEntry("status", "ERROR")
+                .containsEntry("matched", false)
+                .containsEntry("fallbackApplied", true)
+                .containsEntry("errorCode", "DECISION_EVALUATION_FAILED");
+        assertThat(trace.get("outputs")).isInstanceOf(Map.class);
+        assertThat((Map<?, ?>) trace.get("outputs")).isEmpty();
+        assertThat(trace.get("errors")).isInstanceOf(List.class);
+        assertThat((List<?>) trace.get("errors"))
+                .anySatisfy(error -> assertThat(String.valueOf(error))
+                        .contains("No version found for decision " + missingDecisionCode));
     }
 
     @Test

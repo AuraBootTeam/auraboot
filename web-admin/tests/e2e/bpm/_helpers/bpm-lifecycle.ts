@@ -55,6 +55,19 @@ export interface TodoTaskRecord {
   raw: Record<string, unknown>;
 }
 
+export interface ExecutionTimelineEntry {
+  pid: string;
+  executionId: string;
+  nodeId: string | null;
+  nodeType: string | null;
+  eventType: string;
+  inputData: Record<string, unknown> | null;
+  outputData: Record<string, unknown> | null;
+  errorMessage: string | null;
+  durationMs: number | null;
+  createdAt: string | null;
+}
+
 /**
  * Login as the default E2E admin and return the JWT string.
  * Response shape: { data: { jwt: "..." } }
@@ -251,6 +264,41 @@ export async function listAuditEvents(
       taskId: (r.taskId as string) ?? null,
     };
   });
+}
+
+/**
+ * List SmartEngine execution timeline entries for a process instance.
+ * Backend shape: ExecutionLogEntry[] — pass-through from
+ *   GET /api/bpm/orchestration/executions/{id}/timeline
+ */
+export async function listExecutionTimeline(
+  request: APIRequestContext,
+  token: string,
+  instanceId: string,
+): Promise<ExecutionTimelineEntry[]> {
+  const resp = await request.get(`/api/bpm/orchestration/executions/${instanceId}/timeline`, {
+    headers: authHeaders(token),
+  });
+  if (!resp.ok()) {
+    throw new Error(`listExecutionTimeline failed: ${resp.status()} ${await resp.text()}`);
+  }
+  const body = await resp.json();
+  const records = body?.data;
+  if (!Array.isArray(records)) {
+    throw new Error(`listExecutionTimeline: data is not an array: ${JSON.stringify(body)}`);
+  }
+  return records.map((r: Record<string, unknown>) => ({
+    pid: String(r.pid ?? ''),
+    executionId: String(r.executionId ?? ''),
+    nodeId: r.nodeId == null ? null : String(r.nodeId),
+    nodeType: r.nodeType == null ? null : String(r.nodeType),
+    eventType: String(r.eventType ?? ''),
+    inputData: (r.inputData as Record<string, unknown> | null) ?? null,
+    outputData: (r.outputData as Record<string, unknown> | null) ?? null,
+    errorMessage: r.errorMessage == null ? null : String(r.errorMessage),
+    durationMs: typeof r.durationMs === 'number' ? r.durationMs : null,
+    createdAt: r.createdAt == null ? null : String(r.createdAt),
+  }));
 }
 
 /**

@@ -17,6 +17,7 @@ import {
   getStartedProcesses,
   getTaskDetail,
   getTodoTasks,
+  listExecutionTimeline,
   getWorkbench,
   startProcess,
   transferTask,
@@ -107,6 +108,30 @@ describe('bpmWorkbenchService query param wiring', () => {
     } as any);
 
     await expect(getInstanceForRecord('BIZ-2')).resolves.toBeNull();
+  });
+
+  it('fetches BPM execution timeline by process instance id', async () => {
+    mockedGet.mockResolvedValue({
+      code: '0',
+      data: [
+        {
+          pid: 'log-1',
+          executionId: 'pi-1',
+          nodeId: 'gw_approver',
+          nodeType: 'ruleBinding',
+          eventType: 'rule_evaluated',
+          outputData: { ruleBinding: { decisionCode: 'approval_routing' } },
+        },
+      ],
+    } as any);
+
+    await expect(listExecutionTimeline('pi-1')).resolves.toEqual([
+      expect.objectContaining({
+        eventType: 'rule_evaluated',
+        outputData: { ruleBinding: { decisionCode: 'approval_routing' } },
+      }),
+    ]);
+    expect(mockedGet).toHaveBeenCalledWith('/api/bpm/orchestration/executions/pi-1/timeline');
   });
 });
 

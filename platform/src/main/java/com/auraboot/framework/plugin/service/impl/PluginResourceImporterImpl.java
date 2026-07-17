@@ -1,5 +1,6 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.agent.dto.CapabilityEvalCase;
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.entity.AgentEvalCase;
@@ -39,6 +40,7 @@ import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.mapper.NamedQueryMapper;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.meta.service.*;
+import com.auraboot.framework.decision.service.DecisionUsageIndexService;
 import com.auraboot.framework.permission.dto.PermissionCreateRequest;
 import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
@@ -67,15 +69,18 @@ import com.auraboot.framework.plugin.dto.imports.ProcessDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ResourceAction;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.dto.imports.RoleDefinitionDTO;
+import com.auraboot.framework.plugin.dto.imports.RolePermissionPolicyDefinitionDTO;
 import com.auraboot.framework.plugin.entity.BpmProcessDefinition;
 import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.exception.PluginException;
 import com.auraboot.framework.plugin.mapper.BpmProcessDefinitionMapper;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
+import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.service.RoleService;
+import com.auraboot.framework.rbac.service.UserRoleService;
 import com.auraboot.framework.menu.mapper.MenuMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -86,6 +91,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
@@ -96,6 +102,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.LinkedHashMap;
 import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import com.auraboot.framework.common.constant.StatusConstants;
 
 /**
@@ -121,6 +129,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final PermissionService permissionService;
     private final RolePermissionService rolePermissionService;
     private final RoleService roleService;
+    private final UserRoleService userRoleService;
     private final MenuService menuService;
     private final PageSchemaService pageSchemaService;
     private final NamedQueryService namedQueryService;
@@ -140,6 +149,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
     private final RoleMapper roleMapper;
     private final MenuMapper menuMapper;
     private final ObjectMapper objectMapper;
+    private final ObjectProvider<DecisionUsageIndexService> usageIndexServiceProvider;
 
     // Mapper dependencies for plugin import (replaces JdbcTemplate for fixed tables)
     private final MetaModelMapper metaModelMapper;
@@ -1091,11 +1101,13 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             String dataScopeConfigJson = dto.getDataScopeConfig() != null ? toJson(dto.getDataScopeConfig()) : null;
             String extensionJson = dto.getExtension() != null ? toJson(dto.getExtension()) : null;
             String tagsArray = dto.getTags() != null ? "{" + String.join(",", dto.getTags()) + "}" : null;
+            String policySchemaJson = dto.getPolicySchema() != null ? toJson(dto.getPolicySchema()) : null;
 
             permissionMapper.updateForPluginImport(
                     dto.getEffectiveName(), dto.getDescription(), dto.getCategory(),
                     dto.getResourceType(), dto.getResourceCode(), dto.getAction(),
                     dto.getDataScopeType(), dataScopeConfigJson, extensionJson, tagsArray,
+                    policySchemaJson,
                     pluginPid, tenantId, dto.getCode());
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.PERMISSION,
@@ -1124,6 +1136,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             request.setDataScopeConfig(dto.getDataScopeConfig());
             request.setExtension(dto.getExtension());
             request.setTags(dto.getTags() != null ? dto.getTags().toArray(new String[0]) : null);
+            request.setPolicySchema(dto.getPolicySchema());
             request.setPluginPid(pluginPid);  // Set plugin_pid via request
 
             PermissionDTO created = permissionService.create(request);
@@ -1176,7 +1189,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
             // Reconcile role-permission bindings and data-scope defaults.
             Long roleId = roleMapper.findIdByCode(tenantId, dto.getCode());
-            updateRolePermissions(roleId, dto.getPermissions(), tenantId, pluginPid);
+            updateRolePermissions(roleId, dto, tenantId, pluginPid);
+            assignSeedMembers(roleId, dto, tenantId);
 
             String existingPid = roleMapper.findPidByCode(tenantId, dto.getCode());
 
@@ -1208,7 +1222,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             roleMapper.updatePluginPidById(pluginPid, created.getId());
 
             // Create role-permission bindings
-            updateRolePermissions(created.getId(), dto.getPermissions(), tenantId, pluginPid);
+            updateRolePermissions(created.getId(), dto, tenantId, pluginPid);
+            assignSeedMembers(created.getId(), dto, tenantId);
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.ROLE,
                     created.getPid(), created.getId(), dto.getCode(), dto.getEffectiveName(),
@@ -1216,10 +1231,34 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         }
     }
 
-    private void updateRolePermissions(Long roleId, List<String> permissionCodes, Long tenantId, String pluginPid) {
+    private void assignSeedMembers(Long roleId, RoleDefinitionDTO dto, Long tenantId) {
+        if (roleId == null || dto.getSeedMembers() == null || dto.getSeedMembers().isEmpty()) {
+            return;
+        }
+        for (String seedMember : dto.getSeedMembers()) {
+            if (seedMember == null || seedMember.isBlank()) {
+                continue;
+            }
+            String normalized = seedMember.trim().toUpperCase(java.util.Locale.ROOT);
+            if (!"CURRENT_MEMBER".equals(normalized)) {
+                throw new PluginException("Unsupported role seedMembers value '" + seedMember
+                        + "' for role " + dto.getCode() + ". Supported: CURRENT_MEMBER");
+            }
+            Long memberId = MetaContext.getCurrentMemberId();
+            if (memberId == null) {
+                throw new PluginException("Role " + dto.getCode()
+                        + " declares seedMembers CURRENT_MEMBER but no current member is available");
+            }
+            userRoleService.assignRolesToMember(memberId, List.of(roleId), tenantId, MetaContext.getCurrentUserId());
+        }
+    }
+
+    private void updateRolePermissions(Long roleId, RoleDefinitionDTO dto, Long tenantId, String pluginPid) {
+        List<String> permissionCodes = dto.getPermissions();
         if (permissionCodes == null || permissionCodes.isEmpty()) {
             return;
         }
+        Map<String, RolePermissionPolicyDefinitionDTO> policyByPermission = rolePermissionPoliciesByCode(dto);
 
         for (String permCode : permissionCodes) {
             try {
@@ -1238,12 +1277,55 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 } else {
                     rolePermissionService.inheritDefaultDataScope(roleId, List.of(perm.getId()));
                 }
+                applyRolePermissionPolicy(roleId, perm, policyByPermission.get(permCode));
             } catch (Exception e) {
                 // Bind loop is per-permission best-effort: a single failed binding
                 // (missing perm, race with another import) must not block the rest
                 // of the role's permission set. Failure surfaced via warn log only.
                 log.warn("Failed to bind permission {} to role: {}", logSafe(permCode), logSafe(e.getMessage()), e);
             }
+        }
+    }
+
+    private Map<String, RolePermissionPolicyDefinitionDTO> rolePermissionPoliciesByCode(RoleDefinitionDTO dto) {
+        if (dto.getPermissionPolicies() == null || dto.getPermissionPolicies().isEmpty()) {
+            return Map.of();
+        }
+        return dto.getPermissionPolicies().stream()
+                .filter(Objects::nonNull)
+                .filter(RolePermissionPolicyDefinitionDTO::isValid)
+                .collect(Collectors.toMap(
+                        RolePermissionPolicyDefinitionDTO::getPermissionCode,
+                        Function.identity(),
+                        (left, right) -> right,
+                        LinkedHashMap::new));
+    }
+
+    private void applyRolePermissionPolicy(
+            Long roleId,
+            PermissionDTO permission,
+            RolePermissionPolicyDefinitionDTO policy) {
+        if (policy == null || permission == null || permission.getId() == null) {
+            return;
+        }
+        RolePermission binding = rolePermissionMapper.findByRoleAndPermission(roleId, permission.getId());
+        if (binding == null || binding.getId() == null) {
+            log.warn("Role-permission binding not found for seeded policy: roleId={}, permissionCode={}",
+                    roleId, logSafe(policy.getPermissionCode()));
+            return;
+        }
+        String conditionsJson = toJson(policy.getConditions());
+        rolePermissionMapper.updateConditionsById(binding.getId(), conditionsJson);
+        refreshPermissionPolicyUsageIndex(binding);
+    }
+
+    private void refreshPermissionPolicyUsageIndex(RolePermission binding) {
+        if (binding == null || binding.getPid() == null || binding.getPid().isBlank()) {
+            return;
+        }
+        DecisionUsageIndexService usageIndexService = usageIndexServiceProvider.getIfAvailable();
+        if (usageIndexService != null) {
+            usageIndexService.refreshSource("PERMISSION_POLICY", binding.getPid());
         }
     }
 
@@ -1407,6 +1489,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         // bpmn_content='' while status='deployed' (runtime then fails with
         // bpm.rule.execution_failed or missing-definition errors).
         Integer initialVersion = 1;
+        Instant now = Instant.now();
+        boolean deployRequested = Boolean.TRUE.equals(autoDeploy);
         String initialBpmnContent = compileBpmnContent(dto, initialVersion);
 
         BpmProcessDefinition process = BpmProcessDefinition.builder()
@@ -1425,11 +1509,13 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 .businessDataBindings(dto.getBusinessDataBindings() != null
                         ? Map.of("bindings", dto.getBusinessDataBindings())
                         : new HashMap<>())
-                .status(Boolean.TRUE.equals(autoDeploy) ? "deployed" : "draft")
+                .status(deployRequested ? "deployed" : "draft")
+                .deploymentId(deployRequested ? dto.getKey() + ":" + initialVersion : null)
+                .deployedAt(deployRequested ? now : null)
                 .version(1)
                 .isCurrent(true)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
 
         if (exists) {
@@ -1437,6 +1523,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
             processDefinitionMapper.clearCurrentVersion(tenantId, dto.getKey());
             int nextVersion = processDefinitionMapper.getNextVersion(tenantId, dto.getKey());
             process.setVersion(nextVersion);
+            if (deployRequested) {
+                process.setDeploymentId(dto.getKey() + ":" + nextVersion);
+            }
             // Recompile BPMN with the new version attribute so the persisted
             // XML and the SmartEngine deployment stay in lock-step.
             String recompiled = compileBpmnContent(dto, nextVersion);

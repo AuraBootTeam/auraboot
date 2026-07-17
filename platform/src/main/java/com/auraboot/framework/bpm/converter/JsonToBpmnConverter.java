@@ -908,7 +908,38 @@ public class JsonToBpmnConverter {
             String serviceType = getTextOrNull(config, "serviceType");
             String className = getTextOrNull(config, "className");
 
-            if ("command".equals(serviceType)) {
+            if ("action".equals(serviceType)) {
+                String actionType = getTextOrNull(config, BpmServiceTaskConstants.ATTR_ACTION);
+                if (actionType == null || actionType.isBlank()) {
+                    actionType = getTextOrNull(config, "actionType");
+                }
+                if (actionType == null || actionType.isBlank()) {
+                    throw new BpmnConversionException("serviceTask '" + id
+                            + "' with serviceType=action missing 'actionType' in config");
+                }
+                writer.writeAttribute(SMART_NAMESPACE, "class",
+                        BpmServiceTaskConstants.BEAN_PLUGIN_ACTION_DELEGATE);
+                writer.writeAttribute(SMART_NAMESPACE, BpmServiceTaskConstants.ATTR_ACTION, actionType);
+                writeOptionalSmartAttribute(writer, config, BpmServiceTaskConstants.ATTR_TARGET, "actionTarget");
+                writeOptionalSmartAttribute(writer, config, BpmServiceTaskConstants.ATTR_RESULT_VAR, "actionResultVar");
+                writeOptionalSmartAttribute(writer, config, BpmServiceTaskConstants.ATTR_IDEMPOTENCY_KEY, "actionIdempotencyKey");
+                writeOptionalSmartAttribute(writer, config, BpmServiceTaskConstants.ATTR_RULE_CODE, "actionRuleCode");
+                String payloadJson = getTextOrNull(config, BpmServiceTaskConstants.ATTR_PAYLOAD_JSON);
+                if (payloadJson == null || payloadJson.isBlank()) {
+                    payloadJson = getTextOrNull(config, "actionPayloadJson");
+                }
+                JsonNode actionPayload = config.path("actionPayload");
+                if ((payloadJson == null || payloadJson.isBlank()) && actionPayload != null && actionPayload.isObject()) {
+                    try {
+                        payloadJson = objectMapper.writeValueAsString(actionPayload);
+                    } catch (Exception e) {
+                        throw new BpmnConversionException("Failed to serialize actionPayload for serviceTask '" + id + "'", e);
+                    }
+                }
+                if (payloadJson != null && !payloadJson.isBlank()) {
+                    writer.writeAttribute(SMART_NAMESPACE, BpmServiceTaskConstants.ATTR_PAYLOAD_JSON, payloadJson);
+                }
+            } else if ("command".equals(serviceType)) {
                 // COMMAND service type: bridge to AuraBoot Command engine via CommandServiceTaskDelegate.
                 // The delegate reads command configuration from process variables at runtime.
                 writer.writeAttribute(SMART_NAMESPACE, "class", "commandServiceTaskDelegate");
@@ -1343,6 +1374,17 @@ public class JsonToBpmnConverter {
     private String getTextOrDefault(JsonNode node, String field, String defaultValue) {
         String value = getTextOrNull(node, field);
         return value != null ? value : defaultValue;
+    }
+
+    private void writeOptionalSmartAttribute(XMLStreamWriter writer, JsonNode node, String attrName, String fallbackField)
+            throws XMLStreamException {
+        String value = getTextOrNull(node, attrName);
+        if (value == null || value.isBlank()) {
+            value = getTextOrNull(node, fallbackField);
+        }
+        if (value != null && !value.isBlank()) {
+            writer.writeAttribute(SMART_NAMESPACE, attrName, value);
+        }
     }
 
     private String joinArrayNode(JsonNode arrayNode) {

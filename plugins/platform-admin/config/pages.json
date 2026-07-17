@@ -75,6 +75,17 @@
         ],
         "rowActions": [
           {
+            "code": "detail",
+            "label": {
+              "zh-CN": "详情",
+              "en-US": "Detail"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "sla_config_detail"
+            }
+          },
+          {
             "code": "edit",
             "label": {
               "zh-CN": "编辑",
@@ -188,7 +199,9 @@
           "mode": "decision",
           "valueField": "rule_binding",
           "fieldCatalogMode": "merge",
+          "fieldCatalogModelCodeField": "model_code",
           "consumerType": "SLA",
+          "consumerCodeField": "pid",
           "showImpactPreview": true,
           "showTestRunner": true,
           "initialDecisionCode": "complaint_sla_deadline",
@@ -201,10 +214,64 @@
             { "scope": "record", "path": "data.priority", "label": "优先级", "dataType": "enum", "options": ["HIGH", "NORMAL", "LOW"] }
           ],
           "decisions": [
-            { "code": "complaint_sla_deadline", "name": "投诉 SLA 截止时间" },
-            { "code": "sla_deadline", "name": "SLA 截止时间" },
-            { "code": "approval_routing", "name": "审批路由" }
+            {
+              "code": "complaint_sla_deadline",
+              "name": "投诉 SLA 截止时间",
+              "outputs": [
+                { "id": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
+                { "id": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" },
+                { "id": "escalationLevel", "label": "升级等级", "dataType": "string" }
+              ]
+            },
+            {
+              "code": "sla_deadline",
+              "name": "SLA 截止时间",
+              "outputs": [
+                { "id": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
+                { "id": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" }
+              ]
+            },
+            {
+              "code": "approval_routing",
+              "name": "审批路由",
+              "outputs": [
+                { "id": "candidateGroups", "label": "候选组", "dataType": "collection" },
+                { "id": "assigneeUserId", "label": "审批人", "dataType": "string" }
+              ]
+            }
           ]
+        }
+      },
+      {
+        "id": "sla_action_policy",
+        "blockType": "custom",
+        "component": "DecisionActionPlanBlock",
+        "props": {
+          "valueField": "action_policy",
+          "title": "超时后动作",
+          "triggerLabel": "SLA 超时",
+          "defaultTrigger": "SLA_TIMEOUT",
+          "consumerType": "SLA",
+          "logsUrl": "/p/decisionops_execution_logs?callerType=SLA&callerRef={pid}",
+          "fieldCatalogModelCodeField": "model_code",
+          "fields": [
+            { "scope": "record", "path": "data.targetType", "label": "目标类型", "dataType": "enum" },
+            { "scope": "record", "path": "data.targetKey", "label": "SLA 节点", "dataType": "string" },
+            { "scope": "record", "path": "data.domainCode", "label": "域编码", "dataType": "string" },
+            { "scope": "record", "path": "data.modelCode", "label": "关联模型", "dataType": "string" },
+            { "scope": "record", "path": "data.priority", "label": "优先级", "dataType": "enum" },
+            { "scope": "sla", "path": "recordPid", "label": "SLA 记录", "dataType": "string" },
+            { "scope": "sla", "path": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
+            { "scope": "sla", "path": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" }
+          ],
+          "decisionOutputs": ["deadlineMinutes", "warningBeforeMinutes", "escalationLevel"],
+          "decisionOutputSchema": {
+            "outputs": [
+              { "id": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
+              { "id": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" },
+              { "id": "escalationLevel", "label": "升级等级", "dataType": "string" }
+            ]
+          }
         }
       },
       {
@@ -242,6 +309,11 @@
     "kind": "detail",
     "schemaVersion": 4,
     "extension": {
+      "dataSource": {
+        "type": "api",
+        "endpoint": "/api/bpm/sla-configs/{pid}",
+        "method": "get"
+      },
       "showShare": false,
       "showReport": false,
       "showPrint": false
@@ -348,7 +420,9 @@
           "mode": "decision",
           "valueField": "rule_binding",
           "fieldCatalogMode": "merge",
+          "fieldCatalogModelCodeField": "model_code",
           "consumerType": "SLA",
+          "consumerCodeField": "pid",
           "readOnly": true,
           "variant": "summary",
           "showImpactPreview": true,
@@ -363,10 +437,46 @@
             { "scope": "record", "path": "data.priority", "label": "优先级", "dataType": "enum", "options": ["HIGH", "NORMAL", "LOW"] }
           ],
           "decisions": [
-            { "code": "complaint_sla_deadline", "name": "投诉 SLA 截止时间" },
-            { "code": "sla_deadline", "name": "SLA 截止时间" },
-            { "code": "approval_routing", "name": "审批路由" }
+            {
+              "code": "complaint_sla_deadline",
+              "name": "投诉 SLA 截止时间",
+              "outputs": [
+                { "id": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
+                { "id": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" },
+                { "id": "escalationLevel", "label": "升级等级", "dataType": "string" }
+              ]
+            },
+            {
+              "code": "sla_deadline",
+              "name": "SLA 截止时间",
+              "outputs": [
+                { "id": "deadlineMinutes", "label": "截止分钟", "dataType": "integer" },
+                { "id": "warningBeforeMinutes", "label": "提前提醒分钟", "dataType": "integer" }
+              ]
+            },
+            {
+              "code": "approval_routing",
+              "name": "审批路由",
+              "outputs": [
+                { "id": "candidateGroups", "label": "候选组", "dataType": "collection" },
+                { "id": "assigneeUserId", "label": "审批人", "dataType": "string" }
+              ]
+            }
           ]
+        }
+      },
+      {
+        "id": "sla_action_policy",
+        "blockType": "custom",
+        "component": "DecisionActionPlanBlock",
+        "props": {
+          "valueField": "action_policy",
+          "title": "超时后动作",
+          "triggerLabel": "SLA 超时",
+          "defaultTrigger": "SLA_TIMEOUT",
+          "consumerType": "SLA",
+          "readOnly": true,
+          "logsUrl": "/p/decisionops_execution_logs?callerType=SLA&callerRef={pid}"
         }
       }
     ]
@@ -1412,7 +1522,7 @@
             },
             "width": 120,
             "renderType": "tag",
-            "dictCode": "member_status"
+            "dictCode": "bpm_process_status"
           },
           {
             "field": "deployed_at",
@@ -1427,10 +1537,21 @@
         ],
         "rowActions": [
           {
-            "code": "edit",
+            "code": "configure_rules",
             "label": {
-              "zh-CN": "编辑",
-              "en-US": "Edit"
+              "zh-CN": "配置规则",
+              "en-US": "Configure Rules"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "/p/bpm_process_management/edit/{pid}"
+            }
+          },
+          {
+            "code": "open_bpmn_designer",
+            "label": {
+              "zh-CN": "设计流程",
+              "en-US": "Design Process"
             },
             "action": {
               "type": "navigate",
@@ -1505,7 +1626,7 @@
           "order": "desc"
         },
         "onRowClick": "navigate",
-        "detailUrl": "/bpmn-designer?pid={pid}"
+        "detailUrl": "/p/bpm_process_management/edit/{pid}"
       }
     ],
     "extension": {
@@ -1514,6 +1635,137 @@
         "endpoint": "/api/bpm/process-definitions",
         "method": "get"
       }
+    }
+  },
+  {
+    "pageKey": "bpm_process_management_form",
+    "modelCode": "bpm_process_management",
+    "name:zh-CN": "BPM 流程定义配置",
+    "name:en": "BPM Process Definition Configuration",
+    "kind": "form",
+    "schemaVersion": 4,
+    "title": {
+      "zh-CN": "流程定义配置",
+      "en-US": "Process Definition Configuration"
+    },
+    "layout": {
+      "type": "stack",
+      "gap": 12
+    },
+    "blocks": [
+      {
+        "id": "process_identity",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "流程信息",
+          "en-US": "Process Information"
+        },
+        "fields": [
+          { "field": "process_name", "colSpan": 6, "readonly": true, "required": true },
+          { "field": "process_key", "colSpan": 6, "readonly": true, "required": true },
+          { "field": "category", "colSpan": 3, "readonly": true },
+          { "field": "version", "colSpan": 3, "readonly": true },
+          { "field": "status", "colSpan": 3, "readonly": true, "dictCode": "bpm_process_status" },
+          { "field": "deployed_at", "colSpan": 3, "readonly": true }
+        ]
+      },
+      {
+        "id": "bpm_rule_binding",
+        "blockType": "custom",
+        "component": "DecisionRuleBindingBlock",
+        "props": {
+          "mode": "decision",
+          "consumerType": "BPM",
+          "consumerNodeId": "gw_approver",
+          "showImpactPreview": true,
+          "showTestRunner": true,
+          "fieldCatalogMode": "fallback",
+          "initialDecisionCode": "approval_routing",
+          "initialVersionPolicy": "LATEST_PUBLISHED",
+          "fields": [
+            { "scope": "process", "path": "nodeId", "label": "BPM 节点", "dataType": "string" },
+            { "scope": "process", "path": "processKey", "label": "流程标识", "dataType": "string" },
+            { "scope": "record", "path": "data.wd_req_days", "label": "请假天数", "dataType": "decimal" },
+            { "scope": "record", "path": "data.wd_req_type", "label": "请假类型", "dataType": "enum", "options": ["annual", "sick", "personal"] },
+            { "scope": "actor", "path": "departmentId", "label": "当前处理人部门", "dataType": "department" }
+          ],
+          "decisions": [
+            { "code": "approval_routing", "name": "审批路由" },
+            { "code": "task_assignee", "name": "任务分派" },
+            { "code": "sla_deadline", "name": "SLA 截止时间" }
+          ],
+          "initialContextJson": "{\n  \"process\": {\n    \"nodeId\": \"task_manager_approve\",\n    \"processKey\": \"wd_leave_approval\"\n  },\n  \"record\": {\n    \"data\": {\n      \"wd_req_days\": 4,\n      \"wd_req_type\": \"annual\"\n    }\n  }\n}",
+          "initialValue": {
+            "consumerType": "BPM",
+            "consumerCode": "wd_leave_approval",
+            "consumerNodeId": "gw_approver",
+            "bindingKind": "DECISION_REF",
+            "enabled": true,
+            "decisionBinding": {
+              "decisionCode": "approval_routing",
+              "versionPolicy": "LATEST_PUBLISHED",
+              "inputMappings": [
+                {
+                  "input": "nodeId",
+                  "source": { "kind": "FIELD", "scope": "process", "path": "nodeId" }
+                },
+                {
+                  "input": "leaveDays",
+                  "source": { "kind": "FIELD", "scope": "record", "path": "data.wd_req_days" }
+                }
+              ],
+              "outputMappings": [
+                {
+                  "output": "approverRole",
+                  "target": { "kind": "PROCESS_VARIABLE", "path": "approverRole" }
+                }
+              ],
+              "fallbackPolicy": { "mode": "FAIL_CLOSED" },
+              "traceMode": "ALWAYS",
+              "enabled": true
+            }
+          }
+        }
+      },
+      {
+        "id": "designer_actions",
+        "blockType": "toolbar",
+        "buttons": [
+          {
+            "code": "open_bpmn_designer",
+            "label": {
+              "zh-CN": "打开 BPMN 设计器",
+              "en-US": "Open BPMN Designer"
+            },
+            "variant": "primary",
+            "action": {
+              "type": "navigate",
+              "to": "/bpmn-designer?pid={pid}"
+            }
+          },
+          {
+            "code": "back_to_list",
+            "label": {
+              "zh-CN": "返回列表",
+              "en-US": "Back"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "/p/bpm_process_management"
+            }
+          }
+        ]
+      }
+    ],
+    "extension": {
+      "recordSource": {
+        "type": "api",
+        "endpoint": "/api/bpm/process-definitions/{pid}",
+        "method": "get"
+      },
+      "hideBuiltInImport": true,
+      "hideBuiltInExport": true,
+      "hideBuiltInPrint": true
     }
   },
   {

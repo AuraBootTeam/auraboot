@@ -10,6 +10,9 @@ import com.auraboot.framework.bpm.service.SlaSchedulerService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.constant.Status;
+import com.auraboot.framework.meta.dto.CommandDefinitionCreateRequest;
+import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.Model;
 import com.auraboot.framework.meta.entity.ModelFieldBinding;
@@ -19,8 +22,11 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.service.CommandExecutor;
+import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,30 +68,35 @@ class RecordLevelSlaActivationIT extends BaseIntegrationTest {
     @Autowired private MetaModelFieldBindingMapper bindingMapper;
     @Autowired private DynamicDataMapper dynamicDataMapper;
     @Autowired private DynamicDataService dynamicDataService;
+    @Autowired private CommandService commandService;
+    @Autowired private CommandExecutor commandExecutor;
     @Autowired private SlaConfigService slaConfigService;
     @Autowired private SlaSchedulerService slaSchedulerService;
     @Autowired private SlaRecordMapper slaRecordMapper;
     @Autowired private BpmNotifyRecordMapper notifyRecordMapper;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private ObjectMapper objectMapper;
 
     private final String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toLowerCase(Locale.ROOT);
     private final String complaintModel = "rsla_" + suffix;
     private final String complaintTable = "mt_" + complaintModel;
     private final String subjectField = "c_subject_" + suffix;
     private final String priorityField = "c_priority_" + suffix;
+    private final String createCommandCode = "rsla:create_" + suffix;
     private final long escalationRecipientId = 960000000L + Math.floorMod(System.nanoTime(), 1_000_000L);
 
     private String slaConfigPid;
 
     @BeforeAll
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
-    public void setUp() {
+    public void setUp() throws Exception {
         super.setupTenantContext();
         MetaContext.setContext(getTestTenant().getId(), getTestUser().getId(), getTestUser().getPid(), getTestUser().getUserName());
 
         dropIfExists(complaintTable);
         cleanMeta(complaintModel);
         publishModel(complaintModel, "Record-SLA complaint", new String[]{subjectField, priorityField});
+        publishCreateCommand();
 
         // RECORD-level SLA: respond within PT2H of creating any record of this model; escalate at 50%.
         var cfg = slaConfigService.create(new SlaConfigService.CreateSlaConfigRequest(
@@ -104,6 +115,7 @@ class RecordLevelSlaActivationIT extends BaseIntegrationTest {
             jdbcTemplate.update("DELETE FROM ab_sla_record WHERE node_id = ?", complaintModel);
             if (slaConfigPid != null) jdbcTemplate.update("DELETE FROM ab_sla_config WHERE pid = ?", slaConfigPid);
             jdbcTemplate.update("DELETE FROM ab_bpm_notify_record WHERE recipient_user_id = ?", escalationRecipientId);
+            jdbcTemplate.update("DELETE FROM ab_command_definition WHERE code = ?", createCommandCode);
             dropIfExists(complaintTable);
             cleanMeta(complaintModel);
         } catch (Exception ignored) {}
@@ -118,8 +130,9 @@ class RecordLevelSlaActivationIT extends BaseIntegrationTest {
     @Order(1)
     @DisplayName("creating a record of the SLA-bound model activates an ab_sla_record with deadline")
     void recordCreate_activatesRecordLevelSla() {
-        Map<String, Object> rec = dynamicDataService.create(complaintModel, Map.of(
-                subjectField, "device black screen", priorityField, "high"));
+        Map<String, Object> rec = MetaContext.runWithoutDataPermission(() ->
+                dynamicDataService.create(complaintModel, Map.of(
+                        subjectField, "device black screen", priorityField, "high")));
         String recordPid = String.valueOf(rec.get("pid"));
 
         List<Map<String, Object>> slaRows = jdbcTemplate.queryForList(
@@ -144,6 +157,33 @@ class RecordLevelSlaActivationIT extends BaseIntegrationTest {
 
     @Test
     @Order(2)
+    @DisplayName("command-created record of the SLA-bound model activates an ab_sla_record")
+    void commandCreate_activatesRecordLevelSla() {
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(Map.of(subjectField, "command-created issue", priorityField, "urgent"));
+        request.setClientRequestId(UUID.randomUUID().toString());
+        // Deliberately do not set request.operationType. The command event must
+        // derive create semantics from executionConfig.type.
+
+        CommandExecuteResult result = commandExecutor.execute(createCommandCode, request);
+        assertThat(result.getData()).containsKey("recordPid");
+        String recordPid = String.valueOf(result.getData().get("recordPid"));
+
+        List<Map<String, Object>> slaRows = jdbcTemplate.queryForList(
+                "SELECT pid, process_instance_id, node_id, start_time, deadline_time "
+                        + "FROM ab_sla_record WHERE tenant_id = ? AND node_id = ? AND process_instance_id = ?",
+                getTestTenant().getId(), complaintModel, recordPid);
+
+        assertThat(slaRows)
+                .as("command-created records must also activate RECORD-level SLA through the command event bridge")
+                .hasSize(1);
+
+        log.info("[F3 command record SLA] PASS — command {} created record {} → SLA on model {}",
+                createCommandCode, recordPid, complaintModel);
+    }
+
+    @Test
+    @Order(3)
     @DisplayName("overdue record-level SLA → scheduler marks overdue + escalates")
     void recordSla_pastDeadline_schedulerMarksOverdueAndEscalates() {
         Long tid = getTestTenant().getId();
@@ -173,6 +213,24 @@ class RecordLevelSlaActivationIT extends BaseIntegrationTest {
     }
 
     // ------------------------------------------------------------------ fixtures
+
+    private void publishCreateCommand() throws Exception {
+        Map<String, Object> execConfig = new LinkedHashMap<>();
+        execConfig.put("type", "create");
+        execConfig.put("inputFields", List.of(subjectField, priorityField));
+
+        CommandDefinitionCreateRequest request = new CommandDefinitionCreateRequest();
+        request.setCode(createCommandCode);
+        request.setDisplayName("Record SLA create command " + suffix);
+        request.setDescription("IT command that creates record-SLA source records");
+        request.setModelCode(complaintModel);
+        request.setInputSchema("{\"type\":\"object\"}");
+        request.setExecutionConfig(objectMapper.writeValueAsString(execConfig));
+        request.setCmdRiskLevel("L1");
+
+        var created = commandService.create(request);
+        commandService.publish(created.getPid());
+    }
 
     private void publishModel(String code, String name, String[] fields) {
         Model m = buildModel(code, name);

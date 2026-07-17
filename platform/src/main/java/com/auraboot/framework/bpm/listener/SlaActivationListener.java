@@ -21,6 +21,8 @@ import org.springframework.stereotype.Component;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.EnumMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -146,7 +148,7 @@ public class SlaActivationListener {
                 continue;
             }
             try {
-                Instant deadline = computeDeadline(config);
+                Instant deadline = computeDeadline(config, recordData);
                 slaRecordService.createRecord(config, recordPid, null, modelCode, deadline);
                 log.info("SLA record created at record creation: modelCode={}, recordPid={}, configPid={}, deadline={}",
                         modelCode, recordPid, config.getPid(), deadline);
@@ -171,6 +173,10 @@ public class SlaActivationListener {
      * Falls back to 24 hours for unknown modes.
      */
     private Instant computeDeadline(SlaConfigEntity config) {
+        return computeDeadline(config, null);
+    }
+
+    private Instant computeDeadline(SlaConfigEntity config, Map<String, Object> recordData) {
         Instant now = Instant.now();
         String mode = config.getDeadlineMode();
         String value = config.getDeadlineValue();
@@ -181,7 +187,7 @@ public class SlaActivationListener {
                 && ruleBinding.active()
                 && ruleBinding.bindingKind() == RuleBindingKind.DECISION_REF
                 && ruleBinding.decisionBinding() != null) {
-            Long minutes = resolveRuleDeadlineMinutesWithBinding(config, ruleBinding.decisionBinding());
+            Long minutes = resolveRuleDeadlineMinutesWithBinding(config, ruleBinding.decisionBinding(), recordData);
             if (minutes != null && minutes > 0) {
                 return now.plus(Duration.ofMinutes(minutes));
             }
@@ -274,18 +280,25 @@ public class SlaActivationListener {
     }
 
     private Long resolveRuleDeadlineMinutesWithBinding(SlaConfigEntity config, DecisionBinding binding) {
+        return resolveRuleDeadlineMinutesWithBinding(config, binding, null);
+    }
+
+    private Long resolveRuleDeadlineMinutesWithBinding(
+            SlaConfigEntity config,
+            DecisionBinding binding,
+            Map<String, Object> runtimeRecordData) {
         try {
-            Map<String, Object> sla = new java.util.HashMap<>();
-            sla.put("targetType", config.getTargetType());
-            sla.put("targetKey", config.getTargetKey());
-            sla.put("deadlineMode", config.getDeadlineMode());
-            sla.put("deadlineValue", config.getDeadlineValue());
-            sla.put("domainCode", config.getDomainCode());
-            sla.put("modelCode", config.getModelCode());
+            Map<String, Object> recordData = buildRuleRecordData(config, runtimeRecordData);
+            Map<Scope, Map<String, Object>> scopes = new EnumMap<>(Scope.class);
+            scopes.put(Scope.RECORD, Map.of("data", recordData));
+            Map<String, Object> meta = extractMeta(runtimeRecordData);
+            if (!meta.isEmpty()) {
+                scopes.put(Scope.META, meta);
+            }
             RuleEvaluationTrace trace = ruleEvaluationService.evaluateDecisionBinding(
                     binding,
                     new RuleEvaluationContext(
-                            Map.of(Scope.RECORD, Map.of("data", sla)),
+                            scopes,
                             "SLA",
                             config.getPid(),
                             config.getTargetKey(),
@@ -301,6 +314,49 @@ public class SlaActivationListener {
                     binding == null ? null : binding.decisionCode(), config.getPid(), e.getMessage());
             return null;
         }
+    }
+
+    private Map<String, Object> buildRuleRecordData(
+            SlaConfigEntity config,
+            Map<String, Object> runtimeRecordData) {
+        Map<String, Object> recordData = new LinkedHashMap<>();
+        if (runtimeRecordData != null) {
+            runtimeRecordData.forEach((field, value) -> {
+                if (field != null && !isMetaField(field)) {
+                    recordData.put(field, value);
+                }
+            });
+        }
+        recordData.put("targetType", config.getTargetType());
+        recordData.put("targetKey", config.getTargetKey());
+        recordData.put("deadlineMode", config.getDeadlineMode());
+        recordData.put("deadlineValue", config.getDeadlineValue());
+        recordData.put("domainCode", config.getDomainCode());
+        recordData.put("modelCode", config.getModelCode());
+        return recordData;
+    }
+
+    private Map<String, Object> extractMeta(Map<String, Object> runtimeRecordData) {
+        if (runtimeRecordData == null || runtimeRecordData.isEmpty()) {
+            return Map.of();
+        }
+        for (String field : List.of("meta", "_meta", "ruleMeta")) {
+            Object value = runtimeRecordData.get(field);
+            if (value instanceof Map<?, ?> raw && !raw.isEmpty()) {
+                Map<String, Object> copy = new LinkedHashMap<>();
+                raw.forEach((key, item) -> {
+                    if (key != null) {
+                        copy.put(String.valueOf(key), item);
+                    }
+                });
+                return copy;
+            }
+        }
+        return Map.of();
+    }
+
+    private boolean isMetaField(String field) {
+        return "meta".equals(field) || "_meta".equals(field) || "ruleMeta".equals(field);
     }
 
     private Long parseDeadlineMinutes(Object minutes) {

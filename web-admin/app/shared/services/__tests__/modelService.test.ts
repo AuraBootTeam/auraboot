@@ -416,6 +416,27 @@ describe('modelService', () => {
       expect(url).toContain('?versionNote=');
       expect(url).toContain('v1%20release');
     });
+
+    it('POSTs model publish governance acknowledgement as request body', async () => {
+      postMock.mockResolvedValue(ok({ pid: 'm1' }));
+
+      await modelService.publish('m1', {
+        versionNote: 'v2 governed release',
+        impactAcknowledged: true,
+        acknowledgementNote: 'Reviewed Rule Center blast radius',
+      });
+
+      expect(postMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1/publish?versionNote=v2%20governed%20release',
+        {
+          versionNote: 'v2 governed release',
+          impactAcknowledged: true,
+          acknowledgementNote: 'Reviewed Rule Center blast radius',
+        },
+        undefined,
+        undefined,
+      );
+    });
   });
 
   // ── unpublish ─────────────────────────────────────────────────────────────────
@@ -442,6 +463,34 @@ describe('modelService', () => {
         operationType: 'CREATE',
         affectedTables: ['ab_dyn_order'],
         riskAssessment: null,
+        governance: {
+          modelCode: 'order',
+          requiresAcknowledgement: true,
+          schemaChangeKinds: ['CREATE_TABLE'],
+          migrationPlan: 'Create the physical table and generated indexes before enabling runtime writes.',
+          historicalVersionPolicy: 'Initial publish: no historical published model version exists.',
+          replayPlan: [
+            {
+              consumerType: 'BPM_PROCESS',
+              consumerLabel: 'BPM 流程',
+              sourceCode: 'approval_flow',
+              sourceVersion: '7',
+              sourcePid: 'bpm-pid',
+              fieldRef: 'order.amount',
+              targetPath: 'record.data.amount',
+              binding: 'GATEWAY_CONDITION',
+              recommendedAction: '打开 BPMN 设计器校验规则绑定、候选人、网关条件和服务任务参数，重新部署流程。',
+              required: true,
+            },
+          ],
+          fieldImpacts: [
+            {
+              fieldRef: 'order.amount',
+              references: [{ sourceType: 'BPM', sourceCode: 'approval_flow' }],
+              risk: { blocking: true, summary: 'BPM consumer references this field', counts: { BPM: 1 } },
+            },
+          ],
+        },
       };
       getMock.mockResolvedValue(ok(preview));
 
@@ -450,6 +499,76 @@ describe('modelService', () => {
       expect(getMock).toHaveBeenCalledWith('/api/meta/models/m1/publish/preview', undefined, undefined, undefined);
       expect(result.ddlStatements).toHaveLength(1);
       expect(result.operationType).toBe('CREATE');
+      expect(result.governance?.requiresAcknowledgement).toBe(true);
+      expect(result.governance?.fieldImpacts?.[0]?.fieldRef).toBe('order.amount');
+      expect(result.governance?.replayPlan?.[0]).toEqual(
+        expect.objectContaining({
+          consumerType: 'BPM_PROCESS',
+          sourceCode: 'approval_flow',
+          required: true,
+        }),
+      );
+    });
+  });
+
+  // ── replayPublishImpact ──────────────────────────────────────────────────────
+
+  describe('replayPublishImpact', () => {
+    it('POSTs /api/meta/models/:pid/publish/replay with sample context', async () => {
+      const report = {
+        modelCode: 'order',
+        totalCount: 2,
+        automatedCount: 1,
+        executedCount: 1,
+        manualCount: 1,
+        results: [
+          {
+            status: 'EXECUTED',
+            automated: true,
+            executed: true,
+            traceId: 'trace-1',
+            matched: true,
+            outputs: { route: 'manager' },
+            step: { consumerType: 'DECISION_VERSION', sourceCode: 'approval_decision' },
+          },
+          {
+            status: 'MANUAL_REQUIRED',
+            automated: false,
+            executed: false,
+            step: {
+              consumerType: 'BPM_PROCESS',
+              sourceCode: 'approval_flow',
+              metadata: { sourceName: 'Approval Flow' },
+            },
+          },
+        ],
+      };
+      postMock.mockResolvedValue(ok(report));
+
+      const result = await modelService.replayPublishImpact('m1', {
+        executeAutomated: true,
+        correlationId: 'corr-1',
+        sampleContext: { record: { amount: 42 } },
+      });
+
+      expect(postMock).toHaveBeenCalledWith(
+        '/api/meta/models/m1/publish/replay',
+        {
+          executeAutomated: true,
+          correlationId: 'corr-1',
+          sampleContext: { record: { amount: 42 } },
+        },
+        undefined,
+        undefined,
+      );
+      expect(result.results?.[0]).toEqual(
+        expect.objectContaining({
+          status: 'EXECUTED',
+          traceId: 'trace-1',
+          matched: true,
+        }),
+      );
+      expect(result.results?.[1]?.step?.metadata).toEqual({ sourceName: 'Approval Flow' });
     });
   });
 

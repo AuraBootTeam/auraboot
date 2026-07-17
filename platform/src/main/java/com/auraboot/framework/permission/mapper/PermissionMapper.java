@@ -281,6 +281,7 @@ public interface PermissionMapper extends BaseMapper<Permission> {
             resource_type = #{resourceType}, resource_code = #{resourceCode}, action = #{action},
             data_scope_type = #{dataScopeType}, data_scope_config = #{dataScopeConfig}::jsonb,
             extension = #{extension}::jsonb, tags = #{tags}::text[],
+            policy_schema = #{policySchema}::jsonb,
             plugin_pid = #{pluginPid}, updated_at = NOW()
         WHERE tenant_id = #{tenantId} AND code = #{code} AND deleted_flag = FALSE
         """)
@@ -294,6 +295,7 @@ public interface PermissionMapper extends BaseMapper<Permission> {
                               @Param("dataScopeConfig") String dataScopeConfig,
                               @Param("extension") String extension,
                               @Param("tags") String tags,
+                              @Param("policySchema") String policySchema,
                               @Param("pluginPid") String pluginPid,
                               @Param("tenantId") Long tenantId,
                               @Param("code") String code);

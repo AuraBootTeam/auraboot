@@ -3612,6 +3612,7 @@ CREATE TABLE IF NOT EXISTS ab_sla_config (
 
     -- Unified rule-center binding for decision-backed SLA policies
     rule_binding JSONB,
+    action_policy JSONB DEFAULT '{}',
 
     -- Model field association
     model_code VARCHAR(64),
@@ -3850,8 +3851,11 @@ COMMENT ON COLUMN ab_automation_debug_session.action_results IS 'Results from ex
 
 ALTER TABLE ab_sla_config ADD COLUMN IF NOT EXISTS suspend_policy VARCHAR(20) DEFAULT 'pause';
 ALTER TABLE ab_sla_config ADD COLUMN IF NOT EXISTS rule_binding JSONB;
+ALTER TABLE ab_sla_config ADD COLUMN IF NOT EXISTS action_policy JSONB DEFAULT '{}';
 CREATE INDEX IF NOT EXISTS idx_sla_config_rule_binding_gin
   ON ab_sla_config USING GIN (rule_binding);
+CREATE INDEX IF NOT EXISTS idx_sla_config_action_policy_gin
+  ON ab_sla_config USING GIN (action_policy);
 
 ALTER TABLE ab_sla_record ADD COLUMN IF NOT EXISTS paused_at TIMESTAMPTZ;
 ALTER TABLE ab_sla_record ADD COLUMN IF NOT EXISTS total_paused_ms BIGINT DEFAULT 0;
@@ -9951,6 +9955,8 @@ CREATE TABLE IF NOT EXISTS ab_drt_log (
     matched             BOOLEAN NOT NULL DEFAULT FALSE,
     status              VARCHAR(20) NOT NULL,
     matched_rules_json  JSONB,
+    output_snapshot     JSONB,
+    trace_snapshot      JSONB,
     duration_ms         BIGINT,
     error_code          VARCHAR(100),
     error_message       TEXT,
@@ -10222,21 +10228,55 @@ CREATE TABLE IF NOT EXISTS ab_drt_policy_exec_log (
     tenant_id       BIGINT NOT NULL,
     idempotency_key TEXT NOT NULL,
     policy_code     TEXT,
+    decision_trace_id VARCHAR(64),
+    correlation_id  VARCHAR(64),
     rule_code       TEXT,
     action_type     TEXT,
     status          TEXT NOT NULL,
     error_message   TEXT,
+    result_payload  JSONB NOT NULL DEFAULT '{}'::jsonb,
+    failure_strategy TEXT,
+    action_payload  JSONB NOT NULL DEFAULT '{}'::jsonb,
+    context_payload JSONB NOT NULL DEFAULT '{}'::jsonb,
+    attempt_count   INTEGER NOT NULL DEFAULT 0,
+    max_attempts    INTEGER NOT NULL DEFAULT 3,
+    next_retry_at   TIMESTAMPTZ,
+    last_retry_at   TIMESTAMPTZ,
+    dead_lettered_at TIMESTAMPTZ,
     executed_at     TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uq_drt_exec_tenant_key UNIQUE (tenant_id, idempotency_key),
     CONSTRAINT chk_drt_exec_status CHECK (status IN (
         'SUCCESS', 'FAILED', 'SKIPPED', 'NO_HANDLER', 'RETRY_PENDING', 'DEAD_LETTER', 'NOT_EXECUTED'
-    ))
+    )),
+    CONSTRAINT chk_drt_exec_retry_attempts CHECK (attempt_count >= 0 AND max_attempts > 0 AND max_attempts <= 20)
 );
 CREATE INDEX IF NOT EXISTS idx_drt_exec_tenant_key
     ON ab_drt_policy_exec_log (tenant_id, idempotency_key);
 CREATE INDEX IF NOT EXISTS idx_drt_exec_policy
     ON ab_drt_policy_exec_log (tenant_id, policy_code, executed_at);
+CREATE INDEX IF NOT EXISTS idx_drt_exec_decision_trace
+    ON ab_drt_policy_exec_log (tenant_id, decision_trace_id, executed_at DESC)
+    WHERE decision_trace_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_drt_exec_correlation
+    ON ab_drt_policy_exec_log (tenant_id, correlation_id, executed_at DESC)
+    WHERE correlation_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_drt_exec_retry_ready
+    ON ab_drt_policy_exec_log (next_retry_at, tenant_id, executed_at)
+    WHERE status = 'RETRY_PENDING';
+CREATE INDEX IF NOT EXISTS idx_drt_exec_dead_letter
+    ON ab_drt_policy_exec_log (tenant_id, dead_lettered_at DESC, executed_at DESC)
+    WHERE status = 'DEAD_LETTER';
 COMMENT ON TABLE ab_drt_policy_exec_log IS 'EventPolicy action execution log; unique (tenant, idempotency_key) gives restart-durable idempotency';
+COMMENT ON COLUMN ab_drt_policy_exec_log.decision_trace_id IS 'Decision Runtime trace_id that caused this EventPolicy action execution';
+COMMENT ON COLUMN ab_drt_policy_exec_log.correlation_id IS 'EventPolicy run correlation id shared with linked decision evaluations';
+COMMENT ON COLUMN ab_drt_policy_exec_log.failure_strategy IS 'Failure strategy used when the action execution row was recorded';
+COMMENT ON COLUMN ab_drt_policy_exec_log.action_payload IS 'Retry envelope: resolved action target/order/payload captured before execution';
+COMMENT ON COLUMN ab_drt_policy_exec_log.context_payload IS 'Retry envelope: decision context scopes captured before execution';
+COMMENT ON COLUMN ab_drt_policy_exec_log.attempt_count IS 'Number of execution attempts recorded for this idempotency key';
+COMMENT ON COLUMN ab_drt_policy_exec_log.max_attempts IS 'Maximum attempts before RETRY_PENDING is exhausted into DEAD_LETTER';
+COMMENT ON COLUMN ab_drt_policy_exec_log.next_retry_at IS 'When RETRY_ASYNC worker may next execute this action';
+COMMENT ON COLUMN ab_drt_policy_exec_log.last_retry_at IS 'Last time the action was attempted';
+COMMENT ON COLUMN ab_drt_policy_exec_log.dead_lettered_at IS 'When retry exhaustion or explicit DEAD_LETTER routing moved this row to the dead-letter queue';
 
 -- EventPolicy transactional outbox (docs/2.md §9): PENDING events written in the save tx, processed after commit
 CREATE TABLE IF NOT EXISTS ab_drt_outbox (

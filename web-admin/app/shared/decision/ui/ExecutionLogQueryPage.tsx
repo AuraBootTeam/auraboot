@@ -34,6 +34,8 @@ function toExecLogEntry(record: DecisionLogRecord): ExecLogEntry {
     decisionCode: record.decisionCode,
     status: (record.status ?? 'UNKNOWN') as ExecLogStatus,
     matchedRules: matchedRules(record.matchedRulesJson),
+    outputSnapshot: record.outputSnapshot,
+    traceSnapshot: record.traceSnapshot,
     durationMs: record.durationMs,
     error: record.errorMessage,
     time: record.createdAt,

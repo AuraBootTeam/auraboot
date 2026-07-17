@@ -26,6 +26,8 @@ export interface FieldAdapter<T = unknown> {
   required?: boolean;
   /** 是否只读 */
   readOnly?: boolean;
+  /** Sibling values from the host property object, when available. */
+  context?: Record<string, unknown>;
   /** 失焦回调 */
   onBlur?: () => void;
   /** 聚焦回调 */
