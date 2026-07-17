@@ -7,6 +7,8 @@ export interface CreateOrReuseSavedViewOptions {
   name: string;
   viewType?: string;
   scope?: string;
+  /** Team PID — required when scope is 'team'. */
+  teamId?: string;
   viewConfig?: Record<string, unknown>;
   expectSuccess?: boolean;
 }
@@ -38,6 +40,7 @@ const GENERATED_VIEW_NAME_PREFIXES = [
   'TL_',
   'Tree',
   'UX_',
+  'VC_',
   'VS_',
   '本周修改',
   '今日新建',

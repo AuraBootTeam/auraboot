@@ -4,6 +4,8 @@ import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.view.dto.AutoSaveViewRequest;
+import com.auraboot.framework.view.dto.ChipPinDTO;
+import com.auraboot.framework.view.dto.ChipPinRequest;
 import com.auraboot.framework.view.dto.CopySavedViewToPersonalRequest;
 import com.auraboot.framework.view.dto.SavedViewAuditEventDTO;
 import com.auraboot.framework.view.dto.SavedViewCapabilityCheckRequest;
@@ -11,6 +13,7 @@ import com.auraboot.framework.view.dto.SavedViewCapabilityCheckResponse;
 import com.auraboot.framework.view.dto.SavedViewCreateRequest;
 import com.auraboot.framework.view.dto.SavedViewDTO;
 import com.auraboot.framework.view.dto.SavedViewUpdateRequest;
+import com.auraboot.framework.view.service.SavedViewChipPinService;
 import com.auraboot.framework.view.service.SavedViewService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -43,6 +46,7 @@ import java.util.Map;
 public class SavedViewController {
 
     private final SavedViewService savedViewService;
+    private final SavedViewChipPinService chipPinService;
     private final CurrentUserTeamResolver currentUserTeamResolver;
 
     // ==================== CRUD Operations ====================
@@ -119,6 +123,63 @@ public class SavedViewController {
 
         log.info("Saved view deleted: pid={}", pid);
         return ApiResponse.success("View deleted successfully", null);
+    }
+
+    // ==================== Quick-filter chip pins ====================
+
+    @PostMapping("/{viewPid}/pin")
+    @Operation(summary = "Pin a view as a quick-filter chip",
+            description = "Pin a SavedView to the current user's (scope=personal) or a team's "
+                    + "(scope=team) list-page quick-filter chip row. Team pins require team-manage.")
+    @RequirePermission(MetaPermission.VIEW_READ)
+    public ApiResponse<Void> pinAsChip(
+            @Parameter(description = "View PID") @PathVariable @NotBlank String viewPid,
+            @RequestBody(required = false) ChipPinRequest request) {
+        SavedViewDTO view = savedViewService.findByPid(viewPid);
+        if (view == null) {
+            return ApiResponse.error("View not found: " + viewPid);
+        }
+        Integer order = request != null ? request.getOrder() : null;
+        if (isTeamScope(request)) {
+            // Authorization (team-manage + membership) is enforced in the service.
+            chipPinService.pinTeam(viewPid, request.getTeamId(), view.getModelCode(), view.getPageKey(), order);
+        } else {
+            chipPinService.pinPersonal(viewPid, view.getModelCode(), view.getPageKey(), order);
+        }
+        return ApiResponse.success("View pinned as quick-filter chip", null);
+    }
+
+    @DeleteMapping("/{viewPid}/pin")
+    @Operation(summary = "Unpin a view from the quick-filter chip row",
+            description = "Remove the current user's (scope=personal) or a team's (scope=team) pin of a SavedView")
+    @RequirePermission(MetaPermission.VIEW_READ)
+    public ApiResponse<Void> unpinChip(
+            @Parameter(description = "View PID") @PathVariable @NotBlank String viewPid,
+            @Parameter(description = "Pin scope (personal|team)")
+            @RequestParam(required = false, defaultValue = "personal") String scope,
+            @Parameter(description = "Team PID (required when scope=team)")
+            @RequestParam(required = false) String teamId) {
+        if ("team".equals(scope)) {
+            // Authorization (team-manage + membership) is enforced in the service.
+            chipPinService.unpinTeam(viewPid, teamId);
+        } else {
+            chipPinService.unpinPersonal(viewPid);
+        }
+        return ApiResponse.success("View unpinned", null);
+    }
+
+    private boolean isTeamScope(ChipPinRequest request) {
+        return request != null && "team".equals(request.getScope());
+    }
+
+    @GetMapping("/chip-pins")
+    @Operation(summary = "List quick-filter chip pins",
+            description = "List the current user's effective chip pins for a model/page")
+    @RequirePermission(MetaPermission.VIEW_READ)
+    public ApiResponse<List<ChipPinDTO>> getChipPins(
+            @Parameter(description = "Model code") @RequestParam @NotBlank String modelCode,
+            @Parameter(description = "Page key (optional)") @RequestParam(required = false) String pageKey) {
+        return ApiResponse.success(chipPinService.listEffectivePins(modelCode, pageKey));
     }
 
     // ==================== View Listing ====================

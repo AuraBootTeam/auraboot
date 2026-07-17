@@ -105,6 +105,22 @@ public class SavedViewDefinitionDTO {
      */
     private Integer sortOrder;
 
+    /**
+     * When true, this preset view is surfaced as a one-click quick-filter chip
+     * on the model's list page (in addition to the view switcher).
+     */
+    private Boolean pinAsQuickFilter;
+
+    /**
+     * Icon (emoji or known token) shown on the quick-filter chip when pinned.
+     */
+    private String quickFilterIcon;
+
+    /**
+     * Display order of the quick-filter chip among pinned view chips (ascending).
+     */
+    private Integer quickFilterOrder;
+
     @JsonIgnore
     private Map<String, Object> unknownFields;
 

@@ -2829,6 +2829,12 @@ public class PluginImportServiceImpl implements PluginImportService {
                 .allowUserOverride(firstNonNull(dto.getAllowUserOverride(), incomingMeta != null ? incomingMeta.getAllowUserOverride() : null, true))
                 .originViewPid(incomingMeta != null ? incomingMeta.getOriginViewPid() : null)
                 .capabilityStatus(incomingMeta != null ? incomingMeta.getCapabilityStatus() : null)
+                .pinnedAsQuickFilter(firstNonNull(dto.getPinAsQuickFilter(),
+                        incomingMeta != null ? incomingMeta.getPinnedAsQuickFilter() : null))
+                .quickFilterIcon(firstNonBlank(dto.getQuickFilterIcon(),
+                        incomingMeta != null ? incomingMeta.getQuickFilterIcon() : null))
+                .quickFilterOrder(firstNonNull(dto.getQuickFilterOrder(),
+                        incomingMeta != null ? incomingMeta.getQuickFilterOrder() : null))
                 .build());
         return viewConfig;
     }
