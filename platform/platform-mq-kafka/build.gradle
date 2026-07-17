@@ -29,11 +29,11 @@ dependencies {
     annotationProcessor 'org.projectlombok:lombok:1.18.40'
 
     // Spring conditional
-    compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.14'
-    compileOnly 'org.springframework:spring-context:6.2.18'
+    compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.16'
+    compileOnly 'org.springframework:spring-context:6.2.19'
 
     // Spring Boot Actuator (HealthIndicator SPI) — runtime optional
-    compileOnly 'org.springframework.boot:spring-boot-actuator:3.5.14'
+    compileOnly 'org.springframework.boot:spring-boot-actuator:3.5.16'
 
     // Root platform classes reference Jackson annotations; keep the compileOnly API visible
     // when this provider compiles against project(':') without the full root runtime graph.
@@ -46,9 +46,9 @@ dependencies {
     testImplementation(project(':')) {
         transitive = false
     }
-    testImplementation 'org.springframework:spring-beans:6.2.18'
-    testImplementation 'org.springframework.boot:spring-boot:3.5.14'
-    testImplementation 'org.springframework.boot:spring-boot-actuator:3.5.14'
+    testImplementation 'org.springframework:spring-beans:6.2.19'
+    testImplementation 'org.springframework.boot:spring-boot:3.5.16'
+    testImplementation 'org.springframework.boot:spring-boot-actuator:3.5.16'
     testImplementation 'org.slf4j:slf4j-api:2.0.18'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.14.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.14.4'
