@@ -32,8 +32,7 @@
     "name:en": "E2E Test Viewer",
     "description": "Read-only access to E2E test order plugin list and dashboards",
     "permissions": [
-      "e2et.order.read",
-      "model.e2et_order.read"
+      "e2et.order.read"
     ]
   },
   {
