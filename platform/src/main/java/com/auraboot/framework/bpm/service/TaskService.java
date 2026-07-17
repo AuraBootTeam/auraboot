@@ -1,7 +1,6 @@
 package com.auraboot.framework.bpm.service;
 
 import com.auraboot.smart.framework.engine.SmartEngine;
-import com.auraboot.smart.framework.engine.constant.AssigneeTypeConstant;
 import com.auraboot.smart.framework.engine.constant.RequestMapSpecialKeyConstant;
 import com.auraboot.smart.framework.engine.model.instance.ProcessInstance;
 import com.auraboot.smart.framework.engine.model.instance.TaskAssigneeCandidateInstance;
@@ -65,46 +64,10 @@ public class TaskService {
         }
         queryParam.setTenantId(tenantId);
 
-        // Tasks can be assigned to a GROUP (a role code — e.g. emitted by a rule-center
-        // review decision) instead of a specific user. SmartEngine only returns those rows
-        // when assigneeGroupIdList is supplied, so resolve the querying user's role codes
-        // into it; otherwise a manager/HR reviewer never sees group-assigned tasks in their
-        // todo list. Only applied when querying the current user's own todos (the real
-        // caller path) — querying another user's todos keeps the user-only scope.
-        // `userId` is the BPM actor key (MetaContext username, matching how user tasks are
-        // assigned in se_task_assignee_instance), not the numeric user id — compare against
-        // the same source so the group filter is applied when querying one's own todos.
-        String currentUsername = MetaContext.getCurrentUsername();
-        if (currentUsername != null && currentUsername.equals(userId)) {
-            List<String> groupCodes = resolveCurrentUserRoleCodes();
-            if (!groupCodes.isEmpty()) {
-                queryParam.setAssigneeGroupIdList(groupCodes);
-            }
-        }
-
         List<TaskInstance> tasks = smartEngine.getTaskQueryService().findPendingTaskList(queryParam);
 
-        return tasks;
-    }
+        return  tasks;
 
-    /**
-     * Resolve the current user's role codes for use as candidate-group ids in
-     * group-assigned task queries. Role ids are already on the MetaContext (loaded by the
-     * permission interceptor); map them to codes via RoleService.
-     */
-    private List<String> resolveCurrentUserRoleCodes() {
-        java.util.Set<Long> roleIds = MetaContext.getCurrentRoleIds();
-        if (roleIds == null || roleIds.isEmpty()) {
-            return java.util.Collections.emptyList();
-        }
-        List<Role> roles = roleService.listByIds(roleIds);
-        List<String> codes = new java.util.ArrayList<>(roles.size());
-        for (Role role : roles) {
-            if (role != null && role.getCode() != null) {
-                codes.add(role.getCode());
-            }
-        }
-        return codes;
     }
 
     /**
@@ -549,29 +512,6 @@ public class TaskService {
             return;
         }
         roleCodes.add(role.getCode());
-    }
-
-    /**
-     * Return true when the current caller is an authorized assignee of the task:
-     * either a direct user-id match on a {@code user} assignee, or a role-code match
-     * (group membership) on a {@code group} assignee.
-     */
-    private boolean matchesAssignee(List<TaskAssigneeInstance> assignees, String userId,
-                                    List<String> roleCodes) {
-        for (TaskAssigneeInstance assignee : assignees) {
-            String assigneeId = assignee.getAssigneeId();
-            if (assigneeId == null) {
-                continue;
-            }
-            if (AssigneeTypeConstant.GROUP.equalsIgnoreCase(assignee.getAssigneeType())) {
-                if (roleCodes.contains(assigneeId)) {
-                    return true;
-                }
-            } else if (userId.equals(assigneeId)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**
