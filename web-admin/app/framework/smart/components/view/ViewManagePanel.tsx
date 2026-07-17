@@ -7,15 +7,17 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Copy, Pencil, Plus, Search, Star, Trash2, X } from 'lucide-react';
+import { Check, Copy, Link2, Pencil, Plus, Search, Star, Trash2, X } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import {
   type SavedView,
   type SavedViewCreateRequest,
+  type SavedViewShareStatus,
   type ViewConfig,
   type ViewScope,
   type ViewType,
 } from '~/framework/smart/types/savedView';
+import { savedViewService } from '~/shared/services/savedViewService';
 import type { FieldOption } from './KanbanConfigPanel';
 import { cn } from '~/utils/cn';
 import { confirmDialog } from '~/utils/confirmDialog';
@@ -28,6 +30,7 @@ import {
   canDeleteSavedView,
   canManageSavedView,
   canSetDefaultSavedView,
+  canShareSavedView,
   isSavedViewLockedPreset,
 } from '~/framework/smart/utils/savedViewPersistence';
 
@@ -235,6 +238,15 @@ function countPersonalManualViews(views: SavedView[]): number {
   return views.filter((view) => view.scope === 'personal' && !view.isImplicit).length;
 }
 
+/**
+ * Public URL a recipient opens. The backend returns `shareUrl` = the API path
+ * (/api/views/shared/{token}); the human-facing page is the /share/{token} route
+ * (app/routes/share.$token.tsx).
+ */
+export function buildPublicShareLink(origin: string, token: string): string {
+  return `${(origin || '').replace(/\/+$/, '')}/share/${token}`;
+}
+
 function nextAutoViewName(baseName: string, views: SavedView[]): string {
   const usedNames = new Set(
     views.map((view) => String(view.name ?? '').trim().toLowerCase()).filter(Boolean),
@@ -287,9 +299,15 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
   const [duplicateName, setDuplicateName] = useState('');
   const [manageSearchTerm, setManageSearchTerm] = useState('');
   const [loadingState, setLoadingState] = useState<{
-    type: 'create' | 'delete' | 'duplicate' | 'setDefault' | 'rename' | null;
+    type: 'create' | 'delete' | 'duplicate' | 'setDefault' | 'rename' | 'share' | null;
     pid?: string;
   }>({ type: null });
+
+  // ── Public share link (GAP-121 producer half) ─────────────────────────────
+  const [sharingView, setSharingView] = useState<SavedView | null>(null);
+  const [shareStatus, setShareStatus] = useState<SavedViewShareStatus | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -301,6 +319,10 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
       setDuplicatingView(null);
       setDuplicateName('');
       setManageSearchTerm('');
+      setSharingView(null);
+      setShareStatus(null);
+      setShareError(null);
+      setShareCopied(false);
     }
   }, [open]);
 
@@ -584,6 +606,107 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
     },
     [onDeleteView, tx],
   );
+
+  // ── Public share link handlers ────────────────────────────────────────────
+
+  const handleShareStart = useCallback(
+    async (view: SavedView) => {
+      if (!canShareSavedView(view)) return;
+      setEditingView(null);
+      setDuplicatingView(null);
+      setShareCopied(false);
+      setShareError(null);
+      setShareStatus(null);
+      setSharingView(view);
+
+      setLoadingState({ type: 'share', pid: view.pid });
+      try {
+        setShareStatus(await savedViewService.getShareStatus(view.pid));
+      } catch (error) {
+        setShareError(
+          error instanceof Error
+            ? error.message
+            : tx('common.saved_view_share_status_failed', '获取分享状态失败'),
+        );
+      } finally {
+        setLoadingState({ type: null });
+      }
+    },
+    [tx],
+  );
+
+  const handleGenerateShareLink = useCallback(async () => {
+    if (!sharingView) return;
+    setShareError(null);
+    setLoadingState({ type: 'share', pid: sharingView.pid });
+    try {
+      const result = await savedViewService.shareView(sharingView.pid);
+      setShareStatus({
+        shared: true,
+        token: result.token,
+        expiresAt: result.expiresAt ?? null,
+        passwordProtected: result.passwordProtected,
+      });
+      setShareCopied(false);
+    } catch (error) {
+      setShareError(
+        error instanceof Error
+          ? error.message
+          : tx('common.saved_view_share_create_failed', '生成分享链接失败'),
+      );
+    } finally {
+      setLoadingState({ type: null });
+    }
+  }, [sharingView, tx]);
+
+  const handleRevokeShareLink = useCallback(async () => {
+    if (!sharingView) return;
+    const confirmed = await confirmDialog({
+      content: tx(
+        'common.saved_view_share_revoke_confirm',
+        '撤销后该链接立即失效，已拿到链接的人将无法访问。确定撤销？',
+      ),
+      variant: 'danger',
+    });
+    if (!confirmed) return;
+
+    setShareError(null);
+    setLoadingState({ type: 'share', pid: sharingView.pid });
+    try {
+      await savedViewService.revokeShare(sharingView.pid);
+      setShareStatus({ shared: false });
+      setShareCopied(false);
+    } catch (error) {
+      setShareError(
+        error instanceof Error
+          ? error.message
+          : tx('common.saved_view_share_revoke_failed', '撤销分享链接失败'),
+      );
+    } finally {
+      setLoadingState({ type: null });
+    }
+  }, [sharingView, tx]);
+
+  const shareLink =
+    shareStatus?.shared && shareStatus.token
+      ? buildPublicShareLink(
+          typeof window !== 'undefined' ? window.location.origin : '',
+          shareStatus.token,
+        )
+      : '';
+
+  const handleCopyShareLink = useCallback(async () => {
+    if (!shareLink) return;
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 2000);
+    } catch {
+      // Clipboard unavailable (insecure context / denied) — say so instead of
+      // flashing a success state the user cannot act on.
+      setShareError(tx('common.saved_view_share_copy_failed', '复制失败，请手动复制链接'));
+    }
+  }, [shareLink, tx]);
 
   const isViewLoading = (pid: string) => loadingState.pid === pid && loadingState.type !== null;
 
@@ -1017,6 +1140,124 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                             </button>
                           </div>
                         </div>
+                      ) : sharingView?.pid === view.pid ? (
+                        <div
+                          className="rounded-md border border-blue-200 bg-blue-50 p-3"
+                          data-testid={`saved-view-share-panel-${view.pid}`}
+                        >
+                          <div className="mb-3 flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-gray-900">
+                              {tx('common.saved_view_share_title', '公开分享链接')}
+                            </h3>
+                            <button
+                              type="button"
+                              onClick={() => setSharingView(null)}
+                              className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                              aria-label={tx('common.saved_view_cancel', '取消')}
+                              data-testid={`saved-view-share-close-${view.pid}`}
+                            >
+                              <X className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          </div>
+
+                          {shareError && (
+                            <p
+                              role="alert"
+                              className="mb-2 rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-700"
+                              data-testid={`saved-view-share-error-${view.pid}`}
+                            >
+                              {shareError}
+                            </p>
+                          )}
+
+                          {loadingState.type === 'share' && loadingState.pid === view.pid ? (
+                            <p
+                              className="text-xs text-gray-500"
+                              data-testid={`saved-view-share-loading-${view.pid}`}
+                            >
+                              {tx('common.saved_view_share_loading', '加载中...')}
+                            </p>
+                          ) : shareStatus?.shared && shareLink ? (
+                            <div className="space-y-2">
+                              <p
+                                className="text-xs text-gray-600"
+                                data-testid={`saved-view-share-state-${view.pid}`}
+                              >
+                                {tx('common.saved_view_share_active', '链接已开启，任何人可通过链接查看')}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="text"
+                                  readOnly
+                                  value={shareLink}
+                                  onFocus={(event) => event.currentTarget.select()}
+                                  className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 font-mono text-xs text-gray-700"
+                                  data-testid={`saved-view-share-link-${view.pid}`}
+                                  aria-label={tx('common.saved_view_share_title', '公开分享链接')}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleCopyShareLink}
+                                  className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                                  data-testid={`saved-view-share-copy-${view.pid}`}
+                                >
+                                  {shareCopied ? (
+                                    <Check className="h-4 w-4 text-green-600" aria-hidden="true" />
+                                  ) : (
+                                    <Copy className="h-4 w-4" aria-hidden="true" />
+                                  )}
+                                  <span>
+                                    {shareCopied
+                                      ? tx('common.saved_view_share_copied', '已复制')
+                                      : tx('common.saved_view_share_copy', '复制')}
+                                  </span>
+                                </button>
+                              </div>
+                              {shareStatus.expiresAt && (
+                                <p
+                                  className="text-xs text-gray-500"
+                                  data-testid={`saved-view-share-expires-${view.pid}`}
+                                >
+                                  {tx('common.saved_view_share_expires_at', '过期时间：{time}', {
+                                    time: shareStatus.expiresAt,
+                                  })}
+                                </p>
+                              )}
+                              <div className="flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={handleRevokeShareLink}
+                                  className="rounded-md px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+                                  data-testid={`saved-view-share-revoke-${view.pid}`}
+                                >
+                                  {tx('common.saved_view_share_revoke', '撤销链接')}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <p
+                                className="text-xs text-gray-600"
+                                data-testid={`saved-view-share-state-${view.pid}`}
+                              >
+                                {tx(
+                                  'common.saved_view_share_inactive',
+                                  '该视图尚未生成公开链接。生成后，任何拿到链接的人无需登录即可查看。',
+                                )}
+                              </p>
+                              <div className="flex justify-end">
+                                <button
+                                  type="button"
+                                  onClick={handleGenerateShareLink}
+                                  className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                                  data-testid={`saved-view-share-generate-${view.pid}`}
+                                >
+                                  {tx('common.saved_view_share_generate', '生成分享链接')}
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       ) : (
                         <div
                           className={cn(
@@ -1121,6 +1362,29 @@ export const ViewManagePanel: React.FC<ViewManagePanelProps> = ({
                               >
                                 <Copy className="h-4 w-4" aria-hidden="true" />
                               </button>
+
+                              {/*
+                                Rendered only when this view can actually be shared, not rendered
+                                disabled. The backend offers the `share` action for team and global
+                                views alone (SavedViewServiceImpl.resolveActions) while this panel
+                                lists personal views, so a button rendered unconditionally is a
+                                greyed-out icon on every row that nobody can ever click and nothing
+                                explains. The plumbing below it is complete: the day a view becomes
+                                shareable, canShareSavedView says so and the button appears.
+                              */}
+                              {canShareSavedView(view) && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleShareStart(view)}
+                                  disabled={isViewLoading(view.pid)}
+                                  className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                                  data-testid={`saved-view-action-share-${view.pid}`}
+                                  aria-label={tx('common.saved_view_action_share', '生成分享链接')}
+                                  title={tx('common.saved_view_action_share', '生成分享链接')}
+                                >
+                                  <Link2 className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                              )}
 
                               <button
                                 type="button"

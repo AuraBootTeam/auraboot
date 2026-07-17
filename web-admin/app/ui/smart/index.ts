@@ -1,6 +1,7 @@
 // Form Components
 export { Input } from '~/ui/smart/form/Input';
 export { default as Textarea } from '~/ui/smart/form/Textarea';
+export { default as JsonEditor } from '~/ui/smart/form/JsonEditor';
 export { default as Select } from '~/ui/smart/form/Select';
 export { default as Checkbox } from '~/ui/smart/form/Checkbox';
 export { default as Radio } from '~/ui/smart/form/Radio';
@@ -59,6 +60,7 @@ export * from '~/ui/smart/ui';
 // Import components for the component map
 import { Input as InputComponent } from '~/ui/smart/form/Input';
 import TextareaComponent from '~/ui/smart/form/Textarea';
+import JsonEditorComponent from '~/ui/smart/form/JsonEditor';
 import SelectComponent from '~/ui/smart/form/Select';
 import CheckboxComponent from '~/ui/smart/form/Checkbox';
 import RadioComponent from '~/ui/smart/form/Radio';
@@ -88,6 +90,8 @@ export const SMART_COMPONENT_MAP = {
   // Form
   input: InputComponent,
   textarea: TextareaComponent,
+  jsoneditor: JsonEditorComponent,
+  'json-editor': JsonEditorComponent,
   select: SelectComponent,
   checkbox: CheckboxComponent,
   radio: RadioComponent,

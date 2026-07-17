@@ -3,6 +3,7 @@ package com.auraboot.framework.permission.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.permission.service.FieldPermissionService;
 import com.auraboot.framework.rbac.entity.Role;
@@ -47,8 +48,16 @@ public class FieldPermissionServiceImpl implements FieldPermissionService {
 
     @Override
     public FieldPermissionSet getFieldPermissions(Long memberId, String modelCode) {
-        // Get member's role codes
         Long tenantId = MetaContext.getCurrentTenantId();
+        return DynamicDataQueryScope.fieldPermissions(
+                tenantId,
+                modelCode,
+                memberId,
+                () -> loadFieldPermissions(memberId, modelCode, tenantId));
+    }
+
+    private FieldPermissionSet loadFieldPermissions(Long memberId, String modelCode, Long tenantId) {
+        // Get member's role codes
         List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
         Set<String> memberRoleCodes = resolveRoleCodes(roleIds);
 

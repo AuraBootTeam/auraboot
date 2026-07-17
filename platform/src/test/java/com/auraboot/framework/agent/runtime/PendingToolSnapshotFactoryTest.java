@@ -5,7 +5,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.runtime.context.AgentContextAssembler;
 import com.auraboot.framework.agent.runtime.context.AgentContextBundle;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.conversation.TurnContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

@@ -127,8 +127,8 @@ class AuraBotChatThinkingPersistenceIntegrationTest extends BaseIntegrationTest 
     }
 
     private TurnRequest newTurnRequest(String message, String clientMsgId) {
-        com.auraboot.framework.aurabot.dto.ChatRequest legacy =
-                new com.auraboot.framework.aurabot.dto.ChatRequest();
+        com.auraboot.framework.agent.dto.ChatRequest legacy =
+                new com.auraboot.framework.agent.dto.ChatRequest();
         legacy.setMessage(message);
         legacy.setSessionId("d1-thinking-persistence");
         legacy.setAgentCode("aurabot");

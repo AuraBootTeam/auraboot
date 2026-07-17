@@ -63,7 +63,7 @@ public class FileServiceImpl implements FileService {
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "application/vnd.ms-excel", "application/msword",
+            "application/vnd.ms-excel", "application/msword", "application/vnd.ms-powerpoint",
             "text/plain", "text/csv", "text/markdown", "text/html",
             "application/json", "application/xml",
             "application/x-yaml", "application/yaml", "text/yaml",

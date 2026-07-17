@@ -47,11 +47,20 @@ interface CreateKbForm {
   chunkOverlap: number;
 }
 
+/**
+ * The model each embedding provider is seeded with. These must produce 1536-dimension vectors —
+ * that is the width of ab_kb_chunk.embedding, and a vector of any other width cannot be stored.
+ */
+const DEFAULT_EMBEDDING_MODELS: Record<string, string> = {
+  openai: 'text-embedding-3-small',
+  qianwen: 'text-embedding-v4',
+};
+
 const DEFAULT_FORM: CreateKbForm = {
   name: '',
   description: '',
   embeddingProvider: 'openai',
-  embeddingModel: 'text-embedding-3-small',
+  embeddingModel: DEFAULT_EMBEDDING_MODELS.openai,
   chunkSize: 500,
   chunkOverlap: 50,
 };
@@ -369,12 +378,38 @@ function KbForm({
             Provider
           </label>
           <select
+            data-testid="kb-provider-select"
             value={form.embeddingProvider}
-            onChange={(e) => update('embeddingProvider', e.target.value)}
+            onChange={(e) => {
+              const provider = e.target.value;
+              // Both fields in ONE update. `update` spreads the current `form` prop, and within a
+              // single handler that prop has not re-rendered — so calling it twice makes the second
+              // call overwrite the first, and the provider silently stays on its old value while
+              // the model changes underneath it.
+              //
+              // Carrying the model across matters: leaving the previous provider's model behind
+              // produces a "model not found" at the first embed, long after the dialog is gone.
+              onChange({
+                ...form,
+                embeddingProvider: provider,
+                embeddingModel: DEFAULT_EMBEDDING_MODELS[provider] ?? form.embeddingModel,
+              });
+            }}
             className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
           >
+            {/*
+              Only providers whose default model produces a 1536-wide vector belong here — that is
+              the width of ab_kb_chunk.embedding, and anything else cannot be stored at all.
+
+              Zhipu is deliberately absent: embedding-3 answers with 2048 dimensions, so a knowledge
+              base created on it would fail to embed every single chunk. An option that is guaranteed
+              to fail is worse than no option — the user only finds out long after the dialog closed,
+              from a knowledge base that quietly returns nothing. The provider stays seeded (disabled,
+              keyless); put it back here once its config pins dimensions=1536 and that has been
+              verified against the live API.
+            */}
             <option value="openai">OpenAI</option>
-            <option value="zhipu">Zhipu</option>
+            <option value="qianwen">通义千问 (DashScope)</option>
           </select>
         </div>
         <div>

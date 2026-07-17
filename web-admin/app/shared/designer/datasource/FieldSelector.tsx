@@ -30,7 +30,7 @@ export const FieldSelector: React.FC<FieldSelectorProps> = ({
   single = false,
   className,
 }) => {
-  const { fields, isLoading } = useModelFields(modelCode);
+  const { fields, isLoading, error } = useModelFields(modelCode);
 
   const filteredFields = fieldTypeFilter ? fields.filter(fieldTypeFilter) : fields;
 
@@ -48,6 +48,17 @@ export const FieldSelector: React.FC<FieldSelectorProps> = ({
       <div className={className}>
         {label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>}
         <p className="text-sm text-gray-500">Loading fields...</p>
+      </div>
+    );
+  }
+
+  // A failed lookup must not read as "this model has no fields" — that is exactly
+  // how a 404 on the field endpoint hid behind an empty picker.
+  if (error) {
+    return (
+      <div className={className}>
+        {label && <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>}
+        <p className="text-sm text-red-600">加载字段失败：{error.message}</p>
       </div>
     );
   }

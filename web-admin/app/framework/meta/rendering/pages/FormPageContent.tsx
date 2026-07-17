@@ -18,7 +18,10 @@ import { usePageRuntime } from '~/framework/meta/rendering/pages/hooks/usePageRu
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
-import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
+import {
+  useActionHandler,
+  resolveCommandErrorMessage,
+} from '~/framework/meta/hooks/useActionHandler';
 import { useComputedFields } from '~/framework/meta/hooks/useComputedFields';
 import { useToastContext } from '~/contexts/ToastContext';
 import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
@@ -31,6 +34,7 @@ import { SubTable } from '~/framework/meta/components/SubTable';
 import { SubTableViewer } from '~/framework/meta/rendering/blocks/SubTableViewer';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
 import { BlockRenderer, BlockErrorBoundary, type PageContentProps } from '@auraboot/runtime-kernel';
+import { DslFormFillProvider } from '~/framework/meta/rendering/DslFormFillContext';
 import type { SubTableColumn } from '~/framework/meta/components/types';
 import { resolveExtensionDisplayName } from '~/framework/meta/utils/i18nResolver';
 import { mergeRules as crossFieldMergeRules } from '~/framework/meta/validation/ruleMerger';
@@ -61,8 +65,8 @@ const DATA_TYPE_TO_COMPONENT: Record<string, string> = {
   datetime: 'SmartDatePicker',
   boolean: 'SmartSwitch',
   reference: 'SmartSelect',
-  json: 'SmartTextarea',
-  jsonb: 'SmartTextarea',
+  json: 'SmartJsonEditor',
+  jsonb: 'SmartJsonEditor',
   file: 'SmartUpload',
   money: 'SmartMoneyInput',
 };
@@ -187,13 +191,14 @@ function normalizeDateTimeFormValue(rawValue: any): any {
   }
 
   const base =
-    `${parsed.getFullYear()}-${padDatePart(parsed.getMonth() + 1)}-${padDatePart(parsed.getDate())}`
-    + `T${padDatePart(parsed.getHours())}:${padDatePart(parsed.getMinutes())}`;
+    `${parsed.getFullYear()}-${padDatePart(parsed.getMonth() + 1)}-${padDatePart(parsed.getDate())}` +
+    `T${padDatePart(parsed.getHours())}:${padDatePart(parsed.getMinutes())}`;
   if (parsed.getSeconds() === 0 && parsed.getMilliseconds() === 0) {
     return base;
   }
   const seconds = `:${padDatePart(parsed.getSeconds())}`;
-  const milliseconds = parsed.getMilliseconds() > 0 ? `.${padDatePart(parsed.getMilliseconds(), 3)}` : '';
+  const milliseconds =
+    parsed.getMilliseconds() > 0 ? `.${padDatePart(parsed.getMilliseconds(), 3)}` : '';
   return `${base}${seconds}${milliseconds}`;
 }
 
@@ -388,6 +393,34 @@ function tryParseJsonText(text: string): unknown {
   } catch {
     return text;
   }
+}
+
+export function getJsonFormValueError(
+  rawValue: any,
+  dataType?: string,
+  label = 'JSON',
+): string | null {
+  if (!isJsonLikeDataType(dataType)) return null;
+  const value = unwrapJsonLikeValue(rawValue);
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const looksLikeObjectOrArray =
+    (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+    (trimmed.startsWith('[') && trimmed.endsWith(']'));
+  if (!looksLikeObjectOrArray) {
+    return `${label} must be a valid JSON object or array`;
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (!parsed || typeof parsed !== 'object') {
+      return `${label} must be a valid JSON object or array`;
+    }
+  } catch {
+    return `${label} must be valid JSON`;
+  }
+  return null;
 }
 
 function isJsonEnvelope(value: unknown): value is { type?: unknown; value: unknown } {
@@ -1216,6 +1249,15 @@ export function FormPageContent(props: PageContentProps) {
     [setError],
   );
 
+  // B-003 (DR-20260715-B-003): the field setter handed to top-level blocks via
+  // DslFormFillProvider. An ai-fill-banner (or any block that calls useDslFormFill)
+  // writes AI-extracted values straight into this page's formData so the form updates.
+  // Defined before early returns to keep hook order stable. setFormData identity is
+  // stable, so [] deps is correct.
+  const applyAiFilledField = useCallback((field: string, value: unknown) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  }, []);
+
   // Fetch model field metadata for component resolution (must be before early returns)
   const [modelFields, setModelFields] = useState<Record<string, FieldMetaInfo>>({});
   const [fieldMetaLoaded, setFieldMetaLoaded] = useState(false);
@@ -1397,13 +1439,23 @@ export function FormPageContent(props: PageContentProps) {
       for (const rawField of fields) {
         const meta = modelFields[rawField.field];
         const rules = mergeFieldValidationRules(rawField, meta, t, locale);
-        const label = rawField.label || meta?.displayName || rawField.field;
+        const label =
+          getLocalizedText(rawField.label, locale, t) || meta?.displayName || rawField.field;
 
         if (rawField.visibleWhen && !evaluateCondition(rawField.visibleWhen, pageContext)) {
           continue;
         }
 
         const value = submissionData[rawField.field];
+        const jsonValueError = getJsonFormValueError(
+          value,
+          rawField.dataType || meta?.dataType,
+          label,
+        );
+        if (jsonValueError) {
+          nextFieldErrors[rawField.field] = jsonValueError;
+          continue;
+        }
         for (const rule of rules) {
           if (!rule?.type) continue;
           if (rule.type === 'required') {
@@ -1743,7 +1795,9 @@ export function FormPageContent(props: PageContentProps) {
                 setSummaryErrors(parseValidationSummaryMessages(contextError));
                 return;
               }
-              throw new Error(result.desc || result.message || 'Command execution failed');
+              // result.desc / result.message are the generic envelope ("Business error").
+              // The reason a command refused the submit lives in context.detail.
+              throw new Error(resolveCommandErrorMessage(result, effectiveCommandCode));
             }
             const asyncDispatch = resolveAsyncCommandDispatch(result.data);
             const responseData = asyncDispatch
@@ -2177,12 +2231,30 @@ export function FormPageContent(props: PageContentProps) {
   const effectiveButtonBlock = buttonBlock || null;
   const submitReady = mainRecordLoaded && (schemaFieldNames.size === 0 || fieldMetaLoaded);
 
+  // B-003 (DR-20260715-B-003): kind:form previously hard-coded form-section / tabs /
+  // custom / form-buttons / sub-table and silently dropped every other top-level block —
+  // an ai-fill-banner declared at the top of a form vanished. Dispatch the rest through
+  // the kernel BlockRenderer (mirrors the ListPageContent / DetailPageContent G7 fallback);
+  // unknown types surface a visible placeholder + console.warn instead of disappearing.
+  const FORM_SPECIALIZED_BLOCK_TYPES = new Set<string>([
+    'form-section',
+    'tabs',
+    'custom',
+    'form-buttons',
+    'sub-table',
+  ]);
+  const miscFormBlocks = allBlocks.filter(
+    (block: any) => !FORM_SPECIALIZED_BLOCK_TYPES.has(block.blockType),
+  );
+
   return (
     <DataSourceProvider manager={dataSourceManager}>
-      {/* Centered, width-capped form: full-width inputs stretched edge-to-edge on
+      {/* B-003: give top-level blocks (ai-fill-banner) a working applyFields wired to formData. */}
+      <DslFormFillProvider setFieldValue={applyAiFilledField} lockedFields={[]}>
+        {/* Centered, width-capped form: full-width inputs stretched edge-to-edge on
           wide screens read as sparse and hurt scanability. max-w-6xl (~1152px) keeps
           a comfortable 2-column line length while staying roomy for sub-tables. */}
-      <div
+        <div
         className="mx-auto w-full max-w-6xl px-2 py-3"
         data-testid={deriveTestId('form', schema?.modelCode || tableName, 'container')}
       >
@@ -2263,6 +2335,18 @@ export function FormPageContent(props: PageContentProps) {
               </div>
             ) : (
               <>
+                {/* B-003: top-level non-whitelist blocks (ai-fill-banner etc.) via the kernel
+                    BlockRenderer, rendered above the form so operators see them first. */}
+                {runtime &&
+                  miscFormBlocks.map((block: any, idx: number) => (
+                    <div
+                      key={block.id || `misc-form-${idx}`}
+                      data-block-id={block.id}
+                      className="mb-4"
+                    >
+                      <BlockRenderer block={block} runtime={runtime} areaId="form-misc" />
+                    </div>
+                  ))}
                 {toolbarBlocks.length > 0 &&
                   toolbarBlocks.map((block: any) => {
                     if (block.visibleWhen && !evaluateCondition(block.visibleWhen, pageContext)) {
@@ -2353,7 +2437,9 @@ export function FormPageContent(props: PageContentProps) {
                           return null;
                         }
                       }
-                      const blockTitle = block.title ? getLocalizedText(block.title, locale, t) : '';
+                      const blockTitle = block.title
+                        ? getLocalizedText(block.title, locale, t)
+                        : '';
                       const blockDescription = block.description
                         ? getLocalizedText(block.description, locale, t)
                         : '';
@@ -2628,6 +2714,7 @@ export function FormPageContent(props: PageContentProps) {
           </form>
         </div>
       </div>
+      </DslFormFillProvider>
     </DataSourceProvider>
   );
 }

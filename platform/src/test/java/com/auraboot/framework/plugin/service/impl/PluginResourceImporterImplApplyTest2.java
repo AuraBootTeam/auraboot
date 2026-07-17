@@ -23,6 +23,7 @@ import com.auraboot.framework.meta.dto.NamedQueryCreateRequest;
 import com.auraboot.framework.meta.dto.NamedQueryDTO;
 import com.auraboot.framework.meta.dto.NamedQueryUpdateRequest;
 import com.auraboot.framework.meta.dto.SchemaOperationResult;
+import com.auraboot.framework.meta.entity.ModelFieldBinding;
 import com.auraboot.framework.meta.entity.NamedQuery;
 import com.auraboot.framework.meta.mapper.BindingRuleMapper;
 import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
@@ -47,6 +48,7 @@ import com.auraboot.framework.plugin.dto.imports.AgentDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.DashboardDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.FieldDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportRequest;
+import com.auraboot.framework.plugin.dto.imports.ModelFieldBindingDTO;
 import com.auraboot.framework.plugin.dto.imports.ModelDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.NamedQueryDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ResourceAction;
@@ -74,6 +76,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -322,6 +325,45 @@ class PluginResourceImporterImplApplyTest2 {
         assertThat(result.getAction()).isEqualTo(ResourceAction.UPDATE.code());
         assertThat(result.getResourcePid()).isEqualTo("field-pid-exist");
         verify(metaFieldService, never()).create(any());
+        verify(metaModelService).clearAllCache();
+    }
+
+    @Test
+    @DisplayName("importModelFieldBinding UPDATE branch evicts model projection caches")
+    void importModelFieldBinding_update_evictsModelProjectionCaches() {
+        MetaModelDTO model = MetaModelDTO.builder()
+                .id(10L)
+                .pid("model-pid")
+                .code("m1")
+                .build();
+        MetaFieldDTO field = new MetaFieldDTO();
+        field.setId(20L);
+        field.setPid("field-pid");
+        field.setCode("f1");
+        ModelFieldBinding existing = new ModelFieldBinding();
+
+        when(metaModelService.findByCode("m1")).thenReturn(model);
+        when(metaFieldService.findCurrentByCode("f1")).thenReturn(Optional.of(field));
+        when(metaModelService.isFieldBoundToModel(10L, 20L)).thenReturn(true);
+        when(fieldBindingMapper.getPidByModelAndField(10L, 20L)).thenReturn("binding-pid");
+        when(metaModelService.getFieldBinding(10L, 20L)).thenReturn(Optional.of(existing));
+
+        ModelFieldBindingDTO dto = ModelFieldBindingDTO.builder()
+                .modelCode("m1")
+                .fieldCode("f1")
+                .sequence(7)
+                .required(true)
+                .visible(true)
+                .editable(true)
+                .build();
+
+        PluginResource result = importer.importModelFieldBinding(dto, "plg", "imp", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE);
+
+        assertThat(result.getAction()).isEqualTo(ResourceAction.UPDATE.code());
+        assertThat(result.getResourcePid()).isEqualTo("binding-pid");
+        verify(metaModelService).updateFieldBinding(existing);
+        verify(metaModelService).clearAllCache();
     }
 
     @Test

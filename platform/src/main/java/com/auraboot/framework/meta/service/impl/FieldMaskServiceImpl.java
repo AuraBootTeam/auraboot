@@ -9,8 +9,6 @@ import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -33,6 +31,7 @@ public class FieldMaskServiceImpl implements FieldMaskService {
     private final FieldMaskConfigMapper maskConfigMapper;
     private final RoleMapper roleMapper;
     private final UserPermissionService userPermissionService;
+    private final FieldMaskConfigCacheService configCacheService;
 
     // ==================== Configuration CRUD ====================
 
@@ -43,8 +42,11 @@ public class FieldMaskServiceImpl implements FieldMaskService {
     }
 
     @Override
-    @Cacheable(value = "fieldMaskConfig", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #modelCode")
     public List<FieldMaskConfig> getEnabledConfigs(String modelCode) {
+        return configCacheService.getEnabledConfigs(modelCode, () -> loadEnabledConfigs(modelCode));
+    }
+
+    private List<FieldMaskConfig> loadEnabledConfigs(String modelCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
         return maskConfigMapper.findByModelCode(tenantId, modelCode);
     }
@@ -147,8 +149,8 @@ public class FieldMaskServiceImpl implements FieldMaskService {
     }
 
     @Override
-    @CacheEvict(value = "fieldMaskConfig", key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #modelCode")
     public void evictCache(String modelCode) {
+        configCacheService.evict(modelCode);
         log.debug("Evicted field mask config cache for model: {}", modelCode);
     }
 

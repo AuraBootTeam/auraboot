@@ -47,6 +47,14 @@ public class LlmProviderFactory {
     @Value("${agent.llm.stub-mode:false}")
     private boolean stubMode;
 
+    /**
+     * CAP-04 — ordered comma-separated provider-code fallback chain tried when the requested
+     * provider has no usable config (missing/blank API key). Empty (default) = no fallback,
+     * behaviour unchanged. Example: {@code agent.llm.provider-fallback=deepseek,anthropic}.
+     */
+    @Value("${agent.llm.provider-fallback:}")
+    private String providerFallbackRaw;
+
     public LlmProviderFactory(List<LlmProvider> providers, CloudConfigService cloudConfigService,
                                AgentProperties agentProperties, ObjectMapper objectMapper,
                                com.auraboot.framework.agent.trace.GenAiUsageRecorder genAiUsageRecorder,
@@ -123,6 +131,131 @@ public class LlmProviderFactory {
      * resolution has routed to a different implementation, such as stub mode.
      */
     public ProviderResolution resolveProvider(Long tenantId, String providerCode) {
+        ProviderResolution primary = resolveProviderExact(tenantId, providerCode);
+        if (primary != null) {
+            return primary;
+        }
+        // CAP-04: config-driven provider fallback. When the requested provider has no usable
+        // config, try the configured fallback chain so a single mis-provisioned provider is
+        // not a hard single point of failure. Default chain is empty → returns null as before.
+        String requested = defaultProviderCode(providerCode);
+        for (String fallbackCode : providerFallbackChain()) {
+            if (fallbackCode.equalsIgnoreCase(requested)) {
+                continue; // the one that already failed
+            }
+            ProviderResolution fb = resolveProviderExact(tenantId, fallbackCode);
+            if (fb != null) {
+                log.warn("LLM provider '{}' unavailable for tenant {}; fell back to '{}'",
+                        requested, tenantId, fb.getEffectiveProviderCode());
+                // Preserve the original request for observability; effective reflects the fallback.
+                return ProviderResolution.builder()
+                        .requestedProviderCode(requested)
+                        .effectiveProviderCode(fb.getEffectiveProviderCode())
+                        .config(fb.getConfig())
+                        .provider(fb.getProvider())
+                        .build();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * CAP-04 (routing half) — resolve a provider + routed model for a logical cost/capability tier.
+     *
+     * <p>Looks up {@code agent.llm.model-routing.<tier>} → {@code provider:model} in the config map,
+     * resolves that provider via the EXISTING {@link #resolveProvider} (so the routed provider
+     * inherits the same availability-fallback chain as ordinary chat calls), and returns a
+     * {@link ProviderResolution} whose effective config model is the routed model.
+     *
+     * <p>This is a <b>seam</b> callers can opt into; existing chat callers are untouched and stay
+     * on {@link #resolveProvider}. Behaviour when routing is unused:
+     * <ul>
+     *   <li>blank tier, unmapped tier, or empty routing map → falls through to the default provider
+     *       ({@code resolveProvider(tenantId, null)}), identical to current behaviour;</li>
+     *   <li>the routed model is stamped onto the config <b>only when the routed provider is the one
+     *       that actually resolved</b> — if availability fallback swapped in a different provider,
+     *       that provider keeps its own default model rather than being forced to serve a model it
+     *       cannot.</li>
+     * </ul>
+     * The default (empty {@code model-routing} map) is a strict no-op with zero behaviour change.
+     *
+     * @param tenantId tenant scope for config resolution (may be null)
+     * @param tier     logical tier key, e.g. {@code cheap} / {@code smart}; blank/unmapped → default provider
+     * @return the routed (or default) provider resolution; {@code null} when neither the routed
+     *         provider (incl. its fallback chain) nor the default provider is configured
+     */
+    public ProviderResolution resolveByTier(Long tenantId, String tier) {
+        RouteTarget target = routeTarget(tier);
+        if (target == null || target.providerCode() == null) {
+            // Blank/unmapped tier, empty routing map, or a malformed target with no provider:
+            // fall back to the default provider — behaviour unchanged.
+            return resolveProvider(tenantId, null);
+        }
+
+        ProviderResolution base = resolveProvider(tenantId, target.providerCode());
+        if (base == null) {
+            return null;
+        }
+        // Only stamp the routed model when the routed provider is the one that actually resolved.
+        // If the availability-fallback chain swapped to a different provider, keep that provider's
+        // own default model instead of forcing a cross-provider model it cannot serve.
+        if (target.model() != null
+                && base.getConfig() != null
+                && target.providerCode().equalsIgnoreCase(base.getEffectiveProviderCode())) {
+            return withEffectiveModel(base, target.model());
+        }
+        return base;
+    }
+
+    /** Parse {@code agent.llm.model-routing.<tier>} into a provider/model pair; null when unmapped. */
+    private RouteTarget routeTarget(String tier) {
+        if (tier == null || tier.isBlank()) {
+            return null;
+        }
+        Map<String, String> routing = agentProperties.getLlm().getModelRouting();
+        if (routing == null || routing.isEmpty()) {
+            return null;
+        }
+        String target = routing.get(tier.trim());
+        if (target == null || target.isBlank()) {
+            return null;
+        }
+        // Format: "provider:model". A bare "provider" (no colon) routes the provider and keeps its
+        // default model. Model names in this codebase carry no colon, so split on the first one.
+        int idx = target.indexOf(':');
+        if (idx < 0) {
+            String provider = target.trim();
+            return new RouteTarget(provider.isBlank() ? null : provider, null);
+        }
+        String providerCode = target.substring(0, idx).trim();
+        String model = target.substring(idx + 1).trim();
+        return new RouteTarget(providerCode.isBlank() ? null : providerCode,
+                model.isBlank() ? null : model);
+    }
+
+    /** Rebuild a resolution with the routed model stamped onto a fresh config (no mutation of the input). */
+    private static ProviderResolution withEffectiveModel(ProviderResolution base, String model) {
+        ProviderConfig c = base.getConfig();
+        ProviderConfig routed = ProviderConfig.builder()
+                .providerCode(c.getProviderCode())
+                .apiKey(c.getApiKey())
+                .baseUrl(c.getBaseUrl())
+                .defaultModel(model)
+                .maxTokens(c.getMaxTokens())
+                .build();
+        return ProviderResolution.builder()
+                .requestedProviderCode(base.getRequestedProviderCode())
+                .effectiveProviderCode(base.getEffectiveProviderCode())
+                .config(routed)
+                .provider(base.getProvider())
+                .build();
+    }
+
+    /** A parsed {@code provider:model} routing target; {@code model} null = keep provider default. */
+    private record RouteTarget(String providerCode, String model) {}
+
+    /** Resolve exactly the requested provider (no fallback). Null when its config is unusable. */
+    private ProviderResolution resolveProviderExact(Long tenantId, String providerCode) {
         ProviderConfig config = resolveConfig(tenantId, providerCode);
         if (config == null || config.getApiKey() == null || config.getApiKey().isBlank()) {
             return null;
@@ -140,6 +273,21 @@ public class LlmProviderFactory {
                 .config(config)
                 .provider(provider)
                 .build();
+    }
+
+    /** Parse the configured comma-separated fallback chain; empty when unset (no fallback). */
+    private List<String> providerFallbackChain() {
+        if (providerFallbackRaw == null || providerFallbackRaw.isBlank()) {
+            return List.of();
+        }
+        List<String> chain = new ArrayList<>();
+        for (String part : providerFallbackRaw.split(",")) {
+            String code = part.trim();
+            if (!code.isBlank()) {
+                chain.add(code);
+            }
+        }
+        return chain;
     }
 
     public static String effectiveProviderCode(String requestedProviderCode, ProviderConfig config) {

@@ -6,8 +6,6 @@ import com.auraboot.framework.bi.service.DashboardDataService;
 import com.auraboot.framework.meta.entity.PageSchema;
 import com.auraboot.framework.meta.mapper.PageSchemaMapper;
 import com.auraboot.framework.common.util.JsonUtil;
-import com.auraboot.framework.datasource.dao.mapper.DynamicQueryMapper;
-import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,18 +23,25 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DashboardDataServiceImpl implements DashboardDataService {
 
     private final PageSchemaMapper formSchemaMapper;
-    private final DynamicQueryMapper dynamicQueryMapper;
 
     /** Simple in-memory cache: dashboardId -> (data, timestamp) */
     private final Map<String, CachedData> cache = new ConcurrentHashMap<>();
 
     private static final int DEFAULT_CACHE_TTL_SECONDS = 30;
 
+    /** Widget error surfaced when a rejected data source type is encountered. */
+    private static final String FREE_SQL_REJECTED_MESSAGE =
+            "Free-form SQL data sources are not supported for dashboard widgets";
+
     @Override
     public DashboardDataResponse fetchDashboardData(String dashboardId, boolean forceRefresh, Long tenantId) {
+        // Cache is keyed by tenant + dashboard so one tenant's cached widget data is
+        // never served to another tenant that requests the same dashboardId.
+        String cacheKey = tenantId + ":" + dashboardId;
+
         // Check cache first
         if (!forceRefresh) {
-            CachedData cached = cache.get(dashboardId);
+            CachedData cached = cache.get(cacheKey);
             if (cached != null && !cached.isExpired()) {
                 log.debug("Returning cached dashboard data for {}", dashboardId);
                 return cached.response;
@@ -46,6 +51,16 @@ public class DashboardDataServiceImpl implements DashboardDataService {
         // Fetch dashboard schema
         PageSchema schema = formSchemaMapper.selectById(dashboardId);
         if (schema == null) {
+            throw new IllegalArgumentException("Dashboard not found: " + dashboardId);
+        }
+
+        // Tenant ownership: a dashboard belongs to exactly one tenant. Reject a
+        // cross-tenant read and return the same not-found error so the caller cannot
+        // probe whether an id exists in another tenant. (A null owner tenant is a
+        // shared/system dashboard and stays readable.)
+        if (schema.getTenantId() != null && !schema.getTenantId().equals(tenantId)) {
+            log.warn("Cross-tenant dashboard access rejected: dashboardId={}, callerTenant={}, ownerTenant={}",
+                    dashboardId, tenantId, schema.getTenantId());
             throw new IllegalArgumentException("Dashboard not found: " + dashboardId);
         }
 
@@ -97,13 +112,12 @@ public class DashboardDataServiceImpl implements DashboardDataService {
         Object titleVal = dashboardConfig.get("title");
         response.setDashboardTitle(titleVal != null ? String.valueOf(titleVal) : "Dashboard");
 
-        // Update cache
-        cache.put(dashboardId, new CachedData(response, cacheTtl));
+        // Update cache (tenant-scoped key)
+        cache.put(cacheKey, new CachedData(response, cacheTtl));
 
         return response;
     }
 
-    @SuppressWarnings("unchecked")
     private Object fetchWidgetData(Map<?, ?> widget, Long tenantId) {
         Object dataSource = widget.get("dataSource");
         if (dataSource == null) {
@@ -113,31 +127,26 @@ public class DashboardDataServiceImpl implements DashboardDataService {
 
         if (dataSource instanceof Map<?, ?> ds) {
             Object typeVal = ds.get("type");
-            String type = typeVal != null ? String.valueOf(typeVal) : "sql";
+            // Require an explicit, safe data source type. A missing type must NOT
+            // fall through to raw SQL execution as it did previously — that default
+            // is what made no-type widgets a cross-tenant read path.
+            String type = typeVal != null ? String.valueOf(typeVal) : "";
             switch (type) {
-                case "sql" -> {
-                    String sql = String.valueOf(ds.get("query"));
-                    if (sql != null && !sql.isBlank()) {
-                        try {
-                            // Security: the widget query is authored config stored in
-                            // ab_page_schema and executed via SqlRunner, which bypasses
-                            // the tenant line interceptor. Enforce the same SELECT-only
-                            // guard every other raw-SQL path uses (DynamicSqlProvider,
-                            // NamedQueryServiceImpl, ReportTemplateServiceImpl) — blocks
-                            // writes/DDL, stacked statements, UNION-based exfiltration,
-                            // comments, and file operations before the query runs.
-                            SqlSafetyUtils.validateSelectOnlySql(sql);
-                            return dynamicQueryMapper.queryData(sql);
-                        } catch (Exception e) {
-                            log.warn("Widget SQL query rejected or failed: {}", e.getMessage());
-                            return Map.of("error", e.getMessage());
-                        }
-                    }
-                }
                 case "static" -> {
                     return ds.get("data");
                 }
-                default -> log.warn("Unknown widget dataSource type: {}", type);
+                case "sql" -> {
+                    // SECURITY (finding DR-20260702-SD2-DASHBOARD-003): free-form SQL
+                    // widgets are rejected and never executed. Such a query would run
+                    // through DynamicQueryMapper/SqlRunner, which bypasses the tenant
+                    // line interceptor, so a SELECT against a shared table would read
+                    // data across every tenant. Dashboard widgets must use tenant-scoped
+                    // data sources (aggregate / namedQuery / static) — the only types the
+                    // Dashboard Designer produces.
+                    log.warn("Rejected free-form SQL dashboard widget; use a tenant-scoped data source instead");
+                    return Map.of("error", FREE_SQL_REJECTED_MESSAGE);
+                }
+                default -> log.warn("Unsupported widget dataSource type: {}", type);
             }
         }
 

@@ -31,7 +31,7 @@ class AuraBotChatToolRuntimeAdapterFactory {
                     LlmProviderFactory.ProviderConfig config,
                     String model,
                     String systemPrompt,
-                    List<com.auraboot.framework.aurabot.dto.ChatMessage> history,
+                    List<com.auraboot.framework.agent.dto.ChatMessage> history,
                     String userMessage,
                     int maxTokens,
                     List<LlmChatRequest.Tool> tools,

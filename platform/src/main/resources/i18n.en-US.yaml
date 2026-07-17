@@ -875,6 +875,11 @@ common:
   saved_view_preset_reset_failed: Failed to reset preset view
   options_load_failed: Failed to load options
   retry: Retry
+  json_editor:
+    valid: Valid
+    invalid: JSON must be an object or array
+    invalid_short: Invalid
+    format: Format
 admin:
   org:
     title: Organization Management
@@ -1354,3 +1359,18 @@ notification_rule:
   saving: Saving...
   update_rule: Update rule
   create_rule: Create rule
+
+aurabot:
+  error:
+    # Streamed to the AuraBot chat panel when no LLM provider is configured for the tenant.
+    no_llm_provider: No LLM provider configured. Please configure an API key in Cloud Config.
+    # Shown in the AuraBot chat panel when the browser cannot reach the chat SSE endpoint.
+    connect_chat: Cannot reach the AuraBot chat service. Please try again later or contact your administrator.
+    # Shown in the AuraBot chat panel when the browser cannot reach the execute SSE endpoint.
+    connect_execute: Cannot reach the AuraBot execution service. Please try again later or contact your administrator.
+  chatbi:
+    # "Save this ad-hoc chat chart as a dashboard widget" action + result states.
+    save_as_dashboard: Save to dashboard
+    saving: Saving…
+    saved_as_dashboard: Saved to dashboard
+    save_failed: Failed to save to dashboard

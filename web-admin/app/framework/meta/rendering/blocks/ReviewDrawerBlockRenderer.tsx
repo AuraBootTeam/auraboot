@@ -486,11 +486,13 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const contextRecord = resolveRuntimeValue(runtime, contextExpression);
   const compareConfig = (block as any).compare || {};
   const candidatesConfig = (block as any).candidates || {};
+  const hasCandidatesConfig = Boolean((block as any).candidates);
   const exportConfig = (block as any).exportImpact || {};
   const sourceConfig = (block as any).source || {};
   const sourceRecordConfig = sourceConfig.record || {};
   const contextDataSource = (block as any).contextDataSource;
   const contextKeyField = (block as any).contextKeyField || 'pid';
+  const closeClearsContext = (block as any).closeClearsContext !== false;
   const rawRecordConfig = compareConfig.rawRecord || {};
   const canonicalRecordConfig = compareConfig.canonicalRecord || {};
   const rawDataSource = rawRecordConfig.dataSource;
@@ -515,6 +517,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
   const initialLayout = initialLayoutRef.current;
 
   const [selectedCandidateKey, setSelectedCandidateKey] = useState('');
+  const [dismissedRecordKey, setDismissedRecordKey] = useState('');
   const [isMaximized, setIsMaximized] = useState(false);
   const [position, setPosition] = useState({
     left: initialLayout.left,
@@ -566,6 +569,12 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     }
   }, [selectedRecordKey, candidatesConfig.selection?.bind, runtime]);
 
+  useEffect(() => {
+    if (!selectedRecordKey) {
+      setDismissedRecordKey('');
+    }
+  }, [selectedRecordKey]);
+
   const runAction = async (actionConfig: any, source: 'candidate' | 'export') => {
     const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
     setRunningAction(`${source}:${code}`);
@@ -584,6 +593,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     setSelectedCandidateKey('');
     if (candidatesConfig.selection?.bind) {
       writeRuntimeState(runtime, candidatesConfig.selection.bind, {});
+    }
+    if (!closeClearsContext) {
+      setDismissedRecordKey(selectedRecordKey);
+      return;
     }
     if (contextStateBinding) {
       writeRuntimeState(runtime, contextStateBinding, {});
@@ -661,6 +674,19 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
       >
         {emptyTitle}
       </div>
+    );
+  }
+
+  if (!closeClearsContext && dismissedRecordKey && dismissedRecordKey === selectedRecordKey) {
+    return (
+      <button
+        type="button"
+        className="rounded-control bg-panel text-text fixed right-4 bottom-4 z-50 border border-blue-200 px-4 py-2 text-sm font-medium shadow-lg hover:bg-blue-50"
+        data-testid="review-drawer-minimized"
+        onClick={() => setDismissedRecordKey('')}
+      >
+        {localized(locale, t, '展开行级复核', 'Open row review')}
+      </button>
     );
   }
 
@@ -934,7 +960,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   </summary>
                   <div className="space-y-3 border-t border-gray-100 p-3">
                     {sourceCards.length > 0 && (
-                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <div
+                        data-testid="review-drawer-source-cards"
+                        className="grid gap-3 md:grid-cols-2"
+                      >
                         {sourceCards.map((card: any) => {
                           const key = String(card.key || card.title || card.valueField);
                           const value = `${formatValue(readFieldValue(sourceRecord, card), card.emptyText)}${
@@ -943,12 +972,17 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           return (
                             <section
                               key={key}
+                              data-testid={`review-drawer-source-card-${key}`}
                               className="rounded-card border-border bg-subtle border p-3"
                             >
                               <h3 className="text-text-2 text-xs font-medium">
                                 {getLocalizedText(card.title || key, locale, t)}
                               </h3>
-                              <div className="text-text mt-2 text-sm font-semibold break-words">
+                              <div
+                                data-testid={`review-drawer-source-card-${key}-value`}
+                                title={value}
+                                className="text-text mt-2 text-sm font-semibold [overflow-wrap:anywhere]"
+                              >
                                 {value}
                               </div>
                               {card.description && (
@@ -1073,6 +1107,11 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
             </div>
           )}
 
+          {/* The candidates panel is BOM's: it talks about 候选物料 and 标准编码 and writing a
+              chosen code back. Rendering it for a page that never configured `candidates` puts one
+              domain's vocabulary in front of another domain's users — a FAQ reviewer has no idea
+              what a 标准编码 is, and nothing on the panel does anything. Show it when it is asked for. */}
+          {hasCandidatesConfig && (
           <aside
             data-testid="review-drawer-tab-candidates"
             className="rounded-card border-border bg-panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden border"
@@ -1331,6 +1370,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               )}
             </section>
           </aside>
+          )}
         </div>
       </div>
 

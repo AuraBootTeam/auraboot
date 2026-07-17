@@ -246,7 +246,8 @@
             "label": {
               "zh-CN": "创建人",
               "en-US": "Created By"
-            }
+            },
+            "component": "memberpicker"
           },
           {
             "field": "createdAt",
@@ -261,7 +262,8 @@
             "label": {
               "zh-CN": "更新人",
               "en-US": "Updated By"
-            }
+            },
+            "component": "memberpicker"
           },
           {
             "field": "updatedAt",
@@ -624,7 +626,8 @@
             "label": {
               "zh-CN": "创建人",
               "en-US": "Created By"
-            }
+            },
+            "component": "memberpicker"
           },
           {
             "field": "createdAt",
@@ -639,7 +642,8 @@
             "label": {
               "zh-CN": "更新人",
               "en-US": "Updated By"
-            }
+            },
+            "component": "memberpicker"
           },
           {
             "field": "updatedAt",
@@ -1922,7 +1926,8 @@
             "label": {
               "zh-CN": "启动人",
               "en-US": "Started By"
-            }
+            },
+            "component": "memberpicker"
           },
           {
             "field": "startedAt",
@@ -1937,7 +1942,8 @@
             "label": {
               "zh-CN": "结束人",
               "en-US": "Ended By"
-            }
+            },
+            "component": "memberpicker"
           },
           {
             "field": "endedAt",

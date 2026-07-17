@@ -11,6 +11,7 @@ import com.auraboot.framework.rag.entity.KbDocument;
 import com.auraboot.framework.rag.service.DocumentProcessingService;
 import com.auraboot.framework.rag.service.DocGenerationService;
 import com.auraboot.framework.rag.service.InternalDocImportService;
+import com.auraboot.framework.rag.service.KbUrlIngestService;
 import com.auraboot.framework.rag.service.KnowledgeBaseService;
 import com.auraboot.framework.rag.service.RagRetrievalService;
 import com.auraboot.framework.permission.annotation.RequirePermission;
@@ -35,6 +36,7 @@ public class KnowledgeBaseController {
 
     private final KnowledgeBaseService kbService;
     private final DocumentProcessingService docProcessingService;
+    private final KbUrlIngestService urlIngestService;
     private final RagRetrievalService ragRetrievalService;
     private final DocGenerationService docGenerationService;
     private final InternalDocImportService internalDocImportService;
@@ -160,6 +162,55 @@ public class KnowledgeBaseController {
         return ApiResponse.success(kbService.deleteDocument(kbPid, docPid));
     }
 
+    /**
+     * Add a web page to the knowledge base by URL.
+     *
+     * <p>This makes the backend fetch a URL the caller chose, so it is an SSRF sink: the fetch is
+     * gated by {@code SsrfValidator} and sent with the resolved IP pinned. A rejected URL comes back
+     * as a plain error the user can act on, not a 500.
+     *
+     * <p>One page, fetched now. Crawling a site is the crawler plugin's job.
+     */
+    @PostMapping("/{kbPid}/documents/from-url")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
+    public ApiResponse<KbDocumentDTO> addDocumentFromUrl(@PathVariable String kbPid,
+                                                           @RequestBody Map<String, String> request) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String url = request.get("url");
+
+        String docPid;
+        try {
+            docPid = urlIngestService.ingestUrl(tenantId, kbPid, url);
+        } catch (IllegalArgumentException e) {
+            // The URL was refused (unsafe target, unreachable host, not an HTML page, no text).
+            // This is the user's input being wrong, not the server failing.
+            return ApiResponse.error(e.getMessage());
+        } catch (java.io.IOException e) {
+            log.warn("Fetching {} for kb {} failed: {}", url, kbPid, e.getMessage());
+            return ApiResponse.error("Could not fetch the URL: " + e.getMessage());
+        }
+
+        return ApiResponse.success(kbService.listDocuments(kbPid).stream()
+                .filter(d -> docPid.equals(d.getPid()))
+                .findFirst()
+                .orElse(null));
+    }
+
+    /**
+     * Parse a document again — for one that failed, or that a worker restart left stranded.
+     * Without this the only way out of a failed parse is to delete the document and re-upload it.
+     */
+    @PostMapping("/{kbPid}/documents/{docPid}/reprocess")
+    @RequirePermission(MetaPermission.AI_KNOWLEDGE_MANAGE)
+    public ApiResponse<Boolean> reprocessDocument(@PathVariable String kbPid,
+                                                    @PathVariable String docPid) {
+        if (!kbService.resetDocumentForReprocess(kbPid, docPid)) {
+            return ApiResponse.error("Document not found: " + docPid);
+        }
+        docProcessingService.processDocument(kbPid, docPid);
+        return ApiResponse.success(true);
+    }
+
     // =========================================================================
     // Chunk preview
     // =========================================================================
@@ -220,15 +271,33 @@ public class KnowledgeBaseController {
     // Helpers
     // =========================================================================
 
-    private String resolveDocType(String extension) {
+    /**
+     * Map an uploaded file's extension to a doc_type, or null if we cannot parse it.
+     *
+     * <p>This gate runs <b>before</b> the document row is created, so a format missing here is
+     * rejected outright no matter what the parser and the CHECK constraint allow. Adding a format
+     * means touching four places in lockstep: the {@code chk_doc_type} constraint, this switch,
+     * {@link DocumentParserService#SUPPORTED_DOC_TYPES}, and the accept list in the upload UI.
+     *
+     * <p>Legacy binary Office formats (.ppt/.xls/.doc) are deliberately absent — parsing them
+     * needs poi-scratchpad, which is not a dependency. Only OOXML is accepted.
+     */
+    static String resolveDocType(String extension) {
         if (extension == null) return null;
         return switch (extension.toLowerCase().replaceFirst("^\\.", "")) {
             case "pdf" -> "pdf";
             case "docx" -> "docx";
+            case "pptx" -> "pptx";
+            case "ppt" -> "ppt";
+            case "xlsx" -> "xlsx";
+            case "xls" -> "xls";
             case "md", "markdown" -> "md";
             case "txt" -> "txt";
             case "csv" -> "csv";
             case "html", "htm" -> "html";
+            // Every raster format collapses to one doc_type: the file is not parsed, it is shown to
+            // a vision model, and the MIME type it needs is derived from the file name at that point.
+            case "png", "jpg", "jpeg", "gif", "webp" -> "image";
             default -> null;
         };
     }

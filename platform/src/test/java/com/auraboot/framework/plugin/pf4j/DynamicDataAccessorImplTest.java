@@ -14,11 +14,13 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -74,6 +76,36 @@ class DynamicDataAccessorImplTest {
     }
 
     @Test
+    void queryIn_builds_IN_condition_from_distinct_non_null_values() {
+        when(dynamicDataService.list(eq("m"), any(DynamicQueryRequest.class)))
+            .thenReturn(PaginationResult.of(List.of(Map.of("code", "A")), 1L, 1, 10000));
+
+        List<Map<String, Object>> rows = accessor.queryIn("m", "code", java.util.Arrays.asList("A", "B", "A", null));
+        assertThat(rows).hasSize(1);
+
+        ArgumentCaptor<DynamicQueryRequest> cap = ArgumentCaptor.forClass(DynamicQueryRequest.class);
+        verify(dynamicDataService).list(eq("m"), cap.capture());
+        DynamicQueryRequest req = cap.getValue();
+        assertThat(req.getPageNum()).isEqualTo(1);
+        assertThat(req.getPageSize()).isEqualTo(10000);
+        assertThat(req.getConditions()).hasSize(1);
+        QueryCondition c = req.getConditions().get(0);
+        assertThat(c.getFieldName()).isEqualTo("code");
+        assertThat(c.getOperator()).isEqualTo(QueryCondition.Operator.IN);
+        assertThat(c.getValues()).containsExactly("A", "B");
+        assertThat(c.getValue()).isNull();
+    }
+
+    @Test
+    void queryIn_returns_empty_without_query_when_values_are_empty_or_null_only() {
+        assertThat(accessor.queryIn("m", "code", null)).isEmpty();
+        assertThat(accessor.queryIn("m", "code", List.of())).isEmpty();
+        assertThat(accessor.queryIn("m", "code", java.util.Arrays.asList(null, null))).isEmpty();
+
+        verifyNoInteractions(dynamicDataService);
+    }
+
+    @Test
     void create_delegates() {
         when(dynamicDataService.create(eq("m"), any())).thenReturn(Map.of("id", "1"));
         assertThat(accessor.create("m", Map.of("a", 1))).containsEntry("id", "1");
@@ -112,5 +144,15 @@ class DynamicDataAccessorImplTest {
     void delete_delegates() {
         accessor.delete("m", "1");
         verify(dynamicDataService).delete("m", "1");
+    }
+
+    @Test
+    void atomicIncrementDelegatesWithoutReadModifyWrite() {
+        when(dynamicDataService.incrementWithinCap("m", "1", "counter", 1L, "cap"))
+                .thenReturn(Optional.of(8L));
+
+        assertThat(accessor.incrementWithinCap("m", "1", "counter", 1L, "cap"))
+                .contains(8L);
+        verify(dynamicDataService).incrementWithinCap("m", "1", "counter", 1L, "cap");
     }
 }

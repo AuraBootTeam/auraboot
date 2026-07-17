@@ -46,7 +46,9 @@ describe('RuntimeFieldRenderer bindState', () => {
 
     render(
       <RuntimeFieldRenderer
-        field={{ field: 'iot_d_status', component: 'SmartSelect', bindState: 'statusFilter' } as any}
+        field={
+          { field: 'iot_d_status', component: 'SmartSelect', bindState: 'statusFilter' } as any
+        }
         runtime={runtime}
       />,
     );
@@ -87,6 +89,39 @@ describe('RuntimeFieldRenderer bindState', () => {
     expect(updateField).toHaveBeenCalledWith('scope-1', 'iot_d_device_code', 'dev-1');
     expect(updateState).not.toHaveBeenCalled();
     expect(notifyStateChanged).not.toHaveBeenCalled();
+  });
+
+  it('infers SmartJsonEditor for runtime jsonb fields declared as textarea', async () => {
+    let captured: any;
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: (p: any) => {
+        captured = p;
+        return <div data-testid="cl" />;
+      },
+    }));
+    const runtime = buildRuntime({
+      updateField: vi.fn(),
+      updateState: vi.fn(),
+      notifyStateChanged: vi.fn(),
+    });
+    const { RuntimeFieldRenderer } = await import('../RuntimeFieldRenderer');
+
+    render(
+      <RuntimeFieldRenderer
+        field={
+          {
+            field: 'iot_dp_alarm_thresholds',
+            component: 'textarea',
+            dataType: 'jsonb',
+          } as any
+        }
+        runtime={runtime}
+      />,
+    );
+    await waitFor(() => expect(captured).toBeTruthy());
+
+    expect(captured.componentName).toBe('SmartJsonEditor');
   });
 
   it('disables dependent selects and withholds their data source while the parent field is blank', async () => {

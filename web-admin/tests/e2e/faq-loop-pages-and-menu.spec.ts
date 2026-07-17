@@ -1,0 +1,305 @@
+/**
+ * Conversation → FAQ loop — the pages and the menu the other two goldens never open.
+ *
+ * The coverage audit found three:
+ *
+ *  - **the sidebar was never clicked.** Both other specs navigate by URL. A reachable URL is not a
+ *    reachable feature: a standalone page whose menu path says /p/{key} instead of /p/c/{key} is
+ *    resolved as a model, gets _list appended, and 404s — while a page.goto() straight at the
+ *    right path passes happily.
+ *  - **faq_candidate_detail was never opened**, and its toolbar is a *second execution path* for
+ *    the same four commands the workbench row actions use. They are different code paths
+ *    (toolbar vs rowAction), and they have already diverged once: the platform validator rejected
+ *    update_qa on this toolbar because an UPDATE command has nowhere to collect values from, so it
+ *    navigates to the form instead of firing. Nothing tested that the substitution actually works.
+ *  - **faq_candidate_list / faq_candidate_form were never opened.** Publishing a model auto-creates
+ *    all three kinds; a stub that renders nothing still counts as a page.
+ */
+import { test, expect, type Page } from '../fixtures';
+
+test.use({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
+
+const SHOTS = process.env.FAQ_GOLDEN_SHOTS || 'test-results/faq-loop-golden';
+
+/** This spec's own conversation. The review golden works its two drafts down to nothing. */
+const OWN_CONV_PID = 'faqseedsupport0000000002';
+
+function isDevServerNoise(text: string): boolean {
+  return /Outdated Optimize Dep|Failed to fetch dynamically imported module|504|Loading chunk|Importing a module script failed/i.test(
+    text,
+  );
+}
+
+function isProductError(text: string): boolean {
+  if (isDevServerNoise(text)) return false;
+  return /exprError|尝试调用非函数值|Maximum update depth|Invalid hook call|is not a function|Internal system error|Application Error|TypeError|ReferenceError|Page not found/i.test(
+    text,
+  );
+}
+
+function captureConsole(page: Page): string[] {
+  const errors: string[] = [];
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
+  page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
+  return errors;
+}
+
+/** Assert on the content region, not the body — a 404 shell still has a body. */
+const main = (page: Page) => page.locator('main');
+
+async function fetchCandidates(page: Page): Promise<Record<string, any>[]> {
+  const res = await page.request.get('/api/dynamic/faq_candidate_list/list?pageNum=1&pageSize=50');
+  expect(res.ok(), `candidate list API responds (${res.status()})`).toBe(true);
+  return (await res.json())?.data?.records ?? [];
+}
+
+test.describe('Conversation → FAQ loop — menu reachability and the remaining pages', () => {
+  test.setTimeout(120_000);
+
+  test('P1 every FAQ menu entry opens its page from the sidebar', async ({ page }) => {
+    // Let the first paint settle before listening. Vite's first-load dependency optimize can
+    // briefly serve two copies of React and spray "Invalid hook call" — a dev-server artifact that
+    // has nothing to do with what this test is about, which is whether the menu goes anywhere.
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await page.waitForLoadState('networkidle').catch(() => null);
+
+    const errors = captureConsole(page);
+
+    // Scope to the sidebar. The home page also renders shortcut cards pointing at the same routes,
+    // so an unscoped by-name lookup finds three of each — and a shortcut card working proves
+    // nothing about menu reachability. This test is about the menu, so it clicks the menu.
+    const sidebar = page.locator('nav').filter({ hasText: '知识闭环' }).first();
+
+    // The group renders expanded. Only toggle it if it is not — an unconditional click *collapses*
+    // it, which leaves the links in the DOM but clipped by the scroll container, and then every
+    // click on them is swallowed by the nav.
+    const firstLink = sidebar.getByRole('link', { name: '可提炼会话' });
+    if (!(await firstLink.isVisible().catch(() => false))) {
+      await sidebar.getByRole('button', { name: /知识闭环/ }).click();
+      await expect(firstLink, 'the menu group expands').toBeVisible({ timeout: 10000 });
+    }
+
+    for (const [label, expected] of [
+      ['可提炼会话', /可提炼会话|Distillable/],
+      ['FAQ 审核台', /FAQ 审核台|FAQ Review/],
+      ['FAQ 候选', /FAQ 候选|FAQ Candidate/],
+    ] as const) {
+      await sidebar.getByRole('link', { name: label }).click();
+      // The page must actually render its own content — a menu path pointing at /p/{key} for a
+      // standalone page resolves as a model, appends _list, and lands on "Page not found".
+      await expect(main(page), `${label} renders its page`).toContainText(expected, {
+        timeout: 20000,
+      });
+      await expect(main(page), `${label} is not a 404`).not.toContainText(/Page not found|页面不存在/);
+    }
+
+    await page.screenshot({ path: `${SHOTS}/P1-menu-reachability.png`, fullPage: true });
+    expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
+  });
+
+  /**
+   * This spec's material, distilled the same way everything else is — from the queue, in the
+   * browser. It does not reuse the review golden's candidates: that one works them down to
+   * nothing, and a spec that quietly depends on another spec's leftovers is a spec that passes
+   * for the wrong reason the day the order changes.
+   */
+  test('P0 distil this spec\'s own conversation from the queue', async ({ page }) => {
+    await page.goto('/p/c/faq_conversation_queue', { waitUntil: 'domcontentloaded' });
+    const row = page.locator(`[data-testid="table-row-${OWN_CONV_PID}"]`);
+    await expect(row).toBeVisible({ timeout: 20000 });
+
+    await row.getByTestId('row-action-extract').click();
+    const dialog = page.getByTestId('form-dialog');
+    await expect(dialog).toBeVisible({ timeout: 10000 });
+    await dialog.getByTestId('form-dialog-field-faq_target_kb_id').selectOption(process.env.FAQ_TARGET_KB_PID!);
+    await dialog.getByTestId('form-dialog-submit').click();
+
+    await expect
+      .poll(async () => (await fetchCandidates(page)).filter((c) => c.faq_source_conversation_pid === OWN_CONV_PID).length, {
+        timeout: 90_000,
+        message: 'the distiller produced candidates from a conversation that plainly has two',
+      })
+      .toBeGreaterThan(0);
+  });
+
+  test('P2 the candidate list page renders real rows, not an empty stub', async ({ page }) => {
+    const errors = captureConsole(page);
+    await page.goto('/p/faq_candidate', { waitUntil: 'domcontentloaded' });
+
+    // autoCreateDefaultPages generates list/form/detail stubs silently; a stub that renders
+    // nothing is still a page, and still counts as "the model has a list page".
+    await expect(main(page)).toContainText(/退款|发票|Q/, { timeout: 20000 });
+    const rows = page.locator('[data-testid^="table-row-"]');
+    await expect.poll(() => rows.count(), { timeout: 15000 }).toBeGreaterThan(0);
+
+    // The status column must render the dict label, not the raw code — a queue showing "draft"
+    // instead of 待审核 is leaking the model at the user.
+    await expect(main(page)).toContainText(/待审核|已批准|已发布|已驳回/);
+    await expect(main(page), 'no raw status codes leak into the UI').not.toContainText(
+      /\bdraft\b|\bapproved\b/,
+    );
+
+    await page.screenshot({ path: `${SHOTS}/P2-candidate-list.png`, fullPage: true });
+    expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
+  });
+
+  test('P3 the detail page shows the candidate, and its toolbar is the second command path', async ({
+    page,
+  }) => {
+    const errors = captureConsole(page);
+
+    const draft = (await (async () => {
+      await page.goto('/p/faq_candidate', { waitUntil: 'domcontentloaded' });
+      return fetchCandidates(page);
+    })()).find((c) => c.faq_status === 'draft' && c.faq_source_conversation_pid === OWN_CONV_PID);
+    expect(draft, 'a draft candidate to open').toBeTruthy();
+    const pid = draft!.pid as string;
+
+    // Reach the detail page the way a user does — by clicking the row's 详情 action, not by typing
+    // its URL. A detail page that only opens when you already know its URL is not reachable.
+    //
+    // The row is located by its text, not by pid: a kind:list page renders through ListTable,
+    // which keys rows by DOM *index* (table-row-0, table-row-1), while a table block inside a
+    // kind:detail page renders through TableBlockRenderer, which keys them by pid. Same testid
+    // prefix, different identity — a locator written for one silently finds nothing on the other.
+    const listRow = page
+      .locator('[data-testid^="table-row-"]')
+      .filter({ hasText: String(draft!.faq_question).slice(0, 10) });
+    await expect(listRow, 'the candidate is in the list').toHaveCount(1);
+    await listRow.getByTestId('row-action-view').click();
+    await expect(page, 'the list row navigates to the detail page').toHaveURL(
+      new RegExp(`/p/faq_candidate.*${pid}`),
+      { timeout: 15000 },
+    );
+
+    // Provenance and review fields must render — the detail page is the only place that shows the
+    // full answer and where it came from.
+    await expect(main(page)).toContainText(String(draft!.faq_question).slice(0, 8), {
+      timeout: 20000,
+    });
+    await expect(main(page)).toContainText(OWN_CONV_PID);
+
+    // Edit Q&A on this toolbar navigates to the form rather than firing the UPDATE command — an
+    // UPDATE has nowhere to collect values from on a toolbar, and the platform validator rejects
+    // the plugin outright if you try. Assert the substitution actually lands somewhere usable.
+    await page.getByTestId('toolbar-btn-update_qa').click();
+    await expect(page, 'Edit Q&A reaches the form page').toHaveURL(/\/p\/faq_candidate.*(edit|new)/i, {
+      timeout: 15000,
+    });
+    await expect(main(page)).toContainText(/问题|Question/);
+
+    await page.screenshot({ path: `${SHOTS}/P3-detail-to-form.png`, fullPage: true });
+    expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
+  });
+
+  test('P5 the form reached from Edit Q&A prefills, refuses an empty question, and saves', async ({
+    page,
+  }) => {
+    const errors = captureConsole(page);
+
+    // The one page the goldens had only ever *opened*. P3 clicks Edit Q&A, watches the URL become
+    // the form, and stops — so nothing had ever pressed its Save button.
+    //
+    // That button is `action: { type: 'command' }` with no command code. The platform resolves it
+    // by convention: no delete/create/update word in the label or code, but a targetRecordPid in
+    // context → operationType 'update' → the model's CRUD update command. Whether that convention
+    // actually fires here is not something you can settle by reading it. Press the button.
+    const draft = (await (async () => {
+      await page.goto('/p/faq_candidate', { waitUntil: 'domcontentloaded' });
+      return fetchCandidates(page);
+    })()).find((c) => c.faq_status === 'draft' && c.faq_source_conversation_pid === OWN_CONV_PID);
+    expect(draft, 'a draft candidate to edit').toBeTruthy();
+    const pid = draft!.pid as string;
+    const originalQuestion = String(draft!.faq_question);
+    const originalAnswer = String(draft!.faq_answer);
+
+    const listRow = page
+      .locator('[data-testid^="table-row-"]')
+      .filter({ hasText: originalQuestion.slice(0, 10) });
+    await listRow.getByTestId('row-action-view').click();
+    await expect(page).toHaveURL(new RegExp(`/p/faq_candidate.*${pid}`), { timeout: 15000 });
+    await page.getByTestId('toolbar-btn-update_qa').click();
+    await expect(page, 'Edit Q&A reaches the form').toHaveURL(/\/p\/faq_candidate.*(edit|new)/i, {
+      timeout: 15000,
+    });
+
+    // 1. It prefills. A form that opens blank does not "let you edit" — it silently invites you to
+    //    retype an answer you cannot see, and Save would then wipe the one the model wrote.
+    const questionField = page.getByTestId('form-field-faq_question').locator('textarea, input').first();
+    const answerField = page.getByTestId('form-field-faq_answer').locator('textarea, input').first();
+    await expect(questionField, 'the question is prefilled, not blank').toHaveValue(
+      originalQuestion,
+      { timeout: 20000 },
+    );
+    await expect(answerField, 'the answer is prefilled, not blank').toHaveValue(originalAnswer);
+
+    // 2. Required is enforced. Clearing a required field and saving must not persist an empty
+    //    question — a FAQ with no question is not a FAQ.
+    await questionField.fill('');
+    await page.getByTestId('form-btn-submit').click();
+    await expect(
+      main(page),
+      'an empty required question is refused, and the form stays put',
+    ).toContainText(/必填|不能为空|required|cannot be empty/i, { timeout: 10000 });
+    const afterEmpty = (await fetchCandidates(page)).find((c) => c.pid === pid);
+    expect(afterEmpty?.faq_question, 'the empty submit persisted nothing').toBe(originalQuestion);
+
+    // 3. It saves. Assert on the record the server returns, not on a toast: a toast is the UI
+    //    telling you it thinks it succeeded.
+    const editedQuestion = `${originalQuestion} (edited via form)`;
+    await questionField.fill(editedQuestion);
+    await page.getByTestId('form-btn-submit').click();
+
+    await expect
+      .poll(
+        async () => (await fetchCandidates(page)).find((c) => c.pid === pid)?.faq_question,
+        { timeout: 20000, message: 'the edit reaches the database' },
+      )
+      .toBe(editedQuestion);
+
+    // Editing the wording is not a review decision — the candidate is still waiting for one.
+    const saved = (await fetchCandidates(page)).find((c) => c.pid === pid);
+    expect(saved?.faq_status, 'editing the Q&A does not approve it').toBe('draft');
+    expect(saved?.faq_answer, 'the untouched answer survives the save').toBe(originalAnswer);
+
+    await page.screenshot({ path: `${SHOTS}/P5-form-save.png` });
+    expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
+  });
+
+  test('P4 approving from the detail toolbar persists, exactly like the row action does', async ({
+    page,
+  }) => {
+    const errors = captureConsole(page);
+
+    await page.goto('/p/faq_candidate', { waitUntil: 'domcontentloaded' });
+    const draft = (await fetchCandidates(page)).find(
+      (c) => c.faq_status === 'draft' && c.faq_source_conversation_pid === OWN_CONV_PID,
+    );
+    expect(draft, 'a draft candidate to approve from the detail page').toBeTruthy();
+    const pid = draft!.pid as string;
+
+    await page.goto(`/p/faq_candidate/view/${pid}`, { waitUntil: 'domcontentloaded' });
+    await expect(main(page)).toContainText(String(draft!.faq_question).slice(0, 8), {
+      timeout: 20000,
+    });
+
+    // Same command, different execution path. The workbench row action was proven to work; that
+    // says nothing about the toolbar, and the two have already diverged once on this very page.
+    await page.getByTestId('toolbar-btn-approve').click();
+
+    await expect
+      .poll(async () => (await fetchCandidates(page)).find((c) => c.pid === pid)?.faq_status, {
+        timeout: 20000,
+        message: 'the detail-page toolbar approve persists, not just toasts',
+      })
+      .toBe('approved');
+
+    const approved = (await fetchCandidates(page)).find((c) => c.pid === pid)!;
+    expect(approved.faq_reviewed_by, 'the reviewer is stamped from this path too').toBeTruthy();
+
+    await page.screenshot({ path: `${SHOTS}/P4-detail-approve.png`, fullPage: true });
+    expect(errors.filter(isProductError), 'no product console errors').toEqual([]);
+  });
+});

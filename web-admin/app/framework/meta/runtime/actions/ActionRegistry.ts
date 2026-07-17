@@ -626,7 +626,7 @@ actionRegistry.register('dialog.confirm', async ({ args, confirm: ctxConfirm }) 
  *
  * Shared by the `dialog.form` action (which stores the values into stateManager)
  * and `command.execute`'s `inputFields` sugar (which merges them into the command
- * payload). Pre-fetches options for select fields with api/static dataSources.
+ * payload). Pre-fetches options for choice fields with api/static dataSources.
  */
 export async function promptInputForm(
   fields: Array<Record<string, any>>,
@@ -634,14 +634,20 @@ export async function promptInputForm(
   fetchResult?: (url: string, opts: any) => Promise<any>,
   submitLabel?: any,
 ): Promise<Record<string, any>> {
-  // Pre-fetch options for select fields with API datasources
-  const fieldOptions: Record<string, Array<{ label: string; value: string }>> = {};
+  const fieldOptions: Record<
+    string,
+    Array<{ label: any; value: string; description?: any; disabled?: boolean; visibleWhen?: any }>
+  > = {};
   for (const field of fields) {
     if (field.dataSource?.type === 'api' && field.dataSource.endpoint && fetchResult) {
       try {
-        const result = await fetchResult(field.dataSource.endpoint, { method: 'get' });
+        const result = await fetchResult(field.dataSource.endpoint, {
+          method: 'get',
+          ...(field.dataSource.params ? { params: field.dataSource.params } : {}),
+        });
         const valueField = field.dataSource.valueField || 'value';
         const labelField = field.dataSource.labelField || 'label';
+        const descriptionField = field.dataSource.descriptionField;
         const rawOptions = Array.isArray(result.data)
           ? result.data
           : Array.isArray(result.data?.records)
@@ -653,12 +659,19 @@ export async function promptInputForm(
               const value = option[valueField] ?? option.value;
               const label = option[labelField] ?? option.label ?? option.name ?? value;
               if (value === undefined || value === null) return null;
-              return { value: String(value), label: String(label ?? value) };
+              const description = descriptionField ? option[descriptionField] : option.description;
+              return {
+                value: String(value),
+                label: String(label ?? value),
+                ...(description === undefined || description === null || description === ''
+                  ? {}
+                  : { description: String(description) }),
+              };
             }
             if (option === undefined || option === null) return null;
             return { value: String(option), label: String(option) };
           })
-          .filter(Boolean) as Array<{ label: string; value: string }>;
+          .filter(Boolean) as Array<{ label: string; value: string; description?: string }>;
       } catch (e) {
         console.error(`[promptInputForm] Failed to fetch options for ${field.field}:`, e);
         fieldOptions[field.field] = [];
@@ -672,7 +685,27 @@ export async function promptInputForm(
   const defaults: Record<string, any> = {};
   for (const field of fields) {
     if (field.defaultValue !== undefined) {
-      defaults[field.field] = field.defaultValue;
+      if (field.type === 'multiselect') {
+        const raw = field.defaultValue;
+        if (Array.isArray(raw)) {
+          defaults[field.field] = raw.map(String).filter(Boolean);
+        } else if (typeof raw === 'string' && raw.trim()) {
+          try {
+            const parsed = raw.trim().startsWith('[') ? JSON.parse(raw) : raw.split(',');
+            defaults[field.field] = Array.isArray(parsed)
+              ? parsed.map((value) => String(value).trim()).filter(Boolean)
+              : [];
+          } catch {
+            defaults[field.field] = raw.split(',').map((value: string) => value.trim()).filter(Boolean);
+          }
+        } else {
+          defaults[field.field] = [];
+        }
+      } else if (field.type === 'checkbox') {
+        defaults[field.field] = field.defaultValue === true || field.defaultValue === 'true';
+      } else {
+        defaults[field.field] = field.defaultValue;
+      }
     }
   }
 
@@ -953,6 +986,41 @@ actionRegistry.register(
   },
 );
 
+export function downloadBase64CommandArtifact(value: any): boolean {
+  let artifact = value;
+  for (let depth = 0; depth < 4; depth += 1) {
+    if (
+      artifact
+      && typeof artifact === 'object'
+      && typeof artifact.contentBase64 !== 'string'
+      && artifact.data
+      && typeof artifact.data === 'object'
+    ) {
+      artifact = artifact.data;
+    } else {
+      break;
+    }
+  }
+  if (
+    typeof document === 'undefined'
+    || typeof artifact?.contentBase64 !== 'string'
+    || typeof artifact?.fileName !== 'string'
+  ) return false;
+  const binary = atob(artifact.contentBase64);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  const blob = new Blob([bytes], { type: artifact.contentType || 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = artifact.fileName;
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  return true;
+}
+
 /**
  * command.execute - Execute a DSL command from an ActionFlow.
  *
@@ -1028,6 +1096,8 @@ actionRegistry.register(
     if (!ResultHelper.isSuccess(result)) {
       throw new Error(result.desc || result.message || `Command ${command} failed`);
     }
+
+    downloadBase64CommandArtifact(result.data);
 
     return result.data;
   },

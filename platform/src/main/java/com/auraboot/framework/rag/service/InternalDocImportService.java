@@ -33,7 +33,6 @@ public class InternalDocImportService {
 
     private final KnowledgeBaseService kbService;
     private final KbDocumentMapper docMapper;
-    private final DocumentParserService parserService;
     private final KbChunkIngestPipeline ingestPipeline;
     private final JdbcTemplate jdbcTemplate;
 

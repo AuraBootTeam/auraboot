@@ -692,7 +692,9 @@ describe('DecisionOpsConsole', () => {
 
     fireEvent.click(screen.getByTestId('strategy-impact-preview'));
     await waitFor(() => expect(getDecisionImpact).toHaveBeenCalledWith('complaint_sla_deadline'));
-    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('1 个消费方引用');
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('1 个消费方引用'),
+    );
 
     fireEvent.click(screen.getByTestId('strategy-run-test'));
     await waitFor(() => expect(evaluate).toHaveBeenCalledOnce());
@@ -703,7 +705,9 @@ describe('DecisionOpsConsole', () => {
         callerRef: 'wd_manager_approve_sla',
       }),
     );
-    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('trace-studio');
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('trace-studio'),
+    );
 
     fireEvent.click(screen.getByTestId('strategy-save-draft'));
     await waitFor(() => expect(createDefinition).toHaveBeenCalledWith(
@@ -894,7 +898,7 @@ describe('DecisionOpsConsole', () => {
       'complaint_sla_deadline',
       undefined,
     );
-    expect(screen.getByTestId('dt-analysis-summary')).toHaveTextContent('规则 1');
+    await waitFor(() => expect(screen.getByTestId('dt-analysis-summary')).toHaveTextContent('规则 1'));
 
     fireEvent.click(screen.getByTestId('dt-export-dmn'));
     await waitFor(() => expect(exportTableDmn).toHaveBeenCalledOnce());
@@ -1304,7 +1308,7 @@ describe('DecisionOpsConsole', () => {
     );
     expect(screen.getByTestId('dt-analysis-panel')).not.toHaveTextContent('DMN_GAP');
     expect(screen.getByTestId('dt-metric-gap')).toHaveTextContent('缺口 1');
-    expect(screen.getByTestId('dt-analysis-summary')).toHaveTextContent('规则 1');
+    await waitFor(() => expect(screen.getByTestId('dt-analysis-summary')).toHaveTextContent('规则 1'));
   });
 
   it('switches to Release Governance tab and renders the rollout monitor', async () => {

@@ -15,6 +15,7 @@
  */
 
 import React from 'react';
+import { Star } from 'lucide-react';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { OwnerCell } from '~/framework/meta/runtime/renderers/OwnerCell';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
@@ -425,6 +426,29 @@ cellRendererRegistry.register('progress', ({ value, column }) => {
       </div>
       {showText && <span className="text-text-2 text-sm dark:text-gray-400">{percentage}%</span>}
     </div>
+  );
+});
+
+/**
+ * Rating renderer — renders a numeric rating as filled/outline stars (default out of 5).
+ * The visual type is inferred from a field's `renderComponent: rating` on list pages.
+ */
+cellRendererRegistry.register('rating', ({ value, column }) => {
+  const max = typeof column.render?.max === 'number' ? column.render.max : 5;
+  const raw = typeof value === 'number' ? value : parseFloat(value);
+  const score = Number.isFinite(raw) ? Math.min(max, Math.max(0, Math.round(raw))) : 0;
+  return (
+    <span className="inline-flex items-center gap-0.5" role="img" aria-label={`${score}/${max}`}>
+      {Array.from({ length: max }, (_, index) => (
+        <Star
+          key={index}
+          aria-hidden="true"
+          className={`h-3.5 w-3.5 ${
+            index < score ? 'fill-amber-500 text-amber-500' : 'text-border dark:text-gray-600'
+          }`}
+        />
+      ))}
+    </span>
   );
 });
 

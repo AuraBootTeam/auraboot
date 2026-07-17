@@ -85,6 +85,17 @@ export interface QueryMeta {
   metrics: string[];
   /** Available drill-down path */
   drillPath?: string[];
+  /**
+   * Display labels for dict-coded dimension values, keyed by dimension field then
+   * raw value: `{ crm_opp_stage: { closed_won: '赢单' } }`.
+   *
+   * Resolved client-side by useChartData — the aggregate response carries raw
+   * column values, so without this every chart renders the stored code
+   * (`closed_won`, `call`) as its category label. Raw values are left untouched
+   * in `rows` so linkage filters, drill-down and kanban `columnOrder` keep
+   * matching on the code; only the displayed text is swapped.
+   */
+  dimensionLabels?: Record<string, Record<string, string>>;
 }
 
 /**
@@ -130,6 +141,20 @@ export interface ChartDataSource {
    * Metric codes may be bare or qualified as `<semanticModelCode>.<metric_code>`.
    */
   semanticModelCode?: string;
+  /**
+   * Dimension field -> dict code, for dimensions whose values are dict-coded.
+   *
+   * Aggregate sources with a `modelCode` discover this automatically from field
+   * metadata (`dictCode` on the field). This is the escape hatch for namedQuery
+   * and static sources, whose columns are SQL aliases with no field behind them.
+   */
+  dimensionDicts?: Record<string, string>;
+  /**
+   * Sort order for the result. The backend has always supported this, but the
+   * field was missing from ChartDataSource, so `limit` degraded from top-N to
+   * "any N rows". Ordering by a metric alias gives a real leaderboard.
+   */
+  orderBy?: OrderByConfig[];
 }
 
 /**

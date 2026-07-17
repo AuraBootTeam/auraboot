@@ -37,6 +37,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -200,13 +201,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         Long tenantId = getCurrentTenantId();
         queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
 
+        String scopedRowFilter = null;
+        String scopedDomainFilter = null;
         if (!MetaContext.isDataPermissionBypassed()) {
             // 添加数据权限行级过滤 — fail-secure: exception = deny all
             try {
                 Long userId = getCurrentUserId();
-                String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
-                if (rowFilter != null && !rowFilter.isBlank()) {
-                    queryBuilder.addRawCondition(rowFilter);
+                scopedRowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
+                        () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+                if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
+                    queryBuilder.addRawCondition(scopedRowFilter);
                 }
             } catch (Exception e) {
                 // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
@@ -219,9 +223,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // Apply data domain isolation filter (D5) — fail-secure
             try {
                 Long userId = getCurrentUserId();
-                String domainFilter = dataDomainService.buildDomainFilter(modelCode, userId);
-                if (domainFilter != null && !domainFilter.isBlank()) {
-                    queryBuilder.addRawCondition(domainFilter);
+                scopedDomainFilter = DynamicDataQueryScope.domainFilter(tenantId, modelCode, userId,
+                        () -> dataDomainService.buildDomainFilter(modelCode, userId));
+                if (scopedDomainFilter != null && !scopedDomainFilter.isBlank()) {
+                    queryBuilder.addRawCondition(scopedDomainFilter);
                 }
             } catch (Exception e) {
                 // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
@@ -271,32 +276,18 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         countBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
 
         if (!MetaContext.isDataPermissionBypassed()) {
-            // Apply the same row-level filter to count query for consistency — fail-secure
-            try {
-                Long countUserId = getCurrentUserId();
-                String countRowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, countUserId);
-                if (countRowFilter != null && !countRowFilter.isBlank()) {
-                    countBuilder.addRawCondition(countRowFilter);
-                }
-            } catch (Exception e) {
-                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-                log.error("Failed to apply row-level data permission to count query for model {} — denying access", logSafe(modelCode), e);
-                throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
+            // Reuse the exact row-level filter from the data query so count cannot drift and
+            // the same request does not re-run permission lookup for the count builder.
+            if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
+                countBuilder.addRawCondition(scopedRowFilter);
             }
         }
 
         if (!MetaContext.isDataPermissionBypassed()) {
-            // Apply the same domain filter to count query for consistency (D5) — fail-secure
-            try {
-                Long countUserId = getCurrentUserId();
-                String countDomainFilter = dataDomainService.buildDomainFilter(modelCode, countUserId);
-                if (countDomainFilter != null && !countDomainFilter.isBlank()) {
-                    countBuilder.addRawCondition(countDomainFilter);
-                }
-            } catch (Exception e) {
-                // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
-                log.error("Failed to apply domain filter to count query for model {} — denying access", logSafe(modelCode), e);
-                throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
+            // Reuse the exact domain filter from the data query for count consistency and to
+            // avoid duplicate domain metadata lookup in one list request.
+            if (scopedDomainFilter != null && !scopedDomainFilter.isBlank()) {
+                countBuilder.addRawCondition(scopedDomainFilter);
             }
         }
 
@@ -579,6 +570,31 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return new String[] { target, display };
     }
 
+    /**
+     * Resolve the display-name enrichment target for a list field, covering both `reference`
+     * fields (via {@link #resolveCanonicalRefTarget}) and renderComponent-driven picker fields
+     * whose visual control implies a target: {@code userselect → sys_user},
+     * {@code organizationselect → org_department}. Returns {@code {targetModelCode, displayField}}
+     * or {@code null} when the field needs no {@code <field>_display} enrichment.
+     *
+     * <p>{@code memberpicker} is intentionally excluded — it stores a multi-value list, not a
+     * single id, so scalar id→name resolution does not apply.
+     */
+    private String[] resolveEnrichmentTarget(FieldDefinition field) {
+        if (field == null) return null;
+        String[] canonical = resolveCanonicalRefTarget(field);
+        if (canonical != null) return canonical;
+        Map<String, Object> extra = field.getExtraProps();
+        Object rc = extra == null ? null : extra.get("renderComponent");
+        String renderComponent = rc instanceof String s ? s.trim().toLowerCase() : null;
+        if (renderComponent == null) return null;
+        return switch (renderComponent) {
+            case "userselect" -> new String[] { "sys_user", null };
+            case "organizationselect" -> new String[] { "org_department", "org_dept_name" };
+            default -> null;
+        };
+    }
+
     /** True when {@code displayField} on {@code targetModelCode} is masked for this user (sensitive). */
     private boolean isDisplayFieldMasked(Long tenantId, Long userId, String targetModelCode, String displayField) {
         if (tenantId == null || userId == null) return false;
@@ -603,9 +619,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (modelOpt.isEmpty()) return;
 
         ModelDefinition model = modelOpt.get();
+        // Enrich `reference` fields AND renderComponent-driven picker fields (userselect /
+        // organizationselect) with a resolved `<field>_display` name — see resolveEnrichmentTarget.
         List<FieldDefinition> refFields = model.getFields().stream()
-                .filter(f -> "reference".equals(f.getDataType()))
-                .filter(f -> resolveCanonicalRefTarget(f) != null)
+                .filter(f -> resolveEnrichmentTarget(f) != null)
                 .toList();
 
         if (refFields.isEmpty()) return;
@@ -617,7 +634,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             String fieldCode = refField.getCode();
             String columnName = refField.getColumnName() != null ? refField.getColumnName() : fieldCode;
 
-            String[] canonical = resolveCanonicalRefTarget(refField);
+            String[] canonical = resolveEnrichmentTarget(refField);
             if (canonical == null) continue;
             String targetModelCode = canonical[0];
             String displayField = canonical[1];
@@ -653,18 +670,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                         .map(id -> "'" + id.replace("'", "''") + "'")
                         .collect(java.util.stream.Collectors.joining(","));
 
-                // Resolve display column name from field code or target model display field metadata.
-                // For system tables (no ModelDefinition), use SYSTEM_TABLE_DISPLAY_EXPRESSIONS mapping
-                // which includes COALESCE fallbacks for when primary display columns are empty.
-                String displayColumnExpr;
-                String displayColumnName;
-                if (targetModelOpt.isEmpty() && displayField == null && SYSTEM_TABLE_DISPLAY_EXPRESSIONS.containsKey(targetModelCode)) {
-                    displayColumnExpr = SYSTEM_TABLE_DISPLAY_EXPRESSIONS.get(targetModelCode);
-                    displayColumnName = "display_value";
-                } else {
-                    displayColumnName = resolveReferenceDisplayColumn(targetModelOpt.orElse(null), displayField);
-                    displayColumnExpr = displayColumnName;
-                }
+                // Resolve the display column expression + alias (system tables → safe COALESCE).
+                String[] displayCol = resolveDisplayColumnExpression(targetModelOpt, targetModelCode, displayField);
+                String displayColumnExpr = displayCol[0];
+                String displayColumnName = displayCol[1];
 
                 String sql = "SELECT pid, " + displayColumnExpr + " AS " + displayColumnName
                         + " FROM " + targetTable
@@ -693,16 +702,38 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     }
                 }
             } catch (Exception e) {
-                // codeql[java/log-injection] Field/model codes are validated metadata identifiers and are logged as structured parameters only.
-                log.warn("Failed to enrich REFERENCE display for field {} in model {}: {}",
-                        logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
+                logReferenceEnrichmentFailure(fieldCode, modelCode, e);
             }
+        }
+    }
+
+    /**
+     * Best-effort reference-display enrichment must never silently mask a real error. When the
+     * enrichment query fails <b>inside an active transaction</b> it also aborts that transaction
+     * (Postgres {@code 25P02}), so the surrounding operation then fails with confusing downstream
+     * {@code current transaction is aborted} errors that bury the true cause. Log at ERROR with
+     * that correlation so the root cause is a one-line find rather than a stack dig. Outside a
+     * transaction the failure is self-contained, so WARN is enough.
+     */
+    private void logReferenceEnrichmentFailure(String fieldCode, String modelCode, Exception e) {
+        // codeql[java/log-injection] Field/model codes are validated metadata identifiers and are logged as structured parameters only.
+        if (TransactionSynchronizationManager.isActualTransactionActive()) {
+            log.error("REFERENCE display enrichment for field {} of model {} failed inside an active "
+                            + "transaction; this aborts the transaction, so any following 'current "
+                            + "transaction is aborted' (25P02) errors are secondary. Root cause: {}",
+                    logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
+        } else {
+            log.warn("Failed to enrich REFERENCE display for field {} in model {}: {}",
+                    logSafe(fieldCode), logSafe(modelCode), logSafe(e.getMessage()), e);
         }
     }
 
     private static final Map<String, String> SYSTEM_TABLE_MAP = Map.of(
             "ns_user", "ab_user",
-            "ab_user", "ab_user"
+            "ab_user", "ab_user",
+            // Canonical user model code used across config/frontend (userselect targets,
+            // sc_owner_user refTarget) — physically the ab_user table.
+            "sys_user", "ab_user"
     );
 
     private String resolveSystemTable(String modelCode) {
@@ -784,11 +815,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         if (configuredDisplayField != null && !configuredDisplayField.isBlank()) {
             for (FieldDefinition field : fields) {
-                if (configuredDisplayField.equals(field.getCode())) {
+                String columnName = field.getColumnName() != null ? field.getColumnName() : field.getCode();
+                if (configuredDisplayField.equals(field.getCode()) || configuredDisplayField.equals(columnName)) {
                     return field.getColumnName() != null ? field.getColumnName() : field.getCode();
                 }
             }
-            return configuredDisplayField;
         }
 
         if (targetModel != null) {
@@ -818,8 +849,34 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      */
     private static final Map<String, String> SYSTEM_TABLE_DISPLAY_EXPRESSIONS = Map.of(
             "ab_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)",
-            "ns_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)"
+            "ns_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)",
+            "sys_user", "COALESCE(NULLIF(nick_name, ''), NULLIF(user_name, ''), email)"
     );
+
+    /**
+     * Choose the display column expression + SELECT alias for a reference-enrichment query,
+     * returned as {@code [expression, alias]}.
+     *
+     * <p>For a <b>system table</b> (no registered {@link ModelDefinition}) we always use the
+     * {@link #SYSTEM_TABLE_DISPLAY_EXPRESSIONS} COALESCE expression, <b>regardless of any
+     * configured {@code displayField}</b>. System tables have no field metadata to validate a
+     * configured display field against, so trusting an arbitrary value would splice it straight
+     * into the SQL as a raw column. A plugin writing e.g. {@code refDisplayField: "username"} for
+     * a {@code sys_user} reference (whose {@code ab_user} table has {@code nick_name / user_name /
+     * email} but no {@code username}) would then produce {@code SELECT pid, username ...} and fail
+     * the whole enrichment query with {@code column "username" does not exist} — which, inside a
+     * command's {@code bpm:run-rule} contextLookup, aborts the transaction and surfaces as an
+     * opaque {@code bpm.rule.execution_failed}. The COALESCE already yields the canonical user
+     * display, so ignoring the raw field here is both safe and the intended behaviour.
+     */
+    private String[] resolveDisplayColumnExpression(
+            Optional<ModelDefinition> targetModelOpt, String targetModelCode, String displayField) {
+        if (targetModelOpt.isEmpty() && SYSTEM_TABLE_DISPLAY_EXPRESSIONS.containsKey(targetModelCode)) {
+            return new String[] { SYSTEM_TABLE_DISPLAY_EXPRESSIONS.get(targetModelCode), "display_value" };
+        }
+        String col = resolveReferenceDisplayColumn(targetModelOpt.orElse(null), displayField);
+        return new String[] { col, col };
+    }
 
     @Override
     public PaginationResult<Map<String, Object>> listByQueryCode(String queryCode, DynamicQueryRequest request) {
@@ -1268,6 +1325,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
             case "DATETIME":
             case "TIMESTAMP":
+            case "LOCALDATETIME":
+                if (value instanceof java.time.Instant instant) {
+                    return java.sql.Timestamp.from(instant);
+                }
+                if (value instanceof java.time.LocalDateTime localDateTime) {
+                    return java.sql.Timestamp.valueOf(localDateTime);
+                }
                 if (value instanceof String) {
                     try {
                         return java.sql.Timestamp.valueOf((String) value);
@@ -1348,15 +1412,21 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     @Override
     @Transactional
-    public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> data) {
+    public Map<String, Object> update(String modelCode, String recordId, Map<String, Object> inputData) {
         validateModelCode(modelCode);
         assertWritable(modelCode);
         if (recordId == null || recordId.trim().isEmpty()) {
             throw new MetaServiceException("Record ID cannot be null or empty");
         }
-        if (data == null || data.isEmpty()) {
+        if (inputData == null || inputData.isEmpty()) {
             throw new MetaServiceException("Data cannot be null or empty");
         }
+        // Work on a copy. payloadTemporalNormalizer.normalize() rewrites temporal values in
+        // place, so an immutable argument — Map.of(...), which is the natural thing to write
+        // for a small update — throws a message-less UnsupportedOperationException from deep
+        // inside, and only when the payload happens to carry a date/time field. Copying also
+        // means we no longer mutate a caller's map behind its back.
+        Map<String, Object> data = new LinkedHashMap<>(inputData);
         
         // Field-level write permission (gap #1): strip fields the current user may not write
         stripNonWritableFields(modelCode, data);
@@ -1377,10 +1447,15 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // 使用验证服务的严格模式进行验证
             // 验证失败会抛出异常并触发事务回滚
             validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
+            // Validation intentionally works with java.time domain types. Convert
+            // them to JDBC-native values only afterwards, matching the CREATE
+            // path and preventing MyBatis from binding Instant as an untyped
+            // Object for dynamic timestamp columns.
+            data = convertDataTypes(model, data);
             
             // Set system fields
             Map<String, Object> enrichedData = new HashMap<>(data);
-            enrichedData.put("updated_at", java.time.Instant.now());
+            enrichedData.put("updated_at", java.sql.Timestamp.from(java.time.Instant.now()));
             enrichedData.put("updated_by", getCurrentUserId());
             enrichedData.remove("tenant_id");
             enrichedData.remove("created_at");
@@ -1410,25 +1485,19 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // Use JSONB-merge-aware toColumnData for UPDATE to preserve unmodified JSONB keys
             Map<String, Object> columnData = toColumnDataForUpdate(model, enrichedData, existingRecord);
             FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-            Long tenantId = getCurrentTenantId();
-            String primaryKeyColumn = primaryKey.getColumnName();
-
-            // Build update conditions
-            Map<String, Object> conditions = new HashMap<>();
-            conditions.put(primaryKeyColumn, recordId);
-            conditions.put("tenant_id", tenantId);
+            String primaryKeyColumn = primaryKey.getColumnName() != null
+                    ? primaryKey.getColumnName()
+                    : primaryKey.getCode();
 
             // If expectedVersion provided, add optimistic lock condition
             if (expectedVersion != null) {
-                conditions.put("row_version", expectedVersion);
                 columnData.put("row_version", ((Number) expectedVersion).intValue() + 1);
             }
 
-            // Execute update with JSONB awareness
+            // Execute update with tenant and DataScope guards in the write SQL itself.
             Set<String> jsonbColumns = JsonbFieldHelper.getJsonbHostColumns(model);
-            int result = jsonbColumns.isEmpty()
-                    ? dynamicDataMapper.update(model.getTableName(), columnData, conditions)
-                    : dynamicDataMapper.updateWithJsonb(model.getTableName(), columnData, conditions, jsonbColumns);
+            int result = executeScopedUpdate(
+                    model, modelCode, primaryKeyColumn, recordId, columnData, jsonbColumns, expectedVersion);
             if (result <= 0) {
                 if (expectedVersion != null) {
                     throw new MetaServiceException("Update failed: version conflict (expected version " + expectedVersion + ")");
@@ -1494,9 +1563,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // 构建删除条件
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-        Map<String, Object> conditions = new java.util.HashMap<>();
-        conditions.put(primaryKey.getColumnName(), recordId);
-        conditions.put("tenant_id", getCurrentTenantId());
+        String primaryKeyColumn = primaryKey.getColumnName() != null
+                ? primaryKey.getColumnName()
+                : primaryKey.getCode();
 
         int result;
         if (model.isSoftDelete()) {
@@ -1505,10 +1574,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             updateData.put("deleted_flag", true);
             updateData.put("updated_at", java.time.Instant.now());
             updateData.put("updated_by", getCurrentUserId());
-            result = dynamicDataMapper.update(model.getTableName(), updateData, conditions);
+            result = executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, updateData, Set.of(), null);
         } else {
             // Hard delete: DELETE FROM (default behavior)
-            result = dynamicDataMapper.delete(model.getTableName(), conditions);
+            result = executeScopedDelete(model, modelCode, primaryKeyColumn, recordId);
         }
         if (result <= 0) {
             throw new MetaServiceException("Failed to delete record");
@@ -1528,6 +1597,123 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         } catch (Exception e) {
             log.error("Failed to record change log for delete: model={}, id={}: {}",
                     logSafe(modelCode), logSafe(recordId), logSafe(e.getMessage()), e);
+        }
+    }
+
+    private int executeScopedUpdate(
+            ModelDefinition model,
+            String modelCode,
+            String primaryKeyColumn,
+            String recordId,
+            Map<String, Object> columnData,
+            Set<String> jsonbColumns,
+            Object expectedVersion) {
+        if (columnData == null || columnData.isEmpty()) {
+            throw new MetaServiceException("Update data cannot be empty");
+        }
+
+        String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
+        String pkColumn = SqlSafetyUtils.requireIdentifier(primaryKeyColumn, "primary key column");
+        Long tenantId = getCurrentTenantId();
+        Long userId = getCurrentUserId();
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        StringBuilder sql = new StringBuilder("UPDATE ")
+                .append(tableName)
+                .append(" SET ");
+        int index = 0;
+        for (Map.Entry<String, Object> entry : columnData.entrySet()) {
+            String columnName = SqlSafetyUtils.requireIdentifier(entry.getKey(), "column name");
+            if (index > 0) {
+                sql.append(", ");
+            }
+            String paramName = "set" + index;
+            if (jsonbColumns != null && jsonbColumns.contains(columnName)) {
+                sql.append(columnName).append(" = #{params.").append(paramName)
+                        .append(",jdbcType=OTHER,typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb");
+            } else {
+                sql.append(columnName).append(" = #{params.").append(paramName).append("}");
+            }
+            Object parameterValue = entry.getValue();
+            // The SQL cast alone is not enough: MyBatis sees a Map first and
+            // asks PostgreSQL for its hstore handler. Serialize every structured
+            // JSONB value at this final binding chokepoint so regular JSON fields
+            // and values produced by virtual-field merging behave identically.
+            if (jsonbColumns != null && jsonbColumns.contains(columnName)
+                    && parameterValue != null && !(parameterValue instanceof String)) {
+                parameterValue = JsonbFieldHelper.toJsonString(parameterValue);
+            }
+            params.put(paramName, parameterValue);
+            index++;
+        }
+
+        params.put("recordId", recordId);
+        params.put("tenantId", tenantId);
+        sql.append(" WHERE ")
+                .append(pkColumn)
+                .append(" = #{params.recordId}")
+                .append(" AND tenant_id = #{params.tenantId}");
+        if (expectedVersion != null) {
+            params.put("expectedVersion", expectedVersion);
+            sql.append(" AND row_version = #{params.expectedVersion}");
+        }
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "update");
+
+        return dynamicDataMapper.updateByQuery(sql.toString(), params);
+    }
+
+    private int executeScopedDelete(
+            ModelDefinition model,
+            String modelCode,
+            String primaryKeyColumn,
+            String recordId) {
+        String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
+        String pkColumn = SqlSafetyUtils.requireIdentifier(primaryKeyColumn, "primary key column");
+        Long tenantId = getCurrentTenantId();
+        Long userId = getCurrentUserId();
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("recordId", recordId);
+        params.put("tenantId", tenantId);
+
+        StringBuilder sql = new StringBuilder("DELETE FROM ")
+                .append(tableName)
+                .append(" WHERE ")
+                .append(pkColumn)
+                .append(" = #{params.recordId}")
+                .append(" AND tenant_id = #{params.tenantId}");
+        appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete");
+
+        return dynamicDataMapper.deleteByQuery(sql.toString(), params);
+    }
+
+    private void appendScopedWriteGuards(
+            StringBuilder sql,
+            Long tenantId,
+            String modelCode,
+            Long userId,
+            String operation) {
+        if (MetaContext.isDataPermissionBypassed()) {
+            return;
+        }
+
+        try {
+            String rowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
+                    () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+            appendScopedBulkFilter(sql, rowFilter);
+        } catch (Exception e) {
+            log.error("Failed to apply row-level data permission for {} on model {} — denying access",
+                    operation, logSafe(modelCode), e);
+            throw new MetaServiceException("Data permission evaluation failed for model: " + modelCode, e);
+        }
+
+        try {
+            String domainFilter = DynamicDataQueryScope.domainFilter(tenantId, modelCode, userId,
+                    () -> dataDomainService.buildDomainFilter(modelCode, userId));
+            appendScopedBulkFilter(sql, domainFilter);
+        } catch (Exception e) {
+            log.error("Failed to apply domain filter for {} on model {} — denying access",
+                    operation, logSafe(modelCode), e);
+            throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
         }
     }
 
@@ -1566,8 +1752,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                             successCount++;
                             continue;
                         }
-                    } catch (Exception e) {
-                        // Record doesn't exist, proceed with creation
+                    } catch (MetaServiceException e) {
+                        if (!isRecordNotFound(e)) {
+                            throw e;
+                        }
+                        // Record does not exist, proceed with creation.
                     }
                 }
 
@@ -1589,6 +1778,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         response.setErrors(errors);
 
         return response;
+    }
+
+    private boolean isRecordNotFound(MetaServiceException e) {
+        String message = e.getMessage();
+        return message != null && message.startsWith("Record not found:");
     }
 
     @Override

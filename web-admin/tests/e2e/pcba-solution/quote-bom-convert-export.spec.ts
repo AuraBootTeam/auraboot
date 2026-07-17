@@ -47,6 +47,25 @@ async function post(page: Page, code: string, payload: any, op = 'create', targe
   return { status: r.status(), body: await r.json().catch(() => ({})) };
 }
 
+async function listConversionTasks(page: Page): Promise<any[]> {
+  const list = await page.request.get('/api/dynamic/bom_conversion_task_pcba/list?pageNum=1&pageSize=10&sortField=created_at&sortOrder=desc');
+  const lb = await list.json().catch(() => ({} as any));
+  const recs = lb?.data?.records || lb?.data?.data?.records || lb?.data || [];
+  return Array.isArray(recs) ? recs : [];
+}
+
+function findTask(recs: any[], projId: string, fileId: string): any | undefined {
+  return recs.find((r: any) =>
+    String(r.bom_task_project_id || '') === String(projId) || String(r.bom_task_raw_file_id || '') === String(fileId));
+}
+
+async function countStandardLines(page: Page, taskId: string): Promise<number> {
+  const r = await page.request.get('/api/dynamic/bom_standard_line_pcba/list?pageNum=1&pageSize=500&sortField=created_at&sortOrder=desc');
+  const b = await r.json().catch(() => ({} as any));
+  const recs = b?.data?.records || b?.data?.data?.records || b?.data || [];
+  return (Array.isArray(recs) ? recs : []).filter((line: any) => String(line.bom_std_task_id || '') === String(taskId)).length;
+}
+
 test.describe('BOM convert + export deep (BOM-03/05/08 + XLS-B) @smoke', () => {
   test.describe.configure({ mode: 'serial', timeout: 300_000 });
 
@@ -86,18 +105,20 @@ test.describe('BOM convert + export deep (BOM-03/05/08 + XLS-B) @smoke', () => {
       // 2) poll for the conversion task to reach a terminal/usable status
       let taskId = '';
       let status = '';
-      for (let i = 0; i < 40; i++) {
-        await page.waitForTimeout(5000);
-        const list = await page.request.get(`/api/dynamic/bom_conversion_task_pcba/list?pageNum=1&pageSize=10&sortField=created_at&sortOrder=desc`);
-        const lb = await list.json().catch(() => ({} as any));
-        const recs = lb?.data?.records || lb?.data?.data?.records || lb?.data || [];
-        const mine = (Array.isArray(recs) ? recs : []).find((r: any) =>
-          String(r.bom_task_project_id || '') === String(projId) || String(r.bom_pcba_code || '').includes(uid) || String(r.bom_task_raw_file_id || '') === String(fileId));
+      let foundTask: any;
+      await expect.poll(async () => {
+        const mine = findTask(await listConversionTasks(page), projId, fileId);
         if (mine) {
+          foundTask = mine;
           taskId = mine.pid || mine.id || '';
           status = String(mine.bom_task_status || mine.status || '');
-          if (/done|complet|succeed|success|ready|pending|review|finish/i.test(status)) break;
+          if (/fail|error/i.test(status)) return -1;
+          return taskId ? await countStandardLines(page, taskId) : 0;
         }
+        return 0;
+      }, { timeout: 200_000, intervals: [1_000, 2_000, 5_000] }).toBeGreaterThan(0);
+      if (foundTask) {
+        status = String(foundTask.bom_task_status || foundTask.status || '');
       }
       // BOM-03: conversion produced a task with a non-failed status
       expect(taskId, 'BOM-03: conversion task exists').toBeTruthy();
@@ -106,8 +127,11 @@ test.describe('BOM convert + export deep (BOM-03/05/08 + XLS-B) @smoke', () => {
 
       // 3) BOM-05: workbench renders the task / candidate lines
       await page.goto(WORKBENCH, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(4000);
-      const mainText = await page.locator('main').innerText().catch(() => '');
+      let mainText = '';
+      await expect.poll(async () => {
+        mainText = await page.locator('main').innerText().catch(() => '');
+        return mainText.length;
+      }, { timeout: 10_000, intervals: [250, 500, 1_000] }).toBeGreaterThan(0);
       expect(mainText.length, 'BOM-05: workbench renders content').toBeGreaterThan(0);
 
       // 4) BOM-08 / XLS-B: regenerate export → download → parse xlsx columns

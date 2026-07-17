@@ -2,6 +2,7 @@ package com.auraboot.framework.im.service.impl;
 
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
+import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.im.dto.Announcement;
 import com.auraboot.framework.im.dto.ConversationAgentSettingsRequest;
 import com.auraboot.framework.im.dto.ConversationCreateRequest;
@@ -85,6 +86,7 @@ public class ImConversationServiceImpl implements ImConversationService {
         }
 
         ImConversation conv = new ImConversation();
+        conv.setPid(UniqueIdGenerator.generate());
         conv.setTenantId(tenantId);
         conv.setType(request.getType());
         conv.setName(request.getName());
@@ -420,6 +422,7 @@ public class ImConversationServiceImpl implements ImConversationService {
 
         // Create new BOT conversation
         ImConversation conv = new ImConversation();
+        conv.setPid(UniqueIdGenerator.generate());
         conv.setTenantId(tenantId);
         conv.setType(ImConstants.TYPE_BOT);
         conv.setName("System Notifications");

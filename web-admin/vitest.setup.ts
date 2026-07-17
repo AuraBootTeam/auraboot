@@ -52,7 +52,13 @@ function createStorageMock() {
   };
 }
 
+// This setup file is shared by every project, but BFF/server tests opt into
+// `@vitest-environment node` — where there is no DOM to stub. Guard the browser-only
+// mocks so those files can load instead of dying on `window is not defined`.
+const hasDom = typeof window !== 'undefined';
+
 beforeEach(() => {
+  if (!hasDom) return;
   Object.defineProperty(window, 'localStorage', {
     value: createStorageMock(),
     configurable: true,
@@ -63,20 +69,22 @@ beforeEach(() => {
   });
 });
 
-// Mock window.matchMedia
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: vi.fn().mockImplementation((query) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: vi.fn(), // deprecated
-    removeListener: vi.fn(), // deprecated
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  })),
-});
+if (hasDom) {
+  // Mock window.matchMedia
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(), // deprecated
+      removeListener: vi.fn(), // deprecated
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
 
 class MockResizeObserver implements ResizeObserver {
   constructor(_callback: ResizeObserverCallback) {}
@@ -102,12 +110,14 @@ class MockIntersectionObserver implements IntersectionObserver {
 globalThis.ResizeObserver = MockResizeObserver;
 globalThis.IntersectionObserver = MockIntersectionObserver;
 
-// Mock scrollIntoView
-Element.prototype.scrollIntoView = vi.fn();
+if (hasDom) {
+  // Mock scrollIntoView
+  Element.prototype.scrollIntoView = vi.fn();
 
-// Mock HTMLElement methods
-HTMLElement.prototype.scrollTo = vi.fn();
-HTMLElement.prototype.scroll = vi.fn();
+  // Mock HTMLElement methods
+  HTMLElement.prototype.scrollTo = vi.fn();
+  HTMLElement.prototype.scroll = vi.fn();
+}
 
 // Mock console methods to reduce noise in tests
 global.console = {

@@ -15,6 +15,7 @@ import type {
 } from '~/framework/smart/types/chart';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { useDimensionLabels } from './useDimensionLabels';
 
 type ApiDataPayload =
   | { records?: Record<string, unknown>[]; rows?: Record<string, unknown>[] }
@@ -293,6 +294,7 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
         metrics: currentDataSource.metrics,
         filters: [...(currentDataSource.filters || []), ...(currentLinkageFilters || [])],
         parameters: currentDataSource.parameters,
+        orderBy: currentDataSource.orderBy,
         limit: currentDataSource.limit,
         drillFilters: currentDrillFilters,
         // When a semantic model is configured, pass it through so the backend
@@ -362,8 +364,21 @@ export function useChartData(options: UseChartDataOptions): UseChartDataResult {
     };
   }, []);
 
+  const resolved = isStatic ? staticData : data;
+
+  // Dict labels for dict-coded dimension values. Resolved here rather than in each
+  // chart so every component gets them for free — the aggregate response only ever
+  // carries raw codes, and a dozen components were each rendering them verbatim.
+  const dimensionLabels = useDimensionLabels(dataSource, resolved?.meta?.dimensions);
+
+  const dataWithLabels = useMemo<AggregateQueryResponse | null>(() => {
+    if (!resolved) return null;
+    if (Object.keys(dimensionLabels).length === 0) return resolved;
+    return { ...resolved, meta: { ...resolved.meta, dimensionLabels } };
+  }, [resolved, dimensionLabels]);
+
   return {
-    data: isStatic ? staticData : data,
+    data: dataWithLabels,
     loading: isStatic ? false : loading,
     error: isStatic ? null : error,
     refetch: fetchData,

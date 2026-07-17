@@ -39,6 +39,22 @@ const GUARD = /@RequirePermission|@AuthenticatedAccess/;
 // are never registered in a production context, so they carry no fail-open risk.
 const TEST_PROFILE = /@Profile\(\s*\{?\s*['"]test['"]/;
 const ADMIN_PATH = /["(]\s*"?\/api\/admin\//;
+// High-sensitivity READ surfaces: AI observability (/api/ai/**) and IM (/api/im/**).
+// A GET-only controller here that shadow-allows any logged-in user can leak other
+// users' data (raw prompts, agent activity, tenant spend). Read endpoints used to be
+// out of scope entirely (SEC-002); they now also need an explicit @RequirePermission
+// or @AuthenticatedAccess decision.
+const READ_MAPPING = /@GetMapping/;
+const SENSITIVE_READ_PATH = /["'`]\/api\/(ai|im)\//;
+
+// Strip block + line comments so a javadoc that merely MENTIONS an annotation
+// ({@link RequirePermission}, "// gated by @AuthenticatedAccess") can never satisfy the
+// guard/mapping regexes — only real code counts. The [^:] guard avoids eating http://.
+function stripComments(src) {
+  return src
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+}
 
 function walk(dir, out = []) {
   let entries;
@@ -53,12 +69,14 @@ function walk(dir, out = []) {
 
 const unguarded = [];
 for (const file of walk(SRC)) {
-  const text = fs.readFileSync(file, 'utf8');
+  const text = stripComments(fs.readFileSync(file, 'utf8'));
   if (!/@RestController|@Controller/.test(text)) continue;
-  if (!WRITE_MAPPING.test(text)) continue;       // no write surface
-  if (GUARD.test(text)) continue;                 // has a @RequirePermission somewhere
+  if (GUARD.test(text)) continue;                 // has a real @RequirePermission/@AuthenticatedAccess
   if (ADMIN_PATH.test(text)) continue;            // AdminRoleInterceptor covers /api/admin/**
   if (TEST_PROFILE.test(text)) continue;          // @Profile("test") controller — never wired in prod
+  const hasWrite = WRITE_MAPPING.test(text);      // @Post/@Put/@Delete/@Patch surface
+  const hasSensitiveRead = READ_MAPPING.test(text) && SENSITIVE_READ_PATH.test(text);
+  if (!hasWrite && !hasSensitiveRead) continue;   // no surface that requires a decision
   unguarded.push(path.relative(REPO, file));
 }
 unguarded.sort();
@@ -83,14 +101,14 @@ if (JSON_OUT) {
   console.log(JSON.stringify({ total: unguarded.length, baseline: baseline.length, added, removed }, null, 2));
 }
 
-console.log(`[controller-authz] unguarded write controllers: ${unguarded.length} (baseline ${baseline.length})`);
+console.log(`[controller-authz] unguarded write/sensitive-read controllers: ${unguarded.length} (baseline ${baseline.length})`);
 if (removed.length) {
   console.log(`[controller-authz] ${removed.length} baselined controller(s) now guarded/removed (good — prune baseline):`);
   removed.forEach((f) => console.log(`   - ${f}`));
 }
 if (added.length) {
-  console.error(`\n❌ ${added.length} NEW unguarded write controller(s) — add @RequirePermission, move under /api/admin, or (if genuinely self-scoped) --write-baseline with justification:`);
+  console.error(`\n❌ ${added.length} NEW unguarded write or sensitive-read (/api/ai|/api/im) controller(s) — add @RequirePermission/@AuthenticatedAccess, move under /api/admin, or (if intentionally accepted) --write-baseline with justification:`);
   added.forEach((f) => console.error(`   + ${f}`));
   process.exit(1);
 }
-console.log('✅ controller-authz check passed (no new fail-open write controllers).');
+console.log('✅ controller-authz check passed (no new fail-open write/sensitive-read controllers).');

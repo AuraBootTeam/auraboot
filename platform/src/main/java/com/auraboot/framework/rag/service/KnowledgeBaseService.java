@@ -18,6 +18,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -126,7 +127,32 @@ public class KnowledgeBaseService {
                 new LambdaQueryWrapper<KbDocument>()
                         .eq(KbDocument::getKbId, kbPid)
                         .orderByDesc(KbDocument::getCreatedAt));
-        return docs.stream().map(this::toDocDTO).toList();
+
+        // How many of each document's chunks actually carry a vector.
+        //
+        // A document reports "completed" once its text is chunked and stored — embedding is a
+        // separate, remote step that can fail on every single chunk while the document still goes
+        // green. The user then has a knowledge base that looks perfect and cannot answer anything:
+        // retrieval quietly falls back to keyword matching. The count is what makes that visible.
+        //
+        // Computed on read, never stored: the embedding retry pass repairs failed chunks in the
+        // background, so a column written at ingest time would start lying within minutes.
+        Map<String, Integer> embeddedByDoc = new HashMap<>();
+        jdbcTemplate.query(
+                "SELECT doc_id, COUNT(*) AS embedded FROM ab_kb_chunk "
+                + "WHERE kb_id = ? AND embedding_status = 'completed' GROUP BY doc_id",
+                rs -> {
+                    embeddedByDoc.put(rs.getString("doc_id"), rs.getInt("embedded"));
+                },
+                kbPid);
+
+        return docs.stream()
+                .map(doc -> {
+                    KbDocumentDTO dto = toDocDTO(doc);
+                    dto.setEmbeddedChunkCount(embeddedByDoc.getOrDefault(doc.getPid(), 0));
+                    return dto;
+                })
+                .toList();
     }
 
     public KbDocument createDocument(Long tenantId, Long userId, String kbPid,
@@ -174,6 +200,28 @@ public class KnowledgeBaseService {
                 "UPDATE ab_knowledge_base SET doc_count = GREATEST(doc_count - 1, 0), "
                 + "chunk_count = GREATEST(chunk_count - ?, 0), updated_at = NOW() WHERE pid = ?",
                 chunkCount, kbPid);
+        return true;
+    }
+
+    /**
+     * Reset a document so it can be parsed again (manual retry of a failed or stranded document).
+     * Clears the previous error and the reconcile attempt counter; the chunks left behind by the
+     * failed run are cleared by the processing pipeline itself.
+     *
+     * @return false if no such document exists in this knowledge base
+     */
+    public boolean resetDocumentForReprocess(String kbPid, String docPid) {
+        KbDocument doc = docMapper.selectOne(
+                new LambdaQueryWrapper<KbDocument>()
+                        .eq(KbDocument::getPid, docPid)
+                        .eq(KbDocument::getKbId, kbPid));
+        if (doc == null) return false;
+
+        jdbcTemplate.update(
+                "UPDATE ab_kb_document SET status = 'pending', error_message = NULL, "
+                + "process_retry_count = 0, process_started_at = NULL, process_completed_at = NULL "
+                + "WHERE pid = ?",
+                docPid);
         return true;
     }
 

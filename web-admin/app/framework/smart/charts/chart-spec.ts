@@ -79,6 +79,15 @@ export interface ChartDimension {
   role: 'category' | 'series' | 'name';
   /** Display label (defaults to field). */
   label?: string;
+  /**
+   * Display text per raw value: `{ closed_won: '赢单' }`.
+   *
+   * Rows carry the stored dict code, so without this a chart grouped by a
+   * dict-coded field labels its categories with the code. Populated from
+   * `data.meta.dimensionLabels` (resolved by useChartData); absent means "render
+   * the raw value", which is what every chart did before this existed.
+   */
+  valueLabels?: Record<string, string>;
 }
 
 /**

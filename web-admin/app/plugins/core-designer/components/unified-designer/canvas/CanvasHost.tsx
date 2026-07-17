@@ -3,7 +3,11 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { ArrowDown, ArrowUp, GripVertical, Lock, Maximize2, Trash2 } from 'lucide-react';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
-import type { DesignerMode, DslBlockV3, PageSchemaV3 } from '../types';
+import type { DesignerMode, DslBlockV3, ModelFieldDefinition, PageSchemaV3 } from '../types';
+import {
+  DesignerModelFieldsContext,
+  EditCanvasFieldPreview,
+} from '../runtime/platformFieldPreview';
 import {
   ROOT_DROPPABLE_ID,
   blockDroppableId,
@@ -24,6 +28,9 @@ const SPAN_PRESETS = [3, 4, 6, 8, 12] as const;
 // so a plain click on the empty canvas (which clears selection) is never
 // mistaken for a marquee.
 const MARQUEE_START_THRESHOLD_PX = 6;
+
+/** Stable empty reference so the default context value never triggers re-renders. */
+const EMPTY_CANVAS_MODEL_FIELDS: ModelFieldDefinition[] = [];
 
 export type ActiveDropIntent = { blockId: string; intent: DropIntent } | null;
 
@@ -56,6 +63,12 @@ interface CanvasHostProps {
    * marquee hit nothing (the caller may clear or leave the selection intact).
    */
   onMarqueeSelect?: (blockIds: string[]) => void;
+  /**
+   * Model field metadata for the page's primary model. When provided, `field` blocks on
+   * the canvas render the real platform control (true WYSIWYG) instead of the field-code
+   * placeholder. Absent → legacy placeholder, so nothing changes for callers that omit it.
+   */
+  modelFields?: ModelFieldDefinition[];
 }
 
 export function CanvasHost({
@@ -72,6 +85,7 @@ export function CanvasHost({
   canDeleteBlock,
   onDeleteBlock,
   onMarqueeSelect,
+  modelFields,
 }: CanvasHostProps) {
   const { locale } = useI18n();
   const hostRef = React.useRef<HTMLElement | null>(null);
@@ -100,7 +114,7 @@ export function CanvasHost({
     }));
   };
 
-  return (
+  const canvas = (
     <main
       ref={hostRef}
       className="relative min-h-[420px] flex-1 overflow-auto bg-slate-100 p-3 lg:p-6 xl:overflow-auto"
@@ -155,6 +169,12 @@ export function CanvasHost({
         </div>
       </div>
     </main>
+  );
+
+  return (
+    <DesignerModelFieldsContext.Provider value={modelFields ?? EMPTY_CANVAS_MODEL_FIELDS}>
+      {canvas}
+    </DesignerModelFieldsContext.Provider>
   );
 }
 
@@ -602,7 +622,10 @@ function BlockContent(props: BlockContentProps) {
   if (block.blockType === 'columns') {
     return <ColumnsBlockContent {...props} />;
   }
-  if (block.blockType === 'list' || block.blockType === 'table' || block.blockType === 'filter-bar') {
+  if (block.blockType === 'table') {
+    return <TableBlockContent {...props} />;
+  }
+  if (block.blockType === 'list' || block.blockType === 'filter-bar') {
     return <ListBlockContent {...props} />;
   }
   if (block.blockType === 'dashboard') {
@@ -610,6 +633,12 @@ function BlockContent(props: BlockContentProps) {
   }
   if (block.blocks?.length) {
     return <NestedBlocks {...props} />;
+  }
+  if (block.blockType === 'field') {
+    return <CanvasFieldLeaf block={block} locale={props.locale} />;
+  }
+  if (block.blockType === 'column') {
+    return <CanvasColumnLeaf block={block} locale={props.locale} />;
   }
   return <LeafBlock block={block} locale={props.locale} />;
 }
@@ -693,6 +722,98 @@ function LeafBlock({ block, locale }: { block: DslBlockV3; locale: string }) {
       <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
         {getBlockLabel(block, locale)}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Field card body on the edit canvas. When the page's model metadata resolves the bound
+ * field, render the real platform control (true WYSIWYG, non-interactive) via
+ * {@link EditCanvasFieldPreview}; otherwise fall back to the field-code placeholder.
+ */
+function CanvasFieldLeaf({ block, locale }: { block: DslBlockV3; locale: string }) {
+  const modelFields = React.useContext(DesignerModelFieldsContext);
+  const modelField = block.field
+    ? modelFields.find((candidate) => candidate.code === block.field)
+    : undefined;
+  if (modelField) {
+    return <EditCanvasFieldPreview block={block} modelField={modelField} locale={locale} />;
+  }
+  return <LeafBlock block={block} locale={locale} />;
+}
+
+function resolveModelFieldLabel(
+  modelField: ModelFieldDefinition | undefined,
+  locale: string,
+): string | undefined {
+  const label = modelField?.label;
+  if (!label) return undefined;
+  if (typeof label === 'string') return label;
+  const rec = label as Record<string, string>;
+  return rec[locale] || rec['zh-CN'] || rec['en-US'] || Object.values(rec)[0];
+}
+
+/**
+ * Column header on the edit canvas. Resolves the display label from the column's own
+ * `props.label`, else the bound model field's displayName, else the raw field code — so
+ * the table header reads like the live list (名称) instead of the field code (sc_name).
+ */
+function CanvasColumnLeaf({ block, locale }: { block: DslBlockV3; locale: string }) {
+  const modelFields = React.useContext(DesignerModelFieldsContext);
+  const modelField = block.field
+    ? modelFields.find((candidate) => candidate.code === block.field)
+    : undefined;
+  const propLabel =
+    typeof block.props?.label === 'string' ? (block.props.label as string) : undefined;
+  const label = propLabel ?? resolveModelFieldLabel(modelField, locale) ?? getBlockLabel(block, locale);
+  return <div className="px-3 py-2 text-sm font-medium text-slate-700">{label}</div>;
+}
+
+/**
+ * Table body on the edit canvas: a real header row of editable column `BlockFrame`s plus a
+ * few non-interactive representative rows, so the list-page designer reads like a data
+ * table (true WYSIWYG) while every column stays individually selectable / draggable /
+ * deletable. Falls back to the schematic vertical stack when there are no columns or no
+ * model metadata to resolve headers (keeps existing behaviour + tests).
+ */
+function TableBlockContent(props: BlockContentProps) {
+  const modelFields = React.useContext(DesignerModelFieldsContext);
+  const children = props.block.blocks ?? [];
+  const columns = children.filter((child) => child.blockType === 'column');
+  if (columns.length === 0 || modelFields.length === 0) {
+    return <ListBlockContent {...props} />;
+  }
+  const nonColumnChildren = children.filter((child) => child.blockType !== 'column');
+  const representativeRows = [0, 1, 2];
+  return (
+    <div className="space-y-3 p-3">
+      <div className="overflow-x-auto rounded-md border border-slate-200 bg-white">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-slate-50 align-top">
+              {columns.map((column) => (
+                <th key={column.id} scope="col" className="min-w-[9rem] p-1 text-left">
+                  <BlockFrame {...props} block={column} siblingBlocks={children} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="pointer-events-none" aria-hidden="true">
+            {representativeRows.map((row) => (
+              <tr key={row} className="border-t border-slate-100">
+                {columns.map((column) => (
+                  <td key={column.id} className="px-3 py-3">
+                    <div className="h-3 w-20 max-w-full rounded bg-slate-100" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {nonColumnChildren.map((child) => (
+        <BlockFrame key={child.id} {...props} block={child} siblingBlocks={children} />
+      ))}
     </div>
   );
 }

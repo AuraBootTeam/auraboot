@@ -26,6 +26,7 @@ const showSuccessToastSpy = vi.fn();
 const showErrorToastSpy = vi.fn();
 const showWarningToastSpy = vi.fn();
 const showInfoToastSpy = vi.fn();
+const hasPermissionSpy = vi.fn<(code?: string) => boolean>(() => true);
 
 vi.mock('~/framework/meta/hooks/useActionHandler', () => ({
   useActionHandler: (options: any) => ({
@@ -38,7 +39,7 @@ vi.mock('~/framework/meta/hooks/useActionHandler', () => ({
 }));
 
 vi.mock('~/contexts/AuthContext', () => ({
-  useAuth: () => ({ token: 'test-token' }),
+  useAuth: () => ({ token: 'test-token', hasPermission: hasPermissionSpy }),
 }));
 
 vi.mock('~/contexts/ToastContext', () => ({
@@ -110,6 +111,8 @@ beforeEach(() => {
   showErrorToastSpy.mockReset();
   showWarningToastSpy.mockReset();
   showInfoToastSpy.mockReset();
+  hasPermissionSpy.mockReset();
+  hasPermissionSpy.mockReturnValue(true);
 });
 
 // ---------------------------------------------------------------------------
@@ -323,6 +326,16 @@ describe('TableBlockRenderer', () => {
     });
   }
 
+  function makeRuntimeWithRows(rows: Array<Record<string, unknown>>) {
+    return makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => rows,
+        has: () => true,
+        register: vi.fn(),
+      }),
+    });
+  }
+
   it('renders rows from table-adaptor data source records', () => {
     const runtime = makeRuntime({
       getDataSourceManager: () => ({
@@ -400,6 +413,41 @@ describe('TableBlockRenderer', () => {
     expect(passedButton.code).toBe('edit');
     expect(passedButton.action).toEqual({ type: 'navigate', to: 'test_model_form' });
     expect(passedRecord).toEqual(baseRow);
+  });
+
+  it('filters table row actions by permissionCode before rendering', () => {
+    hasPermissionSpy.mockImplementation((code?: string) => code !== 'iot.alarm.ack');
+    const runtime = makeRuntimeWithData();
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      columns: baseColumns,
+      rowActions: [
+        {
+          code: 'ack',
+          label: 'Acknowledge',
+          permissionCode: 'iot.alarm.ack',
+          action: { type: 'command', command: 'iot_alarm_event:ack' },
+        },
+        {
+          code: 'simulate',
+          label: 'Simulate',
+          permissionCode: 'iot.rule.read',
+          action: { type: 'command', command: 'iot_rule:simulate' },
+        },
+        {
+          code: 'view',
+          label: 'View',
+          action: { type: 'navigate', to: 'test_model_detail' },
+        },
+      ],
+    };
+
+    const { getByTestId, queryByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+
+    expect(queryByTestId('row-action-ack')).toBeNull();
+    expect(getByTestId('row-action-simulate')).toBeInTheDocument();
+    expect(getByTestId('row-action-view')).toBeInTheDocument();
   });
 
   it('dispatches legacy bare button.handler through useActionHandler (normalized to events.onClick.handler)', () => {
@@ -522,6 +570,43 @@ describe('TableBlockRenderer', () => {
     fireEvent.click(getByTestId('table-row-row-1'));
 
     expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', baseRow);
+  });
+
+  it('writes multiple selected rows and derived ids when table.selection.mode is multiple', () => {
+    const rows = [
+      { id: 'row-1', pid: 'row-1', name: 'Alpha' },
+      { id: 'row-2', pid: 'row-2', name: 'Beta' },
+    ];
+    const runtime = makeRuntimeWithRows(rows) as any;
+    const block = {
+      type: 'table',
+      dataSource: 'list',
+      table: {
+        rowKey: 'pid',
+        selection: {
+          mode: 'multiple',
+          bind: 'selectedLines',
+          detailBind: 'selectedLine',
+          idsBind: 'selectedLineIds',
+          idField: 'pid',
+        },
+        columns: baseColumns,
+      },
+    };
+
+    const { getByTestId } = render(<TableBlockRenderer block={block as any} runtime={runtime} />);
+    fireEvent.click(getByTestId('table-select-row-row-1'));
+    fireEvent.click(getByTestId('table-select-row-row-2'));
+
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLines', [rows[0]]);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', rows[0]);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLineIds', ['row-1']);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLines', rows);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLine', rows[1]);
+    expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'selectedLineIds', [
+      'row-1',
+      'row-2',
+    ]);
   });
 
   it('uses configured rowKey for row identity and highlights the clicked row immediately', () => {

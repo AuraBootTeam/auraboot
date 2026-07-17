@@ -8,6 +8,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import {
   ArrowLeftIcon,
+  ArrowPathIcon,
+  LinkIcon,
   CloudArrowUpIcon,
   DocumentTextIcon,
   MagnifyingGlassIcon,
@@ -40,6 +42,8 @@ interface KbDocument {
   fileSize: number;
   charCount: number;
   chunkCount: number;
+  /** How many chunks carry a vector. Zero, with chunks present, means semantic search is dead. */
+  embeddedChunkCount?: number;
   status: 'pending' | 'processing' | 'completed' | 'failed';
   errorMessage?: string;
   createdAt: string;
@@ -252,6 +256,47 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
     }
   };
 
+  const [url, setUrl] = useState('');
+  const [addingUrl, setAddingUrl] = useState(false);
+
+  const handleAddUrl = async () => {
+    const target = url.trim();
+    if (!target) return;
+
+    setAddingUrl(true);
+    try {
+      const res = await post<KbDocument>(`/api/ai/knowledge/${kbPid}/documents/from-url`, {
+        url: target,
+      });
+      // A refused URL (unsafe target, not an HTML page, no readable text) comes back as a normal
+      // response with success=false — it does not throw. Show the server's reason: "failed" alone
+      // leaves the user with no idea whether to fix the URL or give up.
+      if (res?.success === false || !res?.data) {
+        toast.showErrorToast(res?.message || 'Could not add that URL');
+        return;
+      }
+      toast.showSuccessToast(`Added "${res.data.docName}"`);
+      setUrl('');
+      fetchDocs();
+      onUpdate();
+    } catch {
+      toast.showErrorToast('Could not add that URL');
+    } finally {
+      setAddingUrl(false);
+    }
+  };
+
+  const handleReprocess = async (doc: KbDocument) => {
+    try {
+      await post(`/api/ai/knowledge/${kbPid}/documents/${doc.pid}/reprocess`, {});
+      toast.showSuccessToast(`Reprocessing "${doc.docName}"`);
+      fetchDocs();
+      onUpdate();
+    } catch {
+      toast.showErrorToast('Failed to reprocess document');
+    }
+  };
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
@@ -279,7 +324,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
             ref={fileInputRef}
             type="file"
             multiple
-            accept=".pdf,.docx,.md,.txt,.csv,.html"
+            accept=".pdf,.docx,.pptx,.xlsx,.ppt,.xls,.md,.txt,.csv,.html,.png,.jpg,.jpeg,.gif,.webp"
             onChange={handleUpload}
             className="hidden"
             disabled={uploading}
@@ -288,12 +333,41 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
         </div>
       </div>
 
+      <div className="mb-4 flex items-center gap-2">
+        <LinkIcon className="h-5 w-5 shrink-0 text-gray-400" />
+        <input
+          type="url"
+          data-testid="kb-url-input"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleAddUrl();
+          }}
+          placeholder="Paste a page URL to add it to this knowledge base"
+          disabled={addingUrl}
+          className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-700"
+        />
+        <button
+          type="button"
+          data-testid="kb-url-add-button"
+          onClick={handleAddUrl}
+          disabled={addingUrl || !url.trim()}
+          className={`rounded-lg px-4 py-2 text-sm text-white transition-colors ${
+            addingUrl || !url.trim()
+              ? 'cursor-not-allowed bg-gray-400'
+              : 'bg-blue-600 hover:bg-blue-700'
+          }`}
+        >
+          {addingUrl ? 'Fetching...' : 'Add URL'}
+        </button>
+      </div>
+
       {loading ? (
         <div className="py-8 text-center text-gray-400">Loading...</div>
       ) : docs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400">
           <DocumentTextIcon className="mb-3 h-12 w-12" />
-          <p>No documents yet. Upload PDF, DOCX, MD, TXT, or CSV files.</p>
+          <p>No documents yet. Upload PDF, DOCX, PPTX, XLSX, MD, TXT, CSV, HTML — or a chart image.</p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
@@ -330,12 +404,15 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
                     {doc.docName}
                   </td>
                   <td className="px-4 py-3 text-gray-500">{doc.docType}</td>
-                  <td className="px-4 py-3 text-right text-gray-500">{doc.chunkCount}</td>
+                  <td className="px-4 py-3 text-right text-gray-500">
+                    <EmbeddingState doc={doc} />
+                  </td>
                   <td className="px-4 py-3 text-right text-gray-500">
                     {doc.charCount?.toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span
+                      data-testid={`doc-status-${doc.pid}`}
                       className={`rounded-full px-2 py-1 text-xs ${STATUS_STYLES[doc.status] || ''}`}
                     >
                       {doc.status}
@@ -343,14 +420,37 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
                     {doc.status === 'processing' && (
                       <span className="ml-1 inline-block h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
                     )}
+                    {doc.status === 'failed' && doc.errorMessage && (
+                      <p
+                        data-testid={`doc-error-${doc.pid}`}
+                        className="mt-1 text-xs text-red-600 dark:text-red-400"
+                        title={doc.errorMessage}
+                      >
+                        {doc.errorMessage}
+                      </p>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <button
-                      onClick={() => handleDelete(doc)}
-                      className="text-gray-400 hover:text-red-500"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
+                    <div className="flex items-center justify-center gap-2">
+                      {doc.status === 'failed' && (
+                        <button
+                          type="button"
+                          data-testid={`doc-reprocess-${doc.pid}`}
+                          onClick={() => handleReprocess(doc)}
+                          title="Reprocess document"
+                          className="text-gray-400 hover:text-blue-600"
+                        >
+                          <ArrowPathIcon className="h-4 w-4" />
+                        </button>
+                      )}
+                      <button
+                        data-testid={`doc-delete-${doc.pid}`}
+                        onClick={() => handleDelete(doc)}
+                        className="text-gray-400 hover:text-red-500"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -359,6 +459,46 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * What the chunk count leaves out.
+ *
+ * A document goes "completed" once its text is chunked and stored. Embedding is a separate remote
+ * step, and it can fail on every single chunk while the document still shows green — leaving a
+ * knowledge base that looks perfect and answers nothing, because retrieval silently drops to
+ * keyword matching. The row said "3 chunks" and told you nothing about that.
+ */
+function EmbeddingState({ doc }: { doc: KbDocument }) {
+  const total = doc.chunkCount ?? 0;
+  const embedded = doc.embeddedChunkCount ?? 0;
+
+  if (total === 0) {
+    return <span>0</span>;
+  }
+
+  if (embedded === total) {
+    return <span data-testid={`doc-chunks-${doc.pid}`}>{total}</span>;
+  }
+
+  const none = embedded === 0;
+  return (
+    <span
+      data-testid={`doc-chunks-${doc.pid}`}
+      title={
+        none
+          ? 'Stored, but not embedded — this document cannot be found by meaning, only by keyword. Check the knowledge base\'s embedding provider.'
+          : `Only ${embedded} of ${total} chunks were embedded; the rest are searchable by keyword only.`
+      }
+      className={`rounded px-1.5 py-0.5 text-xs ${
+        none
+          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+      }`}
+    >
+      {embedded}/{total} embedded
+    </span>
   );
 }
 
@@ -488,13 +628,14 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
   const toast = useToastContext();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<RetrievalResult[]>([]);
+  const [path, setPath] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
     setSearching(true);
     try {
-      const res = await post<{ results: RetrievalResult[]; warnings: string[] }>(
+      const res = await post<{ results: RetrievalResult[]; warnings: string[]; path: string }>(
         '/api/ai/knowledge/retrieve',
         {
           query,
@@ -503,6 +644,7 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
         },
       );
       setResults(res?.data?.results ?? []);
+      setPath(res?.data?.path ?? null);
       for (const w of res?.data?.warnings ?? []) {
         toast.showErrorToast(w);
       }
@@ -536,9 +678,28 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
 
       {results.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            {results.length} result(s) found
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              {results.length} result(s) found
+            </h3>
+            {path && (
+              <span
+                data-testid="retrieval-path"
+                title={
+                  path === 'hybrid'
+                    ? 'Vector similarity combined with keyword matching'
+                    : 'Keyword matching only — semantic search was unavailable'
+                }
+                className={`rounded-full px-2 py-0.5 text-xs ${
+                  path === 'hybrid'
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                }`}
+              >
+                {path === 'hybrid' ? 'hybrid (vector + keyword)' : `${path} only`}
+              </span>
+            )}
+          </div>
           {results.map((r, i) => (
             <div
               key={r.chunkPid || i}

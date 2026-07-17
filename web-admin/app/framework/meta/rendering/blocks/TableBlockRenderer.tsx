@@ -16,6 +16,7 @@ import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
+import { cellRendererRegistry } from '~/framework/meta/runtime/renderers/CellRendererRegistry';
 import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { useTreeData } from '~/framework/meta/hooks/useTreeData';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
@@ -23,6 +24,7 @@ import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers
 import { useAuth } from '~/contexts/AuthContext';
 import {
   readDataSourceRows,
+  readDataSourceState,
   useDataSourceSubscription,
   writeRuntimeState,
 } from './workbenchBlockUtils';
@@ -138,7 +140,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // 路由 / 鉴权上下文 — useActionHandler hook 要求
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, hasPermission } = useAuth();
   const schema = runtime.getSchema();
   const tableName = (schema as any).modelCode || schema.id || '';
 
@@ -226,22 +228,44 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
   useDataSourceSubscription(runtime, dataSourceId);
   const rawData = dataSourceId ? readDataSourceRows(runtime, dataSourceId) : [];
+  const dataSourceState = readDataSourceState(runtime, dataSourceId);
+  const dataSourceError = dataSourceState?.error as any;
+  const errorStatus = Number(
+    dataSourceError?.status ?? dataSourceError?.statusCode ?? dataSourceError?.response?.status,
+  );
+  const hasStaleRows = Boolean(dataSourceError) && rawData.length > 0;
+  const stateConfig = ((block as any).states || {}) as Record<string, any>;
+  const stateTitle = (key: string, fallback: string): string => {
+    const configured = stateConfig[key]?.title;
+    return configured ? getLocalizedText(configured, locale, t) : fallback;
+  };
+  const errorStateKey = Number.isFinite(errorStatus) ? String(errorStatus) : 'error';
 
   // Tree configuration — enables expandable hierarchical rows
   const treeConfig: TreeConfig | undefined = block.table?.treeConfig || (block as any).treeConfig;
   const { visibleRows, toggleExpand } = useTreeData(rawData, treeConfig);
   const selectionConfig = block.table?.selection || (block as any).selection;
+  const selectionMode = selectionConfig?.mode || 'single';
+  const isMultipleSelection = selectionMode === 'multiple';
   const defaultFirstSelection = Boolean((selectionConfig as any)?.defaultFirst);
-  const rowKeyField = block.table?.rowKey || 'pid';
+  const rowKeyField = block.table?.rowKey || (selectionConfig as any)?.keyField || 'pid';
+  const selectionIdField = (selectionConfig as any)?.idField || rowKeyField;
   const [localSelectedRowKey, setLocalSelectedRowKey] = useState('');
+  const [localSelectedRowKeys, setLocalSelectedRowKeys] = useState<string[]>([]);
   const getRowIdentity = (row: any, index?: number): string =>
     String(row?.[rowKeyField] ?? row?.id ?? row?.pid ?? index ?? '');
-  const selectedRow = selectionConfig?.bind
+  const selectedStateValue = selectionConfig?.bind
     ? (runtime.getContext().state as Record<string, any> | undefined)?.[selectionConfig.bind]
     : undefined;
+  const selectedRowsFromState = Array.isArray(selectedStateValue) ? selectedStateValue : [];
+  const selectedRow = !Array.isArray(selectedStateValue) ? selectedStateValue : undefined;
   const selectedRowKey =
     selectedRow && typeof selectedRow === 'object' ? getRowIdentity(selectedRow) : '';
   const effectiveSelectedRowKey = localSelectedRowKey || selectedRowKey;
+  const effectiveSelectedRowKeys = localSelectedRowKeys.length
+    ? localSelectedRowKeys
+    : selectedRowsFromState.map((row: any, index: number) => getRowIdentity(row, index));
+  const effectiveSelectedRowKeySet = new Set(effectiveSelectedRowKeys);
 
   // Use tree-processed rows when treeConfig is set, otherwise flat data
   const data = treeConfig ? visibleRows : rawData;
@@ -264,7 +288,7 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
 
   // 渲染列头
   useEffect(() => {
-    if (!selectionConfig?.bind || !defaultFirstSelection) return;
+    if (!selectionConfig?.bind || isMultipleSelection || !defaultFirstSelection) return;
     const current = (runtime.getContext().state as Record<string, any> | undefined)?.[
       selectionConfig.bind
     ];
@@ -284,7 +308,62 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       writeRuntimeState(runtime, selectionConfig.bind, null);
       setLocalSelectedRowKey('');
     }
-  }, [data, runtime, selectionConfig?.bind, defaultFirstSelection, rowKeyField]);
+  }, [
+    data,
+    runtime,
+    selectionConfig?.bind,
+    isMultipleSelection,
+    defaultFirstSelection,
+    rowKeyField,
+  ]);
+
+  const writeMultipleSelection = (rows: any[]) => {
+    if (!selectionConfig?.bind) return;
+    writeRuntimeState(runtime, selectionConfig.bind, rows);
+    if ((selectionConfig as any).idsBind) {
+      writeRuntimeState(
+        runtime,
+        (selectionConfig as any).idsBind,
+        rows
+          .map((row) => row?.[selectionIdField])
+          .filter((value) => value !== undefined && value !== null),
+      );
+    }
+    setLocalSelectedRowKeys(rows.map((row, index) => getRowIdentity(row, index)));
+  };
+
+  const toggleMultipleSelection = (row: any, index: number) => {
+    if (!selectionConfig?.bind) return;
+    if ((selectionConfig as any).detailBind) {
+      writeRuntimeState(runtime, (selectionConfig as any).detailBind, row);
+    }
+    const identity = getRowIdentity(row, index);
+    const currentRows = selectedRowsFromState.length
+      ? selectedRowsFromState
+      : data.filter((candidate: any, candidateIndex: number) =>
+          effectiveSelectedRowKeySet.has(getRowIdentity(candidate, candidateIndex)),
+        );
+    const nextRows = effectiveSelectedRowKeySet.has(identity)
+      ? currentRows.filter((candidate: any, candidateIndex: number) => {
+          const candidateIdentity =
+            getRowIdentity(candidate) || getRowIdentity(candidate, candidateIndex);
+          return candidateIdentity !== identity;
+        })
+      : [...currentRows, row];
+    writeMultipleSelection(nextRows);
+  };
+
+  const allVisibleRowsSelected =
+    isMultipleSelection &&
+    data.length > 0 &&
+    data.every((row: any, index: number) =>
+      effectiveSelectedRowKeySet.has(getRowIdentity(row, index)),
+    );
+
+  const toggleAllVisibleRows = () => {
+    if (!isMultipleSelection) return;
+    writeMultipleSelection(allVisibleRowsSelected ? [] : data);
+  };
 
   const renderColumnHeader = (column: ColumnConfig) => {
     const label = getLocalizedText(column.label, locale, t);
@@ -305,7 +384,10 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   // 渲染单元格内容
   const renderCellContent = (column: ColumnConfig, row: any) => {
     if (column.isActionColumn) {
-      return renderActionButtons(row, Array.isArray((column as any).buttons) ? (column as any).buttons : []);
+      return renderActionButtons(
+        row,
+        Array.isArray((column as any).buttons) ? (column as any).buttons : [],
+      );
     }
 
     const value = row[column.field];
@@ -356,6 +438,27 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
       }
     }
 
+    // renderType 渲染 —— 交给共享的 cell renderer registry。
+    //
+    // Without this, a table block understands exactly one renderType (status-pill) and drops every
+    // other on the floor: `progress`, `currency`, `rating`, `owner` and the rest render as bare
+    // text. The same column config, on a kind:list page, goes through ListTable and renders
+    // properly — so the same DSL means two different things depending on which page kind it
+    // happens to sit in, and the version that does nothing does it silently.
+    // has() first: an unknown renderType must fall through to the existing valueType handling
+    // rather than be silently swallowed by the registry's `default` renderer.
+    if (
+      column.renderType &&
+      column.renderType !== 'status-pill' &&
+      cellRendererRegistry.has(column.renderType)
+    ) {
+      return cellRendererRegistry.render(column.renderType, {
+        value,
+        record: row,
+        column: column as any,
+      } as any);
+    }
+
     // valueType 渲染
     switch (column.valueType) {
       case 'date':
@@ -404,6 +507,9 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     return (
       <div className="flex flex-wrap gap-2">
         {actions.map((button) => {
+          if (button.permissionCode && !hasPermission(button.permissionCode)) {
+            return null;
+          }
           // 条件渲染
           if (button.visibleWhen) {
             const visible = evaluator.evaluateCondition(button.visibleWhen, {
@@ -488,107 +594,207 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
     dispatchAction(normalized, row);
   };
 
-  const handleRowClick = (row: any) => {
+  const handleRowClick = (row: any, index: number) => {
     if (!selectionConfig?.bind) return;
+    if (isMultipleSelection) {
+      toggleMultipleSelection(row, index);
+      return;
+    }
     writeRuntimeState(runtime, selectionConfig.bind, row);
     setLocalSelectedRowKey(getRowIdentity(row));
   };
 
-  return (
-    <div
-      className={`table-block w-full max-w-full overflow-x-auto ${maxHeight ? 'overflow-y-auto' : ''}`}
-      data-testid="table-block"
-      style={tableContainerStyle}
-    >
-      <table className="divide-border w-max min-w-full divide-y">
-        <thead className={maxHeight ? 'bg-subtle sticky top-0 z-10' : 'bg-subtle'}>
-          <tr>
-            {columns.map(renderColumnHeader)}
-            {rowActions.length > 0 && (
-              <th
-                className={`${headerCellClass} text-text-2 text-left text-xs font-medium tracking-wider uppercase`}
-              >
-                {t('common.actions') !== 'common.actions' ? t('common.actions') : 'Actions'}
-              </th>
-            )}
-          </tr>
-        </thead>
-        <tbody className="divide-border bg-panel divide-y">
-          {data.length === 0 ? (
-            <tr>
-              <td
-                colSpan={columns.length + (rowActions.length > 0 ? 1 : 0)}
-                className="text-text-2 px-6 py-4 text-center"
-              >
-                {t('common.noData') !== 'common.noData' ? t('common.noData') : 'No data'}
-              </td>
-            </tr>
-          ) : (
-            data.map((row: any, index: number) => {
-              const rowIdentity = getRowIdentity(row, index);
-              const isSelected =
-                Boolean(effectiveSelectedRowKey) && effectiveSelectedRowKey === rowIdentity;
+  if (dataSourceState?.loading && rawData.length === 0) {
+    return (
+      <div
+        data-testid="table-loading-state"
+        role="status"
+        className="text-text-2 px-6 py-8 text-center"
+      >
+        {stateTitle(
+          'loading',
+          t('common.loading') !== 'common.loading' ? t('common.loading') : 'Loading…',
+        )}
+      </div>
+    );
+  }
 
-              return (
-                <tr
-                  key={rowIdentity}
-                  data-testid={`table-row-${rowIdentity}`}
-                  onClick={() => handleRowClick(row)}
-                  className={`hover:bg-hover ${isSelected ? 'bg-accent-weak' : ''} ${rowClassName(row)} ${
-                    selectionConfig?.bind ? 'cursor-pointer' : ''
-                  }`}
-                >
-                  {columns.map((column, colIdx) => (
-                    <td
-                      key={column.field}
-                      className={`${bodyCellClass} text-text text-sm ${
-                        column.ellipsis ? 'truncate' : ''
-                      } text-${column.align || 'left'}`}
-                      title={getCellTitle(column, row)}
-                      style={{
-                        maxWidth: column.ellipsis ? column.width : undefined,
-                        // Tree indent: apply padding to first column
-                        paddingLeft:
-                          treeConfig && colIdx === 0
-                            ? `${(row._depth || 0) * 24 + 24}px`
-                            : undefined,
-                      }}
-                    >
-                      {/* Tree expand toggle on first column */}
-                      {treeConfig && colIdx === 0 && (
-                        <span className="mr-1 inline-flex items-center">
-                          {row._hasChildren ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleExpand(getLegacyCompatibleRecordPid(row) || '');
-                              }}
-                              className="text-text-3 hover:text-text-2 flex h-4 w-4 items-center justify-center"
-                              data-testid={`tree-toggle-${getLegacyCompatibleRecordPid(row)}`}
-                            >
-                              {row._expanded ? '▼' : '▶'}
-                            </button>
-                          ) : (
-                            <span className="inline-block h-4 w-4" />
-                          )}
-                        </span>
-                      )}
-                      {renderCellContent(column, row)}
-                    </td>
-                  ))}
-                  {rowActions.length > 0 && (
-                    <td className={`${bodyCellClass} text-text text-sm`}>
-                      {renderRowActions(row)}
-                    </td>
-                  )}
-                </tr>
-              );
-            })
+  if (dataSourceError && rawData.length === 0) {
+    return (
+      <div
+        data-testid={`table-error-state-${errorStateKey}`}
+        role="alert"
+        className="border-danger/30 bg-danger/5 rounded-lg border px-6 py-5"
+      >
+        <div className="text-text font-semibold">
+          {stateTitle(
+            errorStateKey,
+            stateTitle('error', errorStatus ? `Request failed (${errorStatus})` : 'Request failed'),
           )}
-        </tbody>
-      </table>
-    </div>
+        </div>
+        <div className="text-text-2 mt-1 text-sm">{String(dataSourceError?.message || '')}</div>
+        {dataSourceId && (
+          <button
+            type="button"
+            data-testid="table-error-retry"
+            className="border-border bg-panel text-text mt-3 rounded-md border px-3 py-1.5 text-sm font-medium"
+            onClick={() => void dataSourceManager.reload(dataSourceId)}
+          >
+            {stateTitle(
+              'retry',
+              t('common.retry') !== 'common.retry' ? t('common.retry') : 'Retry',
+            )}
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {(hasStaleRows || (dataSourceState?.loading && rawData.length > 0)) && (
+        <div
+          data-testid={hasStaleRows ? 'table-stale-state' : 'table-refreshing-state'}
+          role="status"
+          className="border-warning/30 bg-warning/5 text-text mb-2 rounded-lg border px-4 py-2 text-sm"
+        >
+          {hasStaleRows
+            ? stateTitle(
+                'stale',
+                'Showing preserved data because refresh failed. Retry before acting.',
+              )
+            : stateTitle('refreshing', 'Refreshing data…')}
+        </div>
+      )}
+      <div
+        className={`table-block w-full max-w-full overflow-x-auto ${maxHeight ? 'overflow-y-auto' : ''}`}
+        data-testid="table-block"
+        style={tableContainerStyle}
+      >
+        <table className="divide-border w-max min-w-full divide-y">
+          <thead className={maxHeight ? 'bg-subtle sticky top-0 z-10' : 'bg-subtle'}>
+            <tr>
+              {isMultipleSelection && (
+                <th className={`${headerCellClass} w-12 text-left`}>
+                  <input
+                    type="checkbox"
+                    data-testid="table-select-all"
+                    checked={allVisibleRowsSelected}
+                    onChange={toggleAllVisibleRows}
+                    aria-label="Select all rows"
+                  />
+                </th>
+              )}
+              {columns.map(renderColumnHeader)}
+              {rowActions.length > 0 && (
+                <th
+                  className={`${headerCellClass} text-text-2 text-left text-xs font-medium tracking-wider uppercase`}
+                >
+                  {t('common.actions') !== 'common.actions' ? t('common.actions') : 'Actions'}
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody className="divide-border bg-panel divide-y">
+            {data.length === 0 ? (
+              <tr>
+                <td
+                  colSpan={
+                    columns.length + (rowActions.length > 0 ? 1 : 0) + (isMultipleSelection ? 1 : 0)
+                  }
+                  className="text-text-2 px-6 py-4 text-center"
+                >
+                  {/* A table that only fills in once you select something upstream should say so.
+                    "No data" on an empty transcript reads as "this conversation has no messages"
+                    when what it means is "you have not picked one yet" — the same two words for
+                    two different situations, and the user cannot tell which they are in. */}
+                  {(block as any).empty?.title
+                    ? getLocalizedText((block as any).empty.title, locale, t)
+                    : t('common.noData') !== 'common.noData'
+                      ? t('common.noData')
+                      : 'No data'}
+                </td>
+              </tr>
+            ) : (
+              data.map((row: any, index: number) => {
+                const rowIdentity = getRowIdentity(row, index);
+                const isSelected = isMultipleSelection
+                  ? effectiveSelectedRowKeySet.has(rowIdentity)
+                  : Boolean(effectiveSelectedRowKey) && effectiveSelectedRowKey === rowIdentity;
+
+                return (
+                  <tr
+                    key={rowIdentity}
+                    data-testid={`table-row-${rowIdentity}`}
+                    onClick={() => handleRowClick(row, index)}
+                    className={`hover:bg-hover ${isSelected ? 'bg-accent-weak' : ''} ${rowClassName(row)} ${
+                      selectionConfig?.bind ? 'cursor-pointer' : ''
+                    }`}
+                  >
+                    {isMultipleSelection && (
+                      <td className={`${bodyCellClass} w-12`}>
+                        <input
+                          type="checkbox"
+                          data-testid={`table-select-row-${rowIdentity}`}
+                          checked={isSelected}
+                          onClick={(event) => event.stopPropagation()}
+                          onChange={() => toggleMultipleSelection(row, index)}
+                          aria-label={`Select row ${rowIdentity}`}
+                        />
+                      </td>
+                    )}
+                    {columns.map((column, colIdx) => (
+                      <td
+                        key={column.field}
+                        className={`${bodyCellClass} text-text text-sm ${
+                          column.ellipsis ? 'truncate' : ''
+                        } text-${column.align || 'left'}`}
+                        title={getCellTitle(column, row)}
+                        style={{
+                          maxWidth: column.ellipsis ? column.width : undefined,
+                          // Tree indent: apply padding to first column
+                          paddingLeft:
+                            treeConfig && colIdx === 0
+                              ? `${(row._depth || 0) * 24 + 24}px`
+                              : undefined,
+                        }}
+                      >
+                        {/* Tree expand toggle on first column */}
+                        {treeConfig && colIdx === 0 && (
+                          <span className="mr-1 inline-flex items-center">
+                            {row._hasChildren ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExpand(getLegacyCompatibleRecordPid(row) || '');
+                                }}
+                                className="text-text-3 hover:text-text-2 flex h-4 w-4 items-center justify-center"
+                                data-testid={`tree-toggle-${getLegacyCompatibleRecordPid(row)}`}
+                              >
+                                {row._expanded ? '▼' : '▶'}
+                              </button>
+                            ) : (
+                              <span className="inline-block h-4 w-4" />
+                            )}
+                          </span>
+                        )}
+                        {renderCellContent(column, row)}
+                      </td>
+                    ))}
+                    {rowActions.length > 0 && (
+                      <td className={`${bodyCellClass} text-text text-sm`}>
+                        {renderRowActions(row)}
+                      </td>
+                    )}
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 };
 

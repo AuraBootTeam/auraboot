@@ -14,6 +14,8 @@ import {
   resolveHiddenSystemTabKeys,
   resolveSubTableDataSourceConfig,
   resolveVisibleDetailTabs,
+  resolveVisibleDetailTabsFromBlocks,
+  resolveVisibleTopLevelDetailBlocks,
   shouldRenderDefaultDetailEditAction,
   unwrapDetailRecord,
 } from '../DetailPageContent';
@@ -378,6 +380,78 @@ describe('resolveVisibleDetailTabs', () => {
         extension: { hiddenSystemTabs: ['__approval_comments__', '__field_history__'] },
       }).map((tab) => tab.key),
     ).toEqual(['overview', '__comments__']);
+  });
+});
+
+describe('resolveVisibleDetailTabsFromBlocks', () => {
+  const tabBlock = (
+    id: string,
+    key: string,
+    visibleWhen?: string,
+    detailTabOrder?: number,
+  ) => ({
+    id,
+    blockType: 'tabs',
+    visibleWhen,
+    detailTabOrder,
+    tabs: [{ key, label: key, blocks: [] }],
+  }) as any;
+
+  it('composes all visible tab groups and does not let a hidden first group mask later groups', () => {
+    const blocks = [
+      tabBlock('draft-tabs', 'draft', "form.status == 'draft'"),
+      { id: 'summary', blockType: 'description' },
+      tabBlock('completed-tabs', 'completed', "form.status == 'completed'"),
+    ] as any;
+
+    expect(
+      resolveVisibleDetailTabsFromBlocks(
+        blocks,
+        (expression) => expression === "form.status == 'completed'",
+      ).map((tab) => tab.key),
+    ).toEqual(['completed']);
+  });
+
+  it('orders simultaneously visible groups by detailTabOrder before source order', () => {
+    const blocks = [
+      tabBlock('import-tabs', 'field-sources', undefined, 10),
+      tabBlock('workbench-tabs', 'overview', undefined, 0),
+      tabBlock('exports-tabs', 'exports', undefined, 0),
+    ] as any;
+
+    expect(resolveVisibleDetailTabsFromBlocks(blocks, () => true).map((tab) => tab.key)).toEqual([
+      'overview',
+      'exports',
+      'field-sources',
+    ]);
+  });
+});
+
+describe('resolveVisibleTopLevelDetailBlocks', () => {
+  it('keeps visible content blocks that sit beside tabs in source order', () => {
+    const blocks = [
+      { id: 'toolbar', blockType: 'toolbar' },
+      { id: 'metrics', blockType: 'metric-strip', detailPlacement: 'header' },
+      { id: 'tabs', blockType: 'tabs', tabs: [] },
+      { id: 'profile-fields', blockType: 'form-section' },
+      { id: 'audit', blockType: 'description' },
+    ] as any;
+
+    expect(resolveVisibleTopLevelDetailBlocks(blocks, () => true).map((block) => block.id)).toEqual([
+      'profile-fields',
+      'audit',
+    ]);
+  });
+
+  it('removes hidden top-level blocks without dropping later visible blocks', () => {
+    const blocks = [
+      { id: 'candidate-only', blockType: 'form-section', visibleWhen: "form.status == 'candidate'" },
+      { id: 'always', blockType: 'form-section' },
+    ] as any;
+
+    expect(resolveVisibleTopLevelDetailBlocks(blocks, () => false).map((block) => block.id)).toEqual([
+      'always',
+    ]);
   });
 });
 

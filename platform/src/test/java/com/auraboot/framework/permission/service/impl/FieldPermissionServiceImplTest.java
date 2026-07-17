@@ -3,6 +3,7 @@ package com.auraboot.framework.permission.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.service.RoleService;
@@ -22,6 +23,8 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -69,6 +72,23 @@ class FieldPermissionServiceImplTest {
         assertThat(result.viewableFields()).isEmpty();
         assertThat(result.editableFields()).isEmpty();
         assertThat(result.hiddenFields()).isEmpty();
+    }
+
+    @Test
+    void reusesFieldPermissionsInsideDynamicDataQueryScope() {
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of());
+        when(metaModelService.getModelFields("model.user"))
+                .thenReturn(List.of(field("name", null)));
+
+        try (DynamicDataQueryScope ignored = DynamicDataQueryScope.open()) {
+            assertThat(service.getFieldPermissions(1L, "model.user").viewableFields())
+                    .containsExactly("name");
+            assertThat(service.getFieldPermissions(1L, "model.user").viewableFields())
+                    .containsExactly("name");
+        }
+
+        verify(userRoleService, times(1)).getRoleIdsByMemberIdAndTenantId(1L, 100L);
+        verify(metaModelService, times(1)).getModelFields("model.user");
     }
 
     @Test

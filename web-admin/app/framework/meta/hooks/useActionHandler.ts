@@ -58,6 +58,7 @@ import { executeRegistryAction } from '~/framework/meta/hooks/executeRegistryAct
 import { fetchResult } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
+import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { confirmDialog } from '~/utils/confirmDialog';
 import { normalizeAction, normalizeButtonProps } from '~/framework/meta/utils/normalizeAction';
 import {
@@ -217,6 +218,7 @@ function buildPromptUploadCompletedMessage(
 type ActionToastType = 'success' | 'error' | 'warning' | 'info';
 interface ExecuteCommandOptions {
   suppressAsyncSubmitToast?: boolean;
+  asyncTaskLabel?: string;
 }
 
 function notifyActionToast(
@@ -242,7 +244,13 @@ function notifyActionToast(
   }
 }
 
-function resolveCommandErrorMessage(result: unknown, commandCode: string): string {
+/**
+ * Pull the user-facing reason out of a failed command response. The backend puts it in
+ * `context.detail` (localized); `message` / `desc` are the generic envelope text
+ * ("Business error"), so they must stay last. Shared with the DSL form page so both
+ * command execution paths surface the same reason.
+ */
+export function resolveCommandErrorMessage(result: unknown, commandCode: string): string {
   const body = (result || {}) as Record<string, any>;
   return (
     firstNonBlankString(
@@ -387,7 +395,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
    * the BFF proxy timeout). Resolves with the task result data on success.
    */
   const pollAsyncTask = useCallback(
-    async (taskCode: string): Promise<any> => {
+    async (taskCode: string, taskLabel?: string): Promise<any> => {
       const TERMINAL = new Set(['completed', 'failed', 'cancelled']);
       // ~15 min cap at 1.5s intervals — generous for bulk imports.
       for (let attempt = 0; attempt < 600; attempt++) {
@@ -402,14 +410,21 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         }
         const task = (res as any).data || {};
         const status = String(task.status || '').toLowerCase();
+        const presentation = task.inputParams?.handlerParams?.taskPresentation;
         // Feed the live task into the progress modal each tick. Toast is kept as
         // a fallback for hosts that don't render the modal.
         setActiveTask({
           status,
+          taskCode: task.taskCode || taskCode,
+          taskType: task.taskType,
+          taskName: task.taskName,
+          taskLabel: taskLabel || task.taskName,
+          locale,
           progress: typeof task.progress === 'number' ? task.progress : undefined,
           progressMessage: task.progressMessage,
           resultData: task.resultData,
           errorMessage: task.errorMessage,
+          presentation: presentation && typeof presentation === 'object' ? presentation : undefined,
         });
         // No per-tick toast — the progress modal (or background chip) is the live
         // UI. A toast here would spam raw progress text (incl. the JSON message).
@@ -425,7 +440,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
       }
       throw new Error('Async task timed out');
     },
-    [token],
+    [token, setActiveTask, locale],
   );
 
   /**
@@ -483,13 +498,20 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         }
         // Open the progress modal immediately in a running state; pollAsyncTask
         // then refreshes it each tick until terminal.
-        setActiveTask({ status: 'running', progress: 0 });
-        return await pollAsyncTask(dispatch.taskCode);
+        setActiveTask({
+          status: 'running',
+          taskCode: dispatch.taskCode,
+          taskType: dispatch.taskType,
+          taskLabel: commandOptions.asyncTaskLabel,
+          locale,
+          progress: 0,
+        });
+        return await pollAsyncTask(dispatch.taskCode, commandOptions.asyncTaskLabel);
       }
 
       return result.data;
     },
-    [token, notifyToast, pollAsyncTask],
+    [token, notifyToast, pollAsyncTask, setActiveTask, locale],
   );
 
   /**
@@ -601,10 +623,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         confirmText: '我已保存',
         cancelText: '关闭',
       });
-      notifyToast(
-        `临时密码已生成并尝试复制: ${tempPassword}`,
-        'success',
-      );
+      notifyToast(`临时密码已生成并尝试复制: ${tempPassword}`, 'success');
     },
     [notifyToast],
   );
@@ -735,7 +754,14 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
               targetRecordPid,
               payload,
               operationType,
-              { suppressAsyncSubmitToast: promptUploadUsesPanelFeedback },
+              {
+                suppressAsyncSubmitToast: promptUploadUsesPanelFeedback,
+                asyncTaskLabel: getLocalizedText(
+                  normalizedButton.label || normalizedButton.content || normalizedButton.code,
+                  locale,
+                  t,
+                ),
+              },
             );
             surfaceTemporaryPassword(commandResult);
             if ((commandResult as any)?.__asyncFailed) {

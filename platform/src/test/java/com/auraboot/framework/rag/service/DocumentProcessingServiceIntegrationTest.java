@@ -2,6 +2,7 @@ package com.auraboot.framework.rag.service;
 
 import com.auraboot.framework.file.entity.FileEntity;
 import com.auraboot.framework.file.service.FileService;
+import com.auraboot.framework.infrastructure.storage.StorageProvider;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.rag.dto.CreateKnowledgeBaseRequest;
 import com.auraboot.framework.rag.dto.KnowledgeBaseDTO;
@@ -14,6 +15,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.AopTestUtils;
 
+import java.io.FileNotFoundException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -47,6 +50,9 @@ class DocumentProcessingServiceIntegrationTest extends BaseIntegrationTest {
 
     @MockitoBean
     private FileService fileService;
+
+    @MockitoBean
+    private StorageProvider storageProvider;
 
     /** Direct reference bypassing @Async proxy */
     private DocumentProcessingService processingService;
@@ -176,9 +182,13 @@ class DocumentProcessingServiceIntegrationTest extends BaseIntegrationTest {
     @Order(10)
     @DisplayName("PROC-04: Missing file marks document as FAILED")
     void processDocument_missingFile() {
+        // The row points at an object the storage backend does not have — what a real provider
+        // does here is throw, not hand back an empty stream.
         FileEntity fakeFile = new FileEntity();
-        fakeFile.setLocalPath("/tmp/non-existent-file-" + System.currentTimeMillis() + ".txt");
+        fakeFile.setFileName("non-existent-file-" + System.currentTimeMillis() + ".txt");
         when(fileService.findByPid(anyString())).thenReturn(fakeFile);
+        when(storageProvider.download(anyString()))
+                .thenThrow(new UncheckedIOException(new FileNotFoundException("object not found")));
 
         KnowledgeBaseDTO kb = createTestKb("Missing File");
         KbDocument doc = kbService.createDocument(
@@ -303,10 +313,21 @@ class DocumentProcessingServiceIntegrationTest extends BaseIntegrationTest {
         return tmpFile;
     }
 
+    /**
+     * Stub the file lookup + the storage backend the parser now reads through. The storage key is
+     * the entity's generated file name — the same key FileServiceImpl uploads and deletes with —
+     * and the bytes come back as a fresh stream on every download, as a real provider would.
+     */
     private void setupFileServiceMock(String localPath) {
+        Path file = Path.of(localPath);
+        String storageKey = file.getFileName().toString();
+
         FileEntity fileEntity = new FileEntity();
+        fileEntity.setFileName(storageKey);
         fileEntity.setLocalPath(localPath);
         when(fileService.findByPid(anyString())).thenReturn(fileEntity);
+        when(storageProvider.download(storageKey))
+                .thenAnswer(invocation -> Files.newInputStream(file));
     }
 
     private void setupEmbeddingMock(int dimensions) {

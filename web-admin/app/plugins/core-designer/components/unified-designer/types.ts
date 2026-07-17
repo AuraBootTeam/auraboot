@@ -59,6 +59,12 @@ export interface ModelFieldDefinition {
   virtual?: boolean;
   /** Optional backend-provided semantic grouping hint. */
   semanticType?: string;
+  /**
+   * Raw backend field `extension` bag (renderComponent, currencySymbol, precision,
+   * levels, allowClear, ...). Threaded to the designer preview so the WYSIWYG field
+   * renderer can reproduce the exact live control instead of a generic input.
+   */
+  extensionProps?: Record<string, unknown>;
 }
 
 export interface ModelFieldRefTarget {

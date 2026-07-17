@@ -30,7 +30,8 @@ import java.util.stream.Collectors;
  * <pre>
  * L1: user-permissions:{userId} (TTL: 30min)
  *     ↓
- * L2: subject-evaluation:{subjectType}:{subjectId}:{userId} (TTL: 15min)
+ * (An L2 subject-evaluation cache was described here and in CacheConfig, but nothing ever
+ *  populated it — subject visibility is evaluated on every call. Removed 2026-07-14.)
  *     ↓
  * L3: subject-declarations:{subjectType}:{subjectId} (TTL: 60min)
  * </pre>

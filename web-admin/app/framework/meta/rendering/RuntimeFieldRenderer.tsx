@@ -28,6 +28,25 @@ export interface RuntimeFieldRendererProps {
   runtime: SchemaRuntime;
 }
 
+function resolveCreateInitialValues(
+  configured: Record<string, unknown> | undefined,
+  context: Record<string, any>,
+): Record<string, unknown> | undefined {
+  if (!configured) return undefined;
+  return Object.fromEntries(
+    Object.entries(configured).map(([key, value]) => {
+      if (typeof value !== 'string') return [key, value];
+      const match = value.trim().match(/^\$\{form\.([^}]+)\}$/);
+      return [
+        key,
+        match
+          ? match[1].split('.').reduce((current, part) => current?.[part], context.form)
+          : value,
+      ];
+    }),
+  );
+}
+
 /**
  * Platform-provided reference models that are NOT stored in ab_meta_model and therefore cannot
  * be resolved via the generic /api/dynamic/{code}/list route. Each entry maps a system model
@@ -47,6 +66,19 @@ const SYSTEM_MODEL_ENDPOINTS: Record<
 };
 
 const MAX_DYNAMIC_REFERENCE_PAGE_SIZE = 500;
+
+function isJsonLikeField(field: FieldConfig): boolean {
+  return ['json', 'jsonb'].includes(
+    String((field as any).dataType || field.type || '').toLowerCase(),
+  );
+}
+
+function shouldInferJsonEditor(component?: string): boolean {
+  const normalized = String(component || '')
+    .replace(/[-_]/g, '')
+    .toLowerCase();
+  return !normalized || ['input', 'smartinput', 'textarea', 'smarttextarea'].includes(normalized);
+}
 
 /**
  * Runtime 模式字段渲染器
@@ -222,11 +254,15 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
   // 构建组件 props
   // 如果有 dictCode 且未指定组件或组件为 SmartInput，自动使用 SmartSelect
   const componentName = useMemo(() => {
-    if (field.dictCode && (!field.component || field.component === 'SmartInput')) {
+    const explicitComponent = field.component || (field as any).fieldType;
+    if (isJsonLikeField(field) && shouldInferJsonEditor(explicitComponent)) {
+      return 'SmartJsonEditor';
+    }
+    if (field.dictCode && (!explicitComponent || explicitComponent === 'SmartInput')) {
       return 'SmartSelect';
     }
-    return field.component || 'SmartInput';
-  }, [field.dictCode, field.component]);
+    return explicitComponent || 'SmartInput';
+  }, [field, field.dictCode, field.component, (field as any).fieldType]);
 
   const localizeText = useMemo(
     () => (value: unknown) =>
@@ -413,6 +449,10 @@ export const RuntimeFieldRenderer: React.FC<RuntimeFieldRendererProps> = ({ fiel
           createPageKey={field.createPageKey}
           createCommand={createCommandCode}
           displayField={refDisplayField}
+          initialValues={resolveCreateInitialValues(
+            field.createInitialValues,
+            runtime.getContext(),
+          )}
           executeCommand={executeCommand}
           onCreated={handleCreated}
           onClose={() => setCreateOpen(false)}

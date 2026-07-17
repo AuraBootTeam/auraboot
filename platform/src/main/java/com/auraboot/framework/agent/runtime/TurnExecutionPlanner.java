@@ -139,6 +139,18 @@ public class TurnExecutionPlanner {
                 EnumSet.of(PolicySignal.DEFAULT_AGENT_PROFILE, PolicySignal.CHAT_TRIAGE_BUCKET));
     }
 
+    /**
+     * Channels that are pure knowledge Q&A and must never enter the durable/planner path — a
+     * customer-facing widget cannot run execute_sql, loop over tool rounds, or demand human approval.
+     * Kept in step with {@code ChatToolResolver.RAG_ONLY_CHANNELS} (the tool-stripping counterpart on
+     * the sync path): both must list the same channels for the RAG-only guarantee to hold end to end.
+     */
+    private static final Set<String> RAG_ONLY_CHANNELS = Set.of("cs_widget");
+
+    public static boolean isRagOnlyChannel(String channel) {
+        return channel != null && RAG_ONLY_CHANNELS.contains(channel);
+    }
+
     public static boolean isDefaultAgentPath(String agentCode) {
         String normalized = normalizeAgentCode(agentCode);
         return normalized == null || "aurabot".equals(normalized);

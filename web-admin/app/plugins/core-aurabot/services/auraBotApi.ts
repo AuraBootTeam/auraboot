@@ -26,13 +26,21 @@ import type { ResultContract } from '../types/ResultContract';
 const API_BASE_URL = '/api/ai/aurabot';
 
 function formatFetchError(error: unknown, scope: 'chat' | 'execute'): string {
-  const action =
-    scope === 'chat'
-      ? '无法连接 AuraBot 对话服务，请确认前端 BFF(5173) 和后端(6443) 已启动。'
-      : '无法连接 AuraBot 执行服务，请确认前端 BFF(5173) 和后端(6443) 已启动。';
+  // This is a plain service module with no request locale, so we cannot call
+  // useI18n().t() here. Mirror the backend #1256 pattern: emit a `$i18n:<key>`
+  // sentinel and let the chat panel (AuraBotChat.tsx MessageBubble) resolve it
+  // via useSmartText, where the browser locale is known. Do NOT append anything
+  // to the sentinel — useSmartText treats everything after `$i18n:` as the key.
+  //
+  // The raw cause is logged to the console for debugging so we never surface
+  // internal detail (or leak the BFF/backend port numbers, as the previous
+  // hardcoded message did) to end users.
   const raw =
     error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error';
-  return `${action} 原始错误: ${raw}`;
+  console.error(`[auraBotApi] ${scope} request failed:`, raw);
+  return scope === 'chat'
+    ? '$i18n:aurabot.error.connect_chat'
+    : '$i18n:aurabot.error.connect_execute';
 }
 
 async function readErrorMessage(response: Response): Promise<string> {

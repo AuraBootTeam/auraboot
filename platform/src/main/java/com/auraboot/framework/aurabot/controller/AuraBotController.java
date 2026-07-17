@@ -1,7 +1,7 @@
 package com.auraboot.framework.aurabot.controller;
 
 import com.auraboot.framework.agent.dto.LlmChatRequest;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
 import com.auraboot.framework.aurabot.service.ChatToolResolver;
 import com.auraboot.framework.application.tenant.MetaContext;
@@ -199,7 +199,7 @@ public class AuraBotController {
             return Map.of("code", "0", "data", List.of());
         }
 
-        var resolved = chatToolResolver.resolveTools(null, modelCode, recordPid);
+        var resolved = chatToolResolver.resolveTools(null, modelCode, recordPid, null);
 
         // Filter to write-only tools (exclude read-only ones like NQ and builtin)
         List<Map<String, Object>> actions = resolved.tools().stream()

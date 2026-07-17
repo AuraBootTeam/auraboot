@@ -5,6 +5,7 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.connector.service.ApiConnectorService;
 import com.auraboot.framework.entitlement.spi.EntitlementChecker;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.exception.ConflictException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.mapper.BindingRuleMapper;
 import com.auraboot.framework.meta.mapper.CommandDefinitionMapper;
@@ -204,5 +205,25 @@ class CommandExecutorFailureAuditTest {
                 .containsEntry("pageId", "page_schema_list")
                 .containsEntry("blockId", "action_export")
                 .containsEntry("permissionCode", "dashboard.manage");
+    }
+
+    @Test
+    void executePreservesConflictExceptionForHttp409Mapping() {
+        MetaContext.setContext(77L, 42L, "user_42", "Operator");
+        CommandExecuteRequest request = new CommandExecuteRequest();
+        request.setPayload(Map.of("expectedVersion", 2));
+
+        org.mockito.Mockito.doThrow(new ConflictException(
+                        "iot.error.version_conflict:expected=2,actual=3"))
+                .when(commandPipeline)
+                .executeGuardedPhases(any(CommandPipelineContext.class));
+
+        assertThatThrownBy(() -> commandExecutor.execute("iot.task.transition", request))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("iot.error.version_conflict");
+
+        verify(effectExecutor).saveAuditLog(
+                eq(77L), eq("iot.task.transition"), isNull(), eq(42L), any(), isNull(),
+                eq(false), contains("iot.error.version_conflict"), anyLong(), any(), any());
     }
 }

@@ -576,11 +576,11 @@ describe('ExecutionLogTraceBlock', () => {
     await waitFor(() =>
       expect(http.get).toHaveBeenCalledWith('/decision/logs', { traceId: 'trace-1' }),
     );
-    const drawer = screen.getByTestId('elta-trace-drawer');
-    expect(drawer).toHaveTextContent('eligibility_gate');
+    const drawer = await screen.findByTestId('elta-trace-drawer');
+    await waitFor(() => expect(drawer).toHaveTextContent('eligibility_gate'));
     expect(drawer).toHaveTextContent('执行链路');
     expect(drawer).not.toHaveTextContent('Trace Chain');
-    expect(drawer).toHaveTextContent('R-101');
+    await waitFor(() => expect(drawer).toHaveTextContent('R-101'));
     expect(drawer).toHaveTextContent('命中');
     expect(drawer).toHaveTextContent('未命中');
     expect(drawer).not.toHaveTextContent('MATCHED');

@@ -1,0 +1,145 @@
+[
+  {
+    "code": "faq:extract",
+    "displayName:zh-CN": "提炼 FAQ",
+    "displayName:en": "Distil FAQ",
+    "type": "custom",
+    "modelCode": "faq_source_conversation",
+    "inputFields": [
+      "faq_target_kb_id"
+    ],
+    "permissions": [
+      "faq.candidate.extract"
+    ],
+    "agent_hint": "Distil FAQ candidates out of a conversation with the LLM. The caller supplies only the target knowledge base; the candidates land in draft for human review and nothing reaches the knowledge base until someone approves and publishes them. Returning zero candidates is a legitimate result — most conversations contain no reusable Q&A.",
+    "precondition_description": "The conversation must have messages, and a target knowledge base must be given.",
+    "side_effect_description": "Calls the tenant's LLM and creates faq_candidate rows in draft. Re-running replaces this service's own previous drafts and leaves anything a human already decided alone.",
+    "output_description": "Returns how many candidates were created, and the candidates themselves.",
+    "cmd_risk_level": "L2",
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "faq:update_qa",
+    "displayName:zh-CN": "编辑问答",
+    "displayName:en": "Edit Q&A",
+    "type": "update",
+    "modelCode": "faq_candidate",
+    "inputFields": [
+      "faq_question",
+      "faq_answer"
+    ],
+    "permissions": [
+      "faq.candidate.review"
+    ],
+    "agent_hint": "Correct the question or answer text of a FAQ candidate before it is approved. Does not change the review status.",
+    "precondition_description": "Candidate must still be in draft status.",
+    "output_description": "Returns the updated candidate record.",
+    "cmd_risk_level": "L1",
+    "idempotent": true,
+    "reversible": true
+  },
+  {
+    "code": "faq:approve",
+    "displayName:zh-CN": "批准",
+    "displayName:en": "Approve",
+    "type": "state_transition",
+    "modelCode": "faq_candidate",
+    "stateField": "faq_status",
+    "fromStates": [
+      "draft"
+    ],
+    "toState": "approved",
+    "autoSetFields": {
+      "faq_reviewed_by": {
+        "strategy": "current_username"
+      },
+      "faq_reviewed_at": {
+        "strategy": "current_datetime"
+      }
+    },
+    "permissions": [
+      "faq.candidate.review"
+    ],
+    "agent_hint": "Approve a FAQ candidate. Transitions draft to approved and stamps the reviewer and review time. Approving does NOT write to the knowledge base — run faq:publish for that.",
+    "precondition_description": "Candidate must be in draft status.",
+    "output_description": "Returns the updated candidate with approved status.",
+    "cmd_risk_level": "L2",
+    "idempotent": true,
+    "reversible": false
+  },
+  {
+    "code": "faq:reject",
+    "displayName:zh-CN": "驳回",
+    "displayName:en": "Reject",
+    "type": "state_transition",
+    "modelCode": "faq_candidate",
+    "stateField": "faq_status",
+    "fromStates": [
+      "draft"
+    ],
+    "toState": "rejected",
+    "inputFields": [
+      "faq_reject_reason"
+    ],
+    "autoSetFields": {
+      "faq_reviewed_by": {
+        "strategy": "current_username"
+      },
+      "faq_reviewed_at": {
+        "strategy": "current_datetime"
+      }
+    },
+    "permissions": [
+      "faq.candidate.review"
+    ],
+    "agent_hint": "Reject a FAQ candidate with a reason. Transitions draft to rejected. The candidate is never written to the knowledge base.",
+    "precondition_description": "Candidate must be in draft status.",
+    "output_description": "Returns the updated candidate with rejected status and the reason recorded.",
+    "cmd_risk_level": "L2",
+    "idempotent": true,
+    "reversible": false
+  },
+  {
+    "code": "faq:publish",
+    "displayName:zh-CN": "发布到知识库",
+    "displayName:en": "Publish to Knowledge Base",
+    "type": "custom",
+    "modelCode": "faq_candidate",
+    "permissions": [
+      "faq.candidate.publish"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认将该问答发布到知识库？发布后智能体检索时即可召回。",
+      "confirmMessage:en": "Publish this Q&A into the knowledge base? The agent will start recalling it."
+    },
+    "agent_hint": "Publish an approved FAQ candidate into its target knowledge base. Writes an ab_kb_document with source_type=conversation, stores the resulting document pid back on the candidate, and moves it to published. Idempotent: re-publishing the same candidate replaces its document rather than creating a second one. Persistence is owned by the platform FaqCandidateCommandHandler.",
+    "precondition_description": "Candidate must be in approved status and carry a target knowledge base.",
+    "side_effect_description": "Creates (or replaces) a document in the target knowledge base and embeds its chunks, making the FAQ retrievable by the agent.",
+    "output_description": "Returns the updated candidate with published status and the kb document pid filled in.",
+    "cmd_risk_level": "L3",
+    "idempotent": true,
+    "reversible": false
+  },
+  {
+    "code": "faq:unpublish",
+    "displayName:zh-CN": "从知识库撤回",
+    "displayName:en": "Unpublish from Knowledge Base",
+    "type": "custom",
+    "modelCode": "faq_candidate",
+    "permissions": [
+      "faq.candidate.publish"
+    ],
+    "extension": {
+      "confirmMessage:zh-CN": "确认从知识库撤回该问答？撤回后智能体将不再检索到它，候选回到已批准状态、可重新发布。",
+      "confirmMessage:en": "Unpublish this Q&A from the knowledge base? The agent stops recalling it, and the candidate returns to approved so it can be published again."
+    },
+    "agent_hint": "Retract a published FAQ candidate: remove its ab_kb_document (and chunks) from the knowledge base so it stops being retrievable, and move the candidate back to approved with its kb document pid cleared. Removal is by the same (source_type=conversation, candidate pid) key publish used, so it drops exactly the document publish created. Persistence is owned by the platform FaqCandidateCommandHandler.",
+    "precondition_description": "Candidate must be in published status.",
+    "side_effect_description": "Deletes the candidate's document and its chunks from the knowledge base, so the agent can no longer recall the FAQ. The candidate returns to approved and can be re-published.",
+    "output_description": "Returns the updated candidate with approved status and an empty kb document pid.",
+    "cmd_risk_level": "L3",
+    "idempotent": true,
+    "reversible": true
+  }
+]

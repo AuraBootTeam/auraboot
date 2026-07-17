@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import type { BlockConfig } from '~/framework/meta/schemas/types';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
+import { resolveConfirmDialog } from '~/framework/meta/utils/i18nResolver';
 import { executeSimpleWorkbenchAction, useRuntimeStateSubscription } from './workbenchBlockUtils';
 import { LoadingOverlay } from '~/ui/LoadingOverlay';
+import { confirmDialog } from '~/utils/confirmDialog';
+import { useAuth } from '~/contexts/AuthContext';
 
 export interface WorkbenchActionBarBlockRendererProps {
   block: BlockConfig;
@@ -32,11 +35,13 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
   const locale = context.locale || 'zh-CN';
   const t = context.t || ((key: string) => key);
   const evaluator = runtime.getEvaluator();
+  const { hasPermission } = useAuth();
   const actions = Array.isArray((block as any).actions) ? (block as any).actions : [];
   const [runningAction, setRunningAction] = useState<string | null>(null);
   useRuntimeStateSubscription(runtime);
 
   const visibleActions = actions.filter((actionConfig: any) => {
+    if (actionConfig?.permissionCode && !hasPermission(actionConfig.permissionCode)) return false;
     if (!actionConfig?.visibleWhen) return true;
     return evaluator.evaluateCondition(actionConfig.visibleWhen, context);
   });
@@ -61,7 +66,8 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
   const actionButtons = visibleActions.map((actionConfig: any) => {
     const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
     const label = getLocalizedText(actionConfig.label || code, locale, t);
-    const feedback = actionConfig.onClick?.args?.feedback || actionConfig.onClick?.args?.resultFeedback || {};
+    const feedback =
+      actionConfig.onClick?.args?.feedback || actionConfig.onClick?.args?.resultFeedback || {};
     const loadingLabel = getLocalizedText(
       feedback.loadingLabel || t('common.loading') || 'Loading...',
       locale,
@@ -75,6 +81,31 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
       ? evaluator.evaluateCondition(actionConfig.disabledWhen, context)
       : false;
     const disabled = Boolean(disabledByCondition || runningAction);
+    const runAction = async () => {
+      if (actionConfig.confirm) {
+        const confirmation =
+          typeof actionConfig.confirm === 'object'
+            ? {
+                title: t('common.confirm') || 'Confirm',
+                content: getLocalizedText(actionConfig.confirm, locale, t),
+              }
+            : resolveConfirmDialog(actionConfig.confirm, t);
+        const confirmed = await confirmDialog({
+          ...confirmation,
+          variant: variant === 'danger' ? 'danger' : 'default',
+        });
+        if (!confirmed) return;
+      }
+
+      setRunningAction(code);
+      try {
+        await executeSimpleWorkbenchAction(runtime, actionConfig.onClick);
+      } catch (error) {
+        console.error('[WorkbenchActionBarBlockRenderer] action failed:', error);
+      } finally {
+        setRunningAction(null);
+      }
+    };
 
     return (
       <button
@@ -83,12 +114,7 @@ export const WorkbenchActionBarBlockRenderer: React.FC<WorkbenchActionBarBlockRe
         data-testid={`workbench-action-${code}`}
         disabled={disabled}
         onClick={() => {
-          setRunningAction(code);
-          void executeSimpleWorkbenchAction(runtime, actionConfig.onClick)
-            .catch((error) => {
-              console.error('[WorkbenchActionBarBlockRenderer] action failed:', error);
-            })
-            .finally(() => setRunningAction(null));
+          void runAction();
         }}
         className={`rounded-control font-medium ${
           variantClass[variant] || variantClass.secondary

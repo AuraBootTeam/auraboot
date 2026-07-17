@@ -44,6 +44,17 @@ web-admin/vitest.setup.ts
 **/docs
 **/*.md
 
+# ── Test / tooling plugin dirs — kept out of the published (baked) image ──
+# platform/Dockerfile bakes plugins/ into the backend image for the pull-only
+# flow. These four are test fixtures / conformance probes / CLI + script tooling,
+# not business plugins and not imported by quickstart, so we exclude them from the
+# baked image. The compose dev flow bind-mounts the full ./plugins at runtime
+# (mounts ignore .dockerignore), so dev + CI still see the complete set.
+plugins/test-fixtures
+plugins/gamma-conformance
+plugins/cli
+plugins/scripts
+
 # ── Python venv / misc ──
 .venv
 __pycache__

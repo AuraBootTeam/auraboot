@@ -14,17 +14,59 @@ function adminCtx(browser: any) {
   return browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
 }
 
+async function waitForListReady(page: Page): Promise<void> {
+  await expect.poll(async () => {
+    const searchReady = await page.locator('[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"]').first().count();
+    const tableReady = await page.locator('table, [role="table"]').first().count();
+    const loading = await page.locator('[aria-busy="true"], .ant-spin-spinning, [data-loading="true"]').count();
+    return (searchReady > 0 || tableReady > 0) && loading === 0;
+  }).toBe(true);
+}
+
 async function listSearch(page: Page, listPath: string, keyword: string): Promise<number> {
   await page.goto(listPath, { waitUntil: 'domcontentloaded' });
-  await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  await waitForListReady(page);
   const q = page.locator('[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"]').first();
   if (await q.count() > 0) {
     await q.click(); await q.fill(''); await q.pressSequentially(keyword, { delay: 12 });
+    const response = page.waitForResponse((r) => (
+      r.url().includes('/api/dynamic/org_department/list') && r.request().method() === 'GET'
+    ), { timeout: 5000 }).catch(() => null);
     const btn = page.locator('button:has-text("搜索"), [data-testid="search-button"]').first();
     if (await btn.count() > 0) await btn.click(); else await page.keyboard.press('Enter');
-    await page.waitForTimeout(2000);
+    await response;
+    await waitForListReady(page);
   }
   return page.locator('table tbody tr').count();
+}
+
+async function createDepartment(page: Page, marker: string, code: string): Promise<void> {
+  await page.goto(DEPT_NEW, { waitUntil: 'domcontentloaded' });
+  const inputs = page.locator('form input[type="text"], form input:not([type]), input[type="text"]');
+  await expect(inputs.first()).toBeVisible();
+  const ic = await inputs.count();
+  expect(ic, 'department form has text inputs').toBeGreaterThan(0);
+  await inputs.first().click();
+  await inputs.first().pressSequentially(marker, { delay: 12 });
+  if (ic > 1) {
+    const second = inputs.nth(1);
+    if (await second.isEditable().catch(() => false)) {
+      await second.click(); await second.pressSequentially(code, { delay: 10 });
+    }
+  }
+  const saveResponse = page.waitForResponse((r) => (
+    r.url().includes('/api/meta/commands/execute/') && r.request().method() === 'POST'
+  ), { timeout: 5000 }).catch(() => null);
+  await page.getByRole('button', { name: '保存' }).first().click();
+  await saveResponse;
+}
+
+async function waitForMarkerShown(page: Page, marker: string): Promise<boolean> {
+  return expect.poll(async () => {
+    const main = await page.locator('main').innerText().catch(() => '');
+    const detail = await page.locator('[role="dialog"], .ant-drawer, [data-testid="detail-panel"]').innerText().catch(() => '');
+    return main.includes(marker) || detail.includes(marker);
+  }).toBe(true).then(() => true).catch(() => false);
 }
 
 test.describe('Quote/BOM org admin CRUD (ORG-01/03) @smoke', () => {
@@ -36,23 +78,7 @@ test.describe('Quote/BOM org admin CRUD (ORG-01/03) @smoke', () => {
     const page = await ctx.newPage();
     try {
       const marker = `ORG${uid}`.slice(0, 24);
-      await page.goto(DEPT_NEW, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2500);
-      // fill the first text input (department name) generically + any other visible required text inputs
-      const inputs = page.locator('form input[type="text"], form input:not([type]), input[type="text"]');
-      const ic = await inputs.count();
-      expect(ic, 'department form has text inputs').toBeGreaterThan(0);
-      await inputs.first().click();
-      await inputs.first().pressSequentially(marker, { delay: 12 });
-      // if there is an obvious 编码/code field as a second input, fill it too
-      if (ic > 1) {
-        const second = inputs.nth(1);
-        if (await second.isEditable().catch(() => false)) {
-          await second.click(); await second.pressSequentially(`C${uid}`.slice(0, 16), { delay: 10 });
-        }
-      }
-      await page.getByRole('button', { name: '保存' }).first().click();
-      await page.waitForTimeout(2500);
+      await createDepartment(page, marker, `C${uid}`.slice(0, 16));
       const rows = await listSearch(page, DEPT_LIST, marker);
       expect(rows, 'ORG-01: department created appears in list').toBeGreaterThan(0);
       expect(await page.locator(`table tbody tr:has-text("${marker}")`).count(), 'department row present').toBeGreaterThan(0);
@@ -68,38 +94,29 @@ test.describe('Quote/BOM org admin CRUD (ORG-01/03) @smoke', () => {
     try {
       const marker = `ORGD${uid}`.slice(0, 24);
       // ensure one department exists to open
-      await page.goto(DEPT_NEW, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2500);
-      const inputs = page.locator('form input[type="text"], form input:not([type]), input[type="text"]');
-      await inputs.first().click();
-      await inputs.first().pressSequentially(marker, { delay: 12 });
-      if (await inputs.count() > 1 && await inputs.nth(1).isEditable().catch(() => false)) {
-        await inputs.nth(1).click(); await inputs.nth(1).pressSequentially(`CD${uid}`.slice(0, 16), { delay: 10 });
-      }
-      await page.getByRole('button', { name: '保存' }).first().click();
-      await page.waitForTimeout(2500);
+      await createDepartment(page, marker, `CD${uid}`.slice(0, 16));
       await listSearch(page, DEPT_LIST, marker);
       const row = page.locator(`table tbody tr:has-text("${marker}")`).first();
       // open detail: row link → row name cell click → row-action-view (tolerant)
       let opened = false;
       const link = row.locator('a').first();
-      if (await link.count() > 0) { await link.click({ timeout: 8000 }).catch(() => {}); opened = true; }
+      if (await link.count() > 0) opened = await link.click({ timeout: 5000 }).then(() => true).catch(() => false);
       if (!opened) {
         const cell = row.locator(`td:has-text("${marker}")`).first();
-        if (await cell.count() > 0) { await cell.click({ timeout: 6000 }).catch(() => {}); opened = true; }
+        if (await cell.count() > 0) opened = await cell.click({ timeout: 5000 }).then(() => true).catch(() => false);
+      }
+      if (!opened && await page.locator('[role="dialog"], .ant-drawer, [data-testid="detail-panel"], [data-state="open"]').count() > 0) {
+        opened = true;
       }
       if (!opened) {
         await row.hover().catch(() => {});
         const more = row.locator('[data-testid="row-action-more"]').first();
-        if (await more.isVisible({ timeout: 2000 }).catch(() => false)) { await more.click(); await page.waitForTimeout(500); }
+        if (await more.isVisible({ timeout: 2000 }).catch(() => false)) await more.click({ timeout: 5000 }).catch(() => {});
         const view = page.locator('[data-testid="row-action-view"]').or(page.getByText('详情', { exact: false })).first();
-        if (await view.count() > 0) { await view.click({ timeout: 6000 }).catch(() => {}); opened = true; }
+        if (await view.count() > 0) opened = await view.click({ timeout: 5000 }).then(() => true).catch(() => false);
       }
-      await page.waitForTimeout(2000);
       // detail (or expanded row / drawer) renders the marker
-      const shown = (await page.locator('main').innerText()).includes(marker)
-        || (await page.locator('[role="dialog"], .ant-drawer, [data-testid="detail-panel"]').count()) > 0
-          && (await page.locator('[role="dialog"], .ant-drawer, [data-testid="detail-panel"]').innerText().catch(() => '')).includes(marker);
+      const shown = opened && await waitForMarkerShown(page, marker);
       if (!shown) {
         test.info().annotations.push({ type: 'note', description: 'ORG-03: department detail entry not found (list may be inline-edit only) — needs UX confirm' });
       } else {

@@ -12,6 +12,7 @@ import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.FieldDictBinding;
 import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
+import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import com.auraboot.framework.meta.service.DictService;
 import com.auraboot.framework.meta.service.MetaFieldService;
@@ -58,6 +59,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     private final com.auraboot.framework.meta.converter.ExtensionConverter extensionConverter;
     private final com.auraboot.framework.meta.validator.MetaFieldValidator fieldValidator;
     private final com.auraboot.framework.meta.mapper.MetaFieldDictBindingMapper fieldDictBindingMapper;
+    private final MetaModelFieldBindingMapper fieldBindingMapper;
     private final com.auraboot.framework.meta.service.ModelFieldBindingService modelFieldBindingService;  // ✅ 新增: 模型-字段绑定服务
 
     @Autowired
@@ -198,7 +200,13 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     @Transactional
-    @CacheEvict(value = "metaField", allEntries = true)
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "modelFieldBindings",
+            "metaField",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public MetaFieldDTO update(String pid, MetaFieldUpdateRequest request) {
         if (request == null) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "更新请求不能为空");
@@ -221,30 +229,59 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     private MetaFieldDTO updateDirectly(Field existingEntity, MetaFieldUpdateRequest request) {
         log.info("直接更新字段(非Git-First): {}", logSafe(existingEntity.getCode()));
-        
-        // 创建新版本的创建请求
-        MetaFieldCreateRequest createRequest = new MetaFieldCreateRequest();
-        createRequest.setCode(existingEntity.getCode());
-        createRequest.setDataType(request.getDataType());
-        createRequest.setDataSourceId(request.getDataSourceId());
 
-        createRequest.setStatus(request.getStatus());
-        createRequest.setFeature(request.getFeature());
-        createRequest.setRefTarget(request.getRefTarget());
-        createRequest.setIndexHint(request.getIndexHint());
-        createRequest.setUiSchema(request.getUiSchema());
-        createRequest.setQuerySchema(request.getQuerySchema());
-        createRequest.setRuleSchema(request.getRuleSchema());
-        createRequest.setExtension(request.getExtension());
-        createRequest.setVersionNote(request.getVersionNote());
-        
-        // 创建新版本
-        return createDirectly(createRequest);
+        Field updatedEntity = createFieldVersion(existingEntity, request);
+        repointBindingsToCurrentFieldVersion(existingEntity, updatedEntity);
+        return convertToDTO(updatedEntity);
+    }
+
+    private Field createFieldVersion(Field existingEntity, MetaFieldUpdateRequest request) {
+        Integer nextVersion = getNextVersion(existingEntity.getCode());
+
+        Field entity = new Field();
+        entity.setPid(UniqueIdGenerator.generate());
+        entity.setCode(existingEntity.getCode());
+        entity.setDataType(request.getDataType());
+        entity.setDataSourceId(request.getDataSourceId());
+        entity.setVersion(nextVersion);
+        entity.setIsCurrent(true);
+        entity.setStatus(StringUtils.hasText(request.getStatus()) ? request.getStatus() : StatusConstants.DRAFT);
+        entity.setTenantId(MetaContext.getCurrentTenantId());
+        entity.setCreatedAt(Instant.now());
+        entity.setUpdatedAt(Instant.now());
+
+        if (request.getExtension() != null) {
+            entity.setExtension(extensionConverter.toBean(request.getExtension()));
+        }
+
+        metaFieldMapper.clearCurrentFlag(existingEntity.getCode());
+        metaFieldMapper.insert(entity);
+        return entity;
+    }
+
+    private void repointBindingsToCurrentFieldVersion(Field existingEntity, Field updatedEntity) {
+        if (existingEntity.getId() == null || updatedEntity.getId() == null) {
+            return;
+        }
+        int updated = fieldBindingMapper.updateFieldIdForBindings(
+                MetaContext.getCurrentTenantId(),
+                existingEntity.getId(),
+                updatedEntity.getId());
+        if (updated > 0) {
+            log.info("Repointed {} field bindings to new field version: code={}, oldFieldId={}, newFieldId={}",
+                    updated, logSafe(existingEntity.getCode()), existingEntity.getId(), updatedEntity.getId());
+        }
     }
 
     @Override
     @Transactional
-    @CacheEvict(value = "metaField", allEntries = true)
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "modelFieldBindings",
+            "metaField",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public void delete(String pid) {
         if (!StringUtils.hasText(pid)) {
             throw new ValidationException(ResponseCode.CommonValidationFailed, "PID不能为空");
@@ -595,6 +632,13 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "modelFieldBindings",
+            "metaField",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public MetaFieldDTO publishVersion(String pid) {
         log.info("发布字段版本: pid={}", logSafe(pid));
         
@@ -614,6 +658,13 @@ public class MetaFieldServiceImpl implements MetaFieldService {
 
     @Override
     @Transactional
+    @CacheEvict(value = {
+            "modelDefinitions",
+            "modelFieldBindings",
+            "metaField",
+            "viewModelFields",
+            "viewModelSummary"
+    }, allEntries = true)
     public MetaFieldDTO rollbackToVersion(String code, Integer version) {
         log.info("回滚字段到指定版本: code={}, version={}", logSafe(code), version);
 
@@ -651,13 +702,13 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     // ==================== 缓存管理 ====================
 
     @Override
-    @CacheEvict(value = {"metaField", "metaFieldByKey"}, key = "#code + '_' + T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix()")
+    @CacheEvict(value = "metaField", key = "#code + '_' + T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix()")
     public void refreshFieldCache(String code) {
         log.info("刷新字段缓存: code={}", logSafe(code));
     }
 
     @Override
-    @CacheEvict(value = {"metaField", "metaFieldByKey"}, allEntries = true)
+    @CacheEvict(value = "metaField", allEntries = true)
     public void clearAllFieldCache() {
         log.info("清除所有字段缓存");
     }

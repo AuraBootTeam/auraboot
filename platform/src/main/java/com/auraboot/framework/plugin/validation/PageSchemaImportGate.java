@@ -1,5 +1,7 @@
 package com.auraboot.framework.plugin.validation;
 
+import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.validator.PageSchemaBlockStructureValidator;
 import com.auraboot.framework.plugin.dto.imports.PageSchemaDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -89,6 +91,12 @@ public class PageSchemaImportGate {
         // ③ — declarative JSON Schema envelope validation.
         blocking.addAll(jsonSchemaFindings(manifest));
 
+        // ④ — block-structure validator (DR-20260715-A-004). Recurses the whole
+        // block tree and hard-rejects missing/blank id, missing/blank blockType,
+        // and duplicate ids — gaps the ① + ② validator leaves open (it only walks
+        // top-level blocks, never checks duplicate ids, and skips blank blockType).
+        blocking.addAll(blockStructureFindings(manifest));
+
         if (!blocking.isEmpty()) {
             String detail = blocking.stream()
                     .map(m -> m.getCode() + " @ " + m.getPath() + ": " + m.getMessage())
@@ -123,6 +131,42 @@ public class PageSchemaImportGate {
                 out.add(PluginValidationMessage.error("S-PAGE-JSON-SCHEMA", "semantic",
                         "pages[" + i + "]" + loc,
                         "Page '" + pageKey + "' violates v4 import schema: " + e.getMessage()));
+            }
+        }
+        return out;
+    }
+
+    /**
+     * DR-20260715-A-004: mount the online-save {@link PageSchemaBlockStructureValidator}
+     * into the import gate so import rejects the same malformed structures that an
+     * online save does — missing/blank block id, missing/blank blockType, and
+     * duplicate block ids (global, recursive). The validator throws on the first
+     * failing page; we run it per page and convert each failure into a blocking
+     * finding so every offending page is reported (matching this gate's
+     * collect-then-throw contract).
+     * <p>
+     * Note the intentional forward-compat asymmetry preserved here: an <i>unknown
+     * but present</i> blockType is a hard import failure (S-PAGE-BLOCK-TYPE from the
+     * ① + ② validator) yet only a soft warn on online save — see the DSL v4
+     * capability reference. This method does not change that: the structure
+     * validator only soft-warns on unknown blockType, so import's existing hard
+     * failure on it stands.
+     */
+    private List<PluginValidationMessage> blockStructureFindings(PluginManifestExtended manifest) {
+        List<PluginValidationMessage> out = new ArrayList<>();
+        List<PageSchemaDTO> pages = manifest.getPages();
+        for (int i = 0; i < pages.size(); i++) {
+            PageSchemaDTO page = pages.get(i);
+            if (page == null) {
+                continue;
+            }
+            String pageKey = page.getPageKey() != null && !page.getPageKey().isBlank()
+                    ? page.getPageKey() : "<unknown>";
+            try {
+                PageSchemaBlockStructureValidator.validate(page.getBlocks(), pageKey);
+            } catch (ValidationException e) {
+                out.add(PluginValidationMessage.error("S-PAGE-BLOCK-STRUCTURE", "structural",
+                        "pages[" + i + "].blocks", e.getMessage()));
             }
         }
         return out;

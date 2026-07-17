@@ -16,29 +16,98 @@ import { useI18n } from '~/contexts/I18nContext';
 import { getLocalizedText } from '~/framework/meta/runtime/expression/i18n-renderer';
 import { buildRequiredFieldMessage } from '~/framework/meta/utils/validationMessages';
 
+interface VisibilityRule {
+  field: string;
+  operator?: 'equals' | 'notEquals' | 'in' | 'notIn' | 'empty' | 'notEmpty';
+  value?: any;
+  values?: any[];
+}
+
+interface FormOptionConfig {
+  label: string | Record<string, string>;
+  value: string;
+  description?: string | Record<string, string>;
+  disabled?: boolean;
+  visibleWhen?: VisibilityRule;
+}
+
 interface FormFieldConfig {
   field: string;
-  label?: string;
-  type?: 'text' | 'select' | 'number' | 'textarea';
+  label?: string | Record<string, string>;
+  type?: 'text' | 'select' | 'number' | 'textarea' | 'multiselect' | 'segmented' | 'checkbox' | 'file';
   required?: boolean;
-  placeholder?: string;
+  mustBeTrue?: boolean;
+  placeholder?: string | Record<string, string>;
   defaultValue?: any;
+  searchable?: boolean;
+  accept?: string;
+  maxBytes?: number;
+  fileNameField?: string;
+  visibleWhen?: VisibilityRule;
   dataSource?: {
     type: 'api' | 'static';
     endpoint?: string;
-    data?: Array<{ label: string; value: string }>;
+    data?: FormOptionConfig[];
   };
 }
 
 interface FormDialogState {
   open: boolean;
-  title?: string;
+  title?: string | Record<string, string>;
   fields: FormFieldConfig[];
-  fieldOptions: Record<string, Array<{ label: string; value: string }>>;
+  fieldOptions: Record<string, FormOptionConfig[]>;
   defaults: Record<string, any>;
   submitLabel?: string | Record<string, string>;
   onSubmit?: (formData: Record<string, any>) => void;
   onCancel?: () => void;
+}
+
+function matchesVisibility(rule: VisibilityRule | undefined, formData: Record<string, any>) {
+  if (!rule) return true;
+  const actual = formData[rule.field];
+  const values = rule.values ?? (Array.isArray(rule.value) ? rule.value : []);
+  switch (rule.operator ?? 'equals') {
+    case 'notEquals':
+      return actual !== rule.value;
+    case 'in':
+      return values.includes(actual);
+    case 'notIn':
+      return !values.includes(actual);
+    case 'empty':
+      return actual === undefined || actual === null || actual === ''
+        || (Array.isArray(actual) && actual.length === 0);
+    case 'notEmpty':
+      return actual !== undefined && actual !== null && actual !== ''
+        && (!Array.isArray(actual) || actual.length > 0);
+    case 'equals':
+    default:
+      return actual === rule.value;
+  }
+}
+
+function visibleOptions(
+  field: FormFieldConfig,
+  fieldOptions: Record<string, FormOptionConfig[]>,
+  formData: Record<string, any>,
+) {
+  return (fieldOptions[field.field] || []).filter((option) =>
+    matchesVisibility(option.visibleWhen, formData),
+  );
+}
+
+function translatedOrFallback(
+  t: (key: string) => string,
+  key: string,
+  fallback: string,
+): string {
+  const translated = t(key);
+  return translated && translated !== key ? translated : fallback;
+}
+
+function isMissing(value: any) {
+  return value === undefined || value === null || value === ''
+    || (Array.isArray(value) && value.length === 0)
+    || value === false;
 }
 
 export default function FormDialog() {
@@ -51,6 +120,7 @@ export default function FormDialog() {
   });
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [searchTerms, setSearchTerms] = useState<Record<string, string>>({});
   const firstInputRef = useRef<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(null);
 
   // Listen for dialog:form events
@@ -72,6 +142,7 @@ export default function FormDialog() {
       });
       setFormData({ ...defaults });
       setErrors({});
+      setSearchTerms({});
     };
 
     window.addEventListener('dialog:form', handler);
@@ -108,12 +179,26 @@ export default function FormDialog() {
   }, [state.onCancel]);
 
   const handleSubmit = useCallback(() => {
-    // Validate required fields
+    const visibleFields = state.fields.filter((field) =>
+      matchesVisibility(field.visibleWhen, formData),
+    );
     const newErrors: Record<string, string> = {};
-    for (const field of state.fields) {
+    for (const field of visibleFields) {
+      const value = formData[field.field];
       if (field.required) {
-        const value = formData[field.field];
-        if (value === undefined || value === null || value === '') {
+        if (isMissing(value) || (field.mustBeTrue && value !== true)) {
+          const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
+          newErrors[field.field] = buildRequiredFieldMessage(label, {
+            dataType: field.type,
+            component: field.type,
+            locale,
+            t,
+          });
+        }
+      }
+      if (['select', 'segmented'].includes(field.type || '') && value !== undefined && value !== '') {
+        const options = visibleOptions(field, state.fieldOptions, formData);
+        if (!options.some((option) => option.value === value && !option.disabled)) {
           const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
           newErrors[field.field] = buildRequiredFieldMessage(label, {
             dataType: field.type,
@@ -130,7 +215,16 @@ export default function FormDialog() {
       return;
     }
 
-    state.onSubmit?.(formData);
+    const submitted = Object.fromEntries(
+      visibleFields.flatMap((field) => {
+        const entries: [string, any][] = [[field.field, formData[field.field]]];
+        if (field.type === 'file' && field.fileNameField) {
+          entries.push([field.fileNameField, formData[field.fileNameField]]);
+        }
+        return entries;
+      }),
+    );
+    state.onSubmit?.(submitted);
     setState((prev) => ({ ...prev, open: false }));
   }, [state.fields, state.onSubmit, formData, locale, t]);
 
@@ -165,23 +259,38 @@ export default function FormDialog() {
       />
 
       {/* Dialog */}
-      <div className="relative mx-4 w-full max-w-lg scale-100 transform rounded-lg bg-white opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800">
+      <div className="relative mx-4 flex max-h-[calc(100vh-2rem)] w-full max-w-lg scale-100 transform flex-col rounded-lg bg-white opacity-100 shadow-xl transition-all duration-200 dark:bg-gray-800">
         {/* Header */}
-        <div className="border-b border-gray-200 px-6 pt-6 pb-4 dark:border-gray-700">
+        <div className="shrink-0 border-b border-gray-200 px-6 pt-6 pb-4 dark:border-gray-700">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{dialogTitle}</h3>
         </div>
 
         {/* Body - Form Fields */}
-        <div className="max-h-[60vh] space-y-4 overflow-y-auto px-6 py-4">
+        <div
+          className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4 [scrollbar-gutter:stable]"
+          data-testid="form-dialog-body"
+        >
           {state.fields.map((field, index) => {
+            if (!matchesVisibility(field.visibleWhen, formData)) return null;
             const label = field.label ? getLocalizedText(field.label, locale, t) : field.field;
             const placeholder = field.placeholder
               ? getLocalizedText(field.placeholder, locale, t)
               : '';
             const fieldType = field.type || 'text';
-            const options = state.fieldOptions[field.field] || [];
+            const options = visibleOptions(field, state.fieldOptions, formData);
             const error = errors[field.field];
             const isFirst = index === 0;
+            const searchTerm = searchTerms[field.field] || '';
+            const filteredOptions = field.searchable && searchTerm
+              ? options.filter((option) => {
+                  const optionLabel = getLocalizedText(option.label, locale, t);
+                  const description = option.description
+                    ? getLocalizedText(option.description, locale, t)
+                    : '';
+                  const keyword = searchTerm.toLocaleLowerCase();
+                  return `${optionLabel} ${description}`.toLocaleLowerCase().includes(keyword);
+                })
+              : options;
 
             return (
               <div key={field.field}>
@@ -205,7 +314,11 @@ export default function FormDialog() {
                     } focus:ring-2 focus:outline-none`}
                   >
                     <option value="">
-                      {placeholder || `${t('common.select') || 'Select'}...`}
+                      {placeholder || `${translatedOrFallback(
+                        t,
+                        'common.select',
+                        locale.startsWith('zh') ? '请选择' : 'Select',
+                      )}...`}
                     </option>
                     {options.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -213,6 +326,158 @@ export default function FormDialog() {
                       </option>
                     ))}
                   </select>
+                ) : fieldType === 'segmented' ? (
+                  <div
+                    role="radiogroup"
+                    data-testid={`form-dialog-field-${field.field}`}
+                    className="grid grid-cols-2 gap-2 sm:grid-cols-3"
+                  >
+                    {options.map((option) => {
+                      const selected = formData[field.field] === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          disabled={option.disabled}
+                          onClick={() => updateField(field.field, option.value)}
+                          className={`min-h-10 rounded-md border px-3 py-2 text-sm font-medium transition-colors focus:ring-2 focus:ring-blue-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 ${
+                            selected
+                              ? 'border-blue-600 bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200'
+                              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {getLocalizedText(option.label, locale, t)}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : fieldType === 'multiselect' ? (
+                  <div
+                    data-testid={`form-dialog-field-${field.field}`}
+                    className={`overflow-hidden rounded-lg border ${
+                      error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                    }`}
+                  >
+                    {field.searchable && (
+                      <input
+                        ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
+                        type="search"
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerms((prev) => ({
+                          ...prev,
+                          [field.field]: event.target.value,
+                        }))}
+                        placeholder={placeholder}
+                        className="w-full border-0 border-b border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-inset focus:ring-blue-500 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                      />
+                    )}
+                    <div className="max-h-48 overflow-y-auto bg-white dark:bg-gray-700">
+                      {filteredOptions.map((option) => {
+                        const selected = Array.isArray(formData[field.field])
+                          && formData[field.field].includes(option.value);
+                        return (
+                          <label
+                            key={option.value}
+                            className={`flex min-h-11 cursor-pointer items-start gap-3 border-b border-gray-100 px-3 py-2 last:border-b-0 hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-600 ${
+                              option.disabled ? 'cursor-not-allowed opacity-50' : ''
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              disabled={option.disabled}
+                              onChange={() => {
+                                const current = Array.isArray(formData[field.field])
+                                  ? formData[field.field]
+                                  : [];
+                                updateField(
+                                  field.field,
+                                  selected
+                                    ? current.filter((value: string) => value !== option.value)
+                                    : [...current, option.value],
+                                );
+                              }}
+                              className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                                {getLocalizedText(option.label, locale, t)}
+                              </span>
+                              {option.description && (
+                                <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-300">
+                                  {getLocalizedText(option.description, locale, t)}
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        );
+                      })}
+                      {filteredOptions.length === 0 && (
+                        <div className="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-300">
+                          {t('common.noData') || 'No data'}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : fieldType === 'checkbox' ? (
+                  <label
+                    data-testid={`form-dialog-field-${field.field}`}
+                    className={`flex min-h-11 cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 ${
+                      error
+                        ? 'border-red-500'
+                        : 'border-gray-300 bg-white dark:border-gray-600 dark:bg-gray-700'
+                    }`}
+                  >
+                    <input
+                      ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
+                      type="checkbox"
+                      checked={formData[field.field] === true}
+                      onChange={(event) => updateField(field.field, event.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span className="text-sm text-gray-700 dark:text-gray-200">{placeholder || label}</span>
+                  </label>
+                ) : fieldType === 'file' ? (
+                  <input
+                    ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
+                    data-testid={`form-dialog-field-${field.field}`}
+                    type="file"
+                    accept={field.accept}
+                    onChange={async (event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) {
+                        updateField(field.field, '');
+                        if (field.fileNameField) updateField(field.fileNameField, '');
+                        return;
+                      }
+                      if (field.maxBytes && file.size > field.maxBytes) {
+                        setErrors((prev) => ({
+                          ...prev,
+                          [field.field]: locale.startsWith('zh')
+                            ? `文件不能超过 ${Math.ceil(field.maxBytes! / 1024 / 1024)} MB`
+                            : `File must not exceed ${Math.ceil(field.maxBytes! / 1024 / 1024)} MB`,
+                        }));
+                        event.target.value = '';
+                        return;
+                      }
+                      try {
+                        const content = await file.text();
+                        updateField(field.field, content);
+                        if (field.fileNameField) updateField(field.fileNameField, file.name);
+                      } catch {
+                        setErrors((prev) => ({
+                          ...prev,
+                          [field.field]: locale.startsWith('zh') ? '无法读取文件' : 'Unable to read file',
+                        }));
+                        event.target.value = '';
+                      }
+                    }}
+                    className={`w-full rounded-lg border bg-white px-3 py-2 text-sm text-gray-900 file:mr-3 file:rounded file:border-0 file:bg-blue-50 file:px-3 file:py-1 file:text-blue-700 dark:bg-gray-700 dark:text-white ${
+                      error ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                    }`}
+                  />
                 ) : fieldType === 'number' ? (
                   <input
                     ref={isFirst ? (firstInputRef as React.RefObject<HTMLInputElement>) : undefined}
@@ -268,13 +533,13 @@ export default function FormDialog() {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-gray-700">
+        <div className="flex shrink-0 justify-end gap-3 border-t border-gray-200 px-6 py-4 dark:border-gray-700">
           <button
             data-testid="form-dialog-cancel"
             onClick={handleCancel}
             className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 focus:outline-none dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
-            {t('common.cancel') || 'Cancel'}
+            {translatedOrFallback(t, 'common.cancel', locale.startsWith('zh') ? '取消' : 'Cancel')}
           </button>
           <button
             data-testid="form-dialog-submit"
@@ -283,7 +548,11 @@ export default function FormDialog() {
           >
             {state.submitLabel
               ? getLocalizedText(state.submitLabel, locale, t)
-              : t('common.confirm') || 'Confirm'}
+              : translatedOrFallback(
+                  t,
+                  'common.confirm',
+                  locale.startsWith('zh') ? '确认' : 'Confirm',
+                )}
           </button>
         </div>
       </div>

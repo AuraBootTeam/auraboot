@@ -37,7 +37,10 @@ function findSampleBom(): string | undefined {
 async function post(page: Page, code: string, payload: any, op = 'create', target?: string) {
   const data: any = { payload, operationType: op };
   if (target) data.targetRecordPid = target;
-  const r = await page.request.post(`/api/meta/commands/execute/${code}`, { data });
+  const r = await page.request.post(`/api/meta/commands/execute/${code}`, {
+    data,
+    timeout: 150_000,
+  });
   return { status: r.status(), body: await r.json().catch(() => ({})) };
 }
 const pid = (b: any) => b?.data?.data?.recordPid || b?.data?.recordPid || b?.data?.recordId;
@@ -48,6 +51,48 @@ async function listLines(page: Page): Promise<any[]> {
   const b = await r.json().catch(() => ({} as any));
   const recs = b?.data?.records || b?.data?.data?.records || b?.data || [];
   return (Array.isArray(recs) ? recs : []).filter((l: any) => String(l.bom_std_task_id || '') === String(taskId));
+}
+
+async function listConversionTasks(page: Page): Promise<any[]> {
+  const list = await page.request.get('/api/dynamic/bom_conversion_task_pcba/list?pageNum=1&pageSize=10&sortField=created_at&sortOrder=desc');
+  const lb = await list.json().catch(() => ({} as any));
+  const recs = lb?.data?.records || lb?.data?.data?.records || lb?.data || [];
+  return Array.isArray(recs) ? recs : [];
+}
+
+async function advanceTaskThroughImportGateway(page: Page, projId: string, fileId: string): Promise<string> {
+  let task: any;
+  await expect.poll(async () => {
+    task = findTask(await listConversionTasks(page), projId, fileId);
+    return String(task?.bom_task_status || '');
+  }, { timeout: 150_000, intervals: [1_000, 2_000, 5_000] }).toMatch(
+    /^(analysis_ready|adjustment_required|plan_ready|completed)$/,
+  );
+
+  const id = task?.pid || task?.id || '';
+  expect(id, 'pre-analysis produced a conversion task').toBeTruthy();
+  if (task?.bom_task_status !== 'completed') {
+    if (task?.bom_task_status !== 'plan_ready') {
+      const dryRun = await post(page, 'bom:dry_run_parse_plan', { pid: id }, 'update', id);
+      expect(dryRun.status, 'parse-plan dry run is accepted').toBe(200);
+      await expect.poll(async () => {
+        task = findTask(await listConversionTasks(page), projId, fileId);
+        return String(task?.bom_task_status || '');
+      }, { timeout: 150_000, intervals: [1_000, 2_000, 5_000] }).toBe('plan_ready');
+    }
+    const applied = await post(page, 'bom:apply_parse_plan', { pid: id }, 'update', id);
+    expect(applied.status, 'passing parse plan is applied').toBe(200);
+  }
+  return id;
+}
+
+function findTask(recs: any[], projId: string, fileId: string): any | undefined {
+  return recs.find((r: any) => String(r.bom_task_project_id || '') === String(projId) || String(r.bom_task_raw_file_id || '') === String(fileId));
+}
+
+function isConfirmedWithCode(line: any, candidateCode: string): boolean {
+  return line?.bom_std_manual_confirmed === true || line?.bom_std_manual_confirmed === 'true'
+    || String(line?.bom_std_material_code || '').includes(candidateCode);
 }
 
 test.describe('BOM workbench candidate confirm/undo/exclude (BOM-05/06/07) @smoke', () => {
@@ -64,7 +109,10 @@ test.describe('BOM workbench candidate confirm/undo/exclude (BOM-05/06/07) @smok
   // heavy conversion lives in a test (300s describe timeout), not beforeAll (15s hook timeout)
   test('provision + convert a BOM (standard lines ready)', async ({ browser }) => {
     const bom = findSampleBom();
-    test.skip(!bom, 'sample BOM fixture absent');
+    expect(
+      bom,
+      'sample BOM fixture must exist; set QUOTE_BOM_SAMPLES_DIR or keep aura-quote/docs/ref/10款GERBER加坐标 available',
+    ).toBeTruthy();
     const s = await openQuoteRolePage(browser, users['eng']);
     try {
       const proj = await post(s.page, 'bom:create_project', { bom_project_name: `WBL ${uid}`, bom_pcba_code: `WBL-${uid}`, bom_project_library_source: 'excel_current_library' });
@@ -72,21 +120,18 @@ test.describe('BOM workbench candidate confirm/undo/exclude (BOM-05/06/07) @smok
       const up = await s.page.request.post('/api/file/upload', { multipart: { file: { name: 'bom.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: fs.readFileSync(bom!) } } });
       const fileId = (await up.json())?.data?.fileId;
       await post(s.page, 'bom:start_conversion', { bom_task_project_id: projId, bom_task_source_package: 'wbl', bom_task_raw_file_id: fileId });
-      for (let i = 0; i < 30; i++) {
-        await s.page.waitForTimeout(5000);
-        const list = await s.page.request.get('/api/dynamic/bom_conversion_task_pcba/list?pageNum=1&pageSize=10&sortField=created_at&sortOrder=desc');
-        const lb = await list.json().catch(() => ({} as any));
-        const recs = lb?.data?.records || lb?.data?.data?.records || lb?.data || [];
-        const mine = (Array.isArray(recs) ? recs : []).find((r: any) => String(r.bom_task_project_id || '') === String(projId) || String(r.bom_task_raw_file_id || '') === String(fileId));
-        if (mine) { taskId = mine.pid || mine.id || ''; if (taskId) { const ll = await listLines(s.page); if (ll.length > 0) break; } }
-      }
+      taskId = await advanceTaskThroughImportGateway(s.page, projId, fileId);
+      await expect.poll(async () => {
+        const mine = findTask(await listConversionTasks(s.page), projId, fileId);
+        return mine?.bom_task_status === 'completed' && taskId ? (await listLines(s.page)).length : 0;
+      }, { timeout: 150_000, intervals: [1_000, 2_000, 5_000] }).toBeGreaterThan(0);
       expect(taskId, 'conversion produced a task').toBeTruthy();
       expect((await listLines(s.page)).length, 'conversion produced standard lines').toBeGreaterThan(0);
     } finally { await s.context.close(); }
   });
 
   test('BOM-05/06 confirm candidate then undo — decision state changes', async ({ browser }) => {
-    test.skip(!taskId, 'no converted task (sample BOM fixture absent)');
+    expect(taskId, 'previous conversion test must produce a task; fixture/setup failures must fail fast').toBeTruthy();
     const { context, page } = await openQuoteRolePage(browser, users['eng']);
     try {
       const lines = await listLines(page);
@@ -98,18 +143,25 @@ test.describe('BOM workbench candidate confirm/undo/exclude (BOM-05/06/07) @smok
       const conf = await post(page, 'bom:confirm_candidate', { lineId, candidateCode }, 'update', taskId);
       test.info().annotations.push({ type: 'note', description: `BOM-05 confirm status=${conf.status} body=${JSON.stringify(conf.body?.data).slice(0, 120)}` });
       expect(conf.status, `BOM-05: confirm_candidate executed (status=${conf.status})`).toBe(200);
-      await page.waitForTimeout(1500);
-      const afterConfirm = (await listLines(page)).find((l) => l.pid === lineId) || {};
+      let afterConfirm: any = {};
+      await expect.poll(async () => {
+        afterConfirm = (await listLines(page)).find((l) => l.pid === lineId) || {};
+        return isConfirmedWithCode(afterConfirm, candidateCode);
+      }, { timeout: 10_000, intervals: [250, 500, 1_000] }).toBeTruthy();
       // confirmed state: manual_confirmed true OR material code now set to our candidate
-      const confirmedNow = afterConfirm.bom_std_manual_confirmed === true || afterConfirm.bom_std_manual_confirmed === 'true'
-        || String(afterConfirm.bom_std_material_code || '').includes(candidateCode);
+      const confirmedNow = isConfirmedWithCode(afterConfirm, candidateCode);
       expect(confirmedNow, `BOM-05: line shows confirmed decision (manual_confirmed=${afterConfirm.bom_std_manual_confirmed} code=${afterConfirm.bom_std_material_code})`).toBeTruthy();
       // BOM-06: undo the decision → confirmed state reverts
       const undo = await post(page, 'bom:undo_decision', { lineId }, 'update', taskId);
       test.info().annotations.push({ type: 'note', description: `BOM-06 undo status=${undo.status}` });
       expect(undo.status, `BOM-06: undo_decision executed (status=${undo.status})`).toBe(200);
-      await page.waitForTimeout(1500);
-      const afterUndo = (await listLines(page)).find((l) => l.pid === lineId) || {};
+      let afterUndo: any = {};
+      await expect.poll(async () => {
+        afterUndo = (await listLines(page)).find((l) => l.pid === lineId) || {};
+        return afterUndo.bom_std_manual_confirmed !== afterConfirm.bom_std_manual_confirmed
+          || String(afterUndo.bom_std_material_code || '') !== String(afterConfirm.bom_std_material_code || '')
+          || String(afterUndo.bom_std_change_type || '') !== String(afterConfirm.bom_std_change_type || '');
+      }, { timeout: 10_000, intervals: [250, 500, 1_000] }).toBeTruthy();
       const revertedOrChanged = afterUndo.bom_std_manual_confirmed !== afterConfirm.bom_std_manual_confirmed
         || String(afterUndo.bom_std_material_code || '') !== String(afterConfirm.bom_std_material_code || '')
         || String(afterUndo.bom_std_change_type || '') !== String(afterConfirm.bom_std_change_type || '');
@@ -120,7 +172,7 @@ test.describe('BOM workbench candidate confirm/undo/exclude (BOM-05/06/07) @smok
   });
 
   test('BOM-07 export reflects line set (excluded lines absent / count consistent)', async ({ browser }) => {
-    test.skip(!taskId, 'no converted task (sample BOM fixture absent)');
+    expect(taskId, 'previous conversion test must produce a task; fixture/setup failures must fail fast').toBeTruthy();
     const { context, page } = await openQuoteRolePage(browser, users['eng']);
     try {
       const lines = await listLines(page);

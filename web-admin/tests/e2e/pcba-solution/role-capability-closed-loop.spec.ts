@@ -21,7 +21,7 @@ import {
  * Owner-confirmed matrix (small-company overlap; business-roles.json):
  *   | role            | BOM转化 | 报价 | 客户 | 系统 | 组织 |
  *   | tenant_admin    | ✓       | ✓    | ✓    | ✓    | ✓   |
- *   | bom_engineering | ✓       | ✗    | ✓    | ✗    | ✗   |
+ *   | bom_engineering | ✓       | ✓    | ✓    | ✗    | ✗   |
  *   | qo_sales        | ✓       | ✓    | ✓    | ✗    | ✗   |
  *   | qo_procurement  | ✓       | ✓    | ✓    | ✗    | ✗   |
  *
@@ -48,13 +48,64 @@ const MENU = {
 
 // non-admin business roles under test; admin is the storageState session (separate, always all-allowed)
 const ROLES: Array<{ key: string; roleCode: string; quote: boolean }> = [
-  { key: 'bom_engineering', roleCode: 'bom_engineering', quote: false },
+  { key: 'bom_engineering', roleCode: 'bom_engineering', quote: true },
   { key: 'qo_sales', roleCode: 'qo_sales', quote: true },
   { key: 'qo_procurement', roleCode: 'qo_procurement', quote: true },
 ];
 
 const uid = uniqueId('rolecl').replace(/_/g, '-');
 const users: Record<string, QuoteRoleUser> = {};
+
+async function waitForListReady(page: Page): Promise<void> {
+  await expect.poll(async () => {
+    const searchReady = await page.locator('[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"], input[placeholder="查询..."]').first().count();
+    const tableReady = await page.locator('table, [role="table"]').first().count();
+    const loading = await page.locator('[aria-busy="true"], .ant-spin-spinning, [data-loading="true"]').count();
+    const loadingTextVisible = await page
+      .getByText(/^(?:加载中|Loading)(?:\.\.\.)?$/i)
+      .first()
+      .isVisible()
+      .catch(() => false);
+    return (searchReady > 0 || tableReady > 0) && loading === 0 && !loadingTextVisible;
+  }, { timeout: 15_000 }).toBe(true);
+}
+
+async function searchList(page: Page, listPath: string, marker: string): Promise<number> {
+  await page.goto(listPath, { waitUntil: 'domcontentloaded' });
+  await waitForListReady(page);
+  const q = page.getByPlaceholder('查询...').first();
+  if (await q.count() > 0) {
+    const response = page.waitForResponse((r) => (
+      r.url().includes('/api/dynamic/') &&
+      r.url().includes('/list') &&
+      r.request().method() === 'GET' &&
+      decodeURIComponent(r.url()).includes(marker)
+    ), { timeout: 15_000 });
+    await q.click();
+    await q.fill(marker);
+    await page.keyboard.press('Enter');
+    const searchResponse = await response;
+    expect(searchResponse.ok(), `list search failed: HTTP ${searchResponse.status()}`).toBe(true);
+    await waitForListReady(page);
+  }
+  const rows = page.locator(`table tbody tr:has-text("${marker}")`);
+  await expect.poll(() => rows.count(), { timeout: 15_000 }).toBeGreaterThan(0);
+  return rows.count();
+}
+
+async function pickFirstComboboxOptions(page: Page, maxCount: number): Promise<void> {
+  const combos = page.getByRole('combobox');
+  const n = await combos.count();
+  for (let i = 0; i < Math.min(n, maxCount); i++) {
+    try {
+      await combos.nth(i).click();
+      await expect.poll(async () => page.getByRole('option').count()).toBeGreaterThan(0);
+      await page.getByRole('option').first().click();
+    } catch {
+      // Some DSL comboboxes are optional or not interactable for this role.
+    }
+  }
+}
 
 test.describe('Role × capability 真机闭环 @smoke', () => {
   test.describe.configure({ mode: 'serial', timeout: 180_000 });
@@ -77,24 +128,22 @@ test.describe('Role × capability 真机闭环 @smoke', () => {
                                   commandCode: string, extra?: (p: Page) => Promise<void>): Promise<boolean> {
     await page.goto(`${listPath}/new?commandCode=${encodeURIComponent(commandCode)}`,
                     { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(2500);
     const nameInput = page.locator(`input[name='${nameField}'], textarea[name='${nameField}']`).first();
+    await expect(nameInput).toBeVisible();
     await nameInput.click();
     await nameInput.pressSequentially(marker, { delay: 15 });
     if (extra) await extra(page);
+    const saveResponse = page.waitForResponse((r) => (
+      r.url().includes('/api/meta/commands/execute/') &&
+      r.request().method() === 'POST' &&
+      decodeURIComponent(r.url()).includes(commandCode)
+    ), { timeout: 20_000 });
     await page.getByRole('button', { name: '保存' }).first().click();
-    await page.waitForTimeout(2500);
-    // verify in list
-    await page.goto(listPath, { waitUntil: 'domcontentloaded' });
-    await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-    const q = page.getByPlaceholder('查询...');
-    if (await q.count() > 0) {
-      await q.first().click();
-      await q.first().pressSequentially(marker, { delay: 15 });
-      await page.keyboard.press('Enter');
-      await page.waitForTimeout(1800);
-    }
-    return (await page.locator(`table tbody tr:has-text("${marker}")`).count()) > 0;
+    const commandResponse = await saveResponse;
+    expect(commandResponse.ok(), `${commandCode} failed: HTTP ${commandResponse.status()}`).toBe(true);
+    const commandBody = await commandResponse.json().catch(() => ({}));
+    expect(String((commandBody as { code?: unknown }).code), JSON.stringify(commandBody)).toBe('0');
+    return (await searchList(page, listPath, marker)) > 0;
   }
 
   for (const r of ROLES) {
@@ -121,17 +170,7 @@ test.describe('Role × capability 真机闭环 @smoke', () => {
         const projMarker = `ZKHPROJ${uid}${r.key}`.slice(0, 28);
         const projOk = await createClosedLoop(page, MENU.project, 'bom_project_name', projMarker, 'bom:create_project', async (p) => {
           // 客户* reference + 质量等级* — pick first option of each remaining combobox
-          const combos = p.getByRole('combobox');
-          const n = await combos.count();
-          for (let i = 0; i < Math.min(n, 2); i++) {
-            try {
-              await combos.nth(i).click();
-              await p.waitForTimeout(700);
-              const opt = p.getByRole('option');
-              if (await opt.count() > 0) await opt.first().click();
-              await p.waitForTimeout(300);
-            } catch { /* combobox not interactable, skip */ }
-          }
+          await pickFirstComboboxOptions(p, 2);
         });
         expect(projOk, `${r.roleCode} BOM project created and visible in list`).toBe(true);
 

@@ -226,16 +226,16 @@ class AgentRunControllerIntegrationTest extends BaseIntegrationTest {
 
     private void seedConversation(Long conversationId) {
         jdbc.update("INSERT INTO ab_im_conversation " +
-                        "(id, tenant_id, type, name, max_seq, created_at, updated_at) " +
-                        "VALUES (?, ?, 'BOT', 'Replay test conversation', 2, NOW(), NOW())",
-                conversationId, tenantId);
+                        "(id, pid, tenant_id, type, name, max_seq, created_at, updated_at) " +
+                        "VALUES (?, ?, ?, 'BOT', 'Replay test conversation', 2, NOW(), NOW())",
+                conversationId, UniqueIdGenerator.generate(), tenantId);
     }
 
     private void seedConversationForTenant(Long targetTenantId, Long conversationId) {
         jdbc.update("INSERT INTO ab_im_conversation " +
-                        "(id, tenant_id, type, name, max_seq, created_at, updated_at) " +
-                        "VALUES (?, ?, 'BOT', 'Other tenant conversation', 1, NOW(), NOW())",
-                conversationId, targetTenantId);
+                        "(id, pid, tenant_id, type, name, max_seq, created_at, updated_at) " +
+                        "VALUES (?, ?, ?, 'BOT', 'Other tenant conversation', 1, NOW(), NOW())",
+                conversationId, UniqueIdGenerator.generate(), targetTenantId);
     }
 
     private void seedMessage(Long messageId, Long conversationId, String senderType,

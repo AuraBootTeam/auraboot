@@ -17,6 +17,7 @@ import type {
 } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
 import { ChartEmptyState } from './ChartEmptyState';
+import { dimensionLabel } from '~/framework/smart/utils/chartLabels';
 
 /**
  * Props for SmartPieChart component
@@ -188,7 +189,7 @@ export const SmartPieChart: React.FC<SmartPieChartProps> = ({
 
     // Build pie data: { name, value } pairs
     const pieData = data.rows.map((row) => ({
-      name: String(row[dimensionKey] ?? ''),
+      name: dimensionLabel(data.meta, dimensionKey, row[dimensionKey]),
       value: Number(row[metricKey]) || 0,
     }));
 

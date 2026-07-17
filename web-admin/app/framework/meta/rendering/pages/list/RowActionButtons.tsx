@@ -7,6 +7,7 @@
 import React, { useState, useLayoutEffect, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { ButtonConfig } from '~/framework/meta/schemas/types';
+import { partitionRowActions } from './actionColumnWidth';
 
 const DROPDOWN_MIN_WIDTH = 120;
 const DROPDOWN_ESTIMATED_HEIGHT = 40; // single-item baseline; refined per item
@@ -136,48 +137,37 @@ export function RowActionButtons({
 
   if (visibleButtons.length === 0) return null;
 
-  // If only 1 button, render it directly
-  if (visibleButtons.length === 1) {
-    const btn = visibleButtons[0];
-    return (
-      <div className="inline-flex items-center justify-start">
-        <button
-          type="button"
-          data-testid={`row-action-${btn.code}`}
-          onClick={(e) => {
-            e.stopPropagation();
-            handleAction(btn, record);
-          }}
-          className={`rounded-control px-2 py-1 text-sm font-medium transition-colors ${
-            btn.danger
-              ? 'text-status-red hover:bg-status-red-bg hover:text-red-800'
-              : 'text-accent hover:bg-accent-weak hover:text-blue-800'
-          }`}
-        >
-          {resolveButtonLabel(btn)}
-        </button>
-      </div>
-    );
-  }
-
-  // Primary = first non-danger button; rest go into dropdown
-  const primaryBtn = visibleButtons[0];
-  const moreButtons = visibleButtons.slice(1);
+  // Same split the column-width estimator uses, so the column is always sized
+  // for the layout we actually render.
+  const { inline: inlineButtons, overflow: moreButtons } = partitionRowActions(visibleButtons);
 
   return (
     <div className="inline-flex items-center justify-start gap-1">
-      {/* Primary action as link */}
-      <button
-        type="button"
-        data-testid={`row-action-${primaryBtn.code}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          handleAction(primaryBtn, record);
-        }}
-        className="rounded-control text-accent hover:bg-accent-weak px-2 py-1 text-sm font-medium transition-colors hover:text-blue-800"
-      >
-        {resolveButtonLabel(primaryBtn)}
-      </button>
+      {inlineButtons.map((btn) => {
+        const label = resolveButtonLabel(btn);
+        return (
+          <button
+            key={btn.code}
+            type="button"
+            data-testid={`row-action-${btn.code}`}
+            title={label}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAction(btn, record);
+            }}
+            // `truncate` (which implies whitespace-nowrap) + `min-w-0` make label
+            // wrapping impossible: a label too wide for the column degrades to an
+            // ellipsis instead of folding onto a second line and inflating the row.
+            className={`rounded-control min-w-0 truncate px-2 py-1 text-sm font-medium transition-colors ${
+              btn.danger
+                ? 'text-status-red hover:bg-status-red-bg hover:text-red-800'
+                : 'text-accent hover:bg-accent-weak hover:text-blue-800'
+            }`}
+          >
+            {label}
+          </button>
+        );
+      })}
 
       {/* More actions dropdown — rendered via Portal to avoid overflow clipping */}
       {moreButtons.length > 0 && (

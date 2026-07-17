@@ -1,0 +1,185 @@
+{
+  "pageKey": "faq_conversation_queue",
+  "name:zh-CN": "可提炼会话",
+  "name:en": "Distillable Conversations",
+  "modelCode": "faq_source_conversation",
+  "description": "The entry point to the loop: browse support conversations, see which have already been mined, and distil FAQ candidates out of one. Without this page the manual trigger is API-only — you would have to already know a conversation's pid to start.",
+  "kind": "detail",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "extension": {
+    "showShare": false,
+    "showReport": false,
+    "showPrint": false,
+    "showEdit": false
+  },
+  "dataSources": {
+    "conversations": {
+      "type": "api",
+      "method": "get",
+      "endpoint": "/api/faq/conversations",
+      "adaptor": "table",
+      "params": {
+        "pageNum": 1,
+        "pageSize": 50
+      }
+    },
+    "selectedConversationMessages": {
+      "type": "api",
+      "method": "get",
+      "endpoint": "/api/faq/conversations/${state.selectedConversation.pid}/messages",
+      "adaptor": "table",
+      "dependOn": [
+        "state.selectedConversation.pid"
+      ]
+    }
+  },
+  "blocks": [
+    {
+      "id": "faq_conv_table",
+      "blockType": "table",
+      "dataSource": "conversations",
+      "selection": {
+        "mode": "single",
+        "bind": "selectedConversation"
+      },
+      "columns": [
+        {
+          "field": "name",
+          "width": 280,
+          "label": {
+            "zh-CN": "会话",
+            "en": "Conversation"
+          }
+        },
+        {
+          "field": "type",
+          "width": 100,
+          "label": {
+            "zh-CN": "类型",
+            "en": "Type"
+          },
+          "renderType": "tag",
+          "dictCode": "faq_conversation_type"
+        },
+        {
+          "field": "messageCount",
+          "width": 100,
+          "label": {
+            "zh-CN": "消息数",
+            "en": "Messages"
+          }
+        },
+        {
+          "field": "candidateCount",
+          "width": 110,
+          "label": {
+            "zh-CN": "已提炼",
+            "en": "Distilled"
+          }
+        },
+        {
+          "field": "lastMessageAt",
+          "width": 180,
+          "label": {
+            "zh-CN": "最后活动",
+            "en": "Last Activity"
+          },
+          "renderType": "datetime"
+        }
+      ],
+      "rowActions": [
+        {
+          "code": "extract",
+          "icon": "Sparkles",
+          "primary": true,
+          "permissionCode": "faq.candidate.extract",
+          "label": {
+            "zh-CN": "提炼 FAQ",
+            "en": "Distil FAQ"
+          },
+          "action": {
+            "type": "command",
+            "command": "faq:extract",
+            "refresh": [
+              "conversations"
+            ],
+            "inputFields": [
+              {
+                "field": "faq_target_kb_id",
+                "label": {
+                  "zh-CN": "目标知识库",
+                  "en-US": "Target Knowledge Base"
+                },
+                "type": "select",
+                "required": true,
+                "placeholder": {
+                  "zh-CN": "选择批准后要发布到的知识库",
+                  "en-US": "Where approved FAQs will be published"
+                },
+                "dataSource": {
+                  "type": "api",
+                  "endpoint": "/api/ai/knowledge",
+                  "valueField": "pid",
+                  "labelField": "name"
+                }
+              }
+            ],
+            "inputFieldsTitle": {
+              "zh-CN": "提炼到哪个知识库？",
+              "en": "Distil into which knowledge base?"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "faq_conv_transcript",
+      "blockType": "table",
+      "dataSource": "selectedConversationMessages",
+      "title": {
+        "zh-CN": "对话内容",
+        "en": "Transcript"
+      },
+      "columns": [
+        {
+          "field": "seq",
+          "width": 70,
+          "label": {
+            "zh-CN": "#",
+            "en": "#"
+          }
+        },
+        {
+          "field": "sender",
+          "width": 110,
+          "label": {
+            "zh-CN": "说话人",
+            "en": "Speaker"
+          },
+          "renderType": "tag",
+          "dictCode": "faq_message_sender"
+        },
+        {
+          "field": "content",
+          "label": {
+            "zh-CN": "内容",
+            "en": "Content"
+          }
+        }
+      ],
+      "empty": {
+        "title": {
+          "zh-CN": "选择上方一条会话，查看它的对话内容",
+          "en": "Pick a conversation above to read it"
+        }
+      }
+    }
+  ],
+  "title": {
+    "zh-CN": "可提炼会话",
+    "en": "Distillable Conversations"
+  }
+}

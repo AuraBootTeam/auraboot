@@ -50,6 +50,11 @@ common:
   end_date: 종료일
 
   confirm_delete: 삭제하시겠습니까?
+  json_editor:
+    valid: 유효
+    invalid: JSON은 객체 또는 배열이어야 합니다
+    invalid_short: 무효
+    format: 서식 지정
 
 # Notification System
 notification:
@@ -357,3 +362,18 @@ search:
   navigate: 이동
   open: 열기
   close: 닫기
+
+aurabot:
+  error:
+    # Streamed to the AuraBot chat panel when no LLM provider is configured for the tenant.
+    no_llm_provider: 구성된 LLM 공급자가 없습니다. 클라우드 구성에서 API 키를 설정하세요.
+    # Shown in the AuraBot chat panel when the browser cannot reach the chat SSE endpoint.
+    connect_chat: AuraBot 대화 서비스에 연결할 수 없습니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요.
+    # Shown in the AuraBot chat panel when the browser cannot reach the execute SSE endpoint.
+    connect_execute: AuraBot 실행 서비스에 연결할 수 없습니다. 잠시 후 다시 시도하거나 관리자에게 문의하세요.
+  chatbi:
+    # "Save this ad-hoc chat chart as a dashboard widget" action + result states.
+    save_as_dashboard: 대시보드에 저장
+    saving: 저장 중…
+    saved_as_dashboard: 대시보드에 저장됨
+    save_failed: 대시보드 저장 실패

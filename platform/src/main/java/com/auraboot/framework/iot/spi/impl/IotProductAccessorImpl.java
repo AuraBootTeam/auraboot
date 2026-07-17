@@ -40,6 +40,7 @@ public class IotProductAccessorImpl implements BackgroundProductAccessor {
     static final String COL_P_NODE_TYPE = "iot_p_node_type";
     static final String COL_P_DATA_FORMAT = "iot_p_data_format";
     static final String COL_P_TRANSPORT_TYPE = "iot_p_transport_type";
+    static final String COL_P_PROVISION_TYPE = "iot_p_provision_type";
 
     static final String COL_DP_PK = "iot_dp_product_key";
     static final String COL_DP_CODE = "iot_dp_code";
@@ -89,6 +90,7 @@ public class IotProductAccessorImpl implements BackgroundProductAccessor {
                     IotDeviceAccessorImpl.asString(r.get(COL_P_NODE_TYPE)),
                     IotDeviceAccessorImpl.asString(r.get(COL_P_DATA_FORMAT)),
                     IotDeviceAccessorImpl.asString(r.get(COL_P_TRANSPORT_TYPE)),
+                    IotDeviceAccessorImpl.asString(r.get(COL_P_PROVISION_TYPE)),
                     IotDeviceAccessorImpl.asLong(r.get("tenant_id"))));
         });
     }

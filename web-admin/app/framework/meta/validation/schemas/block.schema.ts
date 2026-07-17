@@ -38,6 +38,8 @@ export const BLOCK_TYPES = [
   'artifact-timeline',
   'review-drawer',
   'status-banner',
+  'code-snippet',
+  'conversation-panel',
   'custom',
 ] as const;
 
@@ -58,6 +60,10 @@ const selectionConfigSchema = z.object({
   mode: z.enum(['single', 'multiple']),
   bind: z.string(),
   defaultFirst: z.boolean().optional(),
+  keyField: z.string().optional(),
+  detailBind: z.string().optional(),
+  idsBind: z.string().optional(),
+  idField: z.string().optional(),
 });
 
 const paginationConfigSchema = z.object({

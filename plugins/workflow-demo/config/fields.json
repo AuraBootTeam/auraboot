@@ -22,7 +22,7 @@
     "constraints": { "required": true },
     "extension": {
       "refModelCode": "sys_user",
-      "refDisplayField": "username",
+      "refDisplayField": "nick_name",
       "renderComponent": "memberpicker"
     }
   },
@@ -128,7 +128,7 @@
     "description": "Users to copy on approval notifications.",
     "extension": {
       "refModelCode": "sys_user",
-      "refDisplayField": "username",
+      "refDisplayField": "nick_name",
       "renderComponent": "memberpicker",
       "multiple": true
     }
@@ -161,7 +161,7 @@
     "constraints": { "required": true },
     "extension": {
       "refModelCode": "sys_user",
-      "refDisplayField": "username"
+      "refDisplayField": "nick_name"
     }
   },
   {

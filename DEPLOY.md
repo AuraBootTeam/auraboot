@@ -17,10 +17,78 @@ cp .env.example .env
 # Start the full stack (first run builds images — allow 5-10 min)
 docker compose --profile full up --build -d
 
+# Bootstrap the stack (NOT optional — see below)
+./scripts/quickstart.sh
+
 # Open the app
 open http://localhost:3000
 # Default login: admin@auraboot.com / Test2026x
 ```
+
+**`scripts/quickstart.sh` is not optional.** `docker compose up` starts the services and
+nothing else: it creates no admin user and imports no plugins. Without this step the login
+above fails with *"Invalid username or password"*, and even past it the platform has zero
+models and zero menus. The script is idempotent — run it again any time. (On Windows, run
+it from WSL or Git Bash — see [Windows](#windows) below.)
+
+### Windows
+
+Windows is supported through the **Docker path** (not native-host deployment). Install
+**Docker Desktop** — it runs the whole stack in its WSL2 backend — and use the same
+`docker compose --profile full up --build -d` command as above.
+
+Two things differ from macOS/Linux:
+
+- **Run the shell scripts from a bash environment.** `scripts/quickstart.sh` (the
+  mandatory bootstrap step that creates the admin user and imports the plugins), and any
+  other `scripts/*.sh`, must be run from a **WSL** shell or **Git Bash**, not
+  PowerShell/cmd. They only need `bash` + `curl` and talk to the published port, so they
+  work unchanged.
+- **Open the app with `start` instead of `open`:** `start http://localhost:3000`.
+
+Native, non-Docker deployment directly on a Windows host is **not** supported: the
+reset/init/build tooling is bash-only and the repo ships no `gradlew.bat`. Use Docker
+(above) or WSL for anything beyond running the compose stack.
+
+## Pull-only deployment (no source checkout, no build)
+
+If you just want to **run** AuraBoot — not build it from source — pull the prebuilt
+images instead. This skips the 5–10 min Java + Node build entirely. Everything a first
+boot needs is baked into the images (postgres schema, backend plugins), so you need
+**no `git clone`** — just two files:
+
+```bash
+# Grab the compose file and the bootstrap script (no repo clone needed)
+curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/docker-compose.pull.yml
+curl -O https://raw.githubusercontent.com/AuraBootTeam/auraboot/main/scripts/quickstart.sh
+
+# Pull + start (backend + frontend + postgres, all prebuilt)
+docker compose -f docker-compose.pull.yml up -d
+
+# Bootstrap (NOT optional — creates the admin, imports the plugins)
+bash quickstart.sh
+
+# Open http://localhost:3000  (admin@auraboot.com / Test2026x — change on first login)
+```
+
+Images pulled (multi-arch `amd64`/`arm64`), from GHCR by default:
+
+| Image | What it is |
+|-------|-----------|
+| `ghcr.io/aurabootteam/auraboot` | Backend (Spring Boot) + OSS config plugins baked in |
+| `ghcr.io/aurabootteam/auraboot-frontend` | Frontend (BFF + SSR) |
+| `ghcr.io/aurabootteam/auraboot-postgres` | PostgreSQL 16 (pgvector) + schema seeded on first boot |
+
+**Mainland China** — pull from the Tencent TCR mirror (faster than GHCR) by pointing
+`REGISTRY` at the public `auraboot-oss` namespace:
+
+```bash
+REGISTRY=ccr.ccs.tencentyun.com/auraboot-oss docker compose -f docker-compose.pull.yml up -d
+```
+
+Redis / MinIO / monitoring are advanced add-ons — for those, use the source
+`docker-compose.yml` profiles (`--profile cache` / `storage` / `monitoring`). Redis is
+not required for single-instance deployments.
 
 ## Infrastructure Only (Local Development)
 
@@ -156,6 +224,22 @@ docker compose --profile full up --build -d
 docker compose --profile full up --build -d backend
 docker compose --profile full up --build -d frontend
 ```
+
+## Remote deploy to a host (pre-built images)
+
+To deploy to a host that **can't build or pull the images** (air-gapped, GHCR-blocked,
+or CN networks), use the self-contained orchestrator
+[`scripts/deploy/oss-remote/deploy.sh`](scripts/deploy/oss-remote/deploy.sh). It builds the
+backend + frontend images off-host, ships them with `docker save | ssh docker load`,
+brings the stack up, bootstraps the admin + plugins, seeds showcase demo data, and
+verifies the live URL — nothing is compiled on the target host.
+
+```bash
+HOST=root@1.2.3.4 PUBLIC_URL=http://1.2.3.4 scripts/deploy/oss-remote/deploy.sh
+```
+
+Supports a `coexist` mode to slot in behind an existing reverse proxy on the host
+without touching its config. See [`scripts/deploy/oss-remote/README.md`](scripts/deploy/oss-remote/README.md).
 
 ## Production Checklist
 

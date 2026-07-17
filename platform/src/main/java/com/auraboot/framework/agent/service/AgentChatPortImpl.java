@@ -22,8 +22,8 @@ import com.auraboot.framework.agent.runtime.context.AgentContextAssembler;
 import com.auraboot.framework.agent.runtime.policy.AgentProfile;
 import com.auraboot.framework.agent.runtime.policy.AgentProfileResolver;
 import com.auraboot.framework.agent.runtime.policy.DefaultAgentProfileResolver;
-import com.auraboot.framework.aurabot.dto.ChatMessage;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatMessage;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
@@ -35,6 +35,7 @@ import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -87,6 +88,15 @@ public class AgentChatPortImpl implements AgentChatPort {
     private final AgentChatToolDiscoveryAdapter toolDiscoveryAdapter;
     private final AgentChatContextAdapter contextAdapter;
     private final AgentChatToolRuntimeAdapterFactory toolRuntimeAdapterFactory;
+
+    /**
+     * Max tool-call rounds for the named-agent path. Shares the aurabot config key so a
+     * named agent gets the same 20-round ceiling as the default agent (IMPL-07). This
+     * path used to be hardwired to {@code ChatTurnRuntime.DEFAULT_MAX_TOOL_ROUNDS} (5) —
+     * a silent 4x cap versus the aurabot path's configurable 20.
+     */
+    @Value("${aurabot.max-tool-rounds:20}")
+    private int maxToolRounds;
 
     public AgentChatPortImpl(DynamicDataMapper dynamicDataMapper,
                              LlmProviderFactory providerFactory,
@@ -326,7 +336,7 @@ public class AgentChatPortImpl implements AgentChatPort {
         } else {
             try {
                 toolDefs = toolDiscoveryAdapter.discover(
-                        tenantId, ctx.userId(), agentCode, request.getMessage(), agentDef);
+                        tenantId, ctx.userId(), agentCode, ctx.channel(), request.getMessage(), agentDef);
             } catch (IllegalStateException e) {
                 String msg = safeExceptionMessage(e);
                 sink.onError(msg, null);
@@ -429,7 +439,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                         sink,
                         persistTape,
                         requireInitialToolCall,
-                        ChatTurnRuntime.DEFAULT_MAX_TOOL_ROUNDS,
+                        maxToolRounds,
                         AgentChatTurnOutcomeAdapter.HANDOFF_TOOL_NAME,
                         null,
                         objectMapper),

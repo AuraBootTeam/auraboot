@@ -179,6 +179,8 @@ export interface FieldConfig {
   createPageKey?: string;
   /** Override the permission code used to show inline-create. Defaults to createCommand. */
   createPermission?: string;
+  /** Initial values for inline-create. Exact `${form.<field>}` expressions resolve from the parent form. */
+  createInitialValues?: Record<string, unknown>;
   /** Reserved (deferred): restrict the create form to a subset of fields. Not yet honored — full target-model form is rendered. */
   createFields?: string[];
 }
@@ -242,6 +244,7 @@ export interface ColumnConfig {
     | 'currency'
     | 'tag'
     | 'progress'
+    | 'rating'
     | 'image'
     | 'user_identity'
     | 'reference'
@@ -333,6 +336,13 @@ export interface ButtonConfig {
   danger?: boolean;
   variant?: 'default' | 'primary' | 'danger';
   icon?: string;
+  /**
+   * Row actions only — render this button inline in the action column instead of
+   * collapsing it into the "⋮" overflow menu. At most 3 buttons are laid out
+   * inline (ux-design-system.md §3). When no button opts in, the first visible
+   * one is rendered inline, preserving the historical behaviour.
+   */
+  inline?: boolean;
   visibleWhen?: string;
   enableWhen?: string;
   disableWhen?: string;
@@ -399,6 +409,10 @@ export interface SelectionConfig {
   mode: 'single' | 'multiple';
   bind: string;
   defaultFirst?: boolean;
+  keyField?: string;
+  detailBind?: string;
+  idsBind?: string;
+  idField?: string;
 }
 
 // List Tabs filter configuration

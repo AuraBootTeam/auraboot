@@ -123,3 +123,6 @@ docs/retro/
 docs/superpowers/
 docs/mockups/
 docs/standards/
+
+# Per-worktree isolated Maven repo (multi-worktree publish; never a repo artifact)
+.m2/

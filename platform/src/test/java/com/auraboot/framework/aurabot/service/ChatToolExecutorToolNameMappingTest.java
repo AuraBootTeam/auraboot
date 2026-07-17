@@ -29,7 +29,7 @@ class ChatToolExecutorToolNameMappingTest {
         ToolDiscoveryPort toolDiscoveryPort = new ToolDiscoveryPort() {
             @Override
             public List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills,
-                                               String modelHint, String intentHint, int maxTools) {
+                                               String modelHint, String intentHint, int maxTools, String channel) {
                 return List.of(new ToolDef(
                         "cmd:crm:list_leads",
                         "List Leads",
@@ -42,7 +42,7 @@ class ChatToolExecutorToolNameMappingTest {
         ChatToolResolver resolver = new ChatToolResolver(groundingPort, toolDiscoveryPort, null);
         MetaContext.setSystemTenantContext(1L);
         try {
-            resolver.resolveTools("list high-score leads", "crm_lead", null);
+            resolver.resolveTools("list high-score leads", "crm_lead", null, null);
         } finally {
             MetaContext.clear();
         }

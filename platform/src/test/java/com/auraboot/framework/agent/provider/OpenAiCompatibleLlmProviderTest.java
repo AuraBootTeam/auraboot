@@ -185,6 +185,21 @@ class OpenAiCompatibleLlmProviderTest {
     }
 
     @Test
+    void buildRequestBodyMapsJsonObjectResponseFormat() throws Exception {
+        OpenAiCompatibleLlmProvider provider = createProvider();
+        LlmChatRequest request = LlmChatRequest.builder()
+                .model("deepseek-chat")
+                .maxTokens(256)
+                .responseFormat("json_object")
+                .messages(List.of(LlmChatRequest.Message.text("user", "Return JSON.")))
+                .build();
+
+        Map<String, Object> body = provider.buildOpenAiRequestBody(request);
+
+        assertThat(body).containsEntry("response_format", Map.of("type", "json_object"));
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void buildRequestBodySanitizesCommandCodeToolNames() throws Exception {
         // AuraBoot command tools are named with command codes ("plugin:command"),

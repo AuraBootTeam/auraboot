@@ -28,6 +28,9 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   textarea: runtime('form', 'Textarea', {
     aliases: ['SmartTextarea', 'Textarea', 'textarea'],
   }),
+  jsoneditor: runtime('form', 'JsonEditor', {
+    aliases: ['SmartJsonEditor', 'JsonEditor', 'jsoneditor', 'json-editor', 'json_editor'],
+  }),
   select: runtime('form', 'Select', { aliases: ['SmartSelect', 'Select', 'select'] }),
   checkbox: runtime('form', 'Checkbox', {
     aliases: ['SmartCheckbox', 'Checkbox', 'checkbox'],
@@ -209,11 +212,7 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
     ],
   }),
   processfeerulematrix: runtime('quoteops', 'ProcessFeeRuleMatrixBlock', {
-    aliases: [
-      'ProcessFeeRuleMatrixBlock',
-      'processFeeRuleMatrixBlock',
-      'process_fee_rule_matrix',
-    ],
+    aliases: ['ProcessFeeRuleMatrixBlock', 'processFeeRuleMatrixBlock', 'process_fee_rule_matrix'],
   }),
   teammembersblock: runtime('organization', 'TeamMembersBlock', {
     aliases: ['TeamMembersBlock', 'team-members', 'team_members', 'teammembersblock'],

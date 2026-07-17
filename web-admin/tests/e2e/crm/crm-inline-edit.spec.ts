@@ -8,7 +8,7 @@
  * IE-003 @critical Double-click a text cell → type new value → Enter saves → cell shows new value → reload verifies persistence
  *
  * Prerequisites:
- *   - CRM plugin imported, crm_lead_common model published
+ *   - CRM plugin imported, crm_lead model published
  *   - At least 1 lead record exists (created in beforeAll)
  *
  * @since 8.0.0
@@ -66,7 +66,7 @@ test.describe('CRM Inline Edit @smoke', () => {
   test('IE-001: Navigate to CRM Leads list page @smoke', async ({ page }) => {
     await navigateToDynamicPage(page, 'crm-lead');
     await waitForDynamicPageLoad(page);
-    await expect(page).toHaveURL(/\/p\/crm_lead_common/);
+    await expect(page).toHaveURL(/\/p\/crm_lead/);
 
     const rows = page.locator('tbody tr');
     await rows.first().waitFor({ state: 'visible', timeout: 10000 });
@@ -172,7 +172,7 @@ test.describe('CRM Inline Edit @smoke', () => {
       return;
     }
 
-    // Target a text column that is explicitly inline-editable in crm_lead_common_list DSL.
+    // Target a text column that is explicitly inline-editable in crm_lead_list DSL.
     const ownerCells = row.locator('td').filter({ hasText: initialOwner });
     let editableCell: import('@playwright/test').Locator | null = null;
 
@@ -215,7 +215,7 @@ test.describe('CRM Inline Edit @smoke', () => {
     if (!editableCell) {
       test.skip(
         true,
-        'No inline-editable text cell found on crm_lead_common row — inline edit may not be configured for text fields',
+        'No inline-editable text cell found on crm_lead row — inline edit may not be configured for text fields',
       );
       return;
     }
@@ -229,7 +229,7 @@ test.describe('CRM Inline Edit @smoke', () => {
       .waitForResponse(
         (r) =>
           r.url().includes('/commands/execute') ||
-          (r.url().includes('/api/dynamic/crm_lead_common') && r.request().method() !== 'GET'),
+          (r.url().includes('/api/dynamic/crm_lead') && r.request().method() !== 'GET'),
         { timeout: 15000 },
       )
       .catch(() => null);
@@ -250,7 +250,7 @@ test.describe('CRM Inline Edit @smoke', () => {
     // Wait for list to refresh
     await page
       .waitForResponse(
-        (r) => r.url().includes('/api/dynamic/crm_lead_common') && r.url().includes('/list'),
+        (r) => r.url().includes('/api/dynamic/crm_lead') && r.url().includes('/list'),
         { timeout: 10000 },
       )
       .catch(() => null);
@@ -267,7 +267,7 @@ test.describe('CRM Inline Edit @smoke', () => {
 
     // --- Persistence check: verify via API that the record was updated ---
     if (createdRecordId) {
-      const verifyResp = await page.request.get(`/api/dynamic/crm_lead_common/${createdRecordId}`);
+      const verifyResp = await page.request.get(`/api/dynamic/crm_lead/${createdRecordId}`);
       expect(verifyResp.ok(), 'Record fetch after reload should succeed').toBe(true);
       const verifyBody = await verifyResp.json();
       expect(

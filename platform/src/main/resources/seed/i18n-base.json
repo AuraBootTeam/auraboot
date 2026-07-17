@@ -1012,6 +1012,34 @@
     "en-US": "Loading…"
   },
   {
+    "key": "common.json_editor.valid",
+    "zh-CN": "有效",
+    "en-US": "Valid",
+    "ja-JP": "有効",
+    "ko-KR": "유효"
+  },
+  {
+    "key": "common.json_editor.invalid",
+    "zh-CN": "JSON 必须是对象或数组",
+    "en-US": "JSON must be an object or array",
+    "ja-JP": "JSON はオブジェクトまたは配列である必要があります",
+    "ko-KR": "JSON은 객체 또는 배열이어야 합니다"
+  },
+  {
+    "key": "common.json_editor.invalid_short",
+    "zh-CN": "无效",
+    "en-US": "Invalid",
+    "ja-JP": "無効",
+    "ko-KR": "무효"
+  },
+  {
+    "key": "common.json_editor.format",
+    "zh-CN": "格式化",
+    "en-US": "Format",
+    "ja-JP": "整形",
+    "ko-KR": "서식 지정"
+  },
+  {
     "key": "admin.permission.policy.configure",
     "zh-CN": "配置策略参数",
     "en-US": "Configure policy"

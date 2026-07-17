@@ -7,7 +7,7 @@ import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
 import com.auraboot.framework.agent.trace.AiTraceService;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.SseResponseSink;
@@ -98,7 +98,7 @@ class AuraBotChatServiceThinkingIntegrationTest {
                         .defaultModel("claude-sonnet-4-6")
                         .maxTokens(4096)
                         .build());
-        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null)))
+        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
         when(factory.getProvider(eq("anthropic"))).thenReturn(provider);
         when(provider.streamChat(any(), eq("test-key"), eq("stub://local")))

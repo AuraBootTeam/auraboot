@@ -1,0 +1,30 @@
+[
+  {
+    "code": "faq.candidate.read",
+    "name:zh-CN": "查看 FAQ 候选",
+    "name:en": "View FAQ Candidates",
+    "resourceType": "data",
+    "module": "faq"
+  },
+  {
+    "code": "faq.candidate.review",
+    "name:zh-CN": "审核 FAQ 候选",
+    "name:en": "Review FAQ Candidates",
+    "resourceType": "operation",
+    "module": "faq"
+  },
+  {
+    "code": "faq.candidate.publish",
+    "name:zh-CN": "发布 FAQ 到知识库",
+    "name:en": "Publish FAQ to Knowledge Base",
+    "resourceType": "operation",
+    "module": "faq"
+  },
+  {
+    "code": "faq.candidate.extract",
+    "name:zh-CN": "从对话提炼 FAQ",
+    "name:en": "Extract FAQ from Conversation",
+    "resourceType": "operation",
+    "module": "faq"
+  }
+]

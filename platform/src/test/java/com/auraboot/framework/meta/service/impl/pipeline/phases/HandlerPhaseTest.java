@@ -1,9 +1,12 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.AsyncTaskDTO;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.service.DataDomainService;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl;
 import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -15,6 +18,7 @@ import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
 import com.auraboot.framework.plugin.extension.FileAccessor;
 import com.auraboot.framework.plugin.pf4j.ExtensionRegistry;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -69,6 +73,12 @@ class HandlerPhaseTest {
     private RecordSnapshotReader snapshotReader;
 
     @Mock
+    private DataPermissionEngine dataPermissionEngine;
+
+    @Mock
+    private DataDomainService dataDomainService;
+
+    @Mock
     private FileService fileService;
 
     @Mock
@@ -87,6 +97,11 @@ class HandlerPhaseTest {
         ReflectionTestUtils.setField(phase, "asyncTaskService", asyncTaskService);
         // Default: no chained secondaries (the common case). Individual tests override.
         lenient().when(extensionRegistry.getSecondaryCommandHandlers(any())).thenReturn(List.of());
+    }
+
+    @AfterEach
+    void tearDown() {
+        MetaContext.clear();
     }
 
     @Test
@@ -152,6 +167,21 @@ class HandlerPhaseTest {
     }
 
     @Test
+    void execute_runsPluginHandlersInsideDynamicDataQueryScopeAndClosesIt() throws Exception {
+        ScopeRecordingHandler handler = new ScopeRecordingHandler(PLUGIN_HANDLER_CODE);
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(handler));
+        when(metaModelService.getModelDefinition("pr_purchase_order")).thenReturn(Optional.empty());
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+
+        phase.execute(ctx);
+
+        assertThat(handler.scopeActiveDuringExecute.get()).isTrue();
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
     void execute_chainedSecondaryFailure_propagatesAndAbortsTheCommand() {
         RecordingPluginHandler primary = new RecordingPluginHandler(PLUGIN_HANDLER_CODE);
         CommandHandlerExtension boom = new CommandHandlerExtension() {
@@ -172,6 +202,26 @@ class HandlerPhaseTest {
         // a failing secondary aborts the whole command (so the transaction rolls back)
         assertThatThrownBy(() -> phase.execute(ctx))
                 .hasMessageContaining("over credit limit");
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
+    }
+
+    @Test
+    void execute_mapsPluginVersionConflictToHttpConflictSemantic() {
+        CommandHandlerExtension staleWrite = new CommandHandlerExtension() {
+            @Override public String getCommandType() { return PLUGIN_HANDLER_CODE; }
+            @Override public Object execute(CommandContext context) {
+                throw new IllegalStateException("iot.error.version_conflict:expected=2,actual=3");
+            }
+        };
+        when(extensionRegistry.getCommandHandler(PLUGIN_HANDLER_CODE)).thenReturn(Optional.of(staleWrite));
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
+                "type", "state_transition", "handler", PLUGIN_HANDLER_CODE));
+
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(com.auraboot.framework.exception.ConflictException.class)
+                .hasMessageContaining("iot.error.version_conflict");
+        assertThat(com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive()).isFalse();
     }
 
     @Test
@@ -283,6 +333,58 @@ class HandlerPhaseTest {
         verify(dynamicDataMapper, never()).update(eq(tableName), any(), any());
     }
 
+    @Test
+    void persistHandlerResults_usesScopedSqlGuardsWhenUserContextExists() throws Exception {
+        MetaContext.setContext(1L, 2L, "user-pid", "tester");
+        RecordingFullRowHandler handler = new RecordingFullRowHandler(BUSINESS_COMMAND_CODE);
+        when(extensionRegistry.getCommandHandler(BUSINESS_COMMAND_CODE)).thenReturn(Optional.of(handler));
+
+        String modelCode = "cr_crawl_job";
+        String tableName = "mt_cr_crawl_job";
+        com.auraboot.framework.meta.dto.FieldDefinition statusField =
+                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                        .code("cr_cj_status").columnName("cr_cj_status").dataType("string").build();
+        com.auraboot.framework.meta.dto.FieldDefinition seedUrlsField =
+                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                        .code("cr_cj_seed_urls").columnName("cr_cj_seed_urls").dataType("array").build();
+        com.auraboot.framework.meta.dto.ModelDefinition model =
+                com.auraboot.framework.meta.dto.ModelDefinition.builder()
+                        .code(modelCode).tableName(tableName)
+                        .fields(java.util.List.of(statusField, seedUrlsField)).build();
+
+        when(metaModelService.getModelDefinition(modelCode)).thenReturn(Optional.of(model));
+        when(metaModelService.getTableName(modelCode)).thenReturn(tableName);
+        when(dynamicDataMapper.findJsonbColumns(tableName)).thenReturn(java.util.Set.of("cr_cj_seed_urls"));
+        when(dynamicDataMapper.selectByQuery(any(), any()))
+                .thenReturn(java.util.List.of(Map.of("id", 42L)));
+        when(dataPermissionEngine.buildRowFilter(1L, modelCode, 2L))
+                .thenReturn("AND created_by = 2");
+        when(dataDomainService.buildDomainFilter(modelCode, 2L))
+                .thenReturn("AND domain_id = 7");
+        when(dynamicDataMapper.updateByQuery(any(), any())).thenReturn(1);
+
+        CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, modelCode, Map.of("type", "custom"));
+        phase.execute(ctx);
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> paramsCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(dynamicDataMapper).updateByQuery(sqlCaptor.capture(), paramsCaptor.capture());
+        verify(dynamicDataMapper, never()).update(eq(tableName), any(), any());
+        verify(dynamicDataMapper, never()).updateWithJsonb(eq(tableName), any(), any(), any());
+        assertThat(sqlCaptor.getValue())
+                .contains("UPDATE " + tableName + " SET")
+                .containsPattern("cr_cj_seed_urls = #\\{params\\.set\\d+,jdbcType=OTHER,typeHandler=.*JsonbStringTypeHandler}::jsonb")
+                .contains("WHERE id = #{params.recordId}")
+                .contains("tenant_id = #{params.tenantId}")
+                .contains("created_by = 2")
+                .contains("domain_id = 7");
+        assertThat(paramsCaptor.getValue())
+                .containsEntry("recordId", 42L)
+                .containsEntry("tenantId", 1L)
+                .containsValue("[\"https://example.com/\"]");
+    }
+
     private CommandPipelineContext buildContext(String commandCode, String modelCode, Map<String, Object> execConfig) {
         CommandDefinition command = new CommandDefinition();
         command.setCode(commandCode);
@@ -329,8 +431,9 @@ class HandlerPhaseTest {
         public Object execute(CommandContext context) {
             Map<String, Object> fullRow = new HashMap<>();
             fullRow.put("cr_cj_status", "PAUSED");
-            // jsonb host column round-tripped from getById comes back as a JSON String
-            fullRow.put("cr_cj_seed_urls", "[\"https://example.com/\"]");
+            // A handler may return a structured value instead of a JDBC-ready
+            // string. The final scoped SQL binding must serialize it explicitly.
+            fullRow.put("cr_cj_seed_urls", java.util.List.of("https://example.com/"));
             return fullRow;
         }
     }
@@ -384,6 +487,28 @@ class HandlerPhaseTest {
             // attempt to clobber a primary key — the merge is putIfAbsent, so the primary wins
             result.put("observedCommandType", "SECONDARY_SHOULD_NOT_WIN");
             return result;
+        }
+    }
+
+    private static class ScopeRecordingHandler implements CommandHandlerExtension {
+
+        private final String commandType;
+        private final AtomicReference<Boolean> scopeActiveDuringExecute = new AtomicReference<>(false);
+
+        private ScopeRecordingHandler(String commandType) {
+            this.commandType = commandType;
+        }
+
+        @Override
+        public String getCommandType() {
+            return commandType;
+        }
+
+        @Override
+        public Object execute(CommandContext context) {
+            scopeActiveDuringExecute.set(
+                    com.auraboot.framework.meta.service.impl.DynamicDataQueryScope.isActive());
+            return Map.of("scopeObserved", true);
         }
     }
 }

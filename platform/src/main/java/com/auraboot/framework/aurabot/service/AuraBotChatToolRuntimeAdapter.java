@@ -15,7 +15,7 @@ import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.agent.runtime.context.AgentContextBlock;
 import com.auraboot.framework.agent.runtime.context.AgentContextBundle;
 import com.auraboot.framework.agent.runtime.policy.ExecutionEnvelope;
-import com.auraboot.framework.aurabot.dto.ChatMessage;
+import com.auraboot.framework.agent.dto.ChatMessage;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;

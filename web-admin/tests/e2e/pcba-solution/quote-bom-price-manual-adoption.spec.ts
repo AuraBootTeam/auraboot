@@ -46,6 +46,13 @@ function parseJsonObject(value: unknown): Record<string, any> {
   }
 }
 
+async function fillDialogField(page: Page, field: string, value: string): Promise<void> {
+  const input = page.getByTestId(`form-dialog-field-${field}`);
+  await input.fill('');
+  await input.pressSequentially(value, { delay: 10 });
+  await expect(input).toHaveValue(value);
+}
+
 async function readWaterfallLine(
   page: Page,
   created: BomPriceManualReviewSeed,
@@ -199,10 +206,10 @@ test.describe('PCBA quote BOM price manual adoption', () => {
       await expect(form).toBeVisible();
       await expect(form).toContainText(/请填写|必填|required/i);
 
-      await page.getByTestId('form-dialog-field-unitPrice').fill(String(MANUAL_UNIT_PRICE));
-      await page.getByTestId('form-dialog-field-supplierName').fill(MANUAL_SUPPLIER);
-      await page.getByTestId('form-dialog-field-reason').fill(MANUAL_REASON);
-      await page.getByTestId('form-dialog-field-validUntil').fill(MANUAL_VALID_UNTIL);
+      await fillDialogField(page, 'unitPrice', String(MANUAL_UNIT_PRICE));
+      await fillDialogField(page, 'supplierName', MANUAL_SUPPLIER);
+      await fillDialogField(page, 'reason', MANUAL_REASON);
+      await fillDialogField(page, 'validUntil', MANUAL_VALID_UNTIL);
 
       const manualCommandResponse = page.waitForResponse(
         (response) =>

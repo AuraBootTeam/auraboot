@@ -15,9 +15,19 @@ import { ReviewDrawerBlockRenderer } from '../ReviewDrawerBlockRenderer';
 import { StatusBannerBlockRenderer } from '../StatusBannerBlockRenderer';
 import { useRuntimeStateSubscription } from '../workbenchBlockUtils';
 import { fetchResult } from '~/shared/services/http-client';
+import { confirmDialog } from '~/utils/confirmDialog';
 
 vi.mock('~/shared/services/http-client', () => ({
   fetchResult: vi.fn(() => Promise.resolve({ code: '0', data: {} })),
+}));
+
+vi.mock('~/utils/confirmDialog', () => ({
+  confirmDialog: vi.fn(() => Promise.resolve(true)),
+}));
+
+const hasPermissionSpy = vi.fn<(code: string) => boolean>(() => true);
+vi.mock('~/contexts/AuthContext', () => ({
+  useAuth: () => ({ hasPermission: hasPermissionSpy }),
 }));
 
 function makeRuntime(overrides: Partial<any> = {}): SchemaRuntime {
@@ -166,6 +176,44 @@ describe('MetricStripBlockRenderer', () => {
     expect(runtime.__updateState).toHaveBeenCalledWith('scope-1', 'lineFilter', {
       status: 'pending',
     });
+  });
+
+  it('formats numeric metrics with the configured maximum precision', () => {
+    const runtime = makeRuntime({
+      data: {
+        summary: {
+          matchability: 68.23529411764706,
+          complete: '100.0000',
+        },
+      },
+    }) as any;
+    const block: BlockConfig = {
+      id: 'quality_metrics',
+      blockType: 'metric-strip',
+      dataSource: 'summary',
+      variant: 'chips',
+      metrics: [
+        {
+          key: 'matchability',
+          label: 'Matchability',
+          valueField: 'matchability',
+          precision: 2,
+          unit: '%',
+        },
+        {
+          key: 'complete',
+          label: 'Complete',
+          valueField: 'complete',
+          precision: 2,
+          unit: '%',
+        },
+      ],
+    };
+
+    render(<MetricStripBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('metric-strip-item-matchability')).toHaveTextContent('68.24 %');
+    expect(screen.getByTestId('metric-strip-item-complete')).toHaveTextContent('100 %');
   });
 
   it('renders localized metric subText without leaking object text', () => {
@@ -420,8 +468,29 @@ describe('MetricStripBlockRenderer', () => {
 
 describe('WorkbenchActionBarBlockRenderer', () => {
   beforeEach(() => {
+    hasPermissionSpy.mockReset();
+    hasPermissionSpy.mockReturnValue(true);
     vi.mocked(fetchResult).mockReset();
     vi.mocked(fetchResult).mockResolvedValue({ code: '0', data: {} } as any);
+    vi.mocked(confirmDialog).mockReset();
+    vi.mocked(confirmDialog).mockResolvedValue(true);
+  });
+
+  it('hides actions whose permissionCode is not granted', () => {
+    hasPermissionSpy.mockImplementation((code) => code !== 'iot.dps.execute');
+    const runtime = makeRuntime() as any;
+    const block: BlockConfig = {
+      id: 'actions', blockType: 'workbench-action-bar',
+      actions: [
+        { code: 'cancel', label: 'Cancel Batch', permissionCode: 'iot.dps.execute' },
+        { code: 'read', label: 'View Batch', permissionCode: 'iot.dps.read' },
+      ],
+    };
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.queryByTestId('workbench-action-cancel')).not.toBeInTheDocument();
+    expect(screen.getByTestId('workbench-action-read')).toBeInTheDocument();
   });
 
   it('renders configured actions and executes their lifecycle', async () => {
@@ -450,6 +519,78 @@ describe('WorkbenchActionBarBlockRenderer', () => {
     fireEvent.click(button);
 
     expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
+    expect(confirmDialog).not.toHaveBeenCalled();
+  });
+
+  it('waits for localized confirmation before executing an action', async () => {
+    const runtime = makeRuntime() as any;
+    const block: BlockConfig = {
+      id: 'actions',
+      blockType: 'workbench-action-bar',
+      actions: [
+        {
+          code: 'save_profile',
+          label: 'Save Profile',
+          confirm: {
+            'zh-CN': '仅保存为候选格式，确认继续？',
+            'en-US': 'Save as a candidate format and continue?',
+          },
+          onClick: {
+            action: 'dataSource.reload',
+            args: { ids: ['taskSummary'] },
+          },
+        },
+      ],
+    };
+    let resolveConfirmation: (confirmed: boolean) => void = () => undefined;
+    vi.mocked(confirmDialog).mockImplementationOnce(
+      () => new Promise<boolean>((resolve) => (resolveConfirmation = resolve)),
+    );
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('workbench-action-save_profile'));
+
+    expect(confirmDialog).toHaveBeenCalledWith({
+      title: 'common.confirm',
+      content: 'Save as a candidate format and continue?',
+      variant: 'default',
+    });
+    expect(runtime.__reload).not.toHaveBeenCalled();
+
+    resolveConfirmation(true);
+    await waitFor(() => expect(runtime.__reload).toHaveBeenCalledWith(['taskSummary']));
+  });
+
+  it('does not execute an action when confirmation is cancelled', async () => {
+    vi.mocked(confirmDialog).mockResolvedValueOnce(false);
+    const runtime = makeRuntime() as any;
+    const block: BlockConfig = {
+      id: 'actions',
+      blockType: 'workbench-action-bar',
+      actions: [
+        {
+          code: 'cancel_task',
+          label: 'Cancel Task',
+          variant: 'danger',
+          confirm: 'confirm.cancel',
+          onClick: {
+            action: 'dataSource.reload',
+            args: { ids: ['taskSummary'] },
+          },
+        },
+      ],
+    };
+
+    render(<WorkbenchActionBarBlockRenderer block={block} runtime={runtime} />);
+    fireEvent.click(screen.getByTestId('workbench-action-cancel_task'));
+
+    await waitFor(() => expect(confirmDialog).toHaveBeenCalled());
+    expect(confirmDialog).toHaveBeenCalledWith({
+      title: '确认取消',
+      content: '取消后当前业务状态将终止，确定继续吗？',
+      variant: 'danger',
+    });
+    expect(runtime.__reload).not.toHaveBeenCalled();
   });
 
   it('supports bare compact action bars for workbench headers', () => {
@@ -821,6 +962,38 @@ describe('WorkbenchActionBarBlockRenderer', () => {
 });
 
 describe('StatusBannerBlockRenderer', () => {
+  it('formats numeric summary fields with declarative precision and unit', () => {
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => ({ status: 'ready', score: 68.23529411764706 }),
+        getState: () => ({
+          data: { status: 'ready', score: 68.23529411764706 },
+          loading: false,
+          error: null,
+        }),
+        has: () => true,
+        register: vi.fn(),
+        reload: vi.fn(),
+        subscribe: vi.fn(() => () => undefined),
+      }),
+    }) as any;
+    const block: BlockConfig = {
+      id: 'quality_status',
+      blockType: 'status-banner',
+      dataSource: 'summary',
+      statusField: 'status',
+      titleMap: { ready: 'Ready' },
+      summaryFields: [{ key: 'score', label: 'Score', field: 'score', precision: 2, unit: '%' }],
+    };
+
+    render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('status-banner-quality_status')).toHaveTextContent('68.24 %');
+    expect(screen.getByTestId('status-banner-quality_status')).not.toHaveTextContent(
+      '68.23529411764706',
+    );
+  });
+
   it('renders a running task banner and polls configured data sources', () => {
     vi.useFakeTimers();
     const reload = vi.fn().mockResolvedValue(undefined);
@@ -880,6 +1053,73 @@ describe('StatusBannerBlockRenderer', () => {
 
     expect(reload).toHaveBeenCalledWith(['summary', 'lines']);
     vi.useRealTimers();
+  });
+
+  it('waits for a status poll reload to finish before scheduling the next one', async () => {
+    vi.useFakeTimers();
+    let pending = true;
+    let resolveReload: (() => void) | undefined;
+    const reload = vi.fn(() => {
+      if (!pending) return Promise.resolve();
+      return new Promise<void>((resolve) => {
+        resolveReload = () => {
+          pending = false;
+          resolve();
+        };
+      });
+    });
+    const runtime = makeRuntime({
+      getDataSourceManager: () => ({
+        getData: () => ({ bom_task_status: 'parsing' }),
+        getState: () => ({
+          data: { bom_task_status: 'parsing' },
+          loading: false,
+          error: null,
+        }),
+        has: () => true,
+        register: vi.fn(),
+        reload,
+        subscribe: vi.fn(() => () => undefined),
+      }),
+    }) as any;
+    const block: BlockConfig = {
+      id: 'task_status',
+      blockType: 'status-banner',
+      dataSource: 'summary',
+      statusField: 'bom_task_status',
+      titleMap: { parsing: 'Parsing BOM' },
+      poll: {
+        enabledWhenStatuses: ['parsing'],
+        intervalMs: 3000,
+        reload: ['summary', 'lines'],
+      },
+    };
+
+    try {
+      render(<StatusBannerBlockRenderer block={block} runtime={runtime} />);
+
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+      expect(reload).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        vi.advanceTimersByTime(9000);
+      });
+      expect(reload).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveReload?.();
+        await Promise.resolve();
+      });
+      act(() => {
+        vi.advanceTimersByTime(3000);
+      });
+
+      expect(reload).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('keeps long summary values inside their grid cells', () => {
@@ -1640,6 +1880,13 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByText('Profile Detector')).not.toBeVisible();
     expect(screen.getByText('generate_material_code')).not.toBeVisible();
     expect(screen.getByTestId('review-drawer-source-json')).not.toBeVisible();
+    fireEvent.click(screen.getByText('解析证据与 Profile / LLM Policy'));
+    expect(screen.getByTestId('review-drawer-source-cards')).toHaveClass('md:grid-cols-2');
+    expect(screen.getByTestId('review-drawer-source-cards')).not.toHaveClass('xl:grid-cols-4');
+    expect(screen.getByTestId('review-drawer-source-card-profile-value')).toHaveAttribute(
+      'title',
+      'JIEJIA_WB_FLEX_MAIN_V1',
+    );
     expect(screen.getByTestId('review-drawer-export-action-download_new_bom')).toHaveTextContent(
       '重新生成并下载',
     );
@@ -1650,6 +1897,27 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.queryByRole('button', { name: '收起复核浮层' })).not.toBeInTheDocument();
     expect(screen.queryByTestId('review-drawer-minimized')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '关闭复核浮层' })).toBeInTheDocument();
+  });
+
+  it('can dismiss the drawer without clearing the selected context row', () => {
+    const runtime = makeReviewDrawerRuntime();
+
+    render(
+      <ReviewDrawerBlockRenderer
+        block={{ ...reviewDrawerBlock, closeClearsContext: false } as BlockConfig}
+        runtime={runtime}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭复核浮层' }));
+
+    expect(runtime.__updateState).not.toHaveBeenCalledWith('scope-1', 'selectedBomLine', {});
+    expect(screen.queryByTestId('review-drawer')).not.toBeInTheDocument();
+    expect(screen.getByTestId('review-drawer-minimized')).toHaveTextContent('展开行级复核');
+
+    fireEvent.click(screen.getByTestId('review-drawer-minimized'));
+
+    expect(screen.getByTestId('review-drawer')).toHaveTextContent('Row 5 · LED1 · 待确认');
   });
 
   it('restores the last review drawer position and size from local storage', () => {
@@ -2331,6 +2599,57 @@ describe('EvidencePanelBlockRenderer', () => {
     );
     expect(screen.getByTestId('evidence-panel-section-conflict')).toHaveTextContent(
       '"brand": "alternative"',
+    );
+  });
+
+  it('renders semantic JSON evidence items when sections define item paths', () => {
+    const runtime = makeRuntime({
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: {},
+        global: {},
+        state: {
+          rollout: {
+            progress:
+              '{"total":5,"success":2,"failed":1,"percent":68,"failedDevices":[{"deviceCode":"RF-01-TC-CTRL","reason":"温控自检失败"}],"nextAction":"暂停推送并回滚失败设备"}',
+          },
+        },
+      }),
+    });
+    const block: BlockConfig = {
+      id: 'evidence',
+      blockType: 'evidence-panel',
+      context: '${state.rollout}',
+      title: 'Evidence',
+      sections: [
+        {
+          key: 'rollout',
+          label: '推送进度',
+          field: 'progress',
+          format: 'json',
+          items: [
+            { key: 'total', label: '目标设备', path: 'total' },
+            { key: 'failed', label: '失败设备', path: 'failed', tone: 'danger' },
+            { key: 'percent', label: '完成率', path: 'percent', format: 'percent' },
+            { key: 'reason', label: '失败原因', path: 'failedDevices.0.reason' },
+            { key: 'next_action', label: '下一步', path: 'nextAction' },
+          ],
+        },
+      ],
+    };
+
+    render(<EvidencePanelBlockRenderer block={block} runtime={runtime} />);
+
+    expect(screen.getByTestId('evidence-panel-item-total')).toHaveTextContent('目标设备');
+    expect(screen.getByTestId('evidence-panel-item-total')).toHaveTextContent('5');
+    expect(screen.getByTestId('evidence-panel-item-failed')).toHaveTextContent('失败设备');
+    expect(screen.getByTestId('evidence-panel-item-reason')).toHaveTextContent('温控自检失败');
+    expect(screen.getByTestId('evidence-panel-item-next_action')).toHaveTextContent(
+      '暂停推送并回滚失败设备',
+    );
+    expect(screen.getByTestId('evidence-panel-section-rollout')).not.toHaveTextContent(
+      '"failedDevices"',
     );
   });
 

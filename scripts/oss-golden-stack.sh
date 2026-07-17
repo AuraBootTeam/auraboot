@@ -15,9 +15,13 @@
 # need the full showcase data, run scripts/oss-reset-and-init.sh separately (dormancy-guarded).
 #
 # Usage:
-#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--no-frontend] [--no-warm] [--ttl 6h] [--plugin-profile P|--plugin X]
+#   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--plugin-profile P|--plugin X]
 #       --no-warm : keep the frontend but skip the setup/auth/pre-warm step — for goldens
 #                   that self-provision accounts and run with --no-deps (no storageState).
+#       --fresh-db: drop + recreate the slot's database before applying schema.sql. `up`
+#                   otherwise refuses to run on a database that predates the current
+#                   schema.sql (schema.sql is CREATE TABLE IF NOT EXISTS — it cannot
+#                   back-fill columns into tables that already exist).
 #   ./scripts/oss-golden-stack.sh import <name> [--plugin-profile P|--plugin X]
 #   ./scripts/oss-golden-stack.sh warm <name>          # re-run setup→auth→pre-warm (up does this)
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
@@ -142,13 +146,14 @@ PY
 # ---- up ------------------------------------------------------------------------------
 cmd_up() {
   local name="$1"; shift
-  local slot="" ttl="6h" frontend=1 warm=1
+  local slot="" ttl="6h" frontend=1 warm=1 fresh_db=0
   local plugin_profile="" import_plugins=()
   while [ $# -gt 0 ]; do case "$1" in
     --slot) slot="$2"; shift 2;;
     --ttl) ttl="$2"; shift 2;;
     --no-frontend) frontend=0; shift;;
     --no-warm) warm=0; shift;;
+    --fresh-db) fresh_db=1; shift;;
     --plugin-profile) plugin_profile="$2"; shift 2;;
     --plugin) import_plugins+=("$2"); shift 2;;
     --plugins)
@@ -165,7 +170,24 @@ cmd_up() {
   local sd; sd="$(state_dir "$name")"; mkdir -p "$sd"
 
   log "1/9 allocate runtime '$name' (slot $slot) + ensure infra"
-  "$DEV" runtime allocate auraboot "$name" --slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" >/dev/null
+  # Re-running `up` after a mid-way failure (a plugin the validator rejects, say) must not
+  # trip over its own allocation from the first attempt — every later step here is already
+  # idempotent. Reuse an existing allocation only when it is on the slot being asked for;
+  # a name pinned to a different slot is a real conflict and still stops the run.
+  # Read the slot straight off the env file rather than through runtime_env(), which die()s
+  # when the file is absent — and absent is the normal case on a first run.
+  local allocated_slot=""
+  local env_file="$WORKSPACE/.workspace/env/$name.env"
+  if [ -f "$env_file" ]; then
+    allocated_slot="$(grep -E '^AURA_WORKSPACE_SLOT=' "$env_file" | head -1 | cut -d= -f2- || true)"
+  fi
+  if [ -n "$allocated_slot" ]; then
+    [ "$allocated_slot" = "$slot" ] \
+      || die "runtime '$name' is already allocated on slot $allocated_slot, not $slot — pick another name, or: $DEV runtime destroy $name"
+    log "    reusing existing allocation (slot $slot)"
+  else
+    "$DEV" runtime allocate auraboot "$name" --slot "$slot" --purpose "OSS host-first golden stack" --ttl "$ttl" >/dev/null
+  fi
   "$DEV" infra ensure "$name" --yes >/dev/null
 
   local server_port vite_port bff_port pg_db redis_db pg_host pg_port pg_user pg_pass
@@ -184,9 +206,28 @@ cmd_up() {
   printf '%s\n' "$pg_host $pg_port $pg_user $pg_db $pg_pass" >"$sd/pgenv"
 
   log "2/9 apply schema to $pg_db"
-  PGPASSWORD=auraboot psql -h 127.0.0.1 -p 5432 -U auraboot -d "$pg_db" \
-    -f "$REPO_ROOT/platform/src/main/resources/database/schema.sql" >/dev/null 2>&1 \
-    || die "schema apply failed"
+  # `dev.sh infra ensure` reuses an existing database for the slot, which may have been
+  # created by an older checkout. schema.sql is all CREATE TABLE IF NOT EXISTS, so applying
+  # it to such a database silently skips every table that already exists and leaves columns
+  # added since then missing — the stack then dies much later with an unrelated-looking
+  # error (2026-07-13: ab_named_query.resource_code missing → plugin import failed with
+  # `25P02 current transaction is aborted` pointing at a COUNT(*) on another table).
+  if [ "$fresh_db" = "1" ]; then
+    log "    --fresh-db: dropping and recreating $pg_db"
+    PGPASSWORD=auraboot psql -h 127.0.0.1 -p 5432 -U auraboot -d postgres -q \
+      -c "DROP DATABASE IF EXISTS $pg_db WITH (FORCE)" -c "CREATE DATABASE $pg_db" \
+      || die "could not recreate $pg_db"
+  elif ! PG_HOST=127.0.0.1 PG_PORT=5432 PG_USER=auraboot PG_PASSWORD=auraboot \
+       "$REPO_ROOT/scripts/db/check-db-matches-schema-sql.sh" "$pg_db" --quiet; then
+    die "database '$pg_db' predates the current schema.sql (see the missing columns above).
+     Re-applying schema.sql cannot repair it. Either:
+       $0 destroy $name          # then 'up' again on a clean database
+       $0 up $name --slot $slot --fresh-db   # drop + recreate the database in place"
+  fi
+
+  PGPASSWORD=auraboot psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U auraboot -d "$pg_db" \
+    -q -f "$REPO_ROOT/platform/src/main/resources/database/schema.sql" >"$sd/schema-apply.log" 2>&1 \
+    || { tail -5 "$sd/schema-apply.log" >&2; die "schema apply failed — see $sd/schema-apply.log"; }
 
   log "3/9 seed gradle wrapper jar (fresh-worktree gotcha)"
   if [ ! -f "$REPO_ROOT/platform/gradle/wrapper/gradle-wrapper.jar" ]; then

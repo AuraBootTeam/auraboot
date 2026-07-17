@@ -5597,12 +5597,12 @@ CREATE TABLE public.ab_drt_log (
     matched boolean DEFAULT false NOT NULL,
     status character varying(20) NOT NULL,
     matched_rules_json jsonb,
-    output_snapshot jsonb,
-    trace_snapshot jsonb,
     duration_ms bigint,
     error_code character varying(100),
     error_message text,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    output_snapshot jsonb,
+    trace_snapshot jsonb,
     CONSTRAINT chk_drt_log_status CHECK (((status)::text = ANY ((ARRAY['MATCHED'::character varying, 'NOT_MATCHED'::character varying, 'ERROR'::character varying, 'SKIPPED'::character varying, 'UNKNOWN'::character varying])::text[])))
 );
 
@@ -7863,7 +7863,8 @@ CREATE TABLE public.ab_im_conversation (
     bound_model_code character varying(100),
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    bound_record_pid character varying(64)
+    bound_record_pid character varying(64),
+    pid character varying(26) DEFAULT "substring"(replace((gen_random_uuid())::text, '-'::text, ''::text), 1, 26) NOT NULL
 );
 
 
@@ -8477,9 +8478,10 @@ CREATE TABLE public.ab_kb_document (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     deleted_flag boolean DEFAULT false,
-    CONSTRAINT chk_doc_source CHECK (((source_type)::text = ANY ((ARRAY['file'::character varying, 'entity'::character varying, 'internal_doc'::character varying])::text[]))),
+    process_retry_count integer DEFAULT 0 NOT NULL,
+    CONSTRAINT chk_doc_source CHECK (((source_type)::text = ANY ((ARRAY['file'::character varying, 'entity'::character varying, 'internal_doc'::character varying, 'conversation'::character varying])::text[]))),
     CONSTRAINT chk_doc_status CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'processing'::character varying, 'completed'::character varying, 'failed'::character varying])::text[]))),
-    CONSTRAINT chk_doc_type CHECK (((doc_type)::text = ANY ((ARRAY['pdf'::character varying, 'docx'::character varying, 'md'::character varying, 'txt'::character varying, 'csv'::character varying, 'html'::character varying])::text[])))
+    CONSTRAINT chk_doc_type CHECK (((doc_type)::text = ANY ((ARRAY['pdf'::character varying, 'docx'::character varying, 'md'::character varying, 'txt'::character varying, 'csv'::character varying, 'html'::character varying, 'pptx'::character varying, 'xlsx'::character varying, 'image'::character varying, 'ppt'::character varying, 'xls'::character varying])::text[])))
 );
 
 
@@ -8488,6 +8490,13 @@ CREATE TABLE public.ab_kb_document (
 --
 
 COMMENT ON TABLE public.ab_kb_document IS 'RAG document — file or entity content indexed into a knowledge base';
+
+
+--
+-- Name: COLUMN ab_kb_document.process_retry_count; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_kb_document.process_retry_count IS 'Parse attempts made by the reconcile pass after a worker restart stranded the document';
 
 
 --
@@ -25535,6 +25544,13 @@ CREATE UNIQUE INDEX uq_user_soul_profile_active ON public.ab_agent_user_soul_pro
 --
 
 CREATE UNIQUE INDEX user_name_idx ON public.ab_user USING btree (user_name) WHERE (deleted_flag = false);
+
+
+--
+-- Name: ux_ab_im_conversation_pid; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_ab_im_conversation_pid ON public.ab_im_conversation USING btree (pid);
 
 
 --

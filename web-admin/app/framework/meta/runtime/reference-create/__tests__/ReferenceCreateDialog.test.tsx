@@ -137,6 +137,24 @@ describe('ReferenceCreateDialog', () => {
     );
   });
 
+  it('passes parent-derived initial values into the DSL create form', () => {
+    render(
+      <ReferenceCreateDialog
+        open
+        targetModel="project"
+        createCommand="project:create"
+        initialValues={{ customer_id: 'customer-pid-1' }}
+        executeCommand={vi.fn()}
+        onCreated={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(formHook.useDslForm).toHaveBeenCalledWith(
+      expect.objectContaining({ initialValues: { customer_id: 'customer-pid-1' } }),
+    );
+  });
+
   it('defaults the create page key to targetModel_new when no page key is configured', () => {
     render(
       <ReferenceCreateDialog

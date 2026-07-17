@@ -208,7 +208,7 @@ class ModelCreateSkillIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("undo twice on same model: second call throws ValidationException (canonical 模型不存在)")
+    @DisplayName("undo twice on same model: second call throws ValidationException (model not found)")
     void undo_alreadyMissing_idempotent() {
         SkillResult exec = skill.execute(req(testCode));
         String modelPid = objectMapper.valueToTree(exec.getPayload()).get("modelPid").asText();
@@ -216,12 +216,13 @@ class ModelCreateSkillIntegrationTest extends BaseIntegrationTest {
         // First undo: SUCCESS.
         assertThatCode(() -> skill.undoByModel(modelPid, testCode)).doesNotThrowAnyException();
 
-        // Second undo: MetaModelService.delete throws ValidationException("模型不存在").
+        // Second undo: the pid is already gone, so undoByModel's raw-SELECT existence guard
+        // throws ValidationException before it ever reaches MetaModelService.delete.
         // Wrapping policy: surface raw ValidationException to the caller — Controller
-        // hand-off in T6 will translate. We assert on the canonical message fragment.
+        // hand-off in T6 will translate. (I18N-009: message is English, no raw pid.)
         assertThatThrownBy(() -> skill.undoByModel(modelPid, testCode))
                 .isInstanceOf(ValidationException.class)
-                .hasMessageContaining("模型不存在");
+                .hasMessageContaining("model not found");
     }
 
     @Test

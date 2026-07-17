@@ -31,6 +31,8 @@ export interface ReferenceCreateDialogProps {
   createCommand: string;
   /** display field used to compute the selected option label */
   displayField?: string;
+  /** initial values copied from the parent form into the quick-create form */
+  initialValues?: Record<string, any>;
   /** injected from useActionHandler in the parent */
   executeCommand: (
     commandCode: string,
@@ -50,6 +52,7 @@ export function ReferenceCreateDialog({
   createPageKey,
   createCommand,
   displayField,
+  initialValues,
   executeCommand,
   onCreated,
   onClose,
@@ -60,6 +63,7 @@ export function ReferenceCreateDialog({
   const form = useDslForm({
     pageKey: createPageKey || `${targetModel}_new`,
     enabled: open,
+    initialValues,
     onSubmit: async ({ values }) => {
       // Errors are caught here so they don't propagate as unhandled rejections.
       // The dialog stays open because we only call onCreated/onClose on success.

@@ -1,0 +1,40 @@
+[
+  {
+    "code": "faq_candidate",
+    "displayName:zh-CN": "FAQ 候选",
+    "displayName:en": "FAQ Candidate",
+    "description": "A question/answer pair an LLM distilled from a support conversation, pending human review before it is written back into a knowledge base.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "A candidate FAQ entry extracted from a customer-service conversation. Carries the proposed question and answer, the model's confidence, and a link back to the conversation it came from. A reviewer approves, edits or rejects it; approved candidates are published into a knowledge base and become retrievable by the agent.",
+    "domain_category": "knowledge",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "draft → approved → published (also draft → rejected)",
+    "extension": {
+      "icon": "MessageSquareQuote",
+      "category": "faq-loop",
+      "titleField": "faq_question",
+      "subtitleField": "faq_status"
+    }
+  },
+  {
+    "code": "faq_source_conversation",
+    "displayName:zh-CN": "可提炼会话",
+    "displayName:en": "Distillable Conversation",
+    "description": "Metadata-only view over ab_im_conversation, so the FAQ console can browse conversations and distil one. Read through GET /api/faq/conversations; nothing is ever written back to the conversation.",
+    "modelType": "entity",
+    "modelCategory": "document",
+    "semantic_description": "A support conversation that FAQ pairs can be distilled from. Carries how many candidates it has already produced, so a reviewer can see what has and has not been mined.",
+    "domain_category": "knowledge",
+    "data_sensitivity": "internal",
+    "lifecycle_description": "read-only; the only action is to distil FAQ candidates from it",
+    "extension": {
+      "icon": "MessagesSquare",
+      "category": "faq-loop",
+      "titleField": "faq_conv_name",
+      "subtitleField": "faq_conv_type",
+      "tableName": "ab_im_conversation",
+      "skipTableCreation": true
+    }
+  }
+]

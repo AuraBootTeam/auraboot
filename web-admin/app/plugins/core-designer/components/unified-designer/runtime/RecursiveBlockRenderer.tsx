@@ -3,7 +3,13 @@ import { usePermissions } from '~/contexts/AuthContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { DESIGNER_I18N, resolveDesignerText } from '~/shared/designer';
 import { getChartComponent, normalizeChartType } from '~/framework/smart/charts/SharedChartFactory';
-import type { DslBlockV3, PageSchemaV3 } from '../types';
+import { ControlledFieldRenderer } from '~/framework/meta/rendering/ControlledFieldRenderer';
+import { createExpressionContext } from '~/framework/meta/runtime/expression/context';
+import { DataSourceProvider } from '~/framework/meta/contexts/DataSourceContext';
+import { DataSourceManager } from '~/framework/meta/runtime/data-pipeline/DataSourceManager';
+import { buildPreviewFieldConfig } from './platformFieldPreview';
+import { DesignerPageModelCodeContext, PreviewListTable } from './platformTablePreview';
+import type { DslBlockV3, ModelFieldDefinition, PageSchemaV3 } from '../types';
 import { getCustomBlockRenderer } from './customBlockRendererRegistry';
 import {
   normalizeRuntimeExecutionError,
@@ -19,16 +25,33 @@ interface RecursiveBlockRendererProps {
   schema: PageSchemaV3;
   runtimeServices?: RuntimeExecutionServices;
   permissionEvaluator?: (permissionCode: string) => boolean;
+  /**
+   * Model field metadata for the page's primary model. When provided, form `field`
+   * blocks render the real platform control (true WYSIWYG) via {@link RuntimePlatformField}
+   * instead of the generic representative input. Absent (default) → legacy preview,
+   * so existing callers/tests are unaffected.
+   */
+  modelFields?: ModelFieldDefinition[];
 }
 
 export function RecursiveBlockRenderer({
   schema,
   runtimeServices,
   permissionEvaluator,
+  modelFields,
 }: RecursiveBlockRendererProps) {
   const { hasPermission } = usePermissions();
   const { locale } = useI18n();
   const evaluatePermission = permissionEvaluator ?? hasPermission;
+  const modelFieldList = modelFields ?? EMPTY_MODEL_FIELDS;
+  // WYSIWYG is active only when model metadata is supplied (workbench preview). In that
+  // mode the real platform controls (SmartSelect/pickers) call useFieldDataSource, which
+  // hard-requires a DataSourceManager in context — so we provide a lightweight one.
+  const wysiwygActive = modelFieldList.length > 0;
+  const dataSourceManager = React.useMemo(
+    () => new DataSourceManager(createExpressionContext({ locale })),
+    [locale],
+  );
   const pageContext: RuntimePageContext = {
     source: 'unified-designer-runtime-preview',
     pageId: schema.id,
@@ -37,26 +60,36 @@ export function RecursiveBlockRenderer({
     routeQuery: getCurrentRouteQuery(),
   };
 
-  return (
+  const tree = (
     <RuntimeLocaleContext.Provider value={locale}>
-      <RuntimePermissionContext.Provider value={evaluatePermission}>
-        <div
-          className="grid grid-cols-12 gap-4"
-          data-testid={`runtime-page-${schema.id}`}
-          data-schema-version={schema.schemaVersion}
-        >
-          {schema.blocks.map((block) => (
-            <RuntimeBlock
-              key={block.id}
-              block={block}
-              runtimeServices={runtimeServices}
-              pageContext={pageContext}
-              blockPath={[block.id]}
-            />
-          ))}
-        </div>
-      </RuntimePermissionContext.Provider>
+      <RuntimeModelFieldsContext.Provider value={modelFieldList}>
+        <DesignerPageModelCodeContext.Provider value={schema.modelCode}>
+        <RuntimePermissionContext.Provider value={evaluatePermission}>
+          <div
+            className="grid grid-cols-12 gap-4"
+            data-testid={`runtime-page-${schema.id}`}
+            data-schema-version={schema.schemaVersion}
+          >
+            {schema.blocks.map((block) => (
+              <RuntimeBlock
+                key={block.id}
+                block={block}
+                runtimeServices={runtimeServices}
+                pageContext={pageContext}
+                blockPath={[block.id]}
+              />
+            ))}
+          </div>
+        </RuntimePermissionContext.Provider>
+        </DesignerPageModelCodeContext.Provider>
+      </RuntimeModelFieldsContext.Provider>
     </RuntimeLocaleContext.Provider>
+  );
+
+  return wysiwygActive ? (
+    <DataSourceProvider manager={dataSourceManager}>{tree}</DataSourceProvider>
+  ) : (
+    tree
   );
 }
 
@@ -96,6 +129,15 @@ const RuntimeListSelectionContext = React.createContext<RuntimeSelectionContextV
 const RuntimePermissionContext = React.createContext<(permissionCode: string) => boolean>(
   () => false,
 );
+
+/** Stable empty reference so the default context value never triggers re-renders. */
+const EMPTY_MODEL_FIELDS: ModelFieldDefinition[] = [];
+/**
+ * Model field metadata for the page's primary model, provided by the workbench preview.
+ * Consumed by {@link RuntimeField} to render the real platform control for `field` blocks.
+ */
+const RuntimeModelFieldsContext =
+  React.createContext<ModelFieldDefinition[]>(EMPTY_MODEL_FIELDS);
 
 interface RuntimeBlockProps {
   block: DslBlockV3;
@@ -2423,6 +2465,7 @@ function RuntimeField({ block, runtimeServices, pageContext, blockPath }: Runtim
   const formContext = React.useContext(RuntimeFormValueContext);
   const listContext = React.useContext(RuntimeListSelectionContext);
   const hasPermission = React.useContext(RuntimePermissionContext);
+  const modelFields = React.useContext(RuntimeModelFieldsContext);
   const t = useRuntimeText();
   if (!isRuntimeBlockVisible(block, formContext?.values)) return null;
 
@@ -2443,6 +2486,16 @@ function RuntimeField({ block, runtimeServices, pageContext, blockPath }: Runtim
         />
       </div>
     );
+  }
+
+  // True WYSIWYG: when the page's model metadata is available (workbench preview),
+  // render the real platform control for `field` blocks instead of the generic input.
+  const previewModelField =
+    block.blockType === 'field' && block.field
+      ? modelFields.find((candidate) => candidate.code === block.field)
+      : undefined;
+  if (previewModelField) {
+    return <RuntimePlatformField block={block} modelField={previewModelField} />;
   }
 
   const fieldKey = block.field || block.id;
@@ -2510,6 +2563,79 @@ function RuntimeField({ block, runtimeServices, pageContext, blockPath }: Runtim
           {error}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * WYSIWYG form-field preview: renders the exact same platform control the live
+ * `/p/` page uses ({@link ControlledFieldRenderer}), driven by the field's resolved
+ * model metadata (`renderComponent`, label, dictCode, extension props). This replaces
+ * the legacy generic-input representative preview for `field` blocks whose model
+ * metadata is available.
+ */
+function RuntimePlatformField({
+  block,
+  modelField,
+}: {
+  block: DslBlockV3;
+  modelField: ModelFieldDefinition;
+}) {
+  const locale = React.useContext(RuntimeLocaleContext);
+  const formContext = React.useContext(RuntimeFormValueContext);
+  const hasPermission = React.useContext(RuntimePermissionContext);
+  const [localValue, setLocalValue] = React.useState<unknown>(undefined);
+
+  const fieldConfig = React.useMemo(
+    () => buildPreviewFieldConfig(block, modelField),
+    [block, modelField],
+  );
+  const expressionContext = React.useMemo(() => createExpressionContext({ locale }), [locale]);
+
+  const permissionCode = getRuntimePermissionCode(block);
+  const permissionAllowed = isRuntimeBlockPermissionAllowed(block, hasPermission);
+  if (!permissionAllowed) {
+    return (
+      <div
+        className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm"
+        data-permission-allowed="false"
+        data-permission-code={permissionCode}
+        data-testid={`runtime-field-${block.id}`}
+        style={getSpanGridStyle(block)}
+      >
+        <RuntimePermissionNotice
+          permissionCode={permissionCode}
+          testId={`runtime-field-permission-${block.id}`}
+        />
+      </div>
+    );
+  }
+
+  const fieldKey = block.field || block.id;
+  const value = formContext ? formContext.values[fieldKey] : localValue;
+  const rawError = formContext?.errors[fieldKey];
+  const handleChange = (next: unknown) => {
+    if (formContext) {
+      formContext.setValue(fieldKey, next);
+    } else {
+      setLocalValue(next);
+    }
+  };
+
+  return (
+    <div
+      data-testid={`runtime-field-${block.id}`}
+      data-field-component={fieldConfig.component ?? undefined}
+      data-wysiwyg="platform"
+      style={getSpanGridStyle(block)}
+    >
+      <ControlledFieldRenderer
+        field={fieldConfig}
+        value={value}
+        onChange={handleChange}
+        context={expressionContext}
+        error={typeof rawError === 'string' ? rawError : undefined}
+      />
     </div>
   );
 }
@@ -3860,6 +3986,9 @@ function getRuntimeRepeaterFieldKey(block: DslBlockV3): string {
 function RuntimeTable({ block, runtimeServices, pageContext, blockPath }: RuntimeBlockProps) {
   const selectionContext = React.useContext(RuntimeListSelectionContext);
   const hasPermission = React.useContext(RuntimePermissionContext);
+  const modelFields = React.useContext(RuntimeModelFieldsContext);
+  const pageModelCode = React.useContext(DesignerPageModelCodeContext);
+  const locale = React.useContext(RuntimeLocaleContext);
   const t = useRuntimeText();
   const rows = applyRuntimeListFilters(getRuntimeTableRows(block), selectionContext);
   const configuredColumnBlocks = getRuntimeTableColumnBlocks(block);
@@ -3868,6 +3997,29 @@ function RuntimeTable({ block, runtimeServices, pageContext, blockPath }: Runtim
   );
   const rowActionBlocks = getRuntimeTableRowActionBlocks(block);
   const columns = getRuntimeTableColumns(block, rows, columnBlocks, configuredColumnBlocks.length > 0);
+
+  // True WYSIWYG: for a page `table` with real columns and no author-supplied
+  // representative rows, render the live data table (RecordListView fetches a small page
+  // and resolves dict/reference/typed cells). Gated on model metadata being present, so
+  // the schematic path (and its tests, which pass no modelFields) is unaffected.
+  if (
+    block.blockType === 'table' &&
+    modelFields.length > 0 &&
+    Boolean(pageModelCode) &&
+    configuredColumnBlocks.length > 0 &&
+    getRuntimeTableRows(block).length === 0
+  ) {
+    return (
+      <div data-testid={`runtime-block-${block.id}`}>
+        <PreviewListTable
+          modelCode={pageModelCode}
+          tableBlock={block}
+          modelFields={modelFields}
+          locale={locale}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-md border border-slate-200" data-testid={`runtime-block-${block.id}`}>

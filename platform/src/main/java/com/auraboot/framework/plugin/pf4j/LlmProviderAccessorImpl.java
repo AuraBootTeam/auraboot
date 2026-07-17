@@ -57,6 +57,7 @@ public class LlmProviderAccessorImpl implements AiProviderAccessor {
                     .systemPrompt(request.systemPrompt())
                     .messages(toLlmMessages(request.messages()))
                     .maxTokens(maxTokens)
+                    .responseFormat(responseFormat(request.metadata()))
                     .build();
             LlmChatResponse response = provider.chat(llmRequest, config.getApiKey(), config.getBaseUrl());
             String text = extractText(response);
@@ -96,6 +97,20 @@ public class LlmProviderAccessorImpl implements AiProviderAccessor {
         return messages.stream()
                 .map(message -> LlmChatRequest.Message.text(message.role(), message.content()))
                 .collect(Collectors.toList());
+    }
+
+    private static String responseFormat(Map<String, Object> metadata) {
+        if (metadata == null || metadata.get("responseFormat") == null) {
+            return null;
+        }
+        String value = String.valueOf(metadata.get("responseFormat")).trim();
+        if (value.isEmpty()) {
+            return null;
+        }
+        if (!"json_object".equals(value)) {
+            throw new IllegalArgumentException("Unsupported AI response format: " + value);
+        }
+        return value;
     }
 
     private static String extractText(LlmChatResponse response) {

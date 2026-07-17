@@ -10,6 +10,8 @@ import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.service.DataDomainService;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.util.JsonbFieldHelper;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
@@ -42,6 +44,8 @@ public class CommandFieldMapExecutor {
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
     private final FieldPermissionService fieldPermissionService;
+    private final DataPermissionEngine dataPermissionEngine;
+    private final DataDomainService dataDomainService;
 
     public Map<String, Object> executeFieldMapPhase(List<BindingRule> fieldMapRules,
                                               Map<String, Object> payload,
@@ -112,13 +116,8 @@ public class CommandFieldMapExecutor {
                 // F-5 fix: UPDATE must refresh updated_at — DDL DEFAULT CURRENT_TIMESTAMP only
                 // applies to INSERT, so without explicit assignment audit timestamps stale forever.
                 columnData.put("updated_at", Instant.now());
-                Map<String, Object> conditions = new HashMap<>();
-                conditions.put("tenant_id", tenantId);
                 var idEntry = CommandExecutorUtils.resolveRecordIdColumn(request.getTargetRecordId());
-                conditions.put(idEntry.getKey(), idEntry.getValue());
-                int updated = jsonbCols.isEmpty()
-                        ? dynamicDataMapper.update(tableName, columnData, conditions)
-                        : dynamicDataMapper.updateWithJsonb(tableName, columnData, conditions, jsonbCols);
+                int updated = executeScopedUpdate(tableName, targetModel, idEntry, columnData, tenantId, jsonbCols);
                 if (updated == 0) {
                     // F-5 defense: silent code=0 with affected=0 hides "record not found / wrong tenant"
                     // bugs from callers. Reject explicitly so the caller sees BadParam, not a fake 200.
@@ -128,10 +127,7 @@ public class CommandFieldMapExecutor {
                 }
                 results.put(targetModel + "_updated", updated);
             } else if ("delete".equalsIgnoreCase(operationType) && StringUtils.hasText(request.getTargetRecordId())) {
-                Map<String, Object> conditions = new HashMap<>();
-                conditions.put("tenant_id", tenantId);
                 var delIdEntry = CommandExecutorUtils.resolveRecordIdColumn(request.getTargetRecordId());
-                conditions.put(delIdEntry.getKey(), delIdEntry.getValue());
                 int deleted;
                 if (modelDef != null && modelDef.isSoftDelete()) {
                     // Soft-delete model: flag the row (recoverable/auditable) instead of
@@ -139,9 +135,9 @@ public class CommandFieldMapExecutor {
                     Map<String, Object> softDelete = new HashMap<>();
                     softDelete.put("deleted_flag", true);
                     softDelete.put("updated_at", Instant.now());
-                    deleted = dynamicDataMapper.update(tableName, softDelete, conditions);
+                    deleted = executeScopedUpdate(tableName, targetModel, delIdEntry, softDelete, tenantId, Set.of());
                 } else {
-                    deleted = dynamicDataMapper.delete(tableName, conditions);
+                    deleted = executeScopedDelete(tableName, targetModel, delIdEntry, tenantId);
                 }
                 results.put(targetModel + "_deleted", deleted);
             } else {
@@ -291,13 +287,8 @@ public class CommandFieldMapExecutor {
             // F-5 fix: UPDATE must refresh updated_at — DDL DEFAULT CURRENT_TIMESTAMP only
             // applies to INSERT, so without explicit assignment audit timestamps stale forever.
             columnData.put("updated_at", Instant.now());
-            Map<String, Object> conditions = new HashMap<>();
-            conditions.put("tenant_id", tenantId);
             var idEntry = CommandExecutorUtils.resolveRecordIdColumn(request.getTargetRecordId());
-            conditions.put(idEntry.getKey(), idEntry.getValue());
-            int updated = jsonbColumns.isEmpty()
-                    ? dynamicDataMapper.update(tableName, columnData, conditions)
-                    : dynamicDataMapper.updateWithJsonb(tableName, columnData, conditions, jsonbColumns);
+            int updated = executeScopedUpdate(tableName, modelCode, idEntry, columnData, tenantId, jsonbColumns);
             if (updated == 0) {
                 // F-5 defense: silent code=0 with affected=0 hides "record not found / wrong tenant"
                 // bugs from callers. Reject explicitly so the caller sees BadParam, not a fake 200.
@@ -308,10 +299,7 @@ public class CommandFieldMapExecutor {
             results.put(modelCode + "_updated", updated);
             log.info("Implicit FIELD_MAP UPDATE: {} rows in {} (command={})", updated, modelCode, command.getCode());
         } else if ("delete".equalsIgnoreCase(operationType) && StringUtils.hasText(request.getTargetRecordId())) {
-            Map<String, Object> conditions = new HashMap<>();
-            conditions.put("tenant_id", tenantId);
             var delIdEntry = CommandExecutorUtils.resolveRecordIdColumn(request.getTargetRecordId());
-            conditions.put(delIdEntry.getKey(), delIdEntry.getValue());
             int deleted;
             if (modelDef != null && modelDef.isSoftDelete()) {
                 // Soft-delete model: flag the row (recoverable/auditable) instead of
@@ -319,9 +307,9 @@ public class CommandFieldMapExecutor {
                 Map<String, Object> softDelete = new HashMap<>();
                 softDelete.put("deleted_flag", true);
                 softDelete.put("updated_at", Instant.now());
-                deleted = dynamicDataMapper.update(tableName, softDelete, conditions);
+                deleted = executeScopedUpdate(tableName, modelCode, delIdEntry, softDelete, tenantId, Set.of());
             } else {
-                deleted = dynamicDataMapper.delete(tableName, conditions);
+                deleted = executeScopedDelete(tableName, modelCode, delIdEntry, tenantId);
             }
             results.put(modelCode + "_deleted", deleted);
             log.info("Implicit FIELD_MAP DELETE: {} rows in {} (command={})", deleted, modelCode, command.getCode());
@@ -359,6 +347,133 @@ public class CommandFieldMapExecutor {
         }
 
         return results;
+    }
+
+    private int executeScopedUpdate(
+            String tableName,
+            String modelCode,
+            Map.Entry<String, Object> idEntry,
+            Map<String, Object> data,
+            Long tenantId,
+            Set<String> jsonbColumns) {
+        if (data == null || data.isEmpty()) {
+            return 0;
+        }
+        CommandExecutorUtils.validateSqlIdentifier(tableName, "FIELD_MAP update table");
+        CommandExecutorUtils.validateSqlIdentifier(idEntry.getKey(), "FIELD_MAP update id column");
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        StringBuilder sql = new StringBuilder("UPDATE ")
+                .append(tableName)
+                .append(" SET ");
+        int index = 0;
+        for (Map.Entry<String, Object> entry : data.entrySet()) {
+            CommandExecutorUtils.validateSqlIdentifier(entry.getKey(), "FIELD_MAP update column");
+            if (index > 0) {
+                sql.append(", ");
+            }
+            String paramName = "set" + index;
+            if (jsonbColumns != null && jsonbColumns.contains(entry.getKey())) {
+                sql.append(entry.getKey()).append(" = #{params.").append(paramName)
+                        .append(",jdbcType=OTHER,typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb");
+            } else {
+                sql.append(entry.getKey()).append(" = #{params.").append(paramName).append("}");
+            }
+            Object parameterValue = entry.getValue();
+            if (jsonbColumns != null && jsonbColumns.contains(entry.getKey())
+                    && parameterValue != null && !(parameterValue instanceof String)) {
+                parameterValue = com.auraboot.framework.meta.util.JsonbFieldHelper.toJsonString(parameterValue);
+            }
+            params.put(paramName, parameterValue);
+            index++;
+        }
+
+        params.put("recordId", idEntry.getValue());
+        params.put("tenantId", tenantId);
+        sql.append(" WHERE ")
+                .append(idEntry.getKey())
+                .append(" = #{params.recordId}")
+                .append(" AND tenant_id = #{params.tenantId}");
+        appendScopedWriteGuards(sql, tenantId, modelCode, "update");
+
+        return dynamicDataMapper.updateByQuery(sql.toString(), params);
+    }
+
+    private int executeScopedDelete(
+            String tableName,
+            String modelCode,
+            Map.Entry<String, Object> idEntry,
+            Long tenantId) {
+        CommandExecutorUtils.validateSqlIdentifier(tableName, "FIELD_MAP delete table");
+        CommandExecutorUtils.validateSqlIdentifier(idEntry.getKey(), "FIELD_MAP delete id column");
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("recordId", idEntry.getValue());
+        params.put("tenantId", tenantId);
+        StringBuilder sql = new StringBuilder("DELETE FROM ")
+                .append(tableName)
+                .append(" WHERE ")
+                .append(idEntry.getKey())
+                .append(" = #{params.recordId}")
+                .append(" AND tenant_id = #{params.tenantId}");
+        appendScopedWriteGuards(sql, tenantId, modelCode, "delete");
+
+        return dynamicDataMapper.deleteByQuery(sql.toString(), params);
+    }
+
+    private void appendScopedWriteGuards(StringBuilder sql, Long tenantId, String modelCode, String operation) {
+        if (MetaContext.isDataPermissionBypassed() || !MetaContext.exists()) {
+            return;
+        }
+        Long userId = MetaContext.getCurrentUserId();
+        if (userId == null) {
+            return;
+        }
+
+        try {
+            String rowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
+                    () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+            appendScopedFilter(sql, rowFilter);
+        } catch (Exception e) {
+            log.error("Failed to apply row-level data permission for FIELD_MAP {} on model {}",
+                    operation, modelCode, e);
+            throw new BusinessException(ResponseCode.FORBIDDEN,
+                    "Data permission evaluation failed for model: " + modelCode);
+        }
+
+        try {
+            String domainFilter = DynamicDataQueryScope.domainFilter(tenantId, modelCode, userId,
+                    () -> dataDomainService.buildDomainFilter(modelCode, userId));
+            appendScopedFilter(sql, domainFilter);
+        } catch (Exception e) {
+            log.error("Failed to apply domain filter for FIELD_MAP {} on model {}",
+                    operation, modelCode, e);
+            throw new BusinessException(ResponseCode.FORBIDDEN,
+                    "Data domain filter evaluation failed for model: " + modelCode);
+        }
+    }
+
+    private void appendScopedFilter(StringBuilder sql, String filter) {
+        if (filter == null || filter.isBlank()) {
+            return;
+        }
+        String normalized = filter.trim();
+        if (normalized.regionMatches(true, 0, "AND ", 0, 4)) {
+            normalized = normalized.substring(4).trim();
+        } else if (normalized.regionMatches(true, 0, "WHERE ", 0, 6)) {
+            normalized = normalized.substring(6).trim();
+        }
+        if (normalized.isBlank()) {
+            return;
+        }
+        rejectStatementInjectionMarkers(normalized);
+        sql.append(" AND ").append(normalized);
+    }
+
+    private void rejectStatementInjectionMarkers(String filter) {
+        if (filter.contains(";") || filter.contains("--") || filter.contains("/*") || filter.contains("*/")) {
+            throw new BusinessException(ResponseCode.BadParam, "Unsafe DataScope filter for FIELD_MAP write");
+        }
     }
 
     private String resolveOperationType(Map<String, Object> execConfig, CommandExecuteRequest request) {

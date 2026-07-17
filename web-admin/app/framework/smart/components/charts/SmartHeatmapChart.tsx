@@ -11,6 +11,7 @@ import type { EChartsOption } from 'echarts';
 import { useChartData } from '~/framework/smart/hooks/useChartData';
 import type { ChartDataSource, FilterConfig, LinkageConfig } from '~/framework/smart/types/chart';
 import { cn } from '~/utils/cn';
+import { dimensionLabel } from '~/framework/smart/utils/chartLabels';
 
 /**
  * Props for SmartHeatmapChart component
@@ -101,13 +102,18 @@ export const SmartHeatmapChart: React.FC<SmartHeatmapChartProps> = ({
     const valKey = valueField || metrics[0];
 
     // Extract unique categories for each axis
-    const xCategories = [...new Set(data.rows.map((row) => String(row[xKey] ?? '')))];
-    const yCategories = [...new Set(data.rows.map((row) => String(row[yKey] ?? '')))];
+    // Index on the dict label so the axis text and the cell lookup agree.
+    const xCategories = [
+      ...new Set(data.rows.map((row) => dimensionLabel(data.meta, xKey, row[xKey]))),
+    ];
+    const yCategories = [
+      ...new Set(data.rows.map((row) => dimensionLabel(data.meta, yKey, row[yKey]))),
+    ];
 
     // Build heatmap data: [xIndex, yIndex, value]
     const heatmapData = data.rows.map((row) => {
-      const xIdx = xCategories.indexOf(String(row[xKey] ?? ''));
-      const yIdx = yCategories.indexOf(String(row[yKey] ?? ''));
+      const xIdx = xCategories.indexOf(dimensionLabel(data.meta, xKey, row[xKey]));
+      const yIdx = yCategories.indexOf(dimensionLabel(data.meta, yKey, row[yKey]));
       const val = Number(row[valKey]) || 0;
       return [xIdx, yIdx, val];
     });

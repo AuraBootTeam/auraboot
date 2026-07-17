@@ -533,6 +533,70 @@ class AgentRunServiceSyncTest {
     }
 
     // =========================================================================
+    // CAP-03: run-completion outcome/goal verdict observation
+    // =========================================================================
+
+    @Test
+    @DisplayName("terminal run emits CAP-03 agent_run.outcome observation with 'achieved' verdict")
+    void completeRun_emitsRunOutcomeObservation_achieved() throws Exception {
+        primeHappyPath();
+        AgentRunService.AgentLoopResult ok = new AgentRunService.AgentLoopResult();
+        ok.success = true;
+        ok.lastResponse = "done";
+        // The real StepLoopService mutates each step's status in place; the mock
+        // mirrors that so the in-memory plan handed to completeRun carries final
+        // statuses (COMPLETED) for the evaluator to read.
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+                .thenAnswer(inv -> {
+                    List<AgentPlanStep> plan = inv.getArgument(0);
+                    plan.forEach(s -> s.setStatus(AgentPlanStep.StepStatus.COMPLETED));
+                    return ok;
+                });
+        when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenReturn(true);
+
+        service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        ArgumentCaptor<Map<String, Object>> detailCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(observationService).publish(eq(TENANT_ID), eq("agent_run.outcome"), eq(AGENT_CODE),
+                eq("achieved"), anyString(), detailCaptor.capture());
+        assertThat(detailCaptor.getValue())
+                .containsEntry("verdict", "achieved")
+                .containsEntry("completedSteps", 1)
+                .containsEntry("totalSteps", 1)
+                .containsEntry("runStatus", "success");
+    }
+
+    @Test
+    @DisplayName("terminal soft-failed run emits CAP-03 agent_run.outcome observation with 'abandoned' verdict")
+    void completeRun_emitsRunOutcomeObservation_abandoned() throws Exception {
+        primeHappyPath();
+        AgentRunService.AgentLoopResult failed = new AgentRunService.AgentLoopResult();
+        failed.success = false;
+        failed.lastResponse = "gave up";
+        when(stepLoopService.executePlanSteps(any(), anyInt(), any(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+                .thenAnswer(inv -> {
+                    List<AgentPlanStep> plan = inv.getArgument(0);
+                    plan.forEach(s -> s.setStatus(AgentPlanStep.StepStatus.FAILED));
+                    return failed;
+                });
+        when(runLifecycleService.completeRunRecord(any(), anyString(), anyString(), any(), any(), anyString()))
+                .thenReturn(false);
+
+        service.executeTaskSync(TENANT_ID, TASK_PID, AGENT_CODE, null);
+
+        ArgumentCaptor<Map<String, Object>> detailCaptor = ArgumentCaptor.forClass(Map.class);
+        verify(observationService).publish(eq(TENANT_ID), eq("agent_run.outcome"), eq(AGENT_CODE),
+                eq("abandoned"), anyString(), detailCaptor.capture());
+        assertThat(detailCaptor.getValue())
+                .containsEntry("verdict", "abandoned")
+                .containsEntry("completedSteps", 0)
+                .containsEntry("runStatus", "failed");
+    }
+
+    // =========================================================================
     // Helpers
     // =========================================================================
 

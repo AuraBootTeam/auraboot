@@ -12,6 +12,7 @@ import org.springframework.security.authentication.dao.DaoAuthenticationProvider
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -33,6 +34,18 @@ public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final UserDetailsService userDetailsService;
+
+    /**
+     * Confines scoped tokens (e.g. embedded-widget visitors) to their declared paths. Runs ahead of
+     * {@link JwtAuthenticationFilter}, whose user lookup would answer 500 for a subject that is not
+     * a platform user. See {@link ScopeRestrictionFilter}.
+     */
+    @Autowired
+    private ScopeRestrictionFilter scopeRestrictionFilter;
+
+    /** CORS rules for public key-authenticated endpoints owned by other modules. */
+    @Autowired(required = false)
+    private List<PublicCorsContributor> publicCorsContributors;
 
     /**
      * Test-only filter that allows E2E specs to override MetaContext user id
@@ -63,6 +76,13 @@ public class SecurityConfig {
                 || activeProfile.contains("test") || "default".equals(activeProfile);
 
         http
+                // Spring Security's default HeaderWriterFilter stamps X-Frame-Options: DENY on every
+                // response — including the deliberate CS iframe-embed path /api/public/cs/frame, which
+                // must be framable by a site's own registered origins. SecurityHeadersFilter already
+                // owns framing policy (DENY for every path EXCEPT that one, which instead emits a
+                // per-site frame-ancestors allowlist), so Security's redundant copy only re-adds DENY
+                // and defeats the allowlist. Disable it here; the custom filter stays the single source.
+                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::disable))
                 // codeql[java/csrf-unprotected-request-type] AuraBoot API
                 // authentication is stateless and requires an Authorization:
                 // Bearer token; browser cookies are not an authentication
@@ -89,7 +109,8 @@ public class SecurityConfig {
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(scopeRestrictionFilter, JwtAuthenticationFilter.class);
 
         // Test-only: honor X-Test-Spoof-User-Id AFTER JwtAuthenticationFilter
         // populates MetaContext. Bean is only present when the "test" profile
@@ -175,6 +196,15 @@ public class SecurityConfig {
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/collect/keyed", keyedCollect);
+
+        // Rules contributed by modules that own their own public key-authenticated endpoint (the
+        // embeddable CS widget, for one). Registered before "/api/**" so the specific pattern wins.
+        if (publicCorsContributors != null) {
+            for (PublicCorsContributor contributor : publicCorsContributors) {
+                source.registerCorsConfiguration(contributor.pathPattern(), contributor.corsConfiguration());
+            }
+        }
+
         source.registerCorsConfiguration("/api/**", configuration);
         return source;
     }

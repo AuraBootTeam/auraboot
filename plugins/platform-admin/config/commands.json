@@ -1,11 +1,38 @@
 [
   {
+    "code": "admin:create_member",
+    "displayName:zh-CN": "新建成员",
+    "displayName:en": "Create Member",
+    "description:en": "Create a tenant member directly: creates the user if needed, activates the membership, and grants the given roles. Payload: name, email, password (optional), phone (optional), roleCodes (optional). These are command arguments, not tenant_member fields — a custom command must not declare them as inputFields, which is a whitelist of MODEL fields and is enforced as field-level edit permission.",
+    "description:zh-CN": "直接创建租户成员:按需创建用户、激活成员资格,并授予指定角色。",
+    "type": "custom",
+    "modelCode": "tenant_member",
+    "permissions": [
+      "admin_tenant_member"
+    ]
+  },
+  {
     "code": "admin:create_sla_config",
     "displayName:zh-CN": "创建 SLA 配置",
     "displayName:en": "Create SLA Configuration",
     "type": "create",
     "modelCode": "sla_config",
-    "inputFields": ["name", "target_type", "target_key", "domain_code", "deadline_mode", "deadline_value", "business_calendar", "suspend_policy", "rule_binding", "action_policy", "model_code", "deadline_field", "priority_field", "enabled"]
+    "inputFields": [
+      "name",
+      "target_type",
+      "target_key",
+      "domain_code",
+      "deadline_mode",
+      "deadline_value",
+      "business_calendar",
+      "suspend_policy",
+      "rule_binding",
+      "action_policy",
+      "model_code",
+      "deadline_field",
+      "priority_field",
+      "enabled"
+    ]
   },
   {
     "code": "admin:update_sla_config",
@@ -13,7 +40,22 @@
     "displayName:en": "Update SLA Configuration",
     "type": "update",
     "modelCode": "sla_config",
-    "inputFields": ["name", "target_type", "target_key", "domain_code", "deadline_mode", "deadline_value", "business_calendar", "suspend_policy", "rule_binding", "action_policy", "model_code", "deadline_field", "priority_field", "enabled"]
+    "inputFields": [
+      "name",
+      "target_type",
+      "target_key",
+      "domain_code",
+      "deadline_mode",
+      "deadline_value",
+      "business_calendar",
+      "suspend_policy",
+      "rule_binding",
+      "action_policy",
+      "model_code",
+      "deadline_field",
+      "priority_field",
+      "enabled"
+    ]
   },
   {
     "code": "admin:delete_sla_config",
@@ -21,16 +63,27 @@
     "displayName:en": "Delete SLA Configuration",
     "type": "delete",
     "modelCode": "sla_config",
-    "extension": { "confirmMessage:zh-CN": "确认删除此 SLA 配置？", "confirmMessage:en": "Confirm delete this SLA configuration?" }
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此 SLA 配置？",
+      "confirmMessage:en": "Confirm delete this SLA configuration?"
+    }
   },
-
   {
     "code": "admin:create_bpm_domain_config",
     "displayName:zh-CN": "创建域配置",
     "displayName:en": "Create Domain Configuration",
     "type": "create",
     "modelCode": "bpm_domain_config",
-    "inputFields": ["domain_code", "domain_name", "model_code", "process_keys", "list_fields", "filter_fields", "sort_fields", "enabled"]
+    "inputFields": [
+      "domain_code",
+      "domain_name",
+      "model_code",
+      "process_keys",
+      "list_fields",
+      "filter_fields",
+      "sort_fields",
+      "enabled"
+    ]
   },
   {
     "code": "admin:update_bpm_domain_config",
@@ -38,7 +91,16 @@
     "displayName:en": "Update Domain Configuration",
     "type": "update",
     "modelCode": "bpm_domain_config",
-    "inputFields": ["domain_code", "domain_name", "model_code", "process_keys", "list_fields", "filter_fields", "sort_fields", "enabled"]
+    "inputFields": [
+      "domain_code",
+      "domain_name",
+      "model_code",
+      "process_keys",
+      "list_fields",
+      "filter_fields",
+      "sort_fields",
+      "enabled"
+    ]
   },
   {
     "code": "admin:delete_bpm_domain_config",
@@ -46,16 +108,30 @@
     "displayName:en": "Delete Domain Configuration",
     "type": "delete",
     "modelCode": "bpm_domain_config",
-    "extension": { "confirmMessage:zh-CN": "确认删除此域配置？", "confirmMessage:en": "Confirm delete this domain configuration?" }
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此域配置？",
+      "confirmMessage:en": "Confirm delete this domain configuration?"
+    }
   },
-
   {
     "code": "admin:create_data_permission",
     "displayName:zh-CN": "创建数据权限策略",
     "displayName:en": "Create Data Permission Policy",
     "type": "create",
     "modelCode": "data_permission",
-    "inputFields": ["name", "description", "model_code", "policy_type", "scope_type", "scope_expression", "field_code", "mask_type", "mask_expression", "priority", "enabled"]
+    "inputFields": [
+      "name",
+      "description",
+      "model_code",
+      "policy_type",
+      "scope_type",
+      "scope_expression",
+      "field_code",
+      "mask_type",
+      "mask_expression",
+      "priority",
+      "enabled"
+    ]
   },
   {
     "code": "admin:update_data_permission",
@@ -63,7 +139,19 @@
     "displayName:en": "Update Data Permission Policy",
     "type": "update",
     "modelCode": "data_permission",
-    "inputFields": ["name", "description", "model_code", "policy_type", "scope_type", "scope_expression", "field_code", "mask_type", "mask_expression", "priority", "enabled"]
+    "inputFields": [
+      "name",
+      "description",
+      "model_code",
+      "policy_type",
+      "scope_type",
+      "scope_expression",
+      "field_code",
+      "mask_type",
+      "mask_expression",
+      "priority",
+      "enabled"
+    ]
   },
   {
     "code": "admin:delete_data_permission",
@@ -71,16 +159,29 @@
     "displayName:en": "Delete Data Permission Policy",
     "type": "delete",
     "modelCode": "data_permission",
-    "extension": { "confirmMessage:zh-CN": "确认删除此数据权限策略？", "confirmMessage:en": "Confirm delete this data permission policy?" }
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此数据权限策略？",
+      "confirmMessage:en": "Confirm delete this data permission policy?"
+    }
   },
-
   {
     "code": "admin:create_webhook",
     "displayName:zh-CN": "创建 Webhook",
     "displayName:en": "Create Webhook",
     "type": "create",
     "modelCode": "webhook",
-    "inputFields": ["name", "target_url", "event_type", "model_code", "filter_expression", "secret", "headers", "max_retries", "timeout_ms", "enabled"]
+    "inputFields": [
+      "name",
+      "target_url",
+      "event_type",
+      "model_code",
+      "filter_expression",
+      "secret",
+      "headers",
+      "max_retries",
+      "timeout_ms",
+      "enabled"
+    ]
   },
   {
     "code": "admin:update_webhook",
@@ -88,7 +189,18 @@
     "displayName:en": "Update Webhook",
     "type": "update",
     "modelCode": "webhook",
-    "inputFields": ["name", "target_url", "event_type", "model_code", "filter_expression", "secret", "headers", "max_retries", "timeout_ms", "enabled"]
+    "inputFields": [
+      "name",
+      "target_url",
+      "event_type",
+      "model_code",
+      "filter_expression",
+      "secret",
+      "headers",
+      "max_retries",
+      "timeout_ms",
+      "enabled"
+    ]
   },
   {
     "code": "admin:delete_webhook",
@@ -96,16 +208,27 @@
     "displayName:en": "Delete Webhook",
     "type": "delete",
     "modelCode": "webhook",
-    "extension": { "confirmMessage:zh-CN": "确认删除此 Webhook？", "confirmMessage:en": "Confirm delete this webhook?" }
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此 Webhook？",
+      "confirmMessage:en": "Confirm delete this webhook?"
+    }
   },
-
   {
     "code": "admin:create_api_connector",
     "displayName:zh-CN": "创建 API 连接器",
     "displayName:en": "Create API Connector",
     "type": "create",
     "modelCode": "api_connector",
-    "inputFields": ["name", "base_url", "auth_type", "auth_config", "default_headers", "timeout_ms", "retry_policy", "enabled"]
+    "inputFields": [
+      "name",
+      "base_url",
+      "auth_type",
+      "auth_config",
+      "default_headers",
+      "timeout_ms",
+      "retry_policy",
+      "enabled"
+    ]
   },
   {
     "code": "admin:update_api_connector",
@@ -113,7 +236,16 @@
     "displayName:en": "Update API Connector",
     "type": "update",
     "modelCode": "api_connector",
-    "inputFields": ["name", "base_url", "auth_type", "auth_config", "default_headers", "timeout_ms", "retry_policy", "enabled"]
+    "inputFields": [
+      "name",
+      "base_url",
+      "auth_type",
+      "auth_config",
+      "default_headers",
+      "timeout_ms",
+      "retry_policy",
+      "enabled"
+    ]
   },
   {
     "code": "admin:delete_api_connector",
@@ -121,9 +253,11 @@
     "displayName:en": "Delete API Connector",
     "type": "delete",
     "modelCode": "api_connector",
-    "extension": { "confirmMessage:zh-CN": "确认删除此 API 连接器？", "confirmMessage:en": "Confirm delete this API connector?" }
+    "extension": {
+      "confirmMessage:zh-CN": "确认删除此 API 连接器？",
+      "confirmMessage:en": "Confirm delete this API connector?"
+    }
   },
-
   {
     "code": "admin:approve_member",
     "displayName:zh-CN": "通过",
@@ -131,7 +265,9 @@
     "type": "state_transition",
     "modelCode": "tenant_member",
     "stateField": "status",
-    "fromStates": ["pending"],
+    "fromStates": [
+      "pending"
+    ],
     "toState": "active",
     "extension": {
       "confirmMessage:zh-CN": "确认通过该成员申请？",
@@ -145,7 +281,9 @@
     "type": "state_transition",
     "modelCode": "tenant_member",
     "stateField": "status",
-    "fromStates": ["pending"],
+    "fromStates": [
+      "pending"
+    ],
     "toState": "rejected",
     "extension": {
       "confirmMessage:zh-CN": "确认拒绝该成员申请？",
@@ -159,7 +297,9 @@
     "type": "state_transition",
     "modelCode": "tenant_member",
     "stateField": "status",
-    "fromStates": ["active"],
+    "fromStates": [
+      "active"
+    ],
     "toState": "suspended",
     "extension": {
       "confirmMessage:zh-CN": "确认暂停该成员？",
@@ -173,7 +313,10 @@
     "type": "state_transition",
     "modelCode": "tenant_member",
     "stateField": "status",
-    "fromStates": ["suspended", "rejected"],
+    "fromStates": [
+      "suspended",
+      "rejected"
+    ],
     "toState": "active",
     "extension": {
       "confirmMessage:zh-CN": "确认恢复该成员？",
@@ -187,7 +330,9 @@
     "type": "state_transition",
     "modelCode": "tenant_member",
     "stateField": "status",
-    "fromStates": ["active"],
+    "fromStates": [
+      "active"
+    ],
     "toState": "inactive",
     "extension": {
       "confirmMessage:zh-CN": "确认将该成员标记为离职？",
@@ -227,14 +372,25 @@
       "confirmMessage:en": "Provision an account from the selected employee? A one-time temporary password will be generated when a user is created."
     }
   },
-
   {
     "code": "admin:create_scheduled_task",
     "displayName:zh-CN": "创建定时任务",
     "displayName:en": "Create Scheduled Task",
     "type": "create",
     "modelCode": "scheduled_task",
-    "inputFields": ["name", "description", "task_type", "cron_expression", "interval_ms", "handler_bean", "handler_method", "params", "max_retries", "timeout_ms", "enabled"]
+    "inputFields": [
+      "name",
+      "description",
+      "task_type",
+      "cron_expression",
+      "interval_ms",
+      "handler_bean",
+      "handler_method",
+      "params",
+      "max_retries",
+      "timeout_ms",
+      "enabled"
+    ]
   },
   {
     "code": "admin:update_scheduled_task",
@@ -242,7 +398,19 @@
     "displayName:en": "Update Scheduled Task",
     "type": "update",
     "modelCode": "scheduled_task",
-    "inputFields": ["name", "description", "task_type", "cron_expression", "interval_ms", "handler_bean", "handler_method", "params", "max_retries", "timeout_ms", "enabled"]
+    "inputFields": [
+      "name",
+      "description",
+      "task_type",
+      "cron_expression",
+      "interval_ms",
+      "handler_bean",
+      "handler_method",
+      "params",
+      "max_retries",
+      "timeout_ms",
+      "enabled"
+    ]
   },
   {
     "code": "admin:delete_scheduled_task",

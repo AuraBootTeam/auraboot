@@ -9,9 +9,11 @@ import com.auraboot.framework.agent.service.SubAgentRunner;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.ai.AiModelSuggestionService;
 import com.auraboot.framework.meta.constant.SystemFieldConstants;
+import com.auraboot.framework.meta.dto.FieldMaskRule;
 import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.security.SqlSafetyUtils;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.MetaModelService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +51,7 @@ public class PlatformToolProvider implements ToolProvider {
     private final NlModelingService nlModelingService;
     private final SubAgentRunner subAgentRunner;
     private final JdbcTemplate jdbcTemplate;
+    private final DataPermissionEngine dataPermissionEngine;
 
     private static final List<ToolDefinition> PLATFORM_TOOLS = List.of(
         ToolDefinition.builder()
@@ -202,9 +205,12 @@ public class PlatformToolProvider implements ToolProvider {
         }
         queryParams.put("tenantId", effectiveTenantId);
 
-        // Tenant isolation enforcement: inject the runtime tenant for simple
-        // read-only SELECT statements instead of asking the LLM/user for tenant_id.
-        String isolatedSql = injectTenantFilterIfMissing(sql);
+        // Tenant isolation enforcement: ALWAYS inject the runtime tenant predicate
+        // for read-only SELECT statements. The SQL originates from an LLM tool-call
+        // param, so we must never trust a tenant_id the model wrote — the injected
+        // server-side predicate is AND-ed onto whatever the query already contains,
+        // which can only narrow the result set to the current tenant.
+        String isolatedSql = injectTenantFilter(sql);
         if (isolatedSql == null) {
             return errorResult("SQL requires tenant isolation. Prefer the available DSL/list/named-query tools, "
                     + "or use a SELECT with a clear top-level FROM/WHERE clause so tenant_id can be injected.");
@@ -227,6 +233,12 @@ public class PlatformToolProvider implements ToolProvider {
         }
 
         if (rows == null) rows = Collections.emptyList();
+
+        // SEC-005: execute_sql reads mt_* tables via selectByQueryWithoutTenant, which
+        // bypasses the row-level ACL + field masking that DynamicDataService applies on
+        // the DSL list/get path. Re-apply DataPermissionEngine post-filtering so the LLM
+        // SQL tool honours the same data-permission policies as the rest of the platform.
+        rows = applyDataPermissions(sql, rows, effectiveTenantId);
 
         // Extract column names from first row
         List<String> columns = rows.isEmpty()
@@ -534,9 +546,9 @@ public class PlatformToolProvider implements ToolProvider {
     private static final Pattern FROM_TABLE = Pattern.compile(
             "\\bfrom\\s+(mt_\\w+)",
             Pattern.CASE_INSENSITIVE);
-    private static final Pattern TENANT_ID_REFERENCE = Pattern.compile("\\btenant_id\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern FROM_REFERENCE = Pattern.compile("\\bfrom\\b", Pattern.CASE_INSENSITIVE);
     private static final Pattern LIMIT_REFERENCE = Pattern.compile("\\blimit\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MT_TABLE_REFERENCE = Pattern.compile("\\bmt_(\\w+)", Pattern.CASE_INSENSITIVE);
 
     /**
      * Turn opaque SQL errors into actionable guidance for the LLM.
@@ -629,10 +641,19 @@ public class PlatformToolProvider implements ToolProvider {
         return "true".equalsIgnoreCase(val.toString().trim());
     }
 
-    private static String injectTenantFilterIfMissing(String sql) {
-        if (TENANT_ID_REFERENCE.matcher(sql).find()) {
-            return sql;
-        }
+    /**
+     * Unconditionally inject the current-tenant predicate into a read-only SELECT.
+     *
+     * <p>The SQL is authored by the LLM from a tool-call param, so a
+     * prompt-injected {@code WHERE tenant_id = <other tenant>} must NOT be
+     * trusted. We always AND {@code tenant_id = #{params.tenantId}} onto the
+     * top-level WHERE (or add a WHERE when absent); when the caller already wrote
+     * a tenant_id the result is {@code server-condition AND caller-condition},
+     * which can only intersect down to the current tenant. Returns {@code null}
+     * when the statement has no place to attach the predicate (caller then
+     * rejects the query).
+     */
+    private static String injectTenantFilter(String sql) {
         if (!FROM_REFERENCE.matcher(sql).find()) {
             return sql;
         }
@@ -652,6 +673,66 @@ public class PlatformToolProvider implements ToolProvider {
             return null;
         }
         return head + " WHERE " + predicate + tail;
+    }
+
+    /**
+     * SEC-005: apply the same row-level ACL + field masking that
+     * {@code DynamicDataService} applies on the DSL list/get path.
+     *
+     * <p>Post-query filtering can only be attributed to a single model, so it is
+     * applied when the query targets exactly one {@code mt_<model>} table. Cross-model
+     * joins / aggregates / non-mt_ system tables cannot be mapped to one model's row
+     * policies; those rely on the unconditional tenant predicate (see
+     * {@link #injectTenantFilter}) as the isolation boundary. Any failure inside the
+     * engine propagates to {@link #execute} and is surfaced as a failed result
+     * (fail-secure: no rows leak).
+     */
+    private List<Map<String, Object>> applyDataPermissions(String sql,
+                                                           List<Map<String, Object>> rows,
+                                                           Long tenantId) {
+        if (rows == null || rows.isEmpty()) {
+            return rows;
+        }
+        String modelCode = singleTargetModelCode(sql);
+        if (modelCode == null) {
+            // Cannot attribute per-row ACL to one model; tenant predicate already enforced.
+            return rows;
+        }
+        Long userId = MetaContext.getCurrentUserId();
+
+        // Row-level ACL (SELF / DEPARTMENT / PROJECT / CUSTOM) — narrows to accessible rows.
+        List<Map<String, Object>> filtered =
+                dataPermissionEngine.filterRecords(tenantId, modelCode, userId, rows);
+
+        // Column-level masking.
+        List<FieldMaskRule> maskRules =
+                dataPermissionEngine.getFieldMaskRules(tenantId, modelCode, userId);
+        if (maskRules != null && !maskRules.isEmpty()) {
+            filtered = dataPermissionEngine.applyFieldMasking(filtered, maskRules);
+        }
+        return filtered;
+    }
+
+    /**
+     * Return the single {@code mt_<model>} model code referenced by the SQL, or
+     * {@code null} when zero or more than one distinct {@code mt_} table is present
+     * (per-row ACL cannot be attributed to a single model in those cases).
+     */
+    private static String singleTargetModelCode(String sql) {
+        if (sql == null) {
+            return null;
+        }
+        Matcher matcher = MT_TABLE_REFERENCE.matcher(sql);
+        String first = null;
+        while (matcher.find()) {
+            String candidate = matcher.group(1);
+            if (first == null) {
+                first = candidate;
+            } else if (!first.equalsIgnoreCase(candidate)) {
+                return null;
+            }
+        }
+        return first;
     }
 
     private static int firstClauseBoundary(String sql) {

@@ -502,21 +502,4 @@ class SubjectPermissionServiceIntegrationTest {
 
     // ==================== Cache Eviction Tests ====================
 
-    @Test
-    @Order(40)
-    @DisplayName("Should evict subject evaluations from cache")
-    void testEvictSubjectEvaluations() {
-        Long subjectId = System.nanoTime();
-
-        org.springframework.cache.Cache cache = cacheManager.getCache("subject-evaluation");
-        assertThat(cache).isNotNull();
-
-        String cacheKey = "BUTTON:" + subjectId + ":" + testUser.getId();
-        cache.put(cacheKey, Boolean.TRUE);
-        assertThat(cache.get(cacheKey)).isNotNull();
-
-        subjectPermissionService.evictSubjectEvaluations("button", subjectId);
-
-        assertThat(cache.get(cacheKey)).isNull();
-    }
 }

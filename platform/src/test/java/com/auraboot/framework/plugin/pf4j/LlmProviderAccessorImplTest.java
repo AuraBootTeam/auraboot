@@ -53,7 +53,7 @@ class LlmProviderAccessorImplTest {
                 "Return JSON only.",
                 List.of(AiProviderAccessor.Message.user("Raw row")),
                 1024,
-                Map.of("source", "jiejia")
+                Map.of("source", "jiejia", "responseFormat", "json_object")
         ));
 
         assertEquals("qianwen", response.providerCode());
@@ -67,6 +67,7 @@ class LlmProviderAccessorImplTest {
         assertEquals("Return JSON only.", requestCaptor.getValue().getSystemPrompt());
         assertEquals("Raw row", requestCaptor.getValue().getMessages().get(0).getContent());
         assertEquals(1024, requestCaptor.getValue().getMaxTokens());
+        assertEquals("json_object", requestCaptor.getValue().getResponseFormat());
     }
 
     @Test

@@ -19,9 +19,9 @@ import { type Page, type Locator, expect } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 
 const CURRENT_DYNAMIC_PAGE_KEY_ALIASES: Record<string, string> = {
-  'crm-account': 'crm_account_common',
-  crm_account: 'crm_account_common',
-  crm_account_list: 'crm_account_common',
+  'crm-account': 'crm_account',
+  crm_account: 'crm_account',
+  crm_account_list: 'crm_account',
 };
 
 export function normalizeDynamicPageKey(pageKey: string): string {
@@ -916,7 +916,12 @@ export async function executeCommandViaApi(
   options?: { allowHttpError?: boolean; timeoutMs?: number },
 ): Promise<{ recordId: string; code: string }> {
   const data: Record<string, unknown> = { payload };
-  if (targetRecordId) data.targetRecordId = targetRecordId;
+  // Public JSON callers must send the record target as `targetRecordPid` — the
+  // request DTO @JsonIgnore's `targetRecordId` (internal pipeline field) per the
+  // public-record dual-id contract. Sending `targetRecordId` here was silently
+  // dropped, so UPDATE/DELETE commands never received their target (e.g. the
+  // unique_composite validator could not exclude the record being updated).
+  if (targetRecordId) data.targetRecordPid = targetRecordId;
   if (operationType) data.operationType = operationType;
 
   const resp = await page.request.post(`/api/meta/commands/execute/${commandCode}`, {

@@ -260,6 +260,15 @@ configurations {
         exclude group: 'org.slf4j', module: 'slf4j-reload4j'
         exclude group: 'org.slf4j', module: 'slf4j-log4j12'
         exclude group: 'log4j', module: 'log4j'
+        // The ancient XPP pull parsers (org.gjt.xpp, from xmlpull/pull-parser/xpp3) register
+        // org.gjt.xpp.sax2.Driver as the SAX driver but reject SAX properties Apache POI/xmlbeans
+        // require ("not supported setting property lexical-handler") — OOXML ingestion then throws
+        // "Failed to parse PPTX" in the assembled app (unit tests pass on the JDK parser, so only a
+        // real-stack golden catches it). The JDK SAX parser + stax2-api/woodstox handle XML; drop them.
+        exclude group: 'pull-parser', module: 'pull-parser'
+        exclude group: 'xpp3', module: 'xpp3'
+        exclude group: 'stax', module: 'stax-api'
+        exclude group: 'javax.xml.stream', module: 'stax-api'
     }
 }
 
@@ -353,10 +362,17 @@ dependencies {
     implementation 'org.postgresql:postgresql:42.7.11'
     runtimeOnly 'com.mysql:mysql-connector-j'
 
-    // Apache POI for Excel export
+    // Apache POI for Excel export + RAG document parsing (docx / pptx / xlsx)
     implementation 'org.apache.poi:poi:5.5.1'
     implementation 'org.apache.poi:poi-ooxml:5.5.1'
     implementation 'org.apache.pdfbox:pdfbox:2.0.36'
+
+    // Legacy binary Office formats (.ppt / .xls) for RAG ingestion — HSLF / HSSF live here,
+    // not in poi-ooxml. Users have decks that predate OOXML and uploading them used to be refused.
+    implementation 'org.apache.poi:poi-scratchpad:5.5.1'
+
+    // HTML parsing for RAG document ingestion (DocumentParserService)
+    implementation 'org.jsoup:jsoup:1.17.2'
 
     // Firebase Admin SDK for FCM push notifications (APNs + FCM unified)
     implementation('com.google.firebase:firebase-admin:9.9.0') {

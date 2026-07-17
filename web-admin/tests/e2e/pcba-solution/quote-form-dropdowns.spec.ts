@@ -18,6 +18,23 @@ const QUOTE_NEW = '/p/qo_quote_common/new?commandCode=qo_quote_common:create';
 const uid = uniqueId('ldd').replace(/_/g, '-');
 const users: Record<string, QuoteRoleUser> = {};
 
+async function waitForOptionsAfterOpen(page: Page): Promise<number> {
+  await expect.poll(async () => {
+    const optionCount = await page.getByRole('option').count();
+    const popupCount = await page.locator('[role="listbox"], [data-radix-popper-content-wrapper], .ant-select-dropdown').count();
+    return optionCount > 0 || popupCount > 0;
+  }, { timeout: 3_000, intervals: [100, 250, 500] }).toBeTruthy().catch(() => {});
+  return page.getByRole('option').count();
+}
+
+async function waitForFilterToSettle(page: Page, previousCount: number): Promise<number> {
+  await expect.poll(async () => {
+    const currentCount = await page.getByRole('option').count();
+    return currentCount <= previousCount;
+  }, { timeout: 3_000, intervals: [100, 250, 500] }).toBeTruthy();
+  return page.getByRole('option').count();
+}
+
 test.describe('Quote form reference dropdowns searchable (DD-04/05) @smoke', () => {
   test.describe.configure({ mode: 'serial', timeout: 120_000 });
 
@@ -45,7 +62,10 @@ test.describe('Quote form reference dropdowns searchable (DD-04/05) @smoke', () 
     const { context, page } = await openQuoteRolePage(browser, users['sales']);
     try {
       await page.goto(QUOTE_NEW, { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(2500);
+      await expect.poll(async () => page.getByRole('combobox').count(), {
+        timeout: 10_000,
+        intervals: [250, 500, 1_000],
+      }).toBeGreaterThan(0);
       const combos = page.getByRole('combobox');
       const n = await combos.count();
       expect(n, 'quote form has reference/dict dropdowns').toBeGreaterThan(0);
@@ -56,7 +76,7 @@ test.describe('Quote form reference dropdowns searchable (DD-04/05) @smoke', () 
       for (let i = 0; i < Math.min(n, 6); i++) {
         const c = combos.nth(i);
         await c.click().catch(() => {});
-        await page.waitForTimeout(700);
+        await waitForOptionsAfterOpen(page);
         const opts = page.getByRole('option');
         const oc = await opts.count();
         if (oc > 0) {
@@ -66,14 +86,13 @@ test.describe('Quote form reference dropdowns searchable (DD-04/05) @smoke', () 
           const token = firstText.trim().slice(0, 2);
           if (token) {
             await page.keyboard.type(token, { delay: 25 });
-            await page.waitForTimeout(800);
-            const oc2 = await page.getByRole('option').count();
+            const oc2 = await waitForFilterToSettle(page, oc);
             // filtering applied if the option count changed or all remaining contain the token
             if (oc2 >= 0 && oc2 <= oc) filteredOk = true;
           }
         }
         await page.keyboard.press('Escape').catch(() => {});
-        await page.waitForTimeout(200);
+        await expect(page.getByRole('option').first()).toBeHidden({ timeout: 1_000 }).catch(() => {});
       }
       expect(loadedOptionLists, 'DD-04/05: at least one reference dropdown loads options').toBeGreaterThan(0);
       expect(filteredOk, 'DD-04/05: typing into a searchable dropdown filters options').toBeTruthy();

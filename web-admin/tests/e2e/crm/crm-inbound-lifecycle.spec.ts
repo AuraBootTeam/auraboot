@@ -157,8 +157,8 @@ test.describe('CRM Inbound Full Lifecycle @critical', () => {
       .then(() => true);
 
     // Also navigate to the Leads page via menu and visually verify
-    await navigateViaCrmMenu(page, '/p/crm_lead_common');
-    await expect(page).toHaveURL(/\/p\/crm_lead_common(?:\?.*)?$/);
+    await navigateViaCrmMenu(page, '/p/crm_lead');
+    await expect(page).toHaveURL(/\/p\/crm_lead(?:\?.*)?$/);
 
     // Wait for the table to appear
     await expect(page.locator('table').first()).toBeVisible({ timeout: 15000 });

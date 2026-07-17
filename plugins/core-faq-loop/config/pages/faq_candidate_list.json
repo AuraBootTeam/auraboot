@@ -1,0 +1,157 @@
+{
+  "pageKey": "faq_candidate_list",
+  "modelCode": "faq_candidate",
+  "kind": "list",
+  "schemaVersion": 4,
+  "layout": {
+    "type": "stack"
+  },
+  "blocks": [
+    {
+      "id": "faq_candidate_tabs",
+      "blockType": "tabs",
+      "tabs": [
+        {
+          "key": "all",
+          "label": {
+            "zh-CN": "全部",
+            "en": "All"
+          },
+          "filter": null
+        },
+        {
+          "key": "draft",
+          "label": {
+            "zh-CN": "待审核",
+            "en": "Pending Review"
+          },
+          "filter": {
+            "field": "faq_status",
+            "value": "draft",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "approved",
+          "label": {
+            "zh-CN": "已批准",
+            "en": "Approved"
+          },
+          "filter": {
+            "field": "faq_status",
+            "value": "approved",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "published",
+          "label": {
+            "zh-CN": "已发布",
+            "en": "Published"
+          },
+          "filter": {
+            "field": "faq_status",
+            "value": "published",
+            "operator": "EQ"
+          }
+        },
+        {
+          "key": "rejected",
+          "label": {
+            "zh-CN": "已驳回",
+            "en": "Rejected"
+          },
+          "filter": {
+            "field": "faq_status",
+            "value": "rejected",
+            "operator": "EQ"
+          }
+        }
+      ]
+    },
+    {
+      "id": "faq_candidate_table",
+      "blockType": "table",
+      "onRowClick": "navigate",
+      "columns": [
+        {
+          "field": "faq_question",
+          "width": 320,
+          "sortable": false
+        },
+        {
+          "field": "faq_status",
+          "width": 120,
+          "renderType": "tag",
+          "dictCode": "faq_candidate_status"
+        },
+        {
+          "field": "faq_confidence",
+          "width": 110,
+          "sortable": true,
+          "renderType": "progress",
+          "render": {
+            "thresholds": [
+              {
+                "max": 60,
+                "tone": "gray"
+              },
+              {
+                "max": 85,
+                "tone": "amber"
+              },
+              {
+                "tone": "green"
+              }
+            ]
+          }
+        },
+        {
+          "field": "faq_reviewed_by",
+          "width": 140
+        },
+        {
+          "field": "faq_reviewed_at",
+          "width": 170,
+          "sortable": true,
+          "renderType": "datetime"
+        },
+        {
+          "field": "actions",
+          "isActionColumn": true,
+          "label": {
+            "zh-CN": "操作",
+            "en": "Actions"
+          },
+          "buttons": [
+            {
+              "code": "view",
+              "label": {
+                "zh-CN": "详情",
+                "en": "Detail"
+              },
+              "action": {
+                "type": "navigate",
+                "to": "faq_candidate_detail"
+              }
+            }
+          ]
+        }
+      ],
+      "searchFields": [
+        "faq_question",
+        "faq_answer"
+      ],
+      "defaultSort": {
+        "field": "created_at",
+        "order": "desc"
+      }
+    }
+  ],
+  "name:zh-CN": "FAQ 候选列表",
+  "name:en": "FAQ Candidates",
+  "title": {
+    "zh-CN": "FAQ 候选列表",
+    "en": "FAQ Candidates"
+  }
+}

@@ -15,8 +15,8 @@ import com.auraboot.framework.agent.runtime.LlmRuntimeResolver;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.agent.trace.SpanContext;
 import com.auraboot.framework.agent.trace.TraceContext;
-import com.auraboot.framework.aurabot.dto.ChatMessage;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatMessage;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
@@ -111,6 +111,35 @@ public class AuraBotChatService {
             "You are AuraBot, an intelligent assistant for the AuraBoot platform. " +
             "Help users with their questions about the current page and data. " +
             "Be concise, accurate, and helpful. Respond in the user's language.";
+
+    /**
+     * Injected in place of the knowledge context when a tool-less (RAG-only) turn has an explicit
+     * knowledge base bound but retrieval returned nothing. Absence of context is NOT "answer freely":
+     * without this an LLM fills the gap from general knowledge (e.g. an empty-KB tenant answering a
+     * "7-day no-reason return" from consumer-law priors). The marker makes the empty result explicit.
+     */
+    private static final String EMPTY_KB_MARKER =
+            "[Knowledge base search result: EMPTY] No relevant content was found in the bound knowledge "
+            + "base for this question. You MUST reply that the information was not found and offer to "
+            + "hand off to a human agent; do NOT answer from general knowledge or industry convention. "
+            + "【知识库检索结果为空:必须如实告知“暂未找到相关信息”并建议转人工客服,禁止用通用常识或行业惯例作答】";
+
+    /**
+     * Appended AFTER the retrieved context on a tool-less (RAG-only, e.g. CS widget) turn that DID get
+     * context. The customer-facing gap: the model has the right fact in context ("7 个自然日") yet
+     * overrides it with a parametric prior ("30 days") and drifts to English. Recency-positioned hard
+     * grounding — verbatim facts, no substitution, answer in the user's language — closes it. Kept
+     * separate from the tenant prompt template so it holds even if a tenant customizes/omits the rule.
+     */
+    private static final String RAG_ONLY_GROUNDING =
+            "\n\n【回答约束(必须遵守)】\n"
+            + "1. 只依据上面的“知识库检索结果”回答;其中的数字、日期、期限、金额、型号、比例等事实必须逐字照抄,"
+            + "严禁用常识、行业惯例或训练知识替换、推算或补全。\n"
+            + "2. 若检索结果没有包含用户问题的答案,只回答“抱歉,暂未找到相关信息”,并主动提出转接人工客服,不要编造。\n"
+            + "3. 始终使用用户提问所用的语言回答。\n"
+            + "(Answer strictly from the retrieved context above; copy figures/dates/terms verbatim, never "
+            + "substitute from general knowledge; if the answer is not in the context, say it was not found "
+            + "and offer a human handoff; reply in the user's language.)";
 
     public AuraBotChatService(LlmProviderFactory llmProviderFactory,
                               PromptTemplateService promptTemplateService,
@@ -333,9 +362,13 @@ public class AuraBotChatService {
                 llmProviderFactory, options.getProvider(), options.getModel());
         ProviderConfig config = llmProviderFactory.resolveConfig(tenantId, providerCode);
         if (config == null) {
-            String msg = "No LLM provider configured. Please configure an API key in Cloud Config.";
-            sink.onError(msg, null);
-            return new TurnOutcome.Failed(msg, null);
+            // User-facing: emit an $i18n: sentinel so the frontend (which knows the
+            // browser locale) localizes it via useSmartText. The service layer has no
+            // request locale here, mirroring the BusinessException.i18n contract. Keep
+            // a readable English message on the outcome for logs / audit.
+            sink.onError("$i18n:aurabot.error.no_llm_provider", null);
+            return new TurnOutcome.Failed(
+                    "No LLM provider configured. Please configure an API key in Cloud Config.", null);
         }
         // Use the resolved provider code (may differ from input when auto-discovered)
         providerCode = LlmProviderFactory.effectiveProviderCode(providerCode, config);
@@ -417,7 +450,7 @@ public class AuraBotChatService {
         SpanContext resolveSpan = aiTraceService.startSpan(
                 trace, null, "span", "resolve_tools",
                 buildResolveToolsSpanInput(request.getMessage(), modelCode, recordPid));
-        var resolved = chatToolResolver.resolveTools(request.getMessage(), modelCode, recordPid);
+        var resolved = chatToolResolver.resolveTools(request.getMessage(), modelCode, recordPid, ctx.channel());
         List<LlmChatRequest.Tool> tools = resolved.tools();
         if (bif != null) {
             tools = applyCandidateSkillsMode(tools, bif);
@@ -430,7 +463,14 @@ public class AuraBotChatService {
 
         // --- Trace: render prompt span ---
         SpanContext promptSpan = aiTraceService.startSpan(trace, null, "span", "render_prompt", null);
-        AgentContextBundle contextBundle = buildAgentContextBundle(tenantId, request);
+        List<String> contextWarnings = new ArrayList<>();
+        AgentContextBundle contextBundle = buildAgentContextBundle(tenantId, request, contextWarnings);
+        // A knowledge base that could not be searched is not a detail to log and move on from: the
+        // user is about to read a confident answer that was built without it, and nothing else on
+        // screen would tell them apart.
+        if (!contextWarnings.isEmpty()) {
+            sink.onWarnings(contextWarnings);
+        }
         String systemPrompt = buildSystemPrompt(tenantId, request, effectiveResolved, contextBundle);
         if (bif != null) {
             systemPrompt = systemPrompt + buildBifContextHint(bif);
@@ -504,6 +544,18 @@ public class AuraBotChatService {
                 ? assembledContextBundle
                 : buildAgentContextBundle(tenantId, request);
         String contextSection = contextBundle.renderPromptSection();
+        // RAG-only turn (no tools, e.g. the CS widget) whose bound knowledge base returned nothing:
+        // replace the empty context with an explicit "not found → decline" marker so the model does
+        // not free-associate from general knowledge (gap: empty-KB tenant answering "7-day return").
+        if (!hasTools && contextSection.isBlank()
+                && request != null && request.getKnowledgeBaseIds() != null
+                && !request.getKnowledgeBaseIds().isEmpty()) {
+            contextSection = EMPTY_KB_MARKER;
+        }
+        // RAG-only turn that DID get real context: enforce verbatim grounding + user-language reply
+        // (closes the "has '7 个自然日' in context but answers '30 days' in English" hallucination).
+        boolean ragOnlyGrounding = !hasTools && !contextSection.isBlank()
+                && !EMPTY_KB_MARKER.equals(contextSection);
         if (ctx != null) {
             vars.put("hasPageContext", true);
             vars.put("pageType", ctx.getKind());
@@ -553,6 +605,9 @@ public class AuraBotChatService {
             if (!contextSection.isBlank()) {
                 prompt += "\n\n" + contextSection;
             }
+            if (ragOnlyGrounding) {
+                prompt += RAG_ONLY_GROUNDING;
+            }
             return prompt;
         }
 
@@ -564,6 +619,9 @@ public class AuraBotChatService {
         if (!contextSection.isBlank()) {
             sb.append("\n\n").append(contextSection);
         }
+        if (ragOnlyGrounding) {
+            sb.append(RAG_ONLY_GROUNDING);
+        }
         return sb.toString();
     }
 
@@ -573,9 +631,14 @@ public class AuraBotChatService {
     }
 
     private AgentContextBundle buildAgentContextBundle(Long tenantId, ChatRequest request) {
+        return buildAgentContextBundle(tenantId, request, new ArrayList<>());
+    }
+
+    private AgentContextBundle buildAgentContextBundle(Long tenantId, ChatRequest request,
+                                                        List<String> warnings) {
         ChatRequest.PageContext ctx = request != null ? request.getPageContext() : null;
         String modelSchemaText = ctx != null ? buildModelSchemaText(ctx.getModelCode()) : "";
-        String ragContext = request != null ? resolveRagContext(tenantId, request) : "";
+        String ragContext = request != null ? resolveRagContext(tenantId, request, warnings) : "";
         AgentContextBundle contextBundle = contextAssembler.assemble(
                 new AgentContextAssembler.Request(
                         tenantId,
@@ -631,6 +694,14 @@ public class AuraBotChatService {
      * Uses the optional RagContextProvider from the core AI runtime.
      */
     private String resolveRagContext(Long tenantId, ChatRequest request) {
+        return resolveRagContext(tenantId, request, new ArrayList<>());
+    }
+
+    /**
+     * @param warnings collector for a failure the user needs to know about; the caller forwards it
+     *                 to the response sink
+     */
+    private String resolveRagContext(Long tenantId, ChatRequest request, List<String> warnings) {
         if (ragContextProvider == null) return "";
         try {
             List<String> kbIds = request.getKnowledgeBaseIds();
@@ -644,7 +715,14 @@ public class AuraBotChatService {
             String context = ragContextProvider.retrieveContext(tenantId, request.getMessage(), kbIds);
             return context != null ? context : "";
         } catch (Exception e) {
-            log.debug("RAG context resolution failed: {}", e.getMessage());
+            // The turn must survive a broken knowledge base — but the user must not be left thinking
+            // the answer was informed by it. Without this they get a fluent, confident reply built on
+            // nothing, and no way to tell it apart from a real one. log.debug meant even the operator
+            // could not see it.
+            log.warn("RAG context resolution failed for tenant {} — answering without the knowledge "
+                    + "base: {}", tenantId, e.getMessage());
+            warnings.add("The knowledge base could not be searched, so this answer does not use it. "
+                    + "Try again, or check the knowledge base's embedding provider.");
             return "";
         }
     }

@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 /**
  * Assert phase: binding-rule assertions, preconditions, and validation rules.
@@ -189,6 +190,16 @@ public class AssertPhase implements CommandPhase {
             case "GT", "GE", "LT", "LE" -> compareNumeric(op, actual, expected);
             case "CONTAINS" -> actual != null && String.valueOf(actual).contains(String.valueOf(expected));
             case "NOT_CONTAINS" -> actual == null || !String.valueOf(actual).contains(String.valueOf(expected));
+            // DR-20260715-A-001: these five were declared in DslRegistry.PreconditionOperator but had
+            // no runtime branch — a command guarded by one was permanently blocked (fail-safe false),
+            // while introspection advertised them to LLM/agent authoring. Semantics mirror the SQL /
+            // QueryOperator forms (starts_with = LIKE 'x%', ends_with = LIKE '%x', like = SQL LIKE,
+            // between = inclusive [lo, hi]).
+            case "STARTS_WITH" -> actual != null && String.valueOf(actual).startsWith(String.valueOf(expected));
+            case "ENDS_WITH" -> actual != null && String.valueOf(actual).endsWith(String.valueOf(expected));
+            case "LIKE" -> actual != null && matchesSqlLike(String.valueOf(actual), String.valueOf(expected));
+            case "NOT_LIKE" -> actual == null || !matchesSqlLike(String.valueOf(actual), String.valueOf(expected));
+            case "BETWEEN" -> evaluateBetween(actual, expected);
             default -> {
                 log.warn("Unknown precondition operator: {}, failing safe", operator);
                 yield false;
@@ -224,6 +235,11 @@ public class AssertPhase implements CommandPhase {
             case "lte", "le", "<=" -> "LE";
             case "contains" -> "CONTAINS";
             case "not_contains", "notcontains" -> "NOT_CONTAINS";
+            case "between" -> "BETWEEN";
+            case "like" -> "LIKE";
+            case "not_like", "notlike" -> "NOT_LIKE";
+            case "starts_with", "startswith" -> "STARTS_WITH";
+            case "ends_with", "endswith" -> "ENDS_WITH";
             default -> operator.trim().toUpperCase();
         };
     }
@@ -250,6 +266,37 @@ public class AssertPhase implements CommandPhase {
                 default -> false;
             };
         }
+    }
+
+    /**
+     * SQL LIKE semantics (case-sensitive, anchored): {@code %} matches any sequence, {@code _}
+     * matches any single char; all other characters are literal. Used by the LIKE / NOT_LIKE
+     * precondition operators (DR-20260715-A-001).
+     */
+    private static boolean matchesSqlLike(String value, String pattern) {
+        StringBuilder regex = new StringBuilder("^");
+        for (int i = 0; i < pattern.length(); i++) {
+            char c = pattern.charAt(i);
+            switch (c) {
+                case '%' -> regex.append(".*");
+                case '_' -> regex.append('.');
+                default -> regex.append(Pattern.quote(String.valueOf(c)));
+            }
+        }
+        regex.append('$');
+        return Pattern.compile(regex.toString(), Pattern.DOTALL).matcher(value).matches();
+    }
+
+    /**
+     * BETWEEN: {@code expected} is a two-element {@code [lo, hi]} list, matched inclusively
+     * (lo &lt;= actual &lt;= hi) reusing the numeric-or-lexical comparison of {@link #compareNumeric}
+     * (DR-20260715-A-001).
+     */
+    private boolean evaluateBetween(Object actual, Object expected) {
+        if (actual == null || !(expected instanceof List<?> range) || range.size() != 2) {
+            return false;
+        }
+        return compareNumeric("GE", actual, range.get(0)) && compareNumeric("LE", actual, range.get(1));
     }
 
     private Map<String, Object> buildPreconditionPayload(Map<String, Object> payload,

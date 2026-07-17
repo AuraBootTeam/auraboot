@@ -21,14 +21,24 @@ const users: Record<string, QuoteRoleUser> = {};
 
 async function fillSeq(page: Page, name: string, value: string) {
   const loc = page.locator(`input[name='${name}'], textarea[name='${name}']`).first();
+  await expect(loc).toBeVisible();
   await loc.click();
   await loc.fill('');
   await loc.pressSequentially(value, { delay: 12 });
 }
 
+async function waitForListReady(page: Page): Promise<void> {
+  await expect.poll(async () => {
+    const searchReady = await page.locator('[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"], input[type="search"]').first().count();
+    const tableReady = await page.locator('table, [role="table"]').first().count();
+    const loading = await page.locator('[aria-busy="true"], .ant-spin-spinning, [data-loading="true"]').count();
+    return (searchReady > 0 || tableReady > 0) && loading === 0;
+  }).toBe(true);
+}
+
 async function listSearch(page: Page, listPath: string, keyword: string): Promise<number> {
   await page.goto(listPath, { waitUntil: 'domcontentloaded' });
-  await page.locator('table tbody tr').first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
+  await waitForListReady(page);
   const q = page.locator(
     '[data-testid="list-search-input"], input[placeholder*="查询"], input[placeholder*="搜索"], input[type="search"]'
   ).first();
@@ -39,19 +49,25 @@ async function listSearch(page: Page, listPath: string, keyword: string): Promis
     const searchBtn = page.locator(
       '[data-testid="search-button"], [data-testid="table-search-button"], button:has-text("搜索")'
     ).first();
+    const response = page.waitForResponse((r) => (
+      r.url().includes('/api/dynamic/crm_account_common/list') && r.request().method() === 'GET'
+    ), { timeout: 5000 }).catch(() => null);
     if (await searchBtn.count() > 0) await searchBtn.click();
     else await page.keyboard.press('Enter');
-    await page.waitForTimeout(2000);
+    await response;
+    await waitForListReady(page);
   }
   return page.locator('table tbody tr').count();
 }
 
 async function createCustomer(page: Page, name: string) {
   await page.goto(CUST_NEW, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(2000);
   await fillSeq(page, 'crm_acc_name', name);
+  const saveResponse = page.waitForResponse((r) => (
+    r.url().includes('/api/meta/commands/execute/') && r.request().method() === 'POST'
+  ), { timeout: 5000 }).catch(() => null);
   await page.getByRole('button', { name: '保存' }).first().click();
-  await page.waitForTimeout(2500);
+  await saveResponse;
 }
 
 test.describe('Quote/BOM customer delete + data-scope isolation @smoke', () => {
@@ -97,8 +113,7 @@ test.describe('Quote/BOM customer delete + data-scope isolation @smoke', () => {
         // detail-page delete fallback
         const link = page.locator(`table tbody tr:has-text("${marker}")`).first().locator('a').first();
         if (await link.count() > 0) {
-          await link.click({ timeout: 6000 }).catch(() => {});
-          await page.waitForTimeout(1500);
+          await link.click({ timeout: 5000 }).catch(() => {});
           const dbtn = page.locator('[data-testid="form-btn-delete"]').or(page.getByRole('button', { name: /删除|Delete/ }));
           if (await dbtn.first().isVisible({ timeout: 3000 }).catch(() => false)) { await dbtn.first().click(); deleted = true; }
         }
@@ -107,12 +122,17 @@ test.describe('Quote/BOM customer delete + data-scope isolation @smoke', () => {
         test.info().annotations.push({ type: 'note', description: 'CUST-04: delete entry not found inline or on detail — needs product/selector confirm (delete may be admin-only or detail-only)' });
         return;
       }
-      await page.waitForTimeout(800);
+      await expect.poll(async () => page.locator('[data-testid="confirm-dialog"], [role="alertdialog"], .ant-modal-confirm, .ant-popconfirm').count())
+        .toBeGreaterThan(0)
+        .catch(() => null);
       const confirm = page.locator('[data-testid="confirm-dialog"], [role="alertdialog"], .ant-modal-confirm, .ant-popconfirm')
         .getByRole('button').filter({ hasText: /确定|确认|删除|OK|Yes/i }).first();
-      if (await confirm.count() > 0) await confirm.click({ timeout: 6000 });
-      else await page.getByRole('button').filter({ hasText: /确定|确认|删除|OK|Yes/i }).first().click({ timeout: 6000 }).catch(() => {});
-      await page.waitForTimeout(2500);
+      const deleteResponse = page.waitForResponse((r) => (
+        r.url().includes('/api/meta/commands/execute/') && r.request().method() === 'POST'
+      ), { timeout: 5000 }).catch(() => null);
+      if (await confirm.count() > 0) await confirm.click({ timeout: 5000 });
+      else await page.getByRole('button').filter({ hasText: /确定|确认|删除|OK|Yes/i }).first().click({ timeout: 5000 }).catch(() => {});
+      await deleteResponse;
       await listSearch(page, CUST_LIST, marker);
       expect(await page.locator(`table tbody tr:has-text("${marker}")`).count(),
         'CUST-04: deleted customer no longer in list').toBe(0);

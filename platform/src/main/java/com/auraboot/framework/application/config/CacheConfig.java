@@ -56,34 +56,19 @@ public class CacheConfig {
             "dictData",
             "cascadeDict",
             "cascadeTree",
-            "dictMetadata",
-            "dictCache",
-            "dictItems",
-            "dictExists",
 
             // Query caches
             "namedQuery",
             "namedQueries",
-            "queryStatistics",
             "secureQuery",
             "aggregateQuery",
 
             // Permission caches (Legacy)
-            "effectivePermissions",
-            "permissionCheck",
-            "userPermissions",
-            "rolePermissions",
-            "userRoles",
 
             // Permission V4 caches
             "user-permissions",
-            "subject-evaluation",
-            "subject-declarations",
 
             // Permission projection caches
-            "schemaPermissionProjection",
-            "dataFilterResult",
-            "fieldPermissionProjection",
             "fieldMaskConfig",                                // FieldMaskServiceImpl @CacheEvict; absent here = saveConfig/deleteConfig threw "Cannot find cache" in prod (caught 2026-06-19 by the cache-name audit + FieldMaskServiceImpl coverage IT)
 
             // Data domain (row-level domain isolation) — DataDomainServiceImpl uses
@@ -96,28 +81,18 @@ public class CacheConfig {
 
             // Model metadata caches
             "modelDefinitions",
-            "fieldDefinitions",
-            "relationDefinitions",
-            "modelExists",
 
             // Field metadata caches
             "metaField",
-            "metaFieldByKey",
 
             // Model field binding caches
             "modelFieldBindings",
-            "fieldBindings",
 
             // ViewModel caches
             "viewModelFields",
             "viewModelSummary",
 
             // DSL projection caches
-            "modelMetadata",
-            "modelCache",
-            "fieldMetadata",
-            "modelFields",
-            "fieldCache",
 
             // Data permission caches
             "dataPermissionRowFilter",

@@ -13,7 +13,9 @@ import com.auraboot.framework.agent.runtime.PendingToolSnapshotFactory;
 import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.agent.service.GroundingService;
 import com.auraboot.framework.agent.trace.AiTraceService;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
+import com.auraboot.framework.agent.runtime.context.AgentContextBlock;
+import com.auraboot.framework.agent.runtime.context.AgentContextBundle;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
@@ -119,7 +121,7 @@ class AuraBotChatServiceGroundingTest {
         verify(sink).onError(
                 eq("D1 grounding failed: semantic store unavailable"),
                 eq(null));
-        verify(chatToolResolver, never()).resolveTools(any(), any(), any());
+        verify(chatToolResolver, never()).resolveTools(any(), any(), any(), any());
     }
 
     @Test
@@ -153,7 +155,7 @@ class AuraBotChatServiceGroundingTest {
                         .defaultModel("stub-model")
                         .maxTokens(4096)
                         .build());
-        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null)))
+        when(chatToolResolver.resolveTools(eq("hello"), eq(null), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
         when(llmProviderFactory.getProvider(eq(StubLlmProvider.PROVIDER_CODE)))
                 .thenReturn(stubProvider);
@@ -213,7 +215,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("hello from openai"), eq(null), eq(null)))
+        when(chatToolResolver.resolveTools(eq("hello from openai"), eq(null), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(List.of(), null, null, true));
         when(llmProviderFactory.getProvider(eq("openai"))).thenReturn(openAiProvider);
         when(openAiProvider.streamChat(any(), eq("test-key"), eq("stub://local")))
@@ -281,7 +283,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq("crm_customer"), eq(null)))
+        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq("crm_customer"), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(
                         List.of(statsTool),
                         "stats",
@@ -376,7 +378,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq(null), eq(null)))
+        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq(null), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(
                         List.of(statsTool),
                         "stats",
@@ -475,7 +477,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq("crm_customer"), eq(null)))
+        when(chatToolResolver.resolveTools(eq("统计客户信息"), eq("crm_customer"), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(
                         List.of(statsTool),
                         "stats",
@@ -569,7 +571,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("创建客户"), eq("crm_customer"), eq(null)))
+        when(chatToolResolver.resolveTools(eq("创建客户"), eq("crm_customer"), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(
                         List.of(createTool),
                         "create",
@@ -670,7 +672,7 @@ class AuraBotChatServiceGroundingTest {
                         .maxTokens(4096)
                         .build());
         lenient().when(llmProviderFactory.listAllProviders()).thenReturn(List.of());
-        when(chatToolResolver.resolveTools(eq("查询客户统计"), eq(null), eq(null)))
+        when(chatToolResolver.resolveTools(eq("查询客户统计"), eq(null), eq(null), any()))
                 .thenReturn(new ChatToolResolver.ResolvedTools(
                         List.of(statsTool),
                         "query",
@@ -739,5 +741,68 @@ class AuraBotChatServiceGroundingTest {
                 .contains("recordPids=[CUST-1]")
                 .contains("sensitivity=CONFIDENTIAL")
                 .contains("<user-data>");
+    }
+
+    private AuraBotChatService newService() {
+        return new AuraBotChatService(
+                llmProviderFactory,
+                promptTemplateService,
+                chatToolResolver,
+                chatToolExecutor,
+                new ObjectMapper(),
+                aiTraceService,
+                metaModelService,
+                new ChatTurnRuntime(),
+                (Executor) Runnable::run);
+    }
+
+    @Test
+    @DisplayName("RAG-only turn WITH context appends the verbatim-grounding + user-language directive")
+    void ragOnlyTurnWithContextAppendsGroundingDirective() {
+        MetaContext.setContext(1L, 100L, null, "tester");
+        AuraBotChatService service = newService();
+        // tenant did not customize the template -> render null; grounding must hold regardless
+        lenient().when(promptTemplateService.render(anyLong(), eq("aurabot_chat"), any())).thenReturn(null);
+
+        ChatRequest request = new ChatRequest();
+        request.setMessage("取消账号后多久还能导出数据？");
+        request.setKnowledgeBaseIds(List.of("kb-1"));
+        AgentContextBundle ctx = new AgentContextBundle(List.of(
+                new AgentContextBlock("KB", "账号取消后，客户可在 7 个自然日内导出数据。", null)));
+
+        // RAG-only turn: no tools
+        ChatToolResolver.ResolvedTools ragOnly =
+                new ChatToolResolver.ResolvedTools(List.of(), null, null, true);
+        String prompt = service.buildSystemPrompt(1L, request, ragOnly, ctx);
+
+        assertThat(prompt)
+                .as("RAG-only turn with real context must carry the hard grounding directive")
+                .contains("回答约束")
+                .contains("逐字照抄")
+                .contains("用户提问所用的语言")
+                .contains("7 个自然日");   // the retrieved fact is in the prompt
+    }
+
+    @Test
+    @DisplayName("Empty-KB RAG-only turn gets the not-found marker, NOT the grounding directive")
+    void emptyKbTurnGetsMarkerNotGroundingDirective() {
+        MetaContext.setContext(1L, 100L, null, "tester");
+        AuraBotChatService service = newService();
+        lenient().when(promptTemplateService.render(anyLong(), eq("aurabot_chat"), any())).thenReturn(null);
+
+        ChatRequest request = new ChatRequest();
+        request.setMessage("取消账号后多久还能导出数据？");
+        request.setKnowledgeBaseIds(List.of("kb-1"));
+        AgentContextBundle emptyCtx = new AgentContextBundle(List.of());  // retrieval returned nothing
+
+        ChatToolResolver.ResolvedTools ragOnly =
+                new ChatToolResolver.ResolvedTools(List.of(), null, null, true);
+        String prompt = service.buildSystemPrompt(1L, request, ragOnly, emptyCtx);
+
+        // Falsifiability: the grounding directive is CONDITIONAL — absent when there is no real context;
+        // the empty-KB refusal marker is what appears instead.
+        assertThat(prompt)
+                .contains("Knowledge base search result: EMPTY")
+                .doesNotContain("回答约束");
     }
 }

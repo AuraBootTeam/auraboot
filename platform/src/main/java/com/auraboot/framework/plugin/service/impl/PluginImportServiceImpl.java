@@ -831,8 +831,12 @@ public class PluginImportServiceImpl implements PluginImportService {
                         .filter(m -> m.isWarning())
                         .forEach(m -> result.addWarning("[" + m.getCode() + "] " + m.getMessage()));
             } catch (Exception e) {
-                log.warn("Validation pipeline error (non-blocking): {}", logSafe(e.getMessage()));
-                result.addWarning("Validation pipeline error: " + e.getMessage());
+                // DR-20260715-A-005: fail closed. If the whole validation pipeline crashes,
+                // the plugin's safety is entirely unknown — block the import (preview error →
+                // executeFromManifest aborts on !isValid()) rather than pass it with an
+                // advisory warning.
+                log.error("Validation pipeline crashed (blocking import): {}", logSafe(e.getMessage()), e);
+                result.addError("Validation pipeline error: " + e.getMessage());
             }
         }
 

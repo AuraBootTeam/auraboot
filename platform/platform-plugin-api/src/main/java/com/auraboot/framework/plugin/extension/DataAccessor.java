@@ -1,7 +1,11 @@
 package com.auraboot.framework.plugin.extension;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Data access interface for plugin command handlers.
@@ -34,6 +38,47 @@ public interface DataAccessor {
      * @return list of matching records
      */
     List<Map<String, Object>> query(String modelCode, Map<String, Object> filters);
+
+    /**
+     * Query records where a single field is in the provided value set.
+     *
+     * <p>The default implementation preserves binary/source compatibility for
+     * existing plugin test doubles by delegating to {@link #query} once per
+     * distinct non-null value. Runtime platform implementations should override
+     * this method and issue a single dynamic query with an {@code IN} condition.
+     *
+     * @param modelCode the model code
+     * @param fieldName field code or supported system field name
+     * @param values    candidate values; duplicates and nulls are ignored
+     * @return list of matching records
+     */
+    default List<Map<String, Object>> queryIn(String modelCode, String fieldName, Collection<?> values) {
+        if (fieldName == null || fieldName.isBlank()) {
+            throw new IllegalArgumentException("fieldName cannot be null or blank");
+        }
+        List<Object> queryValues = distinctNonNullValues(values);
+        if (queryValues.isEmpty()) {
+            return List.of();
+        }
+        List<Map<String, Object>> records = new ArrayList<>();
+        for (Object value : queryValues) {
+            records.addAll(query(modelCode, Map.of(fieldName, value)));
+        }
+        return records;
+    }
+
+    private static List<Object> distinctNonNullValues(Collection<?> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        LinkedHashSet<Object> distinct = new LinkedHashSet<>();
+        for (Object value : values) {
+            if (value != null) {
+                distinct.add(value);
+            }
+        }
+        return List.copyOf(distinct);
+    }
 
     /**
      * Create a new record.
@@ -70,4 +115,28 @@ public interface DataAccessor {
      * @param recordId  the record ID to delete
      */
     void delete(String modelCode, String recordId);
+
+    /**
+     * Atomically increment one numeric field, optionally bounded by another
+     * numeric field. Runtime implementations execute one UPDATE ... RETURNING;
+     * the default fails closed so plugins cannot silently fall back to a racy
+     * read-modify-write sequence.
+     *
+     * @since 2.7.0
+     */
+    default Optional<Long> incrementWithinCap(String modelCode,
+                                              String recordId,
+                                              String counterCode,
+                                              long delta,
+                                              String capCode) {
+        throw new UnsupportedOperationException("Atomic increment is not supported by this DataAccessor");
+    }
+
+    /** Atomically increment one numeric field without a cap. */
+    default Optional<Long> increment(String modelCode,
+                                     String recordId,
+                                     String counterCode,
+                                     long delta) {
+        return incrementWithinCap(modelCode, recordId, counterCode, delta, null);
+    }
 }

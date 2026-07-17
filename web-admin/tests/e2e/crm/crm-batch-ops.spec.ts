@@ -7,7 +7,7 @@
  * - Individual row checkbox selection works without triggering navigation
  *
  * Prerequisites:
- *   - CRM plugin imported, crm_lead_common model published
+ *   - CRM plugin imported, crm_lead model published
  *   - At least 2 lead records exist (created in beforeAll)
  *
  * @since 8.0.0
@@ -42,21 +42,21 @@ test.describe('CRM Batch Operations Smoke @smoke', () => {
     const ctx = await browser.newContext({ storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json' });
     const page = await ctx.newPage();
     try {
-      const modelResp = await page.request.get('/api/meta/models/code/crm_lead_common');
-      expect(modelResp.ok(), 'crm_lead_common model should exist').toBe(true);
+      const modelResp = await page.request.get('/api/meta/models/code/crm_lead');
+      expect(modelResp.ok(), 'crm_lead model should exist').toBe(true);
       const modelBody = await modelResp.json();
       const model = modelBody.data;
-      expect(model?.pid, 'crm_lead_common model pid should be available').toBeTruthy();
+      expect(model?.pid, 'crm_lead model pid should be available').toBeTruthy();
 
       if (model.status === 'draft') {
         const publishResp = await page.request.post(`/api/meta/models/${model.pid}/publish`);
-        expect(publishResp.ok(), 'crm_lead_common model should publish successfully').toBe(true);
+        expect(publishResp.ok(), 'crm_lead model should publish successfully').toBe(true);
       }
 
       const syncResp = await page.request.post(`/api/meta/models/${model.pid}/sync-schema`, {
         timeout: 30000,
       });
-      expect(syncResp.ok(), 'crm_lead_common schema should sync successfully').toBe(true);
+      expect(syncResp.ok(), 'crm_lead schema should sync successfully').toBe(true);
 
       for (let i = 1; i <= 2; i++) {
         await executeCommandViaApi(
@@ -86,7 +86,7 @@ test.describe('CRM Batch Operations Smoke @smoke', () => {
   }) => {
     await navigateToDynamicPage(page, 'crm-lead');
     await waitForDynamicPageLoad(page);
-    await expect(page).toHaveURL(/\/p\/crm_lead_common(?:\?.*)?$/);
+    await expect(page).toHaveURL(/\/p\/crm_lead(?:\?.*)?$/);
 
     const rowCheckboxes = await waitForSelectableRows(page);
 

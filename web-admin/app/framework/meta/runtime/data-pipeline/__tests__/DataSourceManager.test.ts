@@ -225,6 +225,196 @@ describe('DataSourceManager', () => {
     );
   });
 
+  it('coalesces concurrent requests for the same evaluated data source', async () => {
+    let resolveFetch: ((value: any) => void) | undefined;
+    const pendingFetch = new Promise<any>((resolve) => {
+      resolveFetch = resolve;
+    });
+    mockedFetchResult.mockReturnValueOnce(pendingFetch);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { pid: 'quote-1' },
+      } as any),
+    );
+    manager.register('bomPriceMetrics', {
+      type: 'namedQuery',
+      queryCode: 'qo_quote_bom_price_metrics',
+      format: 'records',
+      adaptor: 'table',
+      autoFetch: false,
+      params: {
+        quoteId: '${form.pid}',
+      },
+    });
+
+    const first = manager.fetch('bomPriceMetrics');
+    const second = manager.fetch('bomPriceMetrics');
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+
+    resolveFetch?.({
+      code: '0',
+      data: { records: [{ total_lines: 7 }], total: 1 },
+    });
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { records: [{ total_lines: 7 }], total: 1, current: 1, pageSize: 10 },
+      { records: [{ total_lines: 7 }], total: 1, current: 1, pageSize: 10 },
+    ]);
+  });
+
+  it('bypasses min fetch interval for explicit reloads', async () => {
+    mockedFetchResult
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { records: [{ pid: 'line-1', status: 'pending' }], total: 1 },
+      } as any)
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { records: [{ pid: 'line-1', status: 'confirmed' }], total: 1 },
+      } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { pid: 'quote-1' },
+      } as any),
+    );
+    manager.register('bomPriceWaterfall', {
+      type: 'namedQuery',
+      queryCode: 'qo_quote_bom_price_waterfall',
+      format: 'records',
+      adaptor: 'table',
+      autoFetch: false,
+      minFetchIntervalMs: 1500,
+      params: {
+        quoteId: '${form.pid}',
+      },
+    } as any);
+
+    await manager.fetch('bomPriceWaterfall');
+    await manager.reload('bomPriceWaterfall');
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(2);
+    expect(manager.getData('bomPriceWaterfall')?.records).toEqual([
+      { pid: 'line-1', status: 'confirmed' },
+    ]);
+  });
+
+  it('starts a fresh reload when a matching request is still in flight', async () => {
+    let resolveInitial: ((value: any) => void) | undefined;
+    const initialFetch = new Promise<any>((resolve) => {
+      resolveInitial = resolve;
+    });
+    mockedFetchResult.mockReturnValueOnce(initialFetch).mockResolvedValueOnce({
+      code: '0',
+      data: { records: [{ pid: 'line-1', status: 'confirmed' }], total: 1 },
+    } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { pid: 'quote-1' },
+      } as any),
+    );
+    manager.register('bomPriceWaterfall', {
+      type: 'namedQuery',
+      queryCode: 'qo_quote_bom_price_waterfall',
+      format: 'records',
+      adaptor: 'table',
+      autoFetch: false,
+      params: {
+        quoteId: '${form.pid}',
+      },
+    });
+
+    const staleFetch = manager.fetch('bomPriceWaterfall');
+    await manager.reload('bomPriceWaterfall');
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(2);
+    expect(manager.getData('bomPriceWaterfall')?.records).toEqual([
+      { pid: 'line-1', status: 'confirmed' },
+    ]);
+
+    resolveInitial?.({
+      code: '0',
+      data: { records: [{ pid: 'line-1', status: 'pending' }], total: 1 },
+    });
+    await staleFetch;
+
+    expect(manager.getData('bomPriceWaterfall')?.records).toEqual([
+      { pid: 'line-1', status: 'confirmed' },
+    ]);
+  });
+
+  it('keeps cached namedQuery data during rate-limit backoff', async () => {
+    mockedFetchResult
+      .mockResolvedValueOnce({
+        code: '0',
+        data: { records: [{ total_lines: 7 }], total: 1 },
+      } as any)
+      .mockResolvedValueOnce({
+        code: '500',
+        desc: 'Rate limit exceeded for query: qo_quote_bom_price_metrics (max 60 per minute)',
+        data: null,
+      } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { pid: 'quote-1' },
+      } as any),
+    );
+    manager.register('bomPriceMetrics', {
+      type: 'namedQuery',
+      queryCode: 'qo_quote_bom_price_metrics',
+      format: 'records',
+      adaptor: 'table',
+      autoFetch: false,
+      rateLimitBackoffMs: 30_000,
+      params: {
+        quoteId: '${form.pid}',
+      },
+    } as any);
+
+    await manager.fetch('bomPriceMetrics');
+    const rateLimited = await manager.fetch('bomPriceMetrics');
+    const skipped = await manager.fetch('bomPriceMetrics');
+
+    expect(rateLimited).toEqual({
+      records: [{ total_lines: 7 }],
+      total: 1,
+      current: 1,
+      pageSize: 10,
+    });
+    expect(skipped).toEqual(rateLimited);
+    expect(manager.getState('bomPriceMetrics')?.error).toBeNull();
+    expect(mockedFetchResult).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves HTTP status metadata on API data-source errors', async () => {
+    mockedFetchResult.mockResolvedValueOnce({
+      code: '503',
+      desc: 'temporary dependency outage',
+      success: false,
+      data: null,
+    } as any);
+    const manager = new DataSourceManager(createExpressionContext({} as any));
+    manager.register('batchJobList', {
+      type: 'api',
+      endpoint: '/api/dynamic/iot_dps_batch_onboarding_job_list/list',
+      method: 'get',
+      adaptor: 'table',
+      autoFetch: false,
+    });
+
+    await manager.fetch('batchJobList');
+
+    expect(manager.getState('batchJobList')?.error).toMatchObject({
+      message: 'temporary dependency outage',
+      status: 503,
+      statusCode: 503,
+      code: '503',
+    });
+  });
+
   it('omits format for namedQuery sources by default (option/dropdown format)', async () => {
     mockedFetchResult.mockResolvedValueOnce({ code: '0', data: [] } as any);
 
@@ -439,6 +629,58 @@ describe('DataSourceManager', () => {
     expect(JSON.parse(params.filters)).toEqual([
       { fieldName: 'bom_me_canonical_line_id', operator: 'EQ', value: 'std-1' },
     ]);
+  });
+
+  it('clears nested state-dependent data instead of fetching without a leaf value', async () => {
+    mockedFetchResult.mockResolvedValue({
+      code: '0',
+      data: { records: [{ pid: 'shadow-1' }], total: 1, current: 1, pageSize: 1 },
+    } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        state: {
+          selectedDevice: { iot_d_device_code: 'RF-01-TC-CTRL' },
+        },
+      } as any),
+    );
+    manager.register('selectedDeviceShadow', {
+      type: 'api',
+      endpoint: '/api/dynamic/iot_device_shadow_list/list',
+      method: 'get',
+      adaptor: 'table',
+      autoFetch: false,
+      params: {
+        pageNum: 1,
+        pageSize: 1,
+        filters: [
+          {
+            fieldName: 'iot_sh_device_code',
+            operator: 'EQ',
+            value: '${state.selectedDevice.iot_d_device_code}',
+          },
+        ],
+      },
+      dependOn: ['state.selectedDevice.iot_d_device_code'],
+    });
+
+    await manager.fetch('selectedDeviceShadow');
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+    expect(manager.getData('selectedDeviceShadow')?.records).toEqual([{ pid: 'shadow-1' }]);
+
+    manager.updateContext(
+      createExpressionContext({
+        state: {
+          selectedDevice: {},
+        },
+      } as any),
+    );
+
+    await manager.notifyStateChanged('selectedDevice');
+
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+    expect(manager.getData('selectedDeviceShadow')).toBeNull();
   });
 
   it('converts dynamic list field params into filters and skips blank optional values', async () => {

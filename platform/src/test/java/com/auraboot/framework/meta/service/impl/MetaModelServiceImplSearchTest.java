@@ -115,6 +115,8 @@ class MetaModelServiceImplSearchTest {
     private PermissionEvaluator permissionEvaluator;
     @Mock
     private RollUpFieldRegistry rollUpFieldRegistry;
+    @Mock
+    private MetaDefinitionCacheService metaDefinitionCacheService;
 
     @BeforeEach
     void setUpMetaContext() {
@@ -141,7 +143,8 @@ class MetaModelServiceImplSearchTest {
                 metaFieldMapper,
                 queryBuilderService,
                 fieldBindingMapper,
-                autoPermissionAssignmentService
+                autoPermissionAssignmentService,
+                metaDefinitionCacheService
         );
 
         PageResult<MetaModelDTO> result = service.searchModels(
@@ -162,7 +165,8 @@ class MetaModelServiceImplSearchTest {
                 metaFieldMapper,
                 queryBuilderService,
                 fieldBindingMapper,
-                autoPermissionAssignmentService
+                autoPermissionAssignmentService,
+                metaDefinitionCacheService
         );
         Map<String, Object> fieldPermission = Map.of(
                 "view", List.of("low_field_viewer"),
@@ -1045,7 +1049,8 @@ class MetaModelServiceImplSearchTest {
                 metaFieldMapper,
                 queryBuilderService,
                 fieldBindingMapper,
-                autoPermissionAssignmentService
+                autoPermissionAssignmentService,
+                metaDefinitionCacheService
         );
         ReflectionTestUtils.setField(service, "schemaManagementService", schemaManagementService);
         ReflectionTestUtils.setField(service, "decisionImpactService", decisionImpactService);

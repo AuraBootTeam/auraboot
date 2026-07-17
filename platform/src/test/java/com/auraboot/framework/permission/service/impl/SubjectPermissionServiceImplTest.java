@@ -47,8 +47,6 @@ class SubjectPermissionServiceImplTest {
     @Mock
     private SubjectPermissionConverter subjectPermissionConverter;
 
-    @Mock
-    private CacheManager cacheManager;
 
     @Mock
     private SubjectPermissionEvaluator evaluator;
@@ -62,7 +60,6 @@ class SubjectPermissionServiceImplTest {
     @BeforeEach
     void setUp() {
         MetaContext.setContext(100L, 1L, "u-pid", "tester");
-        lenient().when(cacheManager.getCache("subject-evaluation")).thenReturn(cache);
     }
 
     @AfterEach
@@ -167,7 +164,6 @@ class SubjectPermissionServiceImplTest {
 
         assertThat(result).isSameAs(dto);
         verify(subjectPermissionMapper).insert(entity);
-        verify(cache).clear();
     }
 
     @Test
@@ -197,7 +193,6 @@ class SubjectPermissionServiceImplTest {
 
         assertThat(result).hasSize(2);
         verify(subjectPermissionMapper).batchInsert(anyList());
-        verify(cache).clear();
     }
 
     @Test
@@ -218,7 +213,6 @@ class SubjectPermissionServiceImplTest {
         service.removePermission(99L);
 
         verify(subjectPermissionMapper).deleteById(99L);
-        verify(cache).clear();
     }
 
     @Test
@@ -228,7 +222,6 @@ class SubjectPermissionServiceImplTest {
         service.removeAllPermissions("MENU", 10L);
 
         verify(subjectPermissionMapper).deleteBySubject("MENU", 10L);
-        verify(cache).clear();
     }
 
     @Test
@@ -261,13 +254,6 @@ class SubjectPermissionServiceImplTest {
         Map<Long, Boolean> result = service.batchEvaluateVisibility("MENU", List.of(10L), 1L);
 
         assertThat(result).containsEntry(10L, true);
-    }
-
-    @Test
-    void evictSubjectEvaluationsClearsCache() {
-        service.evictSubjectEvaluations("MENU", 10L);
-
-        verify(cache).clear();
     }
 
     @Test

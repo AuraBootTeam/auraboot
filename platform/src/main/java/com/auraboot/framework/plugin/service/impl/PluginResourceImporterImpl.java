@@ -533,6 +533,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
         // 4. Evict cache
         evictFieldCache(existingField.getPid());
+        metaModelService.clearAllCache();
 
         syncPublishedModelsForUpdatedField(existingField, dto.getCode());
 
@@ -794,6 +795,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                 fieldBindingMapper.clearDeletedFlag(modelId, fieldId);
 
                 metaModelService.updateFieldBinding(existingBinding);
+                metaModelService.clearAllCache();
             }
 
             return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL_FIELD_BINDING,
@@ -817,6 +819,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
 
                 bindingPid = fieldBindingMapper.getPidByModelAndField(modelId, fieldId);
                 log.info("Resurrected soft-deleted binding: {}", logSafe(bindingCode));
+                metaModelService.clearAllCache();
 
                 return createResourceRecord(pluginPid, importId, tenantId, ResourceType.MODEL_FIELD_BINDING,
                         bindingPid, null, bindingCode, bindingCode, ResourceAction.CREATE, null, null);
@@ -836,6 +839,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                         dto.getAliasCode(), dto.getDictOverrideCode(),
                         dto.getUiHint(), dto.getIsSystemBinding());
             }
+            metaModelService.clearAllCache();
 
             // Get the newly created binding's pid
             bindingPid = fieldBindingMapper.getPidByModelAndField(modelId, fieldId);

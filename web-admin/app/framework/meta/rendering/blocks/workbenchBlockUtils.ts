@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { SchemaRuntime } from '~/framework/meta/runtime/schema-runtime';
+import { resolveCommandErrorMessage } from '~/framework/meta/hooks/useActionHandler';
 import { JWT_TOKEN_KEY } from '~/constants/AuthConstant';
 import { fetchResult } from '~/shared/services/http-client';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
@@ -13,7 +14,10 @@ export function readDataSourceRows(runtime: SchemaRuntime, dataSource?: string):
   return data ? [data] : [];
 }
 
-export function readDataSourceRecord(runtime: SchemaRuntime, dataSource?: string): Record<string, any> {
+export function readDataSourceRecord(
+  runtime: SchemaRuntime,
+  dataSource?: string,
+): Record<string, any> {
   const rows = readDataSourceRows(runtime, dataSource);
   return rows[0] ?? {};
 }
@@ -112,6 +116,45 @@ function resolveReloadIds(args: any): string | string[] | undefined {
   return args.ids ?? args.id ?? args.dataSourceId ?? args.dataSourceIds ?? args.reload;
 }
 
+function resolveWorkbenchNavigatePath(args: any): string | undefined {
+  const rawTarget = args?.path ?? args?.to ?? args?.url ?? args?.href;
+  if (typeof rawTarget !== 'string') return undefined;
+  const target = rawTarget.trim();
+  if (!target) return undefined;
+  if (/^(https?:)?\/\//.test(target) || target.startsWith('/')) {
+    return target;
+  }
+  return `/p/c/${target}`;
+}
+
+function pruneRouteContext(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => pruneRouteContext(item)).filter((item) => item !== undefined);
+  }
+  if (!value || typeof value !== 'object') {
+    if (value === undefined || value === null || value === '') return undefined;
+    return value;
+  }
+
+  const entries = Object.entries(value)
+    .map(([key, child]) => [key, pruneRouteContext(child)] as const)
+    .filter(([, child]) => child !== undefined);
+  if (entries.length === 0) return undefined;
+  return Object.fromEntries(entries);
+}
+
+function appendRouteContext(path: string, context: unknown): string {
+  const routeContext = pruneRouteContext(context);
+  if (routeContext === undefined) return path;
+  if (/^(https?:)?\/\//.test(path) || path.startsWith('/api/')) return path;
+
+  const hashIndex = path.indexOf('#');
+  const base = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
+  const hash = hashIndex >= 0 ? path.slice(hashIndex) : '';
+  const separator = base.includes('?') ? '&' : '?';
+  return `${base}${separator}routeContext=${encodeURIComponent(JSON.stringify(routeContext))}${hash}`;
+}
+
 async function reloadDataSources(runtime: SchemaRuntime, ids: string | string[] | undefined) {
   if (!ids || (Array.isArray(ids) && ids.length === 0)) return;
   const manager = runtime.getDataSourceManager?.();
@@ -155,7 +198,7 @@ function resolveFeedbackMessage(
   fallback?: string,
   preferFallback = false,
 ): string | undefined {
-  const raw = preferFallback ? fallback ?? feedback?.[key] : feedback?.[key] ?? fallback;
+  const raw = preferFallback ? (fallback ?? feedback?.[key]) : (feedback?.[key] ?? fallback);
   if (raw === false || raw === undefined || raw === null) return undefined;
   const context = runtime.getContext?.() || {};
   const locale = context.locale || 'zh-CN';
@@ -203,6 +246,11 @@ function resolvePollIntervalMs(args: any): number {
   return Number.isFinite(value) && value >= 0 ? value : 1500;
 }
 
+function resolveAsyncReloadIntervalMs(args: any): number {
+  const value = Number(args?.asyncReloadIntervalMs ?? args?.reloadIntervalMs ?? 3000);
+  return Number.isFinite(value) && value >= 0 ? value : 3000;
+}
+
 function resolvePollAttempts(args: any): number {
   const value = Number(args?.asyncMaxPollAttempts ?? args?.maxPollAttempts ?? 600);
   return Number.isFinite(value) && value > 0 ? Math.floor(value) : 600;
@@ -221,21 +269,39 @@ async function pollWorkbenchAsyncTask(
 ): Promise<any> {
   const terminalStatuses = new Set(['completed', 'failed', 'cancelled']);
   const intervalMs = resolvePollIntervalMs(args);
+  const reloadIntervalMs = resolveAsyncReloadIntervalMs(args);
   const maxAttempts = resolvePollAttempts(args);
+  let lastReloadAt = 0;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const result = await fetchResult<AsyncTaskStatus>(`/api/async-tasks/${encodeURIComponent(taskCode)}`, {
-      method: 'get',
-    });
+    const result = await fetchResult<AsyncTaskStatus>(
+      `/api/async-tasks/${encodeURIComponent(taskCode)}`,
+      {
+        method: 'get',
+      },
+    );
     if (!isSuccessResult(result)) {
-      throw new Error((result as any).message || (result as any).desc || 'Async task status unavailable');
+      // B-002 (DR-20260715-B-002): prefer localized context.detail over the generic
+      // message/desc envelope — the third command path (workbench) must extract the
+      // reason the same way useActionHandler / FormPageContent do (OSS #1212).
+      throw new Error(resolveCommandErrorMessage(result, taskCode));
     }
 
     const task: AsyncTaskStatus = result?.data ?? {};
-    await reloadDataSources(runtime, reloadIds);
-
     const status = String(task.status || '').toLowerCase();
-    if (terminalStatuses.has(status)) {
+    const isTerminal = terminalStatuses.has(status);
+    const now = Date.now();
+    const shouldReload =
+      lastReloadAt === 0 ||
+      isTerminal ||
+      reloadIntervalMs <= 0 ||
+      now - lastReloadAt >= reloadIntervalMs;
+    if (shouldReload) {
+      await reloadDataSources(runtime, reloadIds);
+      lastReloadAt = Date.now();
+    }
+
+    if (isTerminal) {
       if (status === 'completed') return task.resultData ?? {};
       if (status === 'cancelled') throw new Error('Task cancelled');
       throw new Error(task.errorMessage || task.message || 'Async task failed');
@@ -261,21 +327,16 @@ function resolveDownloadUrl(commandResult: any, downloadConfig: any): string | u
   if (!downloadConfig) return undefined;
   const data = unwrapCommandData(commandResult);
   const config = downloadConfig === true ? {} : downloadConfig;
-  const url = readFirstPath(data, [
-    config.urlField,
-    config.downloadUrlField,
-    'downloadUrl',
-    'url',
-  ].filter(Boolean));
+  const url = readFirstPath(
+    data,
+    [config.urlField, config.downloadUrlField, 'downloadUrl', 'url'].filter(Boolean),
+  );
   if (url) return String(url);
 
-  const fileId = readFirstPath(data, [
-    config.fileIdField,
-    'fileId',
-    'exportFileId',
-    'id',
-    'pid',
-  ].filter(Boolean));
+  const fileId = readFirstPath(
+    data,
+    [config.fileIdField, 'fileId', 'exportFileId', 'id', 'pid'].filter(Boolean),
+  );
   if (!fileId) return undefined;
   return `/api/file/download/${encodeURIComponent(String(fileId))}`;
 }
@@ -327,7 +388,8 @@ async function downloadWithAuth(url: string): Promise<void> {
   const objectUrl = window.URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = objectUrl;
-  anchor.download = filenameFromContentDisposition(response.headers.get('Content-Disposition')) || 'download';
+  anchor.download =
+    filenameFromContentDisposition(response.headers.get('Content-Disposition')) || 'download';
   anchor.style.display = 'none';
   document.body.appendChild(anchor);
   anchor.click();
@@ -335,11 +397,42 @@ async function downloadWithAuth(url: string): Promise<void> {
   window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 0);
 }
 
+/**
+ * Legal workbench action verbs. Kept as a named list so the static gate
+ * (auraboot/scripts/check-dsl-actions.mjs, via sync-dsl-action-catalog.mjs)
+ * derives the same set from this file and stays drift-free. If you add a verb,
+ * add its `if (config.action === '<verb>')` branch below — the parser reads the
+ * branch conditions, so the catalog updates itself.
+ */
+const KNOWN_WORKBENCH_ACTIONS = ['state.set', 'dataSource.reload', 'navigate', 'command.execute'];
+
 export async function executeSimpleWorkbenchAction(
   runtime: SchemaRuntime,
   config: any,
 ): Promise<void> {
   if (!config) return;
+  if (!KNOWN_WORKBENCH_ACTIONS.includes(config.action)) {
+    // An unrecognized action used to fall through every branch below and return
+    // silently: a wrong-dialect object action ({ type: 'api', ... }), an invented
+    // verb ('api'), or a typo'd arg key produced a DEAD BUTTON with zero signal —
+    // no console log, no toast, no audit row. That is the exact footgun that shipped
+    // to a golden-green page (ENT#784 CS 坐席台). Fail loudly instead, so real-browser
+    // golden verification and the console point straight at the offending action.
+    // The static gate catches these before runtime; this is the backstop for
+    // anything it does not model.
+    const shape =
+      config.action && typeof config.action === 'object'
+        ? 'an object — a workbench action is a string verb + args, not the ' +
+          'ActionRegistry { type, ... } shape used by table rowActions'
+        : JSON.stringify(config.action);
+    const message =
+      `[workbench] unknown action ${shape}. ` +
+      `Legal verbs: ${KNOWN_WORKBENCH_ACTIONS.join(' | ')}. ` +
+      'A backend write must be modeled as command.execute — there is no "api" action here.';
+    console.error(message, config);
+    showCommandFeedback(runtime, {}, 'unknownAction', 'error', message);
+    throw new Error(message);
+  }
   if (config.action === 'state.set' && config.args && typeof config.args === 'object') {
     Object.entries(resolveRuntimeValue(runtime, config.args)).forEach(([key, value]) => {
       writeRuntimeState(runtime, key, value);
@@ -350,6 +443,16 @@ export async function executeSimpleWorkbenchAction(
   if (config.action === 'dataSource.reload') {
     const args = resolveRuntimeValue(runtime, config.args);
     await reloadDataSources(runtime, resolveReloadIds(args));
+    return;
+  }
+
+  if (config.action === 'navigate') {
+    const args = resolveRuntimeValue(runtime, config.args || {});
+    const path = resolveWorkbenchNavigatePath(args);
+    if (!path) {
+      throw new Error('[workbench] navigate requires args.path or args.to');
+    }
+    runtime.navigateTo(appendRouteContext(path, args.context));
     return;
   }
 
@@ -400,17 +503,28 @@ export async function executeSimpleWorkbenchAction(
         params,
       });
       if (!isSuccessResult(result)) {
-        throw new Error((result as any).message || (result as any).desc || `${command} failed`);
+        // B-002 (DR-20260715-B-002): a business-rejected command puts the real,
+        // localized reason in context.detail; message/desc are the generic envelope.
+        // Use the shared extractor so the workbench toast shows the reason (not
+        // "Business error"), matching useActionHandler / FormPageContent (OSS #1212).
+        throw new Error(resolveCommandErrorMessage(result, command));
       }
 
       const reloadIds = resolveReloadIds(args.reload);
       const dispatch = unwrapCommandData(result);
+      const asyncDispatched = isAsyncDispatch(dispatch);
       if (isAsyncDispatch(dispatch)) {
         result = await pollWorkbenchAsyncTask(runtime, dispatch.taskCode, reloadIds, args);
       }
 
-      await reloadDataSources(runtime, reloadIds);
+      if (!asyncDispatched) {
+        await reloadDataSources(runtime, reloadIds);
+      }
       const resultData = unwrapCommandData(result);
+      const { downloadBase64CommandArtifact } = await import(
+        '~/framework/meta/runtime/actions/ActionRegistry'
+      );
+      downloadBase64CommandArtifact(resultData);
       if (isBusinessRejected(resultData)) {
         showCommandFeedback(
           runtime,
@@ -429,7 +543,10 @@ export async function executeSimpleWorkbenchAction(
         try {
           await downloadWithAuth(downloadUrl);
         } catch (error) {
-          console.error('[workbench] authenticated download failed, falling back to direct navigation:', error);
+          console.error(
+            '[workbench] authenticated download failed, falling back to direct navigation:',
+            error,
+          );
           openDownloadUrl(downloadUrl);
         }
       }

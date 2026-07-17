@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
@@ -18,9 +19,12 @@ import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.dto.AsyncTaskDTO;
 import com.auraboot.framework.meta.dto.AsyncTaskSubmitRequest;
+import com.auraboot.framework.meta.service.DataDomainService;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl;
 import com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutor;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
+import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
@@ -56,6 +60,8 @@ public class HandlerPhase implements CommandPhase {
     private final DynamicDataMapper dynamicDataMapper;
     private final MetaModelService metaModelService;
     private final RecordSnapshotReader snapshotReader;
+    private final DataPermissionEngine dataPermissionEngine;
+    private final DataDomainService dataDomainService;
 
     @Autowired(required = false)
     private BiTemporalService biTemporalService;
@@ -226,15 +232,18 @@ public class HandlerPhase implements CommandPhase {
         CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");
 
         Map<String, Object> conditions;
+        Map.Entry<String, Object> idEntry;
         String sql = "SELECT id FROM " + tableName
                 + " WHERE tenant_id = #{params.tenantId} AND pid = #{params.pid}";
         Map<String, Object> lookupParams = Map.of("tenantId", tenantId, "pid", recordIdStr);
         List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, lookupParams);
         if (rows != null && !rows.isEmpty()) {
             Long dbId = ((Number) rows.get(0).get("id")).longValue();
+            idEntry = Map.entry("id", dbId);
             conditions = Map.of("tenant_id", tenantId, "id", dbId);
         } else {
             var fallbackEntry = CommandExecutorUtils.resolveRecordIdColumn(recordIdStr);
+            idEntry = fallbackEntry;
             conditions = Map.of("tenant_id", tenantId, fallbackEntry.getKey(), fallbackEntry.getValue());
         }
 
@@ -247,7 +256,9 @@ public class HandlerPhase implements CommandPhase {
         // in the data map. (Distinct from OSS #398, which only covered the
         // CommandSideEffectExecutor UPDATE_RECORD + partial-CRUD paths.)
         Set<String> jsonbColumns = resolveJsonbColumns(modelDef, tableName);
-        if (jsonbColumns.isEmpty()) {
+        if (shouldUseScopedWrite()) {
+            executeScopedUpdate(tableName, modelCode, idEntry, persistable, tenantId, jsonbColumns);
+        } else if (jsonbColumns.isEmpty()) {
             dynamicDataMapper.update(tableName, persistable, conditions);
         } else {
             dynamicDataMapper.updateWithJsonb(tableName, persistable, conditions, jsonbColumns);
@@ -277,6 +288,109 @@ public class HandlerPhase implements CommandPhase {
             }
         }
         return jsonbColumns;
+    }
+
+    private void executeScopedUpdate(
+            String tableName,
+            String modelCode,
+            Map.Entry<String, Object> idEntry,
+            Map<String, Object> data,
+            Long tenantId,
+            Set<String> jsonbColumns) {
+        CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");
+        CommandExecutorUtils.validateSqlIdentifier(idEntry.getKey(), "handler field id column");
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        StringBuilder sql = new StringBuilder("UPDATE ")
+                .append(tableName)
+                .append(" SET ");
+        int index = 0;
+        for (Map.Entry<String, Object> entry : data.entrySet()) {
+            CommandExecutorUtils.validateSqlIdentifier(entry.getKey(), "handler field column");
+            if (index > 0) {
+                sql.append(", ");
+            }
+            String paramName = "set" + index;
+            if (jsonbColumns != null && jsonbColumns.contains(entry.getKey())) {
+                sql.append(entry.getKey()).append(" = #{params.").append(paramName)
+                        .append(",jdbcType=OTHER,typeHandler=com.auraboot.framework.application.database.mybatis.JsonbStringTypeHandler}::jsonb");
+            } else {
+                sql.append(entry.getKey()).append(" = #{params.").append(paramName).append("}");
+            }
+            Object parameterValue = entry.getValue();
+            if (jsonbColumns != null && jsonbColumns.contains(entry.getKey())
+                    && parameterValue != null && !(parameterValue instanceof String)) {
+                parameterValue = com.auraboot.framework.meta.util.JsonbFieldHelper.toJsonString(parameterValue);
+            }
+            params.put(paramName, parameterValue);
+            index++;
+        }
+
+        params.put("recordId", idEntry.getValue());
+        params.put("tenantId", tenantId);
+        sql.append(" WHERE ")
+                .append(idEntry.getKey())
+                .append(" = #{params.recordId}")
+                .append(" AND tenant_id = #{params.tenantId}");
+        appendScopedWriteGuards(sql, tenantId, modelCode);
+
+        dynamicDataMapper.updateByQuery(sql.toString(), params);
+    }
+
+    private boolean shouldUseScopedWrite() {
+        return dataPermissionEngine != null
+                && dataDomainService != null
+                && MetaContext.exists()
+                && !MetaContext.isDataPermissionBypassed()
+                && MetaContext.getCurrentUserId() != null;
+    }
+
+    private void appendScopedWriteGuards(StringBuilder sql, Long tenantId, String modelCode) {
+        Long userId = MetaContext.getCurrentUserId();
+        try {
+            String rowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
+                    () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+            appendScopedFilter(sql, rowFilter);
+        } catch (Exception e) {
+            log.error("Failed to apply row-level data permission for HANDLER result write on model {}",
+                    modelCode, e);
+            throw new BusinessException(ResponseCode.FORBIDDEN,
+                    "Data permission evaluation failed for model: " + modelCode);
+        }
+
+        try {
+            String domainFilter = DynamicDataQueryScope.domainFilter(tenantId, modelCode, userId,
+                    () -> dataDomainService.buildDomainFilter(modelCode, userId));
+            appendScopedFilter(sql, domainFilter);
+        } catch (Exception e) {
+            log.error("Failed to apply domain filter for HANDLER result write on model {}",
+                    modelCode, e);
+            throw new BusinessException(ResponseCode.FORBIDDEN,
+                    "Data domain filter evaluation failed for model: " + modelCode);
+        }
+    }
+
+    private void appendScopedFilter(StringBuilder sql, String filter) {
+        if (filter == null || filter.isBlank()) {
+            return;
+        }
+        String normalized = filter.trim();
+        if (normalized.regionMatches(true, 0, "AND ", 0, 4)) {
+            normalized = normalized.substring(4).trim();
+        } else if (normalized.regionMatches(true, 0, "WHERE ", 0, 6)) {
+            normalized = normalized.substring(6).trim();
+        }
+        if (normalized.isBlank()) {
+            return;
+        }
+        rejectStatementInjectionMarkers(normalized);
+        sql.append(" AND ").append(normalized);
+    }
+
+    private void rejectStatementInjectionMarkers(String filter) {
+        if (filter.contains(";") || filter.contains("--") || filter.contains("/*") || filter.contains("*/")) {
+            throw new BusinessException(ResponseCode.BadParam, "Unsafe DataScope filter for HANDLER result write");
+        }
     }
 
     // ==================== Helper methods ====================
@@ -340,6 +454,7 @@ public class HandlerPhase implements CommandPhase {
                 handlerCode, commandCode,
                 handler != null ? handler.getClass().getName() : "<none>", secondaryHandlers.size());
 
+        DynamicDataQueryScope queryScope = DynamicDataQueryScope.open();
         try {
             String namespace = handlerCode.contains(":") ? handlerCode.split(":")[0] : null;
             Map<String, Object> pluginSettings = new HashMap<>();
@@ -420,7 +535,16 @@ public class HandlerPhase implements CommandPhase {
         } catch (Exception e) {
             log.error("Plugin command handler execution failed for {} (command={}): {}",
                     handlerCode, commandCode, e.getMessage(), e);
+            // Plugin handlers use stable, transport-neutral error keys because
+            // the plugin API must not depend on host web exceptions. Preserve
+            // the optimistic-concurrency semantic at the host boundary so DSL
+            // clients receive HTTP 409 and can offer reload/retry recovery.
+            if (e.getMessage() != null && e.getMessage().contains("iot.error.version_conflict")) {
+                throw new com.auraboot.framework.exception.ConflictException(e.getMessage(), e);
+            }
             throw new BusinessException(ResponseCode.BadParam, "Plugin handler execution failed: " + e.getMessage());
+        } finally {
+            queryScope.close();
         }
     }
 

@@ -167,6 +167,70 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
     ).resolves.toEqual(await submitted);
   });
 
+  it('preserves API option descriptions and normalizes choice defaults', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({
+      code: '0',
+      data: {
+        records: [
+          { key: 's0-h0-c0', label: 'A · 规格', detail: '候选角色=spec' },
+          { key: 's0-h0-c1', label: 'B · 型号', detail: '候选角色=mpn' },
+        ],
+      },
+    });
+    window.addEventListener(
+      'dialog:form',
+      (event) => {
+        const detail = (event as CustomEvent).detail;
+        expect(detail.fieldOptions.sourceColumns).toEqual([
+          { value: 's0-h0-c0', label: 'A · 规格', description: '候选角色=spec' },
+          { value: 's0-h0-c1', label: 'B · 型号', description: '候选角色=mpn' },
+        ]);
+        expect(detail.defaults).toEqual({
+          sourceColumns: ['s0-h0-c0', 's0-h0-c1'],
+          confirmedByUser: false,
+        });
+        detail.onSubmit(detail.defaults);
+      },
+      { once: true },
+    );
+
+    await expect(
+      promptInputForm(
+        [
+          {
+            field: 'sourceColumns',
+            type: 'multiselect',
+            defaultValue: 's0-h0-c0,s0-h0-c1',
+            dataSource: {
+              type: 'api',
+              endpoint: '/api/dynamic/bom_import_analysis_item/list',
+              params: {
+                pageSize: 200,
+                filters: [{ fieldName: 'bom_iai_item_type', operator: 'EQ', value: 'column' }],
+              },
+              valueField: 'key',
+              labelField: 'label',
+              descriptionField: 'detail',
+            },
+          },
+          { field: 'confirmedByUser', type: 'checkbox', defaultValue: 'false' },
+        ],
+        '调整字段来源',
+        fetchResult,
+      ),
+    ).resolves.toEqual({
+      sourceColumns: ['s0-h0-c0', 's0-h0-c1'],
+      confirmedByUser: false,
+    });
+    expect(fetchResult).toHaveBeenCalledWith('/api/dynamic/bom_import_analysis_item/list', {
+      method: 'get',
+      params: {
+        pageSize: 200,
+        filters: [{ fieldName: 'bom_iai_item_type', operator: 'EQ', value: 'column' }],
+      },
+    });
+  });
+
   it('aborts (does not submit the command) when the user cancels the form', async () => {
     const fetchResult = vi.fn().mockResolvedValue({ code: '0', data: {} });
     window.addEventListener(
@@ -199,6 +263,33 @@ describe('ActionRegistry command.execute inputFields (command-form sugar)', () =
       '/api/meta/commands/execute/x:do',
       expect.objectContaining({ params: expect.objectContaining({ payload: { a: 1 } }) }),
     );
+  });
+
+  it('downloads a Base64 file artifact returned by a command', async () => {
+    const fetchResult = vi.fn().mockResolvedValue({
+      code: '0',
+      data: {
+        success: true,
+        data: {
+          data: {
+            fileName: 'batch-failures.csv',
+            contentType: 'text/csv;charset=UTF-8',
+            contentBase64: btoa('row,error\n1,INVALID'),
+          },
+        },
+      },
+    });
+    const createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:command-artifact');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+    await actionRegistry.execute('command.execute', {
+      fetchResult,
+      args: { command: 'iot_dps_batch_onboarding_job:export_failures', targetRecordPid: 'B1' },
+    });
+
+    expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
+    expect(click).toHaveBeenCalledOnce();
   });
 });
 

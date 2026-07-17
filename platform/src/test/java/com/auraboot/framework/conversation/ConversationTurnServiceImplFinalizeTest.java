@@ -3,7 +3,7 @@ package com.auraboot.framework.conversation;
 import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.aurabot.dto.ChatRequest;
+import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.aurabot.service.AuraBotChatService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
@@ -270,6 +270,30 @@ class ConversationTurnServiceImplFinalizeTest extends BaseIntegrationTest {
             // recordTurnEnd may or may not fire depending on whether eventEmitter is
             // before or after metricsRecorder in the dispatch order; we only require
             // that the caller still got the outcome back without a thrown exception.
+        });
+    }
+
+    @Test
+    @Order(8)
+    @DisplayName("P-006: persistOutbound throws after Success -> outbound_persist_fail metric + audit, response NOT rolled back")
+    void persistOutboundThrows_surfacedViaMetricAndAudit_responseStillSuccess() {
+        withTestIdentity(() -> {
+            TurnOutcome.Success success = new TurnOutcome.Success("delivered-to-client", java.util.Map.of());
+            when(chatService.executeAuraBotTurn(any(), any(), any())).thenReturn(success);
+            // Simulate a DB constraint failure while persisting the (already streamed)
+            // outbound agent row. This must NOT bubble up nor flip the outcome.
+            doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate key on ab_im_message"))
+                    .when(persistence).persistOutbound(any(), same(success), any());
+
+            TurnOutcome outcome = turnService.runTurn(auraBotTurn("hi"), sink);
+
+            // Response is NOT rolled back — the caller still gets the Success it streamed.
+            assertThat(outcome).isSameAs(success);
+            // Visible failure surface: dedicated metric increment ...
+            verify(metricsRecorder, times(1)).recordOutboundPersistFailure(any());
+            // ... AND an audit failure record (Success branch does not otherwise
+            // write audit, so exactly one writeFailure = the persist-failure surface).
+            verify(auditWriter, times(1)).writeFailure(any(), isA(TurnOutcome.Failed.class));
         });
     }
 }

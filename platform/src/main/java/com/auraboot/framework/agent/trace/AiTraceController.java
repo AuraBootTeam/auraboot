@@ -4,6 +4,8 @@ import com.auraboot.framework.agent.trace.dto.TraceDetailResponse;
 import com.auraboot.framework.agent.trace.dto.TraceStatsResponse;
 import com.auraboot.framework.agent.trace.entity.AiTrace;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -12,9 +14,20 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 
+/**
+ * Read API over the LLM call-trace store. These endpoints expose raw prompts,
+ * keywords, tool-calls and per-tenant cost/usage across ALL users in the tenant
+ * (filtered by tenantId, not by the requesting user), so they are the LLM
+ * observability layer of agent runs. Gated as full-tenant agent-run observability
+ * — the same guard the sibling agent-run consoles ({@code AgentRunController},
+ * {@code AgentRunOpsController}, {@code AgentRunAuditController}) already use — so a
+ * plain authenticated member cannot read other users' AI activity. Without this the
+ * handlers are un-annotated and the interceptor shadow-allows any logged-in user.
+ */
 @RestController
 @RequestMapping("/api/ai/traces")
 @RequiredArgsConstructor
+@RequirePermission(MetaPermission.ACP_AGENT_RUN_ADMIN)
 public class AiTraceController {
 
     private final AiTraceService aiTraceService;

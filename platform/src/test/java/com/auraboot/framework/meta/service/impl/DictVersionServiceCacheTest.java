@@ -206,33 +206,6 @@ class DictVersionServiceCacheTest {
     }
     
     /**
-     * 测试: clearDictCache清除缓存
-     * 
-     * 验证需求 2.3: 缓存清除功能正常工作
-     */
-    @Test
-    void testClearDictCache() {
-        // Given: 设置租户上下文
-        MetaContext.setSystemTenantContext(1001L);
-
-        
-        Dict dict = createMockDict("user_status", "static");
-        when(dictMapper.findCurrentByCode(eq("user_status"))).thenReturn(dict);
-        
-        // When: 第一次调用
-        dictVersionService.loadDictByStrategy("user_status", "latest", null);
-        
-        // When: 清除缓存
-        dictVersionService.clearDictCache("user_status");
-        
-        // When: 第二次调用
-        dictVersionService.loadDictByStrategy("user_status", "latest", null);
-        
-        // Then: 验证调用了两次Mapper(缓存被清除)
-        verify(dictMapper, times(2)).findCurrentByCode(eq("user_status"));
-    }
-    
-    /**
      * 测试: switchCurrentVersion清除缓存
      * 
      * 验证需求 2.3: 版本切换时清除缓存

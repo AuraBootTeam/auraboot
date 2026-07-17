@@ -69,24 +69,30 @@ class DslRegistryTest {
     }
 
     @Test
-    void autoSetStrategy_has14Values() {
-        assertEquals(14, DslRegistry.AutoSetStrategy.values().length);
+    void autoSetStrategy_has12Values() {
+        // DR-20260715-A-002: sequence + field_map removed (no runtime impl; auto_generate / copy_field
+        // cover them). The remaining 12 are all implemented in CommandAutoSetExecutor.
+        assertEquals(12, DslRegistry.AutoSetStrategy.values().length);
         Set<String> codes = DslRegistry.AutoSetStrategy.codes();
         assertTrue(codes.containsAll(Set.of(
                 "current_user", "current_user_pid", "current_username",
                 "current_date", "current_datetime", "current_tenant",
-                "uuid", "sequence", "expression", "fixed_value", "default_value",
-                "auto_generate", "copy_field", "field_map")));
+                "uuid", "expression", "fixed_value", "default_value",
+                "auto_generate", "copy_field")));
+        assertFalse(codes.contains("sequence"));
+        assertFalse(codes.contains("field_map"));
     }
 
     @Test
-    void preconditionOperator_has16Values() {
-        assertEquals(16, DslRegistry.PreconditionOperator.values().length);
+    void preconditionOperator_has17Values() {
+        // DR-20260715-A-001: not_contains added (was implemented in AssertPhase but not declared);
+        // the 5 phantom ops (between/like/not_like/starts_with/ends_with) are now implemented too.
+        assertEquals(17, DslRegistry.PreconditionOperator.values().length);
         Set<String> codes = DslRegistry.PreconditionOperator.codes();
         assertTrue(codes.containsAll(Set.of(
                 "EQ", "NE", "GT", "GE", "LT", "LE", "IN", "not_in",
                 "is_null", "is_not_null", "between", "like", "not_like",
-                "contains", "starts_with", "ends_with")));
+                "contains", "not_contains", "starts_with", "ends_with")));
     }
 
     @Test
@@ -132,8 +138,17 @@ class DslRegistryTest {
     }
 
     @Test
-    void blockType_has35Values() {
-        assertEquals(35, DslRegistry.BlockType.values().length);
+    void blockTypeCodes_includeCodeSnippet() {
+        assertTrue(DslRegistry.BlockType.codes().contains("code-snippet"),
+                "BlockType must include code-snippet (S-PAGE-BLOCK-TYPE whitelist for embed/snippet pages)");
+
+        assertTrue(DslRegistry.BlockType.codes().contains("conversation-panel"),
+                "BlockType must include conversation-panel (S-PAGE-BLOCK-TYPE whitelist for the seat console)");
+    }
+
+    @Test
+    void blockType_has37Values() {
+        assertEquals(37, DslRegistry.BlockType.values().length);
         Set<String> codes = DslRegistry.BlockType.codes();
         assertTrue(codes.containsAll(Set.of(
                 "form", "form-section", "form-buttons", "form-wizard",

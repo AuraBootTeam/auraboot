@@ -69,6 +69,48 @@ describe('workbenchBlockUtils action runner', () => {
     expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
   });
 
+  it('navigates workbench actions to an explicit path or custom page key', async () => {
+    const navigateTo = vi.fn();
+    const runtime = makeRuntime({ navigateTo }) as any;
+
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'navigate',
+      args: { path: '/p/c/iot_alarm_console_workbench' },
+    });
+
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'navigate',
+      args: { to: 'iot_remote_diagnosis_workbench' },
+    });
+
+    expect(navigateTo).toHaveBeenNthCalledWith(1, '/p/c/iot_alarm_console_workbench');
+    expect(navigateTo).toHaveBeenNthCalledWith(2, '/p/c/iot_remote_diagnosis_workbench');
+  });
+
+  it('encodes resolved navigate context as routeContext query state', async () => {
+    const navigateTo = vi.fn();
+    const runtime = makeRuntime({ navigateTo }) as any;
+
+    await executeSimpleWorkbenchAction(runtime, {
+      action: 'navigate',
+      args: {
+        to: 'iot_remote_diagnosis_workbench',
+        context: {
+          source: 'FLEET',
+          deviceCode: '${state.selectedLine.pid}',
+          emptyValue: '',
+        },
+      },
+    });
+
+    const target = new URL(navigateTo.mock.calls[0][0], 'http://auraboot.local');
+    expect(target.pathname).toBe('/p/c/iot_remote_diagnosis_workbench');
+    expect(JSON.parse(target.searchParams.get('routeContext') || '{}')).toEqual({
+      source: 'FLEET',
+      deviceCode: 'LINE-1',
+    });
+  });
+
   it('notifies data source dependents after writing runtime state', () => {
     const runtime = makeRuntime() as any;
 
@@ -96,17 +138,44 @@ describe('workbenchBlockUtils action runner', () => {
       },
     });
 
-    expect(fetchResultMock).toHaveBeenCalledWith('/api/meta/commands/execute/bom:confirm_candidate', {
-      method: 'post',
-      params: {
-        targetRecordPid: 'LINE-1',
-        operationType: 'UPDATE',
-        payload: {
-          materialCode: 'MAT-001',
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/bom:confirm_candidate',
+      {
+        method: 'post',
+        params: {
+          targetRecordPid: 'LINE-1',
+          operationType: 'UPDATE',
+          payload: {
+            materialCode: 'MAT-001',
+          },
+        },
+      },
+    );
+    expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
+  });
+
+  it('downloads Base64 command artifacts from the workbench action path', async () => {
+    fetchResultMock.mockResolvedValueOnce({
+      code: '0',
+      data: {
+        success: true,
+        data: {
+          fileName: 'audit.json',
+          contentType: 'application/json',
+          contentBase64: btoa('{"schema":"v1"}'),
         },
       },
     });
-    expect(runtime.__reload).toHaveBeenCalledWith(['summary', 'lines']);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:workbench-artifact');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+
+    await executeSimpleWorkbenchAction(makeRuntime() as any, {
+      action: 'command.execute',
+      args: { command: 'iot_dps_batch_onboarding_job:export_audit', targetRecordPid: 'B1' },
+    });
+
+    expect(click).toHaveBeenCalledOnce();
   });
 
   it('accepts targetRecordId alias for command actions', async () => {
@@ -142,7 +211,7 @@ describe('workbenchBlockUtils action runner', () => {
     );
   });
 
-  it('polls async command tasks and reloads dependencies while the task is running', async () => {
+  it('polls async command tasks and throttles dependency reloads while the task is running', async () => {
     const runtime = makeRuntime() as any;
     fetchResultMock
       .mockResolvedValueOnce({
@@ -158,6 +227,10 @@ describe('workbenchBlockUtils action runner', () => {
       })
       .mockResolvedValueOnce({
         code: '0',
+        data: { status: 'running', progress: 70, progressMessage: 'Processed 5/7 quote lines' },
+      })
+      .mockResolvedValueOnce({
+        code: '0',
         data: { status: 'completed', resultData: { processedCount: 7, sourcedCount: 5 } },
       });
 
@@ -169,13 +242,14 @@ describe('workbenchBlockUtils action runner', () => {
         operationType: 'update',
         reload: ['bomPriceMetrics', 'bomPriceWaterfall', 'evidence', 'lines'],
         asyncPollIntervalMs: 0,
+        asyncReloadIntervalMs: 3000,
       },
     });
 
     const urls = fetchResultMock.mock.calls.map((call) => String(call[0]));
     expect(urls).toContain('/api/meta/commands/execute/qo_quote_common:batch_source_prices');
     expect(urls).toContain('/api/async-tasks/TASK-PRICE-1');
-    expect(runtime.__reload).toHaveBeenCalledTimes(3);
+    expect(runtime.__reload).toHaveBeenCalledTimes(2);
     expect(runtime.__reload).toHaveBeenLastCalledWith([
       'bomPriceMetrics',
       'bomPriceWaterfall',
@@ -209,6 +283,33 @@ describe('workbenchBlockUtils action runner', () => {
     expect(runtime.__reload).not.toHaveBeenCalled();
   });
 
+  it('B-002: surfaces localized context.detail over the generic message envelope on command reject', async () => {
+    // A business-rejected command puts the real reason in context.detail; message/desc
+    // are the generic "Business error" envelope. The workbench path (executeSimpleWorkbenchAction)
+    // is the third command path (after useActionHandler / FormPageContent, OSS #1212) and
+    // must extract the same way. Pre-fix it threw message ('Business error'); this asserts detail.
+    const runtime = makeRuntime() as any;
+    fetchResultMock.mockResolvedValue({
+      code: '500',
+      message: 'Business error',
+      desc: 'Business error',
+      context: { detail: '库存不足,无法确认入库' },
+    });
+
+    await expect(
+      executeSimpleWorkbenchAction(runtime, {
+        action: 'command.execute',
+        args: {
+          command: 'tinv:confirm_stock_in',
+          targetRecordPid: 'SI-1',
+          operationType: 'update',
+        },
+      }),
+    ).rejects.toThrow('库存不足,无法确认入库');
+
+    expect(runtime.__reload).not.toHaveBeenCalled();
+  });
+
   it('downloads the returned file with browser auth after executing a command', async () => {
     const runtime = makeRuntime() as any;
     const fetchMock = vi.fn().mockResolvedValue({
@@ -234,7 +335,10 @@ describe('workbenchBlockUtils action runner', () => {
     vi.stubGlobal('URL', { createObjectURL, revokeObjectURL });
     window.localStorage.setItem('jwtToken', 'token-1');
     createElement.mockImplementation((tagName: string) => {
-      const element = document.createElementNS('http://www.w3.org/1999/xhtml', tagName) as HTMLAnchorElement;
+      const element = document.createElementNS(
+        'http://www.w3.org/1999/xhtml',
+        tagName,
+      ) as HTMLAnchorElement;
       if (tagName === 'a') {
         element.click = click;
       }
@@ -253,13 +357,16 @@ describe('workbenchBlockUtils action runner', () => {
       },
     });
 
-    expect(fetchResultMock).toHaveBeenCalledWith('/api/meta/commands/execute/bom:regenerate_export', {
-      method: 'post',
-      params: {
-        targetRecordPid: 'TASK-1',
-        payload: {},
+    expect(fetchResultMock).toHaveBeenCalledWith(
+      '/api/meta/commands/execute/bom:regenerate_export',
+      {
+        method: 'post',
+        params: {
+          targetRecordPid: 'TASK-1',
+          payload: {},
+        },
       },
-    });
+    );
     expect(fetchMock).toHaveBeenCalledWith('/api/file/download/export-file-1', {
       method: 'GET',
       headers: {
@@ -271,6 +378,45 @@ describe('workbenchBlockUtils action runner', () => {
     expect(appendChild).toHaveBeenCalled();
     expect(click).toHaveBeenCalled();
     expect(runtime.__reload).toHaveBeenCalledWith(['summary']);
+  });
+});
+
+describe('workbenchBlockUtils unknown-action backstop', () => {
+  it('throws and logs for an invented string verb instead of silently no-op-ing', async () => {
+    const runtime = makeRuntime() as any;
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(
+      executeSimpleWorkbenchAction(runtime, {
+        action: 'api',
+        args: { command: 'cs:go_online', endpoint: '/api/x' },
+      }),
+    ).rejects.toThrow(/unknown action/);
+    expect(errorSpy).toHaveBeenCalled();
+    // The fatal footgun was a dead button with no side effect — assert nothing ran.
+    expect(runtime.__reload).not.toHaveBeenCalled();
+
+    errorSpy.mockRestore();
+  });
+
+  it('throws for an object-shaped action (the ActionRegistry/rowActions dialect)', async () => {
+    const runtime = makeRuntime() as any;
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(
+      executeSimpleWorkbenchAction(runtime, {
+        action: { type: 'api', endpoint: '/api/x', body: {} },
+      }),
+    ).rejects.toThrow(/unknown action an object/);
+
+    errorSpy.mockRestore();
+  });
+
+  it('still runs the four legal verbs without throwing', async () => {
+    const runtime = makeRuntime() as any;
+    await expect(
+      executeSimpleWorkbenchAction(runtime, { action: 'state.set', args: { statusFilter: [] } }),
+    ).resolves.toBeUndefined();
   });
 });
 

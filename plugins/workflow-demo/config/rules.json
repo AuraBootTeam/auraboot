@@ -5,7 +5,7 @@
     "ruleName:zh-CN": "请假申请前置校验",
     "ruleName:en": "Leave Request Validation",
     "ruleType": "VALIDATION",
-    "description": "Pre-flight check run by wd:submit_leave_request before starting the BPM process. Blocks annual leave with insufficient balance and sick leave >2 days without attachment.",
+    "description": "Pre-flight check run by wd:submit_leave_request before starting the BPM process. Blocks annual leave when the applicant has no balance on file or too few days left, and sick leave >2 days without attachment.",
     "enabled": true,
     "version": 1,
     "inputSchema": {
@@ -24,7 +24,7 @@
         "valid": { "type": "boolean" },
         "reason": {
           "type": "string",
-          "enum": ["annual_leave_insufficient", "sick_attachment_required"]
+          "enum": ["annual_balance_not_found", "annual_leave_insufficient", "sick_attachment_required"]
         }
       }
     },

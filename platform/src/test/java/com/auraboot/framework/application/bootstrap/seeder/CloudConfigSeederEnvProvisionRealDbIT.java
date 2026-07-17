@@ -17,7 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * already has {@code ab_cloud_config} + the {@code seed_llm_deepseek} row),
  * so it never runs in the default test/CI sweep (which has no DB).
  *
- * <p>Exercises the actual {@link CloudConfigSeeder#provisionLlmApiKeysFromEnv()}
+ * <p>Exercises the actual {@link CloudConfigSeeder#provisionApiKeysFromEnv()}
  * against a live Postgres connection — proving the {@code SET config = ?::jsonb}
  * UPDATE applies on the real jsonb column and the row flips to {@code enabled=true}
  * carrying the supplied key. Uses a dummy key (never a real secret) and leaves
@@ -62,7 +62,7 @@ class CloudConfigSeederEnvProvisionRealDbIT {
             }
         };
 
-        seeder.provisionLlmApiKeysFromEnv();
+        seeder.provisionApiKeysFromEnv();
 
         // AFTER: row recreated, enabled, apiKey injected, default provider fields present.
         Boolean enabledAfter = jdbc.queryForObject(

@@ -55,4 +55,15 @@ public class RagRetrievalMetrics {
         Counter.builder("rag.embedding.retry").tag("outcome", outcome)
                 .register(registry).increment(count);
     }
+
+    /**
+     * Documents reclaimed by the parse reconcile pass (i.e. left stranded in {@code pending} /
+     * {@code processing} by a worker that died mid-parse).
+     *
+     * @param outcome {@code recovered}/{@code failed}/{@code exhausted}
+     */
+    public void recordDocumentReconcile(String outcome, int count) {
+        Counter.builder("rag.document.reconcile").tag("outcome", outcome)
+                .register(registry).increment(count);
+    }
 }

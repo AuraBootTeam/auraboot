@@ -113,10 +113,6 @@
             "width": 150
           },
           {
-            "field": "semver",
-            "width": 100
-          },
-          {
             "field": "updated_at",
             "width": 180,
             "sortable": true,
@@ -130,6 +126,7 @@
               "zh-CN": "统一设计器",
               "en": "Unified Designer"
             },
+            "inline": true,
             "action": {
               "type": "navigate",
               "to": "/unified-designer?pageId={pid}"
@@ -152,6 +149,7 @@
               "zh-CN": "发布",
               "en": "Publish"
             },
+            "inline": true,
             "action": {
               "type": "command",
               "command": "pgm:publish_page_schema"
