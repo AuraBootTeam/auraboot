@@ -105,6 +105,7 @@ CLAUDE.md
 AGENTS.md
 .claude/.worktrees/
 .worktrees/
+.workspace/
 
 # Test coverage artifacts (D11 vitest --coverage output)
 plugins/cli/coverage/

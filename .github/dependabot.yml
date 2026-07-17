@@ -9,9 +9,12 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
-      day: "tuesday"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 1
+    groups:
+      actions:
+        patterns:
+          - "*"
     labels:
       - "dependencies"
       - "ci"
@@ -22,9 +25,15 @@ updates:
   - package-ecosystem: "gradle"
     directory: "/platform"
     schedule:
-      interval: "weekly"
-      day: "tuesday"
-    open-pull-requests-limit: 8
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    groups:
+      spring:
+        patterns:
+          - "org.springframework*"
+      backend-minor-patch:
+        patterns:
+          - "*"
     labels:
       - "dependencies"
       - "area: backend"
@@ -37,11 +46,21 @@ updates:
 
   # Frontend (pnpm)
   - package-ecosystem: "npm"
-    directory: "/web-admin"
+    # pnpm-lock.yaml lives at the repository root. Scanning /web-admin updates
+    # package.json without the workspace lockfile and creates born-red PRs.
+    directory: "/"
     schedule:
-      interval: "weekly"
-      day: "tuesday"
-    open-pull-requests-limit: 8
+      interval: "monthly"
+    open-pull-requests-limit: 2
+    groups:
+      frontend-runtime:
+        dependency-type: "production"
+        patterns:
+          - "*"
+      frontend-development:
+        dependency-type: "development"
+        patterns:
+          - "*"
     labels:
       - "dependencies"
       - "area: frontend"
@@ -55,8 +74,8 @@ updates:
   - package-ecosystem: "docker"
     directory: "/platform"
     schedule:
-      interval: "weekly"
-      day: "tuesday"
+      interval: "monthly"
+    open-pull-requests-limit: 1
     labels:
       - "dependencies"
       - "area: devops"
@@ -66,8 +85,8 @@ updates:
   - package-ecosystem: "docker"
     directory: "/web-admin"
     schedule:
-      interval: "weekly"
-      day: "tuesday"
+      interval: "monthly"
+    open-pull-requests-limit: 1
     labels:
       - "dependencies"
       - "area: devops"
