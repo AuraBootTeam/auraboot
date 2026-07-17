@@ -127,6 +127,23 @@ describe('QUICK_FILTER_PRESET_KEYS', () => {
   });
 });
 
+describe('quick filter preset icons', () => {
+  it('gives every built-in preset a default icon', () => {
+    for (const preset of getQuickFilterPresetDefinitions()) {
+      expect(preset.icon, `preset ${preset.key} should have an icon`).toBeTruthy();
+    }
+  });
+
+  it('uses the expected default icon for each built-in preset', () => {
+    const byKey = Object.fromEntries(
+      getQuickFilterPresetDefinitions().map((preset) => [preset.key, preset.icon]),
+    );
+    expect(byKey.my_records).toBe('👤');
+    expect(byKey.created_today).toBe('📅');
+    expect(byKey.modified_this_week).toBe('🕐');
+  });
+});
+
 describe('isQuickFilterPresetKey', () => {
   it('accepts valid preset keys', () => {
     expect(isQuickFilterPresetKey('my_records')).toBe(true);

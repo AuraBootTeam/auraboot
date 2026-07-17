@@ -1500,6 +1500,48 @@ class PluginImportServiceImplCoreTest {
         assertThat(updated.getViewConfig().getMeta().getAllowUserCopy()).isTrue();
     }
 
+    @Test
+    @DisplayName("plugin saved views carry pinAsQuickFilter/icon/order into view meta")
+    void importSavedViewsCarriesPinAsQuickFilterIntoMeta() {
+        PluginManifestExtended manifest = baseManifest();
+        SavedViewDefinitionDTO dto = SavedViewDefinitionDTO.builder()
+                .name("Pipeline Board")
+                .modelCode("crm.opportunity")
+                .pageKey("crm_opportunity_list")
+                .viewType("table")
+                .viewKey("crm.opportunity.pipeline")
+                .pinAsQuickFilter(true)
+                .quickFilterIcon("⭐")
+                .quickFilterOrder(2)
+                .viewConfig(Map.of("rowHeight", "medium"))
+                .build();
+        manifest.setSavedViews(List.of(dto));
+
+        when(pageSchemaMapper.selectAnyByPageKey("crm_opportunity_list")).thenReturn(new PageSchema());
+        ViewConfig existingConfig = new ViewConfig();
+        existingConfig.setMeta(ViewConfig.Meta.builder()
+                .viewKey("crm.opportunity.pipeline")
+                .managedBy("plugin")
+                .locked(true)
+                .build());
+        SavedView existing = new SavedView();
+        existing.setPid("existing-view");
+        existing.setName("Old Plugin Board");
+        existing.setViewType("table");
+        existing.setViewConfig(existingConfig);
+        when(savedViewMapper.findGlobalViews("crm.opportunity", "crm_opportunity_list"))
+                .thenReturn(List.of(existing));
+
+        invokeImportSavedViews(manifest, new ImportExecuteResult(), 1L);
+
+        ArgumentCaptor<SavedView> captor = ArgumentCaptor.forClass(SavedView.class);
+        verify(savedViewMapper).updateSavedView(captor.capture());
+        ViewConfig.Meta meta = captor.getValue().getViewConfig().getMeta();
+        assertThat(meta.getPinnedAsQuickFilter()).isTrue();
+        assertThat(meta.getQuickFilterIcon()).isEqualTo("⭐");
+        assertThat(meta.getQuickFilterOrder()).isEqualTo(2);
+    }
+
     private void invokeGeneratePermissionI18nRecords(List<PermissionDefinitionDTO> permissions, Long tenantId) {
         try {
             Method method = PluginImportServiceImpl.class.getDeclaredMethod(

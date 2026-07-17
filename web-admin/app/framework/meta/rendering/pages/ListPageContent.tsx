@@ -83,8 +83,10 @@ import {
   buildQuickFilterPreset,
   buildQuickFilterPresetViewRequest,
   getQuickFilterPresetDefinition,
+  getQuickFilterPresetDefinitions,
   isQuickFilterPresetKey,
 } from './list/quickFilterPresets';
+import { assembleQuickFilterChips, type QuickFilterChip } from './list/quickFilterChips';
 import { resolveListRowClickMode } from './list/rowClickNavigation';
 import { SelectAllMatchingBanner } from './list/SelectAllMatchingBanner';
 import {
@@ -101,7 +103,7 @@ import {
   getExplicitIds as selectionGetExplicitIds,
   isAllMatching as selectionIsAllMatching,
 } from './list/selectionModel';
-import { savedViewService } from '~/shared/services/savedViewService';
+import { savedViewService, type ChipPin } from '~/shared/services/savedViewService';
 import { useDebouncedValue, useDebouncedCallback } from '~/hooks/useDebouncedValue';
 import { evaluateVisibleWhen as evaluateVisibleWhenExpression } from './utils/visibleWhen';
 import {
@@ -1071,6 +1073,48 @@ function ListPageContentInner(props: PageContentProps) {
     scopeFilter: 'personal',
     autoLoad: !!schema && !hideSavedViews && !skipListData,
   });
+
+  // Quick-filter chip pins (Half B): the current user's pinned views for this
+  // model/page, merged into the chip row alongside built-in presets + global pins.
+  const [chipPins, setChipPins] = useState<ChipPin[]>([]);
+  const loadChipPins = useCallback(async () => {
+    if (!schema || hideQuickFilters || skipListData) {
+      setChipPins([]);
+      return;
+    }
+    try {
+      setChipPins(await savedViewService.getChipPins({ modelCode, pageKey }));
+    } catch {
+      setChipPins([]);
+    }
+  }, [schema, hideQuickFilters, skipListData, modelCode, pageKey]);
+  useEffect(() => {
+    void loadChipPins();
+  }, [loadChipPins]);
+
+  // Team-scoped views the user may pin for their team. The saved-view list above
+  // is personal-only (scopeFilter='personal'), so team views are fetched
+  // separately and only when the user can author team pins (team-manage or the
+  // broader view-manage, mirroring the backend gate).
+  const canManageTeamPins =
+    hasPermission('dashboard.saved_view.team.update') ||
+    hasPermission('dashboard.saved_view.update');
+  const [teamViews, setTeamViews] = useState<SavedView[]>([]);
+  const loadTeamViews = useCallback(async () => {
+    if (!schema || !canManageTeamPins || skipListData) {
+      setTeamViews([]);
+      return;
+    }
+    try {
+      setTeamViews(await savedViewService.getTeamViews({ modelCode, pageKey }));
+    } catch {
+      setTeamViews([]);
+    }
+  }, [schema, canManageTeamPins, skipListData, modelCode, pageKey]);
+  useEffect(() => {
+    void loadTeamViews();
+  }, [loadTeamViews]);
+
   const [pendingViewConfig, setPendingViewConfig] = useState<Partial<ViewConfig> | null>(null);
   const [savingViewDraft, setSavingViewDraft] = useState(false);
   const [copyingViewDraft, setCopyingViewDraft] = useState(false);
@@ -3536,6 +3580,59 @@ function ListPageContentInner(props: PageContentProps) {
     ],
   );
 
+  // Assemble the toolbar chip row: built-in filter presets + pinned views. A
+  // pin only resolves to a chip if its SavedView is in the pool, so team views
+  // (fetched separately from the personal-only list) are merged in — otherwise a
+  // team-pinned view could never render as a chip.
+  const quickFilterChips = useMemo<QuickFilterChip[]>(
+    () =>
+      assembleQuickFilterChips({
+        presets: getQuickFilterPresetDefinitions(),
+        t,
+        savedViews: teamViews.length > 0 ? [...savedViews, ...teamViews] : savedViews,
+        pins: chipPins,
+      }),
+    [t, savedViews, teamViews, chipPins],
+  );
+
+  // Select a SavedView: clear any active preset, switch the view, sync the URL
+  // (?view=), and set the non-table view type. Shared by the header selector and
+  // the toolbar view chips so both take the exact same path.
+  const handleSelectView = useCallback(
+    (pid: string) => {
+      activeQuickFilterRef.current = null;
+      setActiveQuickFilter(null);
+      selectView(pid);
+      setSearchParams(
+        (prev) => {
+          const p = new URLSearchParams(prev);
+          p.set('view', pid);
+          clearTransientViewSearchParams(p);
+          return p;
+        },
+        { replace: true },
+      );
+      const view = savedViews.find((v) => v.pid === pid);
+      if (view?.viewType && view.viewType !== 'table') {
+        setActiveViewType(view.viewType as ViewType);
+      }
+    },
+    [selectView, setSearchParams, savedViews, setActiveViewType, setActiveQuickFilter],
+  );
+
+  // Activate a chip: a filter-preset chip toggles its preset; a view chip
+  // switches to that SavedView (columns / sort / viewType).
+  const handleActivateChip = useCallback(
+    (chip: QuickFilterChip) => {
+      if (chip.kind === 'view') {
+        handleSelectView(chip.viewPid);
+        return;
+      }
+      handleQuickFilter(chip.key);
+    },
+    [handleSelectView, handleQuickFilter],
+  );
+
   const handleSaveActivePreset = useCallback(async () => {
     if (!activeQuickFilter) return;
 
@@ -3926,26 +4023,7 @@ function ListPageContentInner(props: PageContentProps) {
             viewsLoading={viewsLoading}
             activeViewType={activeViewType}
             onSelectDefaultView={handleSelectDefaultView}
-            onSelectView={(pid) => {
-              activeQuickFilterRef.current = null;
-              setActiveQuickFilter(null);
-              selectView(pid);
-              // Sync view selection to URL
-              setSearchParams(
-                (prev) => {
-                  const p = new URLSearchParams(prev);
-                  p.set('view', pid);
-                  // Clear temporary filter/sort params when switching views
-                  clearTransientViewSearchParams(p);
-                  return p;
-                },
-                { replace: true },
-              );
-              const view = savedViews.find((v) => v.pid === pid);
-              if (view?.viewType && view.viewType !== 'table') {
-                setActiveViewType(view.viewType as ViewType);
-              }
-            }}
+            onSelectView={handleSelectView}
             onCreateView={(viewType) => {
               if (viewType) {
                 setActiveViewType(viewType);
@@ -4516,8 +4594,10 @@ function ListPageContentInner(props: PageContentProps) {
                 hasFilterBlock={
                   !!(filterBlock && filterBlock.fields && filterBlock.fields.length > 0)
                 }
+                chips={quickFilterChips}
                 activeQuickFilter={activeQuickFilter}
-                onQuickFilter={handleQuickFilter}
+                currentViewPid={currentView?.pid ?? null}
+                onActivateChip={handleActivateChip}
                 onSaveActivePreset={handleSaveActivePreset}
                 activeSorts={activeSorts}
                 onSortsChange={setActiveSorts}
@@ -4774,6 +4854,26 @@ function ListPageContentInner(props: PageContentProps) {
               loadData({ page: 0, size: pagination.pageSize, filters });
             }}
             onViewConfigSaved={reloadViews}
+            pinnedViewPids={chipPins.map((p) => p.viewPid)}
+            onPinView={async (pid: string) => {
+              await savedViewService.pinView(pid);
+              await loadChipPins();
+            }}
+            onUnpinView={async (pid: string) => {
+              await savedViewService.unpinView(pid);
+              await loadChipPins();
+            }}
+            canManageTeamPins={canManageTeamPins}
+            teamViews={teamViews}
+            teamPinnedViewPids={chipPins.map((p) => p.viewPid)}
+            onTeamPinView={async (pid: string, teamId: string) => {
+              await savedViewService.pinView(pid, { scope: 'team', teamId });
+              await loadChipPins();
+            }}
+            onTeamUnpinView={async (pid: string, teamId: string) => {
+              await savedViewService.unpinView(pid, { scope: 'team', teamId });
+              await loadChipPins();
+            }}
             viewManageFields={viewManageFields}
             // ColumnSettingsPanel
             columnSettingsOpen={columnSettingsOpen}

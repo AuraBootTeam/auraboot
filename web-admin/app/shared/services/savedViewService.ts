@@ -63,6 +63,26 @@ function handleResponse<T>(
 }
 
 /**
+ * A quick-filter chip pin: which view the current user pinned and its order.
+ * Structurally matches the `pins` input of assembleQuickFilterChips.
+ */
+export interface ChipPin {
+  viewPid: string;
+  order: number;
+}
+
+/**
+ * Options for pinning/unpinning a view as a quick-filter chip.
+ * `scope: 'team'` requires `teamId` and the caller holding team-manage (enforced
+ * server-side); it defaults to a personal pin.
+ */
+export interface ChipPinOptions {
+  order?: number;
+  scope?: 'personal' | 'team';
+  teamId?: string;
+}
+
+/**
  * SavedView Service Class
  *
  * Encapsulates all SavedView-related API calls
@@ -99,6 +119,56 @@ export class SavedViewService {
   async getGlobalViews(params: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
     const result = await get<SavedView[]>(`${BASE_URL}/global`, params, undefined, request);
     return handleResponse(result, 'Failed to fetch global views');
+  }
+
+  /**
+   * Get team views shared with the current user's teams (scope=team).
+   */
+  async getTeamViews(params: SavedViewQueryParams, request?: Request): Promise<SavedView[]> {
+    const result = await get<SavedView[]>(`${BASE_URL}/team`, params, undefined, request);
+    return handleResponse(result, 'Failed to fetch team views');
+  }
+
+  /**
+   * List the current user's quick-filter chip pins for a model/page.
+   */
+  async getChipPins(params: SavedViewQueryParams, request?: Request): Promise<ChipPin[]> {
+    const result = await get<ChipPin[]>(`${BASE_URL}/chip-pins`, params, undefined, request);
+    return handleResponse(result, 'Failed to fetch quick-filter chip pins');
+  }
+
+  /**
+   * Pin a view to the quick-filter chip row. Defaults to a personal pin; pass
+   * `{ scope: 'team', teamId }` to pin it for a team (requires team-manage).
+   */
+  async pinView(viewPid: string, options: ChipPinOptions = {}, request?: Request): Promise<void> {
+    const body: Record<string, unknown> = { order: options.order };
+    if (options.scope === 'team') {
+      body.scope = 'team';
+      body.teamId = options.teamId;
+    }
+    const result = await post<void>(`${BASE_URL}/${viewPid}/pin`, body, undefined, request);
+    if (!ResultHelper.isSuccess(result)) {
+      throw new Error(result.desc || 'Failed to pin view');
+    }
+  }
+
+  /**
+   * Remove a pin of a view from the quick-filter chip row. Defaults to the
+   * current user's personal pin; pass `{ scope: 'team', teamId }` to remove a
+   * team pin (requires team-manage).
+   */
+  async unpinView(
+    viewPid: string,
+    options: Pick<ChipPinOptions, 'scope' | 'teamId'> = {},
+    request?: Request,
+  ): Promise<void> {
+    const params =
+      options.scope === 'team' ? { scope: 'team', teamId: options.teamId } : undefined;
+    const result = await del<void>(`${BASE_URL}/${viewPid}/pin`, params, undefined, request);
+    if (!ResultHelper.isSuccess(result)) {
+      throw new Error(result.desc || 'Failed to unpin view');
+    }
   }
 
   /**
