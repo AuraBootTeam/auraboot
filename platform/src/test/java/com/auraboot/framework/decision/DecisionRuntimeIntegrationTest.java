@@ -384,8 +384,9 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
 
         String suffix = Long.toString(Math.abs(System.nanoTime()), 36);
         String viewName = "v_drt_src_" + suffix;
+        String modelCode = "drt_virtual_risk_" + suffix;
         createRiskScoreView(viewName);
-        saveRiskScoreVirtualModel("drt_virtual_risk_" + suffix, viewName);
+        saveRiskScoreVirtualModel(modelCode, viewName);
 
         try {
             DrtEvaluateRequest sourceRefOnly = new DrtEvaluateRequest();
@@ -412,6 +413,15 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
             assertThat(traceSnapshot.path("virtualSources").get(0).path("fields").path("slaRiskScore").asInt())
                     .isEqualTo(91);
             assertThat(traceSnapshot.path("virtualSources").get(0).path("fields").has("tenant_id")).isFalse();
+            JsonNode virtualFactMetadata = firstPresent(
+                    traceSnapshot.path("factMetadata"),
+                    "record.data.slaRiskScore",
+                    "data.slaRiskScore",
+                    "slaRiskScore");
+            assertThat(virtualFactMetadata.path("label").asText()).isEqualTo("SLA Risk Score");
+            assertThat(virtualFactMetadata.path("modelCode").asText()).isEqualTo(modelCode);
+            assertThat(virtualFactMetadata.path("dataType").asText()).isEqualTo("integer");
+            assertThat(virtualFactMetadata.path("sourceRef").asText()).isEqualTo(viewName);
 
             DrtEvaluateRequest callerValueWins = new DrtEvaluateRequest();
             callerValueWins.setDecisionCode(code);
@@ -598,6 +608,16 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                 SELECT id, id AS tenant_id, 91::integer AS "slaRiskScore"
                 FROM ab_tenant
                 """.formatted(viewName));
+    }
+
+    private JsonNode firstPresent(JsonNode object, String... keys) {
+        for (String key : keys) {
+            JsonNode node = object.path(key);
+            if (!node.isMissingNode() && !node.isNull()) {
+                return node;
+            }
+        }
+        return object.path(keys.length == 0 ? "" : keys[0]);
     }
 
     private void saveRiskScoreVirtualModel(String modelCode, String viewName) {

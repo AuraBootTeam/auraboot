@@ -97,9 +97,9 @@ class ModelControllerCreateVirtualModelIntegrationTest extends BaseIntegrationTe
                 "sourceRef", "queries/p2a_followup.sql",
                 "primaryKey", "id",
                 "fields", List.of(
-                        Map.of("code", "id", "dataType", "bigint",
+                        Map.of("code", "id", "displayName", "ID", "dataType", "bigint",
                                 "sortable", false, "filterable", false),
-                        Map.of("code", "name", "dataType", "string",
+                        Map.of("code", "name", "displayName", "Name", "dataType", "string",
                                 "sortable", true, "filterable", true)
                 ),
                 "capabilities", Map.of(
@@ -153,6 +153,11 @@ class ModelControllerCreateVirtualModelIntegrationTest extends BaseIntegrationTe
         // into the capability whitelists.
         assertThat(def.getCapabilities().getSortableFields()).contains("name");
         assertThat(def.getCapabilities().getFilterableFields()).contains("name");
+        assertThat(def.getFields()).anySatisfy(field -> {
+            assertThat(field.getCode()).isEqualTo("name");
+            assertThat(field.getDisplayName()).isEqualTo("Name");
+            assertThat(field.getDataType()).isEqualTo("string");
+        });
         assertThat(def.getExtension())
                 .as("caller-supplied extension keys survive the create path")
                 .containsEntry("endpointAdapter", "rest");
