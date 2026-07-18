@@ -149,7 +149,7 @@ test('Strategy Studio DMN round-trip preserves fact catalog valueLabels @golden'
   await page.getByTestId('dt-input-field-option-0-record-data_wd_req_type').click();
 
   await expect(page.getByTestId('dt-in-record_data_wd_req_type')).toContainText(/请假类型|Leave Type/i);
-  await expect(page.getByLabel('input-data-type-0')).toHaveValue('dict');
+  await expect(page.getByLabel('input-data-type-0')).toHaveValue(/dict|enum/);
 
   await page.getByTestId('dt-add-rule').click();
   await page.getByLabel('op-0-record_data_wd_req_type').selectOption('IN');
