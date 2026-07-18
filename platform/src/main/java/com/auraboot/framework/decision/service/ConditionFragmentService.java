@@ -7,6 +7,7 @@ import com.auraboot.framework.decision.dto.ConditionFragmentEvaluateRequest;
 import com.auraboot.framework.decision.dto.ConditionFragmentEvaluationDTO;
 import com.auraboot.framework.decision.dto.ConditionFragmentImpactDTO;
 import com.auraboot.framework.decision.dto.ConditionFragmentVersionCreateRequest;
+import com.auraboot.framework.decision.dto.ConditionFragmentVersionUpdateRequest;
 
 import java.util.List;
 
@@ -16,6 +17,7 @@ import java.util.List;
 public interface ConditionFragmentService {
     ConditionFragmentDTO create(ConditionFragmentCreateRequest request);
     ConditionFragmentDTO createVersion(String fragmentCode, ConditionFragmentVersionCreateRequest request);
+    ConditionFragmentDTO updateDraft(String pid, ConditionFragmentVersionUpdateRequest request);
     ConditionFragmentDTO findByCode(String fragmentCode);
     List<ConditionFragmentDTO> listVersions(String fragmentCode);
     ConditionFragmentDTO validate(String pid);

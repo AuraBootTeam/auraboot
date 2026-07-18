@@ -1,17 +1,21 @@
 package com.auraboot.framework.decision.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.decision.dto.ConditionFragmentDTO;
 import com.auraboot.framework.decision.dto.ConditionFragmentImpactDTO;
+import com.auraboot.framework.decision.dto.ConditionFragmentVersionUpdateRequest;
 import com.auraboot.framework.decision.dto.DecisionImpactRefDTO;
 import com.auraboot.framework.decision.entity.ConditionFragmentEntity;
 import com.auraboot.framework.decision.entity.DecisionUsageRefEntity;
 import com.auraboot.framework.decision.mapper.ConditionFragmentMapper;
 import com.auraboot.framework.decision.mapper.DecisionUsageRefMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -19,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -127,6 +132,82 @@ class ConditionFragmentServiceImplTest {
         assertThat(impact.getIncoming())
                 .extracting(DecisionImpactRefDTO::getSourceName)
                 .contains("主管审批 SLA", "请假审批流程", "长假自动提醒", "请假事件策略", "请假可见性策略");
+    }
+
+    @Test
+    void updateDraftOverwritesEditableVersionAndRefreshesReferenceIndexes() {
+        ConditionFragmentEntity fragment = new ConditionFragmentEntity();
+        fragment.setPid("frag-pid");
+        fragment.setTenantId(7L);
+        fragment.setFragmentCode("leave_bpm_approval_route");
+        fragment.setFragmentName("Old name");
+        fragment.setScopeType("BPM");
+        fragment.setScopeRef("old_process");
+        fragment.setVersion(2);
+        fragment.setStatus("VALIDATED");
+        fragment.setOwnerModule("BPM");
+        fragment.setEnabled(true);
+
+        ConditionFragmentVersionUpdateRequest request = new ConditionFragmentVersionUpdateRequest();
+        request.setFragmentName("申请人审批条件");
+        request.setScopeType("BPM");
+        request.setScopeRef("wd_leave_approval");
+        request.setOwnerModule("BPM");
+        request.setEnabled(true);
+        request.setConditionSpec(objectMapper.valueToTree(Map.of(
+                "root", Map.of(
+                        "type", "compare",
+                        "left", Map.of("type", "path", "scope", "record", "path", "data.wd_req_applicant"),
+                        "operator", "EQ",
+                        "right", Map.of("type", "literal", "value", "user-owner")),
+                "decisionBindings", List.of(Map.of(
+                        "decisionCode", "approval_routing",
+                        "versionPolicy", "LATEST_PUBLISHED",
+                        "inputMappings", List.of(),
+                        "outputMappings", List.of(),
+                        "fallbackPolicy", Map.of("mode", "FAIL_CLOSED"),
+                        "traceMode", "SAMPLED",
+                        "enabled", true)))));
+
+        when(fragmentMapper.findByTenantAndPid(7L, "frag-pid")).thenReturn(fragment);
+
+        ConditionFragmentDTO dto = service.updateDraft("frag-pid", request);
+
+        ArgumentCaptor<ConditionFragmentEntity> captor = ArgumentCaptor.forClass(ConditionFragmentEntity.class);
+        verify(fragmentMapper).updateById(captor.capture());
+        ConditionFragmentEntity saved = captor.getValue();
+        assertThat(saved.getStatus()).isEqualTo("DRAFT");
+        assertThat(saved.getFragmentName()).isEqualTo("申请人审批条件");
+        assertThat(saved.getScopeRef()).isEqualTo("wd_leave_approval");
+        assertThat(objectMapper.convertValue(saved.getFieldRefsJson(), List.class))
+                .contains("record.data.wd_req_applicant");
+        assertThat(objectMapper.convertValue(saved.getDecisionRefsJson(), List.class))
+                .contains("approval_routing");
+        assertThat(dto.getStatus()).isEqualTo("DRAFT");
+        assertThat(dto.getFieldRefs()).contains("record.data.wd_req_applicant");
+        assertThat(dto.getDecisionRefs()).contains("approval_routing");
+    }
+
+    @Test
+    void updateDraftRejectsImmutablePublishedVersion() {
+        ConditionFragmentEntity fragment = new ConditionFragmentEntity();
+        fragment.setPid("published-frag");
+        fragment.setTenantId(7L);
+        fragment.setFragmentCode("leave_bpm_approval_route");
+        fragment.setStatus("PUBLISHED");
+
+        ConditionFragmentVersionUpdateRequest request = new ConditionFragmentVersionUpdateRequest();
+        request.setConditionSpec(objectMapper.valueToTree(Map.of(
+                "root", Map.of(
+                        "type", "group",
+                        "op", "AND",
+                        "children", List.of()))));
+
+        when(fragmentMapper.findByTenantAndPid(7L, "published-frag")).thenReturn(fragment);
+
+        Assertions.assertThrows(
+                com.auraboot.framework.exception.ValidationException.class,
+                () -> service.updateDraft("published-frag", request));
     }
 
     private DecisionUsageRefEntity usageRef(

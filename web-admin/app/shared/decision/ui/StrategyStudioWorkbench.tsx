@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   DecisionRuleBindingBlock,
   type DecisionOption,
+  type RuleConsumerBindingDraft,
 } from '~/ui/smart/decision/DecisionRuleBindingBlock'
 import type {
   ConditionFragment,
+  ConditionFragmentUpsertRequest,
   DecisionAction,
   DecisionApi,
   DecisionTableAnalysis,
@@ -543,7 +545,7 @@ function conditionRootFromFragment(fragment?: ConditionFragment): GroupNode {
 function buildFragmentInitialValue(
   scenario: StrategyScenario,
   fragment?: ConditionFragment,
-) {
+): RuleConsumerBindingDraft {
   return {
     consumerType: scenario.key,
     consumerCode: scenario.ruleCode,
@@ -562,6 +564,61 @@ function buildFragmentInitialValue(
       enabled: true,
     },
     enabled: true,
+  }
+}
+
+function ruleBindingKey(scenario: StrategyScenario, fragment?: ConditionFragment): string {
+  return `${scenario.key}:${fragment?.fragmentCode ?? scenario.ruleCode}`
+}
+
+function editableFragmentStatus(status?: string): boolean {
+  const normalized = String(status ?? '').toUpperCase()
+  return normalized === 'DRAFT' || normalized === 'VALIDATED' || normalized === 'REJECTED'
+}
+
+function conditionSpecFromBinding(binding: RuleConsumerBindingDraft | undefined, fallbackRoot: GroupNode) {
+  return {
+    root: binding?.conditionSpec?.root ?? fallbackRoot,
+    decisionBindings: binding?.conditionSpec?.decisionBindings ?? [],
+  }
+}
+
+function normalizeFragmentCode(value: string): string {
+  return value
+    .trim()
+    .replace(/[^A-Za-z0-9_:-]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 100) || 'strategy_condition'
+}
+
+function defaultFragmentCode(scenario: StrategyScenario): string {
+  return normalizeFragmentCode(`${scenario.ruleCode}_condition`)
+}
+
+function buildConditionFragmentRequest(
+  scenario: StrategyScenario,
+  fragment: ConditionFragment | undefined,
+  binding: RuleConsumerBindingDraft,
+): ConditionFragmentUpsertRequest & { fragmentName: string } {
+  const fallbackRoot = conditionRootFromFragment(fragment)
+  return {
+    fragmentName: fragment?.fragmentName || scenario.fragment || `${scenario.title} 条件`,
+    description: fragment?.description,
+    scopeType: fragment?.scopeType || scenario.key,
+    scopeRef: fragment?.scopeRef || scenario.ruleCode,
+    ownerModule: fragment?.ownerModule || scenario.key,
+    enabled: fragment?.enabled ?? true,
+    conditionSpec: conditionSpecFromBinding(binding, fallbackRoot),
+  }
+}
+
+function upsertConditionFragmentDraft(
+  rows: Record<string, ConditionFragment>,
+  fragment: ConditionFragment,
+): Record<string, ConditionFragment> {
+  return {
+    ...rows,
+    [fragment.fragmentCode]: fragment,
   }
 }
 
@@ -699,6 +756,10 @@ export function StrategyStudioWorkbench({
   const [selectedFragmentCode, setSelectedFragmentCode] = useState<string | null>(null)
   const [operationStatus, setOperationStatus] = useState<string | null>(null)
   const [draftVersionPids, setDraftVersionPids] = useState<Record<string, string>>({})
+  const [conditionFragmentDrafts, setConditionFragmentDrafts] =
+    useState<Record<string, ConditionFragment>>({})
+  const [ruleBindingDrafts, setRuleBindingDrafts] =
+    useState<Record<string, RuleConsumerBindingDraft>>({})
   const [catalogActions, setCatalogActions] = useState<DecisionAction[]>([])
   const [tableDrafts, setTableDrafts] = useState<Record<StrategyScenarioKey, DecisionTable>>(
     initialScenarioTables,
@@ -715,9 +776,13 @@ export function StrategyStudioWorkbench({
   const [activeWorkspacePanel, setActiveWorkspacePanel] =
     useState<StrategyWorkspacePanelKey>('rule')
   const scenario = SCENARIOS.find((candidate) => candidate.key === scenarioKey) ?? SCENARIOS[0]
+  const conditionFragmentRows = useMemo(
+    () => [...conditionFragments, ...Object.values(conditionFragmentDrafts)],
+    [conditionFragments, conditionFragmentDrafts],
+  )
   const compatibleFragments = useMemo(
-    () => latestConditionFragments(conditionFragments),
-    [conditionFragments],
+    () => latestConditionFragments(conditionFragmentRows),
+    [conditionFragmentRows],
   )
   const selectedFragment = useMemo(
     () =>
@@ -841,6 +906,20 @@ export function StrategyStudioWorkbench({
     activeScenario.decisionCode,
     activeScenario.title,
   )
+  const activeRuleBindingKey = ruleBindingKey(activeScenario, selectedFragment)
+  const activeRuleBinding = useMemo(
+    () =>
+      ruleBindingDrafts[activeRuleBindingKey] ??
+      buildFragmentInitialValue(activeScenario, selectedFragment),
+    [activeRuleBindingKey, activeScenario, ruleBindingDrafts, selectedFragment],
+  )
+
+  const updateRuleBindingDraft = (next: RuleConsumerBindingDraft) => {
+    setRuleBindingDrafts((current) => ({
+      ...current,
+      [activeRuleBindingKey]: next,
+    }))
+  }
 
   const refreshImpact = async () => {
     setOperationStatus('影响面查询中...')
@@ -995,28 +1074,65 @@ export function StrategyStudioWorkbench({
     })
   }
 
-  const saveDraft = async (target: StrategyScenario = activeScenario): Promise<string | null> => {
+  const saveDecisionTableDraft = async (target: StrategyScenario): Promise<string | null> => {
+    await ensureDefinition(target)
+    const table = getScenarioTable(target)
+    const draft = await api.createDraftVersion(target.decisionCode, {
+      kind: 'DECISION_TABLE',
+      runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+      versionTag: `studio-${target.key.toLowerCase()}`,
+      contentJson: table,
+      inputSchemaJson: { fields: tableInputRefs(table) },
+      outputSchemaJson: {
+        outputs: tableOutputSchema(table),
+        actions: actionOutputSchema(resolveScenarioActions(target, actionsByType)),
+      },
+      contextSchemaJson: { sample: sampleContext() },
+    })
+    if (draft.pid) {
+      setDraftVersionPids((current) => ({ ...current, [target.key]: draft.pid }))
+    }
+    return draft.pid ?? null
+  }
+
+  const saveConditionFragmentDraft = async (
+    target: StrategyScenario,
+  ): Promise<string | null> => {
+    const fragment = target.key === activeScenario.key ? selectedFragment : undefined
+    const bindingKey = ruleBindingKey(target, fragment)
+    const binding =
+      ruleBindingDrafts[bindingKey] ?? buildFragmentInitialValue(target, fragment)
+    const request = buildConditionFragmentRequest(target, fragment, binding)
+    let saved: ConditionFragment
+    if (fragment?.pid && editableFragmentStatus(fragment.status)) {
+      saved = await api.updateConditionFragmentDraft(fragment.pid, request)
+    } else if (fragment?.fragmentCode) {
+      saved = await api.createConditionFragmentVersion(fragment.fragmentCode, request)
+    } else {
+      saved = await api.createConditionFragment({
+        ...request,
+        fragmentCode: defaultFragmentCode(target),
+        fragmentName: request.fragmentName,
+      })
+    }
+    setConditionFragmentDrafts((current) => upsertConditionFragmentDraft(current, saved))
+    setSelectedFragmentCode(saved.fragmentCode)
+    setRuleBindingDrafts((current) => ({
+      ...current,
+      [ruleBindingKey(target, saved)]: binding,
+    }))
+    return saved.pid ?? null
+  }
+
+  const saveDraft = async (
+    target: StrategyScenario = activeScenario,
+  ): Promise<{ decisionPid: string | null; conditionFragmentPid: string | null } | null> => {
     setOperationStatus('草稿保存中...')
     try {
-      await ensureDefinition(target)
-      const table = getScenarioTable(target)
-      const draft = await api.createDraftVersion(target.decisionCode, {
-        kind: 'DECISION_TABLE',
-        runtimeAdapter: 'PLATFORM_DECISION_TABLE',
-        versionTag: `studio-${target.key.toLowerCase()}`,
-        contentJson: table,
-        inputSchemaJson: { fields: tableInputRefs(table) },
-        outputSchemaJson: {
-          outputs: tableOutputSchema(table),
-          actions: actionOutputSchema(resolveScenarioActions(target, actionsByType)),
-        },
-        contextSchemaJson: { sample: sampleContext() },
-      })
-      if (draft.pid) {
-        setDraftVersionPids((current) => ({ ...current, [target.key]: draft.pid }))
-      }
+      const conditionFragmentPid = await saveConditionFragmentDraft(target)
+      const decisionPid = await saveDecisionTableDraft(target)
       setOperationStatus(`草稿已保存 · ${target.title}`)
-      return draft.pid ?? null
+      return { decisionPid, conditionFragmentPid }
     } catch (error) {
       setOperationStatus(`保存失败 · ${errorMessage(error)}`)
       return null
@@ -1029,9 +1145,17 @@ export function StrategyStudioWorkbench({
       return
     }
     setOperationStatus('发布中...')
-    const pid = draftVersionPids[activeScenario.key] ?? (await saveDraft())
+    const saved = await saveDraft()
+    const pid = saved?.decisionPid ?? draftVersionPids[activeScenario.key]
     if (!pid) return
     try {
+      if (saved?.conditionFragmentPid) {
+        await api.validateConditionFragmentVersion(saved.conditionFragmentPid)
+        await api.publishConditionFragmentVersion(saved.conditionFragmentPid, {
+          impactAcknowledged: true,
+          note: `Published from Strategy Studio for ${activeScenario.consumer}`,
+        })
+      }
       const validation = await api.validateVersion(pid)
       if (!validation) {
         throw new Error('版本校验无返回结果')
@@ -1184,7 +1308,7 @@ export function StrategyStudioWorkbench({
               <span>{activeScenario.fragment}</span>
             </div>
             <DecisionRuleBindingBlock
-              key={`${activeScenario.key}:${selectedFragment?.fragmentCode ?? 'scenario'}`}
+              key={activeRuleBindingKey}
               block={{
                 props: {
                   mode: 'combined',
@@ -1194,7 +1318,7 @@ export function StrategyStudioWorkbench({
                   showImpactPreview: true,
                   showTestRunner: true,
                   initialDecisionCode: activeScenario.decisionCode,
-                  initialValue: buildFragmentInitialValue(activeScenario, selectedFragment),
+                  initialValue: activeRuleBinding,
                   initialContextJson: JSON.stringify(
                     sampleContext(),
                     null,
@@ -1205,6 +1329,7 @@ export function StrategyStudioWorkbench({
                 },
               }}
               api={api}
+              onChange={updateRuleBindingDraft}
             />
           </div>
 
