@@ -36,9 +36,15 @@ export interface ExecVirtualSourceTrace {
   fields?: Record<string, unknown>;
 }
 
+export interface ExecTraceFactMetadata {
+  label?: string;
+  valueLabels?: Record<string, string>;
+}
+
 export interface ExecTraceSnapshot {
   virtualSources?: ExecVirtualSourceTrace[];
   unknownReasons?: string[];
+  factMetadata?: Record<string, ExecTraceFactMetadata>;
 }
 
 export interface ExecutionLogViewerProps {
@@ -77,6 +83,48 @@ function fieldEntries(fields?: Record<string, unknown>) {
     .sort(([left], [right]) => left.localeCompare(right));
 }
 
+function factMetadata(snapshot: ExecLogEntry['traceSnapshot']): Record<string, ExecTraceFactMetadata> {
+  const raw = asRecord(snapshot)?.factMetadata;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).filter(([, value]) => Boolean(asRecord(value))),
+  ) as Record<string, ExecTraceFactMetadata>;
+}
+
+function factAliases(key: string): string[] {
+  const cleaned = key
+    .split('.')
+    .filter((part) => part.trim().length > 0)
+    .join('.');
+  if (!cleaned) return [];
+  const aliases = new Set<string>([cleaned]);
+  const parts = cleaned.split('.');
+  aliases.add(parts[parts.length - 1]);
+  if (!cleaned.includes('.')) {
+    aliases.add(`data.${cleaned}`);
+    aliases.add(`record.data.${cleaned}`);
+  } else if (cleaned.startsWith('data.')) {
+    aliases.add(`record.${cleaned}`);
+    aliases.add(cleaned.slice('data.'.length));
+  } else if (cleaned.startsWith('record.')) {
+    aliases.add(cleaned.slice('record.'.length));
+  }
+  return [...aliases];
+}
+
+function metadataForKey(
+  snapshot: ExecLogEntry['traceSnapshot'],
+  key: string,
+): ExecTraceFactMetadata | undefined {
+  const metadata = factMetadata(snapshot);
+  return factAliases(key).map((alias) => metadata[alias]).find(Boolean);
+}
+
+function fieldLabel(snapshot: ExecLogEntry['traceSnapshot'], key: string): string {
+  const label = metadataForKey(snapshot, key)?.label;
+  return typeof label === 'string' && label.trim() ? label : key;
+}
+
 function displayValue(value: unknown): string {
   if (value == null) return '—';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
@@ -87,6 +135,12 @@ function displayValue(value: unknown): string {
   } catch {
     return String(value);
   }
+}
+
+function displayFieldValue(snapshot: ExecLogEntry['traceSnapshot'], key: string, value: unknown): string {
+  if (typeof value !== 'string') return displayValue(value);
+  const label = metadataForKey(snapshot, key)?.valueLabels?.[value];
+  return typeof label === 'string' && label.trim() ? label : displayValue(value);
 }
 
 export function ExecutionLogViewer({ logs, initialStatus = 'ALL' }: ExecutionLogViewerProps) {
@@ -194,8 +248,8 @@ export function ExecutionLogViewer({ logs, initialStatus = 'ALL' }: ExecutionLog
                     <dl className="elv-trace-fields">
                       {fieldEntries(source.fields).map(([key, value]) => (
                         <div key={key}>
-                          <dt>{key}</dt>
-                          <dd>{displayValue(value)}</dd>
+                          <dt>{fieldLabel(selectedLog.traceSnapshot, key)}</dt>
+                          <dd>{displayFieldValue(selectedLog.traceSnapshot, key, value)}</dd>
                         </div>
                       ))}
                     </dl>

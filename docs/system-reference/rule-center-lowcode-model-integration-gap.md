@@ -2884,6 +2884,26 @@ pnpm exec tsc --noEmit --pretty false --incremental false
 
 状态边界：这条 focused slice 不等于全量 `RC-DICT-01` 完成。仍需覆盖多选 `IN / NOT_IN`、reference 字段、虚拟模型字段、全消费方浏览器黄金、DMN 导出/导入 round-trip metadata 和 Trace per-run fact catalog metadata。当前 `ExecutionLogTraceBlock` 的 `wd_req_type` label/value 是 focused fallback，后续应让后端执行日志携带 fact catalog metadata snapshot，避免只靠前端内置字段映射。
 
+### RC-DICT-01 / RC-TRACE-01 per-run fact metadata snapshot focused slice（2026-07-18，待验证）
+
+本轮补的是上一节最后留下的 Trace metadata 缺口：执行日志不应只靠前端 `wd_req_type` focused fallback 才能显示“请假类型 / 年假”，而应在每次执行写 `ab_drt_log.trace_snapshot` 时把本次上下文、DMN 输出和虚拟源字段涉及到的 Fact Catalog 元数据一起固化为 per-run snapshot。该 snapshot 的目标是让日志回放在模型字段 label、dict value label 后续变化时仍能解释当次执行看到的字段语义。
+
+代码实现：`DecisionEvaluationServiceImpl` 在 `evaluate` 完成 runtime evaluation 后、写日志前，基于 resolved context、`result.outputs()` 和 `virtualSourceTrace.fields` 收集相关 field ref / alias / modelCode，通过现有 `DecisionModelFieldService.getFactCatalog(modelCode)` 读取低码元模型事实目录，并把命中的字段写入 `traceSnapshot.factMetadata`。每个 metadata 条目包含 `scope / path / factKey / label / dataType / modelCode / sourceType / sourceRef / dictCode / valueLabels / masked / permission` 中可用字段；alias 覆盖 `record.data.xxx`、`data.xxx`、`xxx` 等 Trace 常见展示 key，同时对多个 fact 冲突的短 alias 做跳过，避免把不同模型同名字段误贴标签。这里没有引入 `JdbcTemplate` 业务读取，也没有绕过 JSONB typeHandler；日志写入继续走 `DrtLogEntity.traceSnapshot` 的 JSONB handler。
+
+前端实现：`DecisionTraceSnapshot` 增加 `factMetadata` 合同；`ExecutionLogTraceBlock` 的 DMN 输出和虚拟源字段优先读取 `traceSnapshot.factMetadata` 的 `label/valueLabels`，找不到再回落到旧的 action payload label/value table 和 `wd_req_type` focused fallback。`ExecutionLogViewer` 复用组件也支持同一 metadata 协议，避免不同规则中心入口展示不一致。前端测试夹具已追加 `review_status=pending` 这种不在硬编码表里的字段，断言 Trace 展示“审批状态 / 待审批”且不泄漏 `review_status / pending`。
+
+后端测试夹具：`DecisionRuntimeIntegrationTest` 已追加一条待跑用例，使用 `DictService.create` 创建已发布字典、`MetaModelService.saveDefinition` 创建已发布低码模型字段、`MetaFieldService.bindDictionary` 绑定字典，再执行基于该字段的 AST 决策并断言执行日志 `traceSnapshot.factMetadata` 包含字段 label、dictCode 和 `pending -> 待审批`。测试代码只在夹具里沿用该类既有集成测试服务/读取方式；产品路径没有新增 JDBC。
+
+验证状态：按本轮用户要求“先别测试，后面再补测”，当前已完成代码与测试夹具，并执行了不运行测试方法的非测试门禁：`platform && ./gradlew :compileJava -x test`、`platform && ./gradlew :compileTestJava -x test`、`web-admin && pnpm typecheck`、`git diff --check` 均通过。为保证前端 typecheck 使用当前 worktree 依赖，曾先发现 `web-admin/node_modules` 缺失，随后通过 `pnpm install --offline --frozen-lockfile` 重建 ignored `node_modules` 链接后复跑成功。当前仍未运行 Gradle 测试、Vitest 或 Playwright，因此本节只能标记为 **实现待功能验证**，不能把 `RC-DICT-01`、`RC-TRACE-01` 或 full browser golden 改成 DONE。后续补测至少需要跑：
+
+```bash
+platform && ./gradlew :test --tests com.auraboot.framework.decision.DecisionRuntimeIntegrationTest
+web-admin && pnpm exec vitest run app/ui/smart/decision/__tests__/ExecutionLogTraceBlock.test.tsx
+web-admin && pnpm exec tsc --noEmit --pretty false --incremental false
+```
+
+后续仍未关闭：多选 `IN / NOT_IN` 的 label/value 展示、reference/user picker 字段、虚拟模型字段的 browser Trace、DMN import/export round-trip metadata、全消费方浏览器黄金矩阵，以及执行日志页面与规则资产/消费方详情之间的全量 Trace 互跳。
+
 ### 关闭证据模板
 
 每个 gap 关闭时，状态文档必须按下面模板记录，缺一项就不能写 `DONE`：

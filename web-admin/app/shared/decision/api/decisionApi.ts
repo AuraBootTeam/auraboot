@@ -57,9 +57,25 @@ export interface DecisionVirtualSourceTrace {
   fields?: Record<string, unknown>;
 }
 
+export interface DecisionTraceFactMetadata {
+  scope?: string;
+  path?: string;
+  factKey?: string;
+  label?: string;
+  dataType?: string;
+  modelCode?: string;
+  sourceType?: string;
+  sourceRef?: string;
+  dictCode?: string;
+  valueLabels?: Record<string, string>;
+  masked?: boolean;
+  permission?: string;
+}
+
 export interface DecisionTraceSnapshot {
   virtualSources?: DecisionVirtualSourceTrace[];
   unknownReasons?: string[];
+  factMetadata?: Record<string, DecisionTraceFactMetadata>;
 }
 
 export interface DecisionLogRecord {

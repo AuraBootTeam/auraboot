@@ -6,6 +6,10 @@ import com.auraboot.framework.common.dto.PageResult;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.Scope;
+import com.auraboot.framework.decision.dto.DecisionFactCatalogDTO;
+import com.auraboot.framework.decision.dto.DecisionFactDTO;
+import com.auraboot.framework.decision.dto.DecisionFactEntityDTO;
+import com.auraboot.framework.decision.dto.DecisionFactOptionDTO;
 import com.auraboot.framework.decision.dto.DrtEvaluateRequest;
 import com.auraboot.framework.decision.dto.DrtLogDTO;
 import com.auraboot.framework.decision.dto.DrtTestRunRequest;
@@ -27,6 +31,7 @@ import com.auraboot.framework.decision.runtime.DecisionRuntime;
 import com.auraboot.framework.decision.runtime.ResolvedDecision;
 import com.auraboot.framework.decision.runtime.VersionSelector;
 import com.auraboot.framework.decision.service.DecisionEvaluationService;
+import com.auraboot.framework.decision.service.DecisionModelFieldService;
 import com.auraboot.framework.decision.service.DecisionRolloutService;
 import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.entity.Model;
@@ -54,11 +59,14 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
@@ -85,6 +93,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
     private final ObjectProvider<DynamicDataService> dynamicDataServiceProvider;
     private final MetaModelMapper metaModelMapper;
     private final PlatformTransactionManager transactionManager;
+    private final DecisionModelFieldService decisionModelFieldService;
 
     // ─── public API ──────────────────────────────────────────────────────────
 
@@ -103,11 +112,13 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         DecisionResult result = decisionRuntime.evaluate(resolved, ctx, DecisionEvaluateOptions.defaults());
         long durationMs = System.currentTimeMillis() - start;
 
+        Map<String, Object> factMetadata = buildFactMetadataSnapshot(
+                contextBuild.resolvedContext(), result, contextBuild.virtualSourceTrace());
         // Log under the SAME traceId the runtime stamped on the result, so callers can correlate
         // result.traceId() -> ab_drt_log (the §22 audit contract). Generating a separate id here
         // would orphan the log from the returned result.
         writelog(tid, result.traceId(), request, versionEntity, result, durationMs,
-                resolution.rollout(), contextBuild.virtualSourceTrace());
+                resolution.rollout(), contextBuild.virtualSourceTrace(), factMetadata);
 
         log.info("Decision evaluated: code={}, version={}, matched={}, durationMs={}",
                 versionEntity.getDecisionCode(), versionEntity.getVersion(),
@@ -303,7 +314,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         EnrichedContext enriched = enrichVirtualSources(raw);
         Map<String, Map<String, Object>> resolved = enriched.context();
         if (resolved == null || resolved.isEmpty()) {
-            return new ContextBuildResult(DecisionContext.of(Map.of()), enriched.virtualSourceTrace());
+            return new ContextBuildResult(DecisionContext.of(Map.of()), Map.of(), enriched.virtualSourceTrace());
         }
         DecisionContext.Builder builder = DecisionContext.builder();
         for (Map.Entry<String, Map<String, Object>> entry : resolved.entrySet()) {
@@ -315,7 +326,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
                 log.debug("Skipping unknown context scope: {}", entry.getKey());
             }
         }
-        return new ContextBuildResult(builder.build(), enriched.virtualSourceTrace());
+        return new ContextBuildResult(builder.build(), resolved, enriched.virtualSourceTrace());
     }
 
     private EnrichedContext enrichVirtualSources(Map<String, Map<String, Object>> raw) {
@@ -593,7 +604,8 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
                           DecisionResult result,
                           long durationMs,
                           DecisionRolloutSelection rollout,
-                          List<Map<String, Object>> virtualSourceTrace) {
+                          List<Map<String, Object>> virtualSourceTrace,
+                          Map<String, Object> factMetadata) {
         String logStatus = mapStatus(result.status());
 
         DrtLogEntity logEntry = new DrtLogEntity();
@@ -628,7 +640,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         if (result.outputs() != null && !result.outputs().isEmpty()) {
             logEntry.setOutputSnapshot(objectMapper.valueToTree(result.outputs()));
         }
-        Map<String, Object> traceSnapshot = buildTraceSnapshot(result, virtualSourceTrace);
+        Map<String, Object> traceSnapshot = buildTraceSnapshot(result, virtualSourceTrace, factMetadata);
         if (!traceSnapshot.isEmpty()) {
             logEntry.setTraceSnapshot(objectMapper.valueToTree(traceSnapshot));
         }
@@ -723,7 +735,8 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
 
     private Map<String, Object> buildTraceSnapshot(
             DecisionResult result,
-            List<Map<String, Object>> virtualSourceTrace) {
+            List<Map<String, Object>> virtualSourceTrace,
+            Map<String, Object> factMetadata) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         if (virtualSourceTrace != null && !virtualSourceTrace.isEmpty()) {
             snapshot.put("virtualSources", virtualSourceTrace);
@@ -731,16 +744,304 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         if (result != null && result.unknownReasons() != null && !result.unknownReasons().isEmpty()) {
             snapshot.put("unknownReasons", result.unknownReasons());
         }
+        if (factMetadata != null && !factMetadata.isEmpty()) {
+            snapshot.put("factMetadata", factMetadata);
+        }
         return snapshot;
+    }
+
+    private Map<String, Object> buildFactMetadataSnapshot(
+            Map<String, Map<String, Object>> resolvedContext,
+            DecisionResult result,
+            List<Map<String, Object>> virtualSourceTrace) {
+        Set<String> relevantKeys = new LinkedHashSet<>();
+        Set<String> modelCodes = new LinkedHashSet<>();
+        collectContextFactRefs(resolvedContext, relevantKeys, modelCodes);
+        collectOutputFactRefs(result, relevantKeys);
+        collectVirtualSourceFactRefs(virtualSourceTrace, relevantKeys, modelCodes);
+        if (relevantKeys.isEmpty()) {
+            return Map.of();
+        }
+
+        List<FactMetadataMatch> matchedFacts = new ArrayList<>();
+        Set<String> seenFacts = new LinkedHashSet<>();
+        List<String> catalogModelCodes = new ArrayList<>();
+        if (modelCodes.isEmpty()) {
+            catalogModelCodes.add(null);
+        } else {
+            catalogModelCodes.addAll(modelCodes);
+        }
+        for (String modelCode : catalogModelCodes) {
+            DecisionFactCatalogDTO catalog;
+            try {
+                catalog = decisionModelFieldService.getFactCatalog(modelCode);
+            } catch (RuntimeException ex) {
+                log.debug("Skipping decision trace fact metadata snapshot: {}", ex.getMessage());
+                continue;
+            }
+            if (catalog == null || catalog.getEntities() == null) {
+                continue;
+            }
+            for (DecisionFactEntityDTO entity : catalog.getEntities()) {
+                if (entity == null || entity.getFacts() == null) {
+                    continue;
+                }
+                for (DecisionFactDTO fact : entity.getFacts()) {
+                    if (fact == null) {
+                        continue;
+                    }
+                    Set<String> aliases = factAliases(fact);
+                    if (aliases.stream().noneMatch(relevantKeys::contains)) {
+                        continue;
+                    }
+                    String factKey = String.valueOf(entity.getModelCode())
+                            + "|"
+                            + String.valueOf(fact.getFactKey());
+                    if (seenFacts.add(factKey)) {
+                        matchedFacts.add(new FactMetadataMatch(entity, fact, aliases));
+                    }
+                }
+            }
+        }
+        if (matchedFacts.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<String, Integer> aliasCounts = new HashMap<>();
+        for (FactMetadataMatch match : matchedFacts) {
+            for (String alias : match.aliases()) {
+                aliasCounts.merge(alias, 1, Integer::sum);
+            }
+        }
+
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        for (FactMetadataMatch match : matchedFacts) {
+            Map<String, Object> metadata = factMetadata(match.entity(), match.fact());
+            if (metadata.isEmpty()) {
+                continue;
+            }
+            for (String alias : match.aliases()) {
+                if (aliasCounts.getOrDefault(alias, 0) > 1 && isLooseFactAlias(alias)) {
+                    continue;
+                }
+                if (relevantKeys.contains(alias) || alias.equals(match.fact().getFactKey())) {
+                    snapshot.putIfAbsent(alias, metadata);
+                }
+            }
+        }
+        return snapshot;
+    }
+
+    private void collectContextFactRefs(
+            Map<String, Map<String, Object>> resolvedContext,
+            Set<String> relevantKeys,
+            Set<String> modelCodes) {
+        if (resolvedContext == null || resolvedContext.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Map<String, Object>> scopeEntry : resolvedContext.entrySet()) {
+            collectFactRefs(scopeEntry.getKey(), "", scopeEntry.getValue(), relevantKeys, modelCodes);
+        }
+    }
+
+    private void collectFactRefs(
+            String scope,
+            String prefix,
+            Object raw,
+            Set<String> relevantKeys,
+            Set<String> modelCodes) {
+        if (raw instanceof Map<?, ?> rawMap) {
+            for (Map.Entry<?, ?> entry : rawMap.entrySet()) {
+                if (!(entry.getKey() instanceof String key) || !StringUtils.hasText(key)) {
+                    continue;
+                }
+                Object value = entry.getValue();
+                String path = StringUtils.hasText(prefix) ? prefix + "." + key : key;
+                if (("modelCode".equals(key) || "entityCode".equals(key))
+                        && value instanceof String modelCode
+                        && StringUtils.hasText(modelCode)) {
+                    modelCodes.add(modelCode);
+                }
+                addFactKeyAliases(scope, path, relevantKeys);
+                if (value instanceof Map<?, ?>) {
+                    collectFactRefs(scope, path, value, relevantKeys, modelCodes);
+                } else if (value instanceof Iterable<?> iterable) {
+                    for (Object item : iterable) {
+                        collectFactRefs(scope, path, item, relevantKeys, modelCodes);
+                    }
+                }
+            }
+        }
+    }
+
+    private void collectOutputFactRefs(DecisionResult result, Set<String> relevantKeys) {
+        if (result == null || result.outputs() == null || result.outputs().isEmpty()) {
+            return;
+        }
+        for (String key : result.outputs().keySet()) {
+            addLooseFactAliases(key, relevantKeys);
+        }
+    }
+
+    private void collectVirtualSourceFactRefs(
+            List<Map<String, Object>> virtualSourceTrace,
+            Set<String> relevantKeys,
+            Set<String> modelCodes) {
+        if (virtualSourceTrace == null || virtualSourceTrace.isEmpty()) {
+            return;
+        }
+        for (Map<String, Object> source : virtualSourceTrace) {
+            if (source == null) {
+                continue;
+            }
+            Object modelCode = source.get("modelCode");
+            if (modelCode instanceof String code && StringUtils.hasText(code)) {
+                modelCodes.add(code);
+            }
+            Object fields = source.get("fields");
+            if (fields instanceof Map<?, ?> fieldMap) {
+                for (Object key : fieldMap.keySet()) {
+                    if (key instanceof String fieldKey) {
+                        addLooseFactAliases(fieldKey, relevantKeys);
+                    }
+                }
+            }
+        }
+    }
+
+    private void addFactKeyAliases(String scope, String path, Set<String> aliases) {
+        if (!StringUtils.hasText(path)) {
+            return;
+        }
+        String cleanedPath = trimDotPath(path);
+        if (!StringUtils.hasText(cleanedPath)) {
+            return;
+        }
+        aliases.add(cleanedPath);
+        if (StringUtils.hasText(scope)) {
+            aliases.add(trimDotPath(scope + "." + cleanedPath));
+        }
+        int lastDot = cleanedPath.lastIndexOf('.');
+        if (lastDot >= 0 && lastDot < cleanedPath.length() - 1) {
+            aliases.add(cleanedPath.substring(lastDot + 1));
+        }
+        if (cleanedPath.startsWith("data.")) {
+            String shortPath = cleanedPath.substring("data.".length());
+            aliases.add(shortPath);
+            if (StringUtils.hasText(scope)) {
+                aliases.add(trimDotPath(scope + "." + shortPath));
+            }
+        }
+    }
+
+    private void addLooseFactAliases(String key, Set<String> aliases) {
+        if (!StringUtils.hasText(key)) {
+            return;
+        }
+        String cleanedKey = trimDotPath(key);
+        if (!StringUtils.hasText(cleanedKey)) {
+            return;
+        }
+        aliases.add(cleanedKey);
+        int lastDot = cleanedKey.lastIndexOf('.');
+        if (lastDot >= 0 && lastDot < cleanedKey.length() - 1) {
+            aliases.add(cleanedKey.substring(lastDot + 1));
+        }
+        if (!cleanedKey.contains(".")) {
+            aliases.add("data." + cleanedKey);
+            aliases.add("record.data." + cleanedKey);
+        } else if (cleanedKey.startsWith("data.")) {
+            aliases.add("record." + cleanedKey);
+            aliases.add(cleanedKey.substring("data.".length()));
+        } else if (cleanedKey.startsWith("record.")) {
+            aliases.add(cleanedKey.substring("record.".length()));
+        }
+    }
+
+    private Set<String> factAliases(DecisionFactDTO fact) {
+        Set<String> aliases = new LinkedHashSet<>();
+        addLooseFactAliases(fact.getFactKey(), aliases);
+        addFactKeyAliases(fact.getScope(), fact.getPath(), aliases);
+        return aliases;
+    }
+
+    private boolean isLooseFactAlias(String alias) {
+        return StringUtils.hasText(alias) && !alias.contains(".");
+    }
+
+    private String trimDotPath(String value) {
+        if (!StringUtils.hasText(value)) {
+            return "";
+        }
+        String trimmed = value.trim();
+        while (trimmed.startsWith(".")) {
+            trimmed = trimmed.substring(1);
+        }
+        while (trimmed.endsWith(".")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
+    }
+
+    private Map<String, Object> factMetadata(DecisionFactEntityDTO entity, DecisionFactDTO fact) {
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        putText(metadata, "scope", fact.getScope());
+        putText(metadata, "path", fact.getPath());
+        putText(metadata, "factKey", fact.getFactKey());
+        putText(metadata, "label", fact.getLabel());
+        putText(metadata, "dataType", fact.getDataType());
+        putText(metadata, "modelCode", fact.getModelCode());
+        putText(metadata, "sourceType", fact.getSourceType());
+        if (entity != null) {
+            putText(metadata, "sourceRef", entity.getSourceRef());
+        }
+        putText(metadata, "dictCode", fact.getDictCode());
+        Map<String, String> valueLabels = valueLabels(fact.getAllowedValues());
+        if (!valueLabels.isEmpty()) {
+            metadata.put("valueLabels", valueLabels);
+        }
+        if (fact.getMasked() != null) {
+            metadata.put("masked", fact.getMasked());
+        }
+        putText(metadata, "permission", fact.getPermission());
+        return metadata;
+    }
+
+    private Map<String, String> valueLabels(List<DecisionFactOptionDTO> options) {
+        if (options == null || options.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> labels = new LinkedHashMap<>();
+        for (DecisionFactOptionDTO option : options) {
+            if (option == null
+                    || !StringUtils.hasText(option.getValue())
+                    || !StringUtils.hasText(option.getLabel())) {
+                continue;
+            }
+            labels.put(option.getValue(), option.getLabel());
+        }
+        return labels;
+    }
+
+    private void putText(Map<String, Object> target, String key, String value) {
+        if (StringUtils.hasText(value)) {
+            target.put(key, value);
+        }
     }
 
     private record ContextBuildResult(
             DecisionContext context,
+            Map<String, Map<String, Object>> resolvedContext,
             List<Map<String, Object>> virtualSourceTrace) {}
 
     private record EnrichedContext(
             Map<String, Map<String, Object>> context,
             List<Map<String, Object>> virtualSourceTrace) {}
+
+    private record FactMetadataMatch(
+            DecisionFactEntityDTO entity,
+            DecisionFactDTO fact,
+            Set<String> aliases) {}
 
     private String rolloutResultKey(DecisionResult result) {
         if (result == null) {

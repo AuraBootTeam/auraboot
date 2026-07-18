@@ -7,6 +7,7 @@ import {
   type EventPolicyActionLogRecord,
   type DecisionLogFilters,
   type DecisionLogRecord,
+  type DecisionTraceFactMetadata,
   type DecisionVirtualSourceTrace,
   type HttpClient,
 } from '~/shared/decision/api/decisionApi';
@@ -497,8 +498,8 @@ function decisionCell(value: unknown) {
   );
 }
 
-function payloadDisplay(value: unknown, key = ''): string {
-  const fieldLabels = traceValueLabels(key);
+function payloadDisplay(value: unknown, key = '', traceSnapshot?: unknown): string {
+  const fieldLabels = traceValueLabels(key, traceSnapshot);
   if (key === 'deliveryReceipts' && Array.isArray(value)) {
     return (
       value
@@ -510,7 +511,7 @@ function payloadDisplay(value: unknown, key = ''): string {
   if (Array.isArray(value)) {
     return (
       value
-        .map((item) => payloadDisplay(item, key))
+        .map((item) => payloadDisplay(item, key, traceSnapshot))
         .filter((item) => item !== '-')
         .join(', ') || '-'
     );
@@ -523,8 +524,10 @@ function payloadDisplay(value: unknown, key = ''): string {
   return display(value);
 }
 
-function traceValueLabels(key: string): Record<string, string> | undefined {
+function traceValueLabels(key: string, traceSnapshot?: unknown): Record<string, string> | undefined {
   if (!key) return undefined;
+  const metadataLabels = factValueLabels(key, traceSnapshot);
+  if (metadataLabels) return metadataLabels;
   const normalized = key.split('.').filter(Boolean).pop() ?? key;
   return TRACE_VALUE_LABELS_BY_FIELD[normalized];
 }
@@ -575,6 +578,65 @@ function traceSnapshotRecord(raw: unknown): Record<string, unknown> | null {
   return raw && typeof raw === 'object' && !Array.isArray(raw)
     ? (raw as Record<string, unknown>)
     : null;
+}
+
+function factMetadataEntries(raw: unknown): Record<string, DecisionTraceFactMetadata> {
+  const metadata = traceSnapshotRecord(raw)?.factMetadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return {};
+  return Object.fromEntries(
+    Object.entries(metadata as Record<string, unknown>).filter(([, value]) =>
+      Boolean(traceSnapshotRecord(value)),
+    ),
+  ) as Record<string, DecisionTraceFactMetadata>;
+}
+
+function factMetadataForKey(
+  key: string,
+  traceSnapshot?: unknown,
+): DecisionTraceFactMetadata | undefined {
+  if (!key) return undefined;
+  const metadata = factMetadataEntries(traceSnapshot);
+  for (const alias of factKeyAliases(key)) {
+    const item = metadata[alias];
+    if (item) return item;
+  }
+  return undefined;
+}
+
+function factKeyAliases(key: string): string[] {
+  const cleaned = key
+    .split('.')
+    .filter((part) => part.trim().length > 0)
+    .join('.');
+  if (!cleaned) return [];
+  const aliases = new Set<string>([cleaned]);
+  const parts = cleaned.split('.');
+  aliases.add(parts[parts.length - 1]);
+  if (!cleaned.includes('.')) {
+    aliases.add(`data.${cleaned}`);
+    aliases.add(`record.data.${cleaned}`);
+  } else if (cleaned.startsWith('data.')) {
+    aliases.add(`record.${cleaned}`);
+    aliases.add(cleaned.slice('data.'.length));
+  } else if (cleaned.startsWith('record.')) {
+    aliases.add(cleaned.slice('record.'.length));
+  }
+  return [...aliases];
+}
+
+function factValueLabels(key: string, traceSnapshot?: unknown): Record<string, string> | undefined {
+  const raw = factMetadataForKey(key, traceSnapshot)?.valueLabels;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const labels = Object.fromEntries(
+    Object.entries(raw).filter(
+      ([value, label]) =>
+        typeof value === 'string' &&
+        value.trim().length > 0 &&
+        typeof label === 'string' &&
+        label.trim().length > 0,
+    ),
+  ) as Record<string, string>;
+  return Object.keys(labels).length ? labels : undefined;
 }
 
 function virtualSourceEntries(raw: unknown): DecisionVirtualSourceTrace[] {
@@ -637,7 +699,11 @@ function orderedPayloadEntries(payload?: Record<string, unknown>) {
   return [...ordered, ...rest];
 }
 
-function payloadLabel(key: string): string {
+function payloadLabel(key: string, traceSnapshot?: unknown): string {
+  const metadataLabel = factMetadataForKey(key, traceSnapshot)?.label;
+  if (typeof metadataLabel === 'string' && metadataLabel.trim().length > 0) {
+    return metadataLabel;
+  }
   return ACTION_PAYLOAD_LABELS[key] ?? key;
 }
 
@@ -1319,8 +1385,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                       <dl className="elta-action-payload">
                         {outputSnapshotEntries(log.outputSnapshot).map(([key, value]) => (
                           <div key={key}>
-                            <dt>{payloadLabel(key)}</dt>
-                            <dd>{payloadDisplay(value, key)}</dd>
+                            <dt>{payloadLabel(key, log.traceSnapshot)}</dt>
+                            <dd>{payloadDisplay(value, key, log.traceSnapshot)}</dd>
                           </div>
                         ))}
                       </dl>
@@ -1351,8 +1417,8 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                             <dl className="elta-action-payload">
                               {virtualSourceFieldEntries(source.fields).map(([key, value]) => (
                                 <div key={key}>
-                                  <dt>{payloadLabel(key)}</dt>
-                                  <dd>{payloadDisplay(value, key)}</dd>
+                                  <dt>{payloadLabel(key, log.traceSnapshot)}</dt>
+                                  <dd>{payloadDisplay(value, key, log.traceSnapshot)}</dd>
                                 </div>
                               ))}
                             </dl>

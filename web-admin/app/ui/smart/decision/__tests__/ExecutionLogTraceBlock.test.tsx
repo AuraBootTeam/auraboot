@@ -40,10 +40,25 @@ const recentLog = {
   matchedRulesJson: [{ ruleId: 'R-101' }],
   outputSnapshot: {
     deadlineMinutes: 45,
+    review_status: 'pending',
     severity: 'warning',
     wd_req_type: 'annual',
   },
   traceSnapshot: {
+    factMetadata: {
+      review_status: {
+        scope: 'record',
+        path: 'data.review_status',
+        factKey: 'record.data.review_status',
+        label: '审批状态',
+        dataType: 'enum',
+        modelCode: 'wd_leave_request',
+        valueLabels: {
+          pending: '待审批',
+          approved: '已通过',
+        },
+      },
+    },
     virtualSources: [
       {
         sourceRef: 'virtual.leave_request_summary.v1',
@@ -377,9 +392,13 @@ describe('ExecutionLogTraceBlock', () => {
     expect(output).toHaveTextContent('45');
     expect(output).toHaveTextContent('severity');
     expect(output).toHaveTextContent('warning');
+    expect(output).toHaveTextContent('审批状态');
+    expect(output).toHaveTextContent('待审批');
     expect(output).toHaveTextContent('请假类型');
     expect(output).toHaveTextContent('年假');
     expect(output).not.toHaveTextContent('annual');
+    expect(output).not.toHaveTextContent('review_status');
+    expect(output).not.toHaveTextContent('pending');
   });
 
   it('shows virtual source trace evidence in the trace drawer', async () => {
