@@ -198,6 +198,63 @@ describe('DecisionTableEditor', () => {
     expect(dump.rules[0].when.record_data_wd_req_type.value).toBe('annual');
   });
 
+  it('edits dict IN cells as multi-select arrays with value labels', () => {
+    function DictInHarness() {
+      const [v, setV] = useState<DecisionTable>(base());
+      return (
+        <>
+          <DecisionTableEditor
+            value={v}
+            onChange={setV}
+            fieldOptions={[
+              {
+                scope: 'record',
+                path: 'data.wd_req_type',
+                label: '请假类型',
+                dataType: 'dict',
+                options: ['annual', 'sick'],
+                valueLabels: {
+                  annual: '年假',
+                  sick: '病假',
+                },
+              },
+            ]}
+          />
+          <div data-testid="dump">{JSON.stringify(v)}</div>
+        </>
+      );
+    }
+
+    render(<DictInHarness />);
+
+    fireEvent.click(screen.getByTestId('dt-input-field-picker-0'));
+    fireEvent.click(screen.getByTestId('dt-input-field-option-0-record-data_wd_req_type'));
+    fireEvent.click(screen.getByTestId('dt-add-rule'));
+
+    const operator = screen.getByLabelText('op-0-record_data_wd_req_type') as HTMLSelectElement;
+    expect(operator).toHaveTextContent('属于集合');
+    expect(operator).toHaveTextContent('不在集合');
+    expect(operator).not.toHaveTextContent('IN');
+
+    fireEvent.change(operator, { target: { value: 'IN' } });
+    const selector = screen.getByLabelText('val-0-record_data_wd_req_type') as HTMLSelectElement;
+    expect(selector.multiple).toBe(true);
+    expect(selector).toHaveTextContent('年假');
+    expect(selector).toHaveTextContent('病假');
+    expect(selector).not.toHaveTextContent('annual');
+
+    Array.from(selector.options).forEach((option) => {
+      option.selected = ['annual', 'sick'].includes(option.value);
+    });
+    fireEvent.change(selector);
+
+    const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as DecisionTable;
+    expect(dump.rules[0].when.record_data_wd_req_type).toMatchObject({
+      operator: 'IN',
+      value: ['annual', 'sick'],
+    });
+  });
+
   it('exposes temporal FEEL data types for input columns', () => {
     render(<Harness />);
     fireEvent.click(screen.getByTestId('dt-add-input'));

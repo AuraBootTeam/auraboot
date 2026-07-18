@@ -60,6 +60,7 @@ const OPERATORS_BY_TYPE: Partial<Record<DataType, Operator[]>> = {
 };
 
 const UNARY: ReadonlySet<Operator> = new Set<Operator>(['IS_NULL', 'IS_NOT_NULL', 'IS_EMPTY', 'IS_NOT_EMPTY', 'CHANGED']);
+const COLLECTION_OPERATORS: ReadonlySet<Operator> = new Set<Operator>(['IN', 'NOT_IN']);
 
 export function operatorsForDataType(dt: DataType): Operator[] {
   return OPERATORS_BY_TYPE[dt] ?? ['EQ', 'NE'];
@@ -141,6 +142,27 @@ function firstNot(fields: FieldOption[]): ConditionNode | null {
   return initial ? not(initial) : null;
 }
 
+function literalValue(row: CompareNode): unknown {
+  return row.right && 'value' in row.right ? row.right.value : '';
+}
+
+function literalArrayValue(row: CompareNode): string[] {
+  const value = literalValue(row);
+  if (Array.isArray(value)) return value.map((item) => String(item));
+  if (value === undefined || value === null || value === '') return [];
+  return [String(value)];
+}
+
+function literalScalarValue(row: CompareNode): string {
+  const value = literalValue(row);
+  if (Array.isArray(value)) return String(value[0] ?? '');
+  return String(value ?? '');
+}
+
+function splitCollectionInput(value: string): string[] {
+  return value.split(',').map((item) => item.trim()).filter(Boolean);
+}
+
 function replaceChild(children: ConditionNode[], index: number, next: ConditionNode): ConditionNode[] {
   return children.map((child, childIndex) => (childIndex === index ? next : child));
 }
@@ -183,10 +205,17 @@ function CompareEditor({
   };
 
   const onOperatorChange = (op: Operator) => {
-    updateRow({ ...row, operator: op, right: UNARY.has(op) ? undefined : (row.right ?? lit('')) });
+    const nextDt = (row.left as PathOperand).dataType;
+    const currentValue = literalValue(row);
+    const nextRight = UNARY.has(op)
+      ? undefined
+      : COLLECTION_OPERATORS.has(op)
+        ? lit(literalArrayValue(row), nextDt)
+        : lit(Array.isArray(currentValue) ? (currentValue[0] ?? '') : (currentValue ?? ''), nextDt);
+    updateRow({ ...row, operator: op, right: nextRight });
   };
 
-  const onValueChange = (val: string) => {
+  const onValueChange = (val: string | string[]) => {
     const nextDt = (row.left as PathOperand).dataType;
     updateRow({ ...row, right: lit(val, nextDt) });
   };
@@ -219,23 +248,47 @@ function CompareEditor({
 
       {showValue && (
         fieldOpt?.options ? (
-          <select
-            aria-label={`value-${id}`}
-            value={String((row.right && 'value' in row.right ? row.right.value : '') ?? '')}
-            onChange={(e) => onValueChange(e.target.value)}
-          >
-            <option value="">—</option>
-            {fieldOpt.options.map((o) => (
-              <option key={o} value={o}>
-                {optionLabel(fieldOpt, o)}
-              </option>
-            ))}
-          </select>
+          COLLECTION_OPERATORS.has(row.operator) ? (
+            <select
+              aria-label={`value-${id}`}
+              multiple
+              size={Math.min(4, Math.max(2, fieldOpt.options.length))}
+              value={literalArrayValue(row)}
+              onChange={(e) =>
+                onValueChange(Array.from(e.currentTarget.selectedOptions).map((option) => option.value))
+              }
+            >
+              {fieldOpt.options.map((o) => (
+                <option key={o} value={o}>
+                  {optionLabel(fieldOpt, o)}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              aria-label={`value-${id}`}
+              value={literalScalarValue(row)}
+              onChange={(e) => onValueChange(e.target.value)}
+            >
+              <option value="">—</option>
+              {fieldOpt.options.map((o) => (
+                <option key={o} value={o}>
+                  {optionLabel(fieldOpt, o)}
+                </option>
+              ))}
+            </select>
+          )
         ) : (
           <input
             aria-label={`value-${id}`}
-            value={String((row.right && 'value' in row.right ? row.right.value : '') ?? '')}
-            onChange={(e) => onValueChange(e.target.value)}
+            value={COLLECTION_OPERATORS.has(row.operator)
+              ? literalArrayValue(row).join(', ')
+              : literalScalarValue(row)}
+            onChange={(e) =>
+              onValueChange(COLLECTION_OPERATORS.has(row.operator)
+                ? splitCollectionInput(e.target.value)
+                : e.target.value)
+            }
           />
         )
       )}

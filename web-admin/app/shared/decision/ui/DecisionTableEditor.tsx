@@ -35,7 +35,8 @@ export interface DecisionTableEditorProps {
   fieldOptions?: FieldOption[];
 }
 
-const CELL_OPERATORS: Operator[] = ['EQ', 'NE', 'GT', 'GTE', 'LT', 'LTE', 'IN', 'BETWEEN'];
+const CELL_OPERATORS: Operator[] = ['EQ', 'NE', 'GT', 'GTE', 'LT', 'LTE', 'IN', 'NOT_IN', 'BETWEEN'];
+const COLLECTION_OPERATORS: ReadonlySet<Operator> = new Set<Operator>(['IN', 'NOT_IN']);
 const HIT_POLICIES: HitPolicy[] = ['FIRST', 'UNIQUE', 'COLLECT', 'PRIORITY'];
 const AGGREGATIONS: TableAggregation[] = ['NONE', 'SUM', 'MIN', 'MAX', 'COUNT'];
 const DATA_TYPES: DataType[] = [
@@ -50,6 +51,17 @@ const SCOPES: Scope[] = [
 
 const splitValues = (raw: string): string[] =>
   raw.split(',').map((item) => item.trim()).filter(Boolean);
+
+function cellArrayValue(value: unknown): string[] {
+  if (Array.isArray(value)) return value.map((item) => String(item));
+  if (value === undefined || value === null || value === '') return [];
+  return [String(value)];
+}
+
+function cellScalarValue(value: unknown): string {
+  if (Array.isArray(value)) return String(value[0] ?? '');
+  return String(value ?? '');
+}
 
 const formatCombination = (issue: DecisionTableAnalysisIssue): string => {
   const combination = issue.inputCombination ?? {};
@@ -186,12 +198,20 @@ export function DecisionTableEditor({
   const setCellOperator = (idx: number, inputId: string, op: Operator) => {
     const rules = value.rules.slice();
     const r = { ...rules[idx], when: { ...rules[idx].when } };
-    r.when[inputId] = { operator: op, value: r.when[inputId]?.value ?? '', feel: r.when[inputId]?.feel };
+    const currentCell = r.when[inputId];
+    const currentValue = currentCell?.value ?? '';
+    r.when[inputId] = {
+      operator: op,
+      value: COLLECTION_OPERATORS.has(op)
+        ? cellArrayValue(currentValue)
+        : Array.isArray(currentValue) ? (currentValue[0] ?? '') : currentValue,
+      feel: currentCell?.feel,
+    };
     rules[idx] = r;
     emitRules(rules);
   };
 
-  const setCellValue = (idx: number, inputId: string, val: string) => {
+  const setCellValue = (idx: number, inputId: string, val: unknown) => {
     const rules = value.rules.slice();
     const r = { ...rules[idx], when: { ...rules[idx].when } };
     r.when[inputId] = { operator: r.when[inputId]?.operator ?? 'EQ', value: val, feel: r.when[inputId]?.feel };
@@ -288,11 +308,13 @@ export function DecisionTableEditor({
 
   const renderInputCell = (rule: TableRule, idx: number, input: TableInput) => {
     const options = allowedValueOptions(input.allowedValues, input.valueLabels);
+    const cell = rule.when[input.id];
+    const isCollection = COLLECTION_OPERATORS.has(cell?.operator ?? 'EQ');
     return (
       <>
         <select
           aria-label={`op-${idx}-${input.id}`}
-          value={rule.when[input.id]?.operator ?? 'EQ'}
+          value={cell?.operator ?? 'EQ'}
           onChange={(e) => setCellOperator(idx, input.id, e.target.value as Operator)}
         >
           {CELL_OPERATORS.map((op) => (
@@ -300,28 +322,50 @@ export function DecisionTableEditor({
           ))}
         </select>
         {options.length > 0 ? (
-          <select
-            aria-label={`val-${idx}-${input.id}`}
-            value={String(rule.when[input.id]?.value ?? '')}
-            onChange={(e) => setCellValue(idx, input.id, e.target.value)}
-          >
-            <option value="">—</option>
-            {options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          isCollection ? (
+            <select
+              aria-label={`val-${idx}-${input.id}`}
+              multiple
+              size={Math.min(4, Math.max(2, options.length))}
+              value={cellArrayValue(cell?.value)}
+              onChange={(e) =>
+                setCellValue(
+                  idx,
+                  input.id,
+                  Array.from(e.currentTarget.selectedOptions).map((option) => option.value),
+                )
+              }
+            >
+              {options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              aria-label={`val-${idx}-${input.id}`}
+              value={cellScalarValue(cell?.value)}
+              onChange={(e) => setCellValue(idx, input.id, e.target.value)}
+            >
+              <option value="">—</option>
+              {options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          )
         ) : (
           <input
             aria-label={`val-${idx}-${input.id}`}
-            value={String(rule.when[input.id]?.value ?? '')}
-            onChange={(e) => setCellValue(idx, input.id, e.target.value)}
+            value={isCollection ? cellArrayValue(cell?.value).join(', ') : cellScalarValue(cell?.value)}
+            onChange={(e) => setCellValue(idx, input.id, isCollection ? splitValues(e.target.value) : e.target.value)}
           />
         )}
         <input
           aria-label={`feel-${idx}-${input.id}`}
-          value={rule.when[input.id]?.feel ?? ''}
+          value={cell?.feel ?? ''}
           onChange={(e) => setCellFeel(idx, input.id, e.target.value)}
         />
       </>

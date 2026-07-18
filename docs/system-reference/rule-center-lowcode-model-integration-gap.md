@@ -2904,6 +2904,24 @@ web-admin && pnpm exec tsc --noEmit --pretty false --incremental false
 
 后续仍未关闭：多选 `IN / NOT_IN` 的 label/value 展示、reference/user picker 字段、虚拟模型字段的 browser Trace、DMN import/export round-trip metadata、全消费方浏览器黄金矩阵，以及执行日志页面与规则资产/消费方详情之间的全量 Trace 互跳。
 
+### RC-DICT-01 multi-select `IN / NOT_IN` authoring focused slice（2026-07-18，待验证）
+
+本轮补的是上一节剩余矩阵中的多值条件 authoring 缺口：Fact Catalog 已经能给字典/枚举字段提供 `options + valueLabels`，但 `ConditionBuilder` 和 `DecisionTableEditor` 在 `IN` 场景仍用单选控件，保存出的右值是单个字符串，无法真实表达“属于多个字典值”的规则条件。`DecisionTableEditor` 还没有把 `NOT_IN` 暴露在 DMN 输入单元格操作符列表中。
+
+代码实现：`ConditionBuilder` 现在把 `IN / NOT_IN` 识别为集合操作符；切到集合操作符时会把现有 scalar 值转换成数组，切回普通操作符时取第一个值，避免 AST value shape 在 UI 往返中漂移。有 Fact Catalog `options` 的字段渲染为 multi-select，选项显示中文 `valueLabels`，保存的 `LiteralOperand.value` 仍是 raw value 数组；没有 options 的字段用逗号分隔输入并保存数组。`DecisionTableEditor` 同步把 DMN 输入单元格的 `IN / NOT_IN` 作为集合操作符处理，值域字段使用 multi-select，FEEL 旁路仍保留原输入框，`TableCell.value` 保存 raw value 数组。DMN 操作符列表补齐 `NOT_IN`，UI 文案仍来自 `decisionOperatorLabel`，不泄漏 `IN / NOT_IN` raw code。
+
+测试夹具：`ConditionBuilder.test.tsx` 已追加字典字段 `请假类型` 的 `IN` authoring 夹具，断言 multi-select 展示“年假 / 病假”、不展示 raw `annual`，并断言输出 AST `right.value === ['annual','sick']`；`DecisionTableEditor.test.tsx` 已追加 DMN 输入列同款夹具，断言操作符列表展示“属于集合 / 不在集合”、multi-select 展示中文值标签，并断言 `rules[0].when.record_data_wd_req_type.value === ['annual','sick']`。
+
+验证状态：按用户当前“先别测试，后面再补测”要求，本节只完成实现、待跑夹具和非测试门禁。当前已运行 `git diff --check` 与 `web-admin && pnpm typecheck`，均通过；新 worktree 缺少依赖时先执行了 `pnpm install --offline --frozen-lockfile` 生成 ignored `node_modules`。focused e2e-truth 静态扫描对两份 touched 测试夹具未命中 `test.skip/fixme/only`、`waitForTimeout`、`retries`、PUT/PATCH API 兜底、threshold/baseline。尚未运行 Vitest、Playwright 或后端测试，因此只能标记为 **实现待功能验证**。后续补测至少需要跑：
+
+```bash
+web-admin && pnpm exec vitest run \
+  app/shared/decision/ui/__tests__/ConditionBuilder.test.tsx \
+  app/shared/decision/ui/__tests__/DecisionTableEditor.test.tsx
+```
+
+后续仍未关闭：本节自己的 focused Vitest/typecheck/browser authoring 验证；reference/user picker 字段；虚拟模型字段的 browser Trace；DMN import/export round-trip metadata；全消费方浏览器黄金矩阵；执行日志页面与规则资产/消费方详情之间的全量 Trace 互跳；以及 `IN / NOT_IN` 在真实 Strategy Studio / 消费方页面中从 UI 保存到后端 evaluator 的 browser + backend 成对证据。
+
 ### 关闭证据模板
 
 每个 gap 关闭时，状态文档必须按下面模板记录，缺一项就不能写 `DONE`：
