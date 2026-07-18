@@ -1,4 +1,4 @@
-import { test, expect, type APIResponse, type Page } from '@playwright/test';
+import { test, expect, type APIResponse, type Page, type Response } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI } from '../../helpers/wd-fixtures';
@@ -43,6 +43,39 @@ type DecisionResult = {
   outputs?: Record<string, unknown>;
   matchedRules?: Array<{ ruleId?: string }>;
   traceId?: string;
+};
+
+type ConditionFragment = {
+  pid?: string;
+  fragmentCode: string;
+  fragmentName?: string;
+  version?: number;
+  status?: string;
+  scopeType?: string;
+  scopeRef?: string;
+  ownerModule?: string;
+  conditionSpec?: Record<string, any>;
+  fieldRefs?: string[];
+  decisionRefs?: string[];
+};
+
+type ConditionFragmentEvaluation = {
+  fragmentCode?: string;
+  version?: number;
+  matched?: boolean;
+  result?: string;
+};
+
+type UserOption = {
+  pid?: string;
+  id?: string;
+  displayName?: string;
+  name?: string;
+  realName?: string;
+  nickName?: string;
+  nickname?: string;
+  username?: string;
+  email?: string;
 };
 
 type DecisionTableModel = {
@@ -107,6 +140,17 @@ async function getApi<T>(page: Page, endpoint: string): Promise<T> {
   return readApi<T>(await page.request.get(endpoint));
 }
 
+function recordsFromPayload<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (!payload || typeof payload !== 'object') return [];
+  const value = payload as Record<string, unknown>;
+  if (Array.isArray(value.records)) return value.records as T[];
+  if (Array.isArray(value.content)) return value.content as T[];
+  if (Array.isArray(value.list)) return value.list as T[];
+  if (Array.isArray(value.data)) return value.data as T[];
+  return [];
+}
+
 async function openRuleCenterFromSidebar(page: Page): Promise<void> {
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
   await ensureSidebarExpanded(page);
@@ -140,6 +184,30 @@ function findLeaveTypeFact(catalog: DecisionFactCatalog): DecisionFact | undefin
   return facts.find((fact) => fact.path === 'record.data.wd_req_type' || fact.path === 'data.wd_req_type');
 }
 
+function findApplicantFact(catalog: DecisionFactCatalog): DecisionFact | undefined {
+  const facts = [
+    ...(catalog.facts ?? []),
+    ...(catalog.entities ?? []).flatMap((entity) => entity.facts ?? []),
+  ];
+  return facts.find((fact) =>
+    fact.path === 'record.data.wd_req_applicant' || fact.path === 'data.wd_req_applicant');
+}
+
+async function resolveFirstUser(page: Page): Promise<{ pid: string; label: string }> {
+  const payload = await getApi<unknown>(page, '/api/admin/users/search?keyword=&size=20');
+  const users = recordsFromPayload<UserOption>(payload);
+  const user = users.find((item) => item.pid || item.id);
+  expect(user, 'at least one user must exist for the user reference picker').toBeTruthy();
+  const pid = String(user?.pid ?? user?.id ?? '');
+  const label = String(
+    user?.displayName ?? user?.name ?? user?.realName ?? user?.nickName ?? user?.nickname
+      ?? user?.username ?? user?.email ?? pid,
+  );
+  expect(pid, 'user pid must be resolved from /api/admin/users/search').toBeTruthy();
+  expect(label, 'user label must be resolved from /api/admin/users/search').toBeTruthy();
+  return { pid, label };
+}
+
 async function selectedOptionLabels(page: Page, selectorLabel: string): Promise<string[]> {
   return page.getByLabel(selectorLabel).evaluate((select) =>
     Array.from((select as HTMLSelectElement).selectedOptions).map((option) => option.textContent?.trim() ?? ''),
@@ -169,6 +237,46 @@ async function deleteAllDecisionTableRows(page: Page): Promise<void> {
     await expect(deleteButtons).toHaveCount(count - 1);
   }
   throw new Error('Decision table still has rows after 20 delete attempts');
+}
+
+async function resetConditionBuilderToSingleRow(page: Page): Promise<void> {
+  const deleteButtons = page.locator('button[aria-label^="delete-"]');
+  for (let guard = 0; guard < 20; guard += 1) {
+    const count = await deleteButtons.count();
+    if (count === 0) break;
+    await deleteButtons.first().click();
+    await expect.poll(() => deleteButtons.count()).toBeLessThan(count);
+  }
+  await page.getByTestId('cb-add').click();
+  await expect(page.getByTestId('cb-row-0')).toBeVisible({ timeout: 10_000 });
+}
+
+function isConditionFragmentDraftWrite(response: Response): boolean {
+  if (response.request().method() !== 'POST') return false;
+  const path = new URL(response.url()).pathname;
+  return path === '/api/decision/condition-fragments'
+    || /^\/api\/decision\/condition-fragments\/[^/]+\/versions$/.test(path)
+    || /^\/api\/decision\/condition-fragment-versions\/[^/]+\/draft$/.test(path);
+}
+
+function isConditionFragmentValidate(response: Response): boolean {
+  return response.request().method() === 'POST'
+    && /^\/api\/decision\/condition-fragment-versions\/[^/]+\/validate$/.test(new URL(response.url()).pathname);
+}
+
+function isConditionFragmentPublish(response: Response): boolean {
+  return response.request().method() === 'POST'
+    && /^\/api\/decision\/condition-fragment-versions\/[^/]+\/publish$/.test(new URL(response.url()).pathname);
+}
+
+function firstCompareNode(fragment: ConditionFragment | Record<string, any> | undefined): Record<string, any> {
+  const root = fragment && 'conditionSpec' in fragment
+    ? fragment.conditionSpec?.root
+    : (fragment as Record<string, any> | undefined)?.root;
+  const children = root && Array.isArray(root.children) ? root.children : [];
+  const first = children.find((item: Record<string, any>) => item?.type === 'compare') ?? children[0];
+  expect(first, `fragment must persist a compare node: ${JSON.stringify(fragment)}`).toBeTruthy();
+  return first as Record<string, any>;
 }
 
 async function configureLeaveTypeRule(
@@ -488,6 +596,164 @@ test('Strategy Studio saves, publishes and reloads dict IN and NOT_IN raw arrays
   await page.getByLabel('op-0-record_data_wd_req_type').scrollIntoViewIfNeeded();
   await page.screenshot({
     path: testInfo.outputPath('strategy-studio-dict-in-not-in-reload.png'),
+    fullPage: true,
+  });
+});
+
+test('Strategy Studio saves, publishes and reloads BPM user reference condition fragment raw pid @golden', async ({
+  page,
+}, testInfo) => {
+  await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  await expect(page).not.toHaveURL(/\/login(?:$|\?)/);
+
+  const catalog = await getApi<DecisionFactCatalog>(
+    page,
+    '/api/decision/facts/catalog?modelCode=wd_leave_request',
+  );
+  const applicantFact = findApplicantFact(catalog);
+  expect(applicantFact).toMatchObject({
+    label: expect.stringMatching(/申请人|Applicant/i),
+    dataType: expect.stringMatching(/user|reference/i),
+  });
+  const user = await resolveFirstUser(page);
+
+  await openRuleCenterFromSidebar(page);
+  await page.getByTestId('strategy-scenario-BPM').click();
+  await expect(page.getByTestId('strategy-consumer-summary')).toContainText(/BPM|审批人分派/);
+  await page.getByTestId('strategy-workspace-tab-rule').click();
+  await expect(page.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
+  await expect(page.getByTestId('condition-builder')).toBeVisible({ timeout: 15_000 });
+
+  await resetConditionBuilderToSingleRow(page);
+  await page.getByLabel('field-0').selectOption('record:data.wd_req_applicant');
+  await page.getByLabel('operator-0').selectOption('EQ');
+  await expect(page.getByTestId('reference-value-trigger-0')).toContainText('选择用户');
+  await page.getByTestId('reference-value-trigger-0').click();
+  await expect(page.getByTestId('reference-value-menu-0')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('reference-value-meta-0')).toContainText('用户 · pid / displayName');
+  await expect(page.getByTestId(`reference-value-option-0-${user.pid}`)).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId(`reference-value-option-0-${user.pid}`).click();
+  await expect(page.getByTestId('reference-value-trigger-0')).toContainText(user.label);
+  await expect(page.getByTestId('cb-preview')).toContainText(/申请人|Applicant/i);
+  await expect(page.getByTestId('cb-preview')).toContainText(user.label);
+  await expect(page.getByTestId('cb-preview')).not.toContainText(user.pid);
+
+  const fragmentSaveResponsePromise = page.waitForResponse(isConditionFragmentDraftWrite, { timeout: 15_000 });
+  const decisionDraftResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes('/api/decision/definitions/approval_routing/versions'),
+    { timeout: 15_000 },
+  );
+  await page.getByTestId('strategy-save-draft').click();
+  const fragmentSaveResponse = await fragmentSaveResponsePromise;
+  const fragmentSaveRequest = fragmentSaveResponse.request().postDataJSON() as Record<string, any>;
+  const savedFragment = await readApi<ConditionFragment>(fragmentSaveResponse);
+  const savedDecisionDraft = await readApi<DecisionVersion>(await decisionDraftResponsePromise);
+  expect(savedDecisionDraft.pid).toBeTruthy();
+  expect(savedFragment).toMatchObject({
+    fragmentCode: 'wd_leave_approval_condition',
+    scopeType: 'BPM',
+    scopeRef: 'wd_leave_approval',
+    status: 'DRAFT',
+  });
+  expect(savedFragment.fieldRefs).toEqual(expect.arrayContaining(['record.data.wd_req_applicant']));
+  expect(savedFragment.decisionRefs).toEqual(expect.arrayContaining(['approval_routing']));
+  expect(fragmentSaveRequest).toMatchObject({
+    scopeType: 'BPM',
+    scopeRef: 'wd_leave_approval',
+    conditionSpec: {
+      root: {
+        type: 'group',
+        children: [
+          {
+            operator: 'EQ',
+            left: { scope: 'record', path: 'data.wd_req_applicant', dataType: 'user' },
+            right: { value: user.pid, dataType: 'user' },
+          },
+        ],
+      },
+    },
+  });
+  expect(firstCompareNode(savedFragment)).toMatchObject({
+    operator: 'EQ',
+    left: { scope: 'record', path: 'data.wd_req_applicant', dataType: 'user' },
+    right: { value: user.pid, dataType: 'user' },
+  });
+  await expect(page.getByTestId('strategy-operation-status')).toContainText('草稿已保存', {
+    timeout: 15_000,
+  });
+
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('strategy-studio')).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('strategy-scenario-BPM').click();
+  await expect(page.getByTestId(`strategy-fragment-${savedFragment.fragmentCode}`)).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId(`strategy-fragment-${savedFragment.fragmentCode}`).click();
+  await page.getByTestId('strategy-workspace-tab-rule').click();
+  await expect(page.getByLabel('field-0')).toHaveValue('record:data.wd_req_applicant');
+  await expect(page.getByLabel('operator-0')).toHaveValue('EQ');
+  await expect(page.getByTestId('reference-value-trigger-0')).toContainText(user.label, {
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId('cb-preview')).not.toContainText(user.pid);
+
+  const fragmentPublishSavePromise = page.waitForResponse(isConditionFragmentDraftWrite, { timeout: 15_000 });
+  const fragmentValidatePromise = page.waitForResponse(isConditionFragmentValidate, { timeout: 15_000 });
+  const fragmentPublishPromise = page.waitForResponse(isConditionFragmentPublish, { timeout: 15_000 });
+  await page.getByTestId('strategy-publish').click();
+  await readApi<ConditionFragment>(await fragmentPublishSavePromise);
+  const validation = await readApi<{ valid?: boolean }>(await fragmentValidatePromise);
+  expect(validation.valid).toBe(true);
+  const publishedFragment = await readApi<ConditionFragment>(await fragmentPublishPromise);
+  expect(publishedFragment).toMatchObject({
+    fragmentCode: savedFragment.fragmentCode,
+    status: 'PUBLISHED',
+  });
+  await expect(page.getByTestId('strategy-operation-status')).toContainText('发布成功', {
+    timeout: 15_000,
+  });
+
+  const hit = await postApi<ConditionFragmentEvaluation>(
+    page,
+    `/api/decision/condition-fragments/${encodeURIComponent(savedFragment.fragmentCode)}/evaluate`,
+    {
+      context: {
+        record: {
+          modelCode: 'wd_leave_request',
+          data: {
+            wd_req_applicant: user.pid,
+          },
+        },
+      },
+    },
+  );
+  expect(hit).toMatchObject({
+    fragmentCode: savedFragment.fragmentCode,
+    matched: true,
+    result: 'TRUE',
+  });
+  const miss = await postApi<ConditionFragmentEvaluation>(
+    page,
+    `/api/decision/condition-fragments/${encodeURIComponent(savedFragment.fragmentCode)}/evaluate`,
+    {
+      context: {
+        record: {
+          modelCode: 'wd_leave_request',
+          data: {
+            wd_req_applicant: `${user.pid}-miss`,
+          },
+        },
+      },
+    },
+  );
+  expect(miss).toMatchObject({
+    fragmentCode: savedFragment.fragmentCode,
+    matched: false,
+    result: 'FALSE',
+  });
+
+  await page.screenshot({
+    path: testInfo.outputPath('strategy-studio-bpm-user-reference-fragment-reload.png'),
     fullPage: true,
   });
 });
