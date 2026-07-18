@@ -47,6 +47,20 @@ const PROCESS_NODE_VALUE_LABELS: Record<string, string> = {
   gw_manager: '主管审批网关',
 };
 
+const LEAVE_APPLICANT_REFERENCE_FIELD: FieldOption = {
+  scope: 'record',
+  path: 'data.wd_req_applicant',
+  label: '申请人',
+  dataType: 'user',
+  modelCode: 'wd_leave_request',
+  modelName: '请假申请',
+  reference: {
+    targetEntity: 'sys_user',
+    valueField: 'pid',
+    displayField: 'displayName',
+  },
+};
+
 export interface StrategyStudioWorkbenchProps {
   fields: FieldOption[]
   decisions?: DecisionOption[]
@@ -80,6 +94,7 @@ const SCENARIOS: StrategyScenario[] = [
       },
       { scope: 'sla', path: 'deadlineMinutes', label: '截止分钟', dataType: 'integer' },
       { scope: 'sla', path: 'warningBeforeMinutes', label: '提前提醒', dataType: 'integer' },
+      LEAVE_APPLICANT_REFERENCE_FIELD,
       {
         scope: 'process',
         path: 'nodeId',
@@ -112,6 +127,7 @@ const SCENARIOS: StrategyScenario[] = [
         valueLabels: PROCESS_NODE_VALUE_LABELS,
       },
       { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
+      LEAVE_APPLICANT_REFERENCE_FIELD,
       { scope: 'actor', path: 'roles', label: '审批角色', dataType: 'collection' },
     ],
   },
@@ -129,6 +145,7 @@ const SCENARIOS: StrategyScenario[] = [
     modelCodes: ['wd_leave_request'],
     fields: [
       { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
+      LEAVE_APPLICANT_REFERENCE_FIELD,
       { scope: 'record', path: 'pid', label: '申请记录', dataType: 'string' },
       { scope: 'time', path: 'now', label: '触发时间', dataType: 'datetime' },
     ],
@@ -166,6 +183,7 @@ const SCENARIOS: StrategyScenario[] = [
     fields: [
       { scope: 'event', path: 'type', label: '事件类型', dataType: 'string' },
       { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
+      LEAVE_APPLICANT_REFERENCE_FIELD,
       { scope: 'actor', path: 'roles', label: '触发人角色', dataType: 'collection' },
     ],
   },
@@ -642,6 +660,8 @@ function formatDmnError(result: DecisionTableDmnXmlResult): string {
 function sampleContext() {
   return {
     record: {
+      modelCode: 'wd_leave_request',
+      pid: 'wd-leave-demo-001',
       data: {
         amount: 120000,
         customerTier: 'VIP',
@@ -649,6 +669,7 @@ function sampleContext() {
         ownerUserId: 'user-owner',
         priority: 'HIGH',
         status: 'OPEN',
+        wd_req_applicant: 'user-owner',
         wd_req_days: 3,
         wd_req_type: 'annual',
       },

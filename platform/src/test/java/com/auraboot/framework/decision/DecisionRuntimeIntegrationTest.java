@@ -30,6 +30,8 @@ import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.service.DictService;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.user.dto.UserSearchDTO;
+import com.auraboot.framework.user.service.UserService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -71,6 +73,8 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
     private MetaFieldService metaFieldService;
     @Autowired
     private DictService dictService;
+    @Autowired
+    private UserService userService;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -118,6 +122,21 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                         "type", "literal",
                         "value", values,
                         "dataType", "enum")));
+    }
+
+    private JsonNode userReferenceEqAst(String fieldCode, String userPid) {
+        return mapper.valueToTree(Map.of(
+                "type", "compare",
+                "left", Map.of(
+                        "type", "path",
+                        "scope", "record",
+                        "path", "data." + fieldCode,
+                        "dataType", "user"),
+                "operator", "EQ",
+                "right", Map.of(
+                        "type", "literal",
+                        "value", userPid,
+                        "dataType", "user")));
     }
 
     private String createPublishedDecision(String code) throws Exception {
@@ -186,6 +205,21 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                 Map.of(
                         "modelCode", modelCode,
                         "data", Map.of(fieldCode, value))));
+        return req;
+    }
+
+    private DrtEvaluateRequest referenceEvalReq(String code, String modelCode, String fieldCode, String userPid) {
+        DrtEvaluateRequest req = new DrtEvaluateRequest();
+        req.setDecisionCode(code);
+        req.setBinding(VersionBinding.LATEST);
+        req.setCallerType("API");
+        req.setCallerRef("reference-user-it-" + UUID.randomUUID());
+        req.setCorrelationId("reference-user-" + UUID.randomUUID());
+        req.setContext(Map.of(
+                "record",
+                Map.of(
+                        "modelCode", modelCode,
+                        "data", Map.of(fieldCode, userPid))));
         return req;
     }
 
@@ -313,6 +347,37 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo("待审批");
         assertThat(factMetadata.path("record.data." + fieldCode).path("dictCode").asText())
                 .isEqualTo(dictCode);
+    }
+
+    @Test
+    void evaluate_persistsFactMetadataSnapshotForUserReferenceModelFields() {
+        String suffix = Long.toString(Math.abs(System.nanoTime()), 36);
+        String modelCode = "drt_ref_meta_" + suffix;
+        String fieldCode = "applicant_ref_" + suffix;
+        saveUserReferenceModel(modelCode, fieldCode);
+
+        String applicantPid = testUser.getPid();
+        UserSearchDTO applicant = userService.findInTenantByPid(testTenant.getId(), applicantPid);
+        assertThat(applicant).isNotNull();
+        assertThat(applicant.getDisplayName()).isNotBlank();
+
+        String code = "it_ref_fact_meta_" + suffix;
+        createPublishedDecision(code, userReferenceEqAst(fieldCode, applicantPid), "record.data." + fieldCode);
+
+        DecisionResult matched = evaluationService.evaluate(
+                referenceEvalReq(code, modelCode, fieldCode, applicantPid));
+        assertThat(matched.status()).isEqualTo(DecisionStatus.MATCHED);
+        List<DrtLogDTO> logs = evaluationService.findLogsByTraceId(matched.traceId());
+        assertThat(logs).hasSize(1);
+
+        JsonNode factMetadata = logs.get(0).getTraceSnapshot().path("factMetadata");
+        JsonNode byPath = factMetadata.path("record.data." + fieldCode);
+        assertThat(byPath.path("label").asText()).isEqualTo("申请人");
+        assertThat(byPath.path("dataType").asText()).isEqualTo("reference");
+        assertThat(byPath.path("valueLabels").path(applicantPid).asText())
+                .isEqualTo(applicant.getDisplayName());
+        assertThat(factMetadata.path(fieldCode).path("valueLabels").path(applicantPid).asText())
+                .isEqualTo(applicant.getDisplayName());
     }
 
     @Test
@@ -704,6 +769,50 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                 "DecisionRuntimeIntegrationTest fact metadata fixture",
                 true,
                 "Decision trace fact metadata fixture");
+        assertThat(published.getStatus()).isEqualToIgnoringCase("published");
+    }
+
+    private void saveUserReferenceModel(String modelCode, String fieldCode) {
+        MetaModelCreateRequest modelRequest = new MetaModelCreateRequest();
+        modelRequest.setCode(modelCode);
+        modelRequest.setDisplayName("Decision Reference Metadata " + modelCode);
+        modelRequest.setModelType("entity");
+        modelRequest.setSourceType("physical");
+        modelRequest.setPrimaryKey("id");
+
+        MetaModelDTO model = metaModelService.create(modelRequest);
+        assertThat(model.getPid()).isNotBlank();
+
+        MetaFieldCreateRequest fieldRequest = new MetaFieldCreateRequest();
+        fieldRequest.setCode(fieldCode);
+        fieldRequest.setDataType("reference");
+        fieldRequest.setRefTarget(Map.of(
+                "targetEntity", "sys_user",
+                "displayField", "displayName",
+                "valueField", "pid"));
+        fieldRequest.setExtension(Map.of("displayName", "申请人"));
+        fieldRequest.setAutoPublish(true);
+
+        MetaFieldDTO field = metaFieldService.create(fieldRequest);
+        assertThat(field.getPid()).isNotBlank();
+        assertThat(field.getRefTarget()).containsEntry("targetEntity", "sys_user");
+        metaModelService.bindFieldToModel(
+                model.getId(),
+                field.getId(),
+                1,
+                false,
+                true,
+                true,
+                null,
+                null,
+                null,
+                null);
+
+        MetaModelDTO published = metaModelService.publish(
+                model.getPid(),
+                "DecisionRuntimeIntegrationTest reference fact metadata fixture",
+                true,
+                "Decision trace reference fact metadata fixture");
         assertThat(published.getStatus()).isEqualToIgnoringCase("published");
     }
 
