@@ -58,6 +58,7 @@ const quoteOpsCurrentSpecNames = [
   'quote-minimal-create-regression',
   'quote-bom-visual-feedback-golden',
   'quote-corrected-bom-upload-golden',
+  'quote-nonstd-bom-upload-golden',
   'quote-bom-price-manual-adoption',
   'form-and-overlay-golden',
   'quote-bom-price-yunhan-adoption',
