@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Database, Search, UserRound, X } from 'lucide-react';
 import {
   type ConditionNode, type GroupNode, type CompareNode, type Operator, type DataType,
   type PathOperand, cmp, path, lit,
@@ -62,16 +63,30 @@ const OPERATORS_BY_TYPE: Partial<Record<DataType, Operator[]>> = {
 const UNARY: ReadonlySet<Operator> = new Set<Operator>(['IS_NULL', 'IS_NOT_NULL', 'IS_EMPTY', 'IS_NOT_EMPTY', 'CHANGED']);
 const COLLECTION_OPERATORS: ReadonlySet<Operator> = new Set<Operator>(['IN', 'NOT_IN']);
 
+type ValueLabelMap = Record<string, string>;
+
+interface ReferenceOption {
+  value: string;
+  label: string;
+  subtitle?: string;
+  disabled?: boolean;
+}
+
 export function operatorsForDataType(dt: DataType): Operator[] {
   return OPERATORS_BY_TYPE[dt] ?? ['EQ', 'NE'];
 }
 
 const fieldKey = (scope: string, p: string): string => `${scope}:${p}`;
+const fieldOptionKey = (field: FieldOption): string => fieldKey(field.scope, field.path);
 
-function optionLabel(field: FieldOption | undefined, value: unknown): string {
+function optionLabel(
+  field: FieldOption | undefined,
+  value: unknown,
+  runtimeValueLabels?: ValueLabelMap,
+): string {
   const raw = String(value ?? '');
   if (!field) return raw;
-  return field.valueLabels?.[raw] ?? raw;
+  return runtimeValueLabels?.[raw] ?? field.valueLabels?.[raw] ?? raw;
 }
 
 function idFor(pathParts: number[]): string {
@@ -163,6 +178,336 @@ function splitCollectionInput(value: string): string[] {
   return value.split(',').map((item) => item.trim()).filter(Boolean);
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function firstString(record: Record<string, unknown> | null | undefined, keys: string[]): string | undefined {
+  if (!record) return undefined;
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return String(value);
+    }
+  }
+  return undefined;
+}
+
+function dataArray(payload: unknown): unknown[] {
+  const root = asRecord(payload);
+  const data = root?.data;
+  if (Array.isArray(data)) return data;
+  const dataRecord = asRecord(data);
+  const content = dataRecord?.content;
+  if (Array.isArray(content)) return content;
+  const records = dataRecord?.records;
+  if (Array.isArray(records)) return records;
+  return [];
+}
+
+async function fetchJson(url: string): Promise<unknown | null> {
+  const response = await fetch(url, { credentials: 'same-origin' });
+  if (!response.ok) return null;
+  return response.json() as Promise<unknown>;
+}
+
+function normalizeUserOption(value: unknown): ReferenceOption | null {
+  const record = asRecord(value);
+  const user = asRecord(record?.user);
+  const optionValue = firstString(record, ['pid', 'id', 'userPid'])
+    ?? firstString(user, ['pid', 'id']);
+  if (!optionValue) return null;
+  const label = firstString(record, ['displayName', 'name', 'realName', 'username', 'email'])
+    ?? firstString(user, ['displayName', 'name', 'realName', 'username', 'email'])
+    ?? optionValue;
+  const email = firstString(record, ['email']) ?? firstString(user, ['email']);
+  const department = firstString(record, ['department']) ?? firstString(user, ['department']);
+  return {
+    value: optionValue,
+    label,
+    subtitle: [email, department].filter(Boolean).join(' · ') || undefined,
+  };
+}
+
+function normalizeDynamicOption(value: unknown): ReferenceOption | null {
+  const record = asRecord(value);
+  const optionValue = firstString(record, ['value', 'pid', 'id']);
+  if (!optionValue) return null;
+  return {
+    value: optionValue,
+    label: firstString(record, ['label', 'name', 'displayName', 'title', 'code']) ?? optionValue,
+    disabled: record?.disabled === true,
+  };
+}
+
+function isUserReference(field: FieldOption | undefined): boolean {
+  if (!field) return false;
+  const target = String(field.reference?.targetEntity ?? '').toLowerCase();
+  return field.dataType === 'user'
+    || target.includes('user')
+    || target === 'sys_user'
+    || target === 'ab_user';
+}
+
+function isReferenceValueField(field: FieldOption | undefined): boolean {
+  return Boolean(field && !field.options?.length && (field.reference || field.dataType === 'user'));
+}
+
+function fieldCodeFromPath(fieldPath: string): string {
+  if (fieldPath.startsWith('data.')) return fieldPath.slice('data.'.length);
+  const parts = fieldPath.split('.');
+  return parts[parts.length - 1] || fieldPath;
+}
+
+function referenceTargetLabel(field: FieldOption): string {
+  if (isUserReference(field)) return '用户';
+  return field.reference?.targetEntity || field.modelName || '引用对象';
+}
+
+function mergeLabelsFromOptions(options: ReferenceOption[]): ValueLabelMap {
+  return Object.fromEntries(options.map((option) => [option.value, option.label]));
+}
+
+async function loadReferenceOptions(field: FieldOption, query: string): Promise<ReferenceOption[]> {
+  if (isUserReference(field)) {
+    const payload = await fetchJson(
+      `/api/admin/users/search?keyword=${encodeURIComponent(query)}&size=20`,
+    );
+    return dataArray(payload).map(normalizeUserOption).filter((item): item is ReferenceOption => item !== null);
+  }
+  if (!field.modelCode) return [];
+  const fieldName = fieldCodeFromPath(field.path);
+  const suffix = query.trim() ? `?keyword=${encodeURIComponent(query.trim())}` : '';
+  const payload = await fetchJson(
+    `/api/dynamic/${encodeURIComponent(field.modelCode)}/field-options/${encodeURIComponent(fieldName)}${suffix}`,
+  );
+  return dataArray(payload).map(normalizeDynamicOption).filter((item): item is ReferenceOption => item !== null);
+}
+
+function optionFromUserPayload(payload: unknown, fallbackValue: string): ReferenceOption | null {
+  const data = asRecord(payload)?.data;
+  return normalizeUserOption(data) ?? { value: fallbackValue, label: fallbackValue };
+}
+
+function optionFromDynamicRecord(
+  payload: unknown,
+  field: FieldOption,
+  fallbackValue: string,
+): ReferenceOption | null {
+  const data = asRecord(payload)?.data;
+  const record = asRecord(data);
+  if (!record) return { value: fallbackValue, label: fallbackValue };
+  const displayField = field.reference?.displayField;
+  const label = displayField && record[displayField] != null
+    ? String(record[displayField])
+    : firstString(record, ['displayName', 'name', 'title', 'code', 'pid', 'id']) ?? fallbackValue;
+  return { value: fallbackValue, label };
+}
+
+async function resolveReferenceOption(field: FieldOption, value: string): Promise<ReferenceOption | null> {
+  if (!value) return null;
+  if (isUserReference(field)) {
+    return optionFromUserPayload(await fetchJson(`/api/admin/users/${encodeURIComponent(value)}`), value);
+  }
+  const targetEntity = field.reference?.targetEntity;
+  if (!targetEntity) return { value, label: value };
+  return optionFromDynamicRecord(
+    await fetchJson(`/api/dynamic/${encodeURIComponent(targetEntity)}/${encodeURIComponent(value)}`),
+    field,
+    value,
+  );
+}
+
+interface ReferenceValuePickerProps {
+  id: string;
+  field: FieldOption;
+  value: string | string[];
+  multiple: boolean;
+  runtimeValueLabels?: ValueLabelMap;
+  onChange: (value: string | string[]) => void;
+  onValueLabelsChange: (labels: ValueLabelMap) => void;
+}
+
+function ReferenceValuePicker({
+  id,
+  field,
+  value,
+  multiple,
+  runtimeValueLabels,
+  onChange,
+  onValueLabelsChange,
+}: ReferenceValuePickerProps) {
+  const selectedValues = useMemo(() => (
+    Array.isArray(value) ? value.map(String) : value ? [String(value)] : []
+  ), [value]);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [options, setOptions] = useState<ReferenceOption[]>([]);
+  const selectedKey = selectedValues.join('\u0001');
+  const mergedLabels = useMemo<ValueLabelMap>(() => ({
+    ...(field.valueLabels ?? {}),
+    ...(runtimeValueLabels ?? {}),
+    ...mergeLabelsFromOptions(options),
+  }), [field.valueLabels, options, runtimeValueLabels]);
+
+  const rememberOptions = (nextOptions: ReferenceOption[]) => {
+    const labels = mergeLabelsFromOptions(nextOptions);
+    if (Object.keys(labels).length > 0) {
+      onValueLabelsChange(labels);
+    }
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoading(true);
+    loadReferenceOptions(field, query)
+      .then((loaded) => {
+        if (cancelled) return;
+        setOptions(loaded);
+        rememberOptions(loaded);
+      })
+      .catch(() => {
+        if (!cancelled) setOptions([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [field, open, query]);
+
+  useEffect(() => {
+    const missingValues = selectedValues.filter((item) => !mergedLabels[item]);
+    if (missingValues.length === 0) return;
+    let cancelled = false;
+    Promise.all(missingValues.map((item) => resolveReferenceOption(field, item)))
+      .then((resolved) => {
+        if (cancelled) return;
+        const labels = mergeLabelsFromOptions(
+          resolved.filter((item): item is ReferenceOption => item !== null),
+        );
+        if (Object.keys(labels).length > 0) {
+          onValueLabelsChange(labels);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [field, mergedLabels, onValueLabelsChange, selectedKey, selectedValues]);
+
+  const labelOf = (item: string) => mergedLabels[item] ?? item;
+  const selectedSet = new Set(selectedValues);
+  const targetLabel = referenceTargetLabel(field);
+
+  const commit = (option: ReferenceOption) => {
+    if (option.disabled) return;
+    onValueLabelsChange({ [option.value]: option.label });
+    if (multiple) {
+      const next = selectedSet.has(option.value)
+        ? selectedValues.filter((item) => item !== option.value)
+        : [...selectedValues, option.value];
+      onChange(next);
+      return;
+    }
+    onChange(option.value);
+    setOpen(false);
+  };
+
+  const remove = (target: string) => {
+    const next = selectedValues.filter((item) => item !== target);
+    onChange(multiple ? next : '');
+  };
+
+  return (
+    <div className="cb-reference-picker" data-testid={`reference-value-picker-${id}`}>
+      <div className="cb-reference-control">
+        <button
+          type="button"
+          aria-label={`value-${id}`}
+          data-testid={`reference-value-trigger-${id}`}
+          className="cb-reference-trigger"
+          onClick={() => setOpen((next) => !next)}
+        >
+          <span className="cb-reference-icon" aria-hidden="true">
+            {isUserReference(field) ? <UserRound size={14} /> : <Database size={14} />}
+          </span>
+          <span className="cb-reference-values">
+            {selectedValues.length > 0 ? selectedValues.map(labelOf).join('、') : `选择${targetLabel}`}
+          </span>
+        </button>
+        {selectedValues.length > 0 && (
+          <button
+            type="button"
+            className="cb-reference-clear"
+            aria-label={`clear-value-${id}`}
+            onClick={() => onChange(multiple ? [] : '')}
+          >
+            <X size={12} />
+          </button>
+        )}
+      </div>
+
+      {selectedValues.length > 0 && multiple && (
+        <div className="cb-reference-chips" data-testid={`reference-value-selected-${id}`}>
+          {selectedValues.map((item) => (
+            <span key={item} className="cb-reference-chip">
+              {labelOf(item)}
+              <button type="button" aria-label={`remove-value-${id}-${item}`} onClick={() => remove(item)}>
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="cb-reference-menu" data-testid={`reference-value-menu-${id}`}>
+          <label className="cb-reference-search">
+            <Search size={14} aria-hidden="true" />
+            <input
+              aria-label={`reference-search-${id}`}
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={`搜索${targetLabel}`}
+            />
+          </label>
+          <div className="cb-reference-meta" data-testid={`reference-value-meta-${id}`}>
+            {targetLabel}
+            {field.reference?.valueField ? ` · ${field.reference.valueField}` : ''}
+            {field.reference?.displayField ? ` / ${field.reference.displayField}` : ''}
+          </div>
+          <div className="cb-reference-options">
+            {loading ? (
+              <div className="cb-reference-empty">加载中...</div>
+            ) : options.length === 0 ? (
+              <div className="cb-reference-empty">没有匹配项</div>
+            ) : options.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                disabled={option.disabled}
+                data-testid={`reference-value-option-${id}-${option.value}`}
+                className="cb-reference-option"
+                aria-pressed={selectedSet.has(option.value)}
+                onClick={() => commit(option)}
+              >
+                <span>{option.label}</span>
+                {option.subtitle && <small>{option.subtitle}</small>}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function replaceChild(children: ConditionNode[], index: number, next: ConditionNode): ConditionNode[] {
   return children.map((child, childIndex) => (childIndex === index ? next : child));
 }
@@ -172,6 +517,8 @@ interface CompareEditorProps {
   idPath: number[];
   fields: FieldOption[];
   fieldByKey: Map<string, FieldOption>;
+  runtimeValueLabels: Record<string, ValueLabelMap>;
+  rememberValueLabels: (fieldKey: string, labels: ValueLabelMap) => void;
   updateRow: (next: CompareNode) => void;
   deleteRow: () => void;
 }
@@ -181,6 +528,8 @@ function CompareEditor({
   idPath,
   fields,
   fieldByKey,
+  runtimeValueLabels,
+  rememberValueLabels,
   updateRow,
   deleteRow,
 }: CompareEditorProps) {
@@ -196,6 +545,7 @@ function CompareEditor({
   const groupedFields = useMemo(() => groupFields(selectableFields), [selectableFields]);
   const showValue = !UNARY.has(row.operator);
   const id = idPath.join('-');
+  const rowValueLabels = runtimeValueLabels[curKey];
 
   const onFieldChange = (key: string) => {
     const f = fieldByKey.get(key);
@@ -260,7 +610,7 @@ function CompareEditor({
             >
               {fieldOpt.options.map((o) => (
                 <option key={o} value={o}>
-                  {optionLabel(fieldOpt, o)}
+                  {optionLabel(fieldOpt, o, rowValueLabels)}
                 </option>
               ))}
             </select>
@@ -273,11 +623,23 @@ function CompareEditor({
               <option value="">—</option>
               {fieldOpt.options.map((o) => (
                 <option key={o} value={o}>
-                  {optionLabel(fieldOpt, o)}
+                  {optionLabel(fieldOpt, o, rowValueLabels)}
                 </option>
               ))}
             </select>
           )
+        ) : isReferenceValueField(fieldOpt) ? (
+          <ReferenceValuePicker
+            id={id}
+            field={fieldOpt}
+            value={COLLECTION_OPERATORS.has(row.operator)
+              ? literalArrayValue(row)
+              : literalScalarValue(row)}
+            multiple={COLLECTION_OPERATORS.has(row.operator)}
+            runtimeValueLabels={rowValueLabels}
+            onChange={onValueChange}
+            onValueLabelsChange={(labels) => rememberValueLabels(curKey, labels)}
+          />
         ) : (
           <input
             aria-label={`value-${id}`}
@@ -303,6 +665,8 @@ interface NodeEditorProps {
   idPath: number[];
   fields: FieldOption[];
   fieldByKey: Map<string, FieldOption>;
+  runtimeValueLabels: Record<string, ValueLabelMap>;
+  rememberValueLabels: (fieldKey: string, labels: ValueLabelMap) => void;
   updateNode: (next: ConditionNode) => void;
   deleteNode?: () => void;
 }
@@ -312,6 +676,8 @@ function NodeEditor({
   idPath,
   fields,
   fieldByKey,
+  runtimeValueLabels,
+  rememberValueLabels,
   updateNode,
   deleteNode,
 }: NodeEditorProps) {
@@ -322,6 +688,8 @@ function NodeEditor({
         idPath={idPath}
         fields={fields}
         fieldByKey={fieldByKey}
+        runtimeValueLabels={runtimeValueLabels}
+        rememberValueLabels={rememberValueLabels}
         updateRow={updateNode}
         deleteRow={deleteNode ?? (() => undefined)}
       />
@@ -345,6 +713,8 @@ function NodeEditor({
           idPath={[...idPath, 0]}
           fields={fields}
           fieldByKey={fieldByKey}
+          runtimeValueLabels={runtimeValueLabels}
+          rememberValueLabels={rememberValueLabels}
           updateNode={(nextChild) => updateNode({ ...node, child: nextChild })}
         />
       </div>
@@ -357,6 +727,8 @@ function NodeEditor({
       idPath={idPath}
       fields={fields}
       fieldByKey={fieldByKey}
+      runtimeValueLabels={runtimeValueLabels}
+      rememberValueLabels={rememberValueLabels}
       updateNode={updateNode}
       deleteNode={deleteNode}
     />
@@ -368,6 +740,8 @@ interface GroupEditorProps {
   idPath: number[];
   fields: FieldOption[];
   fieldByKey: Map<string, FieldOption>;
+  runtimeValueLabels: Record<string, ValueLabelMap>;
+  rememberValueLabels: (fieldKey: string, labels: ValueLabelMap) => void;
   updateNode: (next: GroupNode) => void;
   deleteNode?: () => void;
 }
@@ -377,6 +751,8 @@ function GroupEditor({
   idPath,
   fields,
   fieldByKey,
+  runtimeValueLabels,
+  rememberValueLabels,
   updateNode,
   deleteNode,
 }: GroupEditorProps) {
@@ -436,6 +812,8 @@ function GroupEditor({
           idPath={[...idPath, childIndex]}
           fields={fields}
           fieldByKey={fieldByKey}
+          runtimeValueLabels={runtimeValueLabels}
+          rememberValueLabels={rememberValueLabels}
           updateNode={(nextChild) =>
             updateNode({ ...node, children: replaceChild(node.children, childIndex, nextChild) })
           }
@@ -480,12 +858,24 @@ function GroupEditor({
 
 export function ConditionBuilder({ value, fields, onChange }: ConditionBuilderProps) {
   const [fieldQuery, setFieldQuery] = useState('');
+  const [runtimeValueLabels, setRuntimeValueLabels] = useState<Record<string, ValueLabelMap>>({});
   const filteredFields = useMemo(() => filterFields(fields, fieldQuery), [fieldQuery, fields]);
   const fieldByKey = useMemo(() => {
     const m = new Map<string, FieldOption>();
     fields.forEach((f) => m.set(fieldKey(f.scope, f.path), f));
     return m;
   }, [fields]);
+
+  const rememberValueLabels = (key: string, labels: ValueLabelMap) => {
+    if (Object.keys(labels).length === 0) return;
+    setRuntimeValueLabels((current) => ({
+      ...current,
+      [key]: {
+        ...(current[key] ?? {}),
+        ...labels,
+      },
+    }));
+  };
 
   const labelOf = (o: PathOperand): string =>
     fieldByKey.get(fieldKey(o.scope, o.path))?.label ?? `${o.scope}.${o.path}`;
@@ -495,9 +885,11 @@ export function ConditionBuilder({ value, fields, onChange }: ConditionBuilderPr
     if (operand.type === 'path') return labelOf(operand);
     if (operand.type === 'literal') {
       if (Array.isArray(operand.value)) {
-        return operand.value.map((item) => optionLabel(leftField, item)).join('、');
+        const labels = leftField ? runtimeValueLabels[fieldOptionKey(leftField)] : undefined;
+        return operand.value.map((item) => optionLabel(leftField, item, labels)).join('、');
       }
-      return optionLabel(leftField, operand.value);
+      const labels = leftField ? runtimeValueLabels[fieldOptionKey(leftField)] : undefined;
+      return optionLabel(leftField, operand.value, labels);
     }
     return `${operand.name}(...)`;
   };
@@ -546,6 +938,8 @@ export function ConditionBuilder({ value, fields, onChange }: ConditionBuilderPr
         idPath={[]}
         fields={filteredFields}
         fieldByKey={fieldByKey}
+        runtimeValueLabels={runtimeValueLabels}
+        rememberValueLabels={rememberValueLabels}
         updateNode={onChange}
       />
 
