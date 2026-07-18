@@ -16,6 +16,7 @@ import { DecisionTableEditor } from './DecisionTableEditor'
 import { group, type GroupNode, type Operator, type Scope } from '../ast/conditionAst'
 import { useSmartText } from '~/utils/i18n'
 import { dataTypeLabel, scenarioScopeLabel, scopeLabel } from './displayLabels'
+import { downloadDmnXml } from './dmnDownload'
 
 type StrategyScenarioKey = 'SLA' | 'BPM' | 'AUTOMATION' | 'PERMISSION' | 'EVENT_POLICY'
 type StrategyWorkspacePanelKey = 'rule' | 'facts' | 'dmn' | 'review'
@@ -858,6 +859,9 @@ export function StrategyStudioWorkbench({
         target.decisionCode,
       )
       applyDmnResult(target.key, result, 'DMN XML 已导出', false)
+      if (result.valid && result.dmnXml) {
+        downloadDmnXml(target.ruleCode, result.dmnXml)
+      }
     } catch (error) {
       setTableDmnErrors((current) => ({ ...current, [target.key]: errorMessage(error) }))
       setTableDmnStatuses((current) => ({ ...current, [target.key]: null }))

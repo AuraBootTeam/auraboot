@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:aura="https://auraboot.io/schema/dmn/metadata" namespace="https://auraboot/dmn/decision-table/complaint_sla_deadline" name="wd_manager_approve_sla" id="complaint_sla_deadline">
+  <extensionElements>
+    <aura:decisionTableMetadata>
+      <aura:valueLabels holder="input" id="record_data_wd_req_type">
+        <aura:valueLabel value="sick" label="病假"/>
+        <aura:valueLabel value="annual" label="年假"/>
+        <aura:valueLabel value="personal" label="事假"/>
+        <aura:valueLabel value="comp" label="调休"/>
+      </aura:valueLabels>
+      <aura:valueLabels holder="input" id="process_nodeId">
+        <aura:valueLabel value="gw_manager" label="主管审批网关"/>
+        <aura:valueLabel value="task_hr_approve" label="HR 审批节点"/>
+        <aura:valueLabel value="task_manager_approve" label="主管审批节点"/>
+      </aura:valueLabels>
+    </aura:decisionTableMetadata>
+  </extensionElements>
+  <inputData id="inputData_record_data_wd_req_type" name="wd_req_type"><variable name="wd_req_type" typeRef="string"/></inputData>
+  <inputData id="inputData_sla_deadlineMinutes" name="deadlineMinutes"><variable name="deadlineMinutes" typeRef="number"/></inputData>
+  <inputData id="inputData_sla_warningBeforeMinutes" name="warningBeforeMinutes"><variable name="warningBeforeMinutes" typeRef="number"/></inputData>
+  <inputData id="inputData_process_nodeId" name="nodeId"><variable name="nodeId" typeRef="string"/></inputData>
+  <decision id="decision_complaint_sla_deadline" name="wd_manager_approve_sla">
+    <variable name="wd_manager_approve_sla" typeRef="context"/>
+    <informationRequirement><requiredInput href="#inputData_record_data_wd_req_type"/></informationRequirement>
+    <informationRequirement><requiredInput href="#inputData_sla_deadlineMinutes"/></informationRequirement>
+    <informationRequirement><requiredInput href="#inputData_sla_warningBeforeMinutes"/></informationRequirement>
+    <informationRequirement><requiredInput href="#inputData_process_nodeId"/></informationRequirement>
+    <decisionTable id="dt_complaint_sla_deadline" hitPolicy="FIRST">
+      <input id="input_record_data_wd_req_type" label="请假类型">
+        <inputExpression id="inputExpr_record_data_wd_req_type" typeRef="string"><text>wd_req_type</text></inputExpression>
+        <inputValues><text>&quot;annual&quot;, &quot;sick&quot;, &quot;personal&quot;, &quot;comp&quot;</text></inputValues>
+      </input>
+      <input id="input_sla_deadlineMinutes" label="截止分钟">
+        <inputExpression id="inputExpr_sla_deadlineMinutes" typeRef="number"><text>deadlineMinutes</text></inputExpression>
+      </input>
+      <input id="input_sla_warningBeforeMinutes" label="提前提醒">
+        <inputExpression id="inputExpr_sla_warningBeforeMinutes" typeRef="number"><text>warningBeforeMinutes</text></inputExpression>
+      </input>
+      <input id="input_process_nodeId" label="流程节点">
+        <inputExpression id="inputExpr_process_nodeId" typeRef="string"><text>nodeId</text></inputExpression>
+        <inputValues><text>&quot;task_manager_approve&quot;, &quot;task_hr_approve&quot;, &quot;gw_manager&quot;</text></inputValues>
+      </input>
+      <output id="output_route" name="route" label="Route" typeRef="string">
+        <outputValues><text>&quot;escalate&quot;, &quot;notify&quot;, &quot;fallback&quot;</text></outputValues>
+      </output>
+      <output id="output_actions" name="actions" label="Actions" typeRef="string">
+        <outputValues><text>&quot;NOTIFY&quot;, &quot;WRITE_AUDIT&quot;</text></outputValues>
+      </output>
+      <rule id="row_1_1784345638357">
+        <inputEntry id="inputEntry_row_1_1784345638357_record_data_wd_req_type"><text>&quot;annual&quot;, &quot;sick&quot;</text></inputEntry>
+        <inputEntry id="inputEntry_row_1_1784345638357_sla_deadlineMinutes"><text>-</text></inputEntry>
+        <inputEntry id="inputEntry_row_1_1784345638357_sla_warningBeforeMinutes"><text>-</text></inputEntry>
+        <inputEntry id="inputEntry_row_1_1784345638357_process_nodeId"><text>-</text></inputEntry>
+        <outputEntry id="outputEntry_row_1_1784345638357_route"><text>null</text></outputEntry>
+        <outputEntry id="outputEntry_row_1_1784345638357_actions"><text>null</text></outputEntry>
+      </rule>
+    </decisionTable>
+  </decision>
+</definitions>
