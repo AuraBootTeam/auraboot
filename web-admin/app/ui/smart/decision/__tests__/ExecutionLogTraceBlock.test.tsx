@@ -58,6 +58,19 @@ const recentLog = {
           approved: '已通过',
         },
       },
+      'record.data.wd_req_type': {
+        scope: 'record',
+        path: 'data.wd_req_type',
+        factKey: 'record.data.wd_req_type',
+        label: '请假类型',
+        dataType: 'enum',
+        modelCode: 'wd_leave_request',
+        dictCode: 'wd_leave_type',
+        valueLabels: {
+          annual: '年假',
+          sick: '病假',
+        },
+      },
     },
     virtualSources: [
       {
@@ -399,6 +412,31 @@ describe('ExecutionLogTraceBlock', () => {
     expect(output).not.toHaveTextContent('annual');
     expect(output).not.toHaveTextContent('review_status');
     expect(output).not.toHaveTextContent('pending');
+  });
+
+  it('shows low-code fact metadata snapshots in the trace drawer', async () => {
+    render(
+      <MemoryRouter initialEntries={['/p/decisionops_execution_logs?traceId=trace-1']}>
+        <ExecutionLogTraceBlock block={{ props: { mode: 'list', pageSize: 50 } }} />
+      </MemoryRouter>,
+    );
+
+    await screen.findByTestId('elta-row-log-1');
+    fireEvent.click(screen.getByTestId('elta-open-trace-log-1'));
+
+    const facts = await screen.findByTestId('elta-fact-metadata-log-1');
+    expect(facts).toHaveTextContent('事实快照');
+    expect(facts).toHaveTextContent('审批状态');
+    expect(facts).toHaveTextContent('record.data.review_status');
+    expect(facts).toHaveTextContent('pending');
+    expect(facts).toHaveTextContent('待审批');
+    expect(facts).toHaveTextContent('请假类型');
+    expect(facts).toHaveTextContent('record.data.wd_req_type');
+    expect(facts).toHaveTextContent('模型 wd_leave_request');
+    expect(facts).toHaveTextContent('字典 wd_leave_type');
+    expect(facts).toHaveTextContent('annual');
+    expect(facts).toHaveTextContent('年假');
+    expect(facts).not.toHaveTextContent('tenant_id');
   });
 
   it('shows virtual source trace evidence in the trace drawer', async () => {

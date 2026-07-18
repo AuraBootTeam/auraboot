@@ -98,4 +98,44 @@ describe('ExecutionLogViewer', () => {
     expect(screen.getByTestId('elv-unknown-reasons')).toHaveTextContent('Missing record.data.managerLevel');
     expect(drawer).not.toHaveTextContent('tenant_id');
   });
+
+  it('shows low-code fact metadata labels and dictionary values in the detail drawer', () => {
+    render(<ExecutionLogViewer logs={[
+      {
+        traceId: 'trace-meta',
+        decisionCode: 'leave_type_gate',
+        status: 'SUCCESS',
+        traceSnapshot: {
+          factMetadata: {
+            wd_req_type: {
+              label: '请假类型',
+              valueLabels: {
+                annual: '年假',
+              },
+            },
+            'record.data.wd_req_type': {
+              scope: 'record',
+              path: 'data.wd_req_type',
+              factKey: 'record.data.wd_req_type',
+              label: '请假类型',
+              dataType: 'enum',
+              modelCode: 'wd_leave_request',
+              dictCode: 'wd_leave_type',
+            },
+          },
+        },
+      },
+    ]} />);
+
+    fireEvent.click(screen.getByTestId('elv-open-trace-meta'));
+    const facts = screen.getByTestId('elv-fact-metadata');
+    expect(facts).toHaveTextContent('事实快照');
+    expect(facts).toHaveTextContent('请假类型');
+    expect(facts).toHaveTextContent('record.data.wd_req_type');
+    expect(facts).toHaveTextContent('模型 wd_leave_request');
+    expect(facts).toHaveTextContent('字典 wd_leave_type');
+    expect(facts).toHaveTextContent('annual');
+    expect(facts).toHaveTextContent('年假');
+    expect(facts.querySelectorAll('.elv-fact-card')).toHaveLength(1);
+  });
 });

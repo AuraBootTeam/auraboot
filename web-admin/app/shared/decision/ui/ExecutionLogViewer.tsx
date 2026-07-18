@@ -37,8 +37,16 @@ export interface ExecVirtualSourceTrace {
 }
 
 export interface ExecTraceFactMetadata {
+  scope?: string;
+  path?: string;
+  factKey?: string;
   label?: string;
+  dataType?: string;
+  modelCode?: string;
+  sourceRef?: string;
+  dictCode?: string;
   valueLabels?: Record<string, string>;
+  masked?: boolean;
 }
 
 export interface ExecTraceSnapshot {
@@ -91,6 +99,16 @@ function factMetadata(snapshot: ExecLogEntry['traceSnapshot']): Record<string, E
   ) as Record<string, ExecTraceFactMetadata>;
 }
 
+type FactMetadataRow = {
+  key: string;
+  aliases: Set<string>;
+  metadata: ExecTraceFactMetadata;
+};
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
 function factAliases(key: string): string[] {
   const cleaned = key
     .split('.')
@@ -110,6 +128,103 @@ function factAliases(key: string): string[] {
     aliases.add(cleaned.slice('record.'.length));
   }
   return [...aliases];
+}
+
+function metadataAliases(key: string, metadata: ExecTraceFactMetadata): Set<string> {
+  const aliases = new Set<string>();
+  const add = (value?: string) => {
+    if (!value) return;
+    factAliases(value).forEach((alias) => aliases.add(alias));
+  };
+  add(key);
+  add(stringValue(metadata.factKey));
+  add(stringValue(metadata.path));
+  const scope = stringValue(metadata.scope);
+  const path = stringValue(metadata.path);
+  if (scope && path) add(`${scope}.${path}`);
+  if (!aliases.size) aliases.add(key);
+  return aliases;
+}
+
+function mergeMetadata(
+  current: ExecTraceFactMetadata,
+  next: ExecTraceFactMetadata,
+): ExecTraceFactMetadata {
+  return {
+    ...current,
+    ...next,
+    label: stringValue(current.label) ?? stringValue(next.label),
+    factKey: stringValue(current.factKey) ?? stringValue(next.factKey),
+    path: stringValue(current.path) ?? stringValue(next.path),
+    scope: stringValue(current.scope) ?? stringValue(next.scope),
+    modelCode: stringValue(current.modelCode) ?? stringValue(next.modelCode),
+    sourceRef: stringValue(current.sourceRef) ?? stringValue(next.sourceRef),
+    dictCode: stringValue(current.dictCode) ?? stringValue(next.dictCode),
+    dataType: stringValue(current.dataType) ?? stringValue(next.dataType),
+    valueLabels: {
+      ...(next.valueLabels ?? {}),
+      ...(current.valueLabels ?? {}),
+    },
+  };
+}
+
+function metadataRows(snapshot: ExecLogEntry['traceSnapshot']): FactMetadataRow[] {
+  const rows: FactMetadataRow[] = [];
+  const entries = Object.entries(factMetadata(snapshot)).sort(([left], [right]) => {
+    const score = (key: string) => (key.includes('.') ? 0 : 1);
+    return score(left) - score(right) || left.localeCompare(right);
+  });
+  for (const [key, metadata] of entries) {
+    const aliases = metadataAliases(key, metadata);
+    const existing = rows.find((row) => [...aliases].some((alias) => row.aliases.has(alias)));
+    if (existing) {
+      existing.aliases = new Set([...existing.aliases, ...aliases]);
+      existing.metadata = mergeMetadata(existing.metadata, metadata);
+      if (!existing.key.includes('.') && key.includes('.')) existing.key = key;
+    } else {
+      rows.push({ key, aliases, metadata });
+    }
+  }
+  return rows.sort((left, right) =>
+    metadataLabel(left).localeCompare(metadataLabel(right), 'zh-CN'),
+  );
+}
+
+function metadataLabel(row: FactMetadataRow): string {
+  return stringValue(row.metadata.label) ?? row.key;
+}
+
+function metadataPath(row: FactMetadataRow): string {
+  const factKey = stringValue(row.metadata.factKey);
+  if (factKey) return factKey;
+  const scope = stringValue(row.metadata.scope);
+  const path = stringValue(row.metadata.path);
+  if (scope && path) return `${scope}.${path}`;
+  return path ?? row.key;
+}
+
+function metadataBadges(row: FactMetadataRow): string[] {
+  return [
+    row.metadata.modelCode ? `模型 ${row.metadata.modelCode}` : '',
+    row.metadata.dataType ? `类型 ${row.metadata.dataType}` : '',
+    row.metadata.dictCode ? `字典 ${row.metadata.dictCode}` : '',
+    row.metadata.sourceRef ? `来源 ${row.metadata.sourceRef}` : '',
+    row.metadata.masked ? '已脱敏' : '',
+  ].filter((item) => item.trim().length > 0);
+}
+
+function metadataValueLabels(row: FactMetadataRow): Array<[string, string]> {
+  const labels = row.metadata.valueLabels;
+  if (!labels || typeof labels !== 'object' || Array.isArray(labels)) return [];
+  return Object.entries(labels)
+    .filter(
+      ([value, label]) =>
+        typeof value === 'string' &&
+        value.trim().length > 0 &&
+        typeof label === 'string' &&
+        label.trim().length > 0,
+    )
+    .sort(([left], [right]) => left.localeCompare(right));
 }
 
 function metadataForKey(
@@ -266,6 +381,32 @@ export function ExecutionLogViewer({ logs, initialStatus = 'ALL' }: ExecutionLog
                   <li key={reason}>{reason}</li>
                 ))}
               </ul>
+            </section>
+          ) : null}
+          {metadataRows(selectedLog.traceSnapshot).length ? (
+            <section className="elv-trace-section" data-testid="elv-fact-metadata">
+              <h5>事实快照</h5>
+              <div className="elv-fact-list">
+                {metadataRows(selectedLog.traceSnapshot).map((row) => (
+                  <article className="elv-fact-card" key={metadataPath(row)}>
+                    <strong>{metadataLabel(row)}</strong>
+                    <span className="mono">{metadataPath(row)}</span>
+                    {metadataBadges(row).length ? (
+                      <small>{metadataBadges(row).join(' / ')}</small>
+                    ) : null}
+                    {metadataValueLabels(row).length ? (
+                      <div>
+                        {metadataValueLabels(row).map(([value, label]) => (
+                          <span key={value}>
+                            <code>{value}</code>
+                            {label}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
             </section>
           ) : null}
         </aside>

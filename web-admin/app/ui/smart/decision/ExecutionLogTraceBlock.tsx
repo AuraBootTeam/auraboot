@@ -590,6 +590,77 @@ function factMetadataEntries(raw: unknown): Record<string, DecisionTraceFactMeta
   ) as Record<string, DecisionTraceFactMetadata>;
 }
 
+type FactMetadataRow = {
+  key: string;
+  aliases: Set<string>;
+  metadata: DecisionTraceFactMetadata;
+};
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+function factMetadataAliasSet(key: string, metadata: DecisionTraceFactMetadata): Set<string> {
+  const aliases = new Set<string>();
+  const add = (value?: string) => {
+    if (!value) return;
+    factKeyAliases(value).forEach((alias) => aliases.add(alias));
+  };
+  add(key);
+  add(nonEmptyString(metadata.factKey));
+  add(nonEmptyString(metadata.path));
+  const scope = nonEmptyString(metadata.scope);
+  const path = nonEmptyString(metadata.path);
+  if (scope && path) add(`${scope}.${path}`);
+  if (!aliases.size) aliases.add(key);
+  return aliases;
+}
+
+function mergeFactMetadata(
+  current: DecisionTraceFactMetadata,
+  next: DecisionTraceFactMetadata,
+): DecisionTraceFactMetadata {
+  return {
+    ...current,
+    ...next,
+    label: nonEmptyString(current.label) ?? nonEmptyString(next.label),
+    factKey: nonEmptyString(current.factKey) ?? nonEmptyString(next.factKey),
+    path: nonEmptyString(current.path) ?? nonEmptyString(next.path),
+    scope: nonEmptyString(current.scope) ?? nonEmptyString(next.scope),
+    modelCode: nonEmptyString(current.modelCode) ?? nonEmptyString(next.modelCode),
+    sourceType: nonEmptyString(current.sourceType) ?? nonEmptyString(next.sourceType),
+    sourceRef: nonEmptyString(current.sourceRef) ?? nonEmptyString(next.sourceRef),
+    dictCode: nonEmptyString(current.dictCode) ?? nonEmptyString(next.dictCode),
+    dataType: nonEmptyString(current.dataType) ?? nonEmptyString(next.dataType),
+    valueLabels: {
+      ...(next.valueLabels ?? {}),
+      ...(current.valueLabels ?? {}),
+    },
+  };
+}
+
+function factMetadataRows(raw: unknown): FactMetadataRow[] {
+  const entries = Object.entries(factMetadataEntries(raw)).sort(([left], [right]) => {
+    const score = (key: string) => (key.includes('.') ? 0 : 1);
+    return score(left) - score(right) || left.localeCompare(right);
+  });
+  const rows: FactMetadataRow[] = [];
+  for (const [key, metadata] of entries) {
+    const aliases = factMetadataAliasSet(key, metadata);
+    const existing = rows.find((row) => [...aliases].some((alias) => row.aliases.has(alias)));
+    if (existing) {
+      existing.aliases = new Set([...existing.aliases, ...aliases]);
+      existing.metadata = mergeFactMetadata(existing.metadata, metadata);
+      if (!existing.key.includes('.') && key.includes('.')) existing.key = key;
+    } else {
+      rows.push({ key, aliases, metadata });
+    }
+  }
+  return rows.sort((left, right) =>
+    factMetadataLabel(left).localeCompare(factMetadataLabel(right), 'zh-CN'),
+  );
+}
+
 function factMetadataForKey(
   key: string,
   traceSnapshot?: unknown,
@@ -705,6 +776,44 @@ function payloadLabel(key: string, traceSnapshot?: unknown): string {
     return metadataLabel;
   }
   return ACTION_PAYLOAD_LABELS[key] ?? key;
+}
+
+function factMetadataLabel(row: FactMetadataRow): string {
+  return nonEmptyString(row.metadata.label) ?? row.key;
+}
+
+function factMetadataPath(row: FactMetadataRow): string {
+  const metadata = row.metadata;
+  const factKey = nonEmptyString(metadata.factKey);
+  if (factKey) return factKey;
+  const scope = nonEmptyString(metadata.scope);
+  const path = nonEmptyString(metadata.path);
+  if (scope && path) return `${scope}.${path}`;
+  return path ?? row.key;
+}
+
+function factMetadataBadges(row: FactMetadataRow): string[] {
+  return [
+    row.metadata.modelCode ? `模型 ${row.metadata.modelCode}` : '',
+    row.metadata.dataType ? `类型 ${row.metadata.dataType}` : '',
+    row.metadata.dictCode ? `字典 ${row.metadata.dictCode}` : '',
+    row.metadata.sourceRef ? `来源 ${row.metadata.sourceRef}` : '',
+    row.metadata.masked ? '已脱敏' : '',
+  ].filter((item) => item.trim().length > 0);
+}
+
+function factMetadataValueLabelEntries(row: FactMetadataRow): Array<[string, string]> {
+  const labels = row.metadata.valueLabels;
+  if (!labels || typeof labels !== 'object' || Array.isArray(labels)) return [];
+  return Object.entries(labels)
+    .filter(
+      ([value, label]) =>
+        typeof value === 'string' &&
+        value.trim().length > 0 &&
+        typeof label === 'string' &&
+        label.trim().length > 0,
+    )
+    .sort(([left], [right]) => left.localeCompare(right));
 }
 
 function actionRetryItems(action: EventPolicyActionLogRecord): string[] {
@@ -1376,6 +1485,41 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                   <div className="elta-chain-rules">
                     命中规则: {matchedRuleLabels(log.matchedRulesJson).join(', ') || '-'}
                   </div>
+                  {factMetadataRows(log.traceSnapshot).length ? (
+                    <section
+                      className="elta-output-snapshot elta-fact-metadata"
+                      data-testid={`elta-fact-metadata-${log.pid ?? index}`}
+                    >
+                      <h4>事实快照</h4>
+                      <div className="elta-fact-list">
+                        {factMetadataRows(log.traceSnapshot).map((row) => (
+                          <article className="elta-fact-card" key={factMetadataPath(row)}>
+                            <div className="elta-fact-card-head">
+                              <strong>{factMetadataLabel(row)}</strong>
+                              <span className="mono">{factMetadataPath(row)}</span>
+                            </div>
+                            {factMetadataBadges(row).length ? (
+                              <div className="elta-fact-badges">
+                                {factMetadataBadges(row).map((badge) => (
+                                  <span key={badge}>{badge}</span>
+                                ))}
+                              </div>
+                            ) : null}
+                            {factMetadataValueLabelEntries(row).length ? (
+                              <div className="elta-fact-values">
+                                {factMetadataValueLabelEntries(row).map(([value, label]) => (
+                                  <span key={value}>
+                                    <code>{value}</code>
+                                    {label}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                          </article>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
                   {outputSnapshotEntries(log.outputSnapshot).length ? (
                     <section
                       className="elta-output-snapshot"
