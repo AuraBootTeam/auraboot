@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { ConditionBuilder, type FieldOption } from '../ConditionBuilder';
 import { group, cmp, path, lit, type GroupNode } from '../../ast/conditionAst';
 
@@ -22,7 +22,16 @@ function Harness({ initial }: { initial: GroupNode }) {
 const oneHighPriority = (): GroupNode =>
   group('AND', [cmp(path('record', 'data.priority', 'enum'), 'EQ', lit('HIGH', 'enum'))]);
 
+const responseJson = (body: unknown): Response => ({
+  ok: true,
+  json: async () => body,
+}) as Response;
+
 describe('ConditionBuilder', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('renders rows + natural-language preview from value', () => {
     render(<Harness initial={oneHighPriority()} />);
     expect(screen.getByTestId('cb-row-0')).toBeInTheDocument();
@@ -115,6 +124,195 @@ describe('ConditionBuilder', () => {
     expect(preview).toHaveTextContent('年假');
     expect(preview).toHaveTextContent('病假');
     expect(preview).not.toHaveTextContent('annual');
+  });
+
+  it('resolves saved user reference ids into labels without changing the persisted raw value', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/admin/users/user-pid-1') {
+        return responseJson({
+          code: '0',
+          data: {
+            pid: 'user-pid-1',
+            displayName: '王经理',
+            email: 'manager@example.com',
+          },
+        });
+      }
+      return responseJson({ code: '0', data: [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <ConditionBuilder
+        value={group('AND', [
+          cmp(path('record', 'data.approverPid', 'user'), 'EQ', lit('user-pid-1', 'user')),
+        ])}
+        fields={[
+          {
+            scope: 'record',
+            path: 'data.approverPid',
+            label: '审批人',
+            dataType: 'user',
+            reference: {
+              targetEntity: 'sys_user',
+              valueField: 'pid',
+              displayField: 'displayName',
+            },
+          },
+        ]}
+        onChange={() => undefined}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('value-0')).toHaveTextContent('王经理');
+    });
+    expect(screen.getByTestId('cb-preview')).toHaveTextContent('王经理');
+    expect(screen.getByTestId('cb-preview')).not.toHaveTextContent('user-pid-1');
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/users/user-pid-1', { credentials: 'same-origin' });
+  });
+
+  it('uses the user picker API to author user reference values while saving raw ids', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.startsWith('/api/admin/users/search')) {
+        return responseJson({
+          code: '0',
+          data: [
+            {
+              pid: 'user-pid-1',
+              displayName: '王经理',
+              email: 'manager@example.com',
+              department: '采购部',
+            },
+          ],
+        });
+      }
+      return responseJson({ code: '0', data: [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    function UserReferenceHarness() {
+      const [v, setV] = useState<GroupNode>(
+        group('AND', [
+          cmp(path('record', 'data.approverPid', 'user'), 'EQ', lit('', 'user')),
+        ]),
+      );
+      return (
+        <>
+          <ConditionBuilder
+            value={v}
+            fields={[
+              {
+                scope: 'record',
+                path: 'data.approverPid',
+                label: '审批人',
+                dataType: 'user',
+                reference: {
+                  targetEntity: 'sys_user',
+                  valueField: 'pid',
+                  displayField: 'displayName',
+                },
+              },
+            ]}
+            onChange={setV}
+          />
+          <pre data-testid="dump">{JSON.stringify(v)}</pre>
+        </>
+      );
+    }
+
+    render(<UserReferenceHarness />);
+    fireEvent.click(screen.getByTestId('reference-value-trigger-0'));
+
+    const option = await screen.findByTestId('reference-value-option-0-user-pid-1');
+    expect(option).toHaveTextContent('王经理');
+    expect(option).toHaveTextContent('manager@example.com · 采购部');
+    expect(screen.getByTestId('reference-value-meta-0')).toHaveTextContent('用户 · pid / displayName');
+    fireEvent.click(option);
+
+    const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as GroupNode;
+    const first = dump.children[0];
+    expect(first.type).toBe('compare');
+    if (first.type !== 'compare') return;
+    expect(first.right && 'value' in first.right ? first.right.value : null).toBe('user-pid-1');
+    expect(screen.getByLabelText('value-0')).toHaveTextContent('王经理');
+    expect(screen.getByTestId('cb-preview')).toHaveTextContent('王经理');
+    expect(screen.getByTestId('cb-preview')).not.toHaveTextContent('user-pid-1');
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/users/search?keyword=&size=20', {
+      credentials: 'same-origin',
+    });
+  });
+
+  it('uses dynamic field-options for generic reference fields and keeps saved values as raw ids', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === '/api/dynamic/wd_leave_request/field-options/supplierPid') {
+        return responseJson({
+          code: '0',
+          data: [
+            {
+              value: 'supplier-1',
+              label: '上海供应商',
+            },
+          ],
+        });
+      }
+      return responseJson({ code: '0', data: [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    function GenericReferenceHarness() {
+      const [v, setV] = useState<GroupNode>(
+        group('AND', [
+          cmp(path('record', 'data.supplierPid', 'object'), 'EQ', lit('', 'object')),
+        ]),
+      );
+      return (
+        <>
+          <ConditionBuilder
+            value={v}
+            fields={[
+              {
+                scope: 'record',
+                path: 'data.supplierPid',
+                label: '供应商',
+                dataType: 'object',
+                modelCode: 'wd_leave_request',
+                modelName: '请假申请',
+                reference: {
+                  targetEntity: 'sc_supplier',
+                  valueField: 'pid',
+                  displayField: 'name',
+                },
+              },
+            ]}
+            onChange={setV}
+          />
+          <pre data-testid="dump">{JSON.stringify(v)}</pre>
+        </>
+      );
+    }
+
+    render(<GenericReferenceHarness />);
+    fireEvent.click(screen.getByTestId('reference-value-trigger-0'));
+
+    const option = await screen.findByTestId('reference-value-option-0-supplier-1');
+    expect(option).toHaveTextContent('上海供应商');
+    expect(screen.getByTestId('reference-value-meta-0')).toHaveTextContent('sc_supplier · pid / name');
+    fireEvent.click(option);
+
+    const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as GroupNode;
+    const first = dump.children[0];
+    expect(first.type).toBe('compare');
+    if (first.type !== 'compare') return;
+    expect(first.right && 'value' in first.right ? first.right.value : null).toBe('supplier-1');
+    expect(screen.getByLabelText('value-0')).toHaveTextContent('上海供应商');
+    expect(screen.getByTestId('cb-preview')).toHaveTextContent('上海供应商');
+    expect(screen.getByTestId('cb-preview')).not.toHaveTextContent('supplier-1');
+    expect(fetchMock).toHaveBeenCalledWith('/api/dynamic/wd_leave_request/field-options/supplierPid', {
+      credentials: 'same-origin',
+    });
   });
 
   it('adds and deletes condition rows', () => {
