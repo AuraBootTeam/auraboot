@@ -18,9 +18,14 @@ import com.auraboot.framework.decision.service.DecisionEvaluationService;
 import com.auraboot.framework.decision.service.DecisionRolloutService;
 import com.auraboot.framework.decision.service.DecisionVersionService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.meta.dto.DictCreateRequest;
+import com.auraboot.framework.meta.dto.DictDTO;
 import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.auraboot.framework.meta.dto.MetaFieldDTO;
 import com.auraboot.framework.meta.dto.ModelCapabilities;
 import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.service.DictService;
+import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -59,6 +64,10 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
     private JdbcTemplate jdbcTemplate;
     @Autowired
     private MetaModelService metaModelService;
+    @Autowired
+    private MetaFieldService metaFieldService;
+    @Autowired
+    private DictService dictService;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -82,6 +91,15 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
               "operator": "GT",
               "right": { "type": "literal", "value": 80, "dataType": "integer" } }
             """);
+    }
+
+    private JsonNode statusEqAst(String fieldCode) throws Exception {
+        return mapper.readTree(("""
+            { "type": "compare",
+              "left": { "type": "path", "scope": "record", "path": "data.%s", "dataType": "string" },
+              "operator": "EQ",
+              "right": { "type": "literal", "value": "pending", "dataType": "string" } }
+            """).formatted(fieldCode));
     }
 
     private String createPublishedDecision(String code) throws Exception {
@@ -223,6 +241,42 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                 "select count(*) from ab_drt_log where trace_id = ? and status = 'UNKNOWN'",
                 Integer.class, unknown.traceId());
         assertThat(unknownLogRows).isEqualTo(1);
+    }
+
+    @Test
+    void evaluate_persistsFactMetadataSnapshotForDictBackedModelFields() throws Exception {
+        String suffix = Long.toString(Math.abs(System.nanoTime()), 36);
+        String modelCode = "drt_trace_meta_" + suffix;
+        String fieldCode = "review_status_" + suffix;
+        String dictCode = "drt_trace_status_" + suffix;
+        createStatusDict(dictCode);
+        saveDictBackedModel(modelCode, fieldCode, dictCode);
+
+        String code = "it_trace_fact_meta_" + suffix;
+        createPublishedDecision(code, statusEqAst(fieldCode), "record.data." + fieldCode);
+
+        DrtEvaluateRequest req = new DrtEvaluateRequest();
+        req.setDecisionCode(code);
+        req.setBinding(VersionBinding.LATEST);
+        req.setCallerType("API");
+        req.setCallerRef("trace-fact-metadata-it");
+        req.setCorrelationId("trace-fact-metadata-" + UUID.randomUUID());
+        req.setContext(Map.of(
+                "record",
+                Map.of(
+                        "modelCode", modelCode,
+                        "data", Map.of(fieldCode, "pending"))));
+
+        DecisionResult matched = evaluationService.evaluate(req);
+        assertThat(matched.status()).isEqualTo(DecisionStatus.MATCHED);
+        List<DrtLogDTO> logs = evaluationService.findLogsByTraceId(matched.traceId());
+        assertThat(logs).hasSize(1);
+        JsonNode factMetadata = logs.get(0).getTraceSnapshot().path("factMetadata");
+        assertThat(factMetadata.path(fieldCode).path("label").asText()).isEqualTo("审批状态");
+        assertThat(factMetadata.path(fieldCode).path("valueLabels").path("pending").asText())
+                .isEqualTo("待审批");
+        assertThat(factMetadata.path("record.data." + fieldCode).path("dictCode").asText())
+                .isEqualTo(dictCode);
     }
 
     @Test
@@ -490,5 +544,57 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                 .build());
         assertThat(saved.getSourceType()).isEqualTo("sqlView");
         assertThat(saved.getSourceRef()).isEqualTo(viewName);
+    }
+
+    private void saveDictBackedModel(String modelCode, String fieldCode, String dictCode) {
+        ModelDefinition saved = metaModelService.saveDefinition(ModelDefinition.builder()
+                .code(modelCode)
+                .displayName("Decision Trace Metadata " + modelCode)
+                .modelType("entity")
+                .sourceType("physical")
+                .primaryKey("id")
+                .fields(List.of(
+                        FieldDefinition.builder()
+                                .code("id")
+                                .name("id")
+                                .displayName("ID")
+                                .dataType("long")
+                                .columnName("id")
+                                .primaryKey(true)
+                                .build(),
+                        FieldDefinition.builder()
+                                .code(fieldCode)
+                                .name(fieldCode)
+                                .displayName("审批状态")
+                                .dataType("enum")
+                                .columnName(fieldCode)
+                                .build()))
+                .status("published")
+                .build());
+        assertThat(saved.getStatus()).isEqualTo("published");
+        MetaFieldDTO field = metaFieldService.findCurrentByCode(fieldCode).orElseThrow();
+        assertThat(metaFieldService.bindDictionary(field.getPid(), dictCode)).isTrue();
+    }
+
+    private DictDTO createStatusDict(String dictCode) {
+        DictCreateRequest request = new DictCreateRequest();
+        request.setCode(dictCode);
+        request.setName("Trace Status Dict");
+        request.setDictType("simple");
+        request.setSourceType("static");
+        request.setItems(List.of(
+                dictItem("pending", "待审批", 1),
+                dictItem("approved", "已通过", 2)));
+        DictDTO dict = dictService.create(request);
+        assertThat(dict.getStatus()).isEqualTo("published");
+        return dict;
+    }
+
+    private DictCreateRequest.DictItemCreateRequest dictItem(String value, String label, int sortOrder) {
+        DictCreateRequest.DictItemCreateRequest item = new DictCreateRequest.DictItemCreateRequest();
+        item.setValue(value);
+        item.setLabel(label);
+        item.setSortOrder(sortOrder);
+        return item;
     }
 }
