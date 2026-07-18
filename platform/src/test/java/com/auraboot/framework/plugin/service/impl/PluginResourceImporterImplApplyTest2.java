@@ -229,6 +229,25 @@ class PluginResourceImporterImplApplyTest2 {
     }
 
     @Test
+    @DisplayName("importModel UPDATE branch: model exists but cannot load fails with diagnostic error")
+    void importModel_update_missingExistingModel_throwsDiagnosticPluginException() {
+        when(metaModelService.isModelExists("m1")).thenReturn(true);
+        when(metaModelService.findByCode("m1")).thenReturn(null);
+
+        ModelDefinitionDTO dto = ModelDefinitionDTO.builder()
+                .code("m1")
+                .displayName("M1 Updated")
+                .modelType("entity")
+                .build();
+
+        assertThatThrownBy(() -> importer.importModel(dto, "plg", "imp", 1L,
+                ImportRequest.ConflictStrategy.OVERWRITE, false))
+                .isInstanceOf(PluginException.class)
+                .hasMessageContaining("Model exists but cannot be loaded for update")
+                .hasMessageContaining("m1");
+    }
+
+    @Test
     @DisplayName("importModel CREATE branch: soft-deleted resurrect -> action=CREATE, pid from jdbc row")
     void importModel_resurrect_path() throws Exception {
         when(metaModelService.isModelExists("m1")).thenReturn(false);
