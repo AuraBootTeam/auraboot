@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   DecisionRuleBindingBlock,
   type DecisionOption,
@@ -658,6 +658,7 @@ export function StrategyStudioWorkbench({
   const [tableDrafts, setTableDrafts] = useState<Record<StrategyScenarioKey, DecisionTable>>(
     initialScenarioTables,
   )
+  const tableDraftsRef = useRef(tableDrafts)
   const [tableAnalyses, setTableAnalyses] = useState<Partial<Record<StrategyScenarioKey, DecisionTableAnalysis | null>>>({})
   const [tableAnalysisErrors, setTableAnalysisErrors] = useState<Partial<Record<StrategyScenarioKey, string | null>>>({})
   const [tableAnalyzing, setTableAnalyzing] = useState(false)
@@ -748,12 +749,14 @@ export function StrategyStudioWorkbench({
   }
 
   const updateScenarioTable = (key: StrategyScenarioKey, next: DecisionTable) => {
-    setTableDrafts((current) => ({ ...current, [key]: next }))
+    const drafts = { ...tableDraftsRef.current, [key]: next }
+    tableDraftsRef.current = drafts
+    setTableDrafts(drafts)
     clearTableFeedback(key)
   }
 
   const getScenarioTable = (target: StrategyScenario): DecisionTable =>
-    tableDrafts[target.key] ?? buildScenarioTable(target)
+    tableDraftsRef.current[target.key] ?? buildScenarioTable(target)
 
   const publishStatus =
     activeScenario.blockers > 0

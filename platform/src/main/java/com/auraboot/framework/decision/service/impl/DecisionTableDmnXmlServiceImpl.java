@@ -266,11 +266,8 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
             List<Element> inputEntries = children(ruleEl, "inputEntry");
             for (int i = 0; i < Math.min(inputEntries.size(), inputElements.size()); i += 1) {
                 String inputId = inputs.get(i).path("id").asText();
-                ObjectNode cell = mapper.createObjectNode();
-                cell.put("operator", "EQ");
-                cell.put("value", "");
-                cell.put("feel", textOf(first(inputEntries.get(i), "text")));
-                when.set(inputId, cell);
+                DataType inputType = fromDmnType(attrOr(first(inputElements.get(i), "inputExpression"), "typeRef", "string"));
+                when.set(inputId, importInputCell(textOf(first(inputEntries.get(i), "text")), inputType));
             }
             rule.set("when", when);
             ObjectNode then = mapper.createObjectNode();
@@ -452,6 +449,62 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
             values.addPOJO(parseLiteral(part, dataType));
         }
         return values;
+    }
+
+    private ObjectNode importInputCell(String rawUnaryTest, DataType dataType) {
+        ObjectNode cell = mapper.createObjectNode();
+        List<String> literals = simpleLiteralParts(rawUnaryTest, dataType);
+        if (!literals.isEmpty()) {
+            if (literals.size() == 1) {
+                cell.put("operator", Operator.EQ.name());
+                cell.set("value", mapper.valueToTree(parseLiteral(literals.get(0), dataType)));
+                return cell;
+            }
+            ArrayNode values = mapper.createArrayNode();
+            for (String literal : literals) {
+                values.addPOJO(parseLiteral(literal, dataType));
+            }
+            cell.put("operator", Operator.IN.name());
+            cell.set("value", values);
+            return cell;
+        }
+        cell.put("operator", Operator.EQ.name());
+        cell.put("value", "");
+        cell.put("feel", rawUnaryTest);
+        return cell;
+    }
+
+    private List<String> simpleLiteralParts(String rawUnaryTest, DataType dataType) {
+        String text = rawUnaryTest == null ? "" : rawUnaryTest.trim();
+        if (text.isEmpty() || "-".equals(text)) {
+            return List.of();
+        }
+        List<String> parts = splitFeelList(text);
+        if (parts.isEmpty() || parts.stream().anyMatch(part -> !isSimpleLiteral(part, dataType))) {
+            return List.of();
+        }
+        return parts;
+    }
+
+    private boolean isSimpleLiteral(String raw, DataType dataType) {
+        String text = raw == null ? "" : raw.trim();
+        if (text.isEmpty() || "-".equals(text)) {
+            return false;
+        }
+        String lower = text.toLowerCase(Locale.ROOT);
+        if (lower.equals("null") || lower.equals("not(null)") || lower.startsWith("not(")
+                || text.startsWith("[") || text.contains("..")
+                || text.startsWith(">") || text.startsWith("<") || text.startsWith("=")
+                || text.startsWith("!=")) {
+            return false;
+        }
+        if ((text.startsWith("\"") && text.endsWith("\"")) || (text.startsWith("'") && text.endsWith("'"))) {
+            return true;
+        }
+        if (lower.equals("true") || lower.equals("false")) {
+            return true;
+        }
+        return dataType != null && dataType.isNumeric() && text.matches("-?\\d+(\\.\\d+)?");
     }
 
     private Map<String, Map<String, String>> valueLabelsByHolder(Element root, String holder) {
