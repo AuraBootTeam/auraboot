@@ -1446,7 +1446,7 @@ BPMN 设计器的网关 / 规则任务已经接入规则中心绑定。
 | Gap | 状态 | 不能误判成 DONE 的原因 | 下一条必须补的证据 |
 |---|---|---|---|
 | Gap 1 统一 `/facts/catalog` 前端消费 | `PARTIAL` | 核心入口已接入，SLA 和 Automation Rule Binding 各有一条保存/reload/impact 切片，Automation 也有一条规则输出驱动通知动作的后端 runtime/Trace 切片；Automation 结果面板组件级 decision trace 已补，workflow-demo seed 浏览器 Trace 黄金已补；Automation `send_notification` 动作节点字段插入、保存、API 反查、reload 回显浏览器黄金已补；Automation Designer 当前 39/39 passed；BPMN Rule Binding 保存/reload/impact tab 和 `/bpmn` XML 持久化已跑绿，后端 SmartEngine runtime/Trace 已跑绿；BPM workflow-demo approve/reject paths 浏览器运行 Trace 已跑绿；Permission 策略弹窗组件级 fact catalog 映射、后端 ABAC runtime guard、浏览器 policy save/reload/impact、service + controller/API + browser 保存校验、低权限 picker、低权限动态访问审计和审计页 trace 回看已跑绿；SLA retry worker/backoff/exhaustion/backend dead-letter row handling 已补一条后端纵深切片，retry timeline read-only API、手工重放 API + 组件操作证据也已补；SLA retry timeline/replay 浏览器黄金已补；SLA action-log → DecisionOps linked action evidence focused Trace 已补；Permission audit ↔ DecisionOps focused trace 已补；重试/幂等广度、规则资产/消费方/执行日志三处全量 Trace UI、Automation 短信 live provider / 外部 provider availability matrix / BPM 更多动作/provider/失败态广度 / 更多权限-provider 失败态仍缺 | 继续补 Automation 短信 live provider、外部 provider availability matrix、BPM 更多动作/provider/失败态广度和更多权限/provider 失败态；BPMN 补 fallback/阻断、更多节点和 Trace UI 矩阵；Permission 补全量三处 Trace 矩阵和更多权限失败态矩阵；SLA 补重试幂等广度和全量 Trace UI |
-| Gap 2 dict/enum 值输入统一 | `PARTIAL+` | 条件片段、Rule Binding、ConditionBuilder、DecisionTableEditor、Strategy Studio test context、DMN import/export round-trip、per-run Trace fact metadata 已有 focused 证据；`wd_req_type` 的 `IN / NOT_IN` raw array 已完成 Strategy Studio 保存/发布/reload 浏览器证据和后端 evaluator true/false 成对证据 | 扩展到 reference/user picker 字段、虚拟模型字段 browser Trace、更多消费方 browser golden 和规则资产/消费方详情/执行日志三处全量 Trace 互跳 |
+| Gap 2 dict/enum 值输入统一 | `PARTIAL+` | 条件片段、Rule Binding、ConditionBuilder、DecisionTableEditor、Strategy Studio test context、DMN import/export round-trip、per-run Trace fact metadata 已有 focused 证据；`wd_req_type` 的 `IN / NOT_IN` raw array 已完成 Strategy Studio 保存/发布/reload 浏览器证据和后端 evaluator true/false 成对证据；虚拟源 `slaRiskScore` fact metadata browser Trace 已补 focused 证据 | 扩展到 reference/user picker 字段、更多虚拟模型字段和全消费方 browser Trace、更多消费方 browser golden 和规则资产/消费方详情/执行日志三处全量 Trace 互跳 |
 | Gap 3 虚拟模型运行时取值 | `PARTIAL` | 后端 catalog 暴露 `sourceType/sourceRef`；Rule Binding 测试上下文展示 sourceRef；injected source context happy/missing source 已有后端和组件证据；backend sourceRef resolver 已能按 `meta.virtualSources[{sourceRef,recordId}]` 自动取值、显式值优先、缺行 UNKNOWN，并已证明 SQL/view 错误不污染外层日志事务；shared RuleEvaluationService 已能保留 meta selector，BPM/Automation backend adapter 已传 selector，SLA record-level deadline、Permission vocabulary/evaluator 和 EventPolicy real-caller selector adapter 已传 selector | 全消费方 browser Trace 明确 sourceType/sourceRef、实际值或缺值原因；更广缺值/权限/失败态 |
 | Gap 4 权限/脱敏闭环 | `PARTIAL` | 后端 ABAC guard、策略弹窗 fact catalog 字段映射、浏览器 policy save/reload/impact、service + controller/API + browser 保存校验只能证明“权限策略可复用规则中心字段和决策，并开始拒绝 out-of-catalog 字段”；masked 字段目录传递、输入映射禁选、保存/API 拒绝和历史策略 runtime DENY 只能证明一个 masked 纵深切片；低权限 fact catalog 后端字段投影、历史策略 runtime 二次拒绝和低权限浏览器 picker golden只能证明目录/guard/picker 会按当前 member 过滤 hidden/view-only/masked 字段并拒绝历史策略引用；低权限真实动态详情访问 audit trace 已证明 runtime/Trace 走了 Rule Center 权限管道；还不能证明字段权限变化后的所有真实访问路径、Trace 互跳和脱敏矩阵都闭环 | 统一 Trace 互跳；Trace/audit 脱敏；更多权限失败态 |
 | Gap 5 消费方 context adapter | `PARTIAL` | 各模块有局部 context，但没有统一 adapter 契约和全矩阵 | SLA/BPM/Automation/EventPolicy/Permission 每类各一条字段可取值和缺值错误 |
@@ -2904,7 +2904,19 @@ web-admin && pnpm exec vitest run app/ui/smart/decision/__tests__/ExecutionLogTr
 web-admin && pnpm exec tsc --noEmit --pretty false --incremental false
 ```
 
-后续仍未关闭：reference/user picker 字段、虚拟模型字段的 browser Trace、Strategy Studio 和更多消费方的真实浏览器 Trace 回看、全消费方浏览器黄金矩阵，以及执行日志页面与规则资产/消费方详情之间的全量 Trace 互跳。
+后续仍未关闭：reference/user picker 字段、更多虚拟模型字段和全消费方 browser Trace、Strategy Studio 和更多消费方的真实浏览器 Trace 回看、全消费方浏览器黄金矩阵，以及执行日志页面与规则资产/消费方详情之间的全量 Trace 互跳。
+
+### RC-VIRTUAL-01 / RC-TRACE-01 virtual-source fact metadata browser Trace focused slice（2026-07-18，focused 后端/组件/浏览器已验证）
+
+本轮补的是上一节留下的“虚拟模型字段 browser Trace”focused 缺口：低码虚拟模型的 declared fields、Fact Catalog metadata 和 sourceRef resolver 已有后端证据，但真实中文页面仍需要证明用户能从规则中心执行日志看到“这个值来自哪个虚拟源、字段业务标签是什么、实际取值是什么、系统列没有泄漏”。
+
+代码实现：#1338 已把虚拟模型 wizard 提交的 `fields` 持久化到模型 definition extension，并在 `MetaModelService.loadModelDefinition` 合并 declared extension fields 与 bound fields；`DecisionModelFieldServiceImpl` 对非物理模型会通过 `MetaModelService.getModelFields(modelCode)` 把 declared virtual fields 投影进 Fact Catalog，字段路径为 `record.data.<fieldCode>`，并携带 `label/displayName/dataType/sourceType/sourceRef`。本轮补测时 browser golden 先暴露两个问题：第一，spec 断言了 `recordId`，但后端 `virtualSourceTrace()` 与前端 `DecisionVirtualSourceTrace` 的正式合同是 `recordPid`；第二，后端虽然已让 `virtualSources.fields` 过滤 `tenant_id`，但 resolver 仍把 SQL view 行里的系统列注入 `record.data`，导致 `traceSnapshot.factMetadata` 重新展示 `tenant_id`。当前修复是 `DecisionEvaluationServiceImpl.resolveVirtualSource` 只把 `isTraceableVirtualField` 允许的业务字段注入 resolved context，同时后端测试补断言 `factMetadata` 不含 `record.data.tenant_id / data.tenant_id / tenant_id`。这里没有绕过低码 `DynamicDataService`，没有引入 `JdbcTemplate` 业务读取，也没有手写 JSONB SQL；执行日志仍由 `DrtLogEntity.traceSnapshot` JSONB typeHandler 持久化。
+
+验证状态：本节已经完成 focused 后端、前端组件、typecheck 和浏览器 golden 验证。#1339 先修复 #1338 合入后远端 Backend CI 暴露的 `DecisionModelFieldServiceImplTest` 构造器缺 `MetaModelService` mock 问题，Backend CI 已恢复成功。本轮工作树 `codex/rule-center-virtual-trace-verify-20260718` 上运行 `platform && ./gradlew :test --tests com.auraboot.framework.decision.DecisionRuntimeIntegrationTest.evaluate_virtualModelSourceRefResolverFetchesSqlViewRecord_andCallerValuesWin --no-daemon` passed；此前同轮补测还运行 `ModelControllerCreateVirtualModelIntegrationTest.createVirtualModel_persistsSourceAndCapabilities` focused passed；`web-admin && pnpm exec vitest run app/ui/smart/decision/__tests__/ExecutionLogTraceBlock.test.tsx app/shared/decision/ui/__tests__/ExecutionLogViewer.test.tsx` passed，2 files / 24 tests passed；`web-admin && pnpm exec tsc --noEmit --pretty false --incremental false` passed。fresh runtime `rc-virtual-trace-102`（slot 102，Backend `6502`，Vite `5202`，BFF `6202`，DB `auraboot_102`，Redis DB `8`，fresh DB，demo import OK，`--no-warm`，spec 自建数据并用 admin `loginViaUI`）下，第三轮 `decisionops/decisionops-virtual-source-trace.spec.ts` passed，1/1，输出目录 `/tmp/pw-decisionops-virtual-source-fact-metadata-trace-20260718-fixed`，截图 `docs/system-reference/assets/decisionops-virtual-source-fact-metadata-trace-20260718.png`。
+
+focused feature/action coverage：用例创建 SQL view、创建并发布带 declared field `slaRiskScore` 的虚拟模型、创建发布决策、用 `context.meta.virtualSources[{sourceRef,recordId}]` 触发 evaluator，经 `/api/decision/logs/recent` 反查同一 trace 的 `traceSnapshot.virtualSources` 和 `traceSnapshot.factMetadata`；随后从 `/home` 通过侧边栏进入“规则中心 → 执行日志”，筛选 traceId/decisionCode，打开 Trace 抽屉，断言“事实快照”展示 `SLA Risk Score / record.data.slaRiskScore / 类型 integer / 来源 <sqlView>`，“虚拟源”展示 `RESOLVED / sourceRef / modelCode / 91`，并断言 UI 不显示 `tenant_id`。focused e2e-truth 静态扫描目标 spec 未命中 `test.skip/fixme/only`、`waitForTimeout`、`retries`、threshold/baseline、`page.request.put/patch` 或业务 `/p/*` 直达；3 处 API request 用于 fixture 创建和 API 取证，不替代侧边栏、筛选和 Trace 抽屉主路径。
+
+当前状态是 **virtual-source fact metadata browser Trace focused 已验证**。这不等于 RC-VIRTUAL-01 或 RC-TRACE-01 full DONE：后续仍需覆盖 reference/user picker 字段、更多虚拟模型 sourceType、缺行/权限/SQL 失败态 browser Trace、SLA/Permission/EventPolicy 等消费方 selector 全入口、规则资产/消费方详情/执行日志三处全量互跳，以及全消费方 browser + backend 成对证据。
 
 ### RC-DICT-01 multi-select `IN / NOT_IN` authoring focused slice（2026-07-18，focused 组件 / 后端 / browser 已验证）
 
@@ -2926,7 +2938,7 @@ web-admin && pnpm exec vitest run \
   app/shared/decision/ui/__tests__/DecisionTableEditor.test.tsx
 ```
 
-后续仍未关闭：reference/user picker 字段；虚拟模型字段的 browser Trace；除 Strategy Studio 外更多消费方 browser authoring；全消费方浏览器黄金矩阵；以及执行日志页面与规则资产/消费方详情之间的全量 Trace 互跳。
+后续仍未关闭：reference/user picker 字段；更多虚拟模型字段和全消费方 browser Trace；除 Strategy Studio 外更多消费方 browser authoring；全消费方浏览器黄金矩阵；以及执行日志页面与规则资产/消费方详情之间的全量 Trace 互跳。
 
 ### RC-DMN-01 DMN valueLabels import/export metadata focused slice（2026-07-18，focused 后端已验证 / browser golden 待补）
 
@@ -2963,7 +2975,7 @@ focused feature/action coverage：菜单进入规则中心、fact catalog 字段
 
 产品修复：本轮还关闭了 Strategy Studio / DecisionOps Console 与 DecisionTableWorkbenchBlock 的 DMN 导出行为不一致问题。此前只有 `DecisionTableWorkbenchBlock` 会触发 Blob 下载，Strategy Studio 和 Console 只是把 XML 写回 textarea；现在三处统一复用 `downloadDmnXml`，`导出 DMN XML` 会真正下载 `<decisionCode>.dmn.xml`。
 
-后续仍未关闭：DMN valueLabels 在规则资产、SLA/BPM/Automation/Permission 消费方、DecisionOps 执行日志三处 Trace 的全矩阵；reference/user picker 字段；虚拟模型字段 browser Trace；Drools/KIE 更广 runtime validation；以及全消费方 browser + backend 成对证据。
+后续仍未关闭：DMN valueLabels 在规则资产、SLA/BPM/Automation/Permission 消费方、DecisionOps 执行日志三处 Trace 的全矩阵；reference/user picker 字段；更多虚拟模型字段和全消费方 browser Trace；Drools/KIE 更广 runtime validation；以及全消费方 browser + backend 成对证据。
 
 ### 关闭证据模板
 
