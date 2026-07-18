@@ -56,7 +56,7 @@ type DecisionLogRecord = {
     virtualSources?: Array<{
       sourceRef?: string;
       modelCode?: string;
-      recordId?: string;
+      recordPid?: string;
       status?: string;
       fields?: Record<string, unknown>;
     }>;
@@ -358,7 +358,7 @@ test('DecisionOps execution logs show low-code virtual-source trace from a real 
     expect(log?.traceSnapshot?.virtualSources?.[0]).toMatchObject({
       sourceRef: viewName,
       modelCode,
-      recordId: tenantId,
+      recordPid: tenantId,
       status: 'RESOLVED',
       fields: {
         slaRiskScore: 91,

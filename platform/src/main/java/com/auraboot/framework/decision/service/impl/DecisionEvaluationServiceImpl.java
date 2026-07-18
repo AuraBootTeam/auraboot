@@ -376,11 +376,11 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
             }
             Map<String, Object> resolvedFields = new LinkedHashMap<>();
             for (Map.Entry<String, Object> entry : row.entrySet()) {
-                if (StringUtils.hasText(entry.getKey()) && !recordData.containsKey(entry.getKey())) {
+                if (StringUtils.hasText(entry.getKey())
+                        && isTraceableVirtualField(entry.getKey())
+                        && !recordData.containsKey(entry.getKey())) {
                     recordData.put(entry.getKey(), entry.getValue());
-                    if (isTraceableVirtualField(entry.getKey())) {
-                        resolvedFields.put(entry.getKey(), entry.getValue());
-                    }
+                    resolvedFields.put(entry.getKey(), entry.getValue());
                 }
             }
             String status = resolvedFields.isEmpty() ? "NO_NEW_FIELDS" : "RESOLVED";

@@ -418,6 +418,9 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                     "record.data.slaRiskScore",
                     "data.slaRiskScore",
                     "slaRiskScore");
+            assertThat(traceSnapshot.path("factMetadata").has("record.data.tenant_id")).isFalse();
+            assertThat(traceSnapshot.path("factMetadata").has("data.tenant_id")).isFalse();
+            assertThat(traceSnapshot.path("factMetadata").has("tenant_id")).isFalse();
             assertThat(virtualFactMetadata.path("label").asText()).isEqualTo("SLA Risk Score");
             assertThat(virtualFactMetadata.path("modelCode").asText()).isEqualTo(modelCode);
             assertThat(virtualFactMetadata.path("dataType").asText()).isEqualTo("integer");
