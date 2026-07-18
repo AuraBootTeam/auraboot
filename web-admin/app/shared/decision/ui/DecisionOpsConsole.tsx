@@ -27,6 +27,7 @@ import type {
   DecisionTableDmnXmlResult,
   EventPolicySummary,
 } from '../api/decisionApi';
+import { downloadDmnXml } from './dmnDownload';
 
 /**
  * DecisionOps console assembly (mockup F1–F8, docs/1.md §22): a tabbed shell composing the console
@@ -260,6 +261,9 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     try {
       const result = await api.exportTableDmn(tableDraft, 'decision_table');
       applyDmnResult(result, 'DMN XML 已导出', false);
+      if (result.valid && result.dmnXml) {
+        downloadDmnXml('decision_table', result.dmnXml);
+      }
     } catch (err) {
       setTableDmnError(err instanceof Error ? err.message : 'DMN XML 导出失败');
       setTableDmnStatus(null);

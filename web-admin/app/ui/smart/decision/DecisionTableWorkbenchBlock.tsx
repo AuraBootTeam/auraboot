@@ -17,6 +17,7 @@ import {
   validateTable,
 } from '~/shared/decision/table/decisionTable';
 import { DecisionTableEditor } from '~/shared/decision/ui/DecisionTableEditor';
+import { downloadDmnXml } from '~/shared/decision/ui/dmnDownload';
 import { decisionStatusLabel } from '~/shared/decision/ui/statusLabels';
 
 interface DecisionTableWorkbenchBlockProps {
@@ -169,25 +170,6 @@ function localDiagnostics(table: DecisionTable): Diagnostic[] {
 function dmnResultError(result: DecisionTableDmnXmlResult): string {
   const issue = [...(result.errors ?? []), ...(result.warnings ?? [])][0];
   return issue ? `${issue.code}: ${issue.message ?? 'DMN XML 处理失败'}` : 'DMN XML 处理失败';
-}
-
-function sanitizeFilenamePart(value: string): string {
-  const normalized = value.trim().replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/^_+|_+$/g, '');
-  return normalized || 'decision_table';
-}
-
-function downloadTextFile(filename: string, content: string, type: string): void {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return;
-  const blob = new Blob([content], { type });
-  const url = window.URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.style.display = 'none';
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.URL.revokeObjectURL(url);
 }
 
 function displayJson(value: unknown): string {
@@ -371,11 +353,7 @@ export function DecisionTableWorkbenchBlock({
       );
       applyDmnResult(result, 'DMN XML 已导出');
       if (result.valid && result.dmnXml) {
-        downloadTextFile(
-          `${sanitizeFilenamePart(decisionCode)}.dmn.xml`,
-          result.dmnXml,
-          'application/xml;charset=utf-8',
-        );
+        downloadDmnXml(decisionCode, result.dmnXml);
       }
     } catch (error) {
       setDmnError(errorMessage(error, 'DMN XML 导出失败'));

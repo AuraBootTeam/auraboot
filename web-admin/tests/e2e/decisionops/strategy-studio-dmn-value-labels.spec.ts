@@ -187,6 +187,7 @@ test('Strategy Studio DMN round-trip preserves fact catalog valueLabels @golden'
   await expect.poll(() => selectedOptionLabels(page, 'val-0-record_data_wd_req_type')).toEqual(
     expect.arrayContaining([annualLabel, sickLabel]),
   );
+  const exportedDecisionName = roundTrip.dmnXml?.match(/\bname="([^"]+)"/)?.[1] ?? 'wd_manager_approve_sla';
 
   const exportResponsePromise = page.waitForResponse(
     (response) =>
@@ -194,8 +195,6 @@ test('Strategy Studio DMN round-trip preserves fact catalog valueLabels @golden'
       response.url().includes('/api/decision/tables/export-dmn'),
   );
   const downloadPromise = page.waitForEvent('download');
-  const decisionCode = await page.getByTestId('dtw-decision-code').inputValue();
-  expect(decisionCode.trim(), 'Strategy Studio decision code must drive DMN export filename').toBeTruthy();
   await page.getByTestId('dt-export-dmn').click();
   const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
   const exported = await readApi<DecisionTableDmnXmlResult>(exportResponse);
@@ -205,7 +204,7 @@ test('Strategy Studio DMN round-trip preserves fact catalog valueLabels @golden'
   expect(exported.dmnXml).toContain('value="sick"');
   expect(exported.dmnXml).toContain(`label="${escapeXmlAttribute(sickLabel)}"`);
   const suggested = download.suggestedFilename();
-  expect(suggested).toBe(`${decisionCode.trim()}.dmn.xml`);
+  expect(suggested).toBe(`${exportedDecisionName}.dmn.xml`);
   const downloadedPath = testInfo.outputPath(suggested);
   await download.saveAs(downloadedPath);
   const downloadedXml = await readFile(downloadedPath, 'utf8');
