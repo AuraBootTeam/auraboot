@@ -11,6 +11,7 @@ import com.auraboot.framework.meta.entity.payload.ExtensionBean;
 import com.auraboot.framework.meta.mapper.DictItemMapper;
 import com.auraboot.framework.meta.mapper.DictMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.ModelFieldBindingService;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.permission.service.FieldPermissionService;
@@ -38,6 +39,9 @@ class DecisionModelFieldServiceImplTest {
     private MetaModelMapper metaModelMapper;
 
     @Mock
+    private MetaModelService metaModelService;
+
+    @Mock
     private ModelFieldBindingService modelFieldBindingService;
 
     @Mock
@@ -57,6 +61,7 @@ class DecisionModelFieldServiceImplTest {
         service = new DecisionModelFieldServiceImpl(
                 versionMapper,
                 metaModelMapper,
+                metaModelService,
                 modelFieldBindingService,
                 dictMapper,
                 dictItemMapper,
