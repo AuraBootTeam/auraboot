@@ -10,6 +10,7 @@ import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.FieldDictBinding;
+import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
 import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
@@ -19,6 +20,8 @@ import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.common.util.DateUtil;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +64,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
     private final com.auraboot.framework.meta.mapper.MetaFieldDictBindingMapper fieldDictBindingMapper;
     private final MetaModelFieldBindingMapper fieldBindingMapper;
     private final com.auraboot.framework.meta.service.ModelFieldBindingService modelFieldBindingService;  // ✅ 新增: 模型-字段绑定服务
+    private final ObjectMapper objectMapper;
 
     @Autowired
     @Lazy
@@ -119,6 +123,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         entity.setCode(request.getCode());
         entity.setDataType(request.getDataType());
         entity.setDataSourceId(request.getDataSourceId());
+        entity.setRefTarget(mapToBean(request.getRefTarget(), FieldRefTargetBean.class, "refTarget"));
         entity.setVersion(nextVersion);
         entity.setIsCurrent(true);
         entity.setStatus(Boolean.TRUE.equals(request.getAutoPublish()) ? "published"
@@ -734,10 +739,33 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 .status(entity.getStatus())
                 .tenantId(entity.getTenantId())
 
+                .refTarget(beanToMap(entity.getRefTarget()))
                 .extension(extensionConverter.toMap(entity.getExtension())) // ✅ 使用ExtensionConverter将ExtensionBean转换为Map
                 .createdAt(DateUtil.toUtcLocalDateTime(entity.getCreatedAt()))
                 .updatedAt(DateUtil.toUtcLocalDateTime(entity.getUpdatedAt()))
                 .build();
+    }
+
+    private <T> T mapToBean(Map<String, Object> source, Class<T> type, String name) {
+        if (source == null || source.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.convertValue(source, type);
+        } catch (IllegalArgumentException ex) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Invalid " + name + " configuration: " + ex.getMessage());
+        }
+    }
+
+    private Map<String, Object> beanToMap(Object bean) {
+        if (bean == null) {
+            return null;
+        }
+        Map<String, Object> result = objectMapper.convertValue(
+                bean,
+                new TypeReference<Map<String, Object>>() {});
+        return result.isEmpty() ? null : result;
     }
     
     // ==================== Git-First辅助方法 ====================

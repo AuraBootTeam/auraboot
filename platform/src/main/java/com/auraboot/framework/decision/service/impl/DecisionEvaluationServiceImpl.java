@@ -38,6 +38,8 @@ import com.auraboot.framework.meta.entity.Model;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.user.dto.UserSearchDTO;
+import com.auraboot.framework.user.service.UserService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -54,6 +56,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.StringUtils;
 
+import java.lang.reflect.Array;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -85,6 +88,8 @@ import java.util.stream.StreamSupport;
 @RequiredArgsConstructor
 public class DecisionEvaluationServiceImpl implements DecisionEvaluationService {
 
+    private static final Object MISSING_CONTEXT_VALUE = new Object();
+
     private final DrtVersionMapper versionMapper;
     private final DrtLogMapper logMapper;
     private final DecisionRuntime decisionRuntime;
@@ -94,6 +99,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
     private final MetaModelMapper metaModelMapper;
     private final PlatformTransactionManager transactionManager;
     private final DecisionModelFieldService decisionModelFieldService;
+    private final UserService userService;
 
     // ─── public API ──────────────────────────────────────────────────────────
 
@@ -816,7 +822,7 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
 
         Map<String, Object> snapshot = new LinkedHashMap<>();
         for (FactMetadataMatch match : matchedFacts) {
-            Map<String, Object> metadata = factMetadata(match.entity(), match.fact());
+            Map<String, Object> metadata = factMetadata(match.entity(), match.fact(), resolvedContext);
             if (metadata.isEmpty()) {
                 continue;
             }
@@ -983,7 +989,10 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         return trimmed;
     }
 
-    private Map<String, Object> factMetadata(DecisionFactEntityDTO entity, DecisionFactDTO fact) {
+    private Map<String, Object> factMetadata(
+            DecisionFactEntityDTO entity,
+            DecisionFactDTO fact,
+            Map<String, Map<String, Object>> resolvedContext) {
         Map<String, Object> metadata = new LinkedHashMap<>();
         putText(metadata, "scope", fact.getScope());
         putText(metadata, "path", fact.getPath());
@@ -996,7 +1005,8 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
             putText(metadata, "sourceRef", entity.getSourceRef());
         }
         putText(metadata, "dictCode", fact.getDictCode());
-        Map<String, String> valueLabels = valueLabels(fact.getAllowedValues());
+        Map<String, String> valueLabels = new LinkedHashMap<>(valueLabels(fact.getAllowedValues()));
+        valueLabels.putAll(referenceValueLabels(fact, resolvedContext));
         if (!valueLabels.isEmpty()) {
             metadata.put("valueLabels", valueLabels);
         }
@@ -1021,6 +1031,253 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
             labels.put(option.getValue(), option.getLabel());
         }
         return labels;
+    }
+
+    private Map<String, String> referenceValueLabels(
+            DecisionFactDTO fact,
+            Map<String, Map<String, Object>> resolvedContext) {
+        String targetEntity = referenceTargetEntity(fact);
+        String dataType = fact.getDataType();
+        if (!isReferenceLike(dataType, targetEntity)) {
+            return Map.of();
+        }
+        Set<String> values = runtimeFactValues(fact, resolvedContext);
+        if (values.isEmpty()) {
+            return Map.of();
+        }
+        String displayField = referenceDisplayField(fact);
+        Map<String, String> labels = new LinkedHashMap<>();
+        for (String value : values) {
+            String label = resolveReferenceLabel(targetEntity, displayField, dataType, value);
+            if (StringUtils.hasText(label)) {
+                labels.put(value, label);
+            }
+        }
+        return labels;
+    }
+
+    private Set<String> runtimeFactValues(
+            DecisionFactDTO fact,
+            Map<String, Map<String, Object>> resolvedContext) {
+        if (fact == null || resolvedContext == null || resolvedContext.isEmpty()) {
+            return Set.of();
+        }
+        Object raw = contextValueForFact(fact, resolvedContext);
+        if (raw == MISSING_CONTEXT_VALUE || raw == null) {
+            return Set.of();
+        }
+        Set<String> values = new LinkedHashSet<>();
+        collectScalarValues(raw, values);
+        return values;
+    }
+
+    private Object contextValueForFact(
+            DecisionFactDTO fact,
+            Map<String, Map<String, Object>> resolvedContext) {
+        String scope = StringUtils.hasText(fact.getScope()) ? fact.getScope() : "record";
+        Map<String, Object> scopeContext = resolvedContext.get(scope);
+        if (scopeContext == null) {
+            scopeContext = resolvedContext.get(scope.toLowerCase(Locale.ROOT));
+        }
+        if (scopeContext == null) {
+            return MISSING_CONTEXT_VALUE;
+        }
+
+        List<String> candidates = new ArrayList<>();
+        if (StringUtils.hasText(fact.getPath())) {
+            candidates.add(fact.getPath());
+        }
+        if (StringUtils.hasText(fact.getFactKey())) {
+            candidates.add(fact.getFactKey());
+        }
+        List<String> normalized = new ArrayList<>();
+        for (String candidate : candidates) {
+            String path = trimDotPath(candidate);
+            if (!StringUtils.hasText(path)) {
+                continue;
+            }
+            normalized.add(path);
+            String scopedPrefix = scope + ".";
+            if (path.startsWith(scopedPrefix)) {
+                normalized.add(path.substring(scopedPrefix.length()));
+            }
+            if (path.startsWith("record.")) {
+                normalized.add(path.substring("record.".length()));
+            }
+        }
+
+        for (String path : normalized) {
+            Object value = readPath(scopeContext, path);
+            if (value != MISSING_CONTEXT_VALUE) {
+                return value;
+            }
+        }
+        return MISSING_CONTEXT_VALUE;
+    }
+
+    private Object readPath(Map<String, Object> root, String path) {
+        if (!StringUtils.hasText(path)) {
+            return MISSING_CONTEXT_VALUE;
+        }
+        Object current = root;
+        for (String segment : path.split("\\.")) {
+            if (!StringUtils.hasText(segment)) {
+                continue;
+            }
+            if (!(current instanceof Map<?, ?> map) || !map.containsKey(segment)) {
+                return MISSING_CONTEXT_VALUE;
+            }
+            current = map.get(segment);
+        }
+        return current;
+    }
+
+    private void collectScalarValues(Object raw, Set<String> values) {
+        if (raw == null) {
+            return;
+        }
+        if (raw instanceof Iterable<?> iterable) {
+            for (Object item : iterable) {
+                collectScalarValues(item, values);
+            }
+            return;
+        }
+        if (raw.getClass().isArray()) {
+            int length = Array.getLength(raw);
+            for (int i = 0; i < length; i++) {
+                collectScalarValues(Array.get(raw, i), values);
+            }
+            return;
+        }
+        if (raw instanceof Map<?, ?> map) {
+            for (String key : List.of("value", "pid", "id")) {
+                Object value = map.get(key);
+                if (value != null) {
+                    collectScalarValues(value, values);
+                    return;
+                }
+            }
+            return;
+        }
+        String value = String.valueOf(raw);
+        if (StringUtils.hasText(value)) {
+            values.add(value);
+        }
+    }
+
+    private String resolveReferenceLabel(
+            String targetEntity,
+            String displayField,
+            String dataType,
+            String value) {
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        if (isUserTarget(targetEntity, dataType)) {
+            return resolveUserLabel(value);
+        }
+        if (!StringUtils.hasText(targetEntity)) {
+            return null;
+        }
+        DynamicDataService dynamicDataService = dynamicDataServiceProvider.getIfAvailable();
+        if (dynamicDataService == null) {
+            return null;
+        }
+        try {
+            Map<String, Object> record = dynamicDataService.getById(targetEntity, value);
+            return firstMapText(
+                    record,
+                    displayField,
+                    "displayName",
+                    "name",
+                    "title",
+                    "code",
+                    "pid",
+                    "id");
+        } catch (RuntimeException ex) {
+            log.debug("Skipping reference value label resolution for {}:{}: {}",
+                    targetEntity, value, ex.getMessage());
+            return null;
+        }
+    }
+
+    private String resolveUserLabel(String pid) {
+        try {
+            UserSearchDTO user = userService.findInTenantByPid(requireTenant(), pid);
+            if (user == null) {
+                return null;
+            }
+            return firstText(user.getDisplayName(), user.getEmail(), user.getPid());
+        } catch (RuntimeException ex) {
+            log.debug("Skipping user value label resolution for {}: {}", pid, ex.getMessage());
+            return null;
+        }
+    }
+
+    private boolean isReferenceLike(String dataType, String targetEntity) {
+        String normalized = dataType == null ? "" : dataType.toLowerCase(Locale.ROOT);
+        return "reference".equals(normalized)
+                || "user".equals(normalized)
+                || "role".equals(normalized)
+                || "group".equals(normalized)
+                || "department".equals(normalized)
+                || StringUtils.hasText(targetEntity);
+    }
+
+    private boolean isUserTarget(String targetEntity, String dataType) {
+        String normalizedDataType = dataType == null ? "" : dataType.toLowerCase(Locale.ROOT);
+        String normalizedTarget = targetEntity == null ? "" : targetEntity.toLowerCase(Locale.ROOT);
+        return "user".equals(normalizedDataType)
+                || normalizedTarget.contains("user")
+                || "sys_user".equals(normalizedTarget)
+                || "ab_user".equals(normalizedTarget);
+    }
+
+    private String referenceTargetEntity(DecisionFactDTO fact) {
+        return firstMapText(
+                fact.getReference(),
+                "targetEntity",
+                "targetModel",
+                "targetModelCode",
+                "modelCode",
+                "refModelCode");
+    }
+
+    private String referenceDisplayField(DecisionFactDTO fact) {
+        return firstMapText(
+                fact.getReference(),
+                "displayField",
+                "refDisplayField",
+                "targetField",
+                "fieldCode");
+    }
+
+    private String firstMapText(Map<String, ?> source, String... keys) {
+        if (source == null || source.isEmpty() || keys == null) {
+            return null;
+        }
+        for (String key : keys) {
+            if (!StringUtils.hasText(key)) {
+                continue;
+            }
+            Object value = source.get(key);
+            if (value != null && StringUtils.hasText(String.valueOf(value))) {
+                return String.valueOf(value);
+            }
+        }
+        return null;
+    }
+
+    private String firstText(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (StringUtils.hasText(value)) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private void putText(Map<String, Object> target, String key, String value) {

@@ -460,6 +460,45 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('cb-preview')).not.toHaveTextContent('task_manager_approve');
   });
 
+  it('exposes the leave applicant as a user reference field in Strategy Studio conditions', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({ data: [] }),
+      })),
+    );
+
+    try {
+      renderConsole();
+
+      fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+      fireEvent.click(screen.getByTestId('cb-add'));
+
+      const fieldSelect = screen.getByLabelText('field-0') as HTMLSelectElement;
+      expect(fieldSelect).toHaveTextContent('申请人');
+
+      fireEvent.change(fieldSelect, {
+        target: { value: 'record:data.wd_req_applicant' },
+      });
+
+      expect(screen.getByLabelText('operator-0')).toHaveValue('EQ');
+      expect(screen.getByTestId('reference-value-trigger-0')).toHaveTextContent('选择用户');
+
+      fireEvent.click(screen.getByTestId('reference-value-trigger-0'));
+
+      expect(screen.getByTestId('reference-value-menu-0')).toBeInTheDocument();
+      expect(screen.getByTestId('reference-value-meta-0')).toHaveTextContent('用户 · pid / displayName');
+      await waitFor(() =>
+        expect(globalThis.fetch).toHaveBeenCalledWith('/api/admin/users/search?keyword=&size=20', {
+          credentials: 'same-origin',
+        }),
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('exposes a direct Strategy Studio workbench jump from the console header', () => {
     renderConsole();
     expect(screen.getByRole('link', { name: '进入工作区' })).toHaveAttribute(
