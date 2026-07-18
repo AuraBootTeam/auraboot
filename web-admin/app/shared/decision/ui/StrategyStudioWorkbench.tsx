@@ -198,6 +198,8 @@ const WORKSPACE_PANELS: Array<{ key: StrategyWorkspacePanelKey; label: string; s
   { key: 'review', label: '片段与发布', summary: '复用 / 动作 / 检查' },
 ]
 
+const NO_FRAGMENT_LABEL = '未选择条件片段'
+
 const DECISIONS = [
   {
     code: 'complaint_sla_deadline',
@@ -601,8 +603,12 @@ function buildConditionFragmentRequest(
   binding: RuleConsumerBindingDraft,
 ): ConditionFragmentUpsertRequest & { fragmentName: string } {
   const fallbackRoot = conditionRootFromFragment(fragment)
+  const scenarioDefaultFragment =
+    SCENARIOS.find((candidate) => candidate.key === scenario.key)?.fragment || `${scenario.title} 条件`
+  const fragmentName =
+    fragment?.fragmentName || (scenario.fragment === NO_FRAGMENT_LABEL ? scenarioDefaultFragment : scenario.fragment)
   return {
-    fragmentName: fragment?.fragmentName || scenario.fragment || `${scenario.title} 条件`,
+    fragmentName,
     description: fragment?.description,
     scopeType: fragment?.scopeType || scenario.key,
     scopeRef: fragment?.scopeRef || scenario.ruleCode,
@@ -786,7 +792,9 @@ export function StrategyStudioWorkbench({
   )
   const selectedFragment = useMemo(
     () =>
-      compatibleFragments.find((fragment) => fragment.fragmentCode === selectedFragmentCode) ??
+      compatibleFragments.find((fragment) =>
+        fragment.fragmentCode === selectedFragmentCode && scenarioForFragment(fragment)?.key === scenario.key,
+      ) ??
       compatibleFragments.find((fragment) => scenarioForFragment(fragment)?.key === scenario.key),
     [compatibleFragments, scenario.key, selectedFragmentCode],
   )
@@ -794,7 +802,7 @@ export function StrategyStudioWorkbench({
     () => ({
       ...scenario,
       decisionCode: selectedFragment?.decisionRefs?.[0] || scenario.decisionCode,
-      fragment: selectedFragment ? fragmentLabel(selectedFragment) : '未选择条件片段',
+      fragment: selectedFragment ? fragmentLabel(selectedFragment) : NO_FRAGMENT_LABEL,
     }),
     [scenario, selectedFragment],
   )

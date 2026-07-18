@@ -530,11 +530,11 @@ describe('DecisionOpsConsole', () => {
   });
 
   it('persists Strategy Studio condition edits as condition fragment draft raw values', async () => {
-    const createConditionFragmentVersion = vi.fn(async (code: string, req: unknown) => ({
+    const createConditionFragment = vi.fn(async (req: unknown) => ({
       ...(req as object),
-      fragmentCode: code,
+      fragmentCode: 'wd_leave_approval_condition',
       pid: 'fragment-draft-applicant',
-      version: 2,
+      version: 1,
       status: 'DRAFT',
     }));
     const createDraftVersion = vi.fn(async () => ({ pid: 'draft-applicant', status: 'DRAFT' }));
@@ -553,7 +553,7 @@ describe('DecisionOpsConsole', () => {
 
     try {
       renderConsole(undefined, {
-        createConditionFragmentVersion,
+        createConditionFragment,
         createDraftVersion,
       } as unknown as Partial<DecisionApi>);
 
@@ -571,9 +571,11 @@ describe('DecisionOpsConsole', () => {
 
       fireEvent.click(screen.getByTestId('strategy-save-draft'));
 
-      await waitFor(() => expect(createConditionFragmentVersion).toHaveBeenCalled());
-      const [, request] = createConditionFragmentVersion.mock.calls[0];
+      await waitFor(() => expect(createConditionFragment).toHaveBeenCalled());
+      const [request] = createConditionFragment.mock.calls[0];
       expect(request).toMatchObject({
+        fragmentCode: 'wd_leave_approval_condition',
+        fragmentName: '请假审批路由条件',
         scopeType: 'BPM',
         scopeRef: 'wd_leave_approval',
         conditionSpec: {
@@ -923,9 +925,10 @@ describe('DecisionOpsConsole', () => {
     await waitFor(() => expect(publishVersion).toHaveBeenCalled());
     expect(createConditionFragment).toHaveBeenCalledWith(
       expect.objectContaining({
-        fragmentCode: 'wd_manager_approve_condition',
+        fragmentCode: 'wd_leave_approval_condition',
+        fragmentName: '请假审批路由条件',
         scopeType: 'BPM',
-        scopeRef: 'wd_manager_approve',
+        scopeRef: 'wd_leave_approval',
       }),
     );
     expect(validateConditionFragmentVersion).toHaveBeenCalled();
