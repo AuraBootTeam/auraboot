@@ -251,7 +251,7 @@ function isUserReference(field: FieldOption | undefined): boolean {
     || target === 'ab_user';
 }
 
-function isReferenceValueField(field: FieldOption | undefined): boolean {
+function isReferenceValueField(field: FieldOption | undefined): field is FieldOption {
   return Boolean(field && !field.options?.length && (field.reference || field.dataType === 'user'));
 }
 
