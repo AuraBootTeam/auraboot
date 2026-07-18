@@ -1388,7 +1388,9 @@ describe('DecisionRuleBindingBlock', () => {
         }),
       ),
     );
-    expect(screen.getByTestId('decision-test-result')).toHaveTextContent('send_notification');
+    await waitFor(() =>
+      expect(screen.getByTestId('decision-test-result')).toHaveTextContent('send_notification'),
+    );
   });
 
   it('edits test context through structured field rows before running a decision test', async () => {
