@@ -698,6 +698,47 @@ public class AuraBotChatService {
     }
 
     /**
+     * Builds the retrieval query for a turn. A bare follow-up ("它防水吗?") carries no entity, so
+     * retrieving on it alone recalls the wrong chunks — coreference is invisible to the vector/BM25
+     * query. We prepend the recent USER turns so the entity a prior turn named ("运动手表 X2 Ultra")
+     * rides along and resolves at the retrieval plane; the current message stays last so its own
+     * terms still dominate. First-turn / single-turn queries are returned unchanged.
+     *
+     * <p>Package-private + static so it can be unit-tested without a chat stack.
+     */
+    static String buildRetrievalQuery(List<ChatMessage> history, String currentMessage) {
+        String current = currentMessage == null ? "" : currentMessage.strip();
+        if (history == null || history.isEmpty()) {
+            return current;
+        }
+        final int maxTurns = 3;
+        final int perMsg = 180;
+        StringBuilder ctx = new StringBuilder();
+        int used = 0;
+        for (int i = history.size() - 1; i >= 0 && used < maxTurns; i--) {
+            ChatMessage m = history.get(i);
+            if (m == null || !"user".equalsIgnoreCase(m.getRole())) {
+                continue;
+            }
+            String c = m.getContent();
+            if (c == null || c.isBlank()) {
+                continue;
+            }
+            c = c.strip();
+            if (c.equals(current)) {
+                // some callers include the current message in the history list
+                continue;
+            }
+            if (c.length() > perMsg) {
+                c = c.substring(0, perMsg);
+            }
+            ctx.insert(0, c + "\n"); // prepend so chronological order is preserved
+            used++;
+        }
+        return ctx.length() == 0 ? current : ctx + current;
+    }
+
+    /**
      * @param warnings collector for a failure the user needs to know about; the caller forwards it
      *                 to the response sink
      */
@@ -712,7 +753,8 @@ public class AuraBotChatService {
                 return "";
             }
 
-            String context = ragContextProvider.retrieveContext(tenantId, request.getMessage(), kbIds);
+            String retrievalQuery = buildRetrievalQuery(request.getHistory(), request.getMessage());
+            String context = ragContextProvider.retrieveContext(tenantId, retrievalQuery, kbIds);
             return context != null ? context : "";
         } catch (Exception e) {
             // The turn must survive a broken knowledge base — but the user must not be left thinking
