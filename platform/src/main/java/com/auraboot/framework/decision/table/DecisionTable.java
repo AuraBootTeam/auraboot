@@ -42,10 +42,20 @@ public record DecisionTable(
         this(hitPolicy, CollectAggregation.NONE, inputs, outputs, rules, defaultOutput);
     }
 
-    /** A table input: an id + operand plus optional finite-domain values for completeness analysis. */
-    public record Input(String id, String label, Operand expr, List<Object> allowedValues) {
+    /**
+     * A table input: an id + operand plus optional finite-domain values for completeness analysis.
+     * {@code valueLabels} keeps display labels for finite-domain values while runtime evaluation keeps
+     * using the raw values.
+     */
+    public record Input(String id, String label, Operand expr, List<Object> allowedValues,
+                        Map<String, String> valueLabels) {
         public Input {
             allowedValues = allowedValues == null ? List.of() : allowedValues;
+            valueLabels = valueLabels == null ? Map.of() : Map.copyOf(valueLabels);
+        }
+
+        public Input(String id, String label, Operand expr, List<Object> allowedValues) {
+            this(id, label, expr, allowedValues, Map.of());
         }
 
         public Input(String id, String label, Operand expr) {
@@ -53,10 +63,19 @@ public record DecisionTable(
         }
     }
 
-    /** A table output column. {@code allowedValues} is ordered highest-priority first for PRIORITY. */
-    public record Output(String id, String label, DataType dataType, List<Object> allowedValues) {
+    /**
+     * A table output column. {@code allowedValues} is ordered highest-priority first for PRIORITY.
+     * {@code valueLabels} carries display labels for UI round-trips and traces.
+     */
+    public record Output(String id, String label, DataType dataType, List<Object> allowedValues,
+                         Map<String, String> valueLabels) {
         public Output {
             allowedValues = allowedValues == null ? List.of() : allowedValues;
+            valueLabels = valueLabels == null ? Map.of() : Map.copyOf(valueLabels);
+        }
+
+        public Output(String id, String label, DataType dataType, List<Object> allowedValues) {
+            this(id, label, dataType, allowedValues, Map.of());
         }
 
         public Output(String id, String label, DataType dataType) {
