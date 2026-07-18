@@ -1960,10 +1960,12 @@ DTO 和 fact 结构已经预留：
 1. 先把本次 RC-BPM-02 approve/reject 证据纳入长期门禁：保留 `workflow-demo-leave-flow.spec.ts` 的 B5.1-B5.5 作为 BPM browser approve/reject golden，后续只扩展矩阵，不再回到“payload / UI 推进 / reject path 是否缺失”的旧阻断。
 2. 继续把 SLA action field insertion 从后端 retry worker/backoff/exhaustion 和手工重放 API/组件操作切片扩展到重试/幂等策略广度和统一 Trace UI 证据；当前不能误判为整条 SLA 产品链路完成。
 3. Automation `send_notification` 字段插入、保存、API 反查、reload 回显浏览器黄金已完成，trigger Rule Binding 已通过保存/reload/impact，workflow-demo seed 测试运行已补 decision trace + runtime overlay 黄金，当前 Automation Designer golden 已 39/39 通过。下一步不是重复这些用例，而是补短信 live provider、外部 provider availability matrix、BPM 更多动作/provider/失败态广度和更多权限/provider 失败态。
-4. 为 DMN 补单元格 dict 值域、输出 schema 被 SLA/BPM/Automation 消费，以及 XML round-trip / runtime evaluate 证据。
-5. 将 Rule Binding 黄金切片继续扩展到 Permission；BPMN 当前已有保存/reload/XML、后端 runtime/Trace 和 workflow-demo approve/reject 浏览器路径，但仍需 fallback/阻断、更多节点和完整 Trace UI 矩阵；SLA 和 Automation 当前已有保存/reload/impact，Automation 当前也有一条 seed 测试运行 Trace 黄金，但不等于所有 Rule Binding 场景完成。
-6. 补 dict 多选、reference/user picker、虚拟模型缺值、权限/脱敏的最小纵深测试。
-7. 用 workflow-demo 的 `wd_leave_request` 跑浏览器级：选择请假类型 / 请假天数 / 流程节点，保存片段，发布，复用到 Automation 或 SLA，执行并看 Trace。
+4. 不再重复 DMN 下载 / XML round-trip focused 切片；2026-07-18 已用 `strategy-studio-dmn-value-labels.spec.ts` 证明真实浏览器导出、下载文件名、XML 内容、导入和 `IN` 多选回显。下一步转向 DMN valueLabels 在规则资产、SLA/BPM/Automation/Permission 消费方和执行日志三处 Trace 的全矩阵。
+5. 优先补 `RC-TRACE-01` per-run `factMetadata` 的真实浏览器黄金：从侧边栏进入 DecisionOps 执行日志，按 traceId/decisionCode 打开 Trace 抽屉，证明非硬编码字段能显示低码字段 label/valueLabels，并用 DB/API 反查同一 `traceSnapshot.factMetadata`。
+6. 优先补 `RC-DICT-01` 多选 `IN / NOT_IN` 的 browser + backend evaluator 成对证据：真实 Strategy Studio 或消费方界面选择“请假类型=年假+病假”，保存 raw value array，reload 显示中文 label，再分别执行 true/false case。
+7. 将 Rule Binding 黄金切片继续扩展到 Permission；BPMN 当前已有保存/reload/XML、后端 runtime/Trace 和 workflow-demo approve/reject 浏览器路径，但仍需 fallback/阻断、更多节点和完整 Trace UI 矩阵；SLA 和 Automation 当前已有保存/reload/impact，Automation 当前也有 seed 测试运行 Trace 黄金，但不等于所有 Rule Binding 场景完成。
+8. 补 reference/user picker、虚拟模型缺值、权限/脱敏的最小纵深测试。
+9. 用 workflow-demo 的 `wd_leave_request` 跑浏览器级：选择请假类型 / 请假天数 / 流程节点，保存片段，发布，复用到 Automation 或 SLA，执行并看 Trace。
 
 这一步完成后，再进入 RuleAsset/DMN 输出 schema、Action Catalog 统一、context adapter 全矩阵和模型变更治理。
 
