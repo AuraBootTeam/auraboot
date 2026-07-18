@@ -38,6 +38,7 @@ import com.auraboot.framework.i18n.service.I18nResourceService;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.lock.DistributedLock;
 import com.auraboot.framework.menu.mapper.MenuMapper;
+import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.service.CommandService;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -57,6 +58,7 @@ import com.auraboot.framework.plugin.dto.imports.DecisionDefinitionSeedDTO;
 import com.auraboot.framework.plugin.dto.imports.EventPolicySeedDTO;
 import com.auraboot.framework.plugin.dto.imports.ImportPreviewResult;
 import com.auraboot.framework.plugin.dto.imports.ImportExecuteResult;
+import com.auraboot.framework.plugin.dto.imports.ImportRequest;
 import com.auraboot.framework.plugin.dto.imports.MenuDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.ModelDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PermissionDefinitionDTO;
@@ -955,6 +957,27 @@ class PluginImportServiceImplCoreTest {
         assertThat(danglingMsgs).isEmpty();
     }
 
+    @Test
+    @DisplayName("autoPublishAndSyncModels acknowledges rule-center governance during trusted plugin import")
+    void autoPublishAndSyncModels_acknowledgesGovernanceForTrustedImport() {
+        ImportRequest request = new ImportRequest();
+        request.setAutoPublishModels(true);
+        MetaModelDTO model = MetaModelDTO.builder()
+                .pid("model-pid")
+                .code("wd_leave_request")
+                .modelType("entity")
+                .status("draft")
+                .build();
+        when(metaModelService.findByCode("wd_leave_request")).thenReturn(model);
+
+        invokeAutoPublishAndSyncModels(List.of("wd_leave_request"), request, "workflow-demo", 1L);
+
+        ArgumentCaptor<String> noteCaptor = ArgumentCaptor.forClass(String.class);
+        verify(metaModelService).publish(eq("model-pid"), eq("Auto-published during plugin import"),
+                eq(true), noteCaptor.capture());
+        assertThat(noteCaptor.getValue()).contains("trusted plugin import").contains("workflow-demo");
+    }
+
     // ---------- checkConflicts branches ----------
 
     @Test
@@ -1565,6 +1588,24 @@ class PluginImportServiceImplCoreTest {
                     "importSavedViews", PluginManifestExtended.class, ImportExecuteResult.class, Long.class);
             method.setAccessible(true);
             method.invoke(service, manifest, result, tenantId);
+        } catch (InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            throw new RuntimeException(cause);
+        } catch (ReflectiveOperationException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void invokeAutoPublishAndSyncModels(
+            List<String> modelCodes, ImportRequest request, String pluginNamespace, Long tenantId) {
+        try {
+            Method method = PluginImportServiceImpl.class.getDeclaredMethod(
+                    "autoPublishAndSyncModels", List.class, ImportRequest.class, String.class, Long.class);
+            method.setAccessible(true);
+            method.invoke(service, modelCodes, request, pluginNamespace, tenantId);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof RuntimeException runtimeException) {

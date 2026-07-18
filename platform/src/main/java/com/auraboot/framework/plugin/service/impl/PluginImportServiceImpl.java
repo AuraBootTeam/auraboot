@@ -1651,7 +1651,10 @@ public class PluginImportServiceImpl implements PluginImportService {
             if (model.isDraft()) {
                 // Publish DRAFT model. VIEW models are also published here to enable runtime permissions/routes.
                 log.info("Auto-publishing DRAFT model: {}", logSafe(modelCode));
-                metaModelService.publish(model.getPid(), "Auto-published during plugin import");
+                String acknowledgementNote = "Acknowledged by trusted plugin import"
+                        + (pluginNamespace == null || pluginNamespace.isBlank() ? "" : ": " + pluginNamespace);
+                metaModelService.publish(model.getPid(), "Auto-published during plugin import",
+                        true, acknowledgementNote);
             } else if (model.isPublished() && !"view".equals(model.getModelType())) {
                 // Sync schema for PUBLISHED ENTITY model → adds any new columns
                 log.info("Syncing schema for PUBLISHED model: {}", logSafe(modelCode));

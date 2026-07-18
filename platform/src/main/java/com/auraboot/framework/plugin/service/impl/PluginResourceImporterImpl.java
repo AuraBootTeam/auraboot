@@ -369,6 +369,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         if (exists) {
             // Update existing model via service
             MetaModelDTO existingModel = metaModelService.findByCode(dto.getCode());
+            if (existingModel == null) {
+                throw new PluginException("Model exists but cannot be loaded for update: " + dto.getCode());
+            }
 
             // Wrap in nested format to match ExtensionBean serialization: {"extension": {...}}
             Map<String, Object> wrappedExtension = new HashMap<>();
