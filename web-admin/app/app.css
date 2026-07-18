@@ -3901,6 +3901,134 @@
   font-weight: 700;
 }
 
+.elta-fact-list {
+  display: grid;
+  gap: 8px;
+}
+
+.elta-fact-card {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.elta-fact-card-head {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.elta-fact-card-head strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.elta-fact-card-head span {
+  min-width: 0;
+  overflow: hidden;
+  color: #475569;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elta-fact-badges,
+.elta-fact-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.elta-fact-badges span,
+.elta-fact-values span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 11px;
+  line-height: 1.3;
+  padding: 3px 7px;
+}
+
+.elta-fact-values span {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.elta-fact-values code {
+  color: #1d4ed8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+}
+
+.elv-fact-list {
+  display: grid;
+  gap: 8px;
+}
+
+.elv-fact-card {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid #dbeafe;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 8px;
+}
+
+.elv-fact-card strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.elv-fact-card span.mono {
+  min-width: 0;
+  overflow: hidden;
+  color: #475569;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.elv-fact-card small {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.elv-fact-card div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.elv-fact-card div span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  font-size: 11px;
+  line-height: 1.3;
+  padding: 3px 7px;
+}
+
+.elv-fact-card code {
+  color: #1d4ed8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-size: 11px;
+}
+
 .elta-chain-error {
   border: 1px solid #fecaca;
   border-radius: 6px;
