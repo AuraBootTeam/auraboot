@@ -1,4 +1,5 @@
 import { test, expect, type APIResponse, type Page } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 import { ensureSidebarExpanded } from '../helpers';
@@ -192,13 +193,30 @@ test('Strategy Studio DMN round-trip preserves fact catalog valueLabels @golden'
       response.request().method() === 'POST' &&
       response.url().includes('/api/decision/tables/export-dmn'),
   );
+  const downloadPromise = page.waitForEvent('download');
+  const decisionCode = await page.getByTestId('dtw-decision-code').inputValue();
+  expect(decisionCode.trim(), 'Strategy Studio decision code must drive DMN export filename').toBeTruthy();
   await page.getByTestId('dt-export-dmn').click();
-  const exported = await readApi<DecisionTableDmnXmlResult>(await exportResponsePromise);
+  const [download, exportResponse] = await Promise.all([downloadPromise, exportResponsePromise]);
+  const exported = await readApi<DecisionTableDmnXmlResult>(exportResponse);
   expect(exported.valid).toBe(true);
   expect(exported.dmnXml).toContain('xmlns:aura="https://auraboot.io/schema/dmn/metadata"');
   expect(exported.dmnXml).toContain('aura:valueLabels');
   expect(exported.dmnXml).toContain('value="sick"');
   expect(exported.dmnXml).toContain(`label="${escapeXmlAttribute(sickLabel)}"`);
+  const suggested = download.suggestedFilename();
+  expect(suggested).toBe(`${decisionCode.trim()}.dmn.xml`);
+  const downloadedPath = testInfo.outputPath(suggested);
+  await download.saveAs(downloadedPath);
+  const downloadedXml = await readFile(downloadedPath, 'utf8');
+  expect(downloadedXml.length).toBeGreaterThan(100);
+  expect(downloadedXml).toContain('<definitions');
+  expect(downloadedXml).toContain('<decisionTable');
+  expect(downloadedXml).toContain('aura:valueLabels');
+  expect(downloadedXml).toContain('value="annual"');
+  expect(downloadedXml).toContain(`label="${escapeXmlAttribute(annualLabel)}"`);
+  expect(downloadedXml).toContain('value="sick"');
+  expect(downloadedXml).toContain(`label="${escapeXmlAttribute(sickLabel)}"`);
   await expect(page.getByTestId('dt-dmn-status')).toContainText('DMN XML 已导出', {
     timeout: 15_000,
   });
