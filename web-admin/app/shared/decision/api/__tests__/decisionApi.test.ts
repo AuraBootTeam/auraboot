@@ -364,6 +364,10 @@ describe('decisionApi client', () => {
       fragmentName: 'High amount approval v2',
       conditionSpec,
     });
+    await api.updateConditionFragmentDraft('fragment-pid', {
+      fragmentName: 'High amount approval draft',
+      conditionSpec,
+    });
     await api.listConditionFragmentVersions('approval_high_amount');
     await api.evaluateConditionFragment('approval_high_amount', {
       record: { data: { amount: 2000 } },
@@ -394,6 +398,14 @@ describe('decisionApi client', () => {
         endpoint: '/decision/condition-fragments/approval_high_amount/versions',
         body: {
           fragmentName: 'High amount approval v2',
+          conditionSpec,
+        },
+      },
+      {
+        method: 'post',
+        endpoint: '/decision/condition-fragment-versions/fragment-pid/draft',
+        body: {
+          fragmentName: 'High amount approval draft',
           conditionSpec,
         },
       },

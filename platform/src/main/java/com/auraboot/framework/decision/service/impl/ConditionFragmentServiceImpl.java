@@ -14,6 +14,7 @@ import com.auraboot.framework.decision.dto.ConditionFragmentEvaluateRequest;
 import com.auraboot.framework.decision.dto.ConditionFragmentEvaluationDTO;
 import com.auraboot.framework.decision.dto.ConditionFragmentImpactDTO;
 import com.auraboot.framework.decision.dto.ConditionFragmentVersionCreateRequest;
+import com.auraboot.framework.decision.dto.ConditionFragmentVersionUpdateRequest;
 import com.auraboot.framework.decision.dto.DecisionImpactRefDTO;
 import com.auraboot.framework.decision.entity.ConditionFragmentEntity;
 import com.auraboot.framework.decision.entity.DecisionUsageRefEntity;
@@ -143,6 +144,38 @@ public class ConditionFragmentServiceImpl implements ConditionFragmentService {
         fragmentMapper.insert(entity);
         log.info("Condition fragment draft version created: code={}, pid={}, version={}",
                 fragmentCode, entity.getPid(), entity.getVersion());
+        return toDTO(entity);
+    }
+
+    @Transactional
+    @Override
+    public ConditionFragmentDTO updateDraft(String pid, ConditionFragmentVersionUpdateRequest request) {
+        ConditionFragmentEntity entity = loadOwned(pid);
+        VersionStatus current = VersionStatus.valueOf(entity.getStatus());
+        if (current != VersionStatus.DRAFT && current != VersionStatus.VALIDATED
+                && current != VersionStatus.REJECTED) {
+            throw new ValidationException(ResponseCode.CommonValidationFailed,
+                    "Cannot update condition fragment version from status " + current
+                            + ". Only DRAFT, VALIDATED or REJECTED versions are editable.");
+        }
+
+        ConditionSpec spec = parseSpec(request.getConditionSpec());
+        RuleReferenceSet refs = RuleReferenceCollector.collect(spec);
+        entity.setFragmentName(valueOrDefault(request.getFragmentName(), entity.getFragmentName()));
+        entity.setDescription(valueOrDefault(request.getDescription(), entity.getDescription()));
+        entity.setScopeType(valueOrDefault(request.getScopeType(), entity.getScopeType()));
+        entity.setScopeRef(valueOrDefault(request.getScopeRef(), entity.getScopeRef()));
+        entity.setOwnerModule(valueOrDefault(request.getOwnerModule(), entity.getOwnerModule()));
+        entity.setEnabled(request.getEnabled() == null ? entity.getEnabled() : request.getEnabled());
+        entity.setStatus(VersionStatus.DRAFT.name());
+        entity.setConditionSpecJson(request.getConditionSpec());
+        entity.setFieldRefsJson(objectMapper.valueToTree(refs.fieldRefs()));
+        entity.setDecisionRefsJson(objectMapper.valueToTree(refs.decisionRefs()));
+        entity.setUpdatedBy(MetaContext.getCurrentUserPid());
+        entity.setUpdatedAt(Instant.now());
+        fragmentMapper.updateById(entity);
+        log.info("Condition fragment draft updated: code={}, pid={}, version={}",
+                entity.getFragmentCode(), entity.getPid(), entity.getVersion());
         return toDTO(entity);
     }
 

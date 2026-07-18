@@ -7,6 +7,7 @@ import com.auraboot.framework.decision.dto.ConditionFragmentDTO;
 import com.auraboot.framework.decision.dto.ConditionFragmentEvaluateRequest;
 import com.auraboot.framework.decision.dto.ConditionFragmentEvaluationDTO;
 import com.auraboot.framework.decision.dto.ConditionFragmentImpactDTO;
+import com.auraboot.framework.decision.dto.ConditionFragmentVersionUpdateRequest;
 import com.auraboot.framework.decision.dto.ConditionFragmentVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DecisionActionCatalogDTO;
 import com.auraboot.framework.decision.dto.DecisionDashboardDTO;
@@ -383,6 +384,17 @@ public class DecisionRuntimeController {
             @Valid @RequestBody ConditionFragmentVersionCreateRequest request) {
         return ApiResponse.success("Condition fragment draft version created",
                 conditionFragmentService.createVersion(code, request));
+    }
+
+    @PostMapping("/condition-fragment-versions/{pid}/draft")
+    @Operation(summary = "Update an editable condition-fragment draft version",
+            description = "Updates the ConditionSpec and reference index for an existing DRAFT/VALIDATED/REJECTED fragment version.")
+    @RequirePermission(MetaPermission.DRT_DEFINITION_MANAGE)
+    public ApiResponse<ConditionFragmentDTO> updateConditionFragmentDraft(
+            @Parameter(description = "Condition fragment version PID") @PathVariable @NotBlank String pid,
+            @Valid @RequestBody ConditionFragmentVersionUpdateRequest request) {
+        return ApiResponse.success("Condition fragment draft updated",
+                conditionFragmentService.updateDraft(pid, request));
     }
 
     @GetMapping("/condition-fragments")

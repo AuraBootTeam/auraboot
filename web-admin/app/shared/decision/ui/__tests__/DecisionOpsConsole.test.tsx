@@ -165,6 +165,36 @@ function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
     listVersions: vi.fn(async () => []),
     validateVersion: vi.fn(async () => ({ valid: true })),
     publishVersion: vi.fn(async () => ({ pid: 'draft-default', status: 'PUBLISHED' })),
+    createConditionFragment: vi.fn(async (req) => ({
+      ...req,
+      pid: 'condition-fragment-new',
+      version: 1,
+      status: 'DRAFT',
+    })),
+    createConditionFragmentVersion: vi.fn(async (code, req) => ({
+      ...req,
+      fragmentCode: code,
+      pid: 'condition-fragment-draft',
+      version: 2,
+      status: 'DRAFT',
+    })),
+    updateConditionFragmentDraft: vi.fn(async (pid, req) => ({
+      ...req,
+      fragmentCode: 'leave_sla_node_match',
+      pid,
+      version: 2,
+      status: 'DRAFT',
+    })),
+    validateConditionFragmentVersion: vi.fn(async (pid) => ({
+      fragmentCode: 'leave_sla_node_match',
+      pid,
+      status: 'VALIDATED',
+    })),
+    publishConditionFragmentVersion: vi.fn(async (pid) => ({
+      fragmentCode: 'leave_sla_node_match',
+      pid,
+      status: 'PUBLISHED',
+    })),
     getActionCatalog: vi.fn(async () => ({
       actions: [
         { actionType: 'NOTIFY', label: 'Send notification', handlerAvailable: true, category: 'messaging' },
@@ -499,6 +529,74 @@ describe('DecisionOpsConsole', () => {
     }
   });
 
+  it('persists Strategy Studio condition edits as condition fragment draft raw values', async () => {
+    const createConditionFragmentVersion = vi.fn(async (code: string, req: unknown) => ({
+      ...(req as object),
+      fragmentCode: code,
+      pid: 'fragment-draft-applicant',
+      version: 2,
+      status: 'DRAFT',
+    }));
+    const createDraftVersion = vi.fn(async () => ({ pid: 'draft-applicant', status: 'DRAFT' }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () => {
+          if (url.includes('/api/admin/users/search')) {
+            return { data: [{ pid: 'user-owner', displayName: '王经理', email: 'owner@example.com' }] };
+          }
+          return { data: { pid: 'user-owner', displayName: '王经理' } };
+        },
+      })),
+    );
+
+    try {
+      renderConsole(undefined, {
+        createConditionFragmentVersion,
+        createDraftVersion,
+      } as unknown as Partial<DecisionApi>);
+
+      fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+      fireEvent.click(screen.getByTestId('cb-add'));
+      fireEvent.change(screen.getByLabelText('field-0'), {
+        target: { value: 'record:data.wd_req_applicant' },
+      });
+      fireEvent.click(screen.getByTestId('reference-value-trigger-0'));
+      await waitFor(() =>
+        expect(screen.getByTestId('reference-value-option-0-user-owner')).toBeInTheDocument(),
+      );
+      fireEvent.click(screen.getByTestId('reference-value-option-0-user-owner'));
+      expect(screen.getByTestId('reference-value-trigger-0')).toHaveTextContent('王经理');
+
+      fireEvent.click(screen.getByTestId('strategy-save-draft'));
+
+      await waitFor(() => expect(createConditionFragmentVersion).toHaveBeenCalled());
+      const [, request] = createConditionFragmentVersion.mock.calls[0];
+      expect(request).toMatchObject({
+        scopeType: 'BPM',
+        scopeRef: 'wd_leave_approval',
+        conditionSpec: {
+          root: {
+            type: 'group',
+            children: [
+              {
+                type: 'compare',
+                left: { type: 'path', scope: 'record', path: 'data.wd_req_applicant' },
+                operator: 'EQ',
+                right: { type: 'literal', value: 'user-owner' },
+              },
+            ],
+          },
+        },
+      });
+      expect(JSON.stringify(request)).not.toContain('王经理');
+      expect(createDraftVersion).toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('exposes a direct Strategy Studio workbench jump from the console header', () => {
     renderConsole();
     expect(screen.getByRole('link', { name: '进入工作区' })).toHaveAttribute(
@@ -719,6 +817,25 @@ describe('DecisionOpsConsole', () => {
     const createDraftVersion = vi.fn(async () => ({ pid: 'draft-studio-1', status: 'DRAFT' }));
     const validateVersion = vi.fn(async () => ({ valid: true }));
     const publishVersion = vi.fn(async () => ({ pid: 'draft-studio-1', status: 'PUBLISHED' }));
+    const createConditionFragmentVersion = vi.fn(async (code: string, req: unknown) => ({
+      ...(req as object),
+      fragmentCode: code,
+      pid: 'fragment-draft-1',
+      status: 'DRAFT',
+    }));
+    const createConditionFragment = vi.fn(async (req: unknown) => ({
+      ...(req as object),
+      pid: 'fragment-new-1',
+      status: 'DRAFT',
+    }));
+    const validateConditionFragmentVersion = vi.fn(async () => ({
+      pid: 'fragment-draft-1',
+      status: 'VALIDATED',
+    }));
+    const publishConditionFragmentVersion = vi.fn(async () => ({
+      pid: 'fragment-draft-1',
+      status: 'PUBLISHED',
+    }));
 
     renderConsole(undefined, {
       getDecisionImpact,
@@ -728,6 +845,10 @@ describe('DecisionOpsConsole', () => {
       createDraftVersion,
       validateVersion,
       publishVersion,
+      createConditionFragment,
+      createConditionFragmentVersion,
+      validateConditionFragmentVersion,
+      publishConditionFragmentVersion,
     } as unknown as Partial<DecisionApi>);
 
     fireEvent.click(screen.getByTestId('strategy-impact-preview'));
@@ -757,6 +878,18 @@ describe('DecisionOpsConsole', () => {
     );
 
     fireEvent.click(screen.getByTestId('strategy-save-draft'));
+    await waitFor(() =>
+      expect(createConditionFragmentVersion).toHaveBeenCalledWith(
+        'leave_sla_node_match',
+        expect.objectContaining({
+          fragmentName: '请假 SLA 节点匹配',
+          scopeType: 'SLA',
+          conditionSpec: expect.objectContaining({
+            root: expect.objectContaining({ type: 'group' }),
+          }),
+        }),
+      ),
+    );
     await waitFor(() => expect(createDefinition).toHaveBeenCalledWith(
       expect.objectContaining({
         decisionCode: 'complaint_sla_deadline',
@@ -788,6 +921,18 @@ describe('DecisionOpsConsole', () => {
     fireEvent.click(screen.getByTestId('strategy-publish'));
 
     await waitFor(() => expect(publishVersion).toHaveBeenCalled());
+    expect(createConditionFragment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fragmentCode: 'wd_manager_approve_condition',
+        scopeType: 'BPM',
+        scopeRef: 'wd_manager_approve',
+      }),
+    );
+    expect(validateConditionFragmentVersion).toHaveBeenCalled();
+    expect(publishConditionFragmentVersion).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ impactAcknowledged: true }),
+    );
     expect(validateVersion).toHaveBeenCalledWith('draft-studio-1');
     expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('发布成功');
     expect(createDraftVersion).toHaveBeenLastCalledWith(

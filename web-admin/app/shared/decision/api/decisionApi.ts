@@ -921,6 +921,13 @@ export function createDecisionApi(http: HttpClient) {
           req,
         )
         .then(unwrap),
+    updateConditionFragmentDraft: (pid: string, req: ConditionFragmentUpsertRequest) =>
+      http
+        .post<ConditionFragment>(
+          `${D}/condition-fragment-versions/${encodeURIComponent(pid)}/draft`,
+          req,
+        )
+        .then(unwrap),
     listConditionFragmentVersions: (code: string) =>
       http
         .get<ConditionFragment[]>(
