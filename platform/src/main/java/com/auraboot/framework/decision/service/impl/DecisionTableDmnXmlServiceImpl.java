@@ -34,6 +34,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -47,6 +48,7 @@ import java.util.Map;
 public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlService {
 
     private static final String DMN_NS = "https://www.omg.org/spec/DMN/20191111/MODEL/";
+    private static final String AURA_DMN_METADATA_NS = "https://auraboot.io/schema/dmn/metadata";
     private static final String DEFAULT_NAMESPACE = "https://auraboot/dmn/decision-table";
 
     private final ObjectMapper mapper;
@@ -116,11 +118,14 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
     private String toDmnXml(DecisionTable table, String decisionId, String decisionName, String namespace,
                             DecisionTableDmnXmlDTO dto) {
         StringBuilder xml = new StringBuilder(4096);
+        boolean hasValueLabels = hasValueLabels(table);
         xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         xml.append("<definitions xmlns=\"").append(DMN_NS).append("\"")
+                .append(hasValueLabels ? " xmlns:aura=\"" + AURA_DMN_METADATA_NS + "\"" : "")
                 .append(" namespace=\"").append(escapeXml(namespace)).append("\"")
                 .append(" name=\"").append(escapeXml(decisionName)).append("\"")
                 .append(" id=\"").append(escapeXml(safeId(decisionId))).append("\">\n");
+        appendValueLabelMetadata(xml, table);
         for (DecisionTable.Input input : table.inputs()) {
             String varName = dmnInputName(input, dto);
             xml.append("  <inputData id=\"").append(escapeXml("inputData_" + safeId(input.id()))).append("\"")
@@ -200,6 +205,11 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
         model.put("hitPolicy", hitPolicy);
         model.put("aggregation", attrOr(table, "aggregation", "NONE"));
 
+        Map<String, Map<String, String>> inputValueLabels =
+                valueLabelsByHolder(doc.getDocumentElement(), "input");
+        Map<String, Map<String, String>> outputValueLabels =
+                valueLabelsByHolder(doc.getDocumentElement(), "output");
+
         ArrayNode inputs = mapper.createArrayNode();
         List<Element> inputElements = children(table, "input");
         for (Element inputEl : inputElements) {
@@ -217,6 +227,10 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
             if (allowed.size() > 0) {
                 input.set("allowedValues", allowed);
             }
+            Map<String, String> labels = inputValueLabels.get(id);
+            if (labels != null && !labels.isEmpty()) {
+                input.set("valueLabels", mapper.valueToTree(labels));
+            }
             inputs.add(input);
         }
         model.set("inputs", inputs);
@@ -233,6 +247,10 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
             ArrayNode allowed = allowedValues(outputEl, "outputValues", dataType);
             if (allowed.size() > 0) {
                 output.set("allowedValues", allowed);
+            }
+            Map<String, String> labels = outputValueLabels.get(id);
+            if (labels != null && !labels.isEmpty()) {
+                output.set("valueLabels", mapper.valueToTree(labels));
             }
             outputs.add(output);
         }
@@ -288,10 +306,27 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
             if (!source.allowedValues().isEmpty()) {
                 input.set("allowedValues", mapper.valueToTree(source.allowedValues()));
             }
+            if (!source.valueLabels().isEmpty()) {
+                input.set("valueLabels", mapper.valueToTree(source.valueLabels()));
+            }
             inputs.add(input);
         }
         model.set("inputs", inputs);
-        model.set("outputs", mapper.valueToTree(table.outputs()));
+        ArrayNode outputs = mapper.createArrayNode();
+        for (DecisionTable.Output source : table.outputs()) {
+            ObjectNode output = mapper.createObjectNode();
+            output.put("id", source.id());
+            output.put("label", textOr(source.label(), source.id()));
+            output.put("dataType", source.dataType() == null ? "string" : source.dataType().code());
+            if (!source.allowedValues().isEmpty()) {
+                output.set("allowedValues", mapper.valueToTree(source.allowedValues()));
+            }
+            if (!source.valueLabels().isEmpty()) {
+                output.set("valueLabels", mapper.valueToTree(source.valueLabels()));
+            }
+            outputs.add(output);
+        }
+        model.set("outputs", outputs);
         model.set("rules", mapper.valueToTree(table.rules()));
         model.set("defaultOutput", mapper.valueToTree(table.defaultOutput()));
         return model;
@@ -374,6 +409,39 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
                 .append("</text></").append(tag).append(">\n");
     }
 
+    private boolean hasValueLabels(DecisionTable table) {
+        return table.inputs().stream().anyMatch(input -> !input.valueLabels().isEmpty())
+                || table.outputs().stream().anyMatch(output -> !output.valueLabels().isEmpty());
+    }
+
+    private void appendValueLabelMetadata(StringBuilder xml, DecisionTable table) {
+        if (!hasValueLabels(table)) {
+            return;
+        }
+        xml.append("  <extensionElements>\n")
+                .append("    <aura:decisionTableMetadata>\n");
+        for (DecisionTable.Input input : table.inputs()) {
+            appendValueLabelGroup(xml, "input", input.id(), input.valueLabels());
+        }
+        for (DecisionTable.Output output : table.outputs()) {
+            appendValueLabelGroup(xml, "output", output.id(), output.valueLabels());
+        }
+        xml.append("    </aura:decisionTableMetadata>\n")
+                .append("  </extensionElements>\n");
+    }
+
+    private void appendValueLabelGroup(StringBuilder xml, String holder, String id, Map<String, String> labels) {
+        if (labels == null || labels.isEmpty()) {
+            return;
+        }
+        xml.append("      <aura:valueLabels holder=\"").append(escapeXml(holder))
+                .append("\" id=\"").append(escapeXml(id)).append("\">\n");
+        labels.forEach((value, label) -> xml.append("        <aura:valueLabel value=\"")
+                .append(escapeXml(value)).append("\" label=\"")
+                .append(escapeXml(label)).append("\"/>\n"));
+        xml.append("      </aura:valueLabels>\n");
+    }
+
     private ArrayNode allowedValues(Element parent, String tag, DataType dataType) {
         ArrayNode values = mapper.createArrayNode();
         Element valueElement = first(parent, tag);
@@ -384,6 +452,40 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
             values.addPOJO(parseLiteral(part, dataType));
         }
         return values;
+    }
+
+    private Map<String, Map<String, String>> valueLabelsByHolder(Element root, String holder) {
+        Map<String, Map<String, String>> byId = new LinkedHashMap<>();
+        if (root == null) {
+            return byId;
+        }
+        NodeList groups = root.getElementsByTagNameNS(AURA_DMN_METADATA_NS, "valueLabels");
+        for (int i = 0; i < groups.getLength(); i += 1) {
+            if (!(groups.item(i) instanceof Element group)) {
+                continue;
+            }
+            if (!holder.equals(attrOr(group, "holder", ""))) {
+                continue;
+            }
+            String id = attrOr(group, "id", "");
+            if (id.isBlank()) {
+                continue;
+            }
+            Map<String, String> labels = new LinkedHashMap<>();
+            NodeList labelNodes = group.getElementsByTagNameNS(AURA_DMN_METADATA_NS, "valueLabel");
+            for (int j = 0; j < labelNodes.getLength(); j += 1) {
+                if (labelNodes.item(j) instanceof Element label) {
+                    String value = attrOr(label, "value", "");
+                    if (!value.isBlank()) {
+                        labels.put(value, attrOr(label, "label", value));
+                    }
+                }
+            }
+            if (!labels.isEmpty()) {
+                byId.put(id, labels);
+            }
+        }
+        return byId;
     }
 
     private List<String> splitFeelList(String text) {

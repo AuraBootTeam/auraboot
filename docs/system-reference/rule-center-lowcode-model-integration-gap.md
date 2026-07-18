@@ -2922,6 +2922,37 @@ web-admin && pnpm exec vitest run \
 
 后续仍未关闭：本节自己的 focused Vitest/typecheck/browser authoring 验证；reference/user picker 字段；虚拟模型字段的 browser Trace；DMN import/export round-trip metadata；全消费方浏览器黄金矩阵；执行日志页面与规则资产/消费方详情之间的全量 Trace 互跳；以及 `IN / NOT_IN` 在真实 Strategy Studio / 消费方页面中从 UI 保存到后端 evaluator 的 browser + backend 成对证据。
 
+### RC-DMN-01 DMN valueLabels import/export metadata focused slice（2026-07-18，待验证）
+
+本轮补的是上一节明确留下的 `DMN import/export round-trip metadata` 缺口：Fact Catalog 和前端 DMN 表格已经能持有 `allowedValues + valueLabels`，但后端 `DecisionTable` record 只接收 `allowedValues`，导致 editor model 进入 DMN XML export/import/roundTrip 后会丢失字典值中文标签。用户看到的是中文环境，DMN 导入导出后不能退回裸 `annual/sick`，同时 runtime evaluator 又必须继续按 raw value 判断。
+
+代码实现：`DecisionTable.Input` / `DecisionTable.Output` 新增 `Map<String,String> valueLabels`，并保留旧构造器兼容已有分析器和 evaluator 测试夹具。`DecisionTableJson.normalizeEditorModel` 不需要额外迁移：它只把 editor input 的 `scope/path/dataType` 转为 `expr`，不会移除 `valueLabels`，Jackson 会把前端传入的 label map 映射到新的 record 字段。`DecisionTableDmnXmlServiceImpl` export 时仅在 DMN `definitions` 下写 Aura 扩展 metadata：
+
+```xml
+<extensionElements>
+  <aura:decisionTableMetadata>
+    <aura:valueLabels holder="input" id="wdReqType">
+      <aura:valueLabel value="annual" label="年假"/>
+    </aura:valueLabels>
+  </aura:decisionTableMetadata>
+</extensionElements>
+```
+
+FEEL input/output entry 仍保存 `"annual"`、`"manager"` 这类 raw value，不把中文 label 写进表达式；import/roundTrip 根据 input/output id 把 `valueLabels` 恢复到 editor model。这样 DMN XML 作为技术 artifact 仍保留可执行 raw value，同时 UI/Trace 可以拿回中文 label。
+
+测试夹具：新增 `DecisionTableDmnXmlServiceImplTest.roundTripPreservesValueLabelsInAuraDmnMetadata`，覆盖 `请假类型 annual/sick` 输入和 `审批路由 manager/hr` 输出。夹具断言 XML 带 `xmlns:aura="https://auraboot.io/schema/dmn/metadata"`、带 input/output `aura:valueLabels`，roundTrip 后 `inputs[0].valueLabels.annual=年假`、`outputs[0].valueLabels.manager=主管`，且 rule FEEL 仍是 `"annual"`。
+
+验证状态：按用户当前“先别测试，后面再补测”要求，本节只完成实现、待跑夹具和非测试门禁。当前已运行：
+
+- `platform && ./gradlew :compileJava -x test`：passed
+- `platform && ./gradlew :compileTestJava -x test`：passed
+- `git diff --check`：passed
+- focused e2e-truth 静态扫描新增后端测试夹具：未命中 `test.skip/fixme/only`、`waitForTimeout`、`retries`、PUT/PATCH API 兜底、threshold/baseline
+
+尚未运行 `DecisionTableDmnXmlServiceImplTest`、任何 Gradle test、Vitest、Playwright 或真实浏览器黄金。因此本节状态只能是 **实现待功能验证**。尤其要注意：Aura DMN 扩展 metadata 的 Drools/KIE validate 行为还需要 focused 单测实际执行来证明；当前 compile 只能证明 API/源码兼容，不能证明 XML runtime validation 已通过。
+
+后续仍未关闭：本节自己的 focused Gradle 测试执行；Strategy Studio 真实浏览器 DMN 导出/导入/roundTrip 回显；DMN valueLabels 在规则资产、SLA/BPM/Automation/Permission 消费方、DecisionOps 执行日志三处 Trace 的全矩阵；reference/user picker 字段；虚拟模型字段 browser Trace；以及全消费方 browser + backend 成对证据。
+
 ### 关闭证据模板
 
 每个 gap 关闭时，状态文档必须按下面模板记录，缺一项就不能写 `DONE`：

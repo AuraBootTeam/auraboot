@@ -73,6 +73,54 @@ class DecisionTableDmnXmlServiceImplTest {
     }
 
     @Test
+    void roundTripPreservesValueLabelsInAuraDmnMetadata() throws Exception {
+        String table = """
+            { "hitPolicy":"FIRST",
+              "inputs":[{
+                "id":"wdReqType",
+                "label":"请假类型",
+                "scope":"record",
+                "path":"data.wd_req_type",
+                "dataType":"dict",
+                "allowedValues":["annual","sick"],
+                "valueLabels":{"annual":"年假","sick":"病假"}
+              }],
+              "outputs":[{
+                "id":"route",
+                "label":"审批路由",
+                "dataType":"string",
+                "allowedValues":["manager","hr"],
+                "valueLabels":{"manager":"主管","hr":"HR"}
+              }],
+              "rules":[
+                {"ruleId":"annual","priority":10,"when":{"wdReqType":{"operator":"EQ","value":"annual"}},"then":{"route":"manager"}},
+                {"ruleId":"sick","priority":20,"when":{"wdReqType":{"operator":"EQ","value":"sick"}},"then":{"route":"hr"}}
+              ] }
+            """;
+        DecisionTableDmnXmlRequest request = new DecisionTableDmnXmlRequest();
+        request.setDecisionName("leave_route");
+        request.setModel(mapper.readTree(table));
+
+        var result = service.roundTrip(request);
+
+        assertThat(result.getValid()).isTrue();
+        assertThat(result.getDmnXml()).contains("xmlns:aura=\"https://auraboot.io/schema/dmn/metadata\"");
+        assertThat(result.getDmnXml()).contains("aura:valueLabels holder=\"input\" id=\"wdReqType\"");
+        assertThat(result.getDmnXml()).contains("aura:valueLabel value=\"annual\" label=\"年假\"");
+        assertThat(result.getDmnXml()).contains("aura:valueLabels holder=\"output\" id=\"route\"");
+        assertThat(result.getModel().path("inputs").get(0).path("allowedValues").get(0).asText())
+                .isEqualTo("annual");
+        assertThat(result.getModel().path("inputs").get(0).path("valueLabels").path("annual").asText())
+                .isEqualTo("年假");
+        assertThat(result.getModel().path("outputs").get(0).path("allowedValues").get(0).asText())
+                .isEqualTo("manager");
+        assertThat(result.getModel().path("outputs").get(0).path("valueLabels").path("manager").asText())
+                .isEqualTo("主管");
+        assertThat(result.getModel().path("rules").get(0).path("when").path("wdReqType").path("feel").asText())
+                .isEqualTo("\"annual\"");
+    }
+
+    @Test
     void importRejectsDmnXmlWithExternalEntity() throws Exception {
         Path secret = Files.createTempFile("auraboot-dmn-xxe-", ".txt");
         Files.writeString(secret, "XXE_SECRET_DO_NOT_READ");
