@@ -162,6 +162,7 @@ function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
     createDefinition: vi.fn(async () => ({ decisionCode: 'approval_routing' })),
     getDefinition: vi.fn(async () => ({ decisionCode: 'approval_routing' })),
     createDraftVersion: vi.fn(async () => ({ pid: 'draft-default', status: 'DRAFT' })),
+    listVersions: vi.fn(async () => []),
     validateVersion: vi.fn(async () => ({ valid: true })),
     publishVersion: vi.fn(async () => ({ pid: 'draft-default', status: 'PUBLISHED' })),
     getActionCatalog: vi.fn(async () => ({
@@ -703,6 +704,13 @@ describe('DecisionOpsConsole', () => {
         decisionCode: 'complaint_sla_deadline',
         callerType: 'SLA',
         callerRef: 'wd_manager_approve_sla',
+        context: expect.objectContaining({
+          record: expect.objectContaining({
+            data: expect.objectContaining({
+              wd_req_type: 'annual',
+            }),
+          }),
+        }),
       }),
     );
     await waitFor(() =>
@@ -809,6 +817,66 @@ describe('DecisionOpsConsole', () => {
         ],
       },
     });
+  });
+
+  it('restores the latest saved Strategy Studio table with dict NOT_IN value labels', async () => {
+    const listVersions = vi.fn(async () => [
+      {
+        pid: 'simple-old',
+        version: 1,
+        status: 'PUBLISHED',
+        kind: 'SIMPLE_CONDITION',
+        runtimeAdapter: 'AST_EVALUATOR',
+        contentJson: {},
+      },
+      {
+        pid: 'table-latest',
+        version: 7,
+        status: 'PUBLISHED',
+        kind: 'DECISION_TABLE',
+        runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+        contentJson: {
+          hitPolicy: 'FIRST',
+          inputs: [
+            {
+              id: 'record_data_wd_req_type',
+              label: '请假类型',
+              scope: 'record',
+              path: 'data.wd_req_type',
+              dataType: 'dict',
+              allowedValues: ['annual', 'sick'],
+              valueLabels: { annual: '年假', sick: '病假' },
+            },
+          ],
+          outputs: [
+            { id: 'route', label: 'Route', dataType: 'string', allowedValues: ['notify', 'fallback'] },
+          ],
+          rules: [
+            {
+              ruleId: 'leave-type-not-in',
+              priority: 10,
+              when: {
+                record_data_wd_req_type: { operator: 'NOT_IN', value: ['annual', 'sick'] },
+              },
+              then: { route: 'notify' },
+            },
+          ],
+          defaultOutput: {},
+        },
+      },
+    ]);
+
+    renderConsole(undefined, { listVersions } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() => expect(listVersions).toHaveBeenCalledWith('complaint_sla_deadline'));
+    await waitFor(() =>
+      expect(screen.getByTestId('dt-in-record_data_wd_req_type')).toHaveTextContent('请假类型'),
+    );
+    expect(screen.getByLabelText('op-0-record_data_wd_req_type')).toHaveValue('NOT_IN');
+    const selector = screen.getByLabelText('val-0-record_data_wd_req_type') as HTMLSelectElement;
+    expect(Array.from(selector.selectedOptions).map((option) => option.textContent)).toEqual(
+      expect.arrayContaining(['年假', '病假']),
+    );
   });
 
   it('exposes the scenario fact catalog inside the Strategy Studio DMN input picker', () => {

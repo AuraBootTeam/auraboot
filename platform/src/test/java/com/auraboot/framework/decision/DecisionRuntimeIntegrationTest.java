@@ -105,6 +105,21 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
             """).formatted(fieldCode));
     }
 
+    private JsonNode statusSetAst(String fieldCode, String operator, List<String> values) {
+        return mapper.valueToTree(Map.of(
+                "type", "compare",
+                "left", Map.of(
+                        "type", "path",
+                        "scope", "record",
+                        "path", "data." + fieldCode,
+                        "dataType", "enum"),
+                "operator", operator,
+                "right", Map.of(
+                        "type", "literal",
+                        "value", values,
+                        "dataType", "enum")));
+    }
+
     private String createPublishedDecision(String code) throws Exception {
         return createPublishedDecision(code, amountGtAst());
     }
@@ -114,15 +129,18 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
     }
 
     private String createPublishedDecision(String code, JsonNode ast, String expectedFieldRef) {
+        createDefinition(code);
+        createAndPublishVersion(code, ast, expectedFieldRef);
+        return code;
+    }
+
+    private void createDefinition(String code) {
         DrtDefinitionCreateRequest def = new DrtDefinitionCreateRequest();
         def.setDecisionCode(code);
         def.setDecisionName("IT " + code);
         def.setScopeType("AUTOMATION");
         def.setOwnerModule("decision");
         definitionService.create(def);
-
-        createAndPublishVersion(code, ast, expectedFieldRef);
-        return code;
     }
 
     private DrtVersionDTO createAndPublishVersion(String code, JsonNode ast) {
@@ -153,6 +171,21 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
         req.setCallerRef("it-" + UUID.randomUUID());
         req.setCorrelationId("corr-" + UUID.randomUUID());
         req.setContext(Map.of("record", Map.of("data", Map.of("amount", amount))));
+        return req;
+    }
+
+    private DrtEvaluateRequest dictEvalReq(String code, String modelCode, String fieldCode, String value) {
+        DrtEvaluateRequest req = new DrtEvaluateRequest();
+        req.setDecisionCode(code);
+        req.setBinding(VersionBinding.LATEST);
+        req.setCallerType("API");
+        req.setCallerRef("dict-array-it-" + UUID.randomUUID());
+        req.setCorrelationId("dict-array-" + UUID.randomUUID());
+        req.setContext(Map.of(
+                "record",
+                Map.of(
+                        "modelCode", modelCode,
+                        "data", Map.of(fieldCode, value))));
         return req;
     }
 
@@ -280,6 +313,68 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo("待审批");
         assertThat(factMetadata.path("record.data." + fieldCode).path("dictCode").asText())
                 .isEqualTo(dictCode);
+    }
+
+    @Test
+    void evaluate_dictBackedInAndNotInUseRawValueArraysOverRealStack() {
+        String suffix = Long.toString(Math.abs(System.nanoTime()), 36);
+        String modelCode = "drt_dict_array_" + suffix;
+        String fieldCode = "review_status_" + suffix;
+        String dictCode = "drt_dict_array_status_" + suffix;
+        createStatusDict(dictCode);
+        saveDictBackedModel(modelCode, fieldCode, dictCode);
+
+        String inCode = "it_dict_in_" + suffix;
+        createDefinition(inCode);
+        DrtVersionDTO inVersion = createAndPublishVersion(
+                inCode,
+                statusSetAst(fieldCode, "IN", List.of("pending", "approved")),
+                "record.data." + fieldCode);
+        JsonNode inRawValues = inVersion.getContentJson().path("right").path("value");
+        assertThat(inRawValues.isArray()).isTrue();
+        assertThat(inRawValues).hasSize(2);
+        assertThat(List.of(inRawValues.get(0).asText(), inRawValues.get(1).asText()))
+                .isEqualTo(List.of("pending", "approved"));
+
+        DecisionResult inMatched = evaluationService.evaluate(
+                dictEvalReq(inCode, modelCode, fieldCode, "pending"));
+        assertThat(inMatched.status()).isEqualTo(DecisionStatus.MATCHED);
+        assertThat(inMatched.matched()).isTrue();
+        assertThat(inMatched.outputs()).containsEntry("truth", "TRUE");
+
+        DecisionResult inNotMatched = evaluationService.evaluate(
+                dictEvalReq(inCode, modelCode, fieldCode, "rejected"));
+        assertThat(inNotMatched.status()).isEqualTo(DecisionStatus.NOT_MATCHED);
+        assertThat(inNotMatched.matched()).isFalse();
+
+        List<DrtLogDTO> inLogs = evaluationService.findLogsByTraceId(inMatched.traceId());
+        assertThat(inLogs).hasSize(1);
+        JsonNode inFactMetadata = inLogs.get(0).getTraceSnapshot().path("factMetadata");
+        assertThat(inFactMetadata.path("record.data." + fieldCode).path("valueLabels").path("pending").asText())
+                .isEqualTo("待审批");
+        assertThat(inFactMetadata.path("record.data." + fieldCode).path("valueLabels").path("approved").asText())
+                .isEqualTo("已通过");
+
+        String notInCode = "it_dict_not_in_" + suffix;
+        createDefinition(notInCode);
+        DrtVersionDTO notInVersion = createAndPublishVersion(
+                notInCode,
+                statusSetAst(fieldCode, "NOT_IN", List.of("pending", "approved")),
+                "record.data." + fieldCode);
+        JsonNode notInRawValues = notInVersion.getContentJson().path("right").path("value");
+        assertThat(notInRawValues.isArray()).isTrue();
+        assertThat(notInRawValues).hasSize(2);
+
+        DecisionResult notInMatched = evaluationService.evaluate(
+                dictEvalReq(notInCode, modelCode, fieldCode, "rejected"));
+        assertThat(notInMatched.status()).isEqualTo(DecisionStatus.MATCHED);
+        assertThat(notInMatched.matched()).isTrue();
+        assertThat(notInMatched.outputs()).containsEntry("truth", "TRUE");
+
+        DecisionResult notInNotMatched = evaluationService.evaluate(
+                dictEvalReq(notInCode, modelCode, fieldCode, "approved"));
+        assertThat(notInNotMatched.status()).isEqualTo(DecisionStatus.NOT_MATCHED);
+        assertThat(notInNotMatched.matched()).isFalse();
     }
 
     @Test
@@ -597,7 +692,8 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
         request.setSourceType("static");
         request.setItems(List.of(
                 dictItem("pending", "待审批", 1),
-                dictItem("approved", "已通过", 2)));
+                dictItem("approved", "已通过", 2),
+                dictItem("rejected", "已拒绝", 3)));
         DictDTO dict = dictService.create(request);
         assertThat(dict.getStatus()).isEqualTo("published");
         return dict;

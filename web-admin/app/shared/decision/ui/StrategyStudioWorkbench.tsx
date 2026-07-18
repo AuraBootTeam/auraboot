@@ -600,6 +600,28 @@ function initialScenarioTables(): Record<StrategyScenarioKey, DecisionTable> {
   ) as Record<StrategyScenarioKey, DecisionTable>
 }
 
+function isDecisionTable(value: unknown): value is DecisionTable {
+  if (!value || typeof value !== 'object') return false
+  const candidate = value as Partial<DecisionTable>
+  return Array.isArray(candidate.inputs)
+    && Array.isArray(candidate.outputs)
+    && Array.isArray(candidate.rules)
+}
+
+function latestRestorableTableVersion(
+  versions: Awaited<ReturnType<DecisionApi['listVersions']>>,
+) {
+  return versions
+    .filter((version) => {
+      const status = String(version.status ?? '').toUpperCase()
+      return version.kind === 'DECISION_TABLE'
+        && (!version.runtimeAdapter || version.runtimeAdapter === 'PLATFORM_DECISION_TABLE')
+        && ['DRAFT', 'VALIDATED', 'PENDING_APPROVAL', 'PUBLISHED'].includes(status)
+        && isDecisionTable(version.contentJson)
+    })
+    .sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0]
+}
+
 function tableInputRefs(table: DecisionTable): string[] {
   return table.inputs.map((input) => `${input.scope}.${input.path}`)
 }
@@ -628,6 +650,7 @@ function sampleContext() {
         priority: 'HIGH',
         status: 'OPEN',
         wd_req_days: 3,
+        wd_req_type: 'annual',
       },
     },
     actor: {
@@ -660,6 +683,7 @@ export function StrategyStudioWorkbench({
     initialScenarioTables,
   )
   const tableDraftsRef = useRef(tableDrafts)
+  const restoredScenarioTablesRef = useRef<Set<string>>(new Set())
   const [tableAnalyses, setTableAnalyses] = useState<Partial<Record<StrategyScenarioKey, DecisionTableAnalysis | null>>>({})
   const [tableAnalysisErrors, setTableAnalysisErrors] = useState<Partial<Record<StrategyScenarioKey, string | null>>>({})
   const [tableAnalyzing, setTableAnalyzing] = useState(false)
@@ -723,6 +747,34 @@ export function StrategyStudioWorkbench({
       })
     return () => { cancelled = true }
   }, [api])
+
+  useEffect(() => {
+    if (typeof api.listVersions !== 'function') return
+    const restoreKey = `${activeScenario.key}:${activeScenario.decisionCode}`
+    if (restoredScenarioTablesRef.current.has(restoreKey)) return
+    restoredScenarioTablesRef.current.add(restoreKey)
+
+    let cancelled = false
+    api.listVersions(activeScenario.decisionCode)
+      .then((versions) => {
+        if (cancelled) return
+        const latest = latestRestorableTableVersion(versions)
+        if (!latest || !isDecisionTable(latest.contentJson)) return
+        const drafts = {
+          ...tableDraftsRef.current,
+          [activeScenario.key]: latest.contentJson,
+        }
+        tableDraftsRef.current = drafts
+        setTableDrafts(drafts)
+        if (String(latest.status ?? '').toUpperCase() === 'DRAFT') {
+          setDraftVersionPids((current) => ({ ...current, [activeScenario.key]: latest.pid }))
+        }
+      })
+      .catch(() => {
+        // Strategy Studio can still work from the scenario template when no saved table exists.
+      })
+    return () => { cancelled = true }
+  }, [api, activeScenario.key, activeScenario.decisionCode])
 
   const selectScenario = (next: StrategyScenario, fragment?: ConditionFragment) => {
     setScenarioKey(next.key)

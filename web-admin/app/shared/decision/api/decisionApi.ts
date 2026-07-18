@@ -533,6 +533,7 @@ export interface DecisionVersionSummary {
   status?: string;
   kind?: string;
   runtimeAdapter?: string;
+  contentJson?: unknown;
   inputSchemaJson?: unknown;
   outputSchemaJson?: unknown;
   contextSchemaJson?: unknown;
