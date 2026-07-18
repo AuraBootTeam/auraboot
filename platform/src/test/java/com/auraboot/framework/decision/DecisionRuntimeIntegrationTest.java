@@ -21,9 +21,12 @@ import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.dto.DictCreateRequest;
 import com.auraboot.framework.meta.dto.DictDTO;
 import com.auraboot.framework.meta.dto.FieldDefinition;
+import com.auraboot.framework.meta.dto.MetaFieldCreateRequest;
 import com.auraboot.framework.meta.dto.MetaFieldDTO;
 import com.auraboot.framework.meta.dto.ModelCapabilities;
 import com.auraboot.framework.meta.dto.ModelDefinition;
+import com.auraboot.framework.meta.dto.MetaModelCreateRequest;
+import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.service.DictService;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -547,33 +550,43 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
     }
 
     private void saveDictBackedModel(String modelCode, String fieldCode, String dictCode) {
-        ModelDefinition saved = metaModelService.saveDefinition(ModelDefinition.builder()
-                .code(modelCode)
-                .displayName("Decision Trace Metadata " + modelCode)
-                .modelType("entity")
-                .sourceType("physical")
-                .primaryKey("id")
-                .fields(List.of(
-                        FieldDefinition.builder()
-                                .code("id")
-                                .name("id")
-                                .displayName("ID")
-                                .dataType("long")
-                                .columnName("id")
-                                .primaryKey(true)
-                                .build(),
-                        FieldDefinition.builder()
-                                .code(fieldCode)
-                                .name(fieldCode)
-                                .displayName("审批状态")
-                                .dataType("enum")
-                                .columnName(fieldCode)
-                                .build()))
-                .status("published")
-                .build());
-        assertThat(saved.getStatus()).isEqualTo("published");
-        MetaFieldDTO field = metaFieldService.findCurrentByCode(fieldCode).orElseThrow();
+        MetaModelCreateRequest modelRequest = new MetaModelCreateRequest();
+        modelRequest.setCode(modelCode);
+        modelRequest.setDisplayName("Decision Trace Metadata " + modelCode);
+        modelRequest.setModelType("entity");
+        modelRequest.setSourceType("physical");
+        modelRequest.setPrimaryKey("id");
+
+        MetaModelDTO model = metaModelService.create(modelRequest);
+        assertThat(model.getPid()).isNotBlank();
+
+        MetaFieldCreateRequest fieldRequest = new MetaFieldCreateRequest();
+        fieldRequest.setCode(fieldCode);
+        fieldRequest.setDataType("enum");
+        fieldRequest.setExtension(Map.of("displayName", "审批状态"));
+        fieldRequest.setAutoPublish(true);
+
+        MetaFieldDTO field = metaFieldService.create(fieldRequest);
+        assertThat(field.getPid()).isNotBlank();
+        metaModelService.bindFieldToModel(
+                model.getId(),
+                field.getId(),
+                1,
+                false,
+                true,
+                true,
+                null,
+                null,
+                null,
+                null);
         assertThat(metaFieldService.bindDictionary(field.getPid(), dictCode)).isTrue();
+
+        MetaModelDTO published = metaModelService.publish(
+                model.getPid(),
+                "DecisionRuntimeIntegrationTest fact metadata fixture",
+                true,
+                "Decision trace fact metadata fixture");
+        assertThat(published.getStatus()).isEqualToIgnoringCase("published");
     }
 
     private DictDTO createStatusDict(String dictCode) {
