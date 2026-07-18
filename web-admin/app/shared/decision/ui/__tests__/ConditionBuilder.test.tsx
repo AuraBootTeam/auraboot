@@ -60,6 +60,63 @@ describe('ConditionBuilder', () => {
     expect(screen.getByTestId('cb-preview')).not.toHaveTextContent('task_manager_approve');
   });
 
+  it('authors dict IN values as arrays while rendering value labels', () => {
+    function DictInHarness() {
+      const [v, setV] = useState<GroupNode>(
+        group('AND', [
+          cmp(path('record', 'data.wd_req_type', 'dict'), 'EQ', lit('', 'dict')),
+        ]),
+      );
+      return (
+        <>
+          <ConditionBuilder
+            value={v}
+            fields={[
+              {
+                scope: 'record',
+                path: 'data.wd_req_type',
+                label: '请假类型',
+                dataType: 'dict',
+                options: ['annual', 'sick'],
+                valueLabels: {
+                  annual: '年假',
+                  sick: '病假',
+                },
+              },
+            ]}
+            onChange={setV}
+          />
+          <pre data-testid="dump">{JSON.stringify(v)}</pre>
+        </>
+      );
+    }
+
+    render(<DictInHarness />);
+
+    fireEvent.change(screen.getByLabelText('operator-0'), { target: { value: 'IN' } });
+    const selector = screen.getByLabelText('value-0') as HTMLSelectElement;
+    expect(selector.multiple).toBe(true);
+    expect(selector).toHaveTextContent('年假');
+    expect(selector).toHaveTextContent('病假');
+    expect(selector).not.toHaveTextContent('annual');
+
+    Array.from(selector.options).forEach((option) => {
+      option.selected = ['annual', 'sick'].includes(option.value);
+    });
+    fireEvent.change(selector);
+
+    const dump = JSON.parse(screen.getByTestId('dump').textContent || '{}') as GroupNode;
+    const first = dump.children[0];
+    expect(first.type).toBe('compare');
+    if (first.type !== 'compare') return;
+    expect(first.operator).toBe('IN');
+    expect(first.right && 'value' in first.right ? first.right.value : null).toEqual(['annual', 'sick']);
+    const preview = screen.getByTestId('cb-preview');
+    expect(preview).toHaveTextContent('年假');
+    expect(preview).toHaveTextContent('病假');
+    expect(preview).not.toHaveTextContent('annual');
+  });
+
   it('adds and deletes condition rows', () => {
     render(<Harness initial={oneHighPriority()} />);
     fireEvent.click(screen.getByTestId('cb-add'));
