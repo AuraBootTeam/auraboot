@@ -985,6 +985,33 @@ Permission DMN outputMappings 后端 + 浏览器审计补充：`PolicyEvaluator`
 - Types/Check: `./node_modules/.bin/tsc` passed；`git diff --check` passed。
 - Compile: `./gradlew :compileJava :compileTestJava` passed.
 
+## Endgame 验收矩阵（2026-07-18 分支清理后）
+
+本节是 `rule-center-lowcode-model-integration-gap.md` 的执行视图，用来避免后续继续只按 pass count 或单个 focused spec 判断“完成”。当前用户要求先清理分支、先合并，后面再补测；因此本节只做矩阵整理，不新增本地测试运行结论。
+
+状态口径：
+
+- `DONE focused`：已有一条纵深切片闭环，但不等于该能力族全量完成。
+- `PARTIAL`：已有代码或证据，但缺 browser/backend 成对证据、截图矩阵或跨消费方矩阵。
+- `UNTESTED` 不使用；未测项统一写 `MISSING`，防止被误读为尚未分类。
+
+| 矩阵项 | 当前状态 | 已有证据边界 | 后续必须补的证据 | 下一条推荐切片 |
+|---|---|---|---|---|
+| RC-FIELD-01 统一事实目录 | `PARTIAL` | Strategy Studio、SLA、Automation、BPMN、EventPolicy、Permission 多入口已有 focused adapter / picker / 保存证据 | 同一 `wd_leave_request` 在 Strategy Studio、SLA、Automation、BPMN、EventPolicy、Permission 六入口的浏览器字段集一致性截图 + API 反查 | 可与 RC-DICT-01 browser golden 合并跑 |
+| RC-DICT-01 字典 label/value | `PARTIAL` | `wd_req_type` label/value 组件与 DMN round-trip 已补；`IN / NOT_IN` authoring 组件已补 | 真实 Strategy Studio/消费方 browser authoring，保存 raw value array、reload 中文 label、后端 evaluator true/false 成对证据 | 先补 `IN / NOT_IN` browser + backend evaluator |
+| RC-TRACE-01 per-run fact metadata | `PARTIAL` | 后端执行日志 `traceSnapshot.factMetadata` 持久化和 Trace viewer 组件展示已补 | 真浏览器从侧边栏进入执行日志，打开 Trace 抽屉，看到非硬编码字段 label/valueLabels；DB/API 反查同一 traceId 的 `factMetadata` | 优先补一条 `review_status=pending -> 审批状态/待审批` browser golden |
+| RC-DMN-01 DMN valueLabels round-trip | `DONE focused / PARTIAL full` | Strategy Studio browser export/import/download round-trip 已补，下载 XML 已归档 | DMN valueLabels 在规则资产、SLA/BPM/Automation/Permission 消费方和执行日志三处 Trace 的全矩阵；Drools/KIE 更广 runtime validation | 暂不重复 DMN 下载；转向消费方 Trace |
+| RC-FRAG-01 条件片段复用 | `PARTIAL+` | v1/v2 创建、绑定、发布影响确认、SLA 复用方和 impact focused 证据已补 | BPM/Automation/EventPolicy/Permission 多消费方 browser runtime + 三处 Trace 互跳 | 补一个跨消费方 runtime 复用 golden |
+| RC-SLA-02 SLA 动作链 | `PARTIAL` | NOTIFY、SMS unavailable、CREATE_TASK、CC_TASK、SEND_IM、WEBHOOK、WRITE_AUDIT、ADD_COMMENT、retry/replay/dead-letter focused 证据已补 | 重试幂等广度、真实外部 provider availability/failure 注入、规则资产/消费方/执行日志三处 Trace 全矩阵 | 补 provider failure matrix 中 Webhook/SMS live 边界或 Trace 三互跳 |
+| RC-BPM-02/03 BPM/BPMN | `PARTIAL` | approve/reject、fail-closed、ServiceTask action success/failure、compact overlay drawer focused 证据已补 | 更多节点、更多输出变量、权限失败态、流程详情/执行日志多入口 Trace UI 和截图矩阵 | 补 BPM ServiceTask 更多动作/provider 失败态或 Rule Trace 多入口 |
+| RC-AUTO-03 Automation | `PARTIAL+` | Automation Designer 当前 39/39 golden；多动作 runtime overlay action evidence 已补 | 短信 live provider、外部 provider availability/failure matrix、更多权限/provider 失败态、三处 Trace 全矩阵 | 不重复 39/39，补 live/provider matrix |
+| RC-EVENT-01 EventPolicy | `PARTIAL+` | AND/OR/NOT、retry/replay/dead-letter、多动作、Webhook、SEND_IM、CREATE_TASK、CC_TASK、empty-role、provider failure structured Trace focused 证据已补 | 更多 provider failure、外部 provider matrix、BPM action 广度、三处 Trace 全矩阵 | 补外部 provider failure 注入或三处 Trace matrix |
+| RC-PERM-01/02/03 Permission/ABAC | `PARTIAL+` | ABAC guard、masked、低权限 picker/runtime audit、audit ↔ DecisionOps 双向 trace focused 证据已补 | 更多权限失败态、字段权限变化后的阻断/回放、全量 Trace/audit 脱敏矩阵 | 补字段权限变化后的 replay/Trace |
+| RC-MODEL-01 模型发布治理 | `PARTIAL+` | preflight、发布治理确认、replay plan/report、Decision/EventPolicy/Automation/SLA record/Permission focused executor 已补 | BPM、Permission 更广失败态、Automation/EventPolicy browser/live/provider failure、迁移工具和完整生命周期治理 | 补发布后跨消费方 replay 失败矩阵 |
+| RC-UX-01 产品化 UX | `PARTIAL` | Strategy Studio、BPMN/Automation compact、执行日志中文化、多个动作证据卡已补 | 全局 shell 窄视口、所有主入口信息架构、旧入口/stale pid 错误态、debug drawer 规范 | 与下一条 browser golden 同步截图 |
+
+这张矩阵的关闭规则保持不变：每一行要写 `DONE`，必须同时具备 browser evidence、backend/runtime evidence、artifact/runtime root 证据、截图或可回放 trace，以及 `/e2e-feature-coverage` 和 `/e2e-truth` 口径下没有未覆盖行动点。focused 证据只能把局部切片推进为 `DONE focused`，不能把整行改成 full `DONE`。
+
 ## 仍需继续
 
 - BPM 审批路由当前状态已更新：G-21 group/role candidate 待办查询和完成授权已修复并复跑通过；Task Center hook 层已补 `taskResult=approved/rejected` 变量转发；RC-BPM-02 workflow-demo approve/reject paths 已补浏览器真实点击“通过/驳回”后的 request payload、流程推进、流程状态 Rule Trace、audit lifecycle、reject branch 和截图。后续要补的是 BPM full matrix：fallback/阻断、更多节点/输出变量、流程详情/执行日志多入口 Trace UI、权限失败态和截图矩阵。
@@ -1005,8 +1032,10 @@ Permission DMN outputMappings 后端 + 浏览器审计补充：`PolicyEvaluator`
 
 ## 当前验证命令
 
+注意：下面是历史 focused 验证命令索引，不代表本轮已经重新执行；`rule-center-product-endgame-20260705` 旧 worktree 已不存在。后续补测必须从当前 `origin/main` 新建隔离 worktree + fresh runtime，并替换为实际 worktree 路径、runtime 名、端口和 DB。
+
 ```bash
-cd /Users/ghj/work/auraboot/auraboot/.worktrees/rule-center-product-endgame-20260705/web-admin
+cd <fresh-rule-center-worktree>/web-admin
 ./node_modules/.bin/vitest run app/framework/smart/components/formula/__tests__/FormulaEditor.fieldPicker.test.tsx
 ./node_modules/.bin/vitest run app/shared/designer/expression/__tests__/ExpressionEditor.i18n.test.tsx app/framework/smart/components/formula/__tests__/FormulaEditor.fieldPicker.test.tsx app/framework/smart/automation/nodes/__tests__/property-panel-render.test.tsx
 ./node_modules/.bin/vitest run app/plugins/core-bpm/components/__tests__/SlaMonitorPanel.test.tsx
