@@ -32,6 +32,21 @@ type DecisionResult = {
   unknownReasons?: string[];
 };
 
+type TraceFactMetadata = {
+  scope?: string;
+  path?: string;
+  factKey?: string;
+  label?: string;
+  dataType?: string;
+  modelCode?: string;
+  sourceType?: string;
+  sourceRef?: string;
+  dictCode?: string;
+  valueLabels?: Record<string, string>;
+  masked?: boolean;
+  permission?: string;
+};
+
 type DecisionLogRecord = {
   pid?: string;
   traceId?: string;
@@ -45,6 +60,7 @@ type DecisionLogRecord = {
       status?: string;
       fields?: Record<string, unknown>;
     }>;
+    factMetadata?: Record<string, TraceFactMetadata>;
     unknownReasons?: string[];
   };
 };
@@ -131,6 +147,11 @@ function createRiskScoreView(viewName: string, tenantId: string): void {
       FROM ab_tenant
      WHERE id = ${tenantId}
   `);
+}
+
+function virtualRiskScoreMetadata(log: DecisionLogRecord | undefined): TraceFactMetadata | undefined {
+  const metadata = log?.traceSnapshot?.factMetadata ?? {};
+  return metadata['record.data.slaRiskScore'] ?? metadata['data.slaRiskScore'] ?? metadata.slaRiskScore;
 }
 
 async function createAndPublishVirtualModel(
@@ -344,6 +365,14 @@ test('DecisionOps execution logs show low-code virtual-source trace from a real 
       },
     });
     expect(log?.traceSnapshot?.virtualSources?.[0]?.fields ?? {}).not.toHaveProperty('tenant_id');
+    const riskMetadata = virtualRiskScoreMetadata(log);
+    expect(riskMetadata).toMatchObject({
+      label: 'SLA Risk Score',
+      modelCode,
+      dataType: 'integer',
+      sourceRef: viewName,
+    });
+    expect(`${riskMetadata?.factKey ?? ''} ${riskMetadata?.path ?? ''}`).toContain('slaRiskScore');
 
     await openExecutionLogsFromSidebar(page);
     await page.getByLabel('log-keyword').fill(evaluation.traceId!);
@@ -365,18 +394,28 @@ test('DecisionOps execution logs show low-code virtual-source trace from a real 
     await expect(page.getByTestId('elta-trace-drawer')).toBeVisible({ timeout: 10_000 });
     await expect(page.getByTestId('elta-trace-chain')).toBeVisible();
 
+    const factMetadataSection = page.getByTestId(`elta-fact-metadata-${log!.pid}`);
+    await expect(factMetadataSection).toBeVisible({ timeout: 10_000 });
+    await expect(factMetadataSection).toContainText('事实快照');
+    await expect(factMetadataSection).toContainText('SLA Risk Score');
+    await expect(factMetadataSection).toContainText(/record\.data\.slaRiskScore|data\.slaRiskScore|slaRiskScore/);
+    await expect(factMetadataSection).toContainText(`模型 ${modelCode}`);
+    await expect(factMetadataSection).toContainText('类型 integer');
+    await expect(factMetadataSection).toContainText(`来源 ${viewName}`);
+    await expect(factMetadataSection).not.toContainText('tenant_id');
+
     const virtualSourceSection = page.getByTestId(`elta-virtual-sources-${log!.pid}`);
     await expect(virtualSourceSection).toBeVisible({ timeout: 10_000 });
     await expect(virtualSourceSection).toContainText('虚拟源');
     await expect(virtualSourceSection).toContainText(viewName);
     await expect(virtualSourceSection).toContainText(modelCode);
     await expect(virtualSourceSection).toContainText('RESOLVED');
-    await expect(virtualSourceSection).toContainText('slaRiskScore');
+    await expect(virtualSourceSection.locator('dt').filter({ hasText: 'SLA Risk Score' })).toBeVisible();
     await expect(virtualSourceSection).toContainText('91');
     await expect(virtualSourceSection).not.toContainText('tenant_id');
 
     await page.screenshot({
-      path: testInfo.outputPath('decisionops-virtual-source-trace.png'),
+      path: testInfo.outputPath('decisionops-virtual-source-fact-metadata-trace.png'),
       fullPage: true,
     });
     expect(consoleErrors).toEqual([]);

@@ -196,6 +196,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
 
             // 加载字段定义
             List<FieldDefinition> fields = loadFieldDefinitions(model.getId());
+            fields = mergeDeclaredExtensionFields(modelDefinition, fields);
             modelDefinition.setFields(fields);
 
             // 加载关联关系
@@ -1026,6 +1027,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             if (StringUtils.hasText(def.getPrimaryKey())) {
                 inner.put("primaryKey", def.getPrimaryKey());
             }
+            if (def.getFields() != null && !def.getFields().isEmpty()) {
+                inner.put("fields", def.getFields());
+            }
             ext.validate();
             existing.setUpdatedAt(Instant.now());
             metaModelMapper.updateById(existing);
@@ -1055,6 +1059,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         // Persist ModelDefinition.primaryKey into extension so it survives reloads.
         if (StringUtils.hasText(def.getPrimaryKey())) {
             extensionData.put("primaryKey", def.getPrimaryKey());
+        }
+        if (def.getFields() != null && !def.getFields().isEmpty()) {
+            extensionData.put("fields", def.getFields());
         }
         ExtensionBean extension = new ExtensionBean();
         extension.setExtension(extensionData);
@@ -1245,6 +1252,38 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             log.error("Failed to load field definitions for model ID: {}", modelId, e);
             throw new MetaServiceException("Failed to load field definitions for model ID: " + modelId, e);
         }
+    }
+
+    private List<FieldDefinition> mergeDeclaredExtensionFields(
+            ModelDefinition modelDefinition,
+            List<FieldDefinition> boundFields) {
+        if (modelDefinition == null
+                || modelDefinition.getExtension() == null
+                || !(modelDefinition.getExtension().get("fields") instanceof List<?> declared)
+                || declared.isEmpty()) {
+            return boundFields;
+        }
+        List<FieldDefinition> merged = new ArrayList<>();
+        Set<String> existingCodes = new LinkedHashSet<>();
+        if (boundFields != null) {
+            for (FieldDefinition field : boundFields) {
+                if (field == null || !StringUtils.hasText(field.getCode())) {
+                    continue;
+                }
+                merged.add(field);
+                existingCodes.add(field.getCode());
+            }
+        }
+        for (Object raw : declared) {
+            FieldDefinition field = raw instanceof FieldDefinition fieldDefinition
+                    ? fieldDefinition
+                    : objectMapper.convertValue(raw, FieldDefinition.class);
+            if (field == null || !StringUtils.hasText(field.getCode()) || !existingCodes.add(field.getCode())) {
+                continue;
+            }
+            merged.add(field);
+        }
+        return merged;
     }
 
     /**

@@ -11,6 +11,7 @@ import com.auraboot.framework.decision.entity.DrtVersionEntity;
 import com.auraboot.framework.decision.mapper.DrtVersionMapper;
 import com.auraboot.framework.decision.service.DecisionModelFieldService;
 import com.auraboot.framework.exception.ValidationException;
+import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.MetaFieldDTO;
 import com.auraboot.framework.meta.entity.Dict;
 import com.auraboot.framework.meta.entity.DictItem;
@@ -18,6 +19,7 @@ import com.auraboot.framework.meta.entity.Model;
 import com.auraboot.framework.meta.mapper.DictItemMapper;
 import com.auraboot.framework.meta.mapper.DictMapper;
 import com.auraboot.framework.meta.mapper.MetaModelMapper;
+import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.ModelFieldBindingService;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
 import com.auraboot.framework.permission.service.FieldPermissionService;
@@ -47,6 +49,7 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
 
     private final DrtVersionMapper versionMapper;
     private final MetaModelMapper metaModelMapper;
+    private final MetaModelService metaModelService;
     private final ModelFieldBindingService modelFieldBindingService;
     private final DictMapper dictMapper;
     private final DictItemMapper dictItemMapper;
@@ -158,6 +161,7 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
 
         FieldPermissionSet fieldPermissions = resolveFieldPermissions(model.getCode());
         List<MetaFieldDTO> modelFields = modelFieldBindingService.getModelFields(model.getPid());
+        Set<String> existingFieldCodes = new LinkedHashSet<>();
         for (MetaFieldDTO field : modelFields) {
             if (field == null || !Boolean.TRUE.equals(field.getVisible()) || !hasText(field.getCode())) {
                 continue;
@@ -165,8 +169,10 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
             if (!canViewField(fieldPermissions, field)) {
                 continue;
             }
+            existingFieldCodes.add(field.getCode());
             entity.getFacts().add(buildFieldFact(model, field, fieldPermissions));
         }
+        appendDeclaredVirtualFieldFacts(model, entity, existingFieldCodes);
         entity.getFacts().sort(Comparator.comparing(DecisionFactDTO::getFactKey));
         return entity;
     }
@@ -191,6 +197,63 @@ public class DecisionModelFieldServiceImpl implements DecisionModelFieldService 
         fact.setMasked(resolveMasked(field));
         fact.setPermission(resolvePermission(field));
         return fact;
+    }
+
+    private void appendDeclaredVirtualFieldFacts(
+            Model model,
+            DecisionFactEntityDTO entity,
+            Set<String> existingFieldCodes) {
+        if (model == null || entity == null || !isVirtualSourceModel(model)) {
+            return;
+        }
+        List<FieldDefinition> declaredFields = metaModelService.getModelFields(model.getCode());
+        if (declaredFields == null || declaredFields.isEmpty()) {
+            return;
+        }
+        for (FieldDefinition field : declaredFields) {
+            if (field == null || !hasText(field.getCode()) || !existingFieldCodes.add(field.getCode())) {
+                continue;
+            }
+            entity.getFacts().add(buildDeclaredFieldFact(model, field));
+        }
+    }
+
+    private boolean isVirtualSourceModel(Model model) {
+        return model != null
+                && hasText(model.getSourceType())
+                && !"physical".equalsIgnoreCase(model.getSourceType());
+    }
+
+    private DecisionFactDTO buildDeclaredFieldFact(Model model, FieldDefinition field) {
+        String dataType = normalizeDataType(field.getDataType());
+        DecisionFactDTO fact = new DecisionFactDTO();
+        fact.setScope("record");
+        fact.setPath(recordDataPath(field.getCode()));
+        fact.setFactKey("record." + fact.getPath());
+        fact.setModelCode(model.getCode());
+        fact.setSourceType(hasText(model.getSourceType()) ? model.getSourceType() : "physical");
+        fact.setLabel(firstText(field.getDisplayName(), field.getName(), field.getCode()));
+        fact.setDataType(dataType);
+        fact.setOperators(operatorsFor(dataType));
+        fact.setRequired(field.getRequired());
+        fact.setVisible(true);
+        fact.setEditable(false);
+        fact.setMasked(firstBoolean(
+                List.of("masked", "mask", "masking", "sensitive", "pii"),
+                field.getExtraProps()));
+        fact.setPermission(firstString(
+                List.of("permission", "permissionCode", "readPermission", "viewPermission"),
+                field.getExtraProps()));
+        return fact;
+    }
+
+    private String firstText(String... values) {
+        for (String value : values) {
+            if (hasText(value)) {
+                return value;
+            }
+        }
+        return null;
     }
 
     private FieldPermissionSet resolveFieldPermissions(String modelCode) {
