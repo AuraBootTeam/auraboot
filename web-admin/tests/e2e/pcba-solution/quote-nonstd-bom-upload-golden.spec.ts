@@ -10,6 +10,19 @@ import {
   type CreatedRows,
 } from './quote-e2e-helpers';
 
+/** qo_pe_snapshot comes back from the dynamic-list API as a JSON string; parse it (or pass through
+ * an already-parsed object). Mirrors the helper used by quote-bom-price-manual-adoption. */
+function parseSnapshot(value: unknown): Record<string, unknown> {
+  if (value && typeof value === 'object') return value as Record<string, unknown>;
+  if (typeof value !== 'string') return {};
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Golden: non-standard "quick quote" via the Yunhan upload-bom lane.
  *
@@ -19,13 +32,13 @@ import {
  *   1. import detected as quick (qo_bi_source_mode='quick') with the raw columns captured
  *      (qo_bi_raw_head + qo_bir_raw_cells) for the upload-bom lane;
  *   2. quote lines parsed from the arbitrary columns (mpn / package / qty) via alias detection;
- *   3. pricing runs through the upload-bom lane (when Yunhan is configured on the stack): the raw
- *      1N4148W row prices via yunhan with snapshot.matchedBy='upload_bom'.
+ *   3. pricing runs through the upload-bom lane (when Yunhan is configured on the stack): at least
+ *      one parsed row prices via yunhan with snapshot.matchedBy='upload_bom' (the ickey sandbox
+ *      catalog is partial, so we assert "at least one" rather than a specific MPN).
  *
- * NOTE: not yet registered in playwright.config.ts `quoteOpsCurrentSpecNames` / the focused gate —
- * it must prove one green run on a host-first stack that builds the feat/nonstd-bom-quick-quote
- * quote-engine jar first (see the design doc). Registering an unproven spec would create a born-red
- * gate. The pricing leg is env-guarded so the spec does not hard-fail when Yunhan is unconfigured.
+ * Registered in playwright.config.ts `quoteOpsCurrentSpecNames` (the focused QuoteOps/BOM gate)
+ * after proving one green run on a host-first enterprise-overlay stack. The pricing leg is
+ * env-guarded so the spec does not hard-fail when Yunhan is unconfigured on a stack.
  */
 test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
   test.describe.configure({ timeout: 120_000 });
@@ -122,6 +135,14 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
         expect.objectContaining({ qo_ql_package: 'SOD-123', qo_ql_qty: 10 }),
       );
 
+      // Dismiss the "上传修正BOM已完成" success dialog before navigating tabs — the result
+      // modal's backdrop otherwise intercepts pointer events on the tab bar (same close
+      // step as the standard corrected-bom-upload golden).
+      await page.getByRole('button', { name: /^关闭$/ }).click();
+      await expect(
+        page.getByText(/上传修正BOM已完成|任务已成功完成/).first(),
+      ).toBeHidden({ timeout: 10_000 });
+
       // UI: the price + process tabs render for the quick quote
       await page.getByRole('tab', { name: /BOM价格计算|BOM Price/i }).click();
       await expect(page.getByTestId('metric-strip-qo_bom_price_metrics')).toBeVisible({
@@ -142,24 +163,30 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
         'execute',
       );
       if (priceResult.sourceMode === 'quick') {
-        // Yunhan configured -> the quick upload-bom lane engaged; the 1N4148W row prices via yunhan.
-        const diodeLineId = String(quoteLines.find((row) => row.qo_ql_mpn === '1N4148W')?.pid ?? '');
-        expect(diodeLineId).toBeTruthy();
+        // Yunhan configured -> the quick upload-bom lane engaged. Assert that at least one of
+        // the parsed rows priced through the real upload-bom lane (snapshot.matchedBy='upload_bom',
+        // status='captured'). We assert "at least one" rather than pinning to a specific MPN: the
+        // ickey *sandbox* catalog is partial (e.g. 1N4148W is not_found there), so pinning to a
+        // single part is brittle. This still fails closed — a regression that breaks the lane
+        // yields zero captured rows and no upload_bom evidence.
+        const lineIds = quoteLines.map((row) => String(row.pid)).filter(Boolean);
+        expect(lineIds).toHaveLength(3);
         await expect
           .poll(
             async () => {
-              const ev = await queryDynamicRecords(page, 'qo_price_evidence_common', [
-                { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: diodeLineId },
-              ]);
-              return ev
-                .filter((row) => row.qo_pe_source === 'yunhan')
-                .map((row) => ({
-                  status: row.qo_pe_status,
-                  matchedBy:
-                    typeof row.qo_pe_snapshot === 'object' && row.qo_pe_snapshot !== null
-                      ? (row.qo_pe_snapshot as Record<string, unknown>).matchedBy
-                      : undefined,
-                }));
+              const evidence: Array<{ status: unknown; matchedBy: unknown }> = [];
+              for (const lineId of lineIds) {
+                const ev = await queryDynamicRecords(page, 'qo_price_evidence_common', [
+                  { fieldName: 'qo_pe_quote_line_id', operator: 'EQ', value: lineId },
+                ]);
+                for (const row of ev.filter((r) => r.qo_pe_source === 'yunhan')) {
+                  evidence.push({
+                    status: row.qo_pe_status,
+                    matchedBy: parseSnapshot(row.qo_pe_snapshot).matchedBy,
+                  });
+                }
+              }
+              return evidence;
             },
             { timeout: 60_000, intervals: [1000, 2000, 3000] },
           )
