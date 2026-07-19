@@ -309,7 +309,10 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
 
             assertThat(outcome).isInstanceOf(TurnOutcome.Success.class);
             verify(chatService, times(1)).executeAuraBotTurn(
-                    argThat(ctx -> ctx.triageBucket() == com.auraboot.framework.agent.triage.TriageBucket.LIGHT_CHAT
+                    // Review G3: a simple write intent is SYNC_ACTION now — chat runtime,
+                    // full catalog behind policy gates, but never the LIGHT_CHAT bucket
+                    // whose "no platform semantics" definition hid it from memory/eval.
+                    argThat(ctx -> ctx.triageBucket() == com.auraboot.framework.agent.triage.TriageBucket.SYNC_ACTION
                             && ctx.allowedReadOnlyTools().isEmpty()),
                     any(),
                     any());

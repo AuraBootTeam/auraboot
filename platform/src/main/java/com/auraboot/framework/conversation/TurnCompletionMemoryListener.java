@@ -36,6 +36,7 @@ import org.springframework.stereotype.Component;
  * <p>Importance heuristic (drives memory recall ranking):
  * <ul>
  *     <li>{@link TriageBucket#ACP_RUN}            -&gt; 5 (full action chain ran)</li>
+ *     <li>{@link TriageBucket#SYNC_ACTION}        -&gt; 4 (synchronous write action, review G3)</li>
  *     <li>{@link TriageBucket#CONTEXTUAL_ANSWER}  -&gt; 3 (page-aware explanation)</li>
  *     <li>null (triage SPI absent / pre-C.1 path) -&gt; 2 (assume some signal)</li>
  * </ul>
@@ -146,6 +147,7 @@ public class TurnCompletionMemoryListener {
         }
         return switch (bucket) {
             case ACP_RUN -> 5;
+            case SYNC_ACTION -> 4; // review G3: real write action, remembered above contextual Q&A
             case CONTEXTUAL_ANSWER -> 3;
             case LIGHT_CHAT -> 1; // unreachable — filtered above
         };

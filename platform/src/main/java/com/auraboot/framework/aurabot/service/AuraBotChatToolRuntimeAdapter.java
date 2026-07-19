@@ -15,6 +15,7 @@ import com.auraboot.framework.agent.runtime.PendingToolStore;
 import com.auraboot.framework.agent.runtime.context.AgentContextBlock;
 import com.auraboot.framework.agent.runtime.context.AgentContextBundle;
 import com.auraboot.framework.agent.runtime.policy.ExecutionEnvelope;
+import com.auraboot.framework.agent.runtime.policy.ToolCapabilityCeiling;
 import com.auraboot.framework.agent.dto.ChatMessage;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.conversation.ResponseSink;
@@ -72,7 +73,7 @@ class AuraBotChatToolRuntimeAdapter {
                 ChatMessage::getRole,
                 ChatMessage::getContent,
                 userMessage);
-        ExecutionEnvelope envelope = toolLoopEnvelope(toolDefinitions);
+        ExecutionEnvelope envelope = toolLoopEnvelope(ctx, toolDefinitions);
         return chatTurnRuntime.runToolLoop(
                 new ChatTurnRuntime.ChatToolLoopSpec(
                         ctx,
@@ -252,7 +253,7 @@ class AuraBotChatToolRuntimeAdapter {
                 .build();
     }
 
-    private ExecutionEnvelope toolLoopEnvelope(List<ToolDefinition> definitions) {
+    private ExecutionEnvelope toolLoopEnvelope(TurnContext ctx, List<ToolDefinition> definitions) {
         if (definitions == null || definitions.isEmpty()) {
             return ExecutionEnvelope.answerOnly();
         }
@@ -263,7 +264,30 @@ class AuraBotChatToolRuntimeAdapter {
                 break;
             }
         }
-        return hasWrite ? ExecutionEnvelope.writeCatalogWithGate() : ExecutionEnvelope.readOnlyCatalog();
+        ExecutionEnvelope base = hasWrite
+                ? ExecutionEnvelope.writeCatalogWithGate()
+                : ExecutionEnvelope.readOnlyCatalog();
+        return capForReadOnlyVerdict(base, ctx);
+    }
+
+    /**
+     * G10 (execution-architecture review): honor the triage read-only verdict.
+     * A CONTEXTUAL_ANSWER turn that was granted only read-only context tools
+     * must not expose write-capable tools, even when the resolved catalog
+     * contains them — cap the envelope at read-only so the policy engine
+     * drops write metadata from the round catalog. Strictly a CAP: an
+     * already-tighter envelope (answer-only / read-only) is never loosened.
+     * This is the enforcement the "read-only tier" label always claimed;
+     * before 2026-07-19 the verdict had no consumer at all.
+     */
+    static ExecutionEnvelope capForReadOnlyVerdict(ExecutionEnvelope base, TurnContext ctx) {
+        if (base == null || ctx == null || !ctx.readOnlyContextualTurn()) {
+            return base;
+        }
+        if (base.capabilityCeiling() == ToolCapabilityCeiling.WRITE_CAPABLE) {
+            return ExecutionEnvelope.readOnlyCatalog();
+        }
+        return base;
     }
 
     private Set<String> resolveUserGrantedRequiredPermissions(TurnContext ctx, List<ToolDefinition> toolDefinitions) {

@@ -38,6 +38,13 @@ public class TurnExecutionPlanner {
         DURABLE_TRIAGE_SIGNAL,
         DURABLE_EXECUTION_POLICY,
         SYNC_READ_ONLY_TURN,
+        /**
+         * Review G3: synchronous single write action — chat runtime, full
+         * catalog behind policy gates, but semantically distinct from plain
+         * chat so telemetry and cross-cutting listeners can treat it as a
+         * platform action.
+         */
+        SYNC_ACTION_TURN,
         SYNC_CHAT_TURN
     }
 
@@ -158,6 +165,14 @@ public class TurnExecutionPlanner {
                     effective.triageBucket(),
                     EnumSet.of(PolicySignal.DEFAULT_AGENT_PROFILE, PolicySignal.READ_ONLY_CONTEXT,
                             PolicySignal.CHAT_TRIAGE_BUCKET));
+        }
+        if (effective.triageBucket() == TriageBucket.SYNC_ACTION) {
+            return new TurnExecutionPlan(
+                    InitialExecutionMode.SYNC_AGENT_TURN,
+                    DecisionReason.SYNC_ACTION_TURN,
+                    normalizedAgentCode,
+                    effective.triageBucket(),
+                    EnumSet.of(PolicySignal.DEFAULT_AGENT_PROFILE, PolicySignal.CHAT_TRIAGE_BUCKET));
         }
         return new TurnExecutionPlan(
                 InitialExecutionMode.SYNC_AGENT_TURN,

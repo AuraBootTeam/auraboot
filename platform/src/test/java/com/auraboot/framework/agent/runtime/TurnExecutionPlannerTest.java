@@ -71,6 +71,19 @@ class TurnExecutionPlannerTest {
     }
 
     @Test
+    @DisplayName("G3: SYNC_ACTION bucket plans a sync chat turn with its own decision reason")
+    void plansSyncActionBucketAsSyncActionTurn() {
+        TurnExecutionPlanner.TurnExecutionPlan action = planner.decide("aurabot", TriageBucket.SYNC_ACTION);
+        assertThat(action.initialMode()).isEqualTo(TurnExecutionPlanner.InitialExecutionMode.SYNC_AGENT_TURN);
+        assertThat(action.reason()).isEqualTo(TurnExecutionPlanner.DecisionReason.SYNC_ACTION_TURN);
+        assertThat(action.durableLifecycleRequired()).isFalse();
+        // Explicit durable flags still upgrade a SYNC_ACTION turn (monotonic).
+        TurnExecutionPlanner.TurnExecutionPlan upgraded = planner.decide(new TurnExecutionPlanner.TurnExecutionInput(
+                "aurabot", TriageBucket.SYNC_ACTION, java.util.Set.of(), false, false, false, true));
+        assertThat(upgraded.initialMode()).isEqualTo(TurnExecutionPlanner.InitialExecutionMode.DURABLE_WORKFLOW);
+    }
+
+    @Test
     @DisplayName("does not turn human approval alone into durable workflow")
     void approvalAloneDoesNotRequireDurableRuntime() {
         TurnExecutionPlanner.TurnExecutionPlan decision = planner.decide(new TurnExecutionPlanner.TurnExecutionInput(

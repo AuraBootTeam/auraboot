@@ -1021,19 +1021,40 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 profileId,
                 request.userMessage(),
                 request.pageContext() != null && !request.pageContext().isEmpty(),
-                hasRecordContext(request),
-                0                                    // recentLightTurnCount — Phase C+ history-hotness query
+                hasRecordContext(request)
         );
         try {
             return preGroundingTriage.triage(tr);
         } catch (Exception e) {
-            log.warn("PreGroundingTriage threw; failing closed to ACP_RUN: {}", e.getMessage());
+            log.warn("PreGroundingTriage threw; failing closed (channel={}): {}",
+                    request.channel(), e.getMessage());
+            return triageFailureFallback(request.channel());
+        }
+    }
+
+    /**
+     * R2 review §6-3 (2026-07-19): channel-sensitive triage failure fallback.
+     * System channels keep ACP_RUN — trusted automation belongs on the durable
+     * path anyway. Human channels fall back to a READ-ONLY contextual chat turn
+     * instead: ACP_RUN is the heavier, MORE capable runtime (not a safe default
+     * for an unclassifiable human message), and on deployments without ACP
+     * wiring it surfaces as a user-visible failure. The read-only grant is
+     * enforced at the tool envelope (G10 cap), so the degraded turn can read
+     * but never write. Never LIGHT_CHAT.
+     */
+    static TriageVerdict triageFailureFallback(String channel) {
+        if (channel != null && PreGroundingTriage.SYSTEM_CHANNELS.contains(channel.toLowerCase())) {
             return new TriageVerdict(
                     TriageBucket.ACP_RUN,
                     0.0,
                     java.util.List.of("triage_exception"),
                     java.util.Set.of());
         }
+        return new TriageVerdict(
+                TriageBucket.CONTEXTUAL_ANSWER,
+                0.0,
+                java.util.List.of("triage_exception_readonly_fallback"),
+                PreGroundingTriage.READONLY_CONTEXT_TOOLS);
     }
 
     /** {@code request.legacyRequest()} carries a {@code recordPid} on

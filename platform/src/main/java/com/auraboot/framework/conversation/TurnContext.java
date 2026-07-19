@@ -129,4 +129,16 @@ public record TurnContext(
     public TurnContext {
         allowedReadOnlyTools = allowedReadOnlyTools == null ? Set.of() : Set.copyOf(allowedReadOnlyTools);
     }
+
+    /**
+     * G10 (execution-architecture review): triage granted this turn only
+     * read-only contextual tools. Consumers must treat this as a CAP — the
+     * tool envelope may be tightened to read-only because of it, never
+     * loosened. Before 2026-07-19 this verdict was computed but consumed by
+     * nobody ("read-only tier" existed as a label only).
+     */
+    public boolean readOnlyContextualTurn() {
+        return triageBucket == com.auraboot.framework.agent.triage.TriageBucket.CONTEXTUAL_ANSWER
+                && !allowedReadOnlyTools.isEmpty();
+    }
 }

@@ -92,6 +92,19 @@ class TurnCompletionMemoryListenerTest {
     }
 
     @Test
+    @DisplayName("SYNC_ACTION + non-blank response -> importance=4 (review G3: write actions ARE remembered)")
+    void syncActionSuccess_writesMemoryWithImportance4() {
+        listener.onTurnCompleted(successEvent(TriageBucket.SYNC_ACTION,
+                "Created customer TestCo."));
+
+        verify(memoryService, times(1)).createScopedMemory(
+                anyLong(), anyString(), anyString(), anyString(),
+                anyString(), anyString(),
+                eq(4),                            // importance
+                anyBoolean(), anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("LIGHT_CHAT -> skipped silently")
     void lightChat_skipsMemoryWrite() {
         listener.onTurnCompleted(successEvent(TriageBucket.LIGHT_CHAT, "Hi! How can I help?"));
