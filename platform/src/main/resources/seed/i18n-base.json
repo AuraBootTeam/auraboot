@@ -479,6 +479,8 @@
   { "key": "admin.permission.members.colPosition", "zh-CN": "岗位", "en-US": "Position" },
   { "key": "admin.permission.members.colAssignedAt", "zh-CN": "分配时间", "en-US": "Assigned At" },
   { "key": "sidebar.noMenus", "zh-CN": "暂无可用菜单", "en-US": "No menus available" },
+  { "key": "sidebar.openMenu", "zh-CN": "打开导航菜单", "en-US": "Open navigation menu" },
+  { "key": "sidebar.closeMenu", "zh-CN": "关闭导航菜单", "en-US": "Close navigation menu" },
   {
     "key": "admin.permission.selectRole",
     "zh-CN": "请选择角色",
