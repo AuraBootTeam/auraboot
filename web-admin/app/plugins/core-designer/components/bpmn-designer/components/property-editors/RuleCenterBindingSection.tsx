@@ -26,6 +26,7 @@ interface RuleCenterBindingSectionProps {
 const BPM_RULE_FIELDS: FieldOption[] = [
   { scope: 'process', path: 'nodeId', label: '流程节点', dataType: 'string' },
   { scope: 'record', path: 'amount', label: '流程金额', dataType: 'decimal' },
+  { scope: 'record', path: 'data.wd_req_applicant', label: '申请人', dataType: 'user' },
   { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
   { scope: 'record', path: 'data.wd_req_type', label: '请假类型', dataType: 'string' },
   { scope: 'record', path: 'data.wd_req_no', label: '申请编号', dataType: 'string' },
@@ -82,10 +83,12 @@ function defaultBpmContext(processKey?: string, nodeId?: string): string {
         taskKey: nodeId ?? 'task_manager_approve',
       },
       record: {
+        modelCode: 'wd_leave_request',
         entityCode: 'wd_leave_request',
         recordPid: 'REQ-LONG-LEAVE-SAMPLE',
         data: {
           wd_req_no: 'REQ-LONG-LEAVE-SAMPLE',
+          wd_req_applicant: '01KXWC18J9HR8B43ZKCCRC7XHZ',
           wd_req_days: 5,
           wd_req_type: 'annual',
           targetKey: nodeId ?? 'task_manager_approve',
