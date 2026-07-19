@@ -1656,6 +1656,9 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
         if (bean == null || bean.getTargetEntity() == null) return null;
         return FieldDefinition.RefTarget.builder()
                 .targetEntity(bean.getTargetEntity())
+                .targetTable(bean.getTargetTable())
+                .valueField(bean.getValueField())
+                .targetField(bean.getTargetField())
                 .displayField(bean.getDisplayField())
                 .build();
     }

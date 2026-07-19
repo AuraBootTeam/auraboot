@@ -10640,11 +10640,11 @@ CREATE TABLE public.ab_permission_audit_log (
     resource_code character varying(100) NOT NULL,
     action_code character varying(50) NOT NULL,
     record_id bigint,
+    record_pid character varying(64),
     result boolean NOT NULL,
     reason text,
     evaluation_trace jsonb,
-    created_at timestamp without time zone DEFAULT now(),
-    record_pid character varying(64)
+    created_at timestamp without time zone DEFAULT now()
 );
 
 

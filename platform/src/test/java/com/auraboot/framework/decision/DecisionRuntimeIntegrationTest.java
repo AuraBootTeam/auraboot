@@ -20,6 +20,8 @@ import com.auraboot.framework.decision.service.DecisionVersionService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.dto.DictCreateRequest;
 import com.auraboot.framework.meta.dto.DictDTO;
+import com.auraboot.framework.meta.dto.FieldOption;
+import com.auraboot.framework.meta.dto.FieldOptionRequest;
 import com.auraboot.framework.meta.dto.FieldDefinition;
 import com.auraboot.framework.meta.dto.MetaFieldCreateRequest;
 import com.auraboot.framework.meta.dto.MetaFieldDTO;
@@ -28,6 +30,7 @@ import com.auraboot.framework.meta.dto.ModelDefinition;
 import com.auraboot.framework.meta.dto.MetaModelCreateRequest;
 import com.auraboot.framework.meta.dto.MetaModelDTO;
 import com.auraboot.framework.meta.service.DictService;
+import com.auraboot.framework.meta.service.DynamicDataService;
 import com.auraboot.framework.meta.service.MetaFieldService;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.user.dto.UserSearchDTO;
@@ -73,6 +76,8 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
     private MetaFieldService metaFieldService;
     @Autowired
     private DictService dictService;
+    @Autowired
+    private DynamicDataService dynamicDataService;
     @Autowired
     private UserService userService;
 
@@ -137,6 +142,21 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                         "type", "literal",
                         "value", userPid,
                         "dataType", "user")));
+    }
+
+    private JsonNode businessReferenceEqAst(String fieldCode, String recordPid) {
+        return mapper.valueToTree(Map.of(
+                "type", "compare",
+                "left", Map.of(
+                        "type", "path",
+                        "scope", "record",
+                        "path", "data." + fieldCode,
+                        "dataType", "reference"),
+                "operator", "EQ",
+                "right", Map.of(
+                        "type", "literal",
+                        "value", recordPid,
+                        "dataType", "reference")));
     }
 
     private String createPublishedDecision(String code) throws Exception {
@@ -378,6 +398,62 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                 .isEqualTo(applicant.getDisplayName());
         assertThat(factMetadata.path(fieldCode).path("valueLabels").path(applicantPid).asText())
                 .isEqualTo(applicant.getDisplayName());
+    }
+
+    @Test
+    void evaluate_persistsFactMetadataSnapshotForBusinessReferenceModelFields() {
+        String suffix = Long.toString(Math.abs(System.nanoTime()), 36);
+        String supplierModel = "drt_supplier_" + suffix;
+        String supplierNameField = "supplier_name_" + suffix;
+        String ticketModel = "drt_ticket_" + suffix;
+        String supplierRefField = "supplier_ref_" + suffix;
+        saveBusinessReferenceModels(supplierModel, supplierNameField, ticketModel, supplierRefField);
+
+        String supplierName = "华东审批供应商 " + suffix;
+        Map<String, Object> supplier = MetaContext.runWithoutDataPermission(() ->
+                dynamicDataService.create(supplierModel, Map.of(supplierNameField, supplierName)));
+        String supplierPid = String.valueOf(supplier.get("pid"));
+        assertThat(supplierPid).isNotBlank();
+
+        List<FieldOption> options = MetaContext.runWithoutDataPermission(() ->
+                dynamicDataService.getFieldOptions(
+                        ticketModel,
+                        supplierRefField,
+                        FieldOptionRequest.builder().keyword("华东审批").limit(10).build()));
+        assertThat(options).anySatisfy(option -> {
+            assertThat(String.valueOf(option.getValue())).isEqualTo(supplierPid);
+            assertThat(option.getLabel()).isEqualTo(supplierName);
+        });
+
+        Map<String, Object> ticket = MetaContext.runWithoutDataPermission(() ->
+                dynamicDataService.create(ticketModel, Map.of(supplierRefField, supplierPid)));
+        String ticketPid = String.valueOf(ticket.get("pid"));
+        Map<String, Object> reloadedTicket = MetaContext.runWithoutDataPermission(() ->
+                dynamicDataService.getById(ticketModel, ticketPid));
+        assertThat(reloadedTicket.get(supplierRefField)).isEqualTo(supplierPid);
+        assertThat(reloadedTicket.get(supplierRefField + "_display")).isEqualTo(supplierName);
+
+        String code = "it_biz_ref_fact_meta_" + suffix;
+        createPublishedDecision(
+                code,
+                businessReferenceEqAst(supplierRefField, supplierPid),
+                "record.data." + supplierRefField);
+
+        DecisionResult matched = MetaContext.runWithoutDataPermission(() ->
+                evaluationService.evaluate(referenceEvalReq(code, ticketModel, supplierRefField, supplierPid)));
+        assertThat(matched.status()).isEqualTo(DecisionStatus.MATCHED);
+        assertThat(matched.matched()).isTrue();
+        List<DrtLogDTO> logs = evaluationService.findLogsByTraceId(matched.traceId());
+        assertThat(logs).hasSize(1);
+
+        JsonNode factMetadata = logs.get(0).getTraceSnapshot().path("factMetadata");
+        JsonNode byPath = factMetadata.path("record.data." + supplierRefField);
+        assertThat(byPath.path("label").asText()).isEqualTo("供应商");
+        assertThat(byPath.path("dataType").asText()).isEqualTo("reference");
+        assertThat(byPath.path("modelCode").asText()).isEqualTo(ticketModel);
+        assertThat(byPath.path("valueLabels").path(supplierPid).asText()).isEqualTo(supplierName);
+        assertThat(factMetadata.path(supplierRefField).path("valueLabels").path(supplierPid).asText())
+                .isEqualTo(supplierName);
     }
 
     @Test
@@ -814,6 +890,90 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                 true,
                 "Decision trace reference fact metadata fixture");
         assertThat(published.getStatus()).isEqualToIgnoringCase("published");
+    }
+
+    private void saveBusinessReferenceModels(
+            String targetModelCode,
+            String targetDisplayField,
+            String sourceModelCode,
+            String sourceReferenceField) {
+        MetaModelDTO targetModel = createDraftPhysicalModel(
+                targetModelCode,
+                "Decision Business Reference Target " + targetModelCode);
+        MetaFieldDTO displayField = createPublishedField(
+                targetDisplayField,
+                "string",
+                Map.of("displayName", "供应商名称", "displayField", true),
+                null);
+        bindField(targetModel, displayField, 1);
+        MetaModelDTO publishedTarget = metaModelService.publish(
+                targetModel.getPid(),
+                "DecisionRuntimeIntegrationTest business reference target fixture",
+                true,
+                "Decision trace business reference target fixture");
+        assertThat(publishedTarget.getStatus()).isEqualToIgnoringCase("published");
+
+        MetaModelDTO sourceModel = createDraftPhysicalModel(
+                sourceModelCode,
+                "Decision Business Reference Source " + sourceModelCode);
+        MetaFieldDTO referenceField = createPublishedField(
+                sourceReferenceField,
+                "reference",
+                Map.of("displayName", "供应商"),
+                Map.of(
+                        "targetEntity", targetModelCode,
+                        "displayField", targetDisplayField,
+                        "valueField", "pid"));
+        bindField(sourceModel, referenceField, 1);
+        assertThat(referenceField.getRefTarget()).containsEntry("targetEntity", targetModelCode);
+        MetaModelDTO publishedSource = metaModelService.publish(
+                sourceModel.getPid(),
+                "DecisionRuntimeIntegrationTest business reference source fixture",
+                true,
+                "Decision trace business reference source fixture");
+        assertThat(publishedSource.getStatus()).isEqualToIgnoringCase("published");
+    }
+
+    private MetaModelDTO createDraftPhysicalModel(String modelCode, String displayName) {
+        MetaModelCreateRequest modelRequest = new MetaModelCreateRequest();
+        modelRequest.setCode(modelCode);
+        modelRequest.setDisplayName(displayName);
+        modelRequest.setModelType("entity");
+        modelRequest.setSourceType("physical");
+        modelRequest.setPrimaryKey("pid");
+        MetaModelDTO model = metaModelService.create(modelRequest);
+        assertThat(model.getPid()).isNotBlank();
+        return model;
+    }
+
+    private MetaFieldDTO createPublishedField(
+            String fieldCode,
+            String dataType,
+            Map<String, Object> extension,
+            Map<String, Object> refTarget) {
+        MetaFieldCreateRequest fieldRequest = new MetaFieldCreateRequest();
+        fieldRequest.setCode(fieldCode);
+        fieldRequest.setDataType(dataType);
+        fieldRequest.setExtension(extension);
+        fieldRequest.setRefTarget(refTarget);
+        fieldRequest.setAutoPublish(true);
+        MetaFieldDTO field = metaFieldService.create(fieldRequest);
+        assertThat(field.getPid()).isNotBlank();
+        return field;
+    }
+
+    private void bindField(MetaModelDTO model, MetaFieldDTO field, int sortOrder) {
+        metaModelService.bindFieldToModel(
+                model.getId(),
+                field.getId(),
+                sortOrder,
+                false,
+                true,
+                true,
+                null,
+                null,
+                null,
+                null);
     }
 
     private DictDTO createStatusDict(String dictCode) {

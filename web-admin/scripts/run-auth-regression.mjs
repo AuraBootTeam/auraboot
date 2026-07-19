@@ -24,6 +24,7 @@ env.no_proxy = env.NO_PROXY;
 env.PW_PROFILE ||= 'fast';
 env.PW_ROLE_PROJECTS ||= '1';
 env.PW_WORKERS ||= '1';
+env.IMPORT_TEST_FIXTURES ||= 'true';
 env.PW_STORAGE_DIR ||= `tests/storage/${runId}`;
 env.PW_ADMIN_STORAGE_STATE ||= `${env.PW_STORAGE_DIR}/admin.json`;
 env.PW_OPERATOR_STORAGE_STATE ||= `${env.PW_STORAGE_DIR}/operator.json`;
@@ -45,6 +46,7 @@ runPlaywright([
   'test',
   'tests/api/setup/00-bootstrap.spec.ts',
   'tests/api/setup/01-multi-role-users.spec.ts',
+  'tests/api/setup/03-import-test-fixtures.spec.ts',
   '--project=setup',
 ]);
 runPlaywright(['test', 'tests/auth.setup.ts', '--project=auth', '--no-deps']);

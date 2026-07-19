@@ -729,8 +729,8 @@ public class DecisionTableDmnXmlServiceImpl implements DecisionTableDmnXmlServic
 
     private boolean isStringLike(DataType dataType) {
         return dataType == DataType.STRING || dataType == DataType.TEXT || dataType == DataType.ENUM
-                || dataType == DataType.DICT || dataType == DataType.USER || dataType == DataType.ROLE
-                || dataType == DataType.GROUP || dataType == DataType.DEPARTMENT;
+                || dataType == DataType.DICT || dataType == DataType.REFERENCE || dataType == DataType.USER
+                || dataType == DataType.ROLE || dataType == DataType.GROUP || dataType == DataType.DEPARTMENT;
     }
 
     private String textOr(String value, String fallback) {

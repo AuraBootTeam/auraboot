@@ -40,6 +40,10 @@ test('01-multi-role-users: provision e2e-operator + e2e-viewer', async ({ reques
     // resolution → the member silently drops to baseline perms → the permission-driven
     // sidebar menu omits the fixture models (saved-view viewer flow can't navigate).
     // Re-assert the role every run so it is idempotently active.
+    // The auth-regression runner invokes this phase before importing the
+    // internal test-fixtures plugin, so this is a best-effort reassertion:
+    // if the fixture role is not present yet, 03-import-test-fixtures will
+    // import it and assign it before auth.setup.
     await ensureActiveRole(request, headers, user);
   }
 });
@@ -98,6 +102,11 @@ async function ensureActiveRole(
   headers: Record<string, string>,
   user: { email: string; roleCode: string },
 ): Promise<void> {
+  const roleAvailable = await roleExists(request, headers, user.roleCode);
+  if (!roleAvailable) {
+    return;
+  }
+
   // Resolve the member pid for this active, employee-unlinked test user in the
   // admin's current tenant, then (re-)assign the fixture role. assign-by-code
   // re-activates a soft-deleted assignment, so this is idempotent.
@@ -123,4 +132,19 @@ async function ensureActiveRole(
     assignResp.ok(),
     `[setup-01] assign ${user.roleCode} to ${user.email} failed: HTTP ${assignResp.status()}`,
   ).toBeTruthy();
+}
+
+async function roleExists(
+  request: APIRequestContext,
+  headers: Record<string, string>,
+  roleCode: string,
+): Promise<boolean> {
+  const rolesResp = await request.get('/api/roles/all', { headers });
+  expect(
+    rolesResp.ok(),
+    `[setup-01] roles/all failed while checking ${roleCode}: HTTP ${rolesResp.status()}`,
+  ).toBeTruthy();
+  const rolesBody = await rolesResp.json().catch(() => ({}));
+  const roles: Array<{ code?: string }> = Array.isArray(rolesBody?.data) ? rolesBody.data : [];
+  return roles.some((role) => role.code === roleCode);
 }

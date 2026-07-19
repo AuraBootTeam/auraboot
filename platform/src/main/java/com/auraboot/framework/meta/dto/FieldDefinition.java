@@ -267,6 +267,13 @@ public class FieldDefinition {
         /** Model code of the referenced entity (e.g. "crm_account"). */
         @JsonAlias("targetModel")
         private String targetEntity;
+        /** Physical target table when a legacy/system reference cannot be resolved by model code. */
+        @JsonAlias("table")
+        private String targetTable;
+        /** Field/column used as the stored raw value. Defaults to pid at runtime. */
+        private String valueField;
+        /** Legacy relation/display key preserved for older plugin payloads. */
+        private String targetField;
         /** Field code to display from the referenced entity (e.g. "name"). Defaults to "name". */
         private String displayField;
     }

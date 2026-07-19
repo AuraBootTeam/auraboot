@@ -2351,6 +2351,118 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
     // ==================== Field Options ====================
 
+    private record ReferenceOptionTarget(
+            String targetModelCode,
+            String targetTable,
+            String valueColumn,
+            String displayExpression,
+            String displayAlias,
+            String groupColumn) {
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> rawRefTargetMap(FieldDefinition fieldDef) {
+        Map<String, Object> extra = fieldDef == null ? null : fieldDef.getExtraProps();
+        if (extra == null || extra.isEmpty()) {
+            return null;
+        }
+        Object raw = extra.get("refTarget");
+        if (!(raw instanceof Map<?, ?>) && extra.get("extension") instanceof Map<?, ?> extension) {
+            raw = extension.get("refTarget");
+        }
+        return raw instanceof Map<?, ?> map ? (Map<String, Object>) map : null;
+    }
+
+    private ReferenceOptionTarget resolveReferenceOptionTarget(FieldDefinition fieldDef) {
+        FieldDefinition.RefTarget canonical = fieldDef == null ? null : fieldDef.getRefTarget();
+        Map<String, Object> raw = rawRefTargetMap(fieldDef);
+
+        String targetModelCode = firstText(
+                canonical == null ? null : canonical.getTargetEntity(),
+                readMapText(raw, "targetEntity", "targetModel", "targetModelCode", "modelCode", "refModelCode"));
+        String targetTable = firstText(
+                canonical == null ? null : canonical.getTargetTable(),
+                readMapText(raw, "targetTable", "table"));
+        String valueField = firstText(
+                canonical == null ? null : canonical.getValueField(),
+                readMapText(raw, "valueField", "targetValueField"),
+                "pid");
+        String displayField = firstText(
+                canonical == null ? null : canonical.getDisplayField(),
+                readMapText(raw, "displayField", "refDisplayField", "targetField", "fieldCode"),
+                "name");
+
+        if (!hasText(targetModelCode) && !hasText(targetTable)) {
+            return null;
+        }
+
+        Optional<ModelDefinition> targetModelOpt = hasText(targetModelCode)
+                ? metadataService.getModelDefinition(targetModelCode)
+                : Optional.empty();
+        String resolvedTargetTable = firstText(
+                targetTable,
+                targetModelOpt.map(ModelDefinition::getTableName).orElse(null),
+                resolveSystemTable(targetModelCode));
+        if (!hasText(resolvedTargetTable)) {
+            return null;
+        }
+
+        String valueColumn = resolveReferenceValueColumn(targetModelOpt.orElse(null), valueField);
+        String[] displayColumn = resolveDisplayColumnExpression(targetModelOpt, targetModelCode, displayField);
+        String groupColumn = resolveReferenceValueColumn(
+                targetModelOpt.orElse(null),
+                firstText(readMapText(raw, "groupField"), "group_code"));
+        return new ReferenceOptionTarget(
+                targetModelCode,
+                resolvedTargetTable,
+                valueColumn,
+                displayColumn[0],
+                displayColumn[1],
+                groupColumn);
+    }
+
+    private String resolveReferenceValueColumn(ModelDefinition targetModel, String configuredValueField) {
+        String valueField = hasText(configuredValueField) ? configuredValueField : "pid";
+        if (targetModel != null && targetModel.getFields() != null) {
+            for (FieldDefinition field : targetModel.getFields()) {
+                String columnName = field.getColumnName() != null ? field.getColumnName() : field.getCode();
+                if (valueField.equals(field.getCode()) || valueField.equals(columnName)) {
+                    return columnName;
+                }
+            }
+        }
+        return valueField;
+    }
+
+    private String readMapText(Map<String, Object> source, String... keys) {
+        if (source == null || keys == null) {
+            return null;
+        }
+        for (String key : keys) {
+            Object value = source.get(key);
+            if (value != null && hasText(String.valueOf(value))) {
+                return String.valueOf(value);
+            }
+        }
+        return null;
+    }
+
+    private String firstText(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (hasText(value)) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
+    }
+
     @Override
     @Transactional(readOnly = true)
     public List<FieldOption> getFieldOptions(String modelCode, String fieldCode, FieldOptionRequest optionRequest) {
@@ -2359,30 +2471,18 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         ModelDefinition model = getModelDefinition(modelCode);
         FieldDefinition fieldDef = findFieldDefinition(model, fieldCode);
-
-        // Get refTarget config from field extraProps
-        Map<String, Object> extraProps = fieldDef.getExtraProps();
-        if (extraProps == null || !extraProps.containsKey("refTarget")) {
-            return Collections.emptyList();
-        }
-
-        @SuppressWarnings("unchecked")
-        Map<String, Object> refTarget = (Map<String, Object>) extraProps.get("refTarget");
-        String targetTable = (String) refTarget.get("table");
-        String valueField = (String) refTarget.getOrDefault("valueField", "id");
-        String displayField = (String) refTarget.getOrDefault("displayField", "name");
-
-        if (targetTable == null) {
+        ReferenceOptionTarget target = resolveReferenceOptionTarget(fieldDef);
+        if (target == null) {
             return Collections.emptyList();
         }
 
         // Security: validate SQL identifiers to prevent injection
         java.util.regex.Pattern NAME_PATTERN = java.util.regex.Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*$");
-        if (!NAME_PATTERN.matcher(targetTable).matches()
-                || !NAME_PATTERN.matcher(valueField).matches()
-                || !NAME_PATTERN.matcher(displayField).matches()) {
+        if (!NAME_PATTERN.matcher(target.targetTable()).matches()
+                || !NAME_PATTERN.matcher(target.valueColumn()).matches()
+                || !NAME_PATTERN.matcher(target.displayAlias()).matches()) {
             log.warn("Invalid SQL identifier in refTarget config: table={}, value={}, display={}",
-                    logSafe(targetTable), logSafe(valueField), logSafe(displayField));
+                    logSafe(target.targetTable()), logSafe(target.valueColumn()), logSafe(target.displayAlias()));
             return Collections.emptyList();
         }
 
@@ -2392,8 +2492,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Build query
         StringBuilder sql = new StringBuilder();
-        sql.append("SELECT ").append(valueField).append(", ").append(displayField);
-        sql.append(" FROM ").append(targetTable);
+        sql.append("SELECT ").append(target.valueColumn()).append(", ")
+                .append(target.displayExpression()).append(" AS ").append(target.displayAlias());
+        sql.append(" FROM ").append(target.targetTable());
         sql.append(" WHERE tenant_id = #{params.tenantId}");
 
         Map<String, Object> params = new HashMap<>();
@@ -2401,7 +2502,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Row-level permission filter on reference target model (fail-secure)
         try {
-            String refModelCode = (String) refTarget.get("targetModel");
+            String refModelCode = target.targetModelCode();
             if (refModelCode != null) {
                 Long userId = getCurrentUserId();
                 String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, refModelCode, userId);
@@ -2416,14 +2517,14 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Add keyword filter
         if (optionRequest != null && optionRequest.getKeyword() != null && !optionRequest.getKeyword().isBlank()) {
-            sql.append(" AND ").append(displayField).append(" ILIKE #{params.keyword}");
+            sql.append(" AND ").append(target.displayExpression()).append(" ILIKE #{params.keyword}");
             params.put("keyword", "%" + optionRequest.getKeyword() + "%");
         }
 
         // Add group filter
         if (optionRequest != null && optionRequest.getGroup() != null && !optionRequest.getGroup().isBlank()) {
-            String groupField = (String) refTarget.getOrDefault("groupField", "group_code");
-            if (!NAME_PATTERN.matcher(groupField).matches()) {
+            String groupField = target.groupColumn();
+            if (!hasText(groupField) || !NAME_PATTERN.matcher(groupField).matches()) {
                 log.warn("Invalid SQL identifier for groupField: {}", logSafe(groupField));
                 return Collections.emptyList();
             }
@@ -2431,7 +2532,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             params.put("groupValue", optionRequest.getGroup());
         }
 
-        sql.append(" ORDER BY ").append(displayField);
+        sql.append(" ORDER BY ").append(target.displayAlias());
         sql.append(" LIMIT ").append(limit);
         sql.append(" OFFSET ").append(offset);
 
@@ -2442,8 +2543,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         int sortOrder = offset;
         for (Map<String, Object> row : results) {
             options.add(FieldOption.builder()
-                    .value(row.get(valueField) != null ? row.get(valueField).toString() : null)
-                    .label(row.get(displayField) != null ? row.get(displayField).toString() : null)
+                    .value(row.get(target.valueColumn()) != null ? row.get(target.valueColumn()).toString() : null)
+                    .label(row.get(target.displayAlias()) != null ? row.get(target.displayAlias()).toString() : null)
                     .sortOrder(sortOrder++)
                     .build());
         }

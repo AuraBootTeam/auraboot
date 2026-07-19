@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { BrowserRouter } from 'react-router';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import DecisionOpsConsolePage from '../DecisionOpsConsolePage';
 import { createDecisionApi } from '~/shared/decision/api/decisionApi';
 import { getApiService } from '~/shared/services/ApiService';
@@ -27,9 +28,19 @@ vi.mock('~/shared/decision/api/decisionApi', () => ({
   createDecisionApi: vi.fn(() => fakeDecisionApi),
 }));
 
+afterEach(() => {
+  cleanup();
+  window.history.pushState({}, '', '/');
+});
+
 describe('DecisionOpsConsolePage', () => {
   it('renders the Strategy Studio product entry instead of redirecting to a DSL page', () => {
-    render(<DecisionOpsConsolePage />);
+    window.history.pushState({}, '', '/decision-ops');
+    render(
+      <BrowserRouter>
+        <DecisionOpsConsolePage />
+      </BrowserRouter>,
+    );
 
     expect(screen.getByTestId('decisionops-console')).toHaveTextContent(
       'studio:3:api-ready',
@@ -42,5 +53,16 @@ describe('DecisionOpsConsolePage', () => {
         delete: expect.any(Function),
       }),
     );
+  });
+
+  it('uses the tab query param as a no-JS fallback for deep linked tabs', () => {
+    window.history.pushState({}, '', '/decision-ops?tab=logs');
+    render(
+      <BrowserRouter>
+        <DecisionOpsConsolePage />
+      </BrowserRouter>,
+    );
+
+    expect(screen.getByTestId('decisionops-console')).toHaveTextContent('logs:3:api-ready');
   });
 });

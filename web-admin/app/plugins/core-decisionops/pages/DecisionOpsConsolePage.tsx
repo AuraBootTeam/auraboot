@@ -1,10 +1,11 @@
 import { useMemo } from 'react'
+import { useLocation } from 'react-router'
 import {
   createDecisionApi,
   type HttpClient,
 } from '~/shared/decision/api/decisionApi'
 import type { FieldOption } from '~/shared/decision/ui/ConditionBuilder'
-import { DecisionOpsConsole } from '~/shared/decision/ui/DecisionOpsConsole'
+import { DecisionOpsConsole, type ConsoleTab } from '~/shared/decision/ui/DecisionOpsConsole'
 import { getApiService } from '~/shared/services/ApiService'
 
 /**
@@ -25,6 +26,24 @@ const DEFAULT_FIELDS: FieldOption[] = [
   { scope: 'record', path: 'data.status', label: '状态', dataType: 'string' },
 ]
 
+const CONSOLE_TABS = new Set<ConsoleTab>([
+  'studio',
+  'dashboard',
+  'policies',
+  'definitions',
+  'designer',
+  'tables',
+  'rollouts',
+  'logs',
+  'model',
+  'permissions',
+  'connectors',
+])
+
+function tabFromSearch(value: string | null): ConsoleTab {
+  return value && CONSOLE_TABS.has(value as ConsoleTab) ? (value as ConsoleTab) : 'studio'
+}
+
 function createApi() {
   const service = getApiService()
   const http: HttpClient = {
@@ -38,5 +57,14 @@ function createApi() {
 
 export default function DecisionOpsConsolePage() {
   const api = useMemo(() => createApi(), [])
-  return <DecisionOpsConsole api={api} fields={DEFAULT_FIELDS} initialTab="studio" />
+  const location = useLocation()
+  const browserSearch = typeof window !== 'undefined' ? window.location.search : ''
+  const searchParams = new URLSearchParams(location.search || browserSearch)
+  return (
+    <DecisionOpsConsole
+      api={api}
+      fields={DEFAULT_FIELDS}
+      initialTab={tabFromSearch(searchParams.get('tab'))}
+    />
+  )
 }

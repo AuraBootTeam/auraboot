@@ -1,10 +1,21 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, it, expect, vi } from 'vitest';
+import { MemoryRouter } from 'react-router';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { DecisionOpsConsole } from '../DecisionOpsConsole';
 import { type FieldOption } from '../ConditionBuilder';
 import type { DecisionApi } from '../../api/decisionApi';
 import { I18nProvider } from '~/contexts/I18nContext';
+
+const traceHttp = vi.hoisted(() => ({
+  get: vi.fn(),
+  post: vi.fn(),
+  delete: vi.fn(),
+}));
+
+vi.mock('~/shared/services/ApiService', () => ({
+  getApiService: () => traceHttp,
+}));
 
 const FIELDS: FieldOption[] = [
   {
@@ -28,6 +39,55 @@ const DECISIONOPS_ZH = {
   'decisionops.header.policies': '事件策略',
   'decisionops.header.today': '今日评估',
 };
+
+const recentTraceLog = {
+  pid: 'log-1',
+  traceId: 'trace-live',
+  decisionCode: 'complaint_sla_deadline',
+  selectedVersion: 3,
+  status: 'MATCHED',
+  callerType: 'API',
+  callerRef: 'case-routing',
+  durationMs: 18,
+  createdAt: '2026-06-08T14:10:00Z',
+  matchedRulesJson: [{ ruleId: 'R-101' }],
+  traceSnapshot: {
+    virtualSources: [
+      {
+        sourceRef: 'virtual.leave_request_summary.v1',
+        modelCode: 'leave_request_summary_v',
+        recordPid: 'REQ-001',
+        status: 'RESOLVED',
+        fields: { slaRiskScore: 91 },
+      },
+    ],
+  },
+};
+
+function mockTraceBlockApi() {
+  traceHttp.get.mockImplementation((endpoint: string, params?: Record<string, unknown>) => {
+    if (endpoint === '/decision/logs/recent') {
+      return Promise.resolve({
+        data: {
+          records: [recentTraceLog],
+          total: 1,
+          size: params?.size ?? 50,
+          current: 1,
+          pages: 1,
+        },
+      });
+    }
+    if (endpoint === '/decision/logs') {
+      return Promise.resolve({ data: [recentTraceLog] });
+    }
+    if (endpoint === '/event-policy/action-logs') {
+      return Promise.resolve({ data: [] });
+    }
+    return Promise.resolve({ data: {} });
+  });
+  traceHttp.post.mockResolvedValue({ data: {} });
+  traceHttp.delete.mockResolvedValue({ data: {} });
+}
 
 function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
   return {
@@ -197,12 +257,42 @@ function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
     })),
     getActionCatalog: vi.fn(async () => ({
       actions: [
-        { actionType: 'NOTIFY', label: 'Send notification', handlerAvailable: true, category: 'messaging' },
-        { actionType: 'START_PROCESS', label: 'Start BPM process', handlerAvailable: true, category: 'workflow' },
-        { actionType: 'ADD_COMMENT', label: 'Add comment', handlerAvailable: true, category: 'collaboration' },
-        { actionType: 'PATCH_RECORD', label: 'Patch record', handlerAvailable: true, category: 'data' },
-        { actionType: 'WEBHOOK', label: 'Webhook', handlerAvailable: true, category: 'integration' },
-        { actionType: 'WRITE_AUDIT', label: 'Write audit', handlerAvailable: true, category: 'governance' },
+        {
+          actionType: 'NOTIFY',
+          label: 'Send notification',
+          handlerAvailable: true,
+          category: 'messaging',
+        },
+        {
+          actionType: 'START_PROCESS',
+          label: 'Start BPM process',
+          handlerAvailable: true,
+          category: 'workflow',
+        },
+        {
+          actionType: 'ADD_COMMENT',
+          label: 'Add comment',
+          handlerAvailable: true,
+          category: 'collaboration',
+        },
+        {
+          actionType: 'PATCH_RECORD',
+          label: 'Patch record',
+          handlerAvailable: true,
+          category: 'data',
+        },
+        {
+          actionType: 'WEBHOOK',
+          label: 'Webhook',
+          handlerAvailable: true,
+          category: 'integration',
+        },
+        {
+          actionType: 'WRITE_AUDIT',
+          label: 'Write audit',
+          handlerAvailable: true,
+          category: 'governance',
+        },
       ],
     })),
     listConditionFragments: vi.fn(async () => ({
@@ -241,32 +331,40 @@ function renderConsole(
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const apiInstance = api(apiOverrides);
   return render(
-    <QueryClientProvider client={client}>
-      <DecisionOpsConsole
-        api={apiInstance}
-        fields={FIELDS}
-        initialTab={initialTab}
-        modelFields={[
-          { entityCode: 'complaint', path: 'priority', label: '优先级', dataType: 'enum', refs: 3 },
-        ]}
-        logs={[{ traceId: 't1', policyCode: 'p1', status: 'SUCCESS' }]}
-        connectors={[
-          { code: 'c1', name: 'Hook', type: 'WEBHOOK', health: 'HEALTHY', enabled: true },
-        ]}
-        permissionGrants={[{ role: '管理员', caps: { view: true, publish: true } }]}
-        dashboard={{
-          summary: {
-            definitions: 5,
-            policies: 2,
-            evaluationsToday: 10,
-            matched: 8,
-            failed: 0,
-            retrying: 0,
-          },
-          exceptions: [],
-        }}
-      />
-    </QueryClientProvider>,
+    <MemoryRouter>
+      <QueryClientProvider client={client}>
+        <DecisionOpsConsole
+          api={apiInstance}
+          fields={FIELDS}
+          initialTab={initialTab}
+          modelFields={[
+            {
+              entityCode: 'complaint',
+              path: 'priority',
+              label: '优先级',
+              dataType: 'enum',
+              refs: 3,
+            },
+          ]}
+          logs={[{ traceId: 't1', policyCode: 'p1', status: 'SUCCESS' }]}
+          connectors={[
+            { code: 'c1', name: 'Hook', type: 'WEBHOOK', health: 'HEALTHY', enabled: true },
+          ]}
+          permissionGrants={[{ role: '管理员', caps: { view: true, publish: true } }]}
+          dashboard={{
+            summary: {
+              definitions: 5,
+              policies: 2,
+              evaluationsToday: 10,
+              matched: 8,
+              failed: 0,
+              retrying: 0,
+            },
+            exceptions: [],
+          }}
+        />
+      </QueryClientProvider>
+    </MemoryRouter>,
   );
 }
 
@@ -414,6 +512,13 @@ function renderConsoleWithoutPermissionGrants(apiOverrides: Partial<DecisionApi>
 }
 
 describe('DecisionOpsConsole', () => {
+  beforeEach(() => {
+    traceHttp.get.mockReset();
+    traceHttp.post.mockReset();
+    traceHttp.delete.mockReset();
+    mockTraceBlockApi();
+  });
+
   it('localizes the product header summary in zh-CN instead of leaking English counters', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
@@ -453,21 +558,33 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('doc-tab-studio')).toBeInTheDocument();
     expect(screen.getByTestId('doc-tab-definitions')).toBeInTheDocument();
     expect(screen.getByTestId('strategy-studio')).toBeInTheDocument();
-    expect(screen.getByTestId('strategy-studio').querySelector('.strategy-studio-header h3')).toHaveTextContent('主管审批 SLA');
+    expect(
+      screen.getByTestId('strategy-studio').querySelector('.strategy-studio-header h3'),
+    ).toHaveTextContent('主管审批 SLA');
     expect(screen.getByTestId('strategy-scenario-SLA')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('strategy-scenario-SLA')).toHaveTextContent('进入审批节点');
-    expect(screen.getByTestId('strategy-scenario-SLA')).not.toHaveTextContent('task.enter.approval');
+    expect(screen.getByTestId('strategy-scenario-SLA')).not.toHaveTextContent(
+      'task.enter.approval',
+    );
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('SLA 节点');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('流程节点');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('当前记录');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('文本');
-    expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('record.data.targetKey');
-    expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('sla.deadlineMinutes');
+    expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent(
+      'record.data.targetKey',
+    );
+    expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent(
+      'sla.deadlineMinutes',
+    );
     expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('优先级');
     expect(screen.getByTestId('strategy-dmn-panel')).toHaveTextContent('请假审批 SLA 截止时间');
-    expect(screen.getByTestId('strategy-dmn-panel')).not.toHaveTextContent('complaint_sla_deadline');
+    expect(screen.getByTestId('strategy-dmn-panel')).not.toHaveTextContent(
+      'complaint_sla_deadline',
+    );
     await waitFor(() =>
-      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('请假 SLA 节点匹配'),
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent(
+        '请假 SLA 节点匹配',
+      ),
     );
     expect(screen.getByTestId('strategy-action-plan')).toHaveTextContent('发送通知');
     expect(screen.getByTestId('strategy-action-plan')).not.toHaveTextContent('NOTIFY');
@@ -478,7 +595,9 @@ describe('DecisionOpsConsole', () => {
     renderConsole();
 
     await waitFor(() =>
-      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('请假 SLA 节点匹配'),
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent(
+        '请假 SLA 节点匹配',
+      ),
     );
 
     const fieldSelect = screen.getByLabelText('field-0') as HTMLSelectElement;
@@ -518,7 +637,9 @@ describe('DecisionOpsConsole', () => {
       fireEvent.click(screen.getByTestId('reference-value-trigger-0'));
 
       expect(screen.getByTestId('reference-value-menu-0')).toBeInTheDocument();
-      expect(screen.getByTestId('reference-value-meta-0')).toHaveTextContent('用户 · pid / displayName');
+      expect(screen.getByTestId('reference-value-meta-0')).toHaveTextContent(
+        '用户 · pid / displayName',
+      );
       await waitFor(() =>
         expect(globalThis.fetch).toHaveBeenCalledWith('/api/admin/users/search?keyword=&size=20', {
           credentials: 'same-origin',
@@ -544,7 +665,9 @@ describe('DecisionOpsConsole', () => {
         ok: true,
         json: async () => {
           if (url.includes('/api/admin/users/search')) {
-            return { data: [{ pid: 'user-owner', displayName: '王经理', email: 'owner@example.com' }] };
+            return {
+              data: [{ pid: 'user-owner', displayName: '王经理', email: 'owner@example.com' }],
+            };
           }
           return { data: { pid: 'user-owner', displayName: '王经理' } };
         },
@@ -617,22 +740,43 @@ describe('DecisionOpsConsole', () => {
   it('keeps compact Strategy Studio work focused on one workspace panel at a time', () => {
     renderConsole();
 
-    expect(screen.getByTestId('strategy-workspace-tab-rule')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('strategy-workspace-tab-rule')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveAttribute('data-active', 'false');
     expect(screen.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'false');
-    expect(screen.getByTestId('strategy-workspace-panel-review')).toHaveAttribute('data-active', 'false');
+    expect(screen.getByTestId('strategy-workspace-panel-review')).toHaveAttribute(
+      'data-active',
+      'false',
+    );
 
     fireEvent.click(screen.getByTestId('strategy-workspace-tab-dmn'));
 
-    expect(screen.getByTestId('strategy-workspace-tab-dmn')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'false');
+    expect(screen.getByTestId('strategy-workspace-tab-dmn')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute(
+      'data-active',
+      'false',
+    );
     expect(screen.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'true');
 
     fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
 
-    expect(screen.getByTestId('strategy-workspace-tab-rule')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
+    expect(screen.getByTestId('strategy-workspace-tab-rule')).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute(
+      'data-active',
+      'true',
+    );
     expect(screen.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'false');
   });
 
@@ -708,9 +852,7 @@ describe('DecisionOpsConsole', () => {
     fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
 
     await waitFor(() =>
-      expect(screen.getByLabelText('decision-code')).toHaveTextContent(
-        'API 审批路由',
-      ),
+      expect(screen.getByLabelText('decision-code')).toHaveTextContent('API 审批路由'),
     );
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('申请金额');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('请假申请');
@@ -748,9 +890,7 @@ describe('DecisionOpsConsole', () => {
 
     renderConsole(undefined, { listConditionFragments } as unknown as Partial<DecisionApi>);
 
-    await waitFor(() =>
-      expect(listConditionFragments).toHaveBeenCalledWith({ page: 1, size: 50 }),
-    );
+    await waitFor(() => expect(listConditionFragments).toHaveBeenCalledWith({ page: 1, size: 50 }));
     await waitFor(() =>
       expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('高金额审批条件'),
     );
@@ -898,12 +1038,14 @@ describe('DecisionOpsConsole', () => {
         }),
       ),
     );
-    await waitFor(() => expect(createDefinition).toHaveBeenCalledWith(
-      expect.objectContaining({
-        decisionCode: 'complaint_sla_deadline',
-        ownerModule: 'SLA',
-      }),
-    ));
+    await waitFor(() =>
+      expect(createDefinition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          decisionCode: 'complaint_sla_deadline',
+          ownerModule: 'SLA',
+        }),
+      ),
+    );
     expect(createDraftVersion).toHaveBeenCalledWith(
       'complaint_sla_deadline',
       expect.objectContaining({
@@ -912,7 +1054,11 @@ describe('DecisionOpsConsole', () => {
         contentJson: expect.objectContaining({
           hitPolicy: 'FIRST',
           inputs: expect.arrayContaining([
-            expect.objectContaining({ id: 'sla_deadlineMinutes', scope: 'sla', path: 'deadlineMinutes' }),
+            expect.objectContaining({
+              id: 'sla_deadlineMinutes',
+              scope: 'sla',
+              path: 'deadlineMinutes',
+            }),
           ]),
         }),
         outputSchemaJson: expect.objectContaining({
@@ -1042,7 +1188,12 @@ describe('DecisionOpsConsole', () => {
             },
           ],
           outputs: [
-            { id: 'route', label: 'Route', dataType: 'string', allowedValues: ['notify', 'fallback'] },
+            {
+              id: 'route',
+              label: 'Route',
+              dataType: 'string',
+              allowedValues: ['notify', 'fallback'],
+            },
           ],
           rules: [
             {
@@ -1189,7 +1340,9 @@ describe('DecisionOpsConsole', () => {
       'complaint_sla_deadline',
       undefined,
     );
-    await waitFor(() => expect(screen.getByTestId('dt-analysis-summary')).toHaveTextContent('规则 1'));
+    await waitFor(() =>
+      expect(screen.getByTestId('dt-analysis-summary')).toHaveTextContent('规则 1'),
+    );
 
     fireEvent.click(screen.getByTestId('dt-export-dmn'));
     await waitFor(() => expect(exportTableDmn).toHaveBeenCalledOnce());
@@ -1274,7 +1427,9 @@ describe('DecisionOpsConsole', () => {
     } as unknown as Partial<DecisionApi>);
 
     await waitFor(() =>
-      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('请假 SLA 节点匹配'),
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent(
+        '请假 SLA 节点匹配',
+      ),
     );
     fireEvent.click(screen.getByTestId('strategy-publish'));
     await waitFor(() =>
@@ -1351,7 +1506,9 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('strategy-scenario-BPM')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent('BPM');
     expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent('进入审批节点');
-    expect(screen.getByTestId('strategy-consumer-summary')).not.toHaveTextContent('task.enter.approval');
+    expect(screen.getByTestId('strategy-consumer-summary')).not.toHaveTextContent(
+      'task.enter.approval',
+    );
     expect(screen.getByLabelText('decision-code')).toHaveValue('approval_routing');
     expect(screen.getByTestId('decision-binding-editor')).toBeInTheDocument();
   });
@@ -1384,7 +1541,9 @@ describe('DecisionOpsConsole', () => {
     }));
     renderConsole(undefined, { listConditionFragments } as unknown as Partial<DecisionApi>);
 
-    await waitFor(() => expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('高金额审批条件'));
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('高金额审批条件'),
+    );
     fireEvent.click(screen.getByTestId('strategy-fragment-approval_high_amount'));
 
     expect(screen.getByTestId('strategy-scenario-BPM')).toHaveAttribute('aria-pressed', 'true');
@@ -1595,7 +1754,11 @@ describe('DecisionOpsConsole', () => {
     render(
       <QueryClientProvider client={client}>
         <DecisionOpsConsole
-          api={api({ getFactCatalog, getModelFields, analyzeTable } as unknown as Partial<DecisionApi>)}
+          api={api({
+            getFactCatalog,
+            getModelFields,
+            analyzeTable,
+          } as unknown as Partial<DecisionApi>)}
           fields={[]}
           initialTab="tables"
         />
@@ -1674,7 +1837,9 @@ describe('DecisionOpsConsole', () => {
     );
     expect(screen.getByTestId('dt-analysis-panel')).not.toHaveTextContent('DMN_GAP');
     expect(screen.getByTestId('dt-metric-gap')).toHaveTextContent('缺口 1');
-    await waitFor(() => expect(screen.getByTestId('dt-analysis-summary')).toHaveTextContent('规则 1'));
+    await waitFor(() =>
+      expect(screen.getByTestId('dt-analysis-summary')).toHaveTextContent('规则 1'),
+    );
   });
 
   it('switches to Release Governance tab and renders the rollout monitor', async () => {
@@ -1755,7 +1920,7 @@ describe('DecisionOpsConsole', () => {
   it('switches to Logs / Model / Permissions / Connectors tabs', () => {
     renderConsole();
     fireEvent.click(screen.getByTestId('doc-tab-logs'));
-    expect(screen.getByTestId('exec-log-viewer')).toBeInTheDocument();
+    expect(screen.getByTestId('execution-log-trace-block')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('doc-tab-model'));
     expect(screen.getByTestId('data-model-viewer')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('doc-tab-permissions'));
@@ -1764,43 +1929,42 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('connector-list')).toBeInTheDocument();
   });
 
-  it('queries execution logs by traceId from the logs tab', async () => {
-    const getLogs = vi.fn(async () => [
-      {
-        traceId: 'trace-live',
-        decisionCode: 'complaint_sla_deadline',
-        status: 'MATCHED',
-        matchedRulesJson: [{ ruleId: 'R-101' }],
-        traceSnapshot: {
-          virtualSources: [
-            {
-              sourceRef: 'virtual.leave_request_summary.v1',
-              modelCode: 'leave_request_summary_v',
-              recordPid: 'REQ-001',
-              status: 'RESOLVED',
-              fields: { slaRiskScore: 91 },
-            },
-          ],
-        },
-        durationMs: 18,
-        createdAt: '2026-06-08T14:10:00Z',
-      },
-    ]);
-    renderConsole('logs', { getLogs } as unknown as Partial<DecisionApi>);
+  it('shows the unified execution trace block from the logs tab', async () => {
+    renderConsole('logs');
 
-    fireEvent.change(screen.getByLabelText('log-trace-id'), { target: { value: 'trace-live' } });
-    fireEvent.click(screen.getByTestId('elq-fetch'));
+    await waitFor(() =>
+      expect(traceHttp.get).toHaveBeenCalledWith(
+        '/decision/logs/recent',
+        expect.objectContaining({ page: 0, size: 50 }),
+      ),
+    );
+    expect(screen.getByTestId('elta-row-log-1')).toHaveTextContent('请假审批 SLA 截止时间');
+    expect(screen.getByTestId('elta-row-log-1')).toHaveTextContent('命中');
+    expect(screen.getByTestId('elta-row-log-1')).not.toHaveTextContent('MATCHED');
+    expect(screen.getByTestId('elta-row-log-1')).toHaveTextContent('18ms');
 
-    await waitFor(() => expect(getLogs).toHaveBeenCalledWith('trace-live'));
-    expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('complaint_sla_deadline');
-    expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('命中');
-    expect(screen.getByTestId('elv-row-trace-live')).not.toHaveTextContent('MATCHED');
-    expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('R-101');
-    expect(screen.getByTestId('elv-row-trace-live')).toHaveTextContent('18ms');
-    fireEvent.click(screen.getByTestId('elv-open-trace-live'));
-    expect(screen.getByTestId('elv-virtual-sources')).toHaveTextContent('virtual.leave_request_summary.v1');
-    expect(screen.getByTestId('elv-virtual-sources')).toHaveTextContent('slaRiskScore');
-    expect(screen.getByTestId('elv-virtual-sources')).toHaveTextContent('91');
+    fireEvent.change(screen.getByLabelText('log-keyword'), { target: { value: 'trace-live' } });
+    fireEvent.click(screen.getByTestId('elta-apply'));
+
+    await waitFor(() =>
+      expect(traceHttp.get).toHaveBeenCalledWith(
+        '/decision/logs/recent',
+        expect.objectContaining({ keyword: 'trace-live' }),
+      ),
+    );
+    fireEvent.click(screen.getByTestId('elta-open-trace-log-1'));
+    await waitFor(() =>
+      expect(traceHttp.get).toHaveBeenCalledWith(
+        '/decision/logs',
+        expect.objectContaining({ traceId: 'trace-live' }),
+      ),
+    );
+    expect(screen.getByTestId('elta-trace-chain')).toHaveTextContent('R-101');
+    expect(screen.getByTestId('elta-virtual-sources-log-1')).toHaveTextContent(
+      'virtual.leave_request_summary.v1',
+    );
+    expect(screen.getByTestId('elta-virtual-sources-log-1')).toHaveTextContent('slaRiskScore');
+    expect(screen.getByTestId('elta-virtual-sources-log-1')).toHaveTextContent('91');
   });
 
   it('honors initialTab', () => {

@@ -9,7 +9,39 @@ status: active
 
 把“决策中心”升级为清晰的“规则中心 / 策略中心”主入口，默认进入 Strategy Studio。Strategy Studio 和 SLA / BPM / Automation / EventPolicy / Permission 都必须基于真实 API 展示规则条件、条件片段、动作目录、消费方引用、执行日志，并且各消费方页面要能看清“绑定了哪个规则、输入输出映射、运行效果、日志证据”。
 
-## 当前测试报告（2026-07-18，持续切片）
+## 当前测试报告（2026-07-19，Reference / DecisionOps Trace 收口）
+
+本轮关闭的是低码业务 reference 字段与 DecisionOps Trace 的 focused end-to-end 链路，并修复静态 `/decision-ops` 执行日志入口仍停留在旧日志页的问题。验证范围包括 dict、user reference、business reference 三类事实元数据，不把其它 SLA / BPM / Automation / EventPolicy / Permission 历史 `PARTIAL` 项误标为全量完成。
+
+| 验证层 | 命令 / 证据 | 结论 |
+|---|---|---|
+| 后端目标集 | `platform && ./gradlew :test --tests com.auraboot.framework.decision.ast.ConditionAstEvaluatorTest --tests com.auraboot.framework.decision.DecisionRuntimeIntegrationTest --tests com.auraboot.framework.integration.CommandActionDeriverIntegrationTest --tests com.auraboot.framework.permission.AutoPermissionHierarchyIntegrationTest` | BUILD SUCCESSFUL；覆盖 `DataType.REFERENCE` raw pid 比较、dict/user/business reference factMetadata、动态模型权限 baseline actions |
+| 前端组件 | `web-admin && pnpm exec vitest run app/shared/decision/ui/__tests__/DecisionOpsConsole.test.tsx app/ui/smart/decision/__tests__/ExecutionLogTraceBlock.test.tsx app/plugins/core-decisionops/pages/__tests__/DecisionOpsConsolePage.test.tsx` | 3 files / 57 tests passed；`/decision-ops` logs tab 复用 `ExecutionLogTraceBlock`，`?tab=logs` deep link fallback passed |
+| 前端类型 | `web-admin && pnpm exec tsc --noEmit --pretty false --incremental false` | passed |
+| 浏览器 golden | `web-admin && eval "$(../scripts/oss-golden-stack.sh env rc-business-ref-browser-105)" && PW_WORKERS=1 pnpm exec playwright test -c playwright.config.ts tests/e2e/decisionops/decisionops-fact-metadata-trace.spec.ts --project=chromium --no-deps --trace=on --reporter=line` | 3/3 passed；runtime `rc-business-ref-browser-105` 先以 `--no-warm` 起栈，后导入 `demo` profile 修复 `wd_leave_request` fact catalog 前置数据 |
+| Schema / JSONB | `scripts/check-schema-sql.sh`、`scripts/check-jsonb-typehandler.sh` | schema.sql applies cleanly，316 tables created；40 String→jsonb fields protected |
+| Schema / Flyway CI | `PG_DB=aura_ci_core_pr1350 scripts/db/flyway-migrate.sh --edition oss`、`PG_DB=aura_ci_core_pr1350 scripts/db/flyway-validate.sh --edition oss`、`PG_DB=aura_ci_core_pr1350 scripts/db/check-schema-drift.sh --edition oss` | fresh migrate / validate passed；首轮 CI `flyway-core` 暴露 `schema-current.sql` snapshot drift，补 `platform/src/main/resources/db/snapshots/schema-current.sql` 后本地 drift passed，远端 `flyway-core` passed |
+| Auth Regression gate | `web-admin && ... PW_PROFILE=fast IMPORT_TEST_FIXTURES=true PW_WORKERS=1 PW_E2E_RUN_ID=local-auth-regression-pr1350-20260719 pnpm exec node scripts/run-auth-regression.mjs` | setup 13/13 passed，auth.setup 4/4 passed，auth specs 64 passed / 12 skipped；修复 `run-auth-regression.mjs` 未导入 test-fixtures 且 `01-multi-role-users` 在 fixture role 未导入前强制赋 `e2et_*` 导致 CI 422 |
+| 静态检查 | `git diff --check` | passed |
+| e2e-truth focused | 对 `decisionops-fact-metadata-trace.spec.ts` 静态扫描 `skip/fixme/only`、`waitForTimeout`、`retries/threshold/baseline`、`page.request.put/patch`、业务 `/p/*` 直达 | red flags 为空；API 调用用于模型/字段/记录/决策造数和后端取证，UI 路径覆盖 DecisionOps 日志入口、筛选、Trace 抽屉、factMetadata 截图 |
+
+本轮新增稳定截图：
+
+- `docs/system-reference/assets/decisionops-dict-fact-metadata-trace-20260719.png`
+- `docs/system-reference/assets/decisionops-user-reference-fact-metadata-trace-20260719.png`
+- `docs/system-reference/assets/decisionops-business-reference-fact-metadata-trace-20260719.png`
+
+试错和修复记录：
+
+- 首轮后端目标命令误在 worktree 顶层运行，Gradle 提示该目录没有 `settings.gradle`；修正为 `platform && ./gradlew :test ...`。
+- 多模块 `./gradlew test --tests ...` 首轮把 `platform-plugin-api:test` 带入，因该模块无匹配测试失败；修正为根项目 `:test`。
+- business reference browser 首轮失败在 `/p/decisionops_execution_logs` DSL page schema 不存在，说明 no-warm/minimal runtime 下不能依赖菜单或 DSL page seed；产品修复为静态 `/decision-ops` logs tab 复用统一 `ExecutionLogTraceBlock`。
+- `/decision-ops` SSR 初始可见但 hydration 前点击 tab 不会触发 React handler；产品修复为 tab anchor fallback `?tab=<key>`，并让 `DecisionOpsConsolePage` 读取 `location.search || window.location.search`。
+- 完整 spec 首轮 2/3 失败是当前 runtime 缺 `workflow-demo` 的 `wd_leave_request` 模型和字典前置数据；执行 `scripts/oss-golden-stack.sh import rc-business-ref-browser-105 --plugin-profile demo` 后同一 spec 3/3 passed。
+- PR 远端 `schema-flyway / flyway-core` 首轮失败不是 migration apply 失败，而是 `schema-current.sql` 未同步 Flyway 生成列顺序；`scripts/check-schema-sql.sh` 不覆盖这个维度，已补 `scripts/db/check-schema-drift.sh --edition oss` 并提交 snapshot。
+- PR 远端 `Auth login/register regression` 首轮失败在 `01-multi-role-users` 给 `e2et_operator` 赋角色 HTTP 422；根因是 auth runner 没执行 `03-import-test-fixtures`，而 `01` 又在角色导入前强制赋 `e2et_*`。已改为 `01` 只在角色存在时 reassert，runner 在 auth.setup 前启用并执行 `03-import-test-fixtures`，本地完整 auth regression 复刻通过。
+
+## 历史测试报告（2026-07-18，持续切片）
 
 本报告只覆盖本轮已复核的 SLA / Rule Binding / Automation / BPM / Condition Fragment / DecisionOps 模型变更 preflight / 模型发布治理后端与前端 service 合同 + 模型详情发布治理 browser golden + 发布后复核计划与 replay report focused evidence + 模型发布 EventPolicy replay executor focused slice + 模型发布 Automation replay executor focused slice + 模型发布 SLA RECORD-level replay executor focused slice + 模型发布 Permission replay executor focused 后端 slice + Permission replay 浏览器 sampleContext allow/deny live browser 切片 / BPM-SLA-Automation-Permission DMN outputMappings 后端 runtime-Trace、Permission 浏览器审计 details 展示、DecisionOps 执行日志 DMN `outputSnapshot` 浏览器/DB 回看、DecisionOps Trace `factMetadata` 事实快照 browser golden、RC-VIRTUAL-01 虚拟字段 injected source context / 后端 sourceRef resolver / shared RuleEvaluationService selector 合同 / BPM/Automation adapter、Automation `SEND_SMS` provider-unavailable + `SEND_IM` + Webhook/update focused browser/runtime slice、Automation test run → DecisionOps unified Trace → Automation designer 反向入口 focused slice、Automation Webhook happy/sad runtime deep-link action evidence focused slice，EventPolicy `SEND_IM` / `CREATE_TASK` / `CC_TASK` success focused action slice、`ROLE:empty_role` target-resolution failure browser golden、Webhook dispatcher runtime failure structured Trace focused slice、`UPDATE_RECORD/PATCH_RECORD` lowcode model failure structured Trace focused slice、`ADD_COMMENT` failure structured Trace focused slice、`WRITE_AUDIT` failure structured Trace focused slice、EventPolicy `SEND_SMS/SEND_IM/CREATE_TASK/CC_TASK/NOTIFY` 配置/投递失败 structured Trace focused slice、Designer / DecisionOps Trace action card 幂等键可读化 focused slice，Action Catalog provider availability metadata + provider dependency matrix + provider failure reason promotion + SLA/EventPolicy/Automation/BPM focused UI 消费切片，以及 BPM ServiceTask action provider failure / success / message-task-notify failure ProcessStatus focused trace 切片，不能被解读为规则中心 endgame 已整体完成。整体状态仍是 **NOT MET / PARTIAL**，完成判定仍以 `rule-center-lowcode-model-integration-gap.md` 的全量验收矩阵清零为准。
 

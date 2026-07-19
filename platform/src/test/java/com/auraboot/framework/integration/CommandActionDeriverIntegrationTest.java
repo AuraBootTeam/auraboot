@@ -53,9 +53,9 @@ class CommandActionDeriverIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void deriveActions_withNoCommands_returnsReadOnly() {
+    void deriveActions_withNoCommands_returnsDynamicApiBaselineActions() {
         List<String> actions = commandActionDeriver.deriveActions("nonexistent_model_xyz_" + System.currentTimeMillis());
-        assertThat(actions).containsExactly("read");
+        assertThat(actions).containsExactly("read", "create", "update", "delete", "export", "import");
     }
 
     @Test
