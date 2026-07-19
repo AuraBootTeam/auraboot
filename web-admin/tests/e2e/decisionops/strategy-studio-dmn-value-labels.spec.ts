@@ -305,11 +305,21 @@ async function configureLeaveTypeRule(
 }
 
 async function saveDraftAndPublishStrategyTable(page: Page): Promise<DecisionVersion> {
-  const draftResponsePromise = page.waitForResponse(
+  const waitForDraftSave = () => page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
       response.url().includes('/api/decision/definitions/complaint_sla_deadline/versions'),
+    { timeout: 15_000 },
   );
+  const waitForVersionAction = (action: 'validate' | 'publish') => page.waitForResponse(
+    (response) => {
+      if (response.request().method() !== 'POST') return false;
+      return new RegExp(`/api/decision/versions/[^/]+/${action}$`).test(new URL(response.url()).pathname);
+    },
+    { timeout: 15_000 },
+  );
+
+  const draftResponsePromise = waitForDraftSave();
   await page.getByTestId('strategy-save-draft').click();
   const draft = await readApi<DecisionVersion>(await draftResponsePromise);
   expect(draft.pid).toBeTruthy();
@@ -317,20 +327,21 @@ async function saveDraftAndPublishStrategyTable(page: Page): Promise<DecisionVer
     timeout: 15_000,
   });
 
-  const validateResponsePromise = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'POST' &&
-      response.url().includes(`/api/decision/versions/${encodeURIComponent(draft.pid)}/validate`),
-  );
-  const publishResponsePromise = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'POST' &&
-      response.url().includes(`/api/decision/versions/${encodeURIComponent(draft.pid)}/publish`),
-  );
+  const publishDraftResponsePromise = waitForDraftSave();
+  const validateResponsePromise = waitForVersionAction('validate');
+  const publishResponsePromise = waitForVersionAction('publish');
   await page.getByTestId('strategy-publish').click();
-  const validation = await readApi<{ valid?: boolean }>(await validateResponsePromise);
+  const publishDraft = await readApi<DecisionVersion>(await publishDraftResponsePromise);
+  expect(publishDraft.pid).toBeTruthy();
+
+  const validateResponse = await validateResponsePromise;
+  expect(validateResponse.url()).toContain(`/api/decision/versions/${encodeURIComponent(publishDraft.pid)}/validate`);
+  const validation = await readApi<{ valid?: boolean }>(validateResponse);
   expect(validation.valid).toBe(true);
-  const published = await readApi<DecisionVersion>(await publishResponsePromise);
+  const publishResponse = await publishResponsePromise;
+  expect(publishResponse.url()).toContain(`/api/decision/versions/${encodeURIComponent(publishDraft.pid)}/publish`);
+  const published = await readApi<DecisionVersion>(publishResponse);
+  expect(published.pid).toBe(publishDraft.pid);
   expect(String(published.status ?? '')).toMatch(/published/i);
   await expect(page.getByTestId('strategy-operation-status')).toContainText('发布成功', {
     timeout: 15_000,
@@ -652,7 +663,7 @@ test('Strategy Studio saves, publishes and reloads BPM user reference condition 
   const savedDecisionDraft = await readApi<DecisionVersion>(await decisionDraftResponsePromise);
   expect(savedDecisionDraft.pid).toBeTruthy();
   expect(savedFragment).toMatchObject({
-    fragmentCode: 'wd_leave_approval_condition',
+    fragmentCode: 'leave_bpm_approval_route',
     scopeType: 'BPM',
     scopeRef: 'wd_leave_approval',
     status: 'DRAFT',
@@ -702,8 +713,11 @@ test('Strategy Studio saves, publishes and reloads BPM user reference condition 
   const fragmentPublishPromise = page.waitForResponse(isConditionFragmentPublish, { timeout: 15_000 });
   await page.getByTestId('strategy-publish').click();
   await readApi<ConditionFragment>(await fragmentPublishSavePromise);
-  const validation = await readApi<{ valid?: boolean }>(await fragmentValidatePromise);
-  expect(validation.valid).toBe(true);
+  const validatedFragment = await readApi<ConditionFragment>(await fragmentValidatePromise);
+  expect(validatedFragment).toMatchObject({
+    fragmentCode: savedFragment.fragmentCode,
+    status: 'VALIDATED',
+  });
   const publishedFragment = await readApi<ConditionFragment>(await fragmentPublishPromise);
   expect(publishedFragment).toMatchObject({
     fragmentCode: savedFragment.fragmentCode,
@@ -754,6 +768,115 @@ test('Strategy Studio saves, publishes and reloads BPM user reference condition 
 
   await page.screenshot({
     path: testInfo.outputPath('strategy-studio-bpm-user-reference-fragment-reload.png'),
+    fullPage: true,
+  });
+});
+
+test('Strategy Studio reuses user reference conditions across SLA Automation EventPolicy and Permission @golden', async ({
+  page,
+}, testInfo) => {
+  await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  await expect(page).not.toHaveURL(/\/login(?:$|\?)/);
+
+  const user = await resolveFirstUser(page);
+  await openRuleCenterFromSidebar(page);
+
+  const scenarios = [
+    {
+      key: 'SLA',
+      summary: /SLA|超时通知/,
+      scopeType: 'SLA',
+      scopeRef: 'wd_leave_approval',
+      decisionCode: 'complaint_sla_deadline',
+    },
+    {
+      key: 'AUTOMATION',
+      summary: /自动化|条件触发/,
+      scopeType: 'AUTOMATION',
+      scopeRef: 'wd_leave_request',
+      decisionCode: 'leave_request_automation',
+    },
+    {
+      key: 'EVENT_POLICY',
+      summary: /事件策略|动作/,
+      scopeType: 'EVENT_POLICY',
+      scopeRef: 'leave_request_event_policy',
+      decisionCode: 'leave_request_automation',
+    },
+    {
+      key: 'PERMISSION',
+      summary: /权限|行级访问/,
+      scopeType: 'PERMISSION',
+      scopeRef: 'ABAC_LEAVE_VISIBILITY',
+      decisionCode: 'leave_visibility_policy',
+    },
+  ];
+
+  for (const scenario of scenarios) {
+    await page.getByTestId(`strategy-scenario-${scenario.key}`).click();
+    await expect(page.getByTestId('strategy-consumer-summary')).toContainText(scenario.summary);
+    await page.getByTestId('strategy-workspace-tab-rule').click();
+    await expect(page.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
+    await expect(page.getByTestId('condition-builder')).toBeVisible({ timeout: 15_000 });
+
+    await resetConditionBuilderToSingleRow(page);
+    await page.getByLabel('field-0').selectOption('record:data.wd_req_applicant');
+    await page.getByLabel('operator-0').selectOption('EQ');
+    await expect(page.getByTestId('reference-value-trigger-0')).toContainText('选择用户');
+    await page.getByTestId('reference-value-trigger-0').click();
+    await expect(page.getByTestId('reference-value-menu-0')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('reference-value-meta-0')).toContainText('用户 · pid / displayName');
+    await expect(page.getByTestId(`reference-value-option-0-${user.pid}`)).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId(`reference-value-option-0-${user.pid}`).click();
+    await expect(page.getByTestId('reference-value-trigger-0')).toContainText(user.label);
+    await expect(page.getByTestId('cb-preview')).toContainText(/申请人|Applicant/i);
+    await expect(page.getByTestId('cb-preview')).toContainText(user.label);
+
+    const fragmentSaveResponsePromise = page.waitForResponse(isConditionFragmentDraftWrite, {
+      timeout: 15_000,
+    });
+    const decisionDraftResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes(`/api/decision/definitions/${scenario.decisionCode}/versions`),
+      { timeout: 15_000 },
+    );
+    await page.getByTestId('strategy-save-draft').click();
+    const fragmentSaveResponse = await fragmentSaveResponsePromise;
+    const fragmentSaveRequest = fragmentSaveResponse.request().postDataJSON() as Record<string, any>;
+    const savedFragment = await readApi<ConditionFragment>(fragmentSaveResponse);
+    const decisionDraft = await readApi<DecisionVersion>(await decisionDraftResponsePromise);
+
+    expect(decisionDraft.pid).toBeTruthy();
+    expect(savedFragment).toMatchObject({
+      scopeType: scenario.scopeType,
+      scopeRef: scenario.scopeRef,
+      status: 'DRAFT',
+    });
+    expect(savedFragment.fieldRefs).toEqual(expect.arrayContaining(['record.data.wd_req_applicant']));
+    expect(savedFragment.decisionRefs).toEqual(expect.arrayContaining([scenario.decisionCode]));
+    expect(fragmentSaveRequest).toMatchObject({
+      scopeType: scenario.scopeType,
+      scopeRef: scenario.scopeRef,
+      conditionSpec: {
+        root: {
+          children: [
+            {
+              operator: 'EQ',
+              left: { scope: 'record', path: 'data.wd_req_applicant' },
+              right: { value: user.pid },
+            },
+          ],
+        },
+      },
+    });
+    await expect(page.getByTestId('strategy-operation-status')).toContainText('草稿已保存', {
+      timeout: 15_000,
+    });
+  }
+
+  await page.screenshot({
+    path: testInfo.outputPath('strategy-studio-cross-scenario-user-reference-drafts.png'),
     fullPage: true,
   });
 });

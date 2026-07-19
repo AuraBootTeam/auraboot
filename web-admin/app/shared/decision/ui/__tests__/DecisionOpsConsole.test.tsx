@@ -590,6 +590,12 @@ describe('DecisionOpsConsole', () => {
               },
             ],
           },
+          decisionBindings: [
+            expect.objectContaining({
+              decisionCode: 'approval_routing',
+              versionPolicy: 'LATEST_PUBLISHED',
+            }),
+          ],
         },
       });
       expect(JSON.stringify(request)).not.toContain('王经理');
@@ -1066,6 +1072,36 @@ describe('DecisionOpsConsole', () => {
     );
   });
 
+  it('falls back to the scenario table when a restored Strategy Studio draft has no inputs', async () => {
+    const listVersions = vi.fn(async (decisionCode: string) => {
+      if (decisionCode !== 'approval_routing') return [];
+      return [
+        {
+          pid: 'empty-bpm-draft',
+          version: 9,
+          status: 'DRAFT',
+          kind: 'DECISION_TABLE',
+          runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+          contentJson: {
+            hitPolicy: 'FIRST',
+            inputs: [],
+            outputs: [],
+            rules: [],
+          },
+        },
+      ];
+    });
+
+    renderConsole(undefined, { listVersions } as unknown as Partial<DecisionApi>);
+    fireEvent.click(screen.getByTestId('strategy-scenario-BPM'));
+
+    await waitFor(() => expect(listVersions).toHaveBeenCalledWith('approval_routing'));
+    await waitFor(() =>
+      expect(screen.getByTestId('dt-in-process_nodeId')).toHaveTextContent('流程节点'),
+    );
+    expect(screen.getByTestId('dt-in-record_data_wd_req_applicant')).toHaveTextContent('申请人');
+  });
+
   it('exposes the scenario fact catalog inside the Strategy Studio DMN input picker', () => {
     renderConsole();
 
@@ -1187,6 +1223,81 @@ describe('DecisionOpsConsole', () => {
         '发布失败 · 发布接口未返回版本结果',
       ),
     );
+  });
+
+  it('creates the next condition fragment version after publishing from Strategy Studio', async () => {
+    let nextFragmentVersion = 2;
+    const fragmentVersions = new Map<string, number>();
+    const fragmentBodies = new Map<string, Record<string, unknown>>();
+    const createConditionFragmentVersion = vi.fn(async (code: string, req: unknown) => {
+      const version = nextFragmentVersion;
+      nextFragmentVersion += 1;
+      const pid = `fragment-draft-${version}`;
+      fragmentVersions.set(pid, version);
+      const body = {
+        ...(req as Record<string, unknown>),
+        fragmentCode: code,
+      };
+      fragmentBodies.set(pid, body);
+      return {
+        ...body,
+        pid,
+        version,
+        status: 'DRAFT',
+      };
+    });
+    const updateConditionFragmentDraft = vi.fn(async (pid: string, req: unknown) => ({
+      ...(req as object),
+      fragmentCode: 'leave_sla_node_match',
+      pid,
+      version: fragmentVersions.get(pid) ?? 2,
+      status: 'DRAFT',
+    }));
+    const validateConditionFragmentVersion = vi.fn(async (pid: string) => ({
+      ...(fragmentBodies.get(pid) ?? { fragmentCode: 'leave_sla_node_match' }),
+      pid,
+      version: fragmentVersions.get(pid) ?? 2,
+      status: 'VALIDATED',
+    }));
+    const publishConditionFragmentVersion = vi.fn(async (pid: string) => ({
+      ...(fragmentBodies.get(pid) ?? { fragmentCode: 'leave_sla_node_match' }),
+      pid,
+      version: fragmentVersions.get(pid) ?? 2,
+      status: 'PUBLISHED',
+    }));
+
+    renderConsole(undefined, {
+      createConditionFragmentVersion,
+      updateConditionFragmentDraft,
+      validateConditionFragmentVersion,
+      publishConditionFragmentVersion,
+    } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('请假 SLA 节点匹配'),
+    );
+    fireEvent.click(screen.getByTestId('strategy-publish'));
+    await waitFor(() =>
+      expect(publishConditionFragmentVersion).toHaveBeenCalledWith(
+        'fragment-draft-2',
+        expect.objectContaining({ impactAcknowledged: true }),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('发布成功'),
+    );
+
+    updateConditionFragmentDraft.mockClear();
+    fireEvent.click(screen.getByTestId('strategy-save-draft'));
+    await waitFor(() => expect(createConditionFragmentVersion).toHaveBeenCalledTimes(2));
+    expect(createConditionFragmentVersion).toHaveBeenLastCalledWith(
+      'leave_sla_node_match',
+      expect.objectContaining({
+        fragmentName: '请假 SLA 节点匹配',
+        scopeType: 'SLA',
+      }),
+    );
+    expect(updateConditionFragmentDraft).not.toHaveBeenCalled();
   });
 
   it('shows a stable Strategy Studio test-run failure when the runtime returns no result body', async () => {
