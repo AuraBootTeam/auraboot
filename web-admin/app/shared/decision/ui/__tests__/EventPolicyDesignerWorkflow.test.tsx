@@ -114,6 +114,12 @@ function api(): DecisionApi {
   } as unknown as DecisionApi;
 }
 
+async function findActionExecutionEvidence() {
+  const executionResults = await screen.findByTestId('epd-action-execution-results');
+  const payload = await screen.findByTestId('epd-action-result-payload-0');
+  return { executionResults, payload };
+}
+
 function apiWithActionCatalog(): DecisionApi {
   return {
     ...api(),
@@ -444,29 +450,27 @@ describe('EventPolicyDesignerWorkflow', () => {
     );
     expect(fakeApi.runPolicy).not.toHaveBeenCalled();
     expect(screen.getByTestId('epd-run-result')).toHaveTextContent('已命中');
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('全部成功');
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('发送站内通知');
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('成功');
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('幂等键 已记录');
-    expect(screen.getByTestId('epd-action-execution-results')).not.toHaveTextContent(
-      'complaint:001:R-1:NOTIFY',
-    );
-    expect(screen.getByTestId('epd-action-execution-0').querySelector('[title]')).toHaveAttribute(
+    const { executionResults, payload } = await findActionExecutionEvidence();
+    expect(executionResults).toHaveTextContent('全部成功');
+    expect(executionResults).toHaveTextContent('发送站内通知');
+    expect(executionResults).toHaveTextContent('成功');
+    expect(executionResults).toHaveTextContent('幂等键 已记录');
+    expect(executionResults).not.toHaveTextContent('complaint:001:R-1:NOTIFY');
+    const actionRow = await screen.findByTestId('epd-action-execution-0');
+    expect(actionRow.querySelector('[title]')).toHaveAttribute(
       'title',
       'complaint:001:R-1:NOTIFY',
     );
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('通道');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('in_app');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('接收对象');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('support_manager');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('发送数');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('1');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('接收人数');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('接收用户');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('1001');
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'targetUserIds',
-    );
+    expect(payload).toHaveTextContent('通道');
+    expect(payload).toHaveTextContent('in_app');
+    expect(payload).toHaveTextContent('接收对象');
+    expect(payload).toHaveTextContent('support_manager');
+    expect(payload).toHaveTextContent('发送数');
+    expect(payload).toHaveTextContent('1');
+    expect(payload).toHaveTextContent('接收人数');
+    expect(payload).toHaveTextContent('接收用户');
+    expect(payload).toHaveTextContent('1001');
+    expect(payload).not.toHaveTextContent('targetUserIds');
   });
 
   it('shows webhook delivery trace evidence without raw payload field names', async () => {
@@ -509,26 +513,19 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() => expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledOnce());
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('调用 Webhook');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('投递追踪');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('ep-webhook-evt-1');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('投递状态');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('已记录投递日志');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('投递日志');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('delivery-log-1');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('投递回执');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent(
-      'sub-1 / delivery-log-1 / failed',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'deliveryEventId',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'deliveryLogPids',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'tracked_delivery_logs',
-    );
+    const { executionResults, payload } = await findActionExecutionEvidence();
+    expect(executionResults).toHaveTextContent('调用 Webhook');
+    expect(payload).toHaveTextContent('投递追踪');
+    expect(payload).toHaveTextContent('ep-webhook-evt-1');
+    expect(payload).toHaveTextContent('投递状态');
+    expect(payload).toHaveTextContent('已记录投递日志');
+    expect(payload).toHaveTextContent('投递日志');
+    expect(payload).toHaveTextContent('delivery-log-1');
+    expect(payload).toHaveTextContent('投递回执');
+    expect(payload).toHaveTextContent('sub-1 / delivery-log-1 / failed');
+    expect(payload).not.toHaveTextContent('deliveryEventId');
+    expect(payload).not.toHaveTextContent('deliveryLogPids');
+    expect(payload).not.toHaveTextContent('tracked_delivery_logs');
   });
 
   it('shows webhook dispatch failure payload without raw payload field names', async () => {
@@ -566,34 +563,25 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() => expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledOnce());
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('调用 Webhook');
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('失败');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('投递追踪');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('ep-webhook-evt-1');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('投递状态');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('投递失败');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('失败原因');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('Webhook 投递失败');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('错误信息');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('dispatcher down');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('业务记录');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('CMP-1');
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'deliveryTraceStatus',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'dispatch_failed',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'failureReason',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'webhook_dispatch_failed',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'errorMessage',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent('payloadKeys');
+    const { executionResults, payload } = await findActionExecutionEvidence();
+    expect(executionResults).toHaveTextContent('调用 Webhook');
+    expect(executionResults).toHaveTextContent('失败');
+    expect(payload).toHaveTextContent('投递追踪');
+    expect(payload).toHaveTextContent('ep-webhook-evt-1');
+    expect(payload).toHaveTextContent('投递状态');
+    expect(payload).toHaveTextContent('投递失败');
+    expect(payload).toHaveTextContent('失败原因');
+    expect(payload).toHaveTextContent('Webhook 投递失败');
+    expect(payload).toHaveTextContent('错误信息');
+    expect(payload).toHaveTextContent('dispatcher down');
+    expect(payload).toHaveTextContent('业务记录');
+    expect(payload).toHaveTextContent('CMP-1');
+    expect(payload).not.toHaveTextContent('deliveryTraceStatus');
+    expect(payload).not.toHaveTextContent('dispatch_failed');
+    expect(payload).not.toHaveTextContent('failureReason');
+    expect(payload).not.toHaveTextContent('webhook_dispatch_failed');
+    expect(payload).not.toHaveTextContent('errorMessage');
+    expect(payload).not.toHaveTextContent('payloadKeys');
   });
 
   it('shows update-record context failure payload without raw payload field names', async () => {
@@ -626,36 +614,21 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() => expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledOnce());
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('更新记录');
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('失败');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('失败原因');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent(
-      '缺少业务记录上下文',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('必需上下文');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent(
-      '记录模型, 业务记录',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('动作类型');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('更新记录');
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'failureReason',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'record_context_missing',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'requiredContext',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'record.entityCode',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'record.recordPid',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'UPDATE_RECORD',
-    );
+    const { executionResults, payload } = await findActionExecutionEvidence();
+    expect(executionResults).toHaveTextContent('更新记录');
+    expect(executionResults).toHaveTextContent('失败');
+    expect(payload).toHaveTextContent('失败原因');
+    expect(payload).toHaveTextContent('缺少业务记录上下文');
+    expect(payload).toHaveTextContent('必需上下文');
+    expect(payload).toHaveTextContent('记录模型, 业务记录');
+    expect(payload).toHaveTextContent('动作类型');
+    expect(payload).toHaveTextContent('更新记录');
+    expect(payload).not.toHaveTextContent('failureReason');
+    expect(payload).not.toHaveTextContent('record_context_missing');
+    expect(payload).not.toHaveTextContent('requiredContext');
+    expect(payload).not.toHaveTextContent('record.entityCode');
+    expect(payload).not.toHaveTextContent('record.recordPid');
+    expect(payload).not.toHaveTextContent('UPDATE_RECORD');
   });
 
   it('shows add-comment content failure payload without raw payload field names', async () => {
@@ -690,33 +663,24 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() => expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledOnce());
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('添加评论');
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('失败');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('失败原因');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('缺少评论内容');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('模型');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('complaint');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('业务记录');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('CMP-1');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('字段');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('评论内容');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('动作类型');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('添加评论');
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'failureReason',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'comment_content_missing',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'payload.content',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'actionType',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'ADD_COMMENT',
-    );
+    const { executionResults, payload } = await findActionExecutionEvidence();
+    expect(executionResults).toHaveTextContent('添加评论');
+    expect(executionResults).toHaveTextContent('失败');
+    expect(payload).toHaveTextContent('失败原因');
+    expect(payload).toHaveTextContent('缺少评论内容');
+    expect(payload).toHaveTextContent('模型');
+    expect(payload).toHaveTextContent('complaint');
+    expect(payload).toHaveTextContent('业务记录');
+    expect(payload).toHaveTextContent('CMP-1');
+    expect(payload).toHaveTextContent('字段');
+    expect(payload).toHaveTextContent('评论内容');
+    expect(payload).toHaveTextContent('动作类型');
+    expect(payload).toHaveTextContent('添加评论');
+    expect(payload).not.toHaveTextContent('failureReason');
+    expect(payload).not.toHaveTextContent('comment_content_missing');
+    expect(payload).not.toHaveTextContent('payload.content');
+    expect(payload).not.toHaveTextContent('actionType');
+    expect(payload).not.toHaveTextContent('ADD_COMMENT');
   });
 
   it('shows write-audit tenant failure payload without raw payload field names', async () => {
@@ -750,31 +714,22 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() => expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledOnce());
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('写入审计');
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('失败');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('失败原因');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('缺少租户上下文');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('必需上下文');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('租户');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('规则');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent(
-      'audit_missing_tenant',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('动作类型');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('写入审计');
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'failureReason',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'audit_tenant_missing',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'requiredContext',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent('tenantId');
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'WRITE_AUDIT',
-    );
+    const { executionResults, payload } = await findActionExecutionEvidence();
+    expect(executionResults).toHaveTextContent('写入审计');
+    expect(executionResults).toHaveTextContent('失败');
+    expect(payload).toHaveTextContent('失败原因');
+    expect(payload).toHaveTextContent('缺少租户上下文');
+    expect(payload).toHaveTextContent('必需上下文');
+    expect(payload).toHaveTextContent('租户');
+    expect(payload).toHaveTextContent('规则');
+    expect(payload).toHaveTextContent('audit_missing_tenant');
+    expect(payload).toHaveTextContent('动作类型');
+    expect(payload).toHaveTextContent('写入审计');
+    expect(payload).not.toHaveTextContent('failureReason');
+    expect(payload).not.toHaveTextContent('audit_tenant_missing');
+    expect(payload).not.toHaveTextContent('requiredContext');
+    expect(payload).not.toHaveTextContent('tenantId');
+    expect(payload).not.toHaveTextContent('WRITE_AUDIT');
   });
 
   it('shows target-resolution failure payload without raw payload field names', async () => {
@@ -810,31 +765,24 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() => expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledOnce());
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('失败');
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent(
-      'CC_TASK target resolved no users',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('待办类型');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('抄送任务');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('投递方式');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('待办');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('失败原因');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('目标未匹配到用户');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('接收类型');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('角色');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('接收对象');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('ROLE:empty_role');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('解析人数');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('0');
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'failureReason',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'target_resolved_no_users',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'resolvedCount',
-    );
+    const { executionResults, payload } = await findActionExecutionEvidence();
+    expect(executionResults).toHaveTextContent('失败');
+    expect(executionResults).toHaveTextContent('CC_TASK target resolved no users');
+    expect(payload).toHaveTextContent('待办类型');
+    expect(payload).toHaveTextContent('抄送任务');
+    expect(payload).toHaveTextContent('投递方式');
+    expect(payload).toHaveTextContent('待办');
+    expect(payload).toHaveTextContent('失败原因');
+    expect(payload).toHaveTextContent('目标未匹配到用户');
+    expect(payload).toHaveTextContent('接收类型');
+    expect(payload).toHaveTextContent('角色');
+    expect(payload).toHaveTextContent('接收对象');
+    expect(payload).toHaveTextContent('ROLE:empty_role');
+    expect(payload).toHaveTextContent('解析人数');
+    expect(payload).toHaveTextContent('0');
+    expect(payload).not.toHaveTextContent('failureReason');
+    expect(payload).not.toHaveTextContent('target_resolved_no_users');
+    expect(payload).not.toHaveTextContent('resolvedCount');
   });
 
   it('shows action configuration failure payload with productized labels', async () => {
@@ -869,20 +817,17 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() => expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledOnce());
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('发送短信');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('失败原因');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('缺少消息内容');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('字段');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('评论内容');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('动作类型');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('发送短信');
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'payload_content_missing',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'failureReason',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent('SEND_SMS');
+    const { executionResults, payload } = await findActionExecutionEvidence();
+    expect(executionResults).toHaveTextContent('发送短信');
+    expect(payload).toHaveTextContent('失败原因');
+    expect(payload).toHaveTextContent('缺少消息内容');
+    expect(payload).toHaveTextContent('字段');
+    expect(payload).toHaveTextContent('评论内容');
+    expect(payload).toHaveTextContent('动作类型');
+    expect(payload).toHaveTextContent('发送短信');
+    expect(payload).not.toHaveTextContent('payload_content_missing');
+    expect(payload).not.toHaveTextContent('failureReason');
+    expect(payload).not.toHaveTextContent('SEND_SMS');
   });
 
   it('shows START_PROCESS result payload with productized workflow labels', async () => {
@@ -915,23 +860,18 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() => expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledOnce());
-    expect(screen.getByTestId('epd-action-execution-results')).toHaveTextContent('启动流程');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('流程标识');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('approval_flow');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('流程实例');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('1784160001001');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('业务主键');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent(
-      'TEST-complaint_form_submit_policy',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('业务记录');
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'processDefinitionId',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'processInstanceId',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent('businessKey');
+    const { executionResults, payload } = await findActionExecutionEvidence();
+    expect(executionResults).toHaveTextContent('启动流程');
+    expect(payload).toHaveTextContent('流程标识');
+    expect(payload).toHaveTextContent('approval_flow');
+    expect(payload).toHaveTextContent('流程实例');
+    expect(payload).toHaveTextContent('1784160001001');
+    expect(payload).toHaveTextContent('业务主键');
+    expect(payload).toHaveTextContent('TEST-complaint_form_submit_policy');
+    expect(payload).toHaveTextContent('业务记录');
+    expect(payload).not.toHaveTextContent('processDefinitionId');
+    expect(payload).not.toHaveTextContent('processInstanceId');
+    expect(payload).not.toHaveTextContent('businessKey');
   });
 
   it('shows START_PROCESS failure payload with productized workflow labels', async () => {
@@ -965,33 +905,23 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() => expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledOnce());
-    expect(screen.getByTestId('epd-action-execution-0')).toHaveTextContent('启动流程');
-    expect(screen.getByTestId('epd-action-execution-0')).toHaveTextContent('失败');
-    expect(screen.getByTestId('epd-action-execution-0')).toHaveTextContent(
-      '流程启动失败：流程未部署或流程标识不存在',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('失败原因');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('流程启动失败');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('流程标识');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent(
-      'missing_approval_flow',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('业务主键');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent(
-      'TEST-complaint_form_submit_policy',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('业务记录');
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'failureReason',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'process_start_failed',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'processDefinitionId',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent('businessKey');
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent('recordPid');
+    const actionRow = await screen.findByTestId('epd-action-execution-0');
+    const { payload } = await findActionExecutionEvidence();
+    expect(actionRow).toHaveTextContent('启动流程');
+    expect(actionRow).toHaveTextContent('失败');
+    expect(actionRow).toHaveTextContent('流程启动失败：流程未部署或流程标识不存在');
+    expect(payload).toHaveTextContent('失败原因');
+    expect(payload).toHaveTextContent('流程启动失败');
+    expect(payload).toHaveTextContent('流程标识');
+    expect(payload).toHaveTextContent('missing_approval_flow');
+    expect(payload).toHaveTextContent('业务主键');
+    expect(payload).toHaveTextContent('TEST-complaint_form_submit_policy');
+    expect(payload).toHaveTextContent('业务记录');
+    expect(payload).not.toHaveTextContent('failureReason');
+    expect(payload).not.toHaveTextContent('process_start_failed');
+    expect(payload).not.toHaveTextContent('processDefinitionId');
+    expect(payload).not.toHaveTextContent('businessKey');
+    expect(payload).not.toHaveTextContent('recordPid');
   });
 
   it('shows START_PROCESS missing configuration failure without raw payload field names', async () => {
@@ -1024,29 +954,21 @@ describe('EventPolicyDesignerWorkflow', () => {
     fireEvent.click(screen.getByTestId('epd-run-published'));
 
     await waitFor(() => expect(fakeApi.runAndExecutePolicy).toHaveBeenCalledOnce());
-    expect(screen.getByTestId('epd-action-execution-0')).toHaveTextContent('启动流程');
-    expect(screen.getByTestId('epd-action-execution-0')).toHaveTextContent('失败');
-    expect(screen.getByTestId('epd-action-execution-0')).toHaveTextContent(
-      '缺少流程标识，无法启动流程',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('失败原因');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('缺少流程标识');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('字段');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('流程标识');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent('业务记录');
-    expect(screen.getByTestId('epd-action-result-payload-0')).toHaveTextContent(
-      'TEST-complaint_form_submit_policy',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'failureReason',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'process_definition_missing',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent(
-      'payload.processDefinitionId',
-    );
-    expect(screen.getByTestId('epd-action-result-payload-0')).not.toHaveTextContent('recordPid');
+    const actionRow = await screen.findByTestId('epd-action-execution-0');
+    const { payload } = await findActionExecutionEvidence();
+    expect(actionRow).toHaveTextContent('启动流程');
+    expect(actionRow).toHaveTextContent('失败');
+    expect(actionRow).toHaveTextContent('缺少流程标识，无法启动流程');
+    expect(payload).toHaveTextContent('失败原因');
+    expect(payload).toHaveTextContent('缺少流程标识');
+    expect(payload).toHaveTextContent('字段');
+    expect(payload).toHaveTextContent('流程标识');
+    expect(payload).toHaveTextContent('业务记录');
+    expect(payload).toHaveTextContent('TEST-complaint_form_submit_policy');
+    expect(payload).not.toHaveTextContent('failureReason');
+    expect(payload).not.toHaveTextContent('process_definition_missing');
+    expect(payload).not.toHaveTextContent('payload.processDefinitionId');
+    expect(payload).not.toHaveTextContent('recordPid');
   });
 
   it('hydrates the selected policy latest version before saving a new draft', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { synthesizeFlowData } from '../AutomationEditPageImpl';
+import { findRuntimeLogByRouteParam, synthesizeFlowData } from '../AutomationEditPageImpl';
 import type { Automation } from '../../services/automationService';
 
 describe('AutomationEditPageImpl legacy flow synthesis', () => {
@@ -99,5 +99,28 @@ describe('AutomationEditPageImpl legacy flow synthesis', () => {
     const triggerConfig = flow?.nodes[0].data.config as any;
     expect(triggerConfig.ruleBinding.decisionBinding.decisionCode).toBe('leave_request_automation');
     expect(triggerConfig.ruleBinding.decisionBinding.inputMappings[0].source.scope).toBe('record');
+  });
+});
+
+describe('AutomationEditPageImpl runtime log route matching', () => {
+  it('matches runtime logs by numeric id from ?logId and by pid for legacy links', () => {
+    const rows = [
+      {
+        id: 51,
+        pid: 'log-webhook-runtime',
+        automationId: 'auto-1',
+        status: 'success',
+      },
+      {
+        id: 52,
+        pid: 'log-other',
+        automationId: 'auto-1',
+        status: 'failed',
+      },
+    ] as const;
+
+    expect(findRuntimeLogByRouteParam([...rows], '51')?.pid).toBe('log-webhook-runtime');
+    expect(findRuntimeLogByRouteParam([...rows], 'log-other')?.id).toBe(52);
+    expect(findRuntimeLogByRouteParam([...rows], 'missing')).toBeNull();
   });
 });

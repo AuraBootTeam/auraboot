@@ -681,7 +681,7 @@ describe('DecisionRuleBindingBlock', () => {
     expect(api.getModelFields).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('cb-add'));
-    fireEvent.change(screen.getByLabelText('field-0'), {
+    fireEvent.change(await screen.findByLabelText('field-0'), {
       target: { value: 'record:data.wd_leave_type' },
     });
     expect(screen.getByLabelText('value-0')).toHaveTextContent('年假');
@@ -896,7 +896,7 @@ describe('DecisionRuleBindingBlock', () => {
     expect(api.getModelFields).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByTestId('cb-add'));
-    fireEvent.change(screen.getByLabelText('field-0'), {
+    fireEvent.change(await screen.findByLabelText('field-0'), {
       target: { value: 'record:data.wd_leave_type' },
     });
     expect(screen.getByLabelText('value-0')).toHaveTextContent('年假');
@@ -1301,15 +1301,16 @@ describe('DecisionRuleBindingBlock', () => {
         context: { record: { data: { amount: 20000 } } },
       }),
     );
-    expect(screen.getByTestId('decision-test-result')).toHaveTextContent('已命中');
-    expect(screen.getByTestId('decision-test-result')).toHaveTextContent('trace-1');
-    expect(screen.getByTestId('decision-test-open-trace')).toHaveAttribute(
+    const testResult = await screen.findByTestId('decision-test-result');
+    expect(testResult).toHaveTextContent('已命中');
+    expect(testResult).toHaveTextContent('trace-1');
+    expect(await screen.findByTestId('decision-test-open-trace')).toHaveAttribute(
       'href',
       '/p/decisionops_execution_logs?traceId=trace-1&decisionCode=approval_routing&callerType=AUTOMATION&callerRef=auto-1',
     );
-    expect(screen.getByTestId('decision-test-result')).toHaveTextContent('route');
-    expect(screen.getByTestId('decision-test-result')).toHaveTextContent('DIRECTOR');
-    expect(screen.getByTestId('decision-test-result')).not.toHaveTextContent('"status": "MATCHED"');
+    expect(testResult).toHaveTextContent('route');
+    expect(testResult).toHaveTextContent('DIRECTOR');
+    expect(testResult).not.toHaveTextContent('"status": "MATCHED"');
   });
 
   it('resolves callerRef from the current record when consumerCodeField is configured', async () => {
@@ -1358,7 +1359,7 @@ describe('DecisionRuleBindingBlock', () => {
         }),
       ),
     );
-    expect(screen.getByTestId('decision-test-open-trace')).toHaveAttribute(
+    expect(await screen.findByTestId('decision-test-open-trace')).toHaveAttribute(
       'href',
       '/p/decisionops_execution_logs?traceId=trace-sla-1&decisionCode=complaint_sla_deadline&callerType=SLA&callerRef=01SLA_CONFIG',
     );
@@ -1592,7 +1593,7 @@ describe('DecisionRuleBindingBlock', () => {
         }),
       ),
     );
-    expect(screen.getByTestId('decision-test-result')).toHaveTextContent('trace-virtual');
+    expect(await screen.findByTestId('decision-test-result')).toHaveTextContent('trace-virtual');
   });
 
   it('surfaces backend unknown reasons when virtual source context is missing', async () => {

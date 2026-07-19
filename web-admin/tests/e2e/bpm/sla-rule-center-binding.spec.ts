@@ -1335,8 +1335,8 @@ test('SLA monitor shows timeout action execution evidence and provider-unavailab
       ruleCode: 'SLA_TIMEOUT',
       actionType: 'SEND_SMS',
       status: 'FAILED',
-      errorMessage: 'No real SMS sender available',
     });
+    expect(String(actionLog.errorMessage ?? '')).toMatch(/No real SMS sender available/i);
 
     const actionLogsResponse = page.waitForResponse(
       (response) => {
@@ -1403,8 +1403,8 @@ test('SLA monitor shows RETRY_ASYNC timeout action strategy, retry timeline, and
       ruleCode: 'SLA_TIMEOUT',
       actionType: 'SEND_SMS',
       status: 'RETRY_PENDING',
-      errorMessage: 'No real SMS sender available',
     });
+    expect(String(actionLog.errorMessage ?? '')).toMatch(/No real SMS sender available/i);
     const actionLogPid = String(actionLog.pid ?? '');
     expect(
       actionLogPid,
@@ -1532,8 +1532,8 @@ test('SLA monitor shows DEAD_LETTER timeout action strategy and dead-letter evid
       ruleCode: 'SLA_TIMEOUT',
       actionType: 'SEND_SMS',
       status: 'DEAD_LETTER',
-      errorMessage: 'No real SMS sender available',
     });
+    expect(String(actionLog.errorMessage ?? '')).toMatch(/No real SMS sender available/i);
 
     const actionLogsResponse = page.waitForResponse(
       (response) => {

@@ -44,6 +44,7 @@ interface PolicyFieldSchema {
   fieldCatalogModelCode?: string;
   fieldCatalogModelCodeField?: string;
   initialContextJson?: string;
+  initialDecisionCode?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -338,6 +339,8 @@ function FieldRenderer({ fieldKey, fieldSchema, value, decisionApi, onChange }: 
                 fieldCatalogModelCode: fieldSchema.fieldCatalogModelCode,
                 fieldCatalogModelCodeField: fieldSchema.fieldCatalogModelCodeField,
                 decisions: fieldSchema.decisions,
+                initialDecisionCode:
+                  fieldSchema.initialDecisionCode ?? fieldSchema.decisions?.[0]?.code,
                 initialContextJson: fieldSchema.initialContextJson,
                 initialVersionPolicy: 'LATEST_PUBLISHED',
               },
