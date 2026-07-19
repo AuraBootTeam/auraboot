@@ -154,6 +154,18 @@ async function captureEntry(page: Page, testInfo: TestInfo, entry: EntrySpec, vi
   });
 }
 
+async function assertSidebarIsInsideViewport(page: Page) {
+  await expect
+    .poll(
+      async () => {
+        const box = await page.getByTestId('sidebar').boundingBox();
+        return box ? Math.round(box.x) : -999;
+      },
+      { message: 'compact sidebar should slide into the viewport' },
+    )
+    .toBeGreaterThanOrEqual(-1);
+}
+
 test('RC-UX-01: rule center main entries stay usable in desktop and compact Chinese layouts @golden', async ({
   page,
 }, testInfo) => {
@@ -175,4 +187,44 @@ test('RC-UX-01: rule center main entries stay usable in desktop and compact Chin
       await captureEntry(page, testInfo, entry, viewport);
     }
   }
+});
+
+test('RC-UX-01: compact shell sidebar exposes rule center entries without horizontal overflow @smoke', async ({
+  page,
+}, testInfo) => {
+  await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  await expect(page).not.toHaveURL(/\/login(?:$|\?)/);
+  await page.setViewportSize({ width: 632, height: 900 });
+  await page.goto('/home', { waitUntil: 'domcontentloaded' });
+  await ensureSidebarExpanded(page);
+
+  const toggle = page.getByTestId('header-sidebar-toggle');
+  await expect(toggle).toBeVisible({ timeout: 10_000 });
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.click();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.getByTestId('sidebar-mobile-backdrop')).toBeVisible({ timeout: 10_000 });
+  await assertSidebarIsInsideViewport(page);
+
+  const sidebar = page.getByTestId('sidebar');
+  const strategyStudioLink = sidebar.locator('a[href="/decision-ops"]').first();
+  await expect(strategyStudioLink).toBeVisible({ timeout: 10_000 });
+  await expect(sidebar).toContainText('规则中心');
+  await page.screenshot({
+    path: testInfo.outputPath('rule-center-shell-sidebar-compact.png'),
+    fullPage: true,
+  });
+
+  for (const entry of ENTRIES) {
+    const href = entry.href ?? entry.path;
+    const link = sidebar.locator(`a[href="${href}"]`).first();
+    await expect(link, `missing compact sidebar href ${href}`).toBeAttached({ timeout: 10_000 });
+    await link.scrollIntoViewIfNeeded();
+    await expect(link, `compact sidebar href ${href} should be visible after scroll`).toBeVisible();
+  }
+
+  await strategyStudioLink.click();
+  await expect(page).toHaveURL(/\/decision-ops(?:$|[?#])/, { timeout: 15_000 });
+  await expect(page.getByTestId('strategy-studio')).toBeVisible({ timeout: 15_000 });
+  await assertNoPageHorizontalOverflow(page, ENTRIES[0], { key: 'compact-shell', width: 632, height: 900 });
 });

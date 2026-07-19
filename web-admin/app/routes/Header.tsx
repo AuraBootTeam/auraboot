@@ -175,6 +175,10 @@ export default function Header({
           {showSidebar && (
             <button
               type="button"
+              aria-controls="app-sidebar"
+              aria-expanded={Boolean(sidebarOpen)}
+              aria-label={sidebarOpen ? '关闭导航菜单' : '打开导航菜单'}
+              data-testid="header-sidebar-toggle"
               className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-blue-600 shadow-sm transition-all duration-200 hover:bg-blue-100 hover:shadow-md focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none lg:hidden dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30 dark:focus:ring-offset-gray-800"
               onClick={() => setSidebarOpen?.(!sidebarOpen)}
             >
