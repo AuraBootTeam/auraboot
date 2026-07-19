@@ -84,6 +84,11 @@ public class TurnCompletionObservationListener {
             return;
         }
 
+        // NULL DISCIPLINE: AgentEvent snapshots the payload with Map.copyOf,
+        // which rejects null VALUES with an NPE — caught live on the first
+        // golden run of this seam (three swallowed NPEs, zero rows) after the
+        // unit tests' mocked AgentObservationService had hidden the contract.
+        // Absent fields are OMITTED, never null.
         Map<String, Object> detail = new LinkedHashMap<>();
         String eventType;
         switch (event.outcome()) {
@@ -93,11 +98,11 @@ public class TurnCompletionObservationListener {
             }
             case TurnOutcome.Failed f -> {
                 eventType = EVENT_FAILED;
-                detail.put("error", truncate(f.errorMessage()));
+                putIfPresent(detail, "error", truncate(f.errorMessage()));
             }
             case TurnOutcome.Interrupted i -> {
                 eventType = EVENT_INTERRUPTED;
-                detail.put("interruptReason", i.reason());
+                putIfPresent(detail, "interruptReason", i.reason());
             }
             case TurnOutcome.PendingConfirmation pc -> {
                 // Not terminal; emitted as TurnSuspendedEvent by finalizeTurn.
@@ -109,19 +114,19 @@ public class TurnCompletionObservationListener {
             }
         }
 
-        detail.put("turnId", ctx.turnId());
-        detail.put("channel", ctx.channel());
-        detail.put("profileId", ctx.profileId());
-        detail.put("triageBucket", ctx.triageBucket() != null ? ctx.triageBucket().name() : null);
+        putIfPresent(detail, "turnId", ctx.turnId());
+        putIfPresent(detail, "channel", ctx.channel());
+        putIfPresent(detail, "profileId", ctx.profileId());
+        putIfPresent(detail, "triageBucket", ctx.triageBucket() != null ? ctx.triageBucket().name() : null);
         TurnRoute route = event.route();
         if (route != null) {
-            detail.put("initialMode", route.initialMode());
-            detail.put("decisionReason", route.decisionReason());
-            detail.put("policySignals", route.policySignals());
+            putIfPresent(detail, "initialMode", route.initialMode());
+            putIfPresent(detail, "decisionReason", route.decisionReason());
+            putIfPresent(detail, "policySignals", route.policySignals());
         }
-        detail.put("userId", ctx.userId());
-        detail.put("conversationId", ctx.conversationId());
-        detail.put("traceId", ctx.traceId());
+        putIfPresent(detail, "userId", ctx.userId());
+        putIfPresent(detail, "conversationId", ctx.conversationId());
+        putIfPresent(detail, "traceId", ctx.traceId());
         if (ctx.beginAt() != null) {
             detail.put("latencyMs", Duration.between(ctx.beginAt(), Instant.now()).toMillis());
         }
@@ -134,6 +139,12 @@ public class TurnCompletionObservationListener {
         log.debug("Turn observation published: type={} turn={} bucket={} mode={}",
                 eventType, ctx.turnId(), ctx.triageBucket(),
                 route != null ? route.initialMode() : null);
+    }
+
+    private static void putIfPresent(Map<String, Object> detail, String key, Object value) {
+        if (value != null) {
+            detail.put(key, value);
+        }
     }
 
     private static String truncate(String message) {
