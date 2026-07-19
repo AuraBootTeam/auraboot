@@ -186,6 +186,32 @@ async function selectStrategyScenario(
   await expect(page.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
 }
 
+type StrategyWorkspaceKey = 'facts' | 'rule' | 'dmn';
+
+const STRATEGY_WORKSPACE_PANEL_TEST_IDS: Record<StrategyWorkspaceKey, string> = {
+  facts: 'strategy-fact-catalog',
+  rule: 'strategy-workspace-panel-rule',
+  dmn: 'strategy-dmn-panel',
+};
+
+async function activateStrategyWorkspace(page: Page, key: StrategyWorkspaceKey): Promise<void> {
+  const tab = page.getByTestId(`strategy-workspace-tab-${key}`);
+  const panel = page.getByTestId(STRATEGY_WORKSPACE_PANEL_TEST_IDS[key]);
+  await expect(tab).toBeVisible({ timeout: 15_000 });
+  await expect
+    .poll(
+      async () => {
+        await tab.click();
+        return (await panel.getAttribute('data-active')) ?? 'false';
+      },
+      {
+        message: `Strategy workspace ${key} should become active after tab click`,
+        timeout: 15_000,
+      },
+    )
+    .toBe('true');
+}
+
 function findLeaveTypeFact(catalog: DecisionFactCatalog): DecisionFact | undefined {
   const facts = [
     ...(catalog.facts ?? []),
@@ -299,8 +325,7 @@ async function configureLeaveTypeRule(
   operator: 'IN' | 'NOT_IN',
   labels: { annual: string; sick: string },
 ): Promise<void> {
-  await page.getByTestId('strategy-workspace-tab-dmn').click();
-  await expect(page.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'true');
+  await activateStrategyWorkspace(page, 'dmn');
   await page.getByTestId('dt-input-field-picker-0').click();
   await expect(page.getByTestId('dt-input-field-picker-panel-0')).toBeVisible({ timeout: 10_000 });
   await page.getByLabel('input-field-search-0').fill('wd_req_type');
@@ -418,8 +443,7 @@ test('Strategy Studio DMN round-trip preserves fact catalog valueLabels @golden'
 
   await openRuleCenterFromSidebar(page);
   await expect(page.getByTestId('strategy-consumer-summary')).toContainText(/SLA|超时通知/);
-  await page.getByTestId('strategy-workspace-tab-dmn').click();
-  await expect(page.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'true');
+  await activateStrategyWorkspace(page, 'dmn');
   await expect(page.getByTestId('strategy-dmn-panel')).toContainText('DMN 决策输出');
 
   await page.getByTestId('dt-input-field-picker-0').click();
@@ -601,8 +625,7 @@ test('Strategy Studio saves, publishes and reloads dict IN and NOT_IN raw arrays
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('strategy-studio')).toBeVisible({ timeout: 15_000 });
-  await page.getByTestId('strategy-workspace-tab-dmn').click();
-  await expect(page.getByTestId('strategy-dmn-panel')).toHaveAttribute('data-active', 'true');
+  await activateStrategyWorkspace(page, 'dmn');
   await expect(page.getByTestId('dt-in-record_data_wd_req_type')).toContainText(/请假类型|Leave Type/i, {
     timeout: 15_000,
   });
@@ -646,8 +669,7 @@ test('Strategy Studio saves, publishes and reloads BPM user reference condition 
   await openRuleCenterFromSidebar(page);
   await page.getByTestId('strategy-scenario-BPM').click();
   await expect(page.getByTestId('strategy-consumer-summary')).toContainText(/BPM|审批人分派/);
-  await page.getByTestId('strategy-workspace-tab-rule').click();
-  await expect(page.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
+  await activateStrategyWorkspace(page, 'rule');
   await expect(page.getByTestId('condition-builder')).toBeVisible({ timeout: 15_000 });
 
   await resetConditionBuilderToSingleRow(page);
@@ -715,7 +737,7 @@ test('Strategy Studio saves, publishes and reloads BPM user reference condition 
   await page.getByTestId('strategy-scenario-BPM').click();
   await expect(page.getByTestId(`strategy-fragment-${savedFragment.fragmentCode}`)).toBeVisible({ timeout: 15_000 });
   await page.getByTestId(`strategy-fragment-${savedFragment.fragmentCode}`).click();
-  await page.getByTestId('strategy-workspace-tab-rule').click();
+  await activateStrategyWorkspace(page, 'rule');
   await expect(page.getByLabel('field-0')).toHaveValue('record:data.wd_req_applicant');
   await expect(page.getByLabel('operator-0')).toHaveValue('EQ');
   await expect(page.getByTestId('reference-value-trigger-0')).toContainText(user.label, {
@@ -816,8 +838,7 @@ test('Strategy Studio exposes the same low-code applicant fact across rule consu
   for (const scenario of scenarios) {
     await selectStrategyScenario(page, scenario);
 
-    await page.getByTestId('strategy-workspace-tab-facts').click();
-    await expect(page.getByTestId('strategy-fact-catalog')).toHaveAttribute('data-active', 'true');
+    await activateStrategyWorkspace(page, 'facts');
     const factItem = page.getByTestId(strategyFactItemTestId('record', 'data.wd_req_applicant'));
     await expect(factItem).toBeVisible({ timeout: 10_000 });
     await expect(factItem).toHaveAttribute('data-path', 'data.wd_req_applicant');
@@ -827,8 +848,7 @@ test('Strategy Studio exposes the same low-code applicant fact across rule consu
     await expect(factItem).toContainText(/请假申请|Leave Request/i);
     await expect(factItem).toContainText(/用户|reference/i);
 
-    await page.getByTestId('strategy-workspace-tab-rule').click();
-    await expect(page.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
+    await activateStrategyWorkspace(page, 'rule');
     await resetConditionBuilderToSingleRow(page);
     await expect(page.getByLabel('field-0').locator('option[value="record:data.wd_req_applicant"]')).toContainText(
       /申请人|Applicant/i,
@@ -884,8 +904,7 @@ test('Strategy Studio reuses user reference conditions across SLA Automation Eve
   for (const scenario of scenarios) {
     await page.getByTestId(`strategy-scenario-${scenario.key}`).click();
     await expect(page.getByTestId('strategy-consumer-summary')).toContainText(scenario.summary);
-    await page.getByTestId('strategy-workspace-tab-rule').click();
-    await expect(page.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
+    await activateStrategyWorkspace(page, 'rule');
     await expect(page.getByTestId('condition-builder')).toBeVisible({ timeout: 15_000 });
 
     await resetConditionBuilderToSingleRow(page);

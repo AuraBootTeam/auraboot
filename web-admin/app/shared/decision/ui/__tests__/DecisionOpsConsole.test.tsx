@@ -2057,10 +2057,11 @@ describe('DecisionOpsConsole', () => {
         expect.objectContaining({ page: 0, size: 50 }),
       ),
     );
-    expect(screen.getByTestId('elta-row-log-1')).toHaveTextContent('请假审批 SLA 截止时间');
-    expect(screen.getByTestId('elta-row-log-1')).toHaveTextContent('命中');
-    expect(screen.getByTestId('elta-row-log-1')).not.toHaveTextContent('MATCHED');
-    expect(screen.getByTestId('elta-row-log-1')).toHaveTextContent('18ms');
+    const logRow = await screen.findByTestId('elta-row-log-1');
+    expect(logRow).toHaveTextContent('请假审批 SLA 截止时间');
+    expect(logRow).toHaveTextContent('命中');
+    expect(logRow).not.toHaveTextContent('MATCHED');
+    expect(logRow).toHaveTextContent('18ms');
 
     fireEvent.change(screen.getByLabelText('log-keyword'), { target: { value: 'trace-live' } });
     fireEvent.click(screen.getByTestId('elta-apply'));

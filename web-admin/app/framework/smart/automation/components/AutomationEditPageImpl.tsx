@@ -121,6 +121,22 @@ function getAutomationTestRunRecordPid(
     : undefined;
 }
 
+export function findRuntimeLogByRouteParam(
+  rows: AutomationLog[],
+  logIdParam: string | undefined,
+): AutomationLog | null {
+  if (!logIdParam) return null;
+  return (
+    rows.find(({ id: automationLogNumericId, pid: automationLogPid }) => {
+      const logNumericId =
+        automationLogNumericId === undefined || automationLogNumericId === null
+          ? undefined
+          : String(automationLogNumericId);
+      return logNumericId === logIdParam || automationLogPid === logIdParam;
+    }) ?? null
+  );
+}
+
 /**
  * Synthesize a FlowData layout from flat triggerType + actions when flowConfig is null.
  * Ensures the visual editor always has nodes to render for legacy automations.
@@ -219,7 +235,7 @@ export function AutomationEditPageImpl(_props: AutomationEditPageImplProps) {
       .then((body) => {
         if (cancelled) return;
         const rows = Array.isArray(body?.data) ? body.data as AutomationLog[] : [];
-        const selected = rows.find((row) => row.pid === logIdParam) ?? null;
+        const selected = findRuntimeLogByRouteParam(rows, logIdParam);
         setRuntimeLog(selected);
       })
       .catch(() => {

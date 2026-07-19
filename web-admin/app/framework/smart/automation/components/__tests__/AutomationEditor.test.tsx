@@ -695,6 +695,64 @@ describe('AutomationEditor — initialData stability (ACP H.1)', () => {
     expect(runtimeLink.getAttribute('href')).toBe('/automation/auto-1?logId=51');
   });
 
+  it('opens runtime trace action evidence when an initial run log arrives after route load', async () => {
+    const { rerender } = render(
+      <AutomationEditor
+        automationId="auto-1"
+        initialData={{
+          name: 'Webhook 出站追踪',
+          flowData: buildFlowData('webhook'),
+        }}
+        initialRunLog={null}
+      />,
+    );
+
+    expect(screen.queryByTestId('automation-test-run-result')).not.toBeInTheDocument();
+
+    rerender(
+      <AutomationEditor
+        automationId="auto-1"
+        initialData={{
+          name: 'Webhook 出站追踪',
+          flowData: buildFlowData('webhook'),
+        }}
+        initialRunLog={{
+          id: 52,
+          pid: 'log-webhook-runtime-async',
+          automationId: 'auto-1',
+          status: 'success',
+          durationMs: 31,
+          triggerRecordPid: 'REQ-ASYNC',
+          triggerPayload: { source: 'runtime-route' },
+          actionResults: [
+            {
+              sequence: 1,
+              actionType: 'send_webhook',
+              status: 'success',
+              durationMs: 24,
+              result: {
+                success: true,
+                deliveryMode: 'direct_http',
+                statusCode: 200,
+                url: 'https://hooks.example/async',
+                responseBodyPreview: '{"ok":true}',
+              },
+            },
+          ],
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('automation-test-run-result')).toBeInTheDocument());
+    const actionResult = screen.getByTestId('automation-action-result-1');
+    expect(actionResult).toHaveTextContent('Send Webhook');
+    expect(actionResult).toHaveTextContent('https://hooks.example/async');
+    expect(screen.getByTestId('automation-runtime-trace-link')).toHaveAttribute(
+      'href',
+      '/automation/auto-1?logId=52',
+    );
+  });
+
   it('shows collaboration and governance runtime evidence with product labels', async () => {
     render(
       <AutomationEditor

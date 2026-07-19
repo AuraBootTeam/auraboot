@@ -224,4 +224,42 @@ describe('PolicyConfigDialog', () => {
     expect(onSuccess).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('uses the policy schema decision as the initial rule binding decision', () => {
+    render(
+      <PolicyConfigDialog
+        open
+        onClose={vi.fn()}
+        rolePid="role-admin"
+        permissionPid="perm-approve"
+        permissionLabel="Approve Invoice"
+        schema={{
+          dynamicAbac: {
+            type: 'rule-center',
+            label: 'Rule center ABAC',
+            mode: 'decision',
+            decisions: [
+              {
+                code: 'permission_department_guard',
+                name: 'Department Guard',
+                outputs: [
+                  { id: 'allowed', label: '是否允许', dataType: 'boolean' },
+                  { id: 'grantReason', label: '授权说明', dataType: 'string' },
+                ],
+              },
+            ],
+            fields: [
+              { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'integer' },
+            ],
+          },
+        }}
+        initialValues={{}}
+        onSuccess={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('decision-code')).toHaveValue('permission_department_guard');
+    fireEvent.click(screen.getByRole('button', { name: '添加输出' }));
+    expect(screen.getByLabelText('output-mapping-output-picker-0')).toHaveTextContent('授权说明');
+  });
 });
