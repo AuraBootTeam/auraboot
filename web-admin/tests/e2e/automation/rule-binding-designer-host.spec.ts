@@ -469,10 +469,7 @@ async function openAutomationListFromSidebar(page: Page): Promise<void> {
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
   await ensureSidebarExpanded(page);
   const nav = page.locator('nav, aside, [role="navigation"]').first();
-  const link = nav
-    .locator('a[href="/automations"]')
-    .or(nav.getByRole('link', { name: /自动化|Automation/i }))
-    .first();
+  const link = nav.locator('a[href="/automations"]').first();
   const parent = nav
     .getByRole('button', { name: /系统管理|System Management|System|管理|Admin/i })
     .or(nav.getByRole('link', { name: /系统管理|System Management|System|管理|Admin/i }))
@@ -484,8 +481,13 @@ async function openAutomationListFromSidebar(page: Page): Promise<void> {
     });
   }
   await expect(link).toBeVisible({ timeout: 15_000 });
-  await link.click();
-  await expect(page).toHaveURL(/\/automations(?:$|[/?#])/, { timeout: 15_000 });
+  await expect(link).toHaveAttribute('href', '/automations');
+  await link.scrollIntoViewIfNeeded();
+  await expect(link).toBeInViewport({ timeout: 5_000 });
+  await Promise.all([
+    page.waitForURL(/\/automations(?:$|[/?#])/, { timeout: 15_000 }),
+    link.click(),
+  ]);
   await expect(page.locator('[data-testid="page-title"]').first()).toBeVisible({
     timeout: 15_000,
   });
