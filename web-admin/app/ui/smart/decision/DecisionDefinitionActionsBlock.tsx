@@ -112,6 +112,10 @@ function rolloutUrlFor(
     .replaceAll('{candidateVersion}', encodeURIComponent(String(candidate.version)));
 }
 
+function executionLogsUrlFor(decisionCode: string): string {
+  return `/p/decisionops_execution_logs?decisionCode=${encodeURIComponent(decisionCode)}`;
+}
+
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -369,6 +373,13 @@ export function DecisionDefinitionActionsBlock({
           onClick={() => navigate(`/p/decisionops_rollouts?decisionCode=${encodeURIComponent(decisionCode)}`)}
         >
           灰度发布
+        </button>
+        <button
+          type="button"
+          data-testid="dda-open-logs"
+          onClick={() => navigate(executionLogsUrlFor(decisionCode))}
+        >
+          执行日志
         </button>
       </div>
 

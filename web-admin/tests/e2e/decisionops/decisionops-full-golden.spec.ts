@@ -283,6 +283,28 @@ async function decisionDefinitionRow(page: Page, decisionCode: string) {
   return row;
 }
 
+async function searchListIfAvailable(page: Page, keyword: string): Promise<void> {
+  const search = page.getByTestId('list-search-input');
+  if (!(await search.isVisible({ timeout: 2_000 }).catch(() => false))) return;
+  await search.fill(keyword);
+  await search.press('Enter');
+  await expect
+    .poll(
+      async () => page.locator('[data-testid^="table-row-"]').count(),
+      { timeout: 5_000, intervals: [100, 250, 500] },
+    )
+    .toBeGreaterThan(0)
+    .catch(() => undefined);
+}
+
+async function tableRowByText(page: Page, text: string) {
+  const row = page.locator('[data-testid^="table-row-"]').filter({ hasText: text }).first();
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await row.scrollIntoViewIfNeeded();
+  await row.hover();
+  return row;
+}
+
 async function clickRowAction(page: Page, row: ReturnType<Page['locator']>, actionCode: string): Promise<void> {
   const action = row.getByTestId(`row-action-${actionCode}`).first();
   if (await action.isVisible({ timeout: 1_000 }).catch(() => false)) {
@@ -329,34 +351,80 @@ async function openDecisionOpsSidebarLink(
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
   await ensureSidebarExpanded(page);
   const sidebar = page.getByTestId('sidebar');
-  const sidebarInViewport = async () =>
-    sidebar
-      .evaluate((element) => {
+  const navigationInViewport = async () =>
+    page.evaluate(() => {
+      const candidates = Array.from(
+        document.querySelectorAll<HTMLElement>('[data-testid="sidebar"], nav, aside, [role="navigation"]'),
+      );
+      return candidates.some((element) => {
         const rect = element.getBoundingClientRect();
+        const style = window.getComputedStyle(element);
         return (
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          rect.width > 0 &&
+          rect.height > 0 &&
           rect.right > 0 &&
           rect.left < window.innerWidth &&
           rect.bottom > 0 &&
           rect.top < window.innerHeight
         );
-      })
-      .catch(() => false);
+      });
+    });
   const sidebarToggle = page.getByTestId('header-sidebar-toggle');
   if (await sidebarToggle.isVisible({ timeout: 1000 }).catch(() => false)) {
-    if (!(await sidebarInViewport())) {
+    if (!(await navigationInViewport())) {
       await sidebarToggle.click();
     }
-    await expect.poll(sidebarInViewport, { timeout: 5000, intervals: [100, 250, 500] }).toBe(true);
+    await expect
+      .poll(navigationInViewport, { timeout: 5000, intervals: [100, 250, 500] })
+      .toBe(true)
+      .catch(() => undefined);
   }
-  const nav = (await sidebar.count()) > 0 ? sidebar : page.locator('nav, aside, [role="navigation"]').first();
+  const navWithTarget = page
+    .locator('[data-testid="sidebar"], nav, aside, [role="navigation"]')
+    .filter({ has: page.locator(`a[href="${href}"]`) })
+    .first();
+  const nav =
+    (await navWithTarget.count()) > 0
+      ? navWithTarget
+      : (await sidebar.count()) > 0
+        ? sidebar
+        : page.locator('nav, aside, [role="navigation"]').first();
   const parent = nav
     .getByRole('button', { name: /规则中心|决策中心|Rule Center|DecisionOps/i })
     .or(nav.getByRole('link', { name: /规则中心|决策中心|Rule Center|DecisionOps/i }))
     .first();
-  const link = nav.locator(`a[href="${href}"]`).or(nav.getByRole('link', { name: linkName })).first();
+  const targetLink = async () => {
+    const candidates = page.locator(`a[href="${href}"]`).or(page.getByRole('link', { name: linkName }));
+    const count = await candidates.count();
+    for (let index = 0; index < count; index += 1) {
+      const candidate = candidates.nth(index);
+      const inViewport = await candidate
+        .evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = window.getComputedStyle(element);
+          return (
+            style.display !== 'none' &&
+            style.visibility !== 'hidden' &&
+            rect.width > 0 &&
+            rect.height > 0 &&
+            rect.right > 0 &&
+            rect.left < window.innerWidth &&
+            rect.bottom > 0 &&
+            rect.top < window.innerHeight
+          );
+        })
+        .catch(() => false);
+      if (inViewport) return candidate;
+    }
+    return candidates.first();
+  };
+  let link = await targetLink();
   if (!(await link.isVisible({ timeout: 1000 }).catch(() => false))) {
     await expect(parent).toBeVisible({ timeout: 10000 });
     await parent.click();
+    link = await targetLink();
   }
   await expect(link).toBeVisible({ timeout: 10000 });
   await link.scrollIntoViewIfNeeded();
@@ -390,6 +458,99 @@ async function openRuleCenterFromSidebar(page: Page): Promise<void> {
     /策略工作台|规则中心|Rule Center|DecisionOps/i,
     /\/decision-ops(?:$|\?)/,
   );
+}
+
+async function openExecutionLogsFromDefinitionDetail(page: Page, decisionCode: string): Promise<void> {
+  const encoded = encodeURIComponent(decisionCode);
+  await Promise.all([
+    page.waitForURL(new RegExp(`/p/decisionops_execution_logs\\?decisionCode=${escapeRegExp(encoded)}`), {
+      timeout: 15_000,
+    }),
+    page.getByTestId('dda-open-logs').click(),
+  ]);
+  await waitForDynamicPageLoad(page);
+}
+
+async function openModelFieldsFromSidebar(page: Page): Promise<void> {
+  await openDecisionOpsSidebarLink(
+    page,
+    '/p/decisionops_model_fields',
+    /数据模型|Data Model/i,
+    /\/p\/decisionops_model_fields(?:$|\?)/,
+  );
+}
+
+async function openModelFieldImpactFromList(
+  page: Page,
+  fieldPath: string,
+  decisionCode: string,
+): Promise<void> {
+  await openModelFieldsFromSidebar(page);
+  await searchListIfAvailable(page, fieldPath);
+  let row = page
+    .locator('[data-testid^="table-row-"]')
+    .filter({ hasText: fieldPath })
+    .filter({ hasText: decisionCode })
+    .first();
+  if (!(await row.isVisible({ timeout: 2_000 }).catch(() => false))) {
+    row = await tableRowByText(page, fieldPath);
+  } else {
+    await row.scrollIntoViewIfNeeded();
+    await row.hover();
+  }
+  await Promise.all([
+    page.waitForURL(/\/p\/decisionops_model_fields_impact\?fieldRef=.*data\.amount/, {
+      timeout: 15_000,
+    }),
+    clickRowAction(page, row, 'impact'),
+  ]);
+  await waitForDynamicPageLoad(page);
+}
+
+async function openConnectorsFromSidebar(page: Page): Promise<void> {
+  await openDecisionOpsSidebarLink(
+    page,
+    '/p/decisionops_connectors',
+    /集成连接器|Connectors/i,
+    /\/p\/decisionops_connectors(?:$|\?)/,
+  );
+}
+
+async function openConnectorDetailFromList(page: Page, connector: ConnectorRecord): Promise<void> {
+  await openConnectorsFromSidebar(page);
+  await searchListIfAvailable(page, connector.name);
+  const row = await tableRowByText(page, connector.name);
+  await Promise.all([
+    page.waitForURL(
+      new RegExp(`/p/decisionops_connectors/view/${escapeRegExp(encodeURIComponent(connector.pid))}`),
+      { timeout: 15_000 },
+    ),
+    clickRowAction(page, row, 'detail'),
+  ]);
+  await waitForDynamicPageLoad(page);
+}
+
+async function openWebhooksFromSidebar(page: Page): Promise<void> {
+  await openDecisionOpsSidebarLink(
+    page,
+    '/p/decisionops_webhooks',
+    /Webhook 治理|Webhook Governance/i,
+    /\/p\/decisionops_webhooks(?:$|\?)/,
+  );
+}
+
+async function openWebhookDetailFromList(page: Page, webhook: WebhookRecord): Promise<void> {
+  await openWebhooksFromSidebar(page);
+  await searchListIfAvailable(page, webhook.name);
+  const row = await tableRowByText(page, webhook.name);
+  await Promise.all([
+    page.waitForURL(
+      new RegExp(`/p/decisionops_webhooks/view/${escapeRegExp(encodeURIComponent(webhook.pid))}`),
+      { timeout: 15_000 },
+    ),
+    clickRowAction(page, row, 'detail'),
+  ]);
+  await waitForDynamicPageLoad(page);
 }
 
 async function assertAnonymousBlocked(browser: Browser): Promise<void> {
@@ -515,12 +676,7 @@ test.describe.serial('DecisionOps full-app golden', () => {
     });
     const outputLogPid = outputLog!.pid!;
 
-    await page.goto(
-      `/p/decisionops_execution_logs?decisionCode=${encodeURIComponent(decisionCode)}&traceId=${encodeURIComponent(
-        evaluate.traceId!,
-      )}`,
-      { waitUntil: 'domcontentloaded' },
-    );
+    await openExecutionLogsFromDefinitionDetail(page, decisionCode);
     await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId('elta-filters')).toBeVisible();
     await expect(page.getByTestId(`elta-row-${outputLogPid}`)).toBeVisible({ timeout: 15000 });
@@ -647,19 +803,14 @@ test.describe.serial('DecisionOps full-app golden', () => {
     await capture(page, testInfo, 'decisionops-dmn-complex-date-gap');
     await expectNoLegacyConsoleLinks(page);
 
-    await page.goto(
-      `/p/decisionops_model_fields_impact?fieldRef=${encodeURIComponent('record.data.amount')}&currentDataType=decimal`,
-      { waitUntil: 'domcontentloaded' },
-    );
+    await openModelFieldImpactFromList(page, 'data.amount', decisionCode);
     await expect(page.getByTestId('decision-field-impact')).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId('field-impact-risk')).toBeVisible({ timeout: 15000 });
     await page.getByTestId('field-preflight-run').click();
     await expect(page.getByTestId('field-preflight-result')).toBeVisible({ timeout: 15000 });
     await capture(page, testInfo, 'decisionops-field-impact');
 
-    await page.goto(`/p/decisionops_connectors/view/${encodeURIComponent(connector.pid)}`, {
-      waitUntil: 'domcontentloaded',
-    });
+    await openConnectorDetailFromList(page, connector);
     await expect(page.getByTestId('decision-integration-impact')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('integration-impact-refresh')).toBeVisible();
     await expect(page.getByTestId('integration-impact-manage')).toHaveAttribute(
@@ -675,9 +826,7 @@ test.describe.serial('DecisionOps full-app golden', () => {
       page,
       `/api/decision/integrations/impact?targetType=WEBHOOK&targetCode=${encodeURIComponent(webhookTargetCode)}`,
     );
-    await page.goto(`/p/decisionops_webhooks/view/${encodeURIComponent(webhook.pid)}`, {
-      waitUntil: 'domcontentloaded',
-    });
+    await openWebhookDetailFromList(page, webhook);
     await expect(page.getByTestId('decision-integration-impact')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('integration-impact-manage')).toHaveAttribute(
       'href',
