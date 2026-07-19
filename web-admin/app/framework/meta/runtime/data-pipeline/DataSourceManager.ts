@@ -566,7 +566,13 @@ export class DataSourceManager {
       return inFlightFetch;
     }
 
-    if (!force && this.shouldSkipForRateLimitBackoff(id)) {
+    // Rate-limit backoff is a HARD backend-protection guard and must hold even
+    // for forced reloads. A `force` reload (user refresh / dependOn cascade) is
+    // allowed to bypass the soft min-interval throttle below, but never the
+    // backoff — otherwise a data source that is rate-limited from its first
+    // fetch (data stays null) gets reload()'d in a loop and hammers the backend
+    // 60/min rate limit (quote price charts, prod incident).
+    if (this.shouldSkipForRateLimitBackoff(id)) {
       const cachedData = this.dataSourceStates.get(id)?.data;
       if (cachedData !== undefined && cachedData !== null) {
         return this.keepExistingData(id);

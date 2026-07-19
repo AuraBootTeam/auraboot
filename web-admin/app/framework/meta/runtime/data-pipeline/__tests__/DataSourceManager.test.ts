@@ -389,6 +389,49 @@ describe('DataSourceManager', () => {
     expect(mockedFetchResult).toHaveBeenCalledTimes(2);
   });
 
+  it('does not hammer a namedQuery that is rate-limited from the first fetch under repeated forced reloads', async () => {
+    // Always rate-limited: the data source NEVER succeeds, so its data stays null.
+    // Reproduces the prod loop where a quote price chart (bomPriceMetrics/waterfall)
+    // is repeatedly reload()'d (notifyStateChanged → reload → force) and hammers the
+    // backend 60/min rate limit because force bypassed the rate-limit backoff.
+    mockedFetchResult.mockResolvedValue({
+      code: '500',
+      desc: 'Rate limit exceeded for query: qo_quote_bom_price_metrics (max 60 per minute)',
+      data: null,
+    } as any);
+
+    const manager = new DataSourceManager(
+      createExpressionContext({
+        form: { pid: 'quote-1' },
+      } as any),
+    );
+    manager.register('bomPriceMetrics', {
+      type: 'namedQuery',
+      queryCode: 'qo_quote_bom_price_metrics',
+      format: 'records',
+      adaptor: 'table',
+      autoFetch: false,
+      minFetchIntervalMs: 1500,
+      rateLimitBackoffMs: 30_000,
+      params: {
+        quoteId: '${form.pid}',
+      },
+    } as any);
+
+    // First fetch is rate-limited → applies the 30s backoff.
+    await manager.fetch('bomPriceMetrics');
+    // The trigger loop issues repeated forced reloads. These MUST honor the
+    // rate-limit backoff — a forced reload is allowed to bypass the soft
+    // min-interval throttle, but never the hard backend rate-limit backoff.
+    await manager.reload('bomPriceMetrics');
+    await manager.reload('bomPriceMetrics');
+    await manager.reload('bomPriceMetrics');
+
+    // Only the initial fetch should have hit the backend; the reloads are
+    // suppressed by the active backoff (before the fix this was 4 — a hammer loop).
+    expect(mockedFetchResult).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves HTTP status metadata on API data-source errors', async () => {
     mockedFetchResult.mockResolvedValueOnce({
       code: '503',
