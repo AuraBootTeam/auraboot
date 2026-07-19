@@ -70,6 +70,7 @@ type ModelPublishReplayResult = {
   executed?: boolean;
   matched?: boolean;
   message?: string;
+  traceId?: string;
   outputs?: Record<string, unknown>;
   errors?: string[];
 };
@@ -1223,11 +1224,13 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   const allowPermissionResult = requirePermissionReplayResult(allowReplayReport, permissionCode);
   expect(allowPermissionResult.status).toBe('EXECUTED');
   expect(allowPermissionResult.executed).toBe(true);
+  expect(allowPermissionResult.traceId).toBeTruthy();
   expect(allowPermissionResult.matched).toBe(true);
   expect(allowPermissionResult.message).toContain('ALLOW');
   expect(allowPermissionResult.outputs).toEqual(expect.objectContaining({
     permissionCode,
     memberId: member.memberId,
+    ruleTraceId: allowPermissionResult.traceId,
     granted: true,
     affectedFieldRef: `${modelCode}.${fieldCode}`,
     fieldMasked: true,
@@ -1249,6 +1252,10 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).toContainText('原因: 已授权');
   await expect(replayReport).toContainText('字段风险: 字段权限变更');
   await expect(replayReport).toContainText('风险说明: 字段已脱敏且权限策略已变化，需使用低权限样本复核');
+  await expect(page.getByTestId('model-publish-replay-open-permission-trace')).toHaveAttribute(
+    'href',
+    new RegExp(`/p/decisionops_execution_logs\\?traceId=${allowPermissionResult.traceId}`),
+  );
   await expect(replayReport).not.toContainText('Permission replay executed');
   await expect(replayReport).not.toContainText('granted: true');
   await expect(replayReport).not.toContainText('Granted');
@@ -1291,11 +1298,13 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   const denyPermissionResult = requirePermissionReplayResult(denyReplayReport, permissionCode);
   expect(denyPermissionResult.status).toBe('EXECUTED');
   expect(denyPermissionResult.executed).toBe(true);
+  expect(denyPermissionResult.traceId).toBeTruthy();
   expect(denyPermissionResult.matched).toBe(false);
   expect(denyPermissionResult.message).toContain('DENY');
   expect(denyPermissionResult.outputs).toEqual(expect.objectContaining({
     permissionCode,
     memberId: member.memberId,
+    ruleTraceId: denyPermissionResult.traceId,
     granted: false,
     affectedFieldRef: `${modelCode}.${fieldCode}`,
     fieldMasked: true,
@@ -1311,6 +1320,10 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
   await expect(replayReport).toContainText('授权结果: 否');
   await expect(replayReport).toContainText('原因: 条件未满足');
   await expect(replayReport).toContainText('字段风险: 字段权限变更');
+  await expect(page.getByTestId('model-publish-replay-open-permission-trace')).toHaveAttribute(
+    'href',
+    new RegExp(`/p/decisionops_execution_logs\\?traceId=${denyPermissionResult.traceId}`),
+  );
   await expect(replayReport).not.toContainText('Permission replay executed');
   await expect(replayReport).not.toContainText('granted: false');
   await expect(replayReport).not.toContainText('Condition guard not satisfied');

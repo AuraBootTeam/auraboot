@@ -310,7 +310,9 @@ class PolicyEvaluatorTest {
                 .contains("invoice_amount_guard")
                 .contains("expected matched=true")
                 .contains("false");
-        assertThat(step.details()).containsKey("ruleCenterFailures");
+        assertThat(step.details())
+                .containsEntry("ruleTraceId", "trace-permission-deny")
+                .containsKey("ruleCenterFailures");
         assertThat(step.details().get("ruleCenterFailures"))
                 .isInstanceOf(List.class)
                 .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.LIST)

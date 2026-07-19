@@ -926,10 +926,12 @@ class MetaModelServiceImplSearchTest {
         assertThat(report.getExecutedCount()).isEqualTo(1);
         assertThat(report.getFailedCount()).isZero();
         assertThat(report.getResults().get(0).getStatus()).isEqualTo("EXECUTED");
+        assertThat(report.getResults().get(0).getTraceId()).isEqualTo("trace-perm-1");
         assertThat(report.getResults().get(0).getMatched()).isTrue();
         assertThat(report.getResults().get(0).getOutputs())
                 .containsEntry("permissionPolicyPid", "role-perm-pid")
                 .containsEntry("permissionCode", "model.order.approve")
+                .containsEntry("ruleTraceId", "trace-perm-1")
                 .containsEntry("resource", "order")
                 .containsEntry("action", "approve")
                 .containsEntry("memberId", "901")
@@ -977,7 +979,10 @@ class MetaModelServiceImplSearchTest {
                 .thenReturn(List.of(publishedVersion(draft.getCode(), 1), draft));
         when(permissionEvaluator.canOperate(eq(902L), eq("invoice"), eq("approve"), any()))
                 .thenReturn(PermissionResult.deny("Policy condition denied", List.of(
-                        new EvaluationStep("Policy", EvaluationVerdict.DENY, "amount is above approval limit"))));
+                        new EvaluationStep("Policy", EvaluationVerdict.DENY, "amount is above approval limit",
+                                Map.of("ruleCenterFailures", List.of(Map.of(
+                                        "ruleTraceId", "trace-perm-deny-1",
+                                        "grantId", 903L)))))));
         MetaModelPublishReplayRequest request = new MetaModelPublishReplayRequest();
         request.setExecuteAutomated(true);
         request.setSampleContext(Map.of(
@@ -990,10 +995,12 @@ class MetaModelServiceImplSearchTest {
         assertThat(report.getExecutedCount()).isEqualTo(1);
         assertThat(report.getFailedCount()).isZero();
         assertThat(report.getResults().get(0).getStatus()).isEqualTo("EXECUTED");
+        assertThat(report.getResults().get(0).getTraceId()).isEqualTo("trace-perm-deny-1");
         assertThat(report.getResults().get(0).getMatched()).isFalse();
         assertThat(report.getResults().get(0).getErrors()).isEmpty();
         assertThat(report.getResults().get(0).getOutputs())
                 .containsEntry("permissionCode", "model.invoice.approve")
+                .containsEntry("ruleTraceId", "trace-perm-deny-1")
                 .containsEntry("resource", "invoice")
                 .containsEntry("action", "approve")
                 .containsEntry("memberId", "902")

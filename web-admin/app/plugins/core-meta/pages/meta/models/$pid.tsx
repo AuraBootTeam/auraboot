@@ -267,6 +267,7 @@ function formatReplayOutputLabel(key: string): string {
     stepCount: '步骤数',
     steps: '评估步骤',
     fieldRefs: '字段引用',
+    ruleTraceId: '统一 Trace',
     traceId: '追踪 ID',
     deadlineMinutes: '截止分钟数',
     processPid: '流程 PID',
@@ -321,6 +322,24 @@ function formatReplayOutputLabel(key: string): string {
 
 function shouldShowReplayOutput(key: string): boolean {
   return key !== 'steps';
+}
+
+function permissionReplayTraceHref(result: ModelPublishReplayResult): string | null {
+  if (result.step?.consumerType !== 'PERMISSION_POLICY') {
+    return null;
+  }
+  const traceId = typeof result.traceId === 'string' ? result.traceId.trim() : '';
+  if (!traceId) {
+    return null;
+  }
+  const params = new URLSearchParams({ traceId, callerType: 'PERMISSION' });
+  const callerRef = typeof result.outputs?.permissionCode === 'string'
+    ? result.outputs.permissionCode
+    : result.step?.sourceCode;
+  if (callerRef) {
+    params.set('callerRef', callerRef);
+  }
+  return `/p/decisionops_execution_logs?${params.toString()}`;
 }
 
 function formatReplayOutputValue(key: string, value: unknown): string {
@@ -2568,6 +2587,7 @@ export default function ModelDetailPage() {
                                 step?.consumerType ||
                                 '未命名消费方';
                               const displayMessage = getReplayResultMessage(result);
+                              const permissionTraceHref = permissionReplayTraceHref(result);
                               return (
                                 <div
                                   key={`replay-result-${step?.consumerType || 'consumer'}-${step?.sourcePid || step?.sourceCode || index}`}
@@ -2588,6 +2608,15 @@ export default function ModelDetailPage() {
                                       <span className="font-mono text-xs text-gray-500">
                                         {result.traceId}
                                       </span>
+                                    )}
+                                    {permissionTraceHref && (
+                                      <Link
+                                        to={permissionTraceHref}
+                                        data-testid="model-publish-replay-open-permission-trace"
+                                        className="rounded border border-blue-200 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+                                      >
+                                        打开统一 Trace
+                                      </Link>
                                     )}
                                   </div>
                                   {displayMessage && (
