@@ -185,12 +185,33 @@ public class PolicyEvaluator {
         }
 
         // Every conditional grant was FALSE / UNKNOWN / unparseable → deny by default.
-        Map<String, Object> details = denyDetails.isEmpty()
-                ? Map.of()
-                : Map.of("ruleCenterFailures", List.copyOf(denyDetails));
+        Map<String, Object> details = new LinkedHashMap<>();
+        if (!denyDetails.isEmpty()) {
+            String ruleTraceId = firstRuleTraceId(denyDetails);
+            if (ruleTraceId != null && !ruleTraceId.isBlank()) {
+                details.put("ruleTraceId", ruleTraceId);
+            }
+            details.put("ruleCenterFailures", List.copyOf(denyDetails));
+        }
         return new EvaluationStep(NAME, EvaluationVerdict.DENY,
                 "Condition guard not satisfied: " + String.join("; ", denyReasons),
                 details);
+    }
+
+    private String firstRuleTraceId(List<Map<String, Object>> details) {
+        if (details == null) {
+            return null;
+        }
+        for (Map<String, Object> detail : details) {
+            if (detail == null) {
+                continue;
+            }
+            Object value = detail.get("ruleTraceId");
+            if (value instanceof String text && !text.isBlank()) {
+                return text;
+            }
+        }
+        return null;
     }
 
     private ConditionNode parseAst(ConditionGuard guard) {

@@ -3475,12 +3475,14 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                         .outputs(permissionReplayOutputs(step, permissionCode, resource, action, memberId, recordPid, null))
                         .build();
             }
+            String ruleTraceId = permissionRuleTraceId(result);
             return ModelPublishReplayResultDTO.builder()
                     .step(step)
                     .status("EXECUTED")
                     .automated(true)
                     .executed(true)
                     .message("Permission replay executed with decision " + (result.granted() ? "ALLOW" : "DENY") + ".")
+                    .traceId(ruleTraceId)
                     .matched(result.granted())
                     .outputs(permissionReplayOutputs(step, permissionCode, resource, action, memberId, recordPid, result))
                     .errors(List.of())
@@ -4211,6 +4213,7 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
             }
         }
         if (result != null) {
+            outputs.put("ruleTraceId", permissionRuleTraceId(result));
             outputs.put("granted", result.granted());
             outputs.put("reason", result.reason());
             outputs.put("stepCount", result.steps() != null ? result.steps().size() : 0);
@@ -4269,6 +4272,42 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
                     return cleaned;
                 })
                 .toList();
+    }
+
+    private String permissionRuleTraceId(PermissionResult result) {
+        if (result == null || result.steps() == null) {
+            return null;
+        }
+        for (EvaluationStep step : result.steps()) {
+            if (step == null || step.details() == null) {
+                continue;
+            }
+            Object value = step.details().get("ruleTraceId");
+            if (value instanceof String text && StringUtils.hasText(text)) {
+                return text;
+            }
+            value = nestedPermissionRuleTraceId(step.details().get("ruleCenterFailures"));
+            if (value instanceof String text && StringUtils.hasText(text)) {
+                return text;
+            }
+        }
+        return null;
+    }
+
+    private String nestedPermissionRuleTraceId(Object failures) {
+        if (!(failures instanceof List<?> failureList)) {
+            return null;
+        }
+        for (Object failure : failureList) {
+            if (!(failure instanceof Map<?, ?> failureMap)) {
+                continue;
+            }
+            Object value = failureMap.get("ruleTraceId");
+            if (value instanceof String text && StringUtils.hasText(text)) {
+                return text;
+            }
+        }
+        return null;
     }
 
     private String idForBrowser(Object value) {
