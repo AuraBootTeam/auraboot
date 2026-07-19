@@ -87,17 +87,82 @@ class TurnExecutionPlannerTest {
     }
 
     @Test
-    @DisplayName("plans explicit named agents as named-agent turns")
+    @DisplayName("plans explicit named agents as named-agent turns; shadowed ACP bucket becomes a visible signal")
     void plansNamedAgentsAsNamedAgentTurns() {
         TurnExecutionPlanner.TurnExecutionPlan named = planner.decide("sales_agent", TriageBucket.ACP_RUN);
         assertThat(named.initialMode()).isEqualTo(TurnExecutionPlanner.InitialExecutionMode.NAMED_AGENT_TURN);
         assertThat(named.reason()).isEqualTo(TurnExecutionPlanner.DecisionReason.NAMED_AGENT_PROFILE);
         assertThat(named.namedAgent()).isTrue();
+        // Review G8: the keyword-derived ACP bucket does NOT hard-conflict (v1 keyword
+        // noise must not break named-agent conversations) but it must never be silently
+        // swallowed either — it surfaces as a policy signal for telemetry.
         assertThat(named.policySignals())
-                .containsExactly(TurnExecutionPlanner.PolicySignal.EXPLICIT_NAMED_AGENT);
+                .containsExactlyInAnyOrder(
+                        TurnExecutionPlanner.PolicySignal.EXPLICIT_NAMED_AGENT,
+                        TurnExecutionPlanner.PolicySignal.DURABLE_TRIAGE_BUCKET);
 
         assertThat(planner.decide("sales_agent", TriageBucket.LIGHT_CHAT).initialMode())
                 .isEqualTo(TurnExecutionPlanner.InitialExecutionMode.NAMED_AGENT_TURN);
+        assertThat(planner.decide("sales_agent", TriageBucket.LIGHT_CHAT).policySignals())
+                .containsExactly(TurnExecutionPlanner.PolicySignal.EXPLICIT_NAMED_AGENT);
+    }
+
+    // =====================================================================
+    // Review G8 — named-agent shadowing matrix: explicit durable flags must
+    // conflict loudly; identity must never silently swallow requirements.
+    // =====================================================================
+
+    private TurnExecutionPlanner.TurnExecutionInput namedInput(boolean explicitDurable,
+                                                               boolean requiresApproval,
+                                                               boolean externalSideEffect,
+                                                               boolean batch) {
+        return new TurnExecutionPlanner.TurnExecutionInput(
+                "sales_agent", TriageBucket.LIGHT_CHAT, java.util.Set.of(),
+                explicitDurable, requiresApproval, externalSideEffect, batch);
+    }
+
+    @Test
+    @DisplayName("G8: named agent + batch -> NAMED_AGENT_DURABLE_UNSUPPORTED, never silent chat")
+    void namedAgentBatch_conflicts() {
+        TurnExecutionPlanner.TurnExecutionPlan plan = planner.decide(namedInput(false, false, false, true));
+        assertThat(plan.reason()).isEqualTo(TurnExecutionPlanner.DecisionReason.NAMED_AGENT_DURABLE_UNSUPPORTED);
+        assertThat(plan.policySignals()).contains(TurnExecutionPlanner.PolicySignal.DURABLE_LIFECYCLE_SIGNAL);
+    }
+
+    @Test
+    @DisplayName("G8: named agent + externalSideEffect -> NAMED_AGENT_DURABLE_UNSUPPORTED")
+    void namedAgentExternalSideEffect_conflicts() {
+        TurnExecutionPlanner.TurnExecutionPlan plan = planner.decide(namedInput(false, false, true, false));
+        assertThat(plan.reason()).isEqualTo(TurnExecutionPlanner.DecisionReason.NAMED_AGENT_DURABLE_UNSUPPORTED);
+    }
+
+    @Test
+    @DisplayName("G8: named agent + explicitDurableRequest -> NAMED_AGENT_DURABLE_UNSUPPORTED with signal")
+    void namedAgentExplicitDurable_conflicts() {
+        TurnExecutionPlanner.TurnExecutionPlan plan = planner.decide(namedInput(true, false, false, false));
+        assertThat(plan.reason()).isEqualTo(TurnExecutionPlanner.DecisionReason.NAMED_AGENT_DURABLE_UNSUPPORTED);
+        assertThat(plan.policySignals()).contains(TurnExecutionPlanner.PolicySignal.EXPLICIT_DURABLE_REQUEST);
+    }
+
+    @Test
+    @DisplayName("G8/G7: named agent + requiresApproval alone -> normal named turn, approval as signal only")
+    void namedAgentApprovalAlone_doesNotConflict() {
+        TurnExecutionPlanner.TurnExecutionPlan plan = planner.decide(namedInput(false, true, false, false));
+        assertThat(plan.reason()).isEqualTo(TurnExecutionPlanner.DecisionReason.NAMED_AGENT_PROFILE);
+        assertThat(plan.policySignals()).contains(TurnExecutionPlanner.PolicySignal.DURABLE_LIFECYCLE_SIGNAL);
+    }
+
+    @Test
+    @DisplayName("invariant: default agent + batch/externalSideEffect always plans durable (monotonic upgrade)")
+    void defaultAgentDurableFlags_planDurable() {
+        TurnExecutionPlanner.TurnExecutionPlan batch = planner.decide(new TurnExecutionPlanner.TurnExecutionInput(
+                "aurabot", TriageBucket.LIGHT_CHAT, java.util.Set.of(), false, false, false, true));
+        assertThat(batch.initialMode()).isEqualTo(TurnExecutionPlanner.InitialExecutionMode.DURABLE_WORKFLOW);
+
+        TurnExecutionPlanner.TurnExecutionPlan external = planner.decide(new TurnExecutionPlanner.TurnExecutionInput(
+                null, TriageBucket.CONTEXTUAL_ANSWER, java.util.Set.of("record.view"), false, false, true, false));
+        assertThat(external.initialMode()).isEqualTo(TurnExecutionPlanner.InitialExecutionMode.DURABLE_WORKFLOW);
+        assertThat(external.reason()).isEqualTo(TurnExecutionPlanner.DecisionReason.DURABLE_EXECUTION_POLICY);
     }
 
     @Test
