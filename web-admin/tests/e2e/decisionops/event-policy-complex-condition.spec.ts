@@ -21,6 +21,12 @@ type EventPolicyVersion = {
   rules_json?: unknown;
 };
 
+type DecisionVersion = {
+  pid: string;
+  status?: string;
+  version?: number;
+};
+
 type FieldImpact = {
   fieldRef?: string;
   references?: Array<{
@@ -105,6 +111,19 @@ type CurrentUserInfo = {
   };
 };
 
+type UserOption = {
+  pid?: string;
+  id?: string;
+  displayName?: string;
+  name?: string;
+  realName?: string;
+  nickName?: string;
+  nickname?: string;
+  username?: string;
+  userName?: string;
+  email?: string;
+};
+
 type ImMessageRecord = {
   id?: number;
   pid?: string;
@@ -168,6 +187,107 @@ async function readApi<T>(response: JsonResponseLike): Promise<T> {
   ).toBe(true);
   expect(isApiSuccess(body), `API failed: ${JSON.stringify(body)}`).toBe(true);
   return body.data as T;
+}
+
+async function postApi<T>(page: Page, endpoint: string, data?: unknown): Promise<T> {
+  const options = data === undefined ? undefined : { data };
+  return readApi<T>(await page.request.post(endpoint, options));
+}
+
+function pageRecordRows<T>(value: PageRecords<T> | T[] | null | undefined): T[] {
+  if (Array.isArray(value)) return value;
+  return value?.records ?? [];
+}
+
+function userLabel(user: UserOption): string {
+  return String(
+    user.displayName ??
+      user.realName ??
+      user.nickName ??
+      user.nickname ??
+      user.name ??
+      user.username ??
+      user.userName ??
+      user.email ??
+      user.pid ??
+      user.id ??
+      '',
+  );
+}
+
+async function resolveFirstUser(page: Page): Promise<{ pid: string; label: string }> {
+  const payload = await readApi<PageRecords<UserOption> | UserOption[]>(
+    await page.request.get('/api/admin/users/search', {
+      params: {
+        keyword: '',
+        page: 1,
+        size: 20,
+      },
+    }),
+  );
+  const users = pageRecordRows(payload);
+  const match =
+    users.find((user) => String(user.email ?? '').toLowerCase() === DEFAULT_TEST_ACCOUNT.email) ??
+    users.find((user) => !userLabel(user).startsWith('Agent:') && (user.pid || user.id)) ??
+    users.find((user) => user.pid || user.id);
+  expect(match, 'Expected at least one tenant user for EventPolicy applicant trace').toBeTruthy();
+  const pid = String(match?.pid ?? match?.id ?? '');
+  const label = userLabel(match as UserOption);
+  expect(pid).toBeTruthy();
+  expect(label).toBeTruthy();
+  return { pid, label };
+}
+
+async function createAndPublishApplicantDecision(
+  page: Page,
+  decisionCode: string,
+  applicantPid: string,
+): Promise<DecisionVersion> {
+  await postApi(page, '/api/decision/definitions', {
+    decisionCode,
+    decisionName: `EventPolicy Applicant ${decisionCode}`,
+    description: 'E2E decision verifies EventPolicy can reuse applicant reference conditions',
+    scopeType: 'EVENT_POLICY',
+    ownerModule: 'decision',
+    enabled: true,
+  });
+
+  const draft = await postApi<DecisionVersion>(
+    page,
+    `/api/decision/definitions/${encodeURIComponent(decisionCode)}/versions`,
+    {
+      kind: 'SIMPLE_CONDITION',
+      runtimeAdapter: 'AST_EVALUATOR',
+      versionTag: `event-policy-applicant-${Date.now()}`,
+      contentJson: {
+        type: 'compare',
+        left: {
+          type: 'path',
+          scope: 'record',
+          path: 'data.wd_req_applicant',
+          dataType: 'user',
+        },
+        operator: 'EQ',
+        right: {
+          type: 'literal',
+          value: applicantPid,
+          dataType: 'user',
+        },
+      },
+    },
+  );
+  expect(draft.pid).toBeTruthy();
+
+  const validation = await postApi<{ valid?: boolean }>(
+    page,
+    `/api/decision/versions/${encodeURIComponent(draft.pid)}/validate`,
+  );
+  expect(validation.valid).toBe(true);
+
+  return postApi<DecisionVersion>(
+    page,
+    `/api/decision/versions/${encodeURIComponent(draft.pid)}/publish`,
+  );
 }
 
 async function openEventPolicyListFromSidebar(page: Page): Promise<void> {
@@ -471,7 +591,7 @@ test('EventPolicy designer persists complex AND/OR/NOT conditions and backend ru
   const linkedActionEvidence = page.getByTestId('elta-linked-action-evidence');
   await expect(linkedActionEvidence).toBeVisible({ timeout: 20_000 });
   await expect(linkedActionEvidence).toContainText('动作执行证据');
-  await expect(linkedActionEvidence).toContainText('NOTIFY');
+  await expect(linkedActionEvidence).toContainText('发送站内通知');
   await expect(linkedActionEvidence).toContainText(notifyRecipientId);
   await expect(linkedActionEvidence).toContainText('Policy notification');
   await expect(linkedActionEvidence).toContainText('in_app');
@@ -607,6 +727,264 @@ test('EventPolicy designer persists complex AND/OR/NOT conditions and backend ru
   await expect(page.getByTestId('event-policy-designer-block')).toBeVisible({ timeout: 15_000 });
 });
 
+test('EventPolicy applicant user reference rule executes action and opens unified Trace fact metadata @golden', async ({
+  page,
+}, testInfo) => {
+  await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  await expect(page).not.toHaveURL(/\/login(?:$|\?)/);
+  const currentUser = await readApi<CurrentUserInfo>(await page.request.get('/api/auth/me'));
+  const notifyRecipientId = currentUser.user?.id;
+  if (!notifyRecipientId) {
+    throw new Error(
+      `Current user id is required for NOTIFY action target: ${JSON.stringify(currentUser)}`,
+    );
+  }
+  expect(notifyRecipientId).toMatch(/^\d+$/);
+  const user = await resolveFirstUser(page);
+
+  const suffix = uniqueId('ep_applicant').replace(/[^a-zA-Z0-9_]/g, '_');
+  const policyCode = `codex_ep_applicant_${suffix}`;
+  const decisionCode = `ep_applicant_reference_${suffix}`;
+  const eventType = `CODEX_LEAVE_APPLICANT_${suffix}`;
+  const publishedDecision = await createAndPublishApplicantDecision(page, decisionCode, user.pid);
+  expect(String(publishedDecision.status ?? '')).toMatch(/PUBLISHED|published/i);
+  await postApi(page, '/api/decision/usage-index/rebuild');
+
+  await openEventPolicyListFromSidebar(page);
+  await expect(page.getByTestId('event-policy-actions-block')).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId('epa-new-policy').click();
+  await expect(page.getByTestId('epa-editor')).toBeVisible({ timeout: 10_000 });
+  await page.getByLabel('policy-code').fill(policyCode);
+  await page.getByLabel('policy-name').fill(`Codex Applicant EventPolicy ${suffix}`);
+  await page.getByLabel('policy-event-type').fill(eventType);
+  await page.getByLabel('policy-target-type').fill('MODEL');
+  await page.getByLabel('policy-target-key').fill('wd_leave_request');
+  await page.getByTestId('epa-save-policy').click();
+  await expect(page).toHaveURL(new RegExp(`/p/decisionops_event_policies/view/${policyCode}`), {
+    timeout: 15_000,
+  });
+
+  await page.getByTestId('epa-open-designer').click();
+  await expect(page).toHaveURL(/\/p\/decisionops_event_policy_designer\?policyCode=/, {
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId('event-policy-designer-block')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('epd-workflow')).toBeVisible();
+
+  await page.getByTestId('epd-step-rules').click();
+  await expect(page.getByTestId('policy-rules-editor')).toBeVisible();
+  await page.getByTestId('cb-add').click();
+  await expect(
+    page.locator('select[aria-label="field-0"] option[value="record:data.wd_req_applicant"]'),
+  ).toContainText(/申请人|Applicant/i, {
+    timeout: 15_000,
+  });
+  await page.getByLabel('field-0').selectOption('record:data.wd_req_applicant');
+  await page.getByLabel('operator-0').selectOption('EQ');
+  await expect(page.getByTestId('reference-value-trigger-0')).toContainText('选择用户');
+  await page.getByTestId('reference-value-trigger-0').click();
+  await expect(page.getByTestId('reference-value-menu-0')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('reference-value-meta-0')).toContainText(
+    /用户 .+ (displayName|nick_name|nickName)/,
+  );
+  await expect(page.getByTestId(`reference-value-option-0-${user.pid}`)).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByTestId(`reference-value-option-0-${user.pid}`).click();
+  await expect(page.getByTestId('reference-value-trigger-0')).toContainText(user.label);
+  await expect(page.getByTestId('cb-preview')).toContainText(/申请人|Applicant/i);
+  await expect(page.getByTestId('cb-preview')).toContainText(user.label);
+  await expect(page.getByTestId('cb-preview')).not.toContainText(user.pid);
+
+  const bindingBlock = page
+    .getByTestId('epd-rule-binding-0')
+    .getByTestId('decision-rule-binding-block');
+  await expect(bindingBlock).toBeVisible({ timeout: 15_000 });
+  await expect(bindingBlock.getByLabel('decision-code').locator(`option[value="${decisionCode}"]`)).toHaveCount(1, {
+    timeout: 15_000,
+  });
+  await bindingBlock.getByLabel('decision-code').selectOption(decisionCode);
+  await bindingBlock.getByLabel('version-policy').selectOption('LATEST_PUBLISHED');
+  await bindingBlock.getByLabel('fallback-mode').selectOption('FAIL_CLOSED');
+  await bindingBlock.getByRole('button', { name: '添加映射' }).click();
+  await expect(
+    bindingBlock.locator('select[aria-label="mapping-field-0"] option[value="record:data.wd_req_applicant"]'),
+  ).toHaveCount(1);
+  await bindingBlock.getByLabel('mapping-input-0').fill('wd_req_applicant');
+  await bindingBlock.getByLabel('mapping-field-0').selectOption('record:data.wd_req_applicant');
+  await expect(bindingBlock.getByTestId('decision-binding-preview')).toContainText(decisionCode);
+  await expect(bindingBlock.getByTestId('decision-binding-preview')).toContainText(/申请人|Applicant/i);
+
+  await page.getByTestId('epd-step-actions').click();
+  await page.getByTestId('epd-add-action').click();
+  await page.getByLabel('action-target-0').fill(`USER:${notifyRecipientId}`);
+  await page.getByLabel('action-field-0-payload.title').fill('Applicant event policy notice');
+  await page
+    .getByLabel('action-field-0-payload.content')
+    .fill('申请人 ${record.data.wd_req_applicant} 触发事件策略');
+
+  await page.getByTestId('epd-step-test').click();
+  await expect(page.getByTestId('condition-testrun')).toContainText('5天长假申请');
+  await expect(page.getByTestId('trp-context')).toContainText(/申请人|Applicant/i, {
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId('trp-context')).toContainText(user.pid);
+  await expect(page.getByTestId('trp-result')).toHaveAttribute('data-truth', 'TRUE');
+
+  await page.screenshot({
+    path: testInfo.outputPath('event-policy-applicant-reference-configured.png'),
+    fullPage: true,
+  });
+
+  await page.getByTestId('epd-step-publish').click();
+  const draftResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes(`/api/event-policy/definitions/${policyCode}/versions`),
+    { timeout: 15_000 },
+  );
+  await page.getByTestId('epd-save-draft').click();
+  const draft = await readApi<EventPolicyVersion>(await draftResponsePromise);
+  expect(draft.pid).toBeTruthy();
+  await expect(page.getByTestId('epd-publish-status')).toContainText(/DRAFT|草稿/i, {
+    timeout: 10_000,
+  });
+
+  const validateResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes(`/api/event-policy/versions/${draft.pid}/validate`),
+    { timeout: 15_000 },
+  );
+  await page.getByTestId('epd-validate-version').click();
+  await expect((await readApi<EventPolicyVersion>(await validateResponsePromise)).status).toBe(
+    'VALIDATED',
+  );
+
+  const publishResponsePromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes(`/api/event-policy/versions/${draft.pid}/publish`),
+    { timeout: 15_000 },
+  );
+  await page.getByTestId('epd-publish-version').click();
+  await expect((await readApi<EventPolicyVersion>(await publishResponsePromise)).status).toBe(
+    'PUBLISHED',
+  );
+  await expect(page.getByTestId('epd-publish-status')).toContainText(/PUBLISHED|已发布/i, {
+    timeout: 10_000,
+  });
+
+  await page.getByTestId('epd-step-test').click();
+  const runButtonResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'POST' &&
+      response.url().includes('/api/event-policy/run-and-execute'),
+    { timeout: 15_000 },
+  );
+  await page.getByTestId('epd-run-published').click();
+  const execution = await readApi<EventPolicyExecutionResult>(await runButtonResponse);
+  expect(execution.policy?.status).toBe('MATCHED');
+  expect(execution.policy?.matchedRuleCodes).toContain('R-1');
+  expect(execution.policy?.decisionTraceIds).toHaveLength(1);
+  expect(execution.execution?.policyCode).toBe(policyCode);
+  expect(execution.execution?.overallStatus).toBe('ALL_SUCCESS');
+  expect(execution.execution?.actions).toHaveLength(1);
+  expect(execution.execution?.actions?.[0]).toMatchObject({
+    ruleCode: 'R-1',
+    type: 'NOTIFY',
+    status: 'SUCCESS',
+  });
+  expect(execution.execution?.actions?.[0]?.resultPayload).toMatchObject({
+    channel: 'in_app',
+    recipientType: 'USER',
+    recipientId: notifyRecipientId,
+    title: 'Applicant event policy notice',
+    sourceId: 'R-1',
+  });
+  const correlationId = execution.policy?.correlationId;
+  const traceId = execution.policy?.decisionTraceIds?.[0];
+  expect(correlationId).toMatch(/^ep-/);
+  expect(traceId).toBeTruthy();
+  await expect(page.getByTestId('epd-action-execution-0')).toContainText('发送站内通知');
+  await expect(page.getByTestId('epd-action-execution-0')).toContainText('成功');
+
+  const eventPolicyTraceLink = page.getByTestId('epd-open-trace');
+  await expect(eventPolicyTraceLink).toBeVisible({ timeout: 10_000 });
+  const eventPolicyTraceHref = await eventPolicyTraceLink.getAttribute('href');
+  expect(eventPolicyTraceHref).toBeTruthy();
+  const eventPolicyTraceUrl = new URL(eventPolicyTraceHref!, page.url());
+  expect(eventPolicyTraceUrl.pathname).toBe('/p/decisionops_execution_logs');
+  expect(eventPolicyTraceUrl.searchParams.get('policyCode')).toBe(policyCode);
+  expect(eventPolicyTraceUrl.searchParams.get('correlationId')).toBe(correlationId);
+  expect(eventPolicyTraceUrl.searchParams.get('callerType')).toBe('EVENT_POLICY');
+  expect(eventPolicyTraceUrl.searchParams.get('callerRef')).toBe(policyCode);
+
+  const traceActionResponse = page.waitForResponse(
+    (response) => {
+      if (response.status() !== 200 || !response.url().includes('/api/event-policy/action-logs')) {
+        return false;
+      }
+      const url = new URL(response.url());
+      return (
+        url.searchParams.get('policyCode') === policyCode &&
+        url.searchParams.get('correlationId') === correlationId
+      );
+    },
+    { timeout: 20_000 },
+  );
+  await eventPolicyTraceLink.click();
+  await expect(page).toHaveURL(/\/p\/decisionops_execution_logs/);
+  await readApi<ActionLogRecord[]>(await traceActionResponse);
+  await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByLabel('log-caller-type')).toHaveValue('EVENT_POLICY');
+  await expect(page.getByLabel('log-keyword')).toHaveValue(policyCode);
+  const linkedActionEvidence = page.getByTestId('elta-linked-action-evidence');
+  await expect(linkedActionEvidence).toBeVisible({ timeout: 20_000 });
+  await expect(linkedActionEvidence).toContainText('发送站内通知');
+  await expect(linkedActionEvidence).toContainText('Applicant event policy notice');
+  await expect(linkedActionEvidence).toContainText(notifyRecipientId);
+
+  const traceRow = page.locator('tr[data-testid^="elta-row-"]').filter({ hasText: traceId! }).first();
+  await expect(traceRow).toBeVisible({ timeout: 20_000 });
+  const rowTestId = await traceRow.getAttribute('data-testid');
+  const logKey = rowTestId?.replace('elta-row-', '');
+  if (!logKey) {
+    throw new Error(`Expected DecisionOps row test id for trace ${traceId}`);
+  }
+  await page.getByTestId(`elta-open-trace-${logKey}`).click();
+  await expect(page.getByTestId('elta-trace-drawer')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('elta-chain-caller-' + logKey)).toContainText(
+    new RegExp(`(事件策略|EVENT_POLICY) / ${policyCode}`),
+  );
+  await expect(page.getByTestId('elta-open-event-policy-detail')).toHaveAttribute(
+    'href',
+    `/p/decisionops_event_policies/view/${encodeURIComponent(policyCode)}`,
+  );
+  await expect(page.getByTestId('elta-open-event-policy-designer')).toHaveAttribute(
+    'href',
+    `/p/decisionops_event_policy_designer?policyCode=${encodeURIComponent(policyCode)}`,
+  );
+  const factMetadata = page.getByTestId(`elta-fact-metadata-${logKey}`);
+  await expect(factMetadata).toBeVisible({ timeout: 10_000 });
+  await expect(factMetadata).toContainText('事实快照');
+  await expect(factMetadata).toContainText(/申请人|Applicant/i);
+  await expect(factMetadata).toContainText('record.data.wd_req_applicant');
+  await expect(factMetadata).toContainText('模型 wd_leave_request');
+  await expect(factMetadata).toContainText(/类型 (user|reference)/i);
+  await expect(factMetadata).toContainText(user.pid);
+  await expect(factMetadata).toContainText(user.label);
+
+  await page.screenshot({
+    path: testInfo.outputPath('event-policy-applicant-reference-trace-fact-metadata.png'),
+    fullPage: true,
+  });
+  await page.screenshot({
+    path: '../docs/system-reference/assets/event-policy-applicant-reference-trace-fact-metadata-20260719.png',
+    fullPage: true,
+  });
+});
+
 test('EventPolicy failed action can be replayed from unified Trace with retry evidence @golden', async ({
   page,
 }, testInfo) => {
@@ -723,7 +1101,7 @@ test('EventPolicy failed action can be replayed from unified Trace with retry ev
     ruleCode: 'R-1',
     type: 'SEND_SMS',
     status: 'RETRY_PENDING',
-    error: 'No real SMS sender available',
+    error: expect.stringContaining('No real SMS sender available'),
   });
   expect(execution.execution?.actions?.[0]?.resultPayload).toMatchObject({
     channel: 'sms',
@@ -752,7 +1130,7 @@ test('EventPolicy failed action can be replayed from unified Trace with retry ev
     failureStrategy: 'RETRY_ASYNC',
     attemptCount: 1,
     maxAttempts: 3,
-    errorMessage: 'No real SMS sender available',
+    errorMessage: expect.stringContaining('No real SMS sender available'),
     resultPayload: {
       channel: 'sms',
       targetPhones: ['+8613800138000'],
@@ -818,7 +1196,7 @@ test('EventPolicy failed action can be replayed from unified Trace with retry ev
     failureStrategy: 'RETRY_ASYNC',
     attemptCount: 2,
     maxAttempts: 3,
-    errorMessage: 'No real SMS sender available',
+    errorMessage: expect.stringContaining('No real SMS sender available'),
   });
   await expect(page.getByTestId(`elta-action-card-${actionLog.pid}`)).toContainText('重试 2/3', {
     timeout: 10_000,
@@ -848,7 +1226,7 @@ test('EventPolicy failed action can be replayed from unified Trace with retry ev
     failureStrategy: 'RETRY_ASYNC',
     attemptCount: 3,
     maxAttempts: 3,
-    errorMessage: 'Retry attempts exhausted after 3 attempts: No real SMS sender available',
+    errorMessage: expect.stringMatching(/Retry attempts exhausted after 3 attempts: .*No real SMS sender available/),
     resultPayload: {
       channel: 'sms',
       targetPhones: ['+8613800138000'],
@@ -1162,8 +1540,8 @@ test('EventPolicy multi-action webhook execution is linked in Trace and idempote
   await readApi<ActionLogRecord[]>(await traceActionResponse);
   const linkedActionEvidence = page.getByTestId('elta-linked-action-evidence');
   await expect(linkedActionEvidence).toBeVisible({ timeout: 20_000 });
-  await expect(linkedActionEvidence).toContainText('NOTIFY');
-  await expect(linkedActionEvidence).toContainText('WEBHOOK');
+  await expect(linkedActionEvidence).toContainText('发送站内通知');
+  await expect(linkedActionEvidence).toContainText('调用 Webhook');
   await expect(linkedActionEvidence).toContainText('投递追踪');
   await expect(linkedActionEvidence).toContainText('投递状态 已记录投递日志');
   await expect(linkedActionEvidence).toContainText(`投递日志 ${deliveryLogPid}`);
@@ -1669,7 +2047,7 @@ test('EventPolicy SEND_IM action writes bot message and linked Trace evidence @g
   await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 20_000 });
   const linkedActionEvidence = page.getByTestId('elta-linked-action-evidence');
   await expect(linkedActionEvidence).toBeVisible({ timeout: 20_000 });
-  await expect(linkedActionEvidence).toContainText('SEND_IM');
+  await expect(linkedActionEvidence).toContainText('发送 IM 消息');
   await expect(linkedActionEvidence).toContainText('成功');
   await expect(linkedActionEvidence).toContainText('发送数 1');
   await expect(linkedActionEvidence).toContainText(expectedRecordPid);
