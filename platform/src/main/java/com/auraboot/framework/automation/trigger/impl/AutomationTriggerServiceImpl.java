@@ -628,10 +628,17 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
 
     private RuleEvaluationContext buildRuleEvaluationContext(Automation automation, Map<String, Object> payload) {
         Map<Scope, Map<String, Object>> scopes = new EnumMap<>(Scope.class);
+        TriggerConfig cfg = automation != null ? automation.getTriggerConfig() : null;
         Object recordData = payload != null ? payload.get("record") : null;
         Map<String, Object> data = recordData instanceof Map<?, ?> m
                 ? castMap(m) : (payload != null ? payload : Map.of());
-        scopes.put(Scope.RECORD, Map.of("data", data));
+        Map<String, Object> recordScope = new LinkedHashMap<>();
+        recordScope.put("data", data);
+        String modelCode = automationModelCode(automation, cfg);
+        if (StringUtils.hasText(modelCode)) {
+            recordScope.put("modelCode", modelCode);
+        }
+        scopes.put(Scope.RECORD, recordScope);
         if (payload != null && payload.get("before") instanceof Map<?, ?> before) {
             scopes.put(Scope.BEFORE, castMap(before));
         }
@@ -647,11 +654,22 @@ public class AutomationTriggerServiceImpl implements AutomationTriggerService {
         return new RuleEvaluationContext(
                 scopes,
                 "AUTOMATION",
-                automation.getPid() != null ? automation.getPid() : String.valueOf(automation.getId()),
+                automation == null ? null
+                        : (automation.getPid() != null ? automation.getPid() : String.valueOf(automation.getId())),
                 "trigger",
                 null,
                 null,
                 null);
+    }
+
+    private String automationModelCode(Automation automation, TriggerConfig cfg) {
+        if (automation != null && StringUtils.hasText(automation.getModelCode())) {
+            return automation.getModelCode();
+        }
+        if (cfg != null && StringUtils.hasText(cfg.getModelCode())) {
+            return cfg.getModelCode();
+        }
+        return null;
     }
 
     @SuppressWarnings("unchecked")

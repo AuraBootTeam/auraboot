@@ -63,7 +63,9 @@ class AutomationDecisionIntegrationTest {
         Automation automation = new Automation();
         automation.setId(2L);
         automation.setPid("auto-rule-1");
+        automation.setModelCode("wd_leave_request");
         TriggerConfig cfg = new TriggerConfig();
+        cfg.setModelCode("wd_leave_request");
         cfg.setRuleBinding(new RuleConsumerBinding(
                 "AUTOMATION",
                 "auto-rule-1",
@@ -152,6 +154,8 @@ class AutomationDecisionIntegrationTest {
         assertThat(context.getValue().consumerType()).isEqualTo("AUTOMATION");
         assertThat(context.getValue().consumerCode()).isEqualTo("auto-rule-1");
         assertThat(context.getValue().toWireContext()).containsKey("record");
+        assertThat(context.getValue().toWireContext().get(Scope.RECORD.code()))
+                .containsEntry("modelCode", "wd_leave_request");
 
         @SuppressWarnings("unchecked")
         Map<String, Object> decision = (Map<String, Object>) enriched.get("decision");

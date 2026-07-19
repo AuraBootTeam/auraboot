@@ -187,6 +187,16 @@
             "path": "data.leaveDays",
             "dataType": "decimal"
           }
+        },
+        {
+          "id": "wd_req_applicant",
+          "label": "Applicant",
+          "expr": {
+            "type": "path",
+            "scope": "record",
+            "path": "data.wd_req_applicant",
+            "dataType": "user"
+          }
         }
       ],
       "outputs": [
