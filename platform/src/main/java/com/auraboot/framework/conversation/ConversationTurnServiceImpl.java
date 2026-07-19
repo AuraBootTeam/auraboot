@@ -165,6 +165,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         ThinkingCapturingResponseSink capturingSink = new ThinkingCapturingResponseSink(sink);
 
         TurnOutcome outcome;
+        TurnRoute route = null;
         try {
             ChatRequest legacyRequest = request.legacyRequest();
             String agentCode = request.agentCode();
@@ -176,6 +177,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 // rounds or demanding human approval on a customer-facing widget (the RAG-only channel
                 // tool gate in ChatToolResolver only covers the SYNC path). Force the sync RAG turn.
                 initialMode = TurnExecutionPlanner.InitialExecutionMode.SYNC_AGENT_TURN;
+                route = TurnRoute.ragOnlyForced();
                 log.debug("Agent turn execution plan: turnId={}, RAG-only channel {} forced to SYNC_AGENT_TURN",
                         ctx.turnId(), request.channel());
             } else {
@@ -189,6 +191,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                                 optionFlag(request, "externalSideEffect"),
                                 optionFlag(request, "batch")));
                 initialMode = turnPlan.initialMode();
+                route = TurnRoute.from(turnPlan);
                 log.debug("Agent turn execution plan: turnId={}, initialMode={}, reason={}, signals={}",
                         ctx.turnId(), initialMode, turnPlan.reason(), turnPlan.policySignals());
             }
@@ -223,7 +226,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
         try {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
-                    capturingSink.capturedContent(), capturingSink.capturedSignature()));
+                    capturingSink.capturedContent(), capturingSink.capturedSignature()), route);
         } catch (Exception e) {
             // Side effects must never block the outcome from being returned to the caller,
             // but the failure must not vanish silently (P-006).
@@ -1032,20 +1035,26 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
     }
 
     private void finalizeTurn(TurnContext ctx, TurnOutcome outcome, TurnArtifacts artifacts) {
+        finalizeTurn(ctx, outcome, artifacts, null);
+    }
+
+    /** {@code route} is the planner snapshot for this turn (G1/G8 observation
+     *  seam); null on resume paths where no fresh planner decision exists. */
+    private void finalizeTurn(TurnContext ctx, TurnOutcome outcome, TurnArtifacts artifacts, TurnRoute route) {
         TurnArtifacts effective = artifacts != null ? artifacts : TurnArtifacts.EMPTY;
         switch (outcome) {
             case TurnOutcome.Success s -> {
                 sideEffects.persistence().persistOutbound(ctx, s, effective);
-                sideEffects.eventEmitter().emit(new TurnCompletedEvent(ctx, s));
+                sideEffects.eventEmitter().emit(new TurnCompletedEvent(ctx, s, route));
             }
             case TurnOutcome.Interrupted i -> {
                 sideEffects.persistence().persistOutbound(ctx, i, effective);
-                sideEffects.eventEmitter().emit(new TurnCompletedEvent(ctx, i));
+                sideEffects.eventEmitter().emit(new TurnCompletedEvent(ctx, i, route));
             }
             case TurnOutcome.Failed f -> {
                 sideEffects.auditWriter().writeFailure(ctx, f);
                 sideEffects.persistence().persistOutbound(ctx, f, effective);
-                sideEffects.eventEmitter().emit(new TurnCompletedEvent(ctx, f));
+                sideEffects.eventEmitter().emit(new TurnCompletedEvent(ctx, f, route));
             }
             case TurnOutcome.PendingConfirmation pc -> {
                 // suspendTurn semantics (P1.4 fix): only persist outbound when there is a
