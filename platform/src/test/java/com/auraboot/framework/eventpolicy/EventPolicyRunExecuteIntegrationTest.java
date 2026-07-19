@@ -25,6 +25,14 @@ import com.auraboot.framework.eventpolicy.service.EventPolicyDefinitionService;
 import com.auraboot.framework.eventpolicy.service.EventPolicyRuntimeService;
 import com.auraboot.framework.eventpolicy.service.EventPolicyVersionService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import com.auraboot.framework.meta.dto.MetaFieldCreateRequest;
+import com.auraboot.framework.meta.dto.MetaFieldDTO;
+import com.auraboot.framework.meta.dto.MetaModelCreateRequest;
+import com.auraboot.framework.meta.dto.MetaModelDTO;
+import com.auraboot.framework.meta.service.MetaFieldService;
+import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.user.dto.UserSearchDTO;
+import com.auraboot.framework.user.service.UserService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
@@ -75,6 +83,9 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
     @Autowired private EventPolicyVersionService versionService;
     @Autowired private EventPolicyRuntimeService runtimeService;
     @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private MetaModelService metaModelService;
+    @Autowired private MetaFieldService metaFieldService;
+    @Autowired private UserService userService;
 
     private final ObjectMapper mapper = new ObjectMapper();
 
@@ -114,6 +125,12 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
     }
 
     private void createPublishedDecision(String decisionCode) throws Exception {
+        createPublishedDecision(decisionCode, amountGtAst(10000), "record.data.amount");
+    }
+
+    private void createPublishedDecision(String decisionCode,
+                                         JsonNode contentJson,
+                                         String expectedFieldRef) {
         DrtDefinitionCreateRequest def = new DrtDefinitionCreateRequest();
         def.setDecisionCode(decisionCode);
         def.setDecisionName("Run+Exec Decision " + decisionCode);
@@ -124,14 +141,74 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
         DrtVersionCreateRequest version = new DrtVersionCreateRequest();
         version.setKind("SIMPLE_CONDITION");
         version.setRuntimeAdapter("AST_EVALUATOR");
-        version.setContentJson(amountGtAst(10000));
+        version.setContentJson(contentJson);
         DrtVersionDTO draft = decisionVersionService.createDraft(decisionCode, version);
 
         DecisionValidateResult validation = decisionVersionService.validate(draft.getPid());
         assertThat(validation.valid()).isTrue();
+        assertThat(validation.fieldRefs()).contains(expectedFieldRef);
 
         DrtVersionDTO published = decisionVersionService.publish(draft.getPid());
         assertThat(published.getStatus()).isEqualTo(VersionStatus.PUBLISHED.name());
+    }
+
+    private JsonNode userReferenceEqAst(String fieldCode, String userPid) {
+        return mapper.valueToTree(Map.of(
+                "type", "compare",
+                "left", Map.of(
+                        "type", "path",
+                        "scope", "record",
+                        "path", "data." + fieldCode,
+                        "dataType", "user"),
+                "operator", "EQ",
+                "right", Map.of(
+                        "type", "literal",
+                        "value", userPid,
+                        "dataType", "user")));
+    }
+
+    private void saveUserReferenceModel(String modelCode, String fieldCode) {
+        MetaModelCreateRequest modelRequest = new MetaModelCreateRequest();
+        modelRequest.setCode(modelCode);
+        modelRequest.setDisplayName("EventPolicy Reference Metadata " + modelCode);
+        modelRequest.setModelType("entity");
+        modelRequest.setSourceType("physical");
+        modelRequest.setPrimaryKey("pid");
+
+        MetaModelDTO model = metaModelService.create(modelRequest);
+        assertThat(model.getPid()).isNotBlank();
+
+        MetaFieldCreateRequest fieldRequest = new MetaFieldCreateRequest();
+        fieldRequest.setCode(fieldCode);
+        fieldRequest.setDataType("reference");
+        fieldRequest.setRefTarget(Map.of(
+                "targetEntity", "sys_user",
+                "displayField", "displayName",
+                "valueField", "pid"));
+        fieldRequest.setExtension(Map.of("displayName", "申请人"));
+        fieldRequest.setAutoPublish(true);
+
+        MetaFieldDTO field = metaFieldService.create(fieldRequest);
+        assertThat(field.getPid()).isNotBlank();
+        assertThat(field.getRefTarget()).containsEntry("targetEntity", "sys_user");
+        metaModelService.bindFieldToModel(
+                model.getId(),
+                field.getId(),
+                1,
+                false,
+                true,
+                true,
+                null,
+                null,
+                null,
+                null);
+
+        MetaModelDTO published = metaModelService.publish(
+                model.getPid(),
+                "EventPolicyRunExecuteIntegrationTest reference fact metadata fixture",
+                true,
+                "EventPolicy trace reference fact metadata fixture");
+        assertThat(published.getStatus()).isEqualToIgnoringCase("published");
     }
 
     private void publishDecisionBoundNotifyPolicy(String code, String targetKey, String decisionCode) throws Exception {
@@ -164,11 +241,56 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
         versionService.publish(draft.getPid());
     }
 
+    private void publishApplicantDecisionBoundNotifyPolicy(String policyCode,
+                                                           String modelCode,
+                                                           String eventType,
+                                                           String decisionCode,
+                                                           String fieldCode) throws Exception {
+        definitionService.create(policyCode, "Run+Exec Applicant Policy", eventType, "MODEL", modelCode);
+
+        JsonNode rulesJson = mapper.readTree(("""
+            [{
+              "ruleCode":"R-APPLICANT-NOTIFY",
+              "ruleName":"applicant matched notify",
+              "priority":100,
+              "enabled":true,
+              "decisionBinding":{
+                "decisionCode":"%s",
+                "versionPolicy":"LATEST_PUBLISHED",
+                "inputMappings":[
+                  {"input":"%s","source":{"kind":"FIELD","scope":"record","path":"data.%s"}}
+                ],
+                "fallbackPolicy":{"mode":"FAIL_CLOSED","reason":"Decision evaluation failed"},
+                "enabled":true
+              },
+              "actions":[{"type":"TEST_NOTIFY","target":"ROLE:mgr","order":10,"payload":{},
+                 "idempotencyKeyTemplate":"${record.entityCode}:${record.recordPid}:${rule.ruleCode}:NOTIFY"}]}]
+            """).formatted(decisionCode, fieldCode, fieldCode));
+
+        DrtPolicyVersionEntity draft = versionService.createDraft(
+                policyCode, PolicyPhase.AFTER_COMMIT, MatchMode.COLLECT_ALL, ExecutionMode.ORDERED,
+                FailureStrategy.CONTINUE_ON_ERROR, ConflictStrategy.REJECT_ON_CONFLICT,
+                DedupStrategy.BY_IDEMPOTENCY_KEY, rulesJson);
+        versionService.validate(draft.getPid());
+        versionService.publish(draft.getPid());
+    }
+
     private Map<String, Map<String, Object>> decisionCtx(String targetKey, String recordPid, int amount) {
         return Map.of("record", Map.of(
                 "entityCode", targetKey,
                 "recordPid", recordPid,
                 "data", Map.of("amount", amount)));
+    }
+
+    private Map<String, Map<String, Object>> applicantDecisionCtx(String modelCode,
+                                                                  String recordPid,
+                                                                  String fieldCode,
+                                                                  String applicantPid) {
+        return Map.of("record", Map.of(
+                "modelCode", modelCode,
+                "entityCode", modelCode,
+                "recordPid", recordPid,
+                "data", Map.of(fieldCode, applicantPid)));
     }
 
     @Test
@@ -235,6 +357,64 @@ class EventPolicyRunExecuteIntegrationTest extends BaseIntegrationTest {
                 r.policy().decisionTraceIds().get(0),
                 r.policy().correlationId());
         assertThat(decisionRows).isEqualTo(1);
+    }
+
+    @Test
+    void runAndExecute_decisionBindingWritesApplicantReferenceFactMetadata() throws Exception {
+        int before = NOTIFY_INVOCATIONS.get();
+        String suffix = Long.toString(Math.abs(System.nanoTime()), 36);
+        String modelCode = "ep_applicant_model_" + suffix;
+        String fieldCode = "applicant_ref_" + suffix;
+        String decisionCode = "ep_applicant_decision_" + suffix;
+        String policyCode = "ep_applicant_policy_" + suffix;
+        String eventType = "EP_APPLICANT_CREATED_" + suffix;
+        String recordPid = "EP-APPLICANT-" + suffix;
+        String applicantPid = getTestUser().getPid();
+
+        saveUserReferenceModel(modelCode, fieldCode);
+        UserSearchDTO applicant = userService.findInTenantByPid(getTestTenant().getId(), applicantPid);
+        assertThat(applicant).isNotNull();
+        assertThat(applicant.getDisplayName()).isNotBlank();
+        createPublishedDecision(
+                decisionCode,
+                userReferenceEqAst(fieldCode, applicantPid),
+                "record.data." + fieldCode);
+        publishApplicantDecisionBoundNotifyPolicy(policyCode, modelCode, eventType, decisionCode, fieldCode);
+
+        EventPolicyExecutionResult result = runtimeService.runAndExecute(
+                eventType,
+                "MODEL",
+                modelCode,
+                applicantDecisionCtx(modelCode, recordPid, fieldCode, applicantPid));
+
+        assertThat(result.policy().status()).isEqualTo(EventPolicyResult.Status.MATCHED);
+        assertThat(result.policy().matchedRuleCodes()).containsExactly("R-APPLICANT-NOTIFY");
+        assertThat(result.policy().decisionTraceIds()).hasSize(1);
+        assertThat(result.execution().overallStatus()).isEqualTo(PolicyExecutionResult.OverallStatus.ALL_SUCCESS);
+        assertThat(NOTIFY_INVOCATIONS.get()).isEqualTo(before + 1);
+
+        String traceId = result.policy().decisionTraceIds().get(0);
+        Map<String, Object> metadata = jdbcTemplate.queryForMap(
+                """
+                select
+                  trace_snapshot->'factMetadata'->?->>'label' as label,
+                  trace_snapshot->'factMetadata'->?->>'modelCode' as model_code,
+                  trace_snapshot->'factMetadata'->?->>'dataType' as data_type,
+                  trace_snapshot->'factMetadata'->?->'valueLabels'->>? as value_label
+                from ab_drt_log
+                where tenant_id = ? and trace_id = ?
+                """,
+                "record.data." + fieldCode,
+                "record.data." + fieldCode,
+                "record.data." + fieldCode,
+                "record.data." + fieldCode,
+                applicantPid,
+                getTestTenant().getId(),
+                traceId);
+        assertThat(metadata.get("label")).isEqualTo("申请人");
+        assertThat(metadata.get("model_code")).isEqualTo(modelCode);
+        assertThat(metadata.get("data_type")).isEqualTo("reference");
+        assertThat(metadata.get("value_label")).isEqualTo(applicant.getDisplayName());
     }
 
     @Test

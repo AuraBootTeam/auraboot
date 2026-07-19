@@ -33,6 +33,19 @@ interface EventPolicyDesignerBlockProps {
   };
 }
 
+type UserOption = {
+  pid?: string;
+  id?: string | number;
+  displayName?: string;
+  name?: string;
+  realName?: string;
+  nickName?: string;
+  nickname?: string;
+  username?: string;
+  userName?: string;
+  email?: string;
+};
+
 const DEFAULT_FIELDS: FieldOption[] = [
   { scope: 'event', path: 'type', label: '事件类型', dataType: 'string' },
   {
@@ -48,6 +61,7 @@ const DEFAULT_FIELDS: FieldOption[] = [
 const LEAVE_REQUEST_FIELDS: FieldOption[] = [
   { scope: 'event', path: 'type', label: '事件类型', dataType: 'string' },
   { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
+  { scope: 'record', path: 'data.wd_req_applicant', label: '申请人', dataType: 'user' },
   { scope: 'record', path: 'data.wd_req_no', label: '申请编号', dataType: 'string' },
   { scope: 'record', path: 'pid', label: '申请记录', dataType: 'string' },
   { scope: 'actor', path: 'roles', label: '触发人角色', dataType: 'collection' },
@@ -76,6 +90,42 @@ function asPolicyList(raw: unknown): EventPolicySummary[] {
     if (Array.isArray(record.data)) return record.data as EventPolicySummary[];
   }
   return [];
+}
+
+function asUserList(raw: unknown): UserOption[] {
+  if (Array.isArray(raw)) return raw as UserOption[];
+  if (raw && typeof raw === 'object') {
+    const record = raw as Record<string, unknown>;
+    if (Array.isArray(record.records)) return record.records as UserOption[];
+    if (Array.isArray(record.rows)) return record.rows as UserOption[];
+    if (Array.isArray(record.content)) return record.content as UserOption[];
+    if (Array.isArray(record.data)) return record.data as UserOption[];
+  }
+  return [];
+}
+
+function userLabel(user: UserOption): string {
+  return String(
+    user.displayName ??
+      user.realName ??
+      user.nickName ??
+      user.nickname ??
+      user.name ??
+      user.username ??
+      user.userName ??
+      user.email ??
+      user.pid ??
+      user.id ??
+      '',
+  );
+}
+
+function preferredSampleUser(users: UserOption[]): UserOption | undefined {
+  return (
+    users.find((user) => String(user.email ?? '').toLowerCase() === 'admin@auraboot.com') ??
+    users.find((user) => !userLabel(user).startsWith('Agent:') && (user.pid || user.id)) ??
+    users.find((user) => user.pid || user.id)
+  );
 }
 
 function runtimeRecord(runtime: EventPolicyDesignerBlockProps['runtime']): Record<string, unknown> {
@@ -110,9 +160,10 @@ function fieldsForPolicy(policy: EventPolicySummary | null, catalogFields: Field
   });
 }
 
-function leaveRequestSampleContext(recordPid: string): TestSample['context'] {
+function leaveRequestSampleContext(recordPid: string, applicantPid?: string): TestSample['context'] {
   return {
     record: {
+      modelCode: 'wd_leave_request',
       entityCode: 'wd_leave_request',
       recordPid,
       data: {
@@ -120,24 +171,31 @@ function leaveRequestSampleContext(recordPid: string): TestSample['context'] {
         recordPid,
         wd_req_no: recordPid,
         wd_req_days: 5,
+        ...(applicantPid ? { wd_req_applicant: applicantPid } : {}),
       },
     },
   };
 }
 
-function leaveRequestRunContext(): TestSample['context'] {
-  return leaveRequestSampleContext(`REQ-LONG-LEAVE-SAMPLE-RUN-${Date.now().toString(36)}`);
+function leaveRequestRunContext(applicantPid?: string): TestSample['context'] {
+  return leaveRequestSampleContext(
+    `REQ-LONG-LEAVE-SAMPLE-RUN-${Date.now().toString(36)}`,
+    applicantPid,
+  );
 }
 
-function defaultSamplesForPolicy(policy: EventPolicySummary | null): TestSample[] {
+function defaultSamplesForPolicy(
+  policy: EventPolicySummary | null,
+  sampleApplicantPid?: string,
+): TestSample[] {
   if (!policy) return [];
   if (policy.policyCode === 'leave_request_event_policy' || policy.targetKey === 'wd_leave_request') {
     const recordPid = 'REQ-LONG-LEAVE-SAMPLE';
     return [
       {
         label: '5天长假申请',
-        context: leaveRequestSampleContext(recordPid),
-        executionContext: leaveRequestRunContext,
+        context: leaveRequestSampleContext(recordPid, sampleApplicantPid),
+        executionContext: () => leaveRequestRunContext(sampleApplicantPid),
       },
     ];
   }
@@ -170,6 +228,7 @@ function defaultSamplesForPolicy(policy: EventPolicySummary | null): TestSample[
 export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesignerBlockProps) {
   const [searchParams] = useSearchParams();
   const params = useParams();
+  const platformApi = useMemo(() => getApiService(), []);
   const api = useMemo(() => createApi(), []);
   const record = runtimeRecord(runtime);
   const configuredFields = block?.props?.fields ?? block?.fields;
@@ -181,11 +240,15 @@ export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesigner
     stringValue(record.policy_code) ??
     stringValue(params.recordPid);
   const [catalogFields, setCatalogFields] = useState<FieldOption[]>([]);
+  const [sampleApplicantPid, setSampleApplicantPid] = useState<string | undefined>();
   const [policy, setPolicy] = useState<EventPolicySummary | null>(null);
   const policyTargetKey = policy?.targetKey;
   const fields = configuredFields
     ?? mergeFieldOptions(fieldsForPolicy(policy, catalogFields), defaultFieldsForPolicy(policy));
-  const samples = useMemo(() => defaultSamplesForPolicy(policy), [policy]);
+  const samples = useMemo(() => defaultSamplesForPolicy(policy, sampleApplicantPid), [
+    policy,
+    sampleApplicantPid,
+  ]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -223,6 +286,28 @@ export function EventPolicyDesignerBlock({ block, runtime }: EventPolicyDesigner
       cancelled = true;
     };
   }, [api, configuredFields, policy, policyCode, policyTargetKey]);
+
+  useEffect(() => {
+    if (policyTargetKey !== 'wd_leave_request') {
+      setSampleApplicantPid(undefined);
+      return;
+    }
+    let cancelled = false;
+    platformApi
+      .get<unknown>('/admin/users/search', { keyword: '', page: 1, size: 20 })
+      .then((result) => {
+        if (cancelled) return;
+        const user = preferredSampleUser(asUserList(result.data));
+        const pid = user?.pid ?? user?.id;
+        setSampleApplicantPid(pid == null ? undefined : String(pid));
+      })
+      .catch(() => {
+        if (!cancelled) setSampleApplicantPid(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [platformApi, policyTargetKey]);
 
   useEffect(() => {
     if (!policyCode) {

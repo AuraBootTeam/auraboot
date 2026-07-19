@@ -85,6 +85,20 @@ describe('EventPolicyDesignerBlock', () => {
           ],
         });
       }
+      if (endpoint === '/admin/users/search') {
+        return Promise.resolve({
+          data: {
+            records: [
+              {
+                id: '1001',
+                pid: '01ADMINUSERPID',
+                email: 'admin@auraboot.com',
+                nickName: 'Admin',
+              },
+            ],
+          },
+        });
+      }
       return Promise.resolve({ data: [] });
     });
   });
@@ -256,10 +270,12 @@ describe('EventPolicyDesignerBlock', () => {
       targetKey: 'wd_leave_request',
       context: expect.objectContaining({
         record: expect.objectContaining({
+          modelCode: 'wd_leave_request',
           entityCode: 'wd_leave_request',
           data: expect.objectContaining({
             wd_req_no: expect.stringMatching(/^REQ-LONG-LEAVE-SAMPLE-RUN-/),
             wd_req_days: 5,
+            wd_req_applicant: '01ADMINUSERPID',
           }),
         }),
       }),
