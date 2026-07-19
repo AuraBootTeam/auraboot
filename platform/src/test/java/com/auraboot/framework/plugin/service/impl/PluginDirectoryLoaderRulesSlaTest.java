@@ -510,6 +510,10 @@ class PluginDirectoryLoaderRulesSlaTest {
         assertThat(automationFragmentRefs.get(0)).isEqualTo("shared_leave_approval_guard");
         Object decisionBinding = invokeGetter(ruleBinding, "decisionBinding");
         assertThat(invokeGetter(decisionBinding, "decisionCode")).isEqualTo("leave_request_automation");
+        List<?> inputMappings = (List<?>) invokeGetter(decisionBinding, "inputMappings");
+        assertThat(inputMappings)
+                .extracting(mapping -> invokeGetter(mapping, "input"))
+                .contains("leaveDays", "wd_req_applicant");
         List<?> actions = (List<?>) invokeGetter(automation, "getActions");
         assertThat(actions).hasSize(1);
         Object action = actions.get(0);

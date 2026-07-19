@@ -115,9 +115,10 @@ public class RuleEvaluationServiceImpl implements RuleEvaluationService {
         request.setCorrelationId(context.traceId());
         request.setRoutingKey(stringValue(context.resolve(binding.routingKeySource()), context.routingKey()));
         request.setTenantSegment(stringValue(context.resolve(binding.tenantSegmentSource()), context.tenantSegment()));
+        Map<String, Map<String, Object>> wireContext = context.toWireContext();
         Map<String, Map<String, Object>> requestContext = new LinkedHashMap<>();
-        requestContext.put(Scope.RECORD.code(), Map.of("data", inputSnapshot));
-        Map<String, Object> meta = context.toWireContext().get(Scope.META.code());
+        requestContext.put(Scope.RECORD.code(), recordScopeForDecisionRequest(wireContext, inputSnapshot));
+        Map<String, Object> meta = wireContext.get(Scope.META.code());
         if (meta != null && !meta.isEmpty()) {
             requestContext.put(Scope.META.code(), new LinkedHashMap<>(meta));
         }
@@ -145,6 +146,27 @@ public class RuleEvaluationServiceImpl implements RuleEvaluationService {
             }
         }
         return input;
+    }
+
+    private Map<String, Object> recordScopeForDecisionRequest(
+            Map<String, Map<String, Object>> wireContext,
+            Map<String, Object> inputSnapshot) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("data", inputSnapshot);
+        Map<String, Object> sourceRecord = wireContext.get(Scope.RECORD.code());
+        copyText(sourceRecord, record, "modelCode");
+        copyText(sourceRecord, record, "entityCode");
+        return record;
+    }
+
+    private void copyText(Map<String, Object> source, Map<String, Object> target, String key) {
+        if (source == null) {
+            return;
+        }
+        Object value = source.get(key);
+        if (value instanceof String text && !text.isBlank()) {
+            target.put(key, text);
+        }
     }
 
     private RuleEvaluationTrace fallbackTrace(

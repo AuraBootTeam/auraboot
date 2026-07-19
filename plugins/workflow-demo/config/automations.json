@@ -43,6 +43,14 @@
                 "scope": "RECORD",
                 "path": "data.wd_req_days"
               }
+            },
+            {
+              "input": "wd_req_applicant",
+              "source": {
+                "kind": "FIELD",
+                "scope": "RECORD",
+                "path": "data.wd_req_applicant"
+              }
             }
           ],
           "outputMappings": [

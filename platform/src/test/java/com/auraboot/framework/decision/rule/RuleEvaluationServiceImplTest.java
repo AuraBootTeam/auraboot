@@ -137,7 +137,9 @@ class RuleEvaluationServiceImplTest {
                 RuleValueSource.field(Scope.TENANT, "segment"));
         RuleEvaluationContext context = new RuleEvaluationContext(
                 Map.of(
-                        Scope.RECORD, Map.of("data", Map.of("amount", 1200, "requestId", "REQ-1")),
+                        Scope.RECORD, Map.of(
+                                "modelCode", "wd_leave_request",
+                                "data", Map.of("amount", 1200, "requestId", "REQ-1")),
                         Scope.ACTOR, Map.of("departmentId", "ops"),
                         Scope.TENANT, Map.of("segment", "enterprise")),
                 "BPM",
@@ -166,7 +168,9 @@ class RuleEvaluationServiceImplTest {
         assertThat(request.getValue().getRoutingKey()).isEqualTo("REQ-1");
         assertThat(request.getValue().getTenantSegment()).isEqualTo("enterprise");
         assertThat(request.getValue().getContext())
-                .containsEntry("record", Map.of("data", Map.of("amount", 1200, "department", "ops")));
+                .containsEntry("record", Map.of(
+                        "modelCode", "wd_leave_request",
+                        "data", Map.of("amount", 1200, "department", "ops")));
 
         assertThat(trace.bindingKind()).isEqualTo(RuleBindingKind.DECISION_REF);
         assertThat(trace.decisionCode()).isEqualTo("approval_routing");
@@ -178,6 +182,51 @@ class RuleEvaluationServiceImplTest {
                 .containsExactly("record.data.amount", "actor.departmentId", "record.data.requestId",
                         "tenant.segment");
         assertThat(trace.decisionRefs()).containsExactly("approval_routing");
+    }
+
+    @Test
+    void evaluateDecisionBindingPreservesRecordEntityCodeForDecisionRuntimeFactCatalog() {
+        DecisionBinding binding = new DecisionBinding(
+                "approval_routing",
+                DecisionVersionPolicy.LATEST_PUBLISHED,
+                null,
+                null,
+                null,
+                List.of(new DecisionBinding.InputMapping(
+                        "wd_req_applicant",
+                        RuleValueSource.field(Scope.RECORD, "data.wd_req_applicant"))),
+                List.of(),
+                DecisionBinding.FallbackPolicy.failClosed(),
+                200,
+                DecisionBinding.TraceMode.ALWAYS,
+                true,
+                null,
+                null);
+        RuleEvaluationContext context = new RuleEvaluationContext(
+                Map.of(Scope.RECORD, Map.of(
+                        "entityCode", "wd_leave_request",
+                        "data", Map.of("wd_req_applicant", "user-1"))),
+                "AUTOMATION",
+                "auto-leave",
+                "trigger",
+                "trace-auto-1",
+                null,
+                null);
+        when(decisionEvaluationService.evaluate(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(DecisionResult.builder("approval_routing")
+                        .traceId("decision-trace-auto-1")
+                        .status(DecisionStatus.MATCHED)
+                        .matched(true)
+                        .outputs(Map.of())
+                        .build());
+
+        service.evaluateDecisionBinding(binding, context);
+
+        ArgumentCaptor<DrtEvaluateRequest> request = ArgumentCaptor.forClass(DrtEvaluateRequest.class);
+        verify(decisionEvaluationService).evaluate(request.capture());
+        assertThat(request.getValue().getContext()).containsEntry("record", Map.of(
+                "entityCode", "wd_leave_request",
+                "data", Map.of("wd_req_applicant", "user-1")));
     }
 
     @Test

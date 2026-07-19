@@ -169,7 +169,9 @@ class AutomationDecisionE2EIntegrationTest extends BaseIntegrationTest {
                 "SELECT count(*) FROM ab_automation_log WHERE automation_id=?", Integer.class, automationPid);
         assertThat(lowCount).as("non-matching decision should skip automation").isZero();
 
-        triggerService.onRecordCreate("wd_leave_request", "REC-AUTO-HIGH", Map.of("wd_req_days", 5));
+        triggerService.onRecordCreate("wd_leave_request", "REC-AUTO-HIGH", Map.of(
+                "wd_req_days", 5,
+                "wd_req_applicant", "u-sales-001"));
 
         Integer highCount = 0;
         for (int i = 0; i < 40 && highCount == 0; i++) {

@@ -10,7 +10,10 @@ import {
 
 const ADMIN_EMAIL = 'admin@auraboot.com';
 const ADMIN_PASSWORD = 'Test2026x';
-const PREFERRED_MODEL_CODE = 'e2et_order';
+const PREFERRED_MODEL_CODE = 'wd_leave_request';
+const PREFERRED_FIELD_SELECT_VALUE = 'record:data.wd_req_days';
+const PREFERRED_FIELD_PATH = 'data.wd_req_days';
+const PREFERRED_EXPRESSION_FIELD = 'record.data.wd_req_days';
 const DECISION_CODE = 'approval_routing';
 
 type ApiEnvelope<T> = {
@@ -41,8 +44,13 @@ type PageResult<T> = {
 type AutomationRecord = {
   pid: string;
   name?: string;
+  description?: string;
   modelCode?: string;
   triggerType?: string;
+  triggerConfig?: Record<string, unknown>;
+  triggerCondition?: string;
+  actions?: Array<Record<string, unknown>>;
+  flowConfig?: Record<string, unknown>;
   enabled?: boolean;
 };
 
@@ -71,6 +79,19 @@ type AutomationNodeExecution = {
 type AutomationTestRunFixture = {
   automation: AutomationRecord;
   triggerLog: AutomationLogPayload;
+};
+
+type UserOption = {
+  pid?: string;
+  id?: string;
+  displayName?: string;
+  name?: string;
+  realName?: string;
+  nickName?: string;
+  nickname?: string;
+  username?: string;
+  userName?: string;
+  email?: string;
 };
 
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -161,6 +182,161 @@ async function findAutomationByName(page: Page, name: string): Promise<Automatio
   return match as AutomationRecord;
 }
 
+function userLabel(user: UserOption): string {
+  return String(
+    user.displayName ??
+      user.realName ??
+      user.nickName ??
+      user.nickname ??
+      user.name ??
+      user.username ??
+      user.userName ??
+      user.email ??
+      user.pid ??
+      user.id ??
+      '',
+  );
+}
+
+async function resolveFirstUser(page: Page): Promise<{ pid: string; label: string }> {
+  const payload = await readApi<PageResult<UserOption> | UserOption[]>(
+    await page.request.get('/api/admin/users/search', {
+      params: {
+        keyword: '',
+        page: 1,
+        size: 20,
+      },
+    }),
+  );
+  const users = pageResultRows(payload);
+  const match =
+    users.find((user) => String(user.email ?? '').toLowerCase() === ADMIN_EMAIL) ??
+    users.find((user) => !userLabel(user).startsWith('Agent:') && (user.pid || user.id)) ??
+    users.find((user) => user.pid || user.id);
+  expect(match, 'Expected at least one tenant user for Automation applicant trace').toBeTruthy();
+  const pid = String(match?.pid ?? match?.id ?? '');
+  const label = userLabel(match as UserOption);
+  expect(pid).toBeTruthy();
+  expect(label).toBeTruthy();
+  return { pid, label };
+}
+
+async function readAutomation(page: Page, pid: string): Promise<AutomationRecord> {
+  return readApi<AutomationRecord>(await page.request.get(`/api/automations/${encodeURIComponent(pid)}`));
+}
+
+async function createAutomationApplicantTraceFixture(
+  page: Page,
+  applicantPid: string,
+): Promise<AutomationRecord> {
+  const automation = await readApi<AutomationRecord>(
+    await page.request.post('/api/automations', {
+      data: {
+        name: `申请人规则 Trace ${uniqueId()}`,
+        description: 'E2E fixture for Automation native rule-center applicant fact trace.',
+        modelCode: 'wd_leave_request',
+        triggerType: 'on_record_create',
+        triggerConfig: {
+          modelCode: 'wd_leave_request',
+          testRecordPid: 'REQ-AUTO-APPLICANT-SAMPLE',
+          testContext: {
+            record: {
+              wd_req_code: 'REQ-AUTO-APPLICANT-SAMPLE',
+              wd_req_applicant: applicantPid,
+              wd_req_type: 'annual',
+              wd_req_days: 5,
+              wd_req_start_date: '2026-07-06',
+              wd_req_start_slot: 'AM',
+              wd_req_end_date: '2026-07-10',
+              wd_req_end_slot: 'PM',
+              status: 'submitted',
+            },
+            source: 'ui-test-run',
+          },
+          ruleBinding: {
+            consumerType: 'AUTOMATION',
+            consumerCode: 'wd_leave_applicant_trace_fixture',
+            consumerNodeId: 'trigger',
+            bindingKind: 'DECISION_REF',
+            conditionFragmentRefs: ['shared_leave_approval_guard'],
+            enabled: true,
+            decisionBinding: {
+              decisionCode: 'leave_request_automation',
+              versionPolicy: 'LATEST_PUBLISHED',
+              traceMode: 'ALWAYS',
+              timeoutMs: 300,
+              enabled: true,
+              inputMappings: [
+                {
+                  input: 'leaveDays',
+                  source: {
+                    kind: 'FIELD',
+                    scope: 'RECORD',
+                    path: 'data.wd_req_days',
+                  },
+                },
+                {
+                  input: 'wd_req_applicant',
+                  source: {
+                    kind: 'FIELD',
+                    scope: 'RECORD',
+                    path: 'data.wd_req_applicant',
+                  },
+                },
+              ],
+              outputMappings: [
+                {
+                  output: 'severity',
+                  target: {
+                    kind: 'ACTION_PARAM',
+                    path: 'severity',
+                  },
+                },
+                {
+                  output: 'message',
+                  target: {
+                    kind: 'ACTION_PARAM',
+                    path: 'message',
+                  },
+                },
+                {
+                  output: 'actionType',
+                  target: {
+                    kind: 'ACTION_PARAM',
+                    path: 'actionType',
+                  },
+                },
+              ],
+              fallbackPolicy: {
+                mode: 'FAIL_CLOSED',
+                defaultOutputs: {},
+                reason: 'Automation decision unavailable',
+              },
+            },
+          },
+        },
+        triggerCondition: "#decision['outputs']['actionType'] == 'send_notification'",
+        actions: [
+          {
+            type: 'send_notification',
+            label: '通知主管',
+            sequence: 0,
+            continueOnError: true,
+            config: {
+              type: 'in_app',
+              title: '长假申请提醒',
+              content: '长假申请需要主管关注',
+              recipients: ['ROLE:wd_manager'],
+            },
+          },
+        ],
+        enabled: true,
+      },
+    }),
+  );
+  return readAutomation(page, automation.pid);
+}
+
 async function getNodeStatusesByLogId(
   page: Page,
   logId: number,
@@ -173,15 +349,16 @@ async function getNodeStatusesByLogId(
 async function openWorkflowDemoSeedAutomationAndRunTest(
   page: Page,
   baseURL: string,
+  automationOverride?: AutomationRecord,
 ): Promise<AutomationTestRunFixture> {
   await loginAsAdmin(page, baseURL);
 
-  const automation = await findAutomationByName(page, '长假申请提醒');
+  const automation = automationOverride ?? (await findAutomationByName(page, '长假申请提醒'));
   expect(automation.modelCode).toBe('wd_leave_request');
   await openAutomationDesigner(page, automation.pid);
 
   await expect(page.locator('[data-testid="automation-editor-name-input"]')).toHaveValue(
-    '长假申请提醒',
+    automation.name ?? '长假申请提醒',
   );
   await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 15_000 });
 
@@ -524,11 +701,11 @@ test('Automation trigger property panel hosts the rule center binding editor and
   await ruleField.locator('input[aria-label="mapping-input-0"]').fill('amount');
   await expect(
     ruleField.locator(
-      'select[aria-label="mapping-field-0"] option[value="record:data.e2et_order_amount"]',
+      `select[aria-label="mapping-field-0"] option[value="${PREFERRED_FIELD_SELECT_VALUE}"]`,
     ),
   ).toHaveCount(1);
   await ruleField.locator('select[aria-label="mapping-field-0"]').selectOption(
-    'record:data.e2et_order_amount',
+    PREFERRED_FIELD_SELECT_VALUE,
   );
   await expect(ruleField.locator('[data-testid="decision-binding-preview"]')).toContainText(
     '请假审批分派',
@@ -540,7 +717,7 @@ test('Automation trigger property panel hosts the rule center binding editor and
     'amount',
   );
   await expect(ruleField.locator('[data-testid="decision-binding-preview"]')).toContainText(
-    '订单总额',
+    /天数|Leave Days|wd_req_days/i,
   );
   await expect(ruleField.locator('[data-testid="decision-binding-preview"]')).not.toContainText(
     'decisionCode',
@@ -570,7 +747,7 @@ test('Automation trigger property panel hosts the rule center binding editor and
         inputMappings: [
           {
             input: 'amount',
-            source: { kind: 'FIELD', scope: 'record', path: 'data.e2et_order_amount' },
+            source: { kind: 'FIELD', scope: 'record', path: PREFERRED_FIELD_PATH },
           },
         ],
       },
@@ -588,7 +765,7 @@ test('Automation trigger property panel hosts the rule center binding editor and
       'amount',
     );
     await expect(reloadedRuleField.locator('select[aria-label="mapping-field-0"]')).toHaveValue(
-      'record:data.e2et_order_amount',
+      PREFERRED_FIELD_SELECT_VALUE,
     );
     await expect(reloadedRuleField.locator('[data-testid="decision-binding-preview"]')).toContainText(
       '灰度发布',
@@ -662,7 +839,7 @@ test('Automation send-notification action inserts fact catalog and rule output f
   await addInputMappingRow(ruleField);
   await ruleField.locator('input[aria-label="mapping-input-0"]').fill('amount');
   await ruleField.locator('select[aria-label="mapping-field-0"]').selectOption(
-    'record:data.e2et_order_amount',
+    PREFERRED_FIELD_SELECT_VALUE,
   );
   await addOutputMappingRow(ruleField);
   await expect(ruleField.locator('select[aria-label="output-mapping-output-picker-0"]')).toContainText(
@@ -678,8 +855,8 @@ test('Automation send-notification action inserts fact catalog and rule output f
   await ruleField.locator('input[aria-label="output-mapping-path-0"]').fill('severity');
 
   const titleField = await selectNodeAndOpenPropertyField(page, actionId, 'title');
-  const titleTextarea = await insertExpressionField(titleField, 'record.data.e2et_order_amount');
-  await expect(titleTextarea).toHaveValue(/\$\{record\.data\.e2et_order_amount\}/);
+  const titleTextarea = await insertExpressionField(titleField, PREFERRED_EXPRESSION_FIELD);
+  await expect(titleTextarea).toHaveValue(/\$\{record\.data\.wd_req_days\}/);
 
   const contentField = await selectNodeAndOpenPropertyField(page, actionId, 'content');
   const contentTextarea = await switchExpressionFieldToTextMode(contentField);
@@ -714,7 +891,7 @@ test('Automation send-notification action inserts fact catalog and rule output f
     expect(savedAction?.data?.config).toMatchObject({
       actionType: 'send_notification',
       notificationType: 'in_app',
-      title: expect.stringContaining('${record.data.e2et_order_amount}'),
+      title: expect.stringContaining(`\${${PREFERRED_EXPRESSION_FIELD}}`),
       content: expect.stringContaining('${decision.outputs.severity}'),
       recipients: 'ROLE:wd_manager',
     });
@@ -726,7 +903,7 @@ test('Automation send-notification action inserts fact catalog and rule output f
     const reloadedTitle = await switchExpressionFieldToTextMode(
       await selectNodeAndOpenPropertyField(page, actionId, 'title'),
     );
-    await expect(reloadedTitle).toHaveValue(/\$\{record\.data\.e2et_order_amount\}/);
+    await expect(reloadedTitle).toHaveValue(/\$\{record\.data\.wd_req_days\}/);
     const reloadedContent = await switchExpressionFieldToTextMode(
       await selectNodeAndOpenPropertyField(page, actionId, 'content'),
     );
@@ -819,53 +996,72 @@ test('Automation test run opens unified DecisionOps trace and links back to auto
   baseURL,
 }, testInfo) => {
   const resolvedBaseURL = baseURL ?? 'http://127.0.0.1:5194';
-  const { automation, triggerLog } = await openWorkflowDemoSeedAutomationAndRunTest(
-    page,
-    resolvedBaseURL,
-  );
-  const decisionTraceId = triggerLog.triggerPayload?.decision?.traceId;
-  expect(decisionTraceId, 'manual test run must produce a DecisionOps trace id').toBeTruthy();
+  await loginAsAdmin(page, resolvedBaseURL);
+  const user = await resolveFirstUser(page);
+  const fixture = await createAutomationApplicantTraceFixture(page, user.pid);
 
-  const unifiedTraceLink = page.locator('[data-testid="automation-unified-trace-link"]');
-  await expect(unifiedTraceLink).toBeVisible({ timeout: 20_000 });
-  await expect(unifiedTraceLink).toHaveAttribute(
-    'href',
-    `/p/decisionops_execution_logs?traceId=${decisionTraceId}&decisionCode=leave_request_automation&callerType=AUTOMATION&callerRef=${automation.pid}`,
-  );
+  try {
+    const { automation, triggerLog } = await openWorkflowDemoSeedAutomationAndRunTest(
+      page,
+      resolvedBaseURL,
+      fixture,
+    );
+    const decisionTraceId = triggerLog.triggerPayload?.decision?.traceId;
+    expect(decisionTraceId, 'manual test run must produce a DecisionOps trace id').toBeTruthy();
 
-  await unifiedTraceLink.click();
-  await expect(page).toHaveURL(/\/p\/decisionops_execution_logs\?/, { timeout: 15_000 });
-  await waitForDynamicPageLoad(page);
-  await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(decisionTraceId as string).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator('[data-testid^="elta-row-"]').first()).toContainText('自动化');
-  await expect(page.locator('[data-testid^="elta-row-"]').first()).toContainText(automation.pid);
+    const unifiedTraceLink = page.locator('[data-testid="automation-unified-trace-link"]');
+    await expect(unifiedTraceLink).toBeVisible({ timeout: 20_000 });
+    await expect(unifiedTraceLink).toHaveAttribute(
+      'href',
+      `/p/decisionops_execution_logs?traceId=${decisionTraceId}&decisionCode=leave_request_automation&callerType=AUTOMATION&callerRef=${automation.pid}`,
+    );
 
-  await page.locator('[data-testid^="elta-open-trace-"]').first().click();
-  const drawer = page.getByTestId('elta-trace-drawer');
-  await expect(drawer).toBeVisible({ timeout: 15_000 });
-  await expect(drawer).toContainText('执行链路');
-  await expect(drawer).toContainText('请假申请自动化策略');
-  await expect(drawer).toContainText(automation.pid);
-  const automationBackLink = page.getByTestId('elta-open-automation');
-  await expect(automationBackLink).toHaveAttribute('href', `/automation/${automation.pid}`);
+    await unifiedTraceLink.click();
+    await expect(page).toHaveURL(/\/p\/decisionops_execution_logs\?/, { timeout: 15_000 });
+    await waitForDynamicPageLoad(page);
+    await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(decisionTraceId as string).first()).toBeVisible({ timeout: 15_000 });
+    const traceRow = page.locator('[data-testid^="elta-row-"]').first();
+    await expect(traceRow).toContainText('自动化');
+    await expect(traceRow).toContainText(automation.pid);
 
-  await page.screenshot({
-    path: testInfo.outputPath('automation-unified-decisionops-trace.png'),
-    fullPage: true,
-  });
+    await page.locator('[data-testid^="elta-open-trace-"]').first().click();
+    const drawer = page.getByTestId('elta-trace-drawer');
+    await expect(drawer).toBeVisible({ timeout: 15_000 });
+    await expect(drawer).toContainText('执行链路');
+    await expect(drawer).toContainText('请假申请自动化策略');
+    await expect(drawer).toContainText(automation.pid);
+    const factMetadata = page.locator('[data-testid^="elta-fact-metadata-"]').first();
+    await expect(factMetadata).toBeVisible({ timeout: 10_000 });
+    await expect(factMetadata).toContainText('事实快照');
+    await expect(factMetadata).toContainText(/申请人|Applicant/i);
+    await expect(factMetadata).toContainText('record.data.wd_req_applicant');
+    await expect(factMetadata).toContainText('模型 wd_leave_request');
+    await expect(factMetadata).toContainText(/类型 (user|reference)/i);
+    await expect(factMetadata).toContainText(user.pid);
+    await expect(factMetadata).toContainText(user.label);
+    const automationBackLink = page.getByTestId('elta-open-automation');
+    await expect(automationBackLink).toHaveAttribute('href', `/automation/${automation.pid}`);
 
-  await automationBackLink.click();
-  await expect(page).toHaveURL(new RegExp(`/automation/${escapeRegExp(automation.pid)}(?:[?#].*)?$`), {
-    timeout: 15_000,
-  });
-  await expect(page.locator('[data-testid="automation-editor-name-input"]')).toHaveValue(
-    '长假申请提醒',
-  );
-  await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 15_000 });
+    await page.screenshot({
+      path: testInfo.outputPath('automation-applicant-reference-trace-fact-metadata.png'),
+      fullPage: true,
+    });
 
-  await page.screenshot({
-    path: testInfo.outputPath('automation-unified-trace-back-to-designer.png'),
-    fullPage: true,
-  });
+    await automationBackLink.click();
+    await expect(page).toHaveURL(new RegExp(`/automation/${escapeRegExp(automation.pid)}(?:[?#].*)?$`), {
+      timeout: 15_000,
+    });
+    await expect(page.locator('[data-testid="automation-editor-name-input"]')).toHaveValue(
+      automation.name ?? '',
+    );
+    await expect(page.locator('.react-flow__node').first()).toBeVisible({ timeout: 15_000 });
+
+    await page.screenshot({
+      path: testInfo.outputPath('automation-unified-trace-back-to-designer.png'),
+      fullPage: true,
+    });
+  } finally {
+    await deleteViaApi(page, fixture.pid);
+  }
 });
