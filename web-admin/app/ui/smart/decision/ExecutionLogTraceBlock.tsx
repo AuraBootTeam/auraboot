@@ -8,6 +8,7 @@ import {
   type DecisionLogFilters,
   type DecisionLogRecord,
   type DecisionTraceFactMetadata,
+  type DecisionTraceOutputMetadata,
   type DecisionVirtualSourceTrace,
   type HttpClient,
 } from '~/shared/decision/api/decisionApi';
@@ -440,6 +441,17 @@ function automationHref(log: DecisionLogRecord): string | undefined {
   return `/automation/${encodeURIComponent(callerRef)}`;
 }
 
+function bpmProcessStatusHref(log: DecisionLogRecord): string | undefined {
+  if (!isBpmLog(log)) return undefined;
+  const correlationId = stringValue(log.correlationId);
+  if (!correlationId?.startsWith('bpm-')) return undefined;
+  const marker = correlationId.lastIndexOf('-');
+  if (marker <= 'bpm-'.length) return undefined;
+  const processInstanceId = correlationId.slice('bpm-'.length, marker);
+  if (!processInstanceId) return undefined;
+  return `/bpm/process-status?processInstanceId=${encodeURIComponent(processInstanceId)}`;
+}
+
 function eventPolicyCode(log: DecisionLogRecord): string | undefined {
   const callerRef = stringValue(log.callerRef);
   if (!callerRef || !isEventPolicyLog(log)) return undefined;
@@ -529,6 +541,8 @@ function traceValueLabels(key: string, traceSnapshot?: unknown): Record<string, 
   if (!key) return undefined;
   const metadataLabels = factValueLabels(key, traceSnapshot);
   if (metadataLabels) return metadataLabels;
+  const outputLabels = outputValueLabels(key, traceSnapshot);
+  if (outputLabels) return outputLabels;
   const normalized = key.split('.').filter(Boolean).pop() ?? key;
   return TRACE_VALUE_LABELS_BY_FIELD[normalized];
 }
@@ -589,6 +603,16 @@ function factMetadataEntries(raw: unknown): Record<string, DecisionTraceFactMeta
       Boolean(traceSnapshotRecord(value)),
     ),
   ) as Record<string, DecisionTraceFactMetadata>;
+}
+
+function outputMetadataEntries(raw: unknown): Record<string, DecisionTraceOutputMetadata> {
+  const metadata = traceSnapshotRecord(raw)?.outputMetadata;
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return {};
+  return Object.fromEntries(
+    Object.entries(metadata as Record<string, unknown>).filter(([, value]) =>
+      Boolean(traceSnapshotRecord(value)),
+    ),
+  ) as Record<string, DecisionTraceOutputMetadata>;
 }
 
 type FactMetadataRow = {
@@ -675,6 +699,19 @@ function factMetadataForKey(
   return undefined;
 }
 
+function outputMetadataForKey(
+  key: string,
+  traceSnapshot?: unknown,
+): DecisionTraceOutputMetadata | undefined {
+  if (!key) return undefined;
+  const metadata = outputMetadataEntries(traceSnapshot);
+  for (const alias of factKeyAliases(key)) {
+    const item = metadata[alias];
+    if (item) return item;
+  }
+  return undefined;
+}
+
 function factKeyAliases(key: string): string[] {
   const cleaned = key
     .split('.')
@@ -698,6 +735,21 @@ function factKeyAliases(key: string): string[] {
 
 function factValueLabels(key: string, traceSnapshot?: unknown): Record<string, string> | undefined {
   const raw = factMetadataForKey(key, traceSnapshot)?.valueLabels;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
+  const labels = Object.fromEntries(
+    Object.entries(raw).filter(
+      ([value, label]) =>
+        typeof value === 'string' &&
+        value.trim().length > 0 &&
+        typeof label === 'string' &&
+        label.trim().length > 0,
+    ),
+  ) as Record<string, string>;
+  return Object.keys(labels).length ? labels : undefined;
+}
+
+function outputValueLabels(key: string, traceSnapshot?: unknown): Record<string, string> | undefined {
+  const raw = outputMetadataForKey(key, traceSnapshot)?.valueLabels;
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
   const labels = Object.fromEntries(
     Object.entries(raw).filter(
@@ -756,6 +808,10 @@ function isSlaLog(log: DecisionLogRecord): boolean {
   return String(log.callerType ?? '').toUpperCase() === 'SLA';
 }
 
+function isBpmLog(log: DecisionLogRecord): boolean {
+  return String(log.callerType ?? '').toUpperCase() === 'BPM';
+}
+
 function orderedPayloadEntries(payload?: Record<string, unknown>) {
   if (!payload) return [];
   const seen = new Set<string>();
@@ -775,6 +831,10 @@ function payloadLabel(key: string, traceSnapshot?: unknown): string {
   const metadataLabel = factMetadataForKey(key, traceSnapshot)?.label;
   if (typeof metadataLabel === 'string' && metadataLabel.trim().length > 0) {
     return metadataLabel;
+  }
+  const outputLabel = outputMetadataForKey(key, traceSnapshot)?.label;
+  if (typeof outputLabel === 'string' && outputLabel.trim().length > 0) {
+    return outputLabel;
   }
   return ACTION_PAYLOAD_LABELS[key] ?? key;
 }
@@ -1418,6 +1478,11 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
               {automationHref(selectedLog) ? (
                 <a data-testid="elta-open-automation" href={automationHref(selectedLog)}>
                   打开自动化
+                </a>
+              ) : null}
+              {bpmProcessStatusHref(selectedLog) ? (
+                <a data-testid="elta-open-bpm-process-status" href={bpmProcessStatusHref(selectedLog)}>
+                  打开流程状态
                 </a>
               ) : null}
               {eventPolicyDetailHref(selectedLog) ? (

@@ -6,7 +6,7 @@
  * decision code, BPM node, match status, outputs, trace id, and duration.
  */
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, CheckCircle2, Clock3, GitBranch } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock3, ExternalLink, GitBranch } from 'lucide-react';
 
 import {
   listExecutionTimeline,
@@ -107,6 +107,15 @@ const OUTPUT_LABELS: Record<string, string> = {
   severity: '级别',
   message: '消息',
 };
+
+function decisionTraceHref(payload: RuleBindingTracePayload): string | null {
+  if (!payload.traceId) return null;
+  const params = new URLSearchParams({ traceId: payload.traceId });
+  if (payload.decisionCode) params.set('decisionCode', payload.decisionCode);
+  params.set('callerType', payload.consumerType || 'BPM');
+  if (payload.consumerCode) params.set('callerRef', payload.consumerCode);
+  return `/p/decisionops_execution_logs?${params.toString()}`;
+}
 
 const ACTION_LABELS: Record<string, string> = {
   ADD_COMMENT: '添加评论',
@@ -724,6 +733,7 @@ export function BpmRuleTraceSection({
           const outputs = asRecord(payload.outputs) ?? {};
           const outputEntries = Object.entries(outputs);
           const failedClosed = isFailureClosed(payload);
+          const traceHref = decisionTraceHref(payload);
           return (
             <article
               key={entry.pid}
@@ -795,6 +805,16 @@ export function BpmRuleTraceSection({
                   {payload.traceId && (
                     <span data-testid="bpm-rule-trace-id">Trace {payload.traceId}</span>
                   )}
+                  {traceHref ? (
+                    <a
+                      data-testid={`bpm-rule-trace-open-decisionops-${nodeId}`}
+                      href={traceHref}
+                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700"
+                    >
+                      打开统一 Trace
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  ) : null}
                   {(payload.durationMs ?? entry.durationMs) !== null &&
                     (payload.durationMs ?? entry.durationMs) !== undefined && (
                       <span className="inline-flex items-center gap-1">

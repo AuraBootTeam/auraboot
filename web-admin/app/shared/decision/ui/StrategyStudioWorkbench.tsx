@@ -474,11 +474,51 @@ function fragmentListKey(fragment: ConditionFragment): string {
   ].join(':')
 }
 
+const FRAGMENT_STATUS_ORDER: Record<string, number> = {
+  DRAFT: 10,
+  REJECTED: 15,
+  VALIDATED: 20,
+  PENDING_APPROVAL: 25,
+  PUBLISHED: 30,
+  DEPRECATED: 35,
+  RETIRED: 40,
+}
+
+function fragmentStatusOrder(status?: string): number {
+  return FRAGMENT_STATUS_ORDER[String(status ?? '').toUpperCase()] ?? 0
+}
+
+function fragmentTime(fragment: ConditionFragment): number {
+  const raw = fragment.updatedAt ?? fragment.publishedAt ?? fragment.createdAt
+  if (!raw) return 0
+  const time = Date.parse(raw)
+  return Number.isFinite(time) ? time : 0
+}
+
+function shouldPreferConditionFragment(
+  candidate: ConditionFragment,
+  current: ConditionFragment,
+): boolean {
+  const candidateVersion = candidate.version ?? 0
+  const currentVersion = current.version ?? 0
+  if (candidateVersion !== currentVersion) return candidateVersion > currentVersion
+
+  const candidateStatus = fragmentStatusOrder(candidate.status)
+  const currentStatus = fragmentStatusOrder(current.status)
+  if (candidateStatus !== currentStatus) return candidateStatus > currentStatus
+
+  const candidateTime = fragmentTime(candidate)
+  const currentTime = fragmentTime(current)
+  if (candidateTime !== currentTime) return candidateTime > currentTime
+
+  return true
+}
+
 function latestConditionFragments(fragments: ConditionFragment[]): ConditionFragment[] {
   const byCode = new Map<string, ConditionFragment>()
   fragments.forEach((fragment) => {
     const current = byCode.get(fragment.fragmentCode)
-    if (!current || (fragment.version ?? 0) > (current.version ?? 0)) {
+    if (!current || shouldPreferConditionFragment(fragment, current)) {
       byCode.set(fragment.fragmentCode, fragment)
     }
   })

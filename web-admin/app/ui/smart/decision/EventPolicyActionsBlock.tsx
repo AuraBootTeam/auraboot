@@ -256,12 +256,14 @@ export function EventPolicyActionsBlock({ block, runtime }: EventPolicyActionsBl
         <div className="decisionops-editor-panel epl-editor" data-testid="epa-editor">
           <input
             aria-label="policy-code"
+            data-testid="epa-policy-code"
             placeholder="policyCode"
             value={draft.policyCode}
             onChange={(e) => updateDraft('policyCode', e.target.value)}
           />
           <input
             aria-label="policy-name"
+            data-testid="epa-policy-name"
             placeholder="policyName"
             value={draft.policyName}
             onChange={(e) => updateDraft('policyName', e.target.value)}
@@ -270,18 +272,21 @@ export function EventPolicyActionsBlock({ block, runtime }: EventPolicyActionsBl
             <>
               <input
                 aria-label="policy-event-type"
+                data-testid="epa-policy-event-type"
                 placeholder="eventType"
                 value={draft.eventType}
                 onChange={(e) => updateDraft('eventType', e.target.value)}
               />
               <input
                 aria-label="policy-target-type"
+                data-testid="epa-policy-target-type"
                 placeholder="targetType"
                 value={draft.targetType}
                 onChange={(e) => updateDraft('targetType', e.target.value)}
               />
               <input
                 aria-label="policy-target-key"
+                data-testid="epa-policy-target-key"
                 placeholder="targetKey"
                 value={draft.targetKey}
                 onChange={(e) => updateDraft('targetKey', e.target.value)}

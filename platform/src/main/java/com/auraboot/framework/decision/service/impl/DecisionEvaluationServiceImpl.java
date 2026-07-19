@@ -646,7 +646,9 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         if (result.outputs() != null && !result.outputs().isEmpty()) {
             logEntry.setOutputSnapshot(objectMapper.valueToTree(result.outputs()));
         }
-        Map<String, Object> traceSnapshot = buildTraceSnapshot(result, virtualSourceTrace, factMetadata);
+        Map<String, Object> outputMetadata = buildOutputMetadataSnapshot(ver.getContentJson());
+        Map<String, Object> traceSnapshot = buildTraceSnapshot(
+                result, virtualSourceTrace, factMetadata, outputMetadata);
         if (!traceSnapshot.isEmpty()) {
             logEntry.setTraceSnapshot(objectMapper.valueToTree(traceSnapshot));
         }
@@ -742,7 +744,8 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
     private Map<String, Object> buildTraceSnapshot(
             DecisionResult result,
             List<Map<String, Object>> virtualSourceTrace,
-            Map<String, Object> factMetadata) {
+            Map<String, Object> factMetadata,
+            Map<String, Object> outputMetadata) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         if (virtualSourceTrace != null && !virtualSourceTrace.isEmpty()) {
             snapshot.put("virtualSources", virtualSourceTrace);
@@ -753,7 +756,49 @@ public class DecisionEvaluationServiceImpl implements DecisionEvaluationService 
         if (factMetadata != null && !factMetadata.isEmpty()) {
             snapshot.put("factMetadata", factMetadata);
         }
+        if (outputMetadata != null && !outputMetadata.isEmpty()) {
+            snapshot.put("outputMetadata", outputMetadata);
+        }
         return snapshot;
+    }
+
+    private Map<String, Object> buildOutputMetadataSnapshot(JsonNode contentJson) {
+        if (contentJson == null || !contentJson.has("outputs") || !contentJson.path("outputs").isArray()) {
+            return Map.of();
+        }
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        for (JsonNode output : contentJson.path("outputs")) {
+            String id = textNode(output, "id");
+            if (!StringUtils.hasText(id)) {
+                continue;
+            }
+            Map<String, Object> row = new LinkedHashMap<>();
+            putIfHasText(row, "label", textNode(output, "label"));
+            putIfHasText(row, "dataType", textNode(output, "dataType"));
+            JsonNode allowedValues = output.path("allowedValues");
+            if (allowedValues.isArray() && !allowedValues.isEmpty()) {
+                row.put("allowedValues", objectMapper.convertValue(allowedValues, List.class));
+            }
+            JsonNode valueLabels = output.path("valueLabels");
+            if (valueLabels.isObject() && !valueLabels.isEmpty()) {
+                row.put("valueLabels", objectMapper.convertValue(valueLabels, Map.class));
+            }
+            if (!row.isEmpty()) {
+                metadata.put(id, row);
+            }
+        }
+        return metadata;
+    }
+
+    private String textNode(JsonNode node, String fieldName) {
+        JsonNode value = node == null ? null : node.path(fieldName);
+        return value != null && value.isTextual() ? value.asText() : null;
+    }
+
+    private void putIfHasText(Map<String, Object> target, String key, String value) {
+        if (StringUtils.hasText(value)) {
+            target.put(key, value);
+        }
     }
 
     private Map<String, Object> buildFactMetadataSnapshot(

@@ -9,6 +9,7 @@ import com.auraboot.smart.framework.engine.service.param.query.PendingTaskQueryP
 import com.auraboot.smart.framework.engine.service.param.query.TaskInstanceQueryByAssigneeParam;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.bpm.audit.BpmAuditService;
+import com.auraboot.framework.bpm.mapper.BpmTaskCandidateMapper;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.mapper.RoleMapper;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ import com.auraboot.smart.framework.engine.model.instance.TaskAssigneeInstance;
 import com.auraboot.smart.framework.engine.model.instance.VariableInstance;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +42,7 @@ public class TaskService {
     private final BpmAuditService bpmAuditService;
     private final BpmTaskActionsResolver taskActionsResolver;
     private final RoleMapper roleMapper;
+    private final BpmTaskCandidateMapper taskCandidateMapper;
 
     /** Key for the approve action in designerJson taskActions declarations. */
     private static final String ACTION_KEY_APPROVE = "approve";
@@ -64,10 +67,77 @@ public class TaskService {
         }
         queryParam.setTenantId(tenantId);
 
+        Map<String, TaskInstance> visibleTasks = new LinkedHashMap<>();
         List<TaskInstance> tasks = smartEngine.getTaskQueryService().findPendingTaskList(queryParam);
+        mergeVisibleTodoTasks(visibleTasks, tasks, userId, assigneeGroupIds, tenantId);
 
-        return  tasks;
+        mergeCandidateTodoTasks(visibleTasks, userId, assigneeGroupIds, tenantId);
 
+        return List.copyOf(visibleTasks.values());
+
+    }
+
+    private void mergeCandidateTodoTasks(
+            Map<String, TaskInstance> target,
+            String userId,
+            List<String> assigneeGroupIds,
+            String tenantId) {
+        List<String> taskIds = taskCandidateMapper.findPendingTaskIdsVisibleTo(
+                tenantId, userId, assigneeGroupIds, 200);
+        if (taskIds == null || taskIds.isEmpty()) {
+            return;
+        }
+        for (String taskId : taskIds) {
+            if (taskId == null || taskId.isBlank() || target.containsKey(taskId)) {
+                continue;
+            }
+            TaskInstance task = smartEngine.getTaskQueryService().findOne(taskId, tenantId);
+            if (canSeeTodoTask(task, userId, assigneeGroupIds, tenantId)) {
+                target.put(taskId, task);
+            }
+        }
+    }
+
+    private void mergeVisibleTodoTasks(
+            Map<String, TaskInstance> target,
+            List<TaskInstance> tasks,
+            String userId,
+            List<String> assigneeGroupIds,
+            String tenantId) {
+        if (tasks == null || tasks.isEmpty()) {
+            return;
+        }
+        for (TaskInstance task : tasks) {
+            String key = task == null ? null : task.getInstanceId();
+            if (key == null || key.isBlank() || target.containsKey(key)) {
+                continue;
+            }
+            if (canSeeTodoTask(task, userId, assigneeGroupIds, tenantId)) {
+                target.put(key, task);
+            }
+        }
+    }
+
+    private boolean canSeeTodoTask(
+            TaskInstance task,
+            String userId,
+            List<String> assigneeGroupIds,
+            String tenantId) {
+        if (task == null) {
+            return false;
+        }
+        if (task.getClaimUserId() != null && task.getClaimUserId().equals(userId)) {
+            return true;
+        }
+        if (task.getTaskAssigneeInstanceList() != null && !task.getTaskAssigneeInstanceList().isEmpty()) {
+            return task.getTaskAssigneeInstanceList().stream()
+                    .anyMatch(assignee -> matchesTaskAssignee(assignee, userId, assigneeGroupIds));
+        }
+        List<TaskAssigneeInstance> assignees =
+                smartEngine.getTaskAssigneeQueryService()
+                        .findList(task.getInstanceId(), tenantId);
+        return assignees != null && assignees.stream()
+                .anyMatch(assignee -> matchesTaskAssignee(assignee, userId, assigneeGroupIds));
     }
 
     /**
@@ -444,10 +514,9 @@ public class TaskService {
 
         // Inline list may be empty when task is queried later; load from DB
         String tenantId = MetaContext.getCurrentTenantIdAsString();
-        Map<String, List<TaskAssigneeInstance>> assigneeMap =
+        List<TaskAssigneeInstance> assignees =
                 smartEngine.getTaskAssigneeQueryService()
-                        .findAssigneeOfInstanceList(List.of(task.getInstanceId()), tenantId);
-        List<TaskAssigneeInstance> assignees = assigneeMap.get(task.getInstanceId());
+                        .findList(task.getInstanceId(), tenantId);
         if (assignees != null) {
             return assignees.stream()
                     .anyMatch(assignee -> matchesTaskAssignee(assignee, userId, assigneeGroupIds));

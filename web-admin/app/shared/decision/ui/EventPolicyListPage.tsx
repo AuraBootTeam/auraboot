@@ -282,18 +282,21 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
         <div className="decisionops-editor-panel epl-editor" data-testid="epl-editor">
           <input
             aria-label="policy-code"
+            data-testid="epl-policy-code"
             placeholder="policyCode"
             value={draft.policyCode}
             onChange={(e) => updateDraft('policyCode', e.target.value)}
           />
           <input
             aria-label="policy-name"
+            data-testid="epl-policy-name"
             placeholder="policyName"
             value={draft.policyName}
             onChange={(e) => updateDraft('policyName', e.target.value)}
           />
           <input
             aria-label="policy-event-type"
+            data-testid="epl-policy-event-type"
             placeholder="eventType"
             value={draft.eventType}
             disabled={editingMode === 'copy'}
@@ -301,6 +304,7 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
           />
           <input
             aria-label="policy-target-type"
+            data-testid="epl-policy-target-type"
             placeholder="targetType"
             value={draft.targetType}
             disabled={editingMode === 'copy'}
@@ -308,6 +312,7 @@ export function EventPolicyListPage({ api, onOpenDesigner, onOpenLogs }: EventPo
           />
           <input
             aria-label="policy-target-key"
+            data-testid="epl-policy-target-key"
             placeholder="targetKey"
             value={draft.targetKey}
             disabled={editingMode === 'copy'}
