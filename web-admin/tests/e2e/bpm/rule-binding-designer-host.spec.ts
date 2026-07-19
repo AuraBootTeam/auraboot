@@ -439,12 +439,28 @@ async function configureAmountInputMapping(ruleSection: Locator): Promise<void> 
   await ruleSection.locator('select[aria-label="mapping-field-0"]').selectOption('record:amount');
 }
 
+async function configureApplicantInputMapping(ruleSection: Locator): Promise<void> {
+  await ruleSection.getByRole('button', { name: '添加映射' }).click();
+  const fieldPicker = ruleSection.locator('select[aria-label="mapping-field-0"]');
+  await expect(fieldPicker).toContainText('申请人', { timeout: 15_000 });
+  await ruleSection.locator('input[aria-label="mapping-input-0"]').fill('wd_req_applicant');
+  await fieldPicker.selectOption('record:data.wd_req_applicant');
+}
+
 async function expectAmountMappingPreview(ruleSection: Locator, decisionName: string): Promise<void> {
   const preview = ruleSection.locator('[data-testid="decision-binding-preview"]');
   await expect(preview).toContainText(decisionName);
   await expect(preview).toContainText('灰度发布');
   await expect(preview).toContainText('amount');
   await expect(preview).toContainText('流程金额');
+}
+
+async function expectApplicantMappingPreview(ruleSection: Locator, decisionName: string | RegExp): Promise<void> {
+  const preview = ruleSection.locator('[data-testid="decision-binding-preview"]');
+  await expect(preview).toContainText(decisionName);
+  await expect(preview).toContainText('灰度发布');
+  await expect(preview).toContainText('wd_req_applicant');
+  await expect(preview).toContainText('申请人');
 }
 
 async function expectGatewayBindingReloaded(page: Page, pid: string): Promise<void> {
@@ -478,9 +494,11 @@ async function expectUserTaskBindingReloaded(page: Page, pid: string): Promise<v
     TASK_ASSIGNMENT_DECISION,
   );
   await expect(ruleSection.locator('select[aria-label="version-policy"]')).toHaveValue('ROLLOUT');
-  await expect(ruleSection.locator('input[aria-label="mapping-input-0"]')).toHaveValue('amount');
+  await expect(ruleSection.locator('input[aria-label="mapping-input-0"]')).toHaveValue(
+    'wd_req_applicant',
+  );
   await expect(ruleSection.locator('select[aria-label="mapping-field-0"]')).toHaveValue(
-    'record:amount',
+    'record:data.wd_req_applicant',
   );
   await expect(ruleSection.locator('input[aria-label="output-mapping-output-0"]')).toHaveValue(
     'candidateUserIds',
@@ -491,13 +509,17 @@ async function expectUserTaskBindingReloaded(page: Page, pid: string): Promise<v
   await expect(ruleSection.locator('input[aria-label="output-mapping-path-0"]')).toHaveValue(
     'candidateUsers',
   );
-  await expectAmountMappingPreview(ruleSection, '任务分派');
+  await expectApplicantMappingPreview(ruleSection, /任务分派|Task Assignee/);
   await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
     '候选审批人',
   );
   await expect(ruleSection.locator('[data-testid="decision-binding-preview"]')).toContainText(
     '动作参数',
   );
+  const applicantInput = ruleSection.locator('input[aria-label="mapping-input-0"]');
+  await applicantInput.scrollIntoViewIfNeeded();
+  await expect(applicantInput).toBeInViewport();
+  await expect(ruleSection.locator('select[aria-label="mapping-field-0"]')).toBeInViewport();
 }
 
 async function expectServiceTaskActionReloaded(page: Page, pid: string): Promise<void> {
@@ -839,8 +861,8 @@ test('BPM userTask property panel hosts rule center assignment and exposes impac
     await expectImpactPreviewAccessible(ruleSection);
 
     await ruleSection.locator('select[aria-label="version-policy"]').selectOption('ROLLOUT');
-    await configureAmountInputMapping(ruleSection);
-    await expectAmountMappingPreview(ruleSection, '任务分派');
+    await configureApplicantInputMapping(ruleSection);
+    await expectApplicantMappingPreview(ruleSection, /任务分派|Task Assignee/);
     await ruleSection.getByRole('button', { name: '添加输出' }).click();
     await expect(
       ruleSection.locator('select[aria-label="output-mapping-output-picker-0"]'),
@@ -895,8 +917,8 @@ test('BPM userTask property panel hosts rule center assignment and exposes impac
         enabled: true,
         inputMappings: [
           {
-            input: 'amount',
-            source: { kind: 'FIELD', scope: 'record', path: 'amount' },
+            input: 'wd_req_applicant',
+            source: { kind: 'FIELD', scope: 'record', path: 'data.wd_req_applicant' },
           },
         ],
         outputMappings: [
@@ -912,6 +934,8 @@ test('BPM userTask property panel hosts rule center assignment and exposes impac
       '&quot;decisionCode&quot;:&quot;task_assignee&quot;',
       '&quot;versionPolicy&quot;:&quot;ROLLOUT&quot;',
       '&quot;consumerNodeId&quot;:&quot;manual_review&quot;',
+      '&quot;input&quot;:&quot;wd_req_applicant&quot;',
+      '&quot;path&quot;:&quot;data.wd_req_applicant&quot;',
       '&quot;output&quot;:&quot;candidateUserIds&quot;',
       '&quot;path&quot;:&quot;candidateUsers&quot;',
     ]);

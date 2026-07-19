@@ -34,6 +34,18 @@ describe('RuleCenterBindingSection', () => {
                 modelName: '请假申请',
                 facts: [
                   {
+                    factKey: 'record.data.wd_req_applicant',
+                    scope: 'record',
+                    path: 'data.wd_req_applicant',
+                    label: '申请人',
+                    dataType: 'reference',
+                    refTarget: {
+                      targetEntity: 'sys_user',
+                      displayField: 'displayName',
+                      valueField: 'pid',
+                    },
+                  },
+                  {
                     factKey: 'record.data.wd_leave_type',
                     scope: 'record',
                     path: 'data.wd_leave_type',
@@ -174,6 +186,7 @@ describe('RuleCenterBindingSection', () => {
     expect(screen.getByTestId('rule-center-section-toggle')).toBeChecked();
     expect(screen.getByTestId('rule-center-section-editor')).toHaveTextContent('任务分派');
     expect(screen.getByTestId('decision-test-runner')).toHaveTextContent('REQ-LONG-LEAVE-SAMPLE');
+    expect(screen.getByTestId('decision-test-runner')).toHaveTextContent('wd_req_applicant');
   });
 
   it('merges BPM rule fields from the unified fact catalog into the embedded rule binding editor', async () => {
@@ -198,8 +211,12 @@ describe('RuleCenterBindingSection', () => {
 
     fireEvent.click(screen.getByTestId('cb-add'));
     const fieldPicker = screen.getByLabelText('field-0');
+    expect(fieldPicker).toHaveTextContent('申请人');
     expect(fieldPicker).toHaveTextContent('请假类型');
     expect(fieldPicker).not.toHaveTextContent('旧字段目录');
+
+    fireEvent.change(fieldPicker, { target: { value: 'record:data.wd_req_applicant' } });
+    expect(fieldPicker).toHaveValue('record:data.wd_req_applicant');
 
     fireEvent.change(fieldPicker, { target: { value: 'record:data.wd_leave_type' } });
     const valuePicker = screen.getByLabelText('value-0');
