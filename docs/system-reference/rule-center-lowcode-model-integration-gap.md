@@ -18,6 +18,32 @@ status: active
 - 每个字段、字典值、虚拟模型值、引用字段、权限字段是否来自低码元模型事实目录，并能被运行时真实取值。
 - 每次保存、发布、测试运行、执行日志、影响分析是否能证明“UI 选到的东西就是后端实际执行的东西”。
 
+## 2026-07-19 Reference / DecisionOps Trace 收口更新
+
+本轮关闭的是“低码业务引用字段作为规则事实”这一条纵深链路，以及 DecisionOps 静态入口的执行日志 UX 断点。它把 `model / field / refTarget / dynamic record / decision evaluator / traceSnapshot.factMetadata / DecisionOps Trace UI` 串成一条可测试链路，但不把规则中心所有历史 `PARTIAL` 项改成全量完成。
+
+| 项目 | 本轮结论 | 证据 |
+|---|---|---|
+| 低码 reference 字段元数据 | `FieldDefinition.RefTarget` 补齐 `targetTable / valueField / targetField`，`MetaModelServiceImpl` 回传 canonical refTarget；`DynamicDataServiceImpl.getFieldOptions` 优先读取 canonical refTarget，兼容 `extraProps/extension.refTarget`，业务引用字段的下拉 option 来自真实目标模型和目标表 | 后端集成 `DecisionRuntimeIntegrationTest.evaluate_persistsFactMetadataSnapshotForBusinessReferenceModelFields` passed；浏览器 golden 会先创建 supplier/ticket 两个低码模型并调用 `/api/dynamic/<ticket>/field-options/<supplierRef>` 验证 option label/value |
+| 规则运行时 reference 类型 | AST `DataType` 新增 `REFERENCE("reference")`，按 raw pid/value 做 `EQ/IN` 判断；DMN XML service 将 reference 作为 string-like literal，避免导入导出或 evaluator 把业务 label 当值 | `ConditionAstEvaluatorTest.referenceEqualityAndSetMatchRawIds` passed；`DecisionRuntimeIntegrationTest` 的 business reference 决策使用 raw supplier pid 命中 |
+| Trace factMetadata value label | 决策执行后 `traceSnapshot.factMetadata` 能记录业务 reference 字段 label、modelCode、dataType、refTarget 和 `valueLabels[rawPid]=业务名称`；DecisionOps Trace 的“事实快照”展示 raw pid + 业务名称，而不是只显示 `-` 或泄漏内部字段 | Playwright `decisionops-fact-metadata-trace.spec.ts` 3/3 passed；截图 `docs/system-reference/assets/decisionops-business-reference-fact-metadata-trace-20260719.png`、`decisionops-user-reference-fact-metadata-trace-20260719.png`、`decisionops-dict-fact-metadata-trace-20260719.png` |
+| 动态模型权限基线 | API 创建/发布的模型即使没有命令定义，也会派生 `read/create/update/delete/export/import` 动态 API 基线权限，避免测试或真实用户只有 `read` 导致低码 record create/update 403 | `CommandActionDeriverIntegrationTest.deriveActions_withNoCommands_returnsDynamicApiBaselineActions` passed；`AutoPermissionHierarchyIntegrationTest` passed；business reference browser golden 中 admin role 自动授权后可创建 supplier/ticket 记录 |
+| DecisionOps 执行日志入口 | `/decision-ops` 的“执行日志”tab 改为复用 `ExecutionLogTraceBlock`，不再使用旧 `ExecutionLogQueryPage`；tab 使用 `?tab=logs` deep link fallback，SSR hydration 前点击也能进入日志页，解决无菜单/无 DSL page schema 时的真实 UX 断点 | `DecisionOpsConsole.test.tsx` + `ExecutionLogTraceBlock.test.tsx` + `DecisionOpsConsolePage.test.tsx` 57/57 passed；探针验证 `/decision-ops?tab=logs` 直接显示 `execution-log-trace-block`；Playwright full spec 3/3 passed |
+| Schema / JSONB 纪律 | baseline schema 和 schema mirror 补齐 `ab_permission_audit_log.record_pid`，并保留 JSONB TypeHandler 路径；本轮没有引入 `JdbcTemplate` 手写 JSONB | `scripts/check-schema-sql.sh` passed，316 tables created；`scripts/check-jsonb-typehandler.sh` passed，40 String→jsonb fields protected |
+
+### 本轮功能覆盖矩阵
+
+| 链路 | UI evidence | Backend evidence | 状态 |
+|---|---|---|---|
+| dict field `wd_req_type` → fact catalog → decision evaluate → Trace label | `decisionops-dict-fact-metadata-trace-20260719.png`，Trace 展示“请假类型 / 年假 / 字典 wd_leave_type” | `DecisionRuntimeIntegrationTest.evaluate_persistsFactMetadataSnapshotForDictBackedModelFields` | `DONE focused` |
+| user reference `wd_req_applicant` → fact catalog → decision evaluate → Trace label | `decisionops-user-reference-fact-metadata-trace-20260719.png`，Trace 展示“申请人 / 用户显示名” | `DecisionRuntimeIntegrationTest.evaluate_persistsFactMetadataSnapshotForUserReferenceModelFields` | `DONE focused` |
+| business reference supplier → dynamic field-options → ticket record raw save/reload → decision evaluate → Trace label | `decisionops-business-reference-fact-metadata-trace-20260719.png`，Trace 展示“供应商 / supplier pid / supplier name” | `DecisionRuntimeIntegrationTest.evaluate_persistsFactMetadataSnapshotForBusinessReferenceModelFields` + `DynamicDataService.getFieldOptions` | `DONE focused` |
+| DecisionOps static logs tab → unified Trace Block | `/decision-ops?tab=logs` browser probe + Playwright 3/3 | `ExecutionLogTraceBlock` API client uses `/decision/logs/recent` and `/decision/logs` | `DONE focused` |
+
+### 本轮 e2e-truth 结论
+
+目标 spec `web-admin/tests/e2e/decisionops/decisionops-fact-metadata-trace.spec.ts` 未命中 `test.skip/fixme/only`、`waitForTimeout`、`retries`、threshold/baseline、`page.request.put/patch` 或业务 `/p/*` 直达兜底。该 spec 有较多 API 调用用于创建低码模型、字段、记录、决策和后端取证；浏览器路径负责从真实 DecisionOps 入口打开执行日志、筛选、打开 Trace 抽屉并截图验证 fact metadata。因此它是“前后端成对 focused evidence”，不是通用 CRUD 全 UI 覆盖。
+
 ### 本文使用方式
 
 后续开发、review 和验收统一按下面顺序使用本文：

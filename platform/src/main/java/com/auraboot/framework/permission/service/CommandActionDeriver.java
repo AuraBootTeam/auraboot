@@ -21,7 +21,8 @@ import java.util.*;
  *   <li>exec_type=query → skip (covered by "read")</li>
  *   <li>exec_type=state_transition/custom/action → extract verb from command code</li>
  * </ul>
- * <p>"read" is always included regardless of commands.
+ * <p>Dynamic model API actions are always included regardless of commands, because
+ * {@code DynamicController} permission-gates those endpoints directly.
  */
 @Slf4j
 @Component
@@ -30,6 +31,8 @@ public class CommandActionDeriver {
 
     private static final Set<String> STANDARD_EXEC_TYPES = Set.of("create", "update", "delete");
     private static final Set<String> SKIP_EXEC_TYPES = Set.of("query");
+    private static final List<String> DEFAULT_DYNAMIC_ACTIONS = List.of(
+            "read", "create", "update", "delete", "export", "import");
     private static final TypeReference<Map<String, Object>> MAP_TYPE_REF = new TypeReference<>() {};
 
     private final CommandDefinitionMapper commandDefinitionMapper;
@@ -37,7 +40,7 @@ public class CommandActionDeriver {
 
     /**
      * Derive the set of permission actions for a given model code.
-     * Always includes "read". Standard CRUD exec types map directly.
+     * Always includes the DynamicController baseline action set. Standard CRUD exec types map directly.
      * Other exec types (state_transition, custom, action) extract the verb from the command code.
      *
      * @param modelCode the model code to derive actions for
@@ -45,7 +48,7 @@ public class CommandActionDeriver {
      */
     public List<String> deriveActions(String modelCode) {
         Set<String> actions = new LinkedHashSet<>();
-        actions.add("read");
+        actions.addAll(DEFAULT_DYNAMIC_ACTIONS);
 
         List<CommandDefinition> commands = commandDefinitionMapper.findByModelCode(modelCode);
         if (commands == null || commands.isEmpty()) {

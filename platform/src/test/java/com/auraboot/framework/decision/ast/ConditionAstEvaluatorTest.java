@@ -47,6 +47,20 @@ class ConditionAstEvaluatorTest {
     }
 
     @Test
+    void referenceEqualityAndSetMatchRawIds() {
+        var eq = cmp(recPath("supplier", DataType.REFERENCE), Operator.EQ, lit("supplier-001", DataType.REFERENCE));
+        assertThat(evaluator.evaluate(eq, ctxOf(Map.of("supplier", "supplier-001"))).result()).isEqualTo(Truth.TRUE);
+        assertThat(evaluator.evaluate(eq, ctxOf(Map.of("supplier", "华东供应商"))).result()).isEqualTo(Truth.FALSE);
+
+        var in = cmp(
+                recPath("supplier", DataType.REFERENCE),
+                Operator.IN,
+                lit(List.of("supplier-001", "supplier-002"), DataType.REFERENCE));
+        assertThat(evaluator.evaluate(in, ctxOf(Map.of("supplier", "supplier-002"))).result()).isEqualTo(Truth.TRUE);
+        assertThat(evaluator.evaluate(in, ctxOf(Map.of("supplier", "supplier-003"))).result()).isEqualTo(Truth.FALSE);
+    }
+
+    @Test
     void numericGreaterThan() {
         var node = cmp(recPath("amount", DataType.DECIMAL), Operator.GT, lit(10000, DataType.DECIMAL));
         assertThat(evaluator.evaluate(node, ctxOf(Map.of("amount", 20000))).result()).isEqualTo(Truth.TRUE);

@@ -32,8 +32,8 @@ import com.auraboot.framework.common.constant.StatusConstants;
  *   <li>Level 3 (Action): model.{modelCode}.{action} — fine-grained actions derived from commands</li>
  * </ul>
  *
- * <p>Actions are derived from model commands via {@link CommandActionDeriver},
- * not hardcoded. "read" is always included.
+ * <p>Actions come from {@link CommandActionDeriver}: DynamicController's baseline
+ * CRUD/import/export permissions are always present, and model commands add extra business actions.
  *
  * @author AuraBoot Platform
  * @version 2.0.0
@@ -56,7 +56,7 @@ public class AutoPermissionAssignmentService {
      * Auto-assign hierarchical permissions for a model.
      *
      * <p>Creates a 3-level hierarchy: Module (level=1) → Resource (level=2) → Action (level=3).
-     * Actions are derived from the model's command definitions.
+     * Actions include DynamicController's baseline API actions plus those derived from the model's commands.
      *
      * @param modelCode  the model code (e.g., "crm_lead")
      * @param moduleCode the module code (e.g., "crm"); if null, derived from modelCode prefix
@@ -90,7 +90,7 @@ public class AutoPermissionAssignmentService {
         // Resolve moduleCode
         String resolvedModule = moduleCode != null ? moduleCode : deriveModuleFromModelCode(modelCode);
 
-        // 1. Derive actions from model commands
+        // 1. Derive baseline dynamic API actions plus command-specific actions.
         List<String> actions = commandActionDeriver.deriveActions(modelCode);
         log.info("Derived {} actions for model {}: {}", actions.size(), modelCode, actions);
 

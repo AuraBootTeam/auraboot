@@ -1,20 +1,17 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import {
-  DecisionDefinitionListPage,
-  type DefinitionSummary,
-} from './DecisionDefinitionListPage';
+import { DecisionDefinitionListPage, type DefinitionSummary } from './DecisionDefinitionListPage';
 import { DecisionTableEditor } from './DecisionTableEditor';
 import { EventPolicyListPage } from './EventPolicyListPage';
 import { EventPolicyDesignerWorkflow } from './EventPolicyDesignerWorkflow';
 import { type ExecLogEntry } from './ExecutionLogViewer';
-import { ExecutionLogQueryPage } from './ExecutionLogQueryPage';
 import { DataModelFieldViewer, type ModelField } from './DataModelFieldViewer';
 import { PermissionMatrix, type RoleGrants } from './PermissionMatrix';
 import { ConnectorListView, type Connector } from './ConnectorListView';
 import { DecisionDashboard, type DashboardSummary, type ExceptionItem } from './DecisionDashboard';
 import { DecisionRolloutMonitor } from './DecisionRolloutMonitor';
 import { StrategyStudioWorkbench } from './StrategyStudioWorkbench';
+import { ExecutionLogTraceBlock } from '~/ui/smart/decision/ExecutionLogTraceBlock';
 import { type FieldOption } from './ConditionBuilder';
 import { type TestSample } from './ConditionTestRunPanel';
 import { factCatalogToFieldOptions, modelFieldsToFieldOptions } from './factCatalogAdapter';
@@ -129,7 +126,6 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     fields,
     modelFields,
     samples = [],
-    logs = [],
     connectors,
     permissionGrants,
     dashboard,
@@ -183,11 +179,12 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
     }));
   const factCatalogFields = factCatalogToFieldOptions(factCatalogQuery.data);
   const legacyStrategyFields = modelFieldsToFieldOptions(modelFieldData);
-  const strategyFields = factCatalogFields.length > 0
-    ? factCatalogFields
-    : legacyStrategyFields.length > 0
-      ? legacyStrategyFields
-      : fields;
+  const strategyFields =
+    factCatalogFields.length > 0
+      ? factCatalogFields
+      : legacyStrategyFields.length > 0
+        ? legacyStrategyFields
+        : fields;
   const connectorQuery = useQuery({
     queryKey: ['decision-connectors'],
     queryFn: () => api.listConnectors(),
@@ -308,9 +305,15 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
           <h1>规则中心</h1>
         </div>
         <div className="decisionops-header-meta">
-          <span>{definitionsLabel} {dashboardData.summary.definitions}</span>
-          <span>{policiesLabel} {dashboardData.summary.policies}</span>
-          <span>{todayLabel} {dashboardData.summary.evaluationsToday}</span>
+          <span>
+            {definitionsLabel} {dashboardData.summary.definitions}
+          </span>
+          <span>
+            {policiesLabel} {dashboardData.summary.policies}
+          </span>
+          <span>
+            {todayLabel} {dashboardData.summary.evaluationsToday}
+          </span>
           <a className="decisionops-workbench-jump" href="#strategy-workbench">
             {openWorkbenchLabel}
           </a>
@@ -320,17 +323,20 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
       <div className="decisionops-layout">
         <nav className="doc-tabs decisionops-nav" role="tablist" aria-label="Rule Center modules">
           {TABS.map((t) => (
-            <button
+            <a
               key={t.key}
-              type="button"
+              href={`?tab=${t.key}`}
               role="tab"
               data-testid={`doc-tab-${t.key}`}
               aria-selected={tab === t.key}
-              onClick={() => setTab(t.key)}
+              onClick={(event) => {
+                event.preventDefault();
+                setTab(t.key);
+              }}
             >
               <span className="decisionops-nav-label">{t.label}</span>
               <span className="decisionops-nav-desc">{t.description}</span>
-            </button>
+            </a>
           ))}
         </nav>
 
@@ -418,7 +424,9 @@ export function DecisionOpsConsole(props: DecisionOpsConsoleProps) {
             {tab === 'rollouts' && (
               <DecisionRolloutMonitor api={api} initialDecisionCode="complaint_sla_deadline" />
             )}
-            {tab === 'logs' && <ExecutionLogQueryPage api={api} initialLogs={logs} />}
+            {tab === 'logs' && (
+              <ExecutionLogTraceBlock block={{ props: { mode: 'list', pageSize: 50 } }} />
+            )}
             {tab === 'model' && (
               <>
                 {modelFields == null && modelFieldQuery.isLoading && (

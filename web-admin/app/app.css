@@ -395,7 +395,7 @@
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.04);
 }
 
-.decisionops-shell .doc-tabs button {
+.decisionops-shell .doc-tabs :is(button, a) {
   display: grid;
   min-height: 52px;
   justify-items: start;
@@ -409,16 +409,17 @@
   font-weight: 600;
   padding: 9px 10px;
   text-align: left;
+  text-decoration: none;
   width: 100%;
 }
 
-.decisionops-shell .doc-tabs button[aria-selected='true'] {
+.decisionops-shell .doc-tabs :is(button, a)[aria-selected='true'] {
   border-color: #bfdbfe;
   background: #eff6ff;
   color: #1d4ed8;
 }
 
-.decisionops-shell .doc-tabs button:hover {
+.decisionops-shell .doc-tabs :is(button, a):hover {
   border-color: #dbeafe;
   background: #f8fbff;
   color: #111827;
@@ -3179,7 +3180,7 @@
     overflow: visible;
   }
 
-  .decisionops-shell .doc-tabs button {
+  .decisionops-shell .doc-tabs :is(button, a) {
     min-width: 0;
   }
 }
@@ -4382,7 +4383,7 @@
     overflow: visible;
   }
 
-  .decisionops-shell .doc-tabs button {
+  .decisionops-shell .doc-tabs :is(button, a) {
     min-width: 0;
   }
 
@@ -4537,7 +4538,7 @@
     display: none;
   }
 
-  .decisionops-shell .doc-tabs button {
+  .decisionops-shell .doc-tabs :is(button, a) {
     flex: 0 0 auto;
     width: auto;
     min-height: 34px;

@@ -8327,6 +8327,7 @@ CREATE TABLE IF NOT EXISTS ab_permission_audit_log (
     resource_code       VARCHAR(100)    NOT NULL,
     action_code         VARCHAR(50)     NOT NULL,
     record_id           BIGINT,
+    record_pid          VARCHAR(64),
     result              BOOLEAN         NOT NULL,
     reason              TEXT,
     evaluation_trace    JSONB,
@@ -8336,6 +8337,9 @@ CREATE INDEX IF NOT EXISTS idx_ab_perm_audit_member
     ON ab_permission_audit_log (tenant_id, member_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_ab_perm_audit_resource
     ON ab_permission_audit_log (tenant_id, resource_code, created_at);
+CREATE INDEX IF NOT EXISTS idx_ab_perm_audit_resource_record_pid
+    ON ab_permission_audit_log (tenant_id, resource_code, record_pid, created_at)
+    WHERE record_pid IS NOT NULL;
 
 -- =====================================================================
 -- IM Module (moved from enterprise 2026-04-15)

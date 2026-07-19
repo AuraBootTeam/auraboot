@@ -19,6 +19,7 @@ public enum DataType {
     DURATION("duration"),
     ENUM("enum"),
     DICT("dict"),
+    REFERENCE("reference"),
     USER("user"),
     ROLE("role"),
     GROUP("group"),
@@ -51,9 +52,9 @@ public enum DataType {
         return this == INTEGER || this == DECIMAL;
     }
 
-    /** enum/dict/user/role/group/department compare by code, not label. */
+    /** enum/dict/reference/user/role/group/department compare by code, not label. */
     public boolean isCodeCompared() {
-        return this == ENUM || this == DICT || this == USER
+        return this == ENUM || this == DICT || this == REFERENCE || this == USER
                 || this == ROLE || this == GROUP || this == DEPARTMENT;
     }
 }
