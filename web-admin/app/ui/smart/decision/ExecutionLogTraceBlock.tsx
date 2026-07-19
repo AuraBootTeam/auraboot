@@ -52,13 +52,14 @@ type FilterState = {
 };
 
 const STATUS_OPTIONS = ['ALL', 'MATCHED', 'NOT_MATCHED', 'ERROR', 'SKIPPED', 'UNKNOWN'];
-const CALLER_OPTIONS = ['ALL', 'API', 'AUTOMATION', 'EVENT_POLICY', 'SLA', 'BPM', 'TEST'];
+const CALLER_OPTIONS = ['ALL', 'API', 'AUTOMATION', 'EVENT_POLICY', 'PERMISSION', 'SLA', 'BPM', 'TEST'];
 const ROLLOUT_OPTIONS = ['ALL', 'BASELINE', 'CANDIDATE'];
 const CALLER_LABELS: Record<string, string> = {
   ALL: '全部',
   API: 'API',
   AUTOMATION: '自动化',
   EVENT_POLICY: '事件策略',
+  PERMISSION: '权限',
   SLA: 'SLA',
   BPM: 'BPM',
   TEST: '测试',

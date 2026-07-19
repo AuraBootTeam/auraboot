@@ -198,8 +198,10 @@ describe('ExecutionLogTraceBlock', () => {
     expect(screen.getByLabelText('log-status')).not.toHaveTextContent('NOT_MATCHED');
     expect(screen.getByLabelText('log-caller-type')).toHaveTextContent('自动化');
     expect(screen.getByLabelText('log-caller-type')).toHaveTextContent('事件策略');
+    expect(screen.getByLabelText('log-caller-type')).toHaveTextContent('权限');
     expect(screen.getByLabelText('log-caller-type')).not.toHaveTextContent('AUTOMATION');
     expect(screen.getByLabelText('log-caller-type')).not.toHaveTextContent('EVENT_POLICY');
+    expect(screen.getByLabelText('log-caller-type')).not.toHaveTextContent('PERMISSION');
     expect(screen.getByLabelText('log-matched')).toHaveTextContent('全部');
     expect(screen.getByLabelText('log-matched')).toHaveTextContent('命中');
     expect(screen.getByLabelText('log-matched')).toHaveTextContent('未命中');

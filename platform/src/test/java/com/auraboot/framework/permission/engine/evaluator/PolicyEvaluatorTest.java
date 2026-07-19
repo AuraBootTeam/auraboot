@@ -185,7 +185,7 @@ class PolicyEvaluatorTest {
         when(policyService.getConditionGuards(1L, "model.leave:approve")).thenReturn(List.of(
                 new PermissionPolicyService.ConditionGuard(902L, null, conditionsJson)));
         when(ruleEvaluationServiceProvider.getIfAvailable()).thenReturn(ruleEvaluationService);
-        when(fieldVocabulary.buildScopes(1L, record)).thenReturn(Map.of(
+        when(fieldVocabulary.buildScopes(1L, "model.leave", record)).thenReturn(Map.of(
                 Scope.RECORD, Map.of("data", Map.of("wd_req_days", 4)),
                 Scope.META, Map.of("virtualSources", List.of(Map.of(
                         "sourceRef", "wd_leave_request.days",
@@ -279,7 +279,7 @@ class PolicyEvaluatorTest {
         when(policyService.getConditionGuards(1L, "model.invoice.approve")).thenReturn(List.of(
                 new PermissionPolicyService.ConditionGuard(903L, null, conditionsJson)));
         when(ruleEvaluationServiceProvider.getIfAvailable()).thenReturn(ruleEvaluationService);
-        when(fieldVocabulary.buildScopes(1L, record)).thenReturn(Map.of(
+        when(fieldVocabulary.buildScopes(1L, "model.invoice", record)).thenReturn(Map.of(
                 Scope.RECORD, Map.of("data", Map.of("amount", 100))));
         when(ruleEvaluationService.evaluateDecisionBinding(any(), any())).thenReturn(new RuleEvaluationTrace(
                 "trace-permission-deny",

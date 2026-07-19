@@ -146,7 +146,7 @@ public class PolicyEvaluator {
                 }
 
                 if (ctx == null) {
-                    ctx = fieldVocabulary.buildContext(memberId, record);
+                    ctx = fieldVocabulary.buildContext(memberId, resource, record);
                 }
                 EvalTrace trace = astEvaluator.evaluate(ast, ctx);
                 if (trace.result() != Truth.TRUE) {
@@ -162,7 +162,7 @@ public class PolicyEvaluator {
 
             if (hasActiveRuleCenterGuard(ruleBinding)) {
                 RuleGuardResult ruleResult = evaluateRuleCenterGuard(
-                        ruleBinding, parsedBinding.expectedMatched(), memberId, permissionCode, record);
+                        ruleBinding, parsedBinding.expectedMatched(), memberId, resource, permissionCode, record);
                 if (!ruleResult.matchedExpected()) {
                     denyReasons.add("grant#" + guard.grantId() + ": " + ruleResult.reason());
                     Map<String, Object> detail = new LinkedHashMap<>(ruleResult.details());
@@ -322,6 +322,7 @@ public class PolicyEvaluator {
     private RuleGuardResult evaluateRuleCenterGuard(RuleConsumerBinding binding,
                                                      Boolean expectedMatched,
                                                      Long memberId,
+                                                     String resource,
                                                      String permissionCode,
                                                      Object record) {
         RuleEvaluationService ruleEvaluationService = ruleEvaluationServiceProvider.getIfAvailable();
@@ -331,7 +332,7 @@ public class PolicyEvaluator {
                     Map.of("error", "RULE_EVALUATION_SERVICE_UNAVAILABLE"));
         }
         RuleEvaluationContext context = new RuleEvaluationContext(
-                fieldVocabulary.buildScopes(memberId, record),
+                fieldVocabulary.buildScopes(memberId, resource, record),
                 "PERMISSION",
                 firstNonBlank(binding.consumerCode(), permissionCode),
                 firstNonBlank(binding.consumerNodeId(), "dynamicAbac"),

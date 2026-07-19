@@ -173,6 +173,18 @@ describe('PermissionAuditTab', () => {
                 ruleCenterFailures: [
                   {
                     grantId: 900,
+                    matched: false,
+                    ruleTraceId: 'trace-permission-nested-001',
+                    decisionCode: 'permission_applicant_trace',
+                    decisionVersion: 1,
+                    decisionStatus: 'NOT_MATCHED',
+                    bindingKind: 'DECISION_REF',
+                    fallbackApplied: false,
+                    fieldRefs: ['record.data.wd_req_applicant'],
+                    decisionOutputs: {
+                      truth: 'FALSE',
+                      matched: false,
+                    },
                     error: 'record.data.salary is masked and cannot be used with token=secret-token-value',
                     fieldGovernance: {
                       fieldRef: 'record.data.salary',
@@ -192,11 +204,21 @@ describe('PermissionAuditTab', () => {
     renderAuditTab();
 
     await waitFor(() => expect(screen.getByTestId('permission-audit-row-88')).toBeTruthy());
+    expect(screen.getByTestId('permission-audit-rule-meta-88-0')).toHaveTextContent('trace-permission-nested-001');
+    expect(screen.getByTestId('permission-audit-rule-meta-88-0')).toHaveTextContent('permission_applicant_trace');
+    expect(screen.getByTestId('permission-audit-rule-meta-88-0')).toHaveTextContent('NOT_MATCHED');
+    expect(screen.getByTestId('permission-audit-open-decision-trace-88-0')).toHaveAttribute(
+      'href',
+      '/p/decisionops_execution_logs?traceId=trace-permission-nested-001',
+    );
     expect(screen.getByTestId('permission-audit-field-governance-88-0')).toHaveTextContent('字段治理');
+    expect(screen.getByTestId('permission-audit-field-governance-88-0')).toHaveTextContent('record.data.wd_req_applicant');
     expect(screen.getByTestId('permission-audit-field-governance-88-0')).toHaveTextContent('record.data.salary');
     expect(screen.getByTestId('permission-audit-field-governance-88-0')).toHaveTextContent('masked');
     expect(screen.getByTestId('permission-audit-field-governance-88-0')).toHaveTextContent('permission-policy-validation');
     expect(screen.getByTestId('permission-audit-field-governance-88-0')).toHaveTextContent('grantId');
+    expect(screen.getByTestId('permission-audit-decision-outputs-88-0')).toHaveTextContent('truth');
+    expect(screen.getByTestId('permission-audit-decision-outputs-88-0')).toHaveTextContent('FALSE');
     expect(screen.queryByText('secret-token-value')).toBeNull();
   });
 

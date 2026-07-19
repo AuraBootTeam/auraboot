@@ -124,25 +124,12 @@ function recordKeyValues(value: unknown): TraceKeyValue[] {
     .map(([key, entryValue]) => ({ key, value: toDisplayValue(entryValue) }));
 }
 
-function fieldGovernanceKeyValues(details: Record<string, unknown>): TraceKeyValue[] {
-  const items: TraceKeyValue[] = [];
-  const append = (value: unknown) => {
-    if (!isRecord(value)) return;
-    items.push(...recordKeyValues(value));
-  };
+function recordArray(value: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord);
+}
 
-  append(details.fieldGovernance);
-  if (Array.isArray(details.ruleCenterFailures)) {
-    details.ruleCenterFailures.forEach((failure) => {
-      if (!isRecord(failure)) return;
-      const grantId = optionalDisplay(failure.grantId);
-      if (grantId) {
-        items.push({ key: 'grantId', value: grantId });
-      }
-      append(failure.fieldGovernance);
-    });
-  }
-
+function dedupeKeyValues(items: TraceKeyValue[]): TraceKeyValue[] {
   const seen = new Set<string>();
   return items.filter((item) => {
     const key = `${item.key}:${item.value}`;
@@ -152,17 +139,51 @@ function fieldGovernanceKeyValues(details: Record<string, unknown>): TraceKeyVal
   });
 }
 
-function addMetadata(
+function appendFieldRefs(items: TraceKeyValue[], value: unknown) {
+  if (!Array.isArray(value)) return;
+  value.forEach((fieldRef) => {
+    const display = optionalDisplay(fieldRef);
+    if (display) {
+      items.push({ key: 'fieldRef', value: display });
+    }
+  });
+}
+
+function fieldGovernanceKeyValues(details: Record<string, unknown>): TraceKeyValue[] {
+  const items: TraceKeyValue[] = [];
+  const append = (value: unknown) => {
+    if (!isRecord(value)) return;
+    items.push(...recordKeyValues(value));
+  };
+
+  append(details.fieldGovernance);
+  appendFieldRefs(items, details.fieldRefs);
+  recordArray(details.ruleCenterFailures).forEach((failure) => {
+    const grantId = optionalDisplay(failure.grantId);
+    if (grantId) {
+      items.push({ key: 'grantId', value: grantId });
+    }
+    appendFieldRefs(items, failure.fieldRefs);
+    append(failure.fieldGovernance);
+  });
+
+  return dedupeKeyValues(items);
+}
+
+function addMetadataOnce(
   metadata: TraceMetadataItem[],
+  seen: Set<string>,
   labelKey: string,
   fallback: string,
   value: unknown,
   options?: Pick<TraceMetadataItem, 'href' | 'testId'>,
 ) {
   const displayValue = optionalDisplay(value);
-  if (displayValue) {
-    metadata.push({ labelKey, fallback, value: displayValue, ...options });
-  }
+  if (!displayValue) return;
+  const dedupeKey = `${labelKey}:${displayValue}:${options?.href ?? ''}`;
+  if (seen.has(dedupeKey)) return;
+  seen.add(dedupeKey);
+  metadata.push({ labelKey, fallback, value: displayValue, ...options });
 }
 
 function toTraceStepView(raw: unknown, index: number): TraceStepView {
@@ -184,22 +205,30 @@ function toTraceStepView(raw: unknown, index: number): TraceStepView {
       ...(rawDetails === undefined ? {} : { details: rawDetails }),
     };
     const metadata: TraceMetadataItem[] = [];
-    const ruleTraceId = optionalDisplay(structuredDetails.ruleTraceId);
+    const seenMetadata = new Set<string>();
+    const ruleCenterFailures = recordArray(structuredDetails.ruleCenterFailures);
+    const ruleTraceId = optionalDisplay(
+      structuredDetails.ruleTraceId ?? ruleCenterFailures.find((failure) => optionalDisplay(failure.ruleTraceId))?.ruleTraceId,
+    );
     if (ruleTraceId) {
-      metadata.push({
-        labelKey: 'admin.permission.audit.traceId',
-        fallback: '统一 Trace',
-        value: ruleTraceId,
+      addMetadataOnce(metadata, seenMetadata, 'admin.permission.audit.traceId', '统一 Trace', ruleTraceId, {
         href: decisionTraceHref(ruleTraceId),
         testId: 'permission-audit-open-decision-trace',
       });
     }
-    addMetadata(metadata, 'admin.permission.audit.decisionCode', '决策', structuredDetails.decisionCode);
-    addMetadata(metadata, 'admin.permission.audit.decisionVersion', '版本', structuredDetails.decisionVersion);
-    addMetadata(metadata, 'admin.permission.audit.decisionStatus', '状态', structuredDetails.decisionStatus);
-    addMetadata(metadata, 'admin.permission.audit.bindingKind', '绑定', structuredDetails.bindingKind);
-    addMetadata(metadata, 'admin.permission.audit.matched', '命中', structuredDetails.matched);
-    addMetadata(metadata, 'admin.permission.audit.fallbackApplied', 'Fallback', structuredDetails.fallbackApplied);
+    const metadataSources = [structuredDetails, ...ruleCenterFailures];
+    metadataSources.forEach((source) => {
+      addMetadataOnce(metadata, seenMetadata, 'admin.permission.audit.decisionCode', '决策', source.decisionCode);
+      addMetadataOnce(metadata, seenMetadata, 'admin.permission.audit.decisionVersion', '版本', source.decisionVersion);
+      addMetadataOnce(metadata, seenMetadata, 'admin.permission.audit.decisionStatus', '状态', source.decisionStatus);
+      addMetadataOnce(metadata, seenMetadata, 'admin.permission.audit.bindingKind', '绑定', source.bindingKind);
+      addMetadataOnce(metadata, seenMetadata, 'admin.permission.audit.matched', '命中', source.matched);
+      addMetadataOnce(metadata, seenMetadata, 'admin.permission.audit.fallbackApplied', 'Fallback', source.fallbackApplied);
+    });
+    const decisionOutputs = dedupeKeyValues([
+      ...recordKeyValues(structuredDetails.decisionOutputs),
+      ...ruleCenterFailures.flatMap((failure) => recordKeyValues(failure.decisionOutputs)),
+    ]);
 
     const knownDetailKeys = new Set([
       'ruleTraceId',
@@ -213,6 +242,9 @@ function toTraceStepView(raw: unknown, index: number): TraceStepView {
       'ruleCenterFailures',
       'permissionContext',
       'decisionOutputs',
+      'fieldRefs',
+      'decisionRefs',
+      'inputSnapshot',
     ]);
     const residual = Object.fromEntries(
       Object.entries(structuredDetails).filter(([key]) => !knownDetailKeys.has(key)),
@@ -224,7 +256,7 @@ function toTraceStepView(raw: unknown, index: number): TraceStepView {
       metadata,
       fieldGovernance: fieldGovernanceKeyValues(structuredDetails),
       permissionContext: recordKeyValues(structuredDetails.permissionContext),
-      decisionOutputs: recordKeyValues(structuredDetails.decisionOutputs),
+      decisionOutputs,
       residualDetails: Object.keys(residual).length > 0 ? safeJson(residual) : undefined,
     };
   }

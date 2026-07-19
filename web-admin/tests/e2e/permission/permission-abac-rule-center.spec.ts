@@ -1,4 +1,6 @@
 import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
+import { mkdirSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
 import { Client } from 'pg';
 import { BACKEND_URL, PG_CONN } from '../../helpers/environments';
 
@@ -22,6 +24,51 @@ type PermissionRecord = {
   pid: string;
   code: string;
   name: string;
+};
+
+type DecisionVersion = {
+  pid: string;
+  status?: string;
+  version?: number;
+};
+
+type UserOption = {
+  id?: string | number;
+  pid?: string;
+  displayName?: string;
+  name?: string;
+  realName?: string;
+  nickName?: string;
+  nickname?: string;
+  username?: string;
+  email?: string;
+};
+
+type DecisionTraceMetadata = {
+  label?: string;
+  dataType?: string;
+  modelCode?: string;
+  valueLabels?: Record<string, string>;
+};
+
+type DecisionTraceLog = {
+  pid: string;
+  traceId: string;
+  decisionCode: string;
+  callerType: string;
+  callerRef: string;
+  matched: boolean;
+  status: string;
+  traceSnapshot: {
+    factMetadata?: Record<string, DecisionTraceMetadata>;
+  };
+};
+
+type LeaveRequestRecordRow = {
+  id: string;
+  pid: string;
+  tenant_id: string;
+  wd_req_applicant: string | null;
 };
 
 type MatrixAction = {
@@ -87,11 +134,18 @@ const ADMIN_EMAIL = 'admin@auraboot.com';
 const ADMIN_PASSWORD = 'Test2026x';
 const TS = Date.now();
 const EVIDENCE_DIR = '/Users/ghj/work/auraboot/aura-decision/docs/evidence';
+const SYSTEM_REFERENCE_ASSETS_DIR = resolvePath(process.cwd(), '../docs/system-reference/assets');
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
 function headers(token: string) {
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+}
+
+function dateOffsetStr(offsetDays: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
 }
 
 async function parseEnvelope<T>(response: { ok(): boolean; status(): number; text(): Promise<string>; url(): string }) {
@@ -545,6 +599,118 @@ async function pickLeaveRequestRecord() {
   });
 }
 
+async function findLatestLeaveRequestRecord() {
+  return withDb(async (client) => {
+    const result = await client.query<LeaveRequestRecordRow>(
+      `
+      select id, pid, tenant_id, wd_req_applicant
+      from mt_wd_leave_request
+      where tenant_id is not null
+      order by id desc
+      limit 1
+      `,
+    );
+    return result.rows[0] ?? null;
+  });
+}
+
+async function findLeaveRequestRecordByPid(pid: string) {
+  return withDb(async (client) => {
+    const result = await client.query<LeaveRequestRecordRow>(
+      `
+      select id, pid, tenant_id, wd_req_applicant
+      from mt_wd_leave_request
+      where pid = $1
+        and tenant_id is not null
+      order by id desc
+      limit 1
+      `,
+      [pid],
+    );
+    return result.rows[0] ?? null;
+  });
+}
+
+async function createDraftLeaveRequestSeed(
+  request: APIRequestContext,
+  adminToken: string,
+  applicantPid: string,
+  suffix: string,
+) {
+  const created = await backendPost<{
+    data?: { recordPid?: string };
+    recordPid?: string;
+    pid?: string;
+  }>(request, adminToken, '/api/meta/commands/execute/wd:create_leave_request', {
+    payload: {
+      wd_req_applicant: applicantPid,
+      wd_req_type: 'annual',
+      wd_req_start_date: dateOffsetStr(5),
+      wd_req_start_slot: 'AM',
+      wd_req_end_date: dateOffsetStr(5),
+      wd_req_end_slot: 'PM',
+      wd_req_days: 0.5,
+      wd_req_reason: `permission applicant trace fixture ${suffix}`,
+    },
+    operationType: 'create',
+  });
+  const pid = String(created?.data?.recordPid ?? created?.recordPid ?? created?.pid ?? '');
+  expect(pid, 'wd:create_leave_request must return recordPid for permission trace fixture').toBeTruthy();
+  return pid;
+}
+
+async function pickLeaveRequestRecordWithApplicant(
+  request: APIRequestContext,
+  adminToken: string,
+  applicantPid: string,
+  suffix: string,
+) {
+  let record = await findLatestLeaveRequestRecord();
+  let createdForTest = false;
+  if (!record) {
+    const createdPid = await createDraftLeaveRequestSeed(request, adminToken, applicantPid, suffix);
+    record = await findLeaveRequestRecordByPid(createdPid);
+    createdForTest = true;
+  }
+  expect(record, 'workflow-demo leave request seed must exist or be creatable for applicant reference permission trace')
+    .toBeTruthy();
+
+  await withDb(async (client) => {
+    await client.query(
+      `
+      update mt_wd_leave_request
+      set wd_req_applicant = $2,
+          updated_at = now()
+      where id = $1::bigint
+      `,
+      [record!.id, applicantPid],
+    );
+  });
+
+  return {
+    id: Number(record!.id),
+    pid: record!.pid,
+    tenantId: record!.tenant_id,
+    applicantPid,
+    originalApplicantPid: record!.wd_req_applicant,
+    createdForTest,
+  };
+}
+
+async function restoreLeaveRequestApplicant(snapshot: Awaited<ReturnType<typeof pickLeaveRequestRecordWithApplicant>>) {
+  await withDb(async (client) => {
+    await client.query(
+      `
+      update mt_wd_leave_request
+      set wd_req_applicant = $2,
+          updated_at = now()
+      where id = $1::bigint
+      `,
+      [snapshot.id, snapshot.originalApplicantPid],
+    );
+  });
+}
+
 async function updateRolePermissionConditionAst(rolePermissionPid: string, ast: Record<string, unknown>) {
   await withDb(async (client) => {
     await client.query(
@@ -556,6 +722,171 @@ async function updateRolePermissionConditionAst(rolePermissionPid: string, ast: 
       `,
       [rolePermissionPid, JSON.stringify(ast)],
     );
+  });
+}
+
+async function updateRolePermissionConditions(rolePermissionPid: string, conditions: Record<string, unknown>) {
+  await withDb(async (client) => {
+    await client.query(
+      `
+      update ab_role_permission
+      set conditions = $2::jsonb,
+          condition_ast = null,
+          updated_at = now()
+      where pid = $1
+      `,
+      [rolePermissionPid, JSON.stringify(conditions)],
+    );
+  });
+}
+
+async function resolveFirstUserForReference(request: APIRequestContext, adminToken: string) {
+  const users = await backendGet<UserOption[]>(
+    request,
+    adminToken,
+    '/api/admin/users/search?keyword=&size=20',
+  );
+  const user = users.find((item) => item.pid || item.id);
+  expect(user, 'at least one user must exist for Permission applicant reference trace evidence').toBeTruthy();
+  const pid = String(user?.pid ?? user?.id ?? '');
+  const label = String(
+    user?.displayName ??
+      user?.name ??
+      user?.realName ??
+      user?.nickName ??
+      user?.nickname ??
+      user?.username ??
+      user?.email ??
+      pid,
+  );
+  expect(pid).not.toEqual('');
+  expect(label).not.toEqual('');
+  return { pid, label };
+}
+
+async function createAndPublishApplicantDecision(
+  request: APIRequestContext,
+  adminToken: string,
+  decisionCode: string,
+  mismatchPid: string,
+): Promise<DecisionVersion> {
+  await backendPost<unknown>(request, adminToken, '/api/decision/definitions', {
+    decisionCode,
+    decisionName: `Permission Applicant Guard ${decisionCode}`,
+    description: 'Permission ABAC applicant reference trace E2E fixture',
+    scopeType: 'PERMISSION',
+    ownerModule: 'permission',
+    enabled: true,
+  });
+
+  const draft = await backendPost<DecisionVersion>(
+    request,
+    adminToken,
+    `/api/decision/definitions/${encodeURIComponent(decisionCode)}/versions`,
+    {
+      kind: 'SIMPLE_CONDITION',
+      runtimeAdapter: 'AST_EVALUATOR',
+      versionTag: `permission-applicant-${Date.now()}`,
+      contentJson: {
+        type: 'compare',
+        left: {
+          type: 'path',
+          scope: 'record',
+          path: 'data.wd_req_applicant',
+          dataType: 'user',
+        },
+        operator: 'EQ',
+        right: {
+          type: 'literal',
+          value: mismatchPid,
+          dataType: 'user',
+        },
+      },
+    },
+  );
+  expect(draft.pid).toBeTruthy();
+
+  const validation = await backendPost<{ valid?: boolean }>(
+    request,
+    adminToken,
+    `/api/decision/versions/${encodeURIComponent(draft.pid)}/validate`,
+  );
+  expect(validation.valid).toBe(true);
+
+  const published = await backendPost<DecisionVersion>(
+    request,
+    adminToken,
+    `/api/decision/versions/${encodeURIComponent(draft.pid)}/publish`,
+    {
+      impactAcknowledged: true,
+      note: 'Permission applicant reference trace E2E publish',
+    },
+  );
+  expect(String(published.status ?? '')).toMatch(/published/i);
+  return published;
+}
+
+function extractRuleTraceId(value: unknown): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = extractRuleTraceId(item);
+      if (found) return found;
+    }
+    return undefined;
+  }
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const direct = record.ruleTraceId;
+    if (typeof direct === 'string' && direct.trim().length > 0) {
+      return direct;
+    }
+    for (const nested of Object.values(record)) {
+      const found = extractRuleTraceId(nested);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+async function readDecisionTraceLog(traceId: string): Promise<DecisionTraceLog> {
+  return withDb(async (client) => {
+    const result = await client.query<{
+      pid: string;
+      trace_id: string;
+      decision_code: string;
+      caller_type: string;
+      caller_ref: string;
+      matched: boolean;
+      status: string;
+      trace_snapshot: unknown;
+    }>(
+      `
+      select pid, trace_id, decision_code, caller_type, caller_ref, matched, status, trace_snapshot
+      from ab_drt_log
+      where trace_id = $1
+      order by id desc
+      limit 1
+      `,
+      [traceId],
+    );
+    const row = result.rows[0];
+    expect(row, `DecisionOps trace log ${traceId} must exist`).toBeTruthy();
+    return {
+      pid: row.pid,
+      traceId: row.trace_id,
+      decisionCode: row.decision_code,
+      callerType: row.caller_type,
+      callerRef: row.caller_ref,
+      matched: row.matched,
+      status: row.status,
+      traceSnapshot:
+        typeof row.trace_snapshot === 'string'
+          ? JSON.parse(row.trace_snapshot)
+          : (row.trace_snapshot as DecisionTraceLog['traceSnapshot']),
+    };
   });
 }
 
@@ -1516,6 +1847,222 @@ test('Low-permission dynamic record access creates permission audit trace @golde
   });
 });
 
+test('Permission Rule Center applicant reference deny links audit to unified Trace fact metadata @golden', async ({
+  page,
+  request,
+  baseURL,
+}, testInfo) => {
+  test.setTimeout(120_000);
+  const resolvedBaseURL = baseURL ?? 'http://127.0.0.1:5212';
+  const suffix = Date.now().toString(36);
+  const roleCode = `cprta_${suffix}`;
+  const lowUserEmail = `codex.perm.applicant.trace.${suffix}@example.com`;
+  const lowUserPassword = 'Test2026x';
+  const decisionCode = `permission_applicant_trace_${suffix}`;
+  const adminToken = await loginBackend(request);
+  const permission = await findPermissionByCode('model.wd_leave_request.read');
+  const applicant = await resolveFirstUserForReference(request, adminToken);
+  let recordSnapshot: Awaited<ReturnType<typeof pickLeaveRequestRecordWithApplicant>> | null = null;
+
+  await createAndPublishApplicantDecision(request, adminToken, decisionCode, `${applicant.pid}_mismatch`);
+
+  const role = await createStandaloneRole(request, adminToken, {
+    roleCode,
+    name: `Applicant Trace Reader ${suffix}`,
+  });
+  await backendPost<boolean>(request, adminToken, `/api/roles/${role.pid}/permissions`, [permission.pid]);
+  const rolePermissionPid = await findRolePermissionPid(role.pid, permission.pid);
+  await updateRolePermissionConditions(rolePermissionPid, {
+    dynamicAbac: {
+      expectedMatched: true,
+      ruleBinding: {
+        consumerType: 'PERMISSION',
+        consumerCode: permission.code,
+        consumerNodeId: 'dynamicAbac',
+        bindingKind: 'DECISION_REF',
+        enabled: true,
+        decisionBinding: {
+          decisionCode,
+          versionPolicy: 'LATEST_PUBLISHED',
+          inputMappings: [
+            {
+              input: 'wd_req_applicant',
+              source: {
+                kind: 'FIELD',
+                scope: 'record',
+                path: 'data.wd_req_applicant',
+              },
+            },
+          ],
+          fallbackPolicy: { mode: 'FAIL_CLOSED' },
+          traceMode: 'ALWAYS',
+          enabled: true,
+        },
+      },
+    },
+  });
+
+  await createUserWithRoles(request, adminToken, {
+    email: lowUserEmail,
+    displayName: `Applicant Trace Reader ${suffix}`,
+    password: lowUserPassword,
+    roleCodes: [roleCode],
+  });
+  const lowUserToken = await loginBackendAs(request, lowUserEmail, lowUserPassword);
+  const member = await findTenantMemberForEmail(lowUserEmail);
+
+  try {
+    recordSnapshot = await pickLeaveRequestRecordWithApplicant(request, adminToken, applicant.pid, suffix);
+    const sinceIso = new Date(Date.now() - 1_000).toISOString();
+    const deniedResponse = await request.get(`${BACKEND_URL}/api/dynamic/wd_leave_request/${recordSnapshot.pid}`, {
+      headers: headers(lowUserToken),
+    });
+    const deniedRaw = await deniedResponse.text();
+    let deniedBody: ApiEnvelope<unknown> | null = null;
+    try {
+      deniedBody = JSON.parse(deniedRaw) as ApiEnvelope<unknown>;
+    } catch {
+      deniedBody = null;
+    }
+    expect(
+      !deniedResponse.ok() ||
+        String(deniedBody?.code ?? '0') !== '0' ||
+        deniedBody?.success === false,
+      `Permission Rule Center applicant decision must deny the low user: HTTP ${deniedResponse.status()} ${deniedRaw}`,
+    ).toBe(true);
+    expect(deniedRaw).toContain('Access denied');
+
+    await expect
+      .poll(
+        async () =>
+          Boolean(
+            await waitForPermissionAuditRow({
+              tenantId: member.tenantId,
+              memberId: member.memberId,
+              resourceCode: 'wd_leave_request',
+              actionCode: 'read',
+              recordPid: recordSnapshot!.pid,
+              sinceIso,
+            }),
+          ),
+        {
+          message: 'Permission decisionBinding deny should persist an audit row with ruleTraceId',
+          timeout: 20_000,
+        },
+      )
+      .toBe(true);
+
+    const audit = await waitForPermissionAuditRow({
+      tenantId: member.tenantId,
+      memberId: member.memberId,
+      resourceCode: 'wd_leave_request',
+      actionCode: 'read',
+      recordPid: recordSnapshot.pid,
+      sinceIso,
+    });
+    expect(audit).toBeTruthy();
+    expect(audit!.reason).toContain(decisionCode);
+    const traceId = extractRuleTraceId(audit!.evaluationTrace);
+    expect(traceId, 'Permission audit trace must expose the DecisionOps ruleTraceId').toBeTruthy();
+
+    const decisionTrace = await readDecisionTraceLog(traceId!);
+    expect(decisionTrace).toMatchObject({
+      decisionCode,
+      callerType: 'PERMISSION',
+      callerRef: permission.code,
+      matched: false,
+    });
+    expect(decisionTrace.status).toMatch(/NOT_MATCHED|SKIPPED|ERROR/i);
+    const applicantMetadata =
+      decisionTrace.traceSnapshot.factMetadata?.['record.data.wd_req_applicant'] ??
+      decisionTrace.traceSnapshot.factMetadata?.['data.wd_req_applicant'] ??
+      decisionTrace.traceSnapshot.factMetadata?.wd_req_applicant;
+    expect(applicantMetadata).toMatchObject({
+      label: expect.stringMatching(/申请人|Applicant/i),
+      modelCode: 'wd_leave_request',
+      dataType: expect.stringMatching(/user|reference/i),
+    });
+    expect(applicantMetadata?.valueLabels?.[applicant.pid]).toContain(applicant.label);
+
+    await loginViaBff(page, resolvedBaseURL);
+    await page.goto('/enterprise/permissions', { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('permission-page')).toBeVisible({ timeout: 15_000 });
+    await openPermissionAuditTab(page);
+    await page.getByTestId('permission-audit-resource-filter').fill('wd_leave_request');
+    await page.getByTestId('permission-audit-member-filter').fill(String(member.memberId));
+    const filteredAuditLoad = page.waitForResponse(
+      (r) =>
+        r.url().includes('/api/permissions/audit') &&
+        r.url().includes('resourceCode=wd_leave_request') &&
+        r.url().includes(`memberId=${member.memberId}`) &&
+        r.status() === 200,
+      { timeout: 15_000 },
+    );
+    await page.getByTestId('permission-audit-refresh').click();
+    const filteredAuditResponse = await filteredAuditLoad;
+    expect(filteredAuditResponse.ok(), await filteredAuditResponse.text()).toBe(true);
+
+    const auditRow = page.getByTestId(`permission-audit-row-${audit!.id}`);
+    await expect(auditRow).toBeVisible({ timeout: 15_000 });
+    await expect(auditRow).toContainText('DENY');
+    await expect(auditRow).toContainText('wd_leave_request / read');
+    await expect(auditRow).toContainText(recordSnapshot.pid);
+    const auditTrace = page.getByTestId(`permission-audit-trace-${audit!.id}`);
+    await expect(auditTrace).toContainText(decisionCode);
+    await expect(auditTrace).toContainText(traceId!);
+    await expect(auditTrace).toContainText('record.data.wd_req_applicant');
+    const decisionTraceLink = page
+      .locator(`[data-testid^="permission-audit-open-decision-trace-${audit!.id}-"]`)
+      .first();
+    await expect(decisionTraceLink).toHaveAttribute(
+      'href',
+      `/p/decisionops_execution_logs?traceId=${traceId}`,
+    );
+
+    await page.screenshot({
+      path: testInfo.outputPath('permission-applicant-reference-runtime-audit.png'),
+      fullPage: true,
+    });
+
+    await decisionTraceLink.click();
+    await expect(page).toHaveURL(new RegExp(`/p/decisionops_execution_logs\\?traceId=${traceId}$`), {
+      timeout: 15_000,
+    });
+    await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 15_000 });
+    const decisionLogRow = page.getByTestId(`elta-row-${decisionTrace.pid}`);
+    await expect(decisionLogRow).toBeVisible({ timeout: 15_000 });
+    await expect(decisionLogRow).toContainText(traceId!);
+    await expect(decisionLogRow).toContainText(decisionCode);
+    await expect(decisionLogRow).toContainText(/权限|PERMISSION/);
+    await page.getByTestId(`elta-open-trace-${decisionTrace.pid}`).click();
+    await expect(page.getByTestId('elta-trace-drawer')).toBeVisible({ timeout: 10_000 });
+    const factMetadata = page.getByTestId(`elta-fact-metadata-${decisionTrace.pid}`);
+    await expect(factMetadata).toBeVisible({ timeout: 10_000 });
+    await expect(factMetadata).toContainText('事实快照');
+    await expect(factMetadata).toContainText(/申请人|Applicant/i);
+    await expect(factMetadata).toContainText('record.data.wd_req_applicant');
+    await expect(factMetadata).toContainText('模型 wd_leave_request');
+    await expect(factMetadata).toContainText(/类型 (user|reference)/i);
+    await expect(factMetadata).toContainText(applicant.pid);
+    await expect(factMetadata).toContainText(applicant.label);
+    await expect(page.getByTestId('elta-open-permission-audit')).toHaveText('打开权限审计');
+
+    mkdirSync(SYSTEM_REFERENCE_ASSETS_DIR, { recursive: true });
+    await page.screenshot({
+      path: testInfo.outputPath('permission-applicant-reference-trace-fact-metadata.png'),
+      fullPage: true,
+    });
+    await page.screenshot({
+      path: `${SYSTEM_REFERENCE_ASSETS_DIR}/permission-applicant-reference-trace-fact-metadata-20260719.png`,
+      fullPage: true,
+    });
+  } finally {
+    if (recordSnapshot) {
+      await restoreLeaveRequestApplicant(recordSnapshot);
+    }
+  }
+});
+
 test('Field permission filtering on dynamic detail creates field-governance audit trace @golden', async ({
   page,
   request,
@@ -1771,7 +2318,7 @@ test('Permission audit tab shows public record pid and masked rule trace @golden
   await expect(decisionLogRow).toBeVisible({ timeout: 15_000 });
   await expect(decisionLogRow).toContainText(audit.ruleTraceId);
   await expect(decisionLogRow).toContainText(audit.decisionCode);
-  await expect(decisionLogRow).toContainText('PERMISSION');
+  await expect(decisionLogRow).toContainText(/权限|PERMISSION/);
   await page.getByTestId(`elta-open-trace-${audit.decisionLogPid}`).click();
   await expect(page.getByTestId('elta-trace-drawer')).toBeVisible({ timeout: 10_000 });
   const permissionAuditBackLink = page.getByTestId('elta-open-permission-audit');

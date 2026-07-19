@@ -83,4 +83,45 @@ class PermissionFieldVocabularyTest {
         assertThat(vocabulary.buildContext(1002L, record).resolve(Scope.RECORD, "data._meta")
                 .present()).isFalse();
     }
+
+    @Test
+    void buildScopesCarriesModelCodeForLowCodePermissionResource() {
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1003L, 21L)).thenReturn(List.of());
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("pid", "REQ-2");
+        record.put("wd_req_applicant", "01USERPID");
+        record.put("modelCode", "legacy_wrong_model");
+
+        Map<Scope, Map<String, Object>> scopes = vocabulary.buildScopes(
+                1003L,
+                "wd_leave_request",
+                record);
+
+        assertThat(scopes.get(Scope.RECORD))
+                .containsEntry("modelCode", "legacy_wrong_model")
+                .containsEntry("entityCode", "legacy_wrong_model");
+        assertThat(scopes.get(Scope.RECORD).get("data"))
+                .isInstanceOf(Map.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("pid", "REQ-2")
+                .containsEntry("wd_req_applicant", "01USERPID")
+                .doesNotContainKeys("modelCode", "entityCode");
+    }
+
+    @Test
+    void buildScopesUsesResourceAsModelCodeWhenRecordHasNoExplicitModelCode() {
+        when(userRoleService.getRoleIdsByMemberIdAndTenantId(1004L, 21L)).thenReturn(List.of());
+
+        Map<Scope, Map<String, Object>> scopes = vocabulary.buildScopes(
+                1004L,
+                "wd_leave_request",
+                Map.of("wd_req_applicant", "01USERPID"));
+
+        assertThat(scopes.get(Scope.RECORD))
+                .containsEntry("modelCode", "wd_leave_request")
+                .containsEntry("entityCode", "wd_leave_request");
+        assertThat(vocabulary.buildContext(1004L, "wd_leave_request", Map.of("wd_req_applicant", "01USERPID"))
+                .resolve(Scope.RECORD, "modelCode")
+                .value()).isEqualTo("wd_leave_request");
+    }
 }
