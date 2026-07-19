@@ -48,6 +48,45 @@ describe('DecisionRuleBindingBlock', () => {
     expect(screen.getByTestId('decision-binding-preview')).not.toHaveTextContent('data.amount');
   });
 
+  it('loads live decision definitions into the decision picker for DSL-hosted consumers', async () => {
+    const api = {
+      getDecisionImpact: vi.fn(),
+      evaluate: vi.fn(),
+      listDefinitions: vi.fn(async () => ({
+        records: [
+          {
+            decisionCode: 'sla_applicant_reference',
+            decisionName: '申请人 SLA 截止时间',
+            enabled: true,
+          },
+        ],
+      })),
+    };
+
+    render(
+      <DecisionRuleBindingBlock
+        api={api}
+        block={{
+          props: {
+            mode: 'decision',
+            consumerType: 'SLA',
+            fields: [
+              {
+                scope: 'record',
+                path: 'data.wd_req_applicant',
+                label: '申请人',
+                dataType: 'user',
+              },
+            ],
+          },
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(api.listDefinitions).toHaveBeenCalledWith({ page: 1, size: 100 }));
+    expect(screen.getByLabelText('decision-code')).toHaveTextContent('申请人 SLA 截止时间');
+  });
+
   it('focuses compact rule authoring into condition, decision, impact and test workspaces', () => {
     render(
       <DecisionRuleBindingBlock

@@ -176,6 +176,16 @@ async function openRuleCenterFromSidebar(page: Page): Promise<void> {
   await expect(page.getByTestId('strategy-studio')).toBeVisible({ timeout: 15_000 });
 }
 
+async function selectStrategyScenario(
+  page: Page,
+  scenario: { key: string; summary: RegExp },
+): Promise<void> {
+  await page.getByTestId(`strategy-scenario-${scenario.key}`).click();
+  await expect(page.getByTestId(`strategy-scenario-${scenario.key}`)).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByTestId('strategy-consumer-summary')).toContainText(scenario.summary);
+  await expect(page.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
+}
+
 function findLeaveTypeFact(catalog: DecisionFactCatalog): DecisionFact | undefined {
   const facts = [
     ...(catalog.facts ?? []),
@@ -191,6 +201,11 @@ function findApplicantFact(catalog: DecisionFactCatalog): DecisionFact | undefin
   ];
   return facts.find((fact) =>
     fact.path === 'record.data.wd_req_applicant' || fact.path === 'data.wd_req_applicant');
+}
+
+function strategyFactItemTestId(scope: string, path: string): string {
+  const sanitizedPath = path.replace(/[^a-zA-Z0-9_]+/g, '_').replace(/^_+|_+$/g, '') || 'field';
+  return `strategy-fact-${scope}-${sanitizedPath}`;
 }
 
 async function resolveFirstUser(page: Page): Promise<{ pid: string; label: string }> {
@@ -768,6 +783,60 @@ test('Strategy Studio saves, publishes and reloads BPM user reference condition 
 
   await page.screenshot({
     path: testInfo.outputPath('strategy-studio-bpm-user-reference-fragment-reload.png'),
+    fullPage: true,
+  });
+});
+
+test('Strategy Studio exposes the same low-code applicant fact across rule consumers @golden', async ({
+  page,
+}, testInfo) => {
+  await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  await expect(page).not.toHaveURL(/\/login(?:$|\?)/);
+
+  const catalog = await getApi<DecisionFactCatalog>(
+    page,
+    '/api/decision/facts/catalog?modelCode=wd_leave_request',
+  );
+  const applicantFact = findApplicantFact(catalog);
+  expect(applicantFact).toMatchObject({
+    path: expect.stringMatching(/(?:record\.)?data\.wd_req_applicant/),
+    label: expect.stringMatching(/申请人|Applicant/i),
+    dataType: expect.stringMatching(/user|reference/i),
+  });
+
+  await openRuleCenterFromSidebar(page);
+  const scenarios = [
+    { key: 'SLA', summary: /SLA|超时通知/ },
+    { key: 'BPM', summary: /BPM|审批人分派/ },
+    { key: 'AUTOMATION', summary: /自动化|条件触发/ },
+    { key: 'EVENT_POLICY', summary: /事件策略|动作/ },
+    { key: 'PERMISSION', summary: /权限|行级访问/ },
+  ];
+
+  for (const scenario of scenarios) {
+    await selectStrategyScenario(page, scenario);
+
+    await page.getByTestId('strategy-workspace-tab-facts').click();
+    await expect(page.getByTestId('strategy-fact-catalog')).toHaveAttribute('data-active', 'true');
+    const factItem = page.getByTestId(strategyFactItemTestId('record', 'data.wd_req_applicant'));
+    await expect(factItem).toBeVisible({ timeout: 10_000 });
+    await expect(factItem).toHaveAttribute('data-path', 'data.wd_req_applicant');
+    await expect(factItem).toHaveAttribute('data-model-code', 'wd_leave_request');
+    await expect(factItem).toHaveAttribute('data-data-type', 'user');
+    await expect(factItem).toContainText(/申请人|Applicant/i);
+    await expect(factItem).toContainText(/请假申请|Leave Request/i);
+    await expect(factItem).toContainText(/用户|reference/i);
+
+    await page.getByTestId('strategy-workspace-tab-rule').click();
+    await expect(page.getByTestId('strategy-workspace-panel-rule')).toHaveAttribute('data-active', 'true');
+    await resetConditionBuilderToSingleRow(page);
+    await expect(page.getByLabel('field-0').locator('option[value="record:data.wd_req_applicant"]')).toContainText(
+      /申请人|Applicant/i,
+    );
+  }
+
+  await page.screenshot({
+    path: testInfo.outputPath('strategy-studio-fact-catalog-cross-consumer-applicant.png'),
     fullPage: true,
   });
 });
