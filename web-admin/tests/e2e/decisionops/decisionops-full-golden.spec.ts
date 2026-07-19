@@ -151,6 +151,10 @@ async function capture(page: Page, testInfo: TestInfo, name: string): Promise<vo
   });
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 async function expectNoLegacyConsoleLinks(
   page: Page,
   options: { allowConsoleContainer?: boolean } = {},
@@ -268,6 +272,51 @@ async function clickDecisionDefinitionFromSidebar(page: Page): Promise<void> {
     .toBe(true);
   await definitionsLink.click();
   await expect(page).toHaveURL(/\/p\/decisionops_definitions(?:$|\?)/);
+  await waitForDynamicPageLoad(page);
+}
+
+async function decisionDefinitionRow(page: Page, decisionCode: string) {
+  const row = page.locator('[data-testid^="table-row-"]').filter({ hasText: decisionCode }).first();
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await row.scrollIntoViewIfNeeded();
+  await row.hover();
+  return row;
+}
+
+async function clickRowAction(page: Page, row: ReturnType<Page['locator']>, actionCode: string): Promise<void> {
+  const action = row.getByTestId(`row-action-${actionCode}`).first();
+  if (await action.isVisible({ timeout: 1_000 }).catch(() => false)) {
+    await action.click();
+    return;
+  }
+  await row.getByTestId('row-action-more').click();
+  const dropdownAction = page.getByTestId(`row-action-${actionCode}`).first();
+  await expect(dropdownAction).toBeVisible({ timeout: 5_000 });
+  await dropdownAction.click();
+}
+
+async function openDecisionDefinitionDetailFromList(page: Page, decisionCode: string): Promise<void> {
+  const row = await decisionDefinitionRow(page, decisionCode);
+  const encoded = encodeURIComponent(decisionCode);
+  await Promise.all([
+    page.waitForURL(new RegExp(`/p/decisionops_definitions/view/${escapeRegExp(encoded)}`), {
+      timeout: 15_000,
+    }),
+    clickRowAction(page, row, 'detail'),
+  ]);
+  await waitForDynamicPageLoad(page);
+}
+
+async function openDecisionRolloutFromList(page: Page, decisionCode: string): Promise<void> {
+  await clickDecisionDefinitionFromSidebar(page);
+  const row = await decisionDefinitionRow(page, decisionCode);
+  const encoded = encodeURIComponent(decisionCode);
+  await Promise.all([
+    page.waitForURL(new RegExp(`/p/decisionops_rollouts\\?decisionCode=${escapeRegExp(encoded)}`), {
+      timeout: 15_000,
+    }),
+    clickRowAction(page, row, 'rollout'),
+  ]);
   await waitForDynamicPageLoad(page);
 }
 
@@ -400,11 +449,7 @@ test.describe.serial('DecisionOps full-app golden', () => {
 
     await clickDecisionDefinitionFromSidebar(page);
     await expectNoLegacyConsoleLinks(page);
-
-    await page.goto(`/p/decisionops_definitions/view/${encodeURIComponent(decisionCode)}`, {
-      waitUntil: 'domcontentloaded',
-    });
-    await waitForDynamicPageLoad(page);
+    await openDecisionDefinitionDetailFromList(page, decisionCode);
     await expect(page.getByTestId('decision-definition-actions-block')).toBeVisible();
     await expect(page.getByTestId('dda-impact-panel')).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId(`dda-version-${draft.pid}`)).toBeVisible({ timeout: 10000 });
@@ -542,9 +587,11 @@ test.describe.serial('DecisionOps full-app golden', () => {
       timeout: 10000,
     });
     await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 10000 });
-    await page.goto(`/p/decisionops_event_policies/view/${encodeURIComponent(policyCopyCode)}`, {
-      waitUntil: 'domcontentloaded',
+    await page.goBack({ waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(new RegExp(`/p/decisionops_event_policies/view/${policyCopyCode}`), {
+      timeout: 15_000,
     });
+    await waitForDynamicPageLoad(page);
     await page.getByTestId('epa-open-designer').click();
     await expect(page).toHaveURL(/\/p\/decisionops_event_policy_designer\?policyCode=/, {
       timeout: 10000,
@@ -640,9 +687,7 @@ test.describe.serial('DecisionOps full-app golden', () => {
     await capture(page, testInfo, 'decisionops-integration-impact');
     await expectNoLegacyConsoleLinks(page);
 
-    await page.goto(`/p/decisionops_rollouts?decisionCode=${encodeURIComponent(decisionCode)}`, {
-      waitUntil: 'domcontentloaded',
-    });
+    await openDecisionRolloutFromList(page, decisionCode);
     await expect(page.getByTestId('decision-rollout-monitor')).toBeVisible({ timeout: 15000 });
     await expect
       .poll(
