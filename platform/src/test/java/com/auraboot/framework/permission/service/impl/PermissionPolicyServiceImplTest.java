@@ -18,7 +18,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -33,7 +32,6 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -107,7 +105,7 @@ class PermissionPolicyServiceImplTest {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
-        when(rolePermissionMapper.getConditionsById(900L)).thenReturn("{\"maxAmount\":1000}");
+        rp.setConditions(Map.of("maxAmount", 1000));
 
         Map<String, Object> result = service.getEffectivePolicy(1L, "model.user.update");
 
@@ -128,8 +126,8 @@ class PermissionPolicyServiceImplTest {
 
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class)))
                 .thenReturn(rp1, rp2);
-        when(rolePermissionMapper.getConditionsById(900L)).thenReturn("{\"maxAmount\":1000,\"minAmount\":50,\"approval\":false,\"regions\":[\"NA\"]}");
-        when(rolePermissionMapper.getConditionsById(901L)).thenReturn("{\"maxAmount\":5000,\"minAmount\":100,\"approval\":true,\"regions\":[\"EU\"]}");
+        rp1.setConditions(Map.of("maxAmount", 1000, "minAmount", 50, "approval", false, "regions", List.of("NA")));
+        rp2.setConditions(Map.of("maxAmount", 5000, "minAmount", 100, "approval", true, "regions", List.of("EU")));
 
         Map<String, Object> result = service.getEffectivePolicy(1L, "model.user.update");
 
@@ -232,9 +230,11 @@ class PermissionPolicyServiceImplTest {
 
         service.setPolicy(7L, 50L, Map.of("maxAmount", 1000));
 
-        ArgumentCaptor<String> jsonCap = ArgumentCaptor.forClass(String.class);
-        verify(rolePermissionMapper).updateConditionsById(eq(900L), jsonCap.capture());
-        assertThat(jsonCap.getValue()).contains("\"maxAmount\":1000");
+        verify(rolePermissionMapper).updateById(rp);
+        assertThat(rp.getConditions())
+                .isInstanceOf(Map.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsEntry("maxAmount", 1000);
     }
 
     @Test
@@ -253,9 +253,11 @@ class PermissionPolicyServiceImplTest {
                         "fallbackPolicy", Map.of("mode", "FAIL_CLOSED")),
                 "expectedMatched", true)));
 
-        ArgumentCaptor<String> jsonCap = ArgumentCaptor.forClass(String.class);
-        verify(rolePermissionMapper).updateConditionsById(eq(900L), jsonCap.capture());
-        assertThat(jsonCap.getValue()).contains("\"decisionCode\":\"permission_amount_guard\"");
+        verify(rolePermissionMapper).updateById(rp);
+        assertThat(rp.getConditions())
+                .isInstanceOf(Map.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsKey("dynamicAbac");
         verify(usageIndexService).refreshSource("PERMISSION_POLICY", "rp-abac-900");
     }
 
@@ -271,7 +273,7 @@ class PermissionPolicyServiceImplTest {
                 .isInstanceOf(RootUnCheckedException.class)
                 .hasMessageContaining("decisionCode is required");
 
-        verify(rolePermissionMapper, never()).updateConditionsById(anyLong(), anyString());
+        verify(rolePermissionMapper, never()).updateById(any(RolePermission.class));
     }
 
     @Test
@@ -296,7 +298,7 @@ class PermissionPolicyServiceImplTest {
                                                 "scope", "record",
                                                 "path", "data.wd_req_days"))))))));
 
-        verify(rolePermissionMapper).updateConditionsById(eq(900L), anyString());
+        verify(rolePermissionMapper).updateById(rp);
     }
 
     @Test
@@ -323,7 +325,7 @@ class PermissionPolicyServiceImplTest {
                 .isInstanceOf(RootUnCheckedException.class)
                 .hasMessageContaining("not available in permission ABAC fact catalog");
 
-        verify(rolePermissionMapper, never()).updateConditionsById(anyLong(), anyString());
+        verify(rolePermissionMapper, never()).updateById(any(RolePermission.class));
     }
 
     @Test
@@ -351,7 +353,7 @@ class PermissionPolicyServiceImplTest {
                 .hasMessageContaining("masked")
                 .hasMessageContaining("record.data.salary");
 
-        verify(rolePermissionMapper, never()).updateConditionsById(anyLong(), anyString());
+        verify(rolePermissionMapper, never()).updateById(any(RolePermission.class));
     }
 
     @Test
@@ -377,7 +379,7 @@ class PermissionPolicyServiceImplTest {
                 .isInstanceOf(RootUnCheckedException.class)
                 .hasMessageContaining("not available in permission ABAC fact catalog");
 
-        verify(rolePermissionMapper, never()).updateConditionsById(anyLong(), anyString());
+        verify(rolePermissionMapper, never()).updateById(any(RolePermission.class));
     }
 
     @Test
@@ -470,7 +472,7 @@ class PermissionPolicyServiceImplTest {
 
         service.setPolicy(7L, 50L, Map.of("k", "v"));
 
-        verify(rolePermissionMapper, never()).updateConditionsById(anyLong(), anyString());
+        verify(rolePermissionMapper, never()).updateById(any(RolePermission.class));
     }
 
     @Test
@@ -478,24 +480,24 @@ class PermissionPolicyServiceImplTest {
         RolePermission rp = new RolePermission();
         rp.setId(900L);
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class))).thenReturn(rp);
-        when(rolePermissionMapper.getConditionsById(900L)).thenReturn("");
+        rp.setConditions(null);
 
         assertThat(service.getPolicy(7L, 50L)).isNull();
     }
 
     @Test
     void getPoliciesByRoleIdReturnsEmptyMapWhenNoRows() {
-        when(rolePermissionMapper.findConditionsByRoleId(7L)).thenReturn(List.of());
+        when(rolePermissionMapper.findByRole(7L)).thenReturn(List.of());
 
         assertThat(service.getPoliciesByRoleId(7L)).isEmpty();
     }
 
     @Test
     void getPoliciesByRoleIdParsesEachRow() {
-        RolePermissionMapper.RolePermissionConditionsRow row = new RolePermissionMapper.RolePermissionConditionsRow();
+        RolePermission row = new RolePermission();
         row.setPermissionId(50L);
-        row.setConditionsJson("{\"maxAmount\":1000}");
-        when(rolePermissionMapper.findConditionsByRoleId(7L)).thenReturn(List.of(row));
+        row.setConditions(Map.of("maxAmount", 1000));
+        when(rolePermissionMapper.findByRole(7L)).thenReturn(List.of(row));
 
         Map<Long, Map<String, Object>> result = service.getPoliciesByRoleId(7L);
 
@@ -505,10 +507,10 @@ class PermissionPolicyServiceImplTest {
 
     @Test
     void getPoliciesByRoleIdSkipsBlankConditions() {
-        RolePermissionMapper.RolePermissionConditionsRow row = new RolePermissionMapper.RolePermissionConditionsRow();
+        RolePermission row = new RolePermission();
         row.setPermissionId(50L);
-        row.setConditionsJson("");
-        when(rolePermissionMapper.findConditionsByRoleId(7L)).thenReturn(List.of(row));
+        row.setConditions(Map.of());
+        when(rolePermissionMapper.findByRole(7L)).thenReturn(List.of(row));
 
         assertThat(service.getPoliciesByRoleId(7L)).isEmpty();
     }

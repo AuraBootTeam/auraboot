@@ -24,11 +24,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Regression for the deep-review finding DR-20260618-D3-jsonb-001.
  *
  * <p>{@link RolePermissionMapper#batchInsert} writes the JSONB {@code conditions} column. The
- * custom {@code @Insert} did not apply the entity's {@code @TableField} JacksonTypeHandler, so a
+ * custom {@code @Insert} did not apply the entity's {@code @TableField} JSONB TypeHandler, so a
  * non-null {@code conditions} value (a {@code Map}) fell through to a default handler and failed
- * ("No hstore extension installed"); even once the handler is selected, the JDBC URL does not set
- * {@code stringtype=unspecified}, so the bound varchar must be cast with {@code ::jsonb}. The
- * single-row {@code @Update} already did this; this test pins both on {@code batchInsert}.
+ * ("No hstore extension installed"). The entity now uses the platform {@code JsonbObjectTypeHandler},
+ * and this test pins both batch and {@code updateById} writes to that mapper/entity contract.
  *
  * <p>Existing tests only ever wrote {@code conditions = null}, so the latent bug was never exercised.
  */
@@ -102,5 +101,71 @@ class RolePermissionMapperJsonbBatchInsertTest extends BaseIntegrationTest {
         Object conditions = rows.get(0).getConditions();
         assertThat(conditions).isNotNull();
         assertThat(conditions.toString()).contains("APAC");
+    }
+
+    @Test
+    @DisplayName("RP-JSONB-02: updateById persists policy conditions through the entity JSONB TypeHandler")
+    void updateByIdWithNonNullConditions() {
+        String runId = String.valueOf(System.nanoTime());
+
+        Role role = new Role();
+        role.setPid(UniqueIdGenerator.generate());
+        role.setName("JSONB Update Role " + runId);
+        role.setCode("rp_jsonb_update_role_" + runId);
+        role.setType("custom");
+        role.setScopeType("tenant");
+        role.setStatus("active");
+        role.setTenantId(testTenant.getId());
+        role.setIsDefault(false);
+        role.setIsSystem(false);
+        role.setDeletedFlag(false);
+        role.setPriority(50);
+        role.setCreatedAt(Instant.now());
+        role.setUpdatedAt(Instant.now());
+        Long roleId = roleService.createRole(role).getId();
+
+        PermissionCreateRequest permReq = new PermissionCreateRequest();
+        permReq.setCode("rp_jsonb_update_perm_" + runId);
+        permReq.setName("JSONB Update Permission");
+        permReq.setDescription("role-permission updateById jsonb regression");
+        permReq.setResourceType("model");
+        permReq.setResourceCode("rp_jsonb_update_model_" + runId);
+        permReq.setAction("approve");
+        permReq.setSource("integration_test");
+        PermissionDTO perm = permissionService.create(permReq);
+
+        RolePermission binding = new RolePermission();
+        binding.setPid(UniqueIdGenerator.generate());
+        binding.setTenantId(testTenant.getId());
+        binding.setRoleId(roleId);
+        binding.setPermissionId(perm.getId());
+        binding.setGrantType("grant");
+        binding.setPriority(0);
+        binding.setStatus("active");
+        binding.setDeletedFlag(false);
+        binding.setCreatedAt(Instant.now());
+        binding.setUpdatedAt(Instant.now());
+        binding.setCreatedBy(testUser.getId());
+        binding.setUpdatedBy(testUser.getId());
+        rolePermissionMapper.insert(binding);
+        assertThat(binding.getId()).isNotNull();
+
+        binding.setConditions(Map.of(
+                "dynamicAbac", Map.of(
+                        "expectedMatched", true,
+                        "ruleBinding", Map.of(
+                                "bindingKind", "DECISION_REF",
+                                "decisionBinding", Map.of("decisionCode", "permission_jsonb_update_guard")))));
+
+        int updated = rolePermissionMapper.updateById(binding);
+        assertThat(updated).isEqualTo(1);
+
+        RolePermission reloaded = rolePermissionMapper.findByRoleAndPermission(roleId, perm.getId());
+        assertThat(reloaded).isNotNull();
+        assertThat(reloaded.getConditions())
+                .as("custom @Select must use mybatis-plus_RolePermission so JSONB is parsed")
+                .isInstanceOf(Map.class)
+                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.MAP)
+                .containsKey("dynamicAbac");
     }
 }

@@ -295,7 +295,8 @@ class PermissionRuleCenterGuardIT extends BaseIntegrationTest {
               }
             }
             """).formatted(permissionCode, decisionCode));
-        rolePermissionMapper.updateConditionsById(binding.getId(), mapper.writeValueAsString(conditions));
+        binding.setConditions(mapper.convertValue(conditions, Object.class));
+        rolePermissionMapper.updateById(binding);
         userPermissionService.evictUserPermissions(getTestUser().getId());
     }
 
@@ -343,7 +344,8 @@ class PermissionRuleCenterGuardIT extends BaseIntegrationTest {
               }
             }
             """).formatted(permissionCode, decisionCode, fieldCode, fieldCode));
-        rolePermissionMapper.updateConditionsById(binding.getId(), mapper.writeValueAsString(conditions));
+        binding.setConditions(mapper.convertValue(conditions, Object.class));
+        rolePermissionMapper.updateById(binding);
         userPermissionService.evictUserPermissions(getTestUser().getId());
     }
 }

@@ -99,18 +99,15 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
             return null;
         }
 
-        // Collect conditions from all role-permission bindings
-        // Use direct SQL to read JSONB reliably (type handler on Object field is unreliable)
+        // Collect conditions from all role-permission bindings. RolePermission uses
+        // autoResultMap + JsonbObjectTypeHandler, so entity reads are the canonical JSONB path.
         List<Map<String, Object>> allPolicies = new ArrayList<>();
         for (Long roleId : roleIds) {
-            Long rpId = findRolePermissionId(roleId, permission.getId());
-            if (rpId != null) {
-                String conditionsJson = rolePermissionMapper.getConditionsById(rpId);
-                if (conditionsJson != null && !conditionsJson.isBlank()) {
-                    Map<String, Object> parsed = convertToMap(conditionsJson);
-                    if (parsed != null && !parsed.isEmpty()) {
-                        allPolicies.add(parsed);
-                    }
+            RolePermission rp = findRolePermission(roleId, permission.getId());
+            if (rp != null) {
+                Map<String, Object> parsed = convertToMap(rp.getConditions());
+                if (parsed != null && !parsed.isEmpty()) {
+                    allPolicies.add(parsed);
                 }
             }
         }
@@ -146,16 +143,8 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
         Permission permission = permissionMapper.selectById(permissionId);
         validatePolicyValues(policyValues, permission);
 
-        // Use direct SQL update for JSONB column — MyBatis-Plus updateById
-        // with JacksonTypeHandler on Object type doesn't reliably serialize JSONB.
-        String jsonStr;
-        try {
-            jsonStr = objectMapper.writeValueAsString(policyValues);
-        } catch (Exception e) {
-            log.error("Failed to serialize policy values", e);
-            return;
-        }
-        rolePermissionMapper.updateConditionsById(rp.getId(), jsonStr);
+        rp.setConditions(policyValues);
+        rolePermissionMapper.updateById(rp);
         refreshPermissionPolicyUsageIndex(rp);
 
         log.info("Updated policy for role-permission: roleId={}, permissionId={}, keys={}",
@@ -164,37 +153,30 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
 
     @Override
     public Map<String, Object> getPolicy(Long roleId, Long permissionId) {
-        String conditionsJson = rolePermissionMapper.getConditionsById(
-                findRolePermissionId(roleId, permissionId));
-        if (conditionsJson == null || conditionsJson.isBlank()) {
+        RolePermission rp = findRolePermission(roleId, permissionId);
+        if (rp == null || rp.getConditions() == null) {
             return null;
         }
-        return convertToMap(conditionsJson);
+        return convertToMap(rp.getConditions());
     }
 
     @Override
     public Map<Long, Map<String, Object>> getPoliciesByRoleId(Long roleId) {
-        List<RolePermissionMapper.RolePermissionConditionsRow> rows =
-            rolePermissionMapper.findConditionsByRoleId(roleId);
+        List<RolePermission> rows = rolePermissionMapper.findByRole(roleId);
         if (rows == null || rows.isEmpty()) {
             return Collections.emptyMap();
         }
         Map<Long, Map<String, Object>> result = new HashMap<>();
-        for (var row : rows) {
-            String json = row.getConditionsJson();
-            if (json != null && !json.isBlank()) {
-                Map<String, Object> map = convertToMap(json);
-                if (map != null) {
+        for (RolePermission row : rows) {
+            Object conditions = row.getConditions();
+            if (conditions != null) {
+                Map<String, Object> map = convertToMap(conditions);
+                if (map != null && !map.isEmpty()) {
                     result.put(row.getPermissionId(), map);
                 }
             }
         }
         return result;
-    }
-
-    private Long findRolePermissionId(Long roleId, Long permissionId) {
-        RolePermission rp = findRolePermission(roleId, permissionId);
-        return rp != null ? rp.getId() : null;
     }
 
     // ========================================================================
@@ -285,8 +267,8 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     // ========================================================================
 
     /**
-     * Find role-permission using LambdaQueryWrapper (not @Select) to ensure
-     * JacksonTypeHandler is applied to the 'conditions' JSONB column.
+     * Find role-permission using LambdaQueryWrapper so the entity autoResultMap and JSONB
+     * type handlers remain in effect for policy conditions.
      */
     private RolePermission findRolePermission(Long roleId, Long permissionId) {
         return rolePermissionMapper.selectOne(

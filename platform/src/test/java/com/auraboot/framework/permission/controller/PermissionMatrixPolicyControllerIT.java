@@ -19,6 +19,7 @@ import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.Filter;
 import org.junit.jupiter.api.BeforeEach;
@@ -82,8 +83,8 @@ class PermissionMatrixPolicyControllerIT extends BaseIntegrationTest {
                         .content(policyPayload("data.wd_req_days")))
                 .andExpect(status().isOk());
 
-        String conditions = conditionsById(binding.getId());
-        assertThat(objectMapper.readTree(conditions)
+        JsonNode conditions = conditionsById(binding.getId());
+        assertThat(conditions
                 .at("/dynamicAbac/ruleBinding/decisionBinding/inputMappings/0/source/path")
                 .asText()).isEqualTo("data.wd_req_days");
     }
@@ -206,10 +207,13 @@ class PermissionMatrixPolicyControllerIT extends BaseIntegrationTest {
                                                         "path", fieldPath))))))));
     }
 
-    private String conditionsById(Long rolePermissionId) {
+    private JsonNode conditionsById(Long rolePermissionId) {
         try {
             applyTestMetaContext();
-            return rolePermissionMapper.getConditionsById(rolePermissionId);
+            RolePermission binding = rolePermissionMapper.selectById(rolePermissionId);
+            return binding == null || binding.getConditions() == null
+                    ? null
+                    : objectMapper.valueToTree(binding.getConditions());
         } finally {
             MetaContext.clear();
         }

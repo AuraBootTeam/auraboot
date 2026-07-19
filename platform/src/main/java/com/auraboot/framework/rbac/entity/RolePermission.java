@@ -1,11 +1,11 @@
 package com.auraboot.framework.rbac.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import com.auraboot.framework.application.database.mybatis.JsonbObjectTypeHandler;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Map;
 
 /**
  * Role-Permission Entity - Role-Permission绑定表 (V4)
@@ -104,7 +104,7 @@ public class RolePermission {
      * Stores policy parameter values for Permission Policy (Phase 4).
      * E.g. {"maxApprovalAmount": 100000, "allowBulkApprove": true}
      */
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(value = "conditions", typeHandler = JsonbObjectTypeHandler.class, jdbcType = JdbcType.OTHER)
     private Object conditions;
 
     // ========================================================================
@@ -112,11 +112,11 @@ public class RolePermission {
     // ========================================================================
 
     /** Materialized condition AST (decision ConditionNode JSON). Replaces `conditions` in Plan B. */
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(value = "condition_ast", typeHandler = JsonbObjectTypeHandler.class, jdbcType = JdbcType.OTHER)
     private Object conditionAst;
 
     /** Materialized data-scope AST (decision ConditionNode JSON). */
-    @TableField(typeHandler = JacksonTypeHandler.class)
+    @TableField(value = "data_scope_ast", typeHandler = JsonbObjectTypeHandler.class, jdbcType = JdbcType.OTHER)
     private Object dataScopeAst;
 
     /** Provenance: which package/override produced this grant (explainer/audit). */

@@ -37,6 +37,7 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
           AND deleted_flag = false
         ORDER BY priority DESC, created_at DESC
         """)
+    @ResultMap("mybatis-plus_RolePermission")
     List<RolePermission> findByRole(@Param("roleId") Long roleId);
 
     /**
@@ -51,6 +52,7 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
           AND deleted_flag = false
         ORDER BY role_id, priority DESC
         """)
+    @ResultMap("mybatis-plus_RolePermission")
     List<RolePermission> findByPermission(@Param("permissionId") Long permissionId);
 
     /**
@@ -71,6 +73,7 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
           AND (expiry_date IS NULL OR expiry_date >= #{currentDate})
         ORDER BY priority DESC, created_at DESC
         """)
+    @ResultMap("mybatis-plus_RolePermission")
     List<RolePermission> findEffectiveByRole(
         @Param("roleId") Long roleId,
         @Param("currentDate") LocalDate currentDate
@@ -162,6 +165,7 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
           AND status = 'active'
         ORDER BY priority DESC
         """)
+    @ResultMap("mybatis-plus_RolePermission")
     List<RolePermission> findDenyBindings(@Param("roleId") Long roleId);
 
     /**
@@ -177,6 +181,7 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
           AND status = 'active'
         ORDER BY expiry_date
         """)
+    @ResultMap("mybatis-plus_RolePermission")
     List<RolePermission> findExpiredBindings(@Param("currentDate") LocalDate currentDate);
 
     /**
@@ -193,6 +198,7 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
           AND deleted_flag = false
         LIMIT 1
         """)
+    @ResultMap("mybatis-plus_RolePermission")
     RolePermission findByRoleAndPermission(
         @Param("roleId") Long roleId,
         @Param("permissionId") Long permissionId
@@ -246,7 +252,7 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
             #{binding.roleId}, #{binding.permissionId},
             #{binding.grantType}, #{binding.priority},
             #{binding.effectiveDate}, #{binding.expiryDate},
-            #{binding.conditions,typeHandler=com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler}::jsonb,
+            #{binding.conditions,typeHandler=com.auraboot.framework.application.database.mybatis.JsonbObjectTypeHandler},
             #{binding.status}, #{binding.deletedFlag},
             #{binding.createdAt}, #{binding.updatedAt}, #{binding.createdBy}, #{binding.updatedBy}
         )
@@ -377,6 +383,7 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
           AND deleted_flag = false
         ORDER BY priority DESC, created_at DESC
         """)
+    @ResultMap("mybatis-plus_RolePermission")
     List<RolePermission> findByRoleId(
         @Param("roleId") Long roleId,
         @Param("tenantId") Long tenantId
@@ -461,20 +468,26 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
     );
 
     /**
-     * Get conditions JSONB as raw string — bypasses type handler issues.
+     * Project conditions JSONB as canonical text for tests and legacy importer boundaries.
+     *
+     * <p>Entity reads should prefer BaseMapper / methods annotated with
+     * {@code mybatis-plus_RolePermission} so JSONB type handlers stay in the main path.
      */
     @Select("SELECT conditions::text FROM ab_role_permission WHERE id = #{id} AND deleted_flag = false")
     String getConditionsById(@Param("id") Long id);
 
     /**
-     * Update conditions JSONB directly — bypasses type handler serialization issues.
+     * Explicit JSON text update for legacy import fixtures that already hold serialized JSON.
+     *
+     * <p>Normal business code should prefer setting {@link RolePermission#getConditions()} and
+     * calling {@link #updateById(RolePermission)}, which uses the entity JSONB type handler.
      */
     @Update("UPDATE ab_role_permission SET conditions = #{json}::jsonb, updated_at = NOW() WHERE id = #{id}")
     void updateConditionsById(@Param("id") Long id, @Param("json") String json);
 
     /**
      * Batch fetch conditions for all permissions of a role.
-     * Returns permission_id and conditions as raw JSON text (bypasses JacksonTypeHandler).
+     * Returns permission_id and conditions as canonical JSON text for legacy callers.
      */
     @Select("""
         SELECT permission_id, conditions::text as conditions_json
@@ -508,7 +521,8 @@ public interface RolePermissionMapper extends BaseMapper<RolePermission> {
      * active GRANT binding for a member's roles on a single permission.
      *
      * <p>Returns the binding id, its {@code condition_ast}, and legacy/config {@code conditions}
-     * as raw JSON text (bypassing the JacksonTypeHandler, mirroring {@link #getConditionsById}).
+     * as canonical JSON text. The hot path parses these into immutable rule DTOs; entity reads
+     * remain backed by {@code mybatis-plus_RolePermission}.
      * A row with a NULL {@code condition_ast} and no rule-center binding in {@code conditions}
      * represents an unconditional grant; it is still returned so the evaluator can short-circuit
      * to ALLOW. DENY bindings are excluded — DENY semantics are resolved by the upstream RBAC
