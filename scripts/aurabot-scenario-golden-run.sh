@@ -44,15 +44,39 @@ SLOT=111
 NAME="aurabot-scenario-golden"
 KEEP=0
 SKIP_TIER_A=0
+LLM=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --slot) SLOT="$2"; shift 2;;
     --name) NAME="$2"; shift 2;;
     --keep) KEEP=1; shift;;
     --skip-tier-a) SKIP_TIER_A=1; shift;;
+    --llm) LLM="$2"; shift 2;;
     *) echo "unknown arg: $1" >&2; exit 2;;
   esac
 done
+
+# --llm qianwen|deepseek — deterministic live-provider choice. With both
+# DASHSCOPE_API_KEY and DEEPSEEK_API_KEY in the environment, CloudConfigSeeder
+# provisions both and chat resolution silently picks by seed priority
+# (deepseek=30 beats qianwen=50) — which mislabeled a whole live run as
+# "Qwen" on 2026-07-19. Choosing a provider simply withholds the other
+# vendor's key from the backend env, so the seeder provisions exactly one.
+# Implies live mode (stub off) unless AGENT_LLM_STUB_MODE is set explicitly.
+case "$LLM" in
+  "") ;;
+  qianwen|qwen)
+    [[ -n "${DASHSCOPE_API_KEY:-}" ]] || { echo "--llm qianwen requires DASHSCOPE_API_KEY" >&2; exit 2; }
+    unset DEEPSEEK_API_KEY
+    export AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-false}"
+    ;;
+  deepseek)
+    [[ -n "${DEEPSEEK_API_KEY:-}" ]] || { echo "--llm deepseek requires DEEPSEEK_API_KEY" >&2; exit 2; }
+    unset DASHSCOPE_API_KEY
+    export AGENT_LLM_STUB_MODE="${AGENT_LLM_STUB_MODE:-false}"
+    ;;
+  *) echo "unknown --llm '$LLM' (qianwen|deepseek)" >&2; exit 2;;
+esac
 RUNTIME="${NAME}-${SLOT}"
 BE_PORT=$((6400 + SLOT))
 DB="auraboot_${SLOT}"
