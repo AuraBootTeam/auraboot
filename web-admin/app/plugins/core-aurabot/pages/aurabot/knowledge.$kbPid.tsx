@@ -11,6 +11,7 @@ import {
   ArrowPathIcon,
   LinkIcon,
   CloudArrowUpIcon,
+  CircleStackIcon,
   DocumentTextIcon,
   MagnifyingGlassIcon,
   TrashIcon,
@@ -19,6 +20,7 @@ import {
 } from '@heroicons/react/24/outline';
 import { get, post, del } from '~/shared/services/http-client';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -86,17 +88,24 @@ export default function KnowledgeBaseDetailPage() {
   const { kbPid } = useParams<{ kbPid: string }>();
   const navigate = useNavigate();
   const toast = useToastContext();
+  const { t } = useI18n();
 
   const [kb, setKb] = useState<KnowledgeBase | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('Documents');
   const [loading, setLoading] = useState(true);
+
+  const TAB_LABELS: Record<Tab, string> = {
+    Documents: t('ai.knowledge.detail.tab.documents', undefined, 'Documents'),
+    Chunks: t('ai.knowledge.detail.tab.chunks', undefined, 'Chunks'),
+    'Retrieval Test': t('ai.knowledge.detail.tab.retrieval', undefined, 'Retrieval Test'),
+  };
 
   const fetchKb = useCallback(async () => {
     try {
       const res = await get<KnowledgeBase>(`/api/ai/knowledge/${kbPid}`);
       setKb(res?.data ?? null);
     } catch {
-      toast.showErrorToast('Failed to load knowledge base');
+      toast.showErrorToast(t('ai.knowledge.detail.toast.loadKbFailed', undefined, 'Failed to load knowledge base'));
     } finally {
       setLoading(false);
     }
@@ -115,7 +124,7 @@ export default function KnowledgeBaseDetailPage() {
   }
 
   if (!kb) {
-    return <div className="p-6 text-gray-500">Knowledge base not found</div>;
+    return <div className="p-6 text-gray-500">{t('ai.knowledge.detail.notFound', undefined, 'Knowledge base not found')}</div>;
   }
 
   return (
@@ -124,16 +133,20 @@ export default function KnowledgeBaseDetailPage() {
       <div className="flex items-center gap-4 border-b border-gray-200 px-6 py-4 dark:border-gray-700">
         <button
           onClick={() => navigate('/aurabot/knowledge')}
-          className="text-gray-400 hover:text-gray-600"
+          className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800"
         >
           <ArrowLeftIcon className="h-5 w-5" />
         </button>
+        <div className="rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5 shadow-sm">
+          <CircleStackIcon className="h-6 w-6 text-white" />
+        </div>
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">{kb.name}</h1>
-          <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
-            <span>{kb.docCount} documents</span>
-            <span>{kb.chunkCount} chunks</span>
-            <span>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{kb.name}</h1>
+          <div className="mt-0.5 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <span>{kb.docCount} {t('ai.knowledge.detail.unit.documents', undefined, 'documents')}</span>
+            <span className="text-gray-300 dark:text-gray-600">·</span>
+            <span>{kb.chunkCount} {t('ai.knowledge.detail.unit.chunks', undefined, 'chunks')}</span>
+            <span className="ml-1 rounded-md bg-gray-100 px-2 py-0.5 font-mono text-xs text-gray-600 dark:bg-gray-800 dark:text-gray-300">
               {kb.embeddingProvider}/{kb.embeddingModel}
             </span>
           </div>
@@ -152,7 +165,7 @@ export default function KnowledgeBaseDetailPage() {
                 : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
-            {tab}
+            {TAB_LABELS[tab]}
           </button>
         ))}
       </div>
@@ -173,6 +186,7 @@ export default function KnowledgeBaseDetailPage() {
 
 function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void }) {
   const toast = useToastContext();
+  const { t } = useI18n();
   const [docs, setDocs] = useState<KbDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -183,7 +197,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
       const res = await get<KbDocument[]>(`/api/ai/knowledge/${kbPid}/documents`);
       setDocs(res?.data ?? []);
     } catch {
-      toast.showErrorToast('Failed to load documents');
+      toast.showErrorToast(t('ai.knowledge.detail.toast.loadDocsFailed', undefined, 'Failed to load documents'));
     } finally {
       setLoading(false);
     }
@@ -220,11 +234,11 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
         });
         if (!resp.ok) throw new Error('Upload failed');
       }
-      toast.showSuccessToast(`${files.length} file(s) uploaded — processing started`);
+      toast.showSuccessToast(t('ai.knowledge.detail.toast.uploaded', { count: files.length }, `${files.length} file(s) uploaded — processing started`));
       fetchDocs();
       onUpdate();
     } catch {
-      toast.showErrorToast('Upload failed');
+      toast.showErrorToast(t('ai.knowledge.detail.toast.uploadFailed', undefined, 'Upload failed'));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -236,23 +250,23 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
     setReindexing(true);
     try {
       const res = await post<{ reindexedChunks: number }>(`/api/ai/knowledge/${kbPid}/reindex`, {});
-      toast.showSuccessToast(`Reindexed ${res?.data?.reindexedChunks ?? 0} chunks`);
+      toast.showSuccessToast(t('ai.knowledge.detail.toast.reindexed', { count: res?.data?.reindexedChunks ?? 0 }, `Reindexed ${res?.data?.reindexedChunks ?? 0} chunks`));
     } catch {
-      toast.showErrorToast('Reindex failed');
+      toast.showErrorToast(t('ai.knowledge.detail.toast.reindexFailed', undefined, 'Reindex failed'));
     } finally {
       setReindexing(false);
     }
   };
 
   const handleDelete = async (doc: KbDocument) => {
-    if (!confirm(`Delete "${doc.docName}"?`)) return;
+    if (!confirm(t('ai.knowledge.detail.confirmDeleteDoc', { name: doc.docName }, `Delete "${doc.docName}"?`))) return;
     try {
       await del(`/api/ai/knowledge/${kbPid}/documents/${doc.pid}`);
-      toast.showSuccessToast('Document deleted');
+      toast.showSuccessToast(t('ai.knowledge.detail.toast.docDeleted', undefined, 'Document deleted'));
       fetchDocs();
       onUpdate();
     } catch {
-      toast.showErrorToast('Failed to delete document');
+      toast.showErrorToast(t('ai.knowledge.detail.toast.docDeleteFailed', undefined, 'Failed to delete document'));
     }
   };
 
@@ -272,15 +286,15 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
       // response with success=false — it does not throw. Show the server's reason: "failed" alone
       // leaves the user with no idea whether to fix the URL or give up.
       if (res?.success === false || !res?.data) {
-        toast.showErrorToast(res?.message || 'Could not add that URL');
+        toast.showErrorToast(res?.message || t('ai.knowledge.detail.toast.urlFailed', undefined, 'Could not add that URL'));
         return;
       }
-      toast.showSuccessToast(`Added "${res.data.docName}"`);
+      toast.showSuccessToast(t('ai.knowledge.detail.toast.urlAdded', { name: res.data.docName }, `Added "${res.data.docName}"`));
       setUrl('');
       fetchDocs();
       onUpdate();
     } catch {
-      toast.showErrorToast('Could not add that URL');
+      toast.showErrorToast(t('ai.knowledge.detail.toast.urlFailed', undefined, 'Could not add that URL'));
     } finally {
       setAddingUrl(false);
     }
@@ -289,18 +303,18 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
   const handleReprocess = async (doc: KbDocument) => {
     try {
       await post(`/api/ai/knowledge/${kbPid}/documents/${doc.pid}/reprocess`, {});
-      toast.showSuccessToast(`Reprocessing "${doc.docName}"`);
+      toast.showSuccessToast(t('ai.knowledge.detail.toast.reprocessing', { name: doc.docName }, `Reprocessing "${doc.docName}"`));
       fetchDocs();
       onUpdate();
     } catch {
-      toast.showErrorToast('Failed to reprocess document');
+      toast.showErrorToast(t('ai.knowledge.detail.toast.reprocessFailed', undefined, 'Failed to reprocess document'));
     }
   };
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Documents</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('ai.knowledge.detail.tab.documents', undefined, 'Documents')}</h2>
         <div className="flex items-center gap-2">
         <button
           type="button"
@@ -311,7 +325,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
             reindexing ? 'cursor-not-allowed text-gray-400' : 'text-gray-700 hover:bg-gray-50 dark:text-gray-200 dark:hover:bg-gray-800'
           }`}
         >
-          {reindexing ? 'Reindexing...' : 'Reindex'}
+          {reindexing ? t('ai.knowledge.detail.reindexing', undefined, 'Reindexing...') : t('ai.knowledge.detail.reindex', undefined, 'Reindex')}
         </button>
         <label
           className={`flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 transition-colors ${
@@ -319,7 +333,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
           } text-white`}
         >
           <CloudArrowUpIcon className="h-5 w-5" />
-          {uploading ? 'Uploading...' : 'Upload Files'}
+          {uploading ? t('ai.knowledge.detail.uploading', undefined, 'Uploading...') : t('ai.knowledge.detail.uploadFiles', undefined, 'Upload Files')}
           <input
             ref={fileInputRef}
             type="file"
@@ -343,7 +357,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleAddUrl();
           }}
-          placeholder="Paste a page URL to add it to this knowledge base"
+          placeholder={t('ai.knowledge.detail.urlPlaceholder', undefined, 'Paste a page URL to add it to this knowledge base')}
           disabled={addingUrl}
           className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-100 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:disabled:bg-gray-700"
         />
@@ -358,16 +372,16 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
               : 'bg-blue-600 hover:bg-blue-700'
           }`}
         >
-          {addingUrl ? 'Fetching...' : 'Add URL'}
+          {addingUrl ? t('ai.knowledge.detail.fetching', undefined, 'Fetching...') : t('ai.knowledge.detail.addUrl', undefined, 'Add URL')}
         </button>
       </div>
 
       {loading ? (
-        <div className="py-8 text-center text-gray-400">Loading...</div>
+        <div className="py-8 text-center text-gray-400">{t('ai.knowledge.detail.loading', undefined, 'Loading...')}</div>
       ) : docs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400">
           <DocumentTextIcon className="mb-3 h-12 w-12" />
-          <p>No documents yet. Upload PDF, DOCX, PPTX, XLSX, MD, TXT, CSV, HTML — or a chart image.</p>
+          <p>{t('ai.knowledge.detail.empty', undefined, 'No documents yet. Upload PDF, DOCX, PPTX, XLSX, MD, TXT, CSV, HTML — or a chart image.')}</p>
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
@@ -375,22 +389,22 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
             <thead className="bg-gray-50 dark:bg-gray-800">
               <tr>
                 <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">
-                  Name
+                  {t('ai.knowledge.detail.col.name', undefined, 'Name')}
                 </th>
                 <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">
-                  Type
+                  {t('ai.knowledge.detail.col.type', undefined, 'Type')}
                 </th>
                 <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">
-                  Chunks
+                  {t('ai.knowledge.detail.col.chunks', undefined, 'Chunks')}
                 </th>
                 <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">
-                  Chars
+                  {t('ai.knowledge.detail.col.chars', undefined, 'Chars')}
                 </th>
                 <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-400">
-                  Status
+                  {t('ai.knowledge.detail.col.status', undefined, 'Status')}
                 </th>
                 <th className="px-4 py-3 text-center font-medium text-gray-500 dark:text-gray-400">
-                  Actions
+                  {t('ai.knowledge.detail.col.actions', undefined, 'Actions')}
                 </th>
               </tr>
             </thead>
@@ -415,7 +429,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
                       data-testid={`doc-status-${doc.pid}`}
                       className={`rounded-full px-2 py-1 text-xs ${STATUS_STYLES[doc.status] || ''}`}
                     >
-                      {doc.status}
+                      {t(`ai.knowledge.detail.docStatus.${doc.status}`, undefined, doc.status)}
                     </span>
                     {doc.status === 'processing' && (
                       <span className="ml-1 inline-block h-3 w-3 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
@@ -437,7 +451,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
                           type="button"
                           data-testid={`doc-reprocess-${doc.pid}`}
                           onClick={() => handleReprocess(doc)}
-                          title="Reprocess document"
+                          title={t('ai.knowledge.detail.reprocessTitle', undefined, 'Reprocess document')}
                           className="text-gray-400 hover:text-blue-600"
                         >
                           <ArrowPathIcon className="h-4 w-4" />
@@ -471,6 +485,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
  * keyword matching. The row said "3 chunks" and told you nothing about that.
  */
 function EmbeddingState({ doc }: { doc: KbDocument }) {
+  const { t } = useI18n();
   const total = doc.chunkCount ?? 0;
   const embedded = doc.embeddedChunkCount ?? 0;
 
@@ -488,8 +503,8 @@ function EmbeddingState({ doc }: { doc: KbDocument }) {
       data-testid={`doc-chunks-${doc.pid}`}
       title={
         none
-          ? 'Stored, but not embedded — this document cannot be found by meaning, only by keyword. Check the knowledge base\'s embedding provider.'
-          : `Only ${embedded} of ${total} chunks were embedded; the rest are searchable by keyword only.`
+          ? t('ai.knowledge.detail.embed.noneTitle', undefined, "Stored, but not embedded — this document cannot be found by meaning, only by keyword. Check the knowledge base's embedding provider.")
+          : t('ai.knowledge.detail.embed.partialTitle', { embedded, total }, `Only ${embedded} of ${total} chunks were embedded; the rest are searchable by keyword only.`)
       }
       className={`rounded px-1.5 py-0.5 text-xs ${
         none
@@ -497,7 +512,7 @@ function EmbeddingState({ doc }: { doc: KbDocument }) {
           : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
       }`}
     >
-      {embedded}/{total} embedded
+      {embedded}/{total} {t('ai.knowledge.detail.embed.embedded', undefined, 'embedded')}
     </span>
   );
 }
@@ -508,6 +523,7 @@ function EmbeddingState({ doc }: { doc: KbDocument }) {
 
 function ChunksTab({ kbPid }: { kbPid: string }) {
   const toast = useToastContext();
+  const { t } = useI18n();
   const [docs, setDocs] = useState<KbDocument[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
   const [chunks, setChunks] = useState<KbChunk[]>([]);
@@ -522,7 +538,7 @@ function ChunksTab({ kbPid }: { kbPid: string }) {
         setDocs(completedDocs);
         if (completedDocs.length > 0) setSelectedDoc(completedDocs[0].pid);
       } catch {
-        toast.showErrorToast('Failed to load documents');
+        toast.showErrorToast(t('ai.knowledge.detail.toast.loadDocsFailed', undefined, 'Failed to load documents'));
       }
     })();
   }, [kbPid, toast]);
@@ -538,7 +554,7 @@ function ChunksTab({ kbPid }: { kbPid: string }) {
         );
         setChunks(res?.data ?? []);
       } catch {
-        toast.showErrorToast('Failed to load chunks');
+        toast.showErrorToast(t('ai.knowledge.detail.toast.loadChunksFailed', undefined, 'Failed to load chunks'));
       } finally {
         setLoadingChunks(false);
       }
@@ -557,7 +573,7 @@ function ChunksTab({ kbPid }: { kbPid: string }) {
     <div>
       <div className="mb-4">
         <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Select Document
+          {t('ai.knowledge.detail.selectDocument', undefined, 'Select Document')}
         </label>
         <select
           value={selectedDoc || ''}
@@ -573,9 +589,9 @@ function ChunksTab({ kbPid }: { kbPid: string }) {
       </div>
 
       {loadingChunks ? (
-        <div className="py-8 text-center text-gray-400">Loading chunks...</div>
+        <div className="py-8 text-center text-gray-400">{t('ai.knowledge.detail.loadingChunks', undefined, 'Loading chunks...')}</div>
       ) : chunks.length === 0 ? (
-        <div className="py-8 text-center text-gray-400">No chunks found</div>
+        <div className="py-8 text-center text-gray-400">{t('ai.knowledge.detail.noChunks', undefined, 'No chunks found')}</div>
       ) : (
         <div className="space-y-2">
           {chunks.map((chunk) => (
@@ -588,16 +604,16 @@ function ChunksTab({ kbPid }: { kbPid: string }) {
                 className="dark:hover:bg-gray-750 flex w-full items-center justify-between bg-gray-50 px-4 py-3 text-left hover:bg-gray-100 dark:bg-gray-800"
               >
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  Chunk #{chunk.chunkIndex}
+                  {t('ai.knowledge.detail.chunk', undefined, 'Chunk')} #{chunk.chunkIndex}
                   <span className="ml-2 text-xs text-gray-400">
-                    {chunk.charCount} chars · {chunk.tokenCount} tokens ·
+                    {chunk.charCount} {t('ai.knowledge.detail.unit.chars', undefined, 'chars')} · {chunk.tokenCount} {t('ai.knowledge.detail.unit.tokens', undefined, 'tokens')} ·
                     <span
                       className={
                         chunk.embeddingStatus === 'completed' ? 'text-green-500' : 'text-yellow-500'
                       }
                     >
                       {' '}
-                      {chunk.embeddingStatus}
+                      {t(`ai.knowledge.detail.docStatus.${chunk.embeddingStatus}`, undefined, chunk.embeddingStatus)}
                     </span>
                   </span>
                 </span>
@@ -626,6 +642,7 @@ function ChunksTab({ kbPid }: { kbPid: string }) {
 
 function RetrievalTestTab({ kbPid }: { kbPid: string }) {
   const toast = useToastContext();
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<RetrievalResult[]>([]);
   const [path, setPath] = useState<string | null>(null);
@@ -649,7 +666,7 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
         toast.showErrorToast(w);
       }
     } catch {
-      toast.showErrorToast('Retrieval failed');
+      toast.showErrorToast(t('ai.knowledge.detail.toast.retrievalFailed', undefined, 'Retrieval failed'));
     } finally {
       setSearching(false);
     }
@@ -663,7 +680,7 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-          placeholder="Ask a question to test retrieval..."
+          placeholder={t('ai.knowledge.detail.retrievalPlaceholder', undefined, 'Ask a question to test retrieval...')}
           className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
         />
         <button
@@ -672,7 +689,7 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
           className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <MagnifyingGlassIcon className="h-5 w-5" />
-          {searching ? 'Searching...' : 'Search'}
+          {searching ? t('ai.knowledge.detail.searching', undefined, 'Searching...') : t('ai.knowledge.detail.search', undefined, 'Search')}
         </button>
       </div>
 
@@ -680,15 +697,15 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
         <div className="space-y-3">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {results.length} result(s) found
+              {results.length} {t('ai.knowledge.detail.resultsFound', undefined, 'result(s) found')}
             </h3>
             {path && (
               <span
                 data-testid="retrieval-path"
                 title={
                   path === 'hybrid'
-                    ? 'Vector similarity combined with keyword matching'
-                    : 'Keyword matching only — semantic search was unavailable'
+                    ? t('ai.knowledge.detail.pathHybridTitle', undefined, 'Vector similarity combined with keyword matching')
+                    : t('ai.knowledge.detail.pathKeywordTitle', undefined, 'Keyword matching only — semantic search was unavailable')
                 }
                 className={`rounded-full px-2 py-0.5 text-xs ${
                   path === 'hybrid'
@@ -696,7 +713,9 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
                     : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                 }`}
               >
-                {path === 'hybrid' ? 'hybrid (vector + keyword)' : `${path} only`}
+                {path === 'hybrid'
+                  ? t('ai.knowledge.detail.pathHybrid', undefined, 'hybrid (vector + keyword)')
+                  : t('ai.knowledge.detail.pathKeywordBadge', undefined, 'keyword only')}
               </span>
             )}
           </div>
@@ -707,10 +726,10 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
             >
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {r.docName} — Chunk #{r.chunkIndex}
+                  {r.docName} — {t('ai.knowledge.detail.chunk', undefined, 'Chunk')} #{r.chunkIndex}
                 </span>
                 <span className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                  {(r.similarity * 100).toFixed(1)}% match
+                  {(r.similarity * 100).toFixed(1)}% {t('ai.knowledge.detail.matchLabel', undefined, 'match')}
                 </span>
               </div>
               <p className="line-clamp-6 text-sm whitespace-pre-wrap text-gray-600 dark:text-gray-400">
@@ -723,7 +742,7 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
 
       {!searching && results.length === 0 && query && (
         <div className="py-8 text-center text-gray-400">
-          No results. Try a different query or ensure documents are processed.
+          {t('ai.knowledge.detail.noResults', undefined, 'No results. Try a different query or ensure documents are processed.')}
         </div>
       )}
     </div>
