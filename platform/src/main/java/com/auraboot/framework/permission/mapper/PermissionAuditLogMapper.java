@@ -91,12 +91,22 @@ public interface PermissionAuditLogMapper extends BaseMapper<PermissionAuditLog>
     @Select("""
             SELECT * FROM ab_permission_audit_log
             WHERE tenant_id = #{tenantId}
-              AND evaluation_trace @> jsonb_build_array(
+              AND (
+                evaluation_trace @> jsonb_build_array(
                     jsonb_build_object(
                         'details',
                         jsonb_build_object('ruleTraceId', #{traceId})
                     )
                   )
+                OR EXISTS (
+                    SELECT 1
+                    FROM jsonb_array_elements(evaluation_trace) AS step(item)
+                    CROSS JOIN LATERAL jsonb_array_elements(
+                        COALESCE(step.item -> 'details' -> 'ruleCenterFailures', '[]'::jsonb)
+                    ) AS failure(item)
+                    WHERE failure.item ->> 'ruleTraceId' = #{traceId}
+                )
+              )
             ORDER BY created_at DESC
             LIMIT #{limit}
             """)
