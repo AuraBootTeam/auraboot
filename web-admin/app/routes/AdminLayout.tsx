@@ -83,6 +83,7 @@ export default function AdminLayout() {
       {sidebarOpen && (
         <div
           className="bg-opacity-75 print-hide fixed inset-0 z-40 bg-gray-600 lg:hidden"
+          data-testid="sidebar-mobile-backdrop"
           onClick={() => setSidebarOpen(false)}
         />
       )}
