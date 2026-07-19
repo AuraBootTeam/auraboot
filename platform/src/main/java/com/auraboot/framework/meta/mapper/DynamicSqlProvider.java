@@ -257,6 +257,70 @@ public class DynamicSqlProvider {
         return sql.toString();
     }
 
+    /**
+     * JSONB-aware multi-row insert. Identical to {@link #batchInsert(Map)} but appends a
+     * {@code ::jsonb} cast on every placeholder whose column is a JSONB host column (mirrors
+     * {@link #insert(Map)} lines that guard on {@code jsonbColumns}). {@code toColumnData}
+     * serializes JSONB host values to JSON strings, so without this cast Postgres rejects the
+     * varchar→jsonb bind ("column ... is of type jsonb but expression is of type character varying").
+     */
+    public static String batchInsertWithJsonb(Map<String, Object> params) {
+        String tableName = requireName((String) params.get("tableName"), "table name");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> dataList = (List<Map<String, Object>>) params.get("dataList");
+        @SuppressWarnings("unchecked")
+        Set<String> jsonbColumns = params.containsKey("jsonbColumns")
+                ? (Set<String>) params.get("jsonbColumns") : null;
+        if (dataList == null || dataList.isEmpty()) {
+            throw new IllegalArgumentException("Batch insert data cannot be empty");
+        }
+
+        Map<String, Object> firstRow = dataList.get(0);
+        if (firstRow.isEmpty()) {
+            throw new IllegalArgumentException("Batch insert row cannot be empty");
+        }
+
+        // Column list = union of every row's keys, same rationale as batchInsert.
+        Set<String> columns = new LinkedHashSet<>();
+        for (Map<String, Object> row : dataList) {
+            columns.addAll(row.keySet());
+        }
+
+        StringBuilder sql = new StringBuilder();
+        sql.append("INSERT INTO ").append(tableName).append(" (");
+        boolean first = true;
+        for (String key : columns) {
+            requireName(key, "column name");
+            if (!first) {
+                sql.append(", ");
+            }
+            sql.append(key);
+            first = false;
+        }
+        sql.append(") VALUES ");
+
+        for (int i = 0; i < dataList.size(); i++) {
+            if (i > 0) {
+                sql.append(", ");
+            }
+            sql.append("(");
+            first = true;
+            for (String key : columns) {
+                if (!first) {
+                    sql.append(", ");
+                }
+                sql.append("#{dataList[").append(i).append("].").append(key).append("}");
+                if (jsonbColumns != null && jsonbColumns.contains(key)) {
+                    sql.append("::jsonb");
+                }
+                first = false;
+            }
+            sql.append(")");
+        }
+
+        return sql.toString();
+    }
+
     @SuppressWarnings("unchecked")
     public static String updateByCondition(Map<String, Object> params) {
         String tableName = requireName((String) params.get("tableName"), "table name");

@@ -109,6 +109,23 @@ public interface DataAccessor {
     List<Map<String, Object>> batchCreate(String modelCode, List<Map<String, Object>> dataList);
 
     /**
+     * Bulk create — single-statement fast path: one multi-row INSERT in a single transaction,
+     * skipping the per-row select-back / change-log / automation / SLA / virtual-field tail that
+     * {@link #create}/{@link #batchCreate} run. Per-row validation, system-field enrichment,
+     * primary-key generation and type conversion still run. Intended for mechanical bulk loads
+     * (e.g. importing many BOM rows) where per-row side effects are neither needed nor wanted.
+     *
+     * <p>The default delegates to {@link #batchCreate} so existing implementors and test doubles
+     * keep working unchanged; runtime implementations override it for the real fast path.
+     *
+     * @return created records with generated ids, in input order (enables caller-side id correlation)
+     * @since 2.8.0
+     */
+    default List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList) {
+        return batchCreate(modelCode, dataList);
+    }
+
+    /**
      * Delete a record by ID.
      *
      * @param modelCode the model code

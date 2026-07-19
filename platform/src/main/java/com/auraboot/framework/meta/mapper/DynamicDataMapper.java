@@ -131,6 +131,15 @@ public interface DynamicDataMapper {
     int batchInsert(@Param("tableName") String tableName, @Param("dataList") List<Map<String, Object>> dataList);
 
     /**
+     * JSONB-aware multi-row insert — like {@link #batchInsert} but casts each JSONB host column
+     * placeholder to {@code ::jsonb}. Use when any row carries a JSONB host column.
+     */
+    @InsertProvider(type = DynamicSqlProvider.class, method = "batchInsertWithJsonb")
+    int batchInsertWithJsonb(@Param("tableName") String tableName,
+                             @Param("dataList") List<Map<String, Object>> dataList,
+                             @Param("jsonbColumns") Set<String> jsonbColumns);
+
+    /**
      * Query data bypassing tenant interceptor.
      * Use ONLY when tenant isolation is already handled inside the SQL (e.g., NamedQuery fromSql with #{params.tenantId}).
      * This avoids JSqlParser failures on complex PostgreSQL-specific syntax (DATE_TRUNC, ::date, window functions)

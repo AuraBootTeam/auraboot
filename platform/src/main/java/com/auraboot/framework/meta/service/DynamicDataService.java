@@ -77,6 +77,15 @@ public interface DynamicDataService {
     DynamicBatchResponse batchCreate(String modelCode, List<Map<String, Object>> dataList);
 
     /**
+     * Bulk create fast path: one multi-row INSERT in a single transaction, skipping per-row
+     * select-back, change-log, automation, SLA and virtual-field materialization. Per-row
+     * validation, system-field enrichment, primary-key generation and type conversion still run.
+     *
+     * @return created rows with generated primary keys, in input order
+     */
+    List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList);
+
+    /**
      * 批量更新数据
      * @param modelCode 模型编码
      * @param dataList 数据列表
