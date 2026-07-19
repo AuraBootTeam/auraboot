@@ -81,8 +81,16 @@ describe('DecisionTableEditor', () => {
 
   it('selects a fact field for a DMN input and migrates existing rule cells', () => {
     function FieldPickerHarness() {
+      const current = base();
       const [v, setV] = useState<DecisionTable>({
-        ...base(),
+        ...current,
+        inputs: [
+          {
+            ...current.inputs[0],
+            expr: { type: 'path', scope: 'record', path: 'data.leaveDays', dataType: 'decimal' },
+          } as DecisionTable['inputs'][number],
+          current.inputs[1],
+        ],
         rules: [
           {
             ruleId: 'row-1',
@@ -140,6 +148,7 @@ describe('DecisionTableEditor', () => {
       dataType: 'integer',
       allowedValues: ['30', '60', '120'],
     });
+    expect(dump.inputs[0]).not.toHaveProperty('expr');
     expect(dump.rules[0].when.sla_deadlineMinutes).toMatchObject({
       operator: 'EQ',
       value: '',

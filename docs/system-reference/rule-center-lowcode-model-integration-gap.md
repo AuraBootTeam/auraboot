@@ -18,6 +18,40 @@ status: active
 - 每个字段、字典值、虚拟模型值、引用字段、权限字段是否来自低码元模型事实目录，并能被运行时真实取值。
 - 每次保存、发布、测试运行、执行日志、影响分析是否能证明“UI 选到的东西就是后端实际执行的东西”。
 
+## 2026-07-19 Endgame 合并矩阵收口
+
+本轮关闭的是当前分支的 Rule Center / Strategy Studio / SLA / BPM / Automation / Permission 合并验证目标：规则条件、条件片段、DMN 字典值、低码申请人引用字段、SLA timeout actions、BPM/Automation 设计器绑定、Permission ABAC 审计和 DecisionOps Trace 能在同一 fresh runtime 中并发跑通。范围不扩大到真实外部 provider live matrix、未来所有权限失败态或所有历史页面的全量视觉重做。
+
+代码修复：
+
+- `StrategyStudioWorkbench` 在保存 DMN 草稿前把编辑器 table 规范化为 runtime `expr` 结构，保留 output contract；保存条件片段时支持已有 draft fallback，不再因重复 draft 直接 422。
+- Strategy Studio 五个消费场景统一暴露 `record.data.wd_req_applicant` 和 `record.data.wd_req_type`，并让规则条件、DMN 输入、条件片段和测试上下文都使用低码事实目录语义。
+- 修复两个真实竞态：自动加载的历史条件片段不能覆盖当前场景的默认 `decisionCode`；用户开始编辑 DMN 后，晚返回的 `listVersions` restore 不能覆盖本地草稿。
+- `DecisionTableEditor` 与后端 `DecisionTableJson` 均保证手动选择字段时 editor 字段优先于 stale runtime `expr`。
+- 条件片段库使用 live decision definition metadata 展示动态决策标签；v2 impact-ack 用动态创建的 SLA consumer 取证，避免依赖含糊 seed 文案。
+- SLA 与 Permission 之间新增 field-permission 文件锁和模型缓存刷新，避免一个 E2E 改了 `wd_leave_request` 字段权限后污染另一个 E2E 的请假单创建链路。
+- Permission audit 只展示 public record pid 和脱敏 trace id；Rule Center 失败 evidence 从嵌套 `ruleCenterFailures[]` 提取统一 Trace、字段引用和 DMN 输出。
+
+最终验证证据：
+
+| 层级 | 命令 / 矩阵 | 结果 |
+|---|---|---|
+| Playwright focused 修复集 | `strategy-studio-dmn-value-labels.spec.ts` 两个失败用例分别重跑；`condition-fragment-library-golden.spec.ts`、`sla-rule-center-binding.spec.ts` focused 组合重跑 | focused 全绿 |
+| Playwright 合并矩阵 | `playwright.gt5.config.ts` 下 11 个 spec：`rule-center-main-entry-ux-smoke`、`strategy-studio-dmn-value-labels`、`condition-fragment-library-golden`、`dmn-export-artifact`、`decisionops-virtual-source-trace`、`decisionops-field-impact-preflight`、`decisionops-full-golden`、Automation/BPM rule-binding designer、SLA rule-center binding、Permission ABAC | `57 passed (3.0m)` |
+| Vitest | `DecisionOpsConsole`、`DecisionTableEditor`、`DecisionRuleBindingBlock`、`ConditionFragmentLibraryBlock`、`PermissionAuditTab` | `5 files / 105 tests passed` |
+| TypeScript | `web-admin && pnpm exec tsc --noEmit --pretty false --incremental false` | passed |
+| 后端 | `./gradlew -p platform :test --tests com.auraboot.framework.decision.service.impl.DecisionTableDmnXmlServiceImplTest` | BUILD SUCCESSFUL，6/6 passed |
+| e2e-truth / feature coverage | 扫描 touched E2E 的 `skip/fixme/.only/waitForTimeout/retries/PUT/PATCH/page.goto/threshold` | 未命中 skip/fixme/.only/waitForTimeout/retries/PUT/PATCH 兜底；命中的阈值为像素容差或真实影响数量下限；权限页 `goto('/enterprise/permissions')` 是被测权限模块自身入口，后续仍通过页面交互打开审计 Tab |
+
+本轮试错归因：
+
+- `Strategy Studio reuses user reference conditions...` 首轮红灯不是 seed 丢失，而是自动加载旧片段后用 `decisionRefs[0]` 覆盖场景决策，导致测试等错决策版本响应；产品修复后同一用例 17/17 passed。
+- `Strategy Studio DMN round-trip preserves fact catalog valueLabels` 红灯不是 fact catalog 缺字段，而是用户点击字段后晚到的 `listVersions` restore 把 DMN 表格恢复成旧 `Leave days`；产品新增 dirty guard 后单用例 17/17 passed，合并矩阵 57/57 passed。
+- 第二轮矩阵中 `SLA` 尾部动作套件持续通过，证明 fieldPermission 锁和模型缓存刷新没有再污染 SLA 创建链路。
+- 扩展矩阵没有用直接 API PUT/PATCH 去替代 UI 保存；API 只用于 fixture、后端取证或命令式业务数据准备。
+
+本轮范围内结论：规则中心主入口、Strategy Studio、条件片段库、DMN valueLabels、SLA/BPM/Automation/Permission 原生消费方和统一 Trace 的回归网已经在同一 fresh runtime 通过。后续产品增强仍按 backlog 继续推进，但不能再把本轮已经修复的两个竞态、field-permission 污染、动态决策标签或 draft fallback 作为未关闭问题重复打开。
+
 ## 2026-07-19 Reference / DecisionOps Trace 收口更新
 
 本轮关闭的是“低码业务引用字段作为规则事实”这一条纵深链路，以及 DecisionOps 静态入口的执行日志 UX 断点。它把 `model / field / refTarget / dynamic record / decision evaluator / traceSnapshot.factMetadata / DecisionOps Trace UI` 串成一条可测试链路。随后继续补上 `wd_leave_request.wd_req_applicant` 在 Strategy Studio 五入口 fact catalog 一致性、SLA 原生配置页 runtime Trace，以及 Automation 原生测试运行 runtime Trace 的 focused evidence：新发布申请人规则能在 SLA 配置页被选择、映射、测试运行、保存和从 DecisionOps Trace 回链；Automation 能把 `modelCode=wd_leave_request` 和 `wd_req_applicant` 输入传入统一 Rule Binding / Decision Runtime，执行日志展示申请人 fact metadata 和 Automation 设计器回链。

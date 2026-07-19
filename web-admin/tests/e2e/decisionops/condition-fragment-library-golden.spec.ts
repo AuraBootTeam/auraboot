@@ -1,7 +1,7 @@
 import { test, expect, type APIResponse, type Page, type Response, type TestInfo } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI } from '../../helpers/wd-fixtures';
-import { ensureSidebarExpanded, uniqueId, waitForDynamicPageLoad } from '../helpers';
+import { ensureSidebarExpanded, extractRecordId, uniqueId, waitForDynamicPageLoad } from '../helpers';
 
 type ApiEnvelope<T> = {
   code?: number | string;
@@ -56,6 +56,68 @@ async function readApi<T>(response: Response | APIResponse): Promise<T> {
   expect(code === undefined || code === null || String(code) === '0', JSON.stringify(body)).toBe(true);
   expect(body.success === false, JSON.stringify(body)).toBe(false);
   return body.data as T;
+}
+
+async function ensureDecisionDefinition(
+  page: Page,
+  decisionCode: string,
+  decisionName: string,
+): Promise<void> {
+  const existing = await page.request.get(`/api/decision/definitions/${encodeURIComponent(decisionCode)}`);
+  const body = (await existing.json().catch(() => null)) as ApiEnvelope<unknown> | null;
+  if (existing.ok() && String(body?.code ?? '0') === '0' && body?.success !== false) return;
+  await readApi(await page.request.post('/api/decision/definitions', {
+    data: {
+      decisionCode,
+      decisionName,
+      description: 'Condition fragment library E2E binding target',
+      scopeType: 'SLA',
+      ownerModule: 'workflow-demo',
+      enabled: true,
+    },
+  }));
+}
+
+async function createSlaDecisionConsumer(
+  page: Page,
+  name: string,
+  decisionCode: string,
+): Promise<string> {
+  const response = await page.request.post('/api/meta/commands/execute/admin:create_sla_config', {
+    data: {
+      operationType: 'create',
+      payload: {
+        name,
+        target_type: 'NODE',
+        target_key: `cfl_${decisionCode}`,
+        model_code: 'wd_leave_request',
+        deadline_mode: 'FIXED',
+        deadline_value: 'PT24H',
+        suspend_policy: 'pause',
+        enabled: true,
+        rule_binding: {
+          consumerType: 'SLA',
+          consumerCode: name,
+          bindingKind: 'DECISION_REF',
+          decisionBinding: {
+            decisionCode,
+            versionPolicy: 'LATEST_PUBLISHED',
+            inputMappings: [],
+            outputMappings: [],
+          },
+          enabled: true,
+        },
+      },
+    },
+  });
+  const body = (await response.json().catch(async () => ({
+    message: await response.text().catch(() => ''),
+  }))) as ApiEnvelope<unknown>;
+  expect(response.ok(), `Create SLA decision consumer failed: ${JSON.stringify(body)}`).toBe(true);
+  const pid = extractRecordId(body);
+  expect(Boolean(pid), `Cannot extract SLA decision consumer pid: ${JSON.stringify(body)}`).toBe(true);
+  await readApi(await page.request.post('/api/decision/usage-index/rebuild'));
+  return pid;
 }
 
 async function openConditionFragmentsFromSidebar(page: Page): Promise<void> {
@@ -184,11 +246,16 @@ test('Condition fragment library creates, reuses, publishes, and impact-acks a s
   await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
   await expect(page).not.toHaveURL(/\/login(?:$|\?)/);
 
-  await openConditionFragmentsFromSidebar(page);
-
   const suffix = uniqueId('cfl').replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
   const fragmentCode = `cfl_${suffix}`;
   const fragmentName = `条件片段复用 ${suffix}`;
+  const decisionCode = `cfl_decision_${suffix}`;
+  const decisionName = `请假审批 SLA 截止时间 ${suffix}`;
+  const slaConsumerName = `条件片段复用 SLA ${suffix}`;
+
+  await ensureDecisionDefinition(page, decisionCode, decisionName);
+  await createSlaDecisionConsumer(page, slaConsumerName, decisionCode);
+  await openConditionFragmentsFromSidebar(page);
 
   await page.getByTestId('cfl-open-create').click();
   await expect(page.getByTestId('cfl-editor')).toBeVisible();
@@ -201,14 +268,12 @@ test('Condition fragment library creates, reuses, publishes, and impact-acks a s
   await page.getByLabel('fragment-owner-module').fill('workflow-demo');
   await page.getByLabel('fragment-description').fill('规则中心条件片段 golden：SLA 决策绑定和复用影响确认');
 
-  await expect(page.getByLabel('fragment-decision-binding-select')).toContainText('请假审批 SLA 截止时间', {
+  await expect(page.getByLabel('fragment-decision-binding-select')).toContainText(decisionName, {
     timeout: 15_000,
   });
-  await page.getByLabel('fragment-decision-binding-select').selectOption('complaint_sla_deadline');
+  await page.getByLabel('fragment-decision-binding-select').selectOption(decisionCode);
   await page.getByTestId('cfl-add-decision-binding').click();
-  await expect(page.getByTestId('cfl-decision-binding-complaint_sla_deadline')).toContainText(
-    '请假审批 SLA 截止时间',
-  );
+  await expect(page.getByTestId(`cfl-decision-binding-${decisionCode}`)).toContainText(decisionName);
 
   await page.getByTestId('cb-add').click();
   await page.getByLabel('field-0').selectOption('record:data.targetKey');
@@ -235,7 +300,7 @@ test('Condition fragment library creates, reuses, publishes, and impact-acks a s
   expect(createRequest.conditionSpec).toMatchObject({
     decisionBindings: [
       {
-        decisionCode: 'complaint_sla_deadline',
+        decisionCode,
         versionPolicy: 'LATEST_PUBLISHED',
         enabled: true,
       },
@@ -256,16 +321,13 @@ test('Condition fragment library creates, reuses, publishes, and impact-acks a s
     fragmentCode,
     version: 1,
     status: 'DRAFT',
-    decisionRefs: ['complaint_sla_deadline'],
+    decisionRefs: [decisionCode],
   });
 
   await expect(page.getByTestId(`cfl-row-${fragmentCode}`)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('cfl-message')).toContainText('已创建条件片段');
-  await expect(page.getByTestId('cfl-impact')).toContainText('主管审批 SLA', { timeout: 15_000 });
-  await expect(page.getByTestId('cfl-impact')).toContainText('HR 审批 SLA');
-  await expect(page.getByTestId('cfl-decision-link-complaint_sla_deadline')).toContainText(
-    '请假审批 SLA 截止时间',
-  );
+  await expect(page.getByTestId('cfl-impact')).toContainText(slaConsumerName, { timeout: 15_000 });
+  await expect(page.getByTestId(`cfl-decision-link-${decisionCode}`)).toContainText(decisionName);
 
   const validateV1ResponsePromise = page.waitForResponse(
     (response) =>
@@ -308,9 +370,7 @@ test('Condition fragment library creates, reuses, publishes, and impact-acks a s
 
   await page.getByTestId('cfl-open-version').click();
   await expect(page.getByTestId('cfl-editor')).toBeVisible();
-  await expect(page.getByTestId('cfl-decision-binding-complaint_sla_deadline')).toContainText(
-    '请假审批 SLA 截止时间',
-  );
+  await expect(page.getByTestId(`cfl-decision-binding-${decisionCode}`)).toContainText(decisionName);
   await page.getByLabel('fragment-name').fill(`${fragmentName} v2`);
   await page.getByLabel('value-0').selectOption('task_hr_approve');
   await expect(page.getByTestId('cb-preview')).toContainText('HR 审批节点');
@@ -327,7 +387,7 @@ test('Condition fragment library creates, reuses, publishes, and impact-acks a s
   expect(createV2Request.conditionSpec).toMatchObject({
     decisionBindings: [
       {
-        decisionCode: 'complaint_sla_deadline',
+        decisionCode,
         versionPolicy: 'LATEST_PUBLISHED',
         enabled: true,
       },
@@ -355,8 +415,7 @@ test('Condition fragment library creates, reuses, publishes, and impact-acks a s
   const validatedV2 = await readApi<ConditionFragment>(await validateV2ResponsePromise);
   expect(validatedV2).toMatchObject({ fragmentCode, version: 2, status: 'VALIDATED' });
 
-  await expect(page.getByTestId('cfl-impact')).toContainText('主管审批 SLA', { timeout: 15_000 });
-  await expect(page.getByTestId('cfl-impact')).toContainText('HR 审批 SLA');
+  await expect(page.getByTestId('cfl-impact')).toContainText(slaConsumerName, { timeout: 15_000 });
   await expect(page.getByTestId('cfl-publish-selected')).toBeDisabled();
   await expect(page.getByTestId('cfl-publish-selected')).toHaveAttribute(
     'title',

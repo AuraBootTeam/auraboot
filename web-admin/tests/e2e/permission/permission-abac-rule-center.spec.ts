@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, rmSync, statSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { Client } from 'pg';
 import { BACKEND_URL, PG_CONN } from '../../helpers/environments';
@@ -135,6 +135,7 @@ const ADMIN_PASSWORD = 'Test2026x';
 const TS = Date.now();
 const EVIDENCE_DIR = '/Users/ghj/work/auraboot/aura-decision/docs/evidence';
 const SYSTEM_REFERENCE_ASSETS_DIR = resolvePath(process.cwd(), '../docs/system-reference/assets');
+const LEAVE_REQUEST_FIELD_PERMISSION_LOCK = 'wd-leave-request-field-permission';
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -146,6 +147,37 @@ function dateOffsetStr(offsetDays: number): string {
   const date = new Date();
   date.setDate(date.getDate() + offsetDays);
   return date.toISOString().slice(0, 10);
+}
+
+async function acquireFileLock(name: string): Promise<() => Promise<void>> {
+  const root = resolvePath(process.cwd(), 'test-results/.locks');
+  const lockPath = resolvePath(root, `${name}.lock`);
+  const deadline = Date.now() + 60_000;
+  mkdirSync(root, { recursive: true });
+
+  while (true) {
+    try {
+      mkdirSync(lockPath);
+      let released = false;
+      return async () => {
+        if (released) return;
+        released = true;
+        rmSync(lockPath, { recursive: true, force: true });
+      };
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EEXIST') throw error;
+      const ageMs = Date.now() - statSync(lockPath).mtimeMs;
+      if (ageMs > 120_000) {
+        rmSync(lockPath, { recursive: true, force: true });
+        continue;
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`Timed out waiting for ${name} lock at ${lockPath}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
 }
 
 async function parseEnvelope<T>(response: { ok(): boolean; status(): number; text(): Promise<string>; url(): string }) {
@@ -849,6 +881,10 @@ function extractRuleTraceId(value: unknown): string | undefined {
     }
   }
   return undefined;
+}
+
+function permissionAuditVisibleTraceId(traceId: string): string {
+  return traceId.replace(/\b\d{6,}\b/g, '***');
 }
 
 async function readDecisionTraceLog(traceId: string): Promise<DecisionTraceLog> {
@@ -1585,6 +1621,7 @@ test('Low-permission browser fact catalog hides forbidden fields and keeps view-
   });
   const rolePermissionPid = await findRolePermissionPid(role.pid, permission.pid);
 
+  const releaseFieldPermissionLock = await acquireFileLock(LEAVE_REQUEST_FIELD_PERMISSION_LOCK);
   try {
     snapshots.push(
       ...(await setFieldPermission('wd_leave_request', 'wd_req_start_date', {
@@ -1698,13 +1735,17 @@ test('Low-permission browser fact catalog hides forbidden fields and keeps view-
       source: { kind: 'FIELD', scope: 'record', path: 'data.wd_req_start_date' },
     });
   } finally {
-    await restoreFieldExtensions(snapshots);
-    await refreshModelCache(request, adminToken, 'wd_leave_request');
-    await refreshModelCache(request, lowUserToken, 'wd_leave_request');
     try {
-      await refreshModelCacheFromBrowser(page, 'wd_leave_request');
-    } catch {
-      // The browser may not have reached a logged-in state if setup failed early.
+      await restoreFieldExtensions(snapshots);
+      await refreshModelCache(request, adminToken, 'wd_leave_request');
+      await refreshModelCache(request, lowUserToken, 'wd_leave_request');
+      try {
+        await refreshModelCacheFromBrowser(page, 'wd_leave_request');
+      } catch {
+        // The browser may not have reached a logged-in state if setup failed early.
+      }
+    } finally {
+      await releaseFieldPermissionLock();
     }
   }
 });
@@ -2009,7 +2050,11 @@ test('Permission Rule Center applicant reference deny links audit to unified Tra
     await expect(auditRow).toContainText(recordSnapshot.pid);
     const auditTrace = page.getByTestId(`permission-audit-trace-${audit!.id}`);
     await expect(auditTrace).toContainText(decisionCode);
-    await expect(auditTrace).toContainText(traceId!);
+    const visibleTraceId = permissionAuditVisibleTraceId(traceId!);
+    await expect(auditTrace).toContainText(visibleTraceId);
+    if (visibleTraceId !== traceId) {
+      await expect(auditTrace).not.toContainText(traceId!);
+    }
     await expect(auditTrace).toContainText('record.data.wd_req_applicant');
     const decisionTraceLink = page
       .locator(`[data-testid^="permission-audit-open-decision-trace-${audit!.id}-"]`)
@@ -2107,6 +2152,7 @@ test('Field permission filtering on dynamic detail creates field-governance audi
   const member = await findTenantMemberForEmail(lowUserEmail);
   const record = await pickLeaveRequestRecord();
 
+  const releaseFieldPermissionLock = await acquireFileLock(LEAVE_REQUEST_FIELD_PERMISSION_LOCK);
   try {
     snapshots.push(
       ...(await setFieldPermission('wd_leave_request', 'wd_req_type', {
@@ -2221,12 +2267,16 @@ test('Field permission filtering on dynamic detail creates field-governance audi
       fullPage: true,
     });
   } finally {
-    await restoreFieldExtensions(snapshots);
-    await refreshModelCache(request, adminToken, 'wd_leave_request');
     try {
-      await refreshModelCacheFromBrowser(page, 'wd_leave_request');
-    } catch {
-      // The browser may not have reached a logged-in state if setup failed early.
+      await restoreFieldExtensions(snapshots);
+      await refreshModelCache(request, adminToken, 'wd_leave_request');
+      try {
+        await refreshModelCacheFromBrowser(page, 'wd_leave_request');
+      } catch {
+        // The browser may not have reached a logged-in state if setup failed early.
+      }
+    } finally {
+      await releaseFieldPermissionLock();
     }
   }
 });

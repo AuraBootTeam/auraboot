@@ -113,6 +113,10 @@ function optionalDisplay(value: unknown): string | undefined {
   return displayValue === '-' ? undefined : displayValue;
 }
 
+function rawTraceId(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
 function decisionTraceHref(traceId: string): string {
   return `/p/decisionops_execution_logs?traceId=${encodeURIComponent(traceId)}`;
 }
@@ -207,12 +211,14 @@ function toTraceStepView(raw: unknown, index: number): TraceStepView {
     const metadata: TraceMetadataItem[] = [];
     const seenMetadata = new Set<string>();
     const ruleCenterFailures = recordArray(structuredDetails.ruleCenterFailures);
-    const ruleTraceId = optionalDisplay(
-      structuredDetails.ruleTraceId ?? ruleCenterFailures.find((failure) => optionalDisplay(failure.ruleTraceId))?.ruleTraceId,
-    );
-    if (ruleTraceId) {
+    const ruleTraceSource =
+      structuredDetails.ruleTraceId ??
+      ruleCenterFailures.find((failure) => rawTraceId(failure.ruleTraceId))?.ruleTraceId;
+    const ruleTraceId = optionalDisplay(ruleTraceSource);
+    const traceHrefId = rawTraceId(ruleTraceSource);
+    if (ruleTraceId && traceHrefId) {
       addMetadataOnce(metadata, seenMetadata, 'admin.permission.audit.traceId', '统一 Trace', ruleTraceId, {
-        href: decisionTraceHref(ruleTraceId),
+        href: decisionTraceHref(traceHrefId),
         testId: 'permission-audit-open-decision-trace',
       });
     }

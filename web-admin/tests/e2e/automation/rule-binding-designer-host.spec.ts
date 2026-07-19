@@ -640,6 +640,7 @@ async function addInputMappingRow(ruleField: ReturnType<Page['locator']>, index 
     .getByRole('button', { name: '添加映射' });
   await expect(async () => {
     if ((await row.count()) === 0) {
+      await expect(addButton).toBeEnabled({ timeout: 1_000 });
       await addButton.click();
     }
     await expect(row).toBeVisible({ timeout: 1_000 });
@@ -699,7 +700,7 @@ test('Automation trigger property panel hosts the rule center binding editor and
   await ruleField.locator('[data-testid="decision-rule-section-tab-decision"]').click();
 
   await ruleField.locator('select[aria-label="version-policy"]').selectOption('ROLLOUT');
-  await ruleField.getByRole('button', { name: '添加映射' }).click();
+  await addInputMappingRow(ruleField);
   await ruleField.locator('input[aria-label="mapping-input-0"]').fill('amount');
   await expect(
     ruleField.locator(

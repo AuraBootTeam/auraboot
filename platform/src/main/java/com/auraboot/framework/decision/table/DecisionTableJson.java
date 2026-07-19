@@ -22,8 +22,7 @@ public final class DecisionTableJson {
         JsonNode inputs = copy.path("inputs");
         if (inputs.isArray()) {
             for (JsonNode node : inputs) {
-                if (node instanceof ObjectNode input && !input.has("expr")
-                        && input.has("scope") && input.has("path")) {
+                if (node instanceof ObjectNode input && input.has("scope") && input.has("path")) {
                     ObjectNode expr = mapper.createObjectNode();
                     expr.put("type", "path");
                     expr.put("scope", input.path("scope").asText("record"));

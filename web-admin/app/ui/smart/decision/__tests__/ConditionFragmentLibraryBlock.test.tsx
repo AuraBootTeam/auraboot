@@ -111,6 +111,12 @@ describe('ConditionFragmentLibraryBlock', () => {
                 scopeType: 'BPM',
                 enabled: true,
               },
+              {
+                decisionCode: 'dynamic_sla_deadline',
+                decisionName: '动态 SLA 截止时间',
+                scopeType: 'SLA',
+                enabled: true,
+              },
             ],
           },
         });
@@ -306,6 +312,28 @@ describe('ConditionFragmentLibraryBlock', () => {
     );
     expect(screen.getByTestId('cfl-evaluation')).toHaveTextContent('命中');
     expect(screen.getByTestId('cfl-evaluation')).not.toHaveTextContent('MATCHED');
+  });
+
+  it('labels dynamic decision bindings from loaded definition metadata', async () => {
+    render(<ConditionFragmentLibraryBlock />);
+
+    await screen.findByTestId('cfl-row-leave_sla_node_match');
+    fireEvent.click(screen.getByTestId('cfl-open-create'));
+    await waitFor(() =>
+      expect(get).toHaveBeenCalledWith('/decision/definitions', { page: 1, size: 200 }),
+    );
+
+    fireEvent.change(screen.getByLabelText('fragment-decision-binding-select'), {
+      target: { value: 'dynamic_sla_deadline' },
+    });
+    fireEvent.click(screen.getByTestId('cfl-add-decision-binding'));
+
+    expect(screen.getByTestId('cfl-decision-binding-dynamic_sla_deadline')).toHaveTextContent(
+      '动态 SLA 截止时间',
+    );
+    expect(screen.getByTestId('cfl-decision-binding-dynamic_sla_deadline')).not.toHaveTextContent(
+      'dynamic_sla_deadline',
+    );
   });
 
   it('loads ConditionBuilder fields from the unified fact catalog before the legacy model field endpoint', async () => {

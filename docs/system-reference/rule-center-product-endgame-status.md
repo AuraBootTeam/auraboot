@@ -9,6 +9,31 @@ status: active
 
 把“决策中心”升级为清晰的“规则中心 / 策略中心”主入口，默认进入 Strategy Studio。Strategy Studio 和 SLA / BPM / Automation / EventPolicy / Permission 都必须基于真实 API 展示规则条件、条件片段、动作目录、消费方引用、执行日志，并且各消费方页面要能看清“绑定了哪个规则、输入输出映射、运行效果、日志证据”。
 
+## 当前测试报告（2026-07-19，Endgame 合并矩阵收口）
+
+本轮在当前隔离 worktree `codex/decisionops-rc-ux-smoke-stability-20260719` 和 fresh runtime `rc-endgame-main-112` 派生环境上完成最终补测。目标是把规则中心相关入口、Strategy Studio、条件片段库、SLA、BPM、Automation、Permission 和 DecisionOps Trace 放到同一浏览器矩阵中验证，而不是只跑单点 happy path。
+
+| 验证层 | 命令 / 范围 | 结果 |
+|---|---|---|
+| Playwright 合并矩阵 | `web-admin && PLAYWRIGHT_BASE_URL=http://127.0.0.1:5216 BACKEND_URL=http://127.0.0.1:6512 BE_PORT=6512 BFF_PORT=6216 PGDATABASE=auraboot_112 PW_SKIP_WEBSERVER=1 pnpm exec playwright test -c playwright.gt5.config.ts ... --project=chromium --reporter=line`；覆盖 11 个 spec：规则中心主入口、Strategy Studio DMN/条件复用、条件片段库、DMN 导出、虚拟源 Trace、Field Impact、DecisionOps full golden、Automation/BPM designer、SLA binding/actions、Permission ABAC | `57 passed (3.0m)` |
+| Focused 红灯复跑 | `Strategy Studio reuses user reference conditions...`、`Strategy Studio DMN round-trip preserves fact catalog valueLabels...` | 两个红灯分别单跑 `17 passed`，随后合并矩阵 57/57 passed |
+| 前端组件 | `pnpm exec vitest run app/shared/decision/ui/__tests__/DecisionOpsConsole.test.tsx app/shared/decision/ui/__tests__/DecisionTableEditor.test.tsx app/ui/smart/decision/__tests__/DecisionRuleBindingBlock.test.tsx app/ui/smart/decision/__tests__/ConditionFragmentLibraryBlock.test.tsx app/routes/enterprise/permission/__tests__/PermissionAuditTab.test.tsx --config vitest.config.ts` | `5 files / 105 tests passed` |
+| 前端类型 | `pnpm exec tsc --noEmit --pretty false --incremental false` | passed |
+| 后端 focused | `./gradlew -p platform :test --tests com.auraboot.framework.decision.service.impl.DecisionTableDmnXmlServiceImplTest` | BUILD SUCCESSFUL，6/6 passed |
+| e2e-truth / feature coverage | touched E2E 静态扫描 `skip/fixme/.only/waitForTimeout/retries/PUT/PATCH/page.goto/threshold` | 无 skip/fixme/.only/waitForTimeout/retries/PUT/PATCH 兜底；阈值为布局像素容差或真实业务数量下限；权限页直接 `goto('/enterprise/permissions')` 是被测模块入口，不是绕过被测规则保存链路 |
+
+本轮修复清单：
+
+- Strategy Studio 保存 DMN 时统一 editor table -> runtime `expr` 结构，防止发布后后端只收到 editor-only 字段。
+- Strategy Studio 条件片段保存支持已有 draft 更新 fallback，避免重复 draft 422。
+- 自动加载历史条件片段时不再用旧 `decisionRefs[0]` 覆盖当前场景的默认 `decisionCode`；只有用户明确点击片段库片段时才跟随片段引用。
+- 用户开始编辑 DMN 表后，晚返回的 `listVersions` restore 不再覆盖本地草稿。
+- 条件片段库动态决策引用使用 live definition label，不再显示 raw decision code。
+- SLA / Permission E2E 通过文件锁和模型缓存刷新隔离 `wd_leave_request` fieldPermission 变更，避免跨文件污染。
+- Permission 审计展示 public record pid 和脱敏 trace，嵌套 Rule Center failure 里的 trace/field/output 能在 UI 中被稳定回看。
+
+当前结论：本轮目标矩阵已经完成并通过，可以作为规则中心核心链路的回归基线。剩余未纳入本轮的真实外部 provider live matrix、更多 Permission 失败态、更多 BPM 节点/失败态和全局视觉细节，继续作为后续产品增强，不阻塞本轮合并。
+
 ## 当前测试报告（2026-07-19，Reference / DecisionOps Trace / Fact Catalog 一致性收口）
 
 本轮关闭的是低码业务 reference 字段与 DecisionOps Trace 的 focused end-to-end 链路，并修复静态 `/decision-ops` 执行日志入口仍停留在旧日志页的问题；follow-up 又补了 Strategy Studio 中 `wd_leave_request.wd_req_applicant` 在 SLA / BPM / Automation / EventPolicy / Permission 五个规则消费场景里的事实目录一致性 focused browser golden。本轮继续补了 SLA、Automation、EventPolicy、Permission 四个原生 runtime Trace 切片：新发布的申请人规则可以在 SLA 配置中选择、映射低码申请人字段、测试运行写入 `callerType=SLA / callerRef=<配置 pid>`，并在 DecisionOps Trace 抽屉展示申请人 fact metadata 和 SLA 回链；Automation 测试运行会把 `modelCode=wd_leave_request` 和 `wd_req_applicant` 输入传给 Rule Binding / Decision Runtime，执行日志展示同一申请人 fact metadata 和 Automation 设计器回链；EventPolicy 设计器现在能在 `wd_leave_request` 样例事实中携带申请人 pid，并在规则卡里绑定新发布 applicant decision，运行后同时产生动作执行证据和 `callerType=EVENT_POLICY / callerRef=<policyCode>` 的统一 Trace，Trace 抽屉展示申请人 fact metadata 和 EventPolicy 详情/设计器回链；Permission 动态 ABAC 现在会把低码 `model.<code>` 资源和 record data 一起传给 Rule Center，权限审计能展示嵌套 `ruleCenterFailures[]` 的统一 Trace 链接、字段引用和 DMN 输出，再跳到 DecisionOps Trace 回看申请人 fact metadata。验证范围包括 dict、user reference、business reference 三类事实元数据、一个五入口字段目录一致性切片，以及 SLA / Automation / EventPolicy / Permission 四条原生消费方 runtime Trace focused 切片，不把其它 BPM / BPMN 历史 `PARTIAL` 项误标为全量完成。

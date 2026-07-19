@@ -1,4 +1,7 @@
 import { test, expect, type APIResponse, type Page } from '@playwright/test';
+import { mkdirSync, rmSync, statSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
+import { Client } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginAs, loginViaUI } from '../../helpers/wd-fixtures';
 import {
@@ -8,7 +11,7 @@ import {
   uniqueId,
   waitForDynamicPageLoad,
 } from '../helpers';
-import { BACKEND_URL } from '../../helpers/environments';
+import { BACKEND_URL, PG_CONN } from '../../helpers/environments';
 
 type ApiEnvelope<T> = {
   code?: number | string;
@@ -121,7 +124,60 @@ type FieldImpact = {
 test.use({ storageState: { cookies: [], origins: [] } });
 test.setTimeout(120_000);
 
+const LEAVE_REQUEST_FIELD_PERMISSION_LOCK = 'wd-leave-request-field-permission';
+const LEAVE_REQUEST_CREATE_FIELDS = [
+  'wd_req_applicant',
+  'wd_req_type',
+  'wd_req_start_date',
+  'wd_req_start_slot',
+  'wd_req_end_date',
+  'wd_req_end_slot',
+  'wd_req_days',
+  'wd_req_reason',
+] as const;
+
 let backendJwtPromise: Promise<string> | null = null;
+
+async function acquireFileLock(name: string): Promise<() => Promise<void>> {
+  const root = resolvePath(process.cwd(), 'test-results/.locks');
+  const lockPath = resolvePath(root, `${name}.lock`);
+  const deadline = Date.now() + 60_000;
+  mkdirSync(root, { recursive: true });
+
+  while (true) {
+    try {
+      mkdirSync(lockPath);
+      let released = false;
+      return async () => {
+        if (released) return;
+        released = true;
+        rmSync(lockPath, { recursive: true, force: true });
+      };
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+      if (code !== 'EEXIST') throw error;
+      const ageMs = Date.now() - statSync(lockPath).mtimeMs;
+      if (ageMs > 120_000) {
+        rmSync(lockPath, { recursive: true, force: true });
+        continue;
+      }
+      if (Date.now() > deadline) {
+        throw new Error(`Timed out waiting for ${name} lock at ${lockPath}`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  }
+}
+
+async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
+  const client = new Client(PG_CONN);
+  await client.connect();
+  try {
+    return await fn(client);
+  } finally {
+    await client.end();
+  }
+}
 
 function isApiSuccess<T>(body: ApiEnvelope<T> | null | undefined): body is ApiEnvelope<T> {
   if (!body) return false;
@@ -205,6 +261,46 @@ async function requestDelete(page: Page, endpoint: string): Promise<APIResponse>
 
 async function postApi<T>(page: Page, endpoint: string, data?: unknown): Promise<T> {
   return readApi<T>(await requestPost(page, endpoint, { data }));
+}
+
+async function clearLeaveRequestCreateFieldPermissions(): Promise<void> {
+  await withDb(async (client) => {
+    await client.query(
+      `
+      update ab_meta_field f
+      set extension = jsonb_set(
+              coalesce(f.extension, '{}'::jsonb) - 'fieldPermission',
+              '{extension}',
+              coalesce(f.extension->'extension', '{}'::jsonb) - 'fieldPermission',
+              true
+          ),
+          updated_at = now()
+      from ab_meta_model_field_binding b
+      join ab_meta_model m on m.id = b.model_id
+      where b.field_id = f.id
+        and m.code = 'wd_leave_request'
+        and f.code = any($1::text[])
+        and m.deleted_flag = false
+        and f.deleted_flag = false
+        and b.deleted_flag = false
+        and m.is_current = true
+        and f.is_current = true
+        and (
+          coalesce(f.extension, '{}'::jsonb) ? 'fieldPermission'
+          or coalesce(f.extension->'extension', '{}'::jsonb) ? 'fieldPermission'
+        )
+      `,
+      [Array.from(LEAVE_REQUEST_CREATE_FIELDS)],
+    );
+  });
+}
+
+async function refreshLeaveRequestModelCache(page: Page): Promise<void> {
+  const model = await readApi<{ pid?: string }>(
+    await requestGet(page, '/api/meta/models/code/wd_leave_request'),
+  );
+  expect(model?.pid, 'wd_leave_request model pid must exist before refreshing cache').toBeTruthy();
+  await readApi<void>(await requestPost(page, `/api/meta/models/${model.pid}/refresh-cache`));
 }
 
 function recordsFromPayload<T>(payload: unknown): T[] {
@@ -810,31 +906,39 @@ async function createLeaveRequestDraft(
   const today = new Date();
   const startDate = today.toISOString().slice(0, 10);
   const endDate = new Date(today.getTime() + 86_400_000).toISOString().slice(0, 10);
-  const response = await requestPost(page, '/api/meta/commands/execute/wd:create_leave_request', {
-    data: {
-      operationType: 'create',
-      payload: {
-        wd_req_applicant: applicantPid,
-        wd_req_type: 'annual',
-        wd_req_start_date: startDate,
-        wd_req_start_slot: 'AM',
-        wd_req_end_date: endDate,
-        wd_req_end_slot: 'PM',
-        wd_req_days: 2,
-        wd_req_reason: reason,
+  const releaseFieldPermissionLock = await acquireFileLock(LEAVE_REQUEST_FIELD_PERMISSION_LOCK);
+  try {
+    await clearLeaveRequestCreateFieldPermissions();
+    await refreshLeaveRequestModelCache(page);
+
+    const response = await requestPost(page, '/api/meta/commands/execute/wd:create_leave_request', {
+      data: {
+        operationType: 'create',
+        payload: {
+          wd_req_applicant: applicantPid,
+          wd_req_type: 'annual',
+          wd_req_start_date: startDate,
+          wd_req_start_slot: 'AM',
+          wd_req_end_date: endDate,
+          wd_req_end_slot: 'PM',
+          wd_req_days: 2,
+          wd_req_reason: reason,
+        },
       },
-    },
-  });
-  const body = await response.json().catch(async () => ({
-    message: await response.text().catch(() => ''),
-  }));
-  expect(
-    response.ok(),
-    `Create leave request for SLA evidence failed: ${JSON.stringify(body)}`,
-  ).toBe(true);
-  const pid = extractRecordId(body);
-  expect(Boolean(pid), `Cannot extract leave request pid: ${JSON.stringify(body)}`).toBe(true);
-  return pid;
+    });
+    const body = await response.json().catch(async () => ({
+      message: await response.text().catch(() => ''),
+    }));
+    expect(
+      response.ok(),
+      `Create leave request for SLA evidence failed: ${JSON.stringify(body)}`,
+    ).toBe(true);
+    const pid = extractRecordId(body);
+    expect(Boolean(pid), `Cannot extract leave request pid: ${JSON.stringify(body)}`).toBe(true);
+    return pid;
+  } finally {
+    await releaseFieldPermissionLock();
+  }
 }
 
 async function waitForSlaActionLog(

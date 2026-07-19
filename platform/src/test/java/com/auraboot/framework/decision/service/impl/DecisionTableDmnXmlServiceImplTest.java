@@ -121,6 +121,41 @@ class DecisionTableDmnXmlServiceImplTest {
     }
 
     @Test
+    void editorFieldsOverrideStaleRuntimeExprWhenExportingDmn() throws Exception {
+        String table = """
+            { "hitPolicy":"FIRST",
+              "inputs":[{
+                "id":"record_data_wd_req_type",
+                "label":"请假类型",
+                "scope":"record",
+                "path":"data.wd_req_type",
+                "dataType":"dict",
+                "expr":{"type":"path","scope":"record","path":"data.leaveDays","dataType":"decimal"},
+                "allowedValues":["annual","sick"],
+                "valueLabels":{"annual":"年假","sick":"病假"}
+              }],
+              "outputs":[{"id":"route","label":"Route","dataType":"string"}],
+              "rules":[
+                {"ruleId":"leave","priority":10,"when":{"record_data_wd_req_type":{"operator":"IN","value":["annual","sick"]}},"then":{"route":"notify"}}
+              ] }
+            """;
+        DecisionTableDmnXmlRequest request = new DecisionTableDmnXmlRequest();
+        request.setDecisionId("leave_request_automation");
+        request.setDecisionName("wd_leave_high_value_notify");
+        request.setModel(mapper.readTree(table));
+
+        var result = service.roundTrip(request);
+
+        assertThat(result.getValid()).isTrue();
+        assertThat(result.getDmnXml()).contains("<text>wd_req_type</text>");
+        assertThat(result.getDmnXml()).doesNotContain("<text>leaveDays</text>");
+        assertThat(result.getModel().path("inputs").get(0).path("path").asText())
+                .isEqualTo("data.wd_req_type");
+        assertThat(result.getModel().path("rules").get(0).path("when")
+                .path("record_data_wd_req_type").path("value").get(0).asText()).isEqualTo("annual");
+    }
+
+    @Test
     void roundTripParsesDmnLiteralListsBackToInCellValues() throws Exception {
         String table = """
             { "hitPolicy":"FIRST",

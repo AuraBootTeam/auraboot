@@ -87,6 +87,33 @@ describe('DecisionRuleBindingBlock', () => {
     expect(screen.getByLabelText('decision-code')).toHaveTextContent('申请人 SLA 截止时间');
   });
 
+  it('disables adding input mappings when no selectable fact field is available', () => {
+    render(
+      <DecisionRuleBindingBlock
+        block={{
+          props: {
+            mode: 'decision',
+            initialDecisionCode: 'approval_routing',
+            fieldCatalogMode: 'disabled',
+            fields: [
+              {
+                scope: 'record',
+                path: 'data.secret_salary',
+                label: '敏感工资',
+                dataType: 'decimal',
+                visible: false,
+              },
+            ],
+            decisions: [{ code: 'approval_routing', name: '审批路由' }],
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '添加映射' })).toBeDisabled();
+    expect(screen.getByTestId('decision-binding-empty')).toHaveTextContent('暂无可映射输入字段');
+  });
+
   it('focuses compact rule authoring into condition, decision, impact and test workspaces', () => {
     render(
       <DecisionRuleBindingBlock
