@@ -2,7 +2,9 @@
  * AuraBot — RAG Knowledge Base Management
  *
  * Card-grid list of knowledge bases with create/edit/delete.
- * Follows the same layout pattern as providers.tsx.
+ * Follows the same layout pattern as providers.tsx. User-facing strings go through i18n
+ * (English fallback in code; zh via the /api/i18n resource) so the page matches the rest
+ * of the console instead of showing English chrome inside a Chinese UI.
  */
 
 import { useState, useEffect, useCallback } from 'react';
@@ -11,12 +13,16 @@ import {
   TrashIcon,
   PencilIcon,
   DocumentTextIcon,
-  MagnifyingGlassIcon,
+  Squares2X2Icon,
   XMarkIcon,
   CircleStackIcon,
+  PlayIcon,
+  PauseIcon,
+  ArrowRightIcon,
 } from '@heroicons/react/24/outline';
 import { get, post, put, del } from '~/shared/services/http-client';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,6 +77,7 @@ const DEFAULT_FORM: CreateKbForm = {
 
 export default function KnowledgeBasePage() {
   const toast = useToastContext();
+  const { t } = useI18n();
   const [kbs, setKbs] = useState<KnowledgeBase[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -82,11 +89,11 @@ export default function KnowledgeBasePage() {
       const res = await get<KnowledgeBase[]>('/api/ai/knowledge');
       setKbs(res?.data ?? []);
     } catch {
-      toast.showErrorToast('Failed to load knowledge bases');
+      toast.showErrorToast(t('ai.knowledge.toast.loadFailed', undefined, 'Failed to load knowledge bases'));
     } finally {
       setLoading(false);
     }
-  }, [toast]);
+  }, [toast, t]);
 
   useEffect(() => {
     fetchKbs();
@@ -94,17 +101,17 @@ export default function KnowledgeBasePage() {
 
   const handleCreate = async () => {
     if (!form.name.trim()) {
-      toast.showWarningToast('Name is required');
+      toast.showWarningToast(t('ai.knowledge.toast.nameRequired', undefined, 'Name is required'));
       return;
     }
     try {
       await post('/api/ai/knowledge', form);
-      toast.showSuccessToast('Knowledge base created');
+      toast.showSuccessToast(t('ai.knowledge.toast.created', undefined, 'Knowledge base created'));
       setShowCreate(false);
       setForm(DEFAULT_FORM);
       fetchKbs();
     } catch {
-      toast.showErrorToast('Failed to create knowledge base');
+      toast.showErrorToast(t('ai.knowledge.toast.createFailed', undefined, 'Failed to create knowledge base'));
     }
   };
 
@@ -112,23 +119,23 @@ export default function KnowledgeBasePage() {
     if (!editingKb) return;
     try {
       await put(`/api/ai/knowledge/${editingKb.pid}`, form);
-      toast.showSuccessToast('Knowledge base updated');
+      toast.showSuccessToast(t('ai.knowledge.toast.updated', undefined, 'Knowledge base updated'));
       setEditingKb(null);
       setForm(DEFAULT_FORM);
       fetchKbs();
     } catch {
-      toast.showErrorToast('Failed to update knowledge base');
+      toast.showErrorToast(t('ai.knowledge.toast.updateFailed', undefined, 'Failed to update knowledge base'));
     }
   };
 
   const handleDelete = async (kb: KnowledgeBase) => {
-    if (!confirm(`Delete "${kb.name}"? This will remove all documents and chunks.`)) return;
+    if (!confirm(t('ai.knowledge.confirmDelete', { name: kb.name }, `Delete "${kb.name}"? This will remove all documents and chunks.`))) return;
     try {
       await del(`/api/ai/knowledge/${kb.pid}`);
-      toast.showSuccessToast('Knowledge base deleted');
+      toast.showSuccessToast(t('ai.knowledge.toast.deleted', undefined, 'Knowledge base deleted'));
       fetchKbs();
     } catch {
-      toast.showErrorToast('Failed to delete knowledge base');
+      toast.showErrorToast(t('ai.knowledge.toast.deleteFailed', undefined, 'Failed to delete knowledge base'));
     }
   };
 
@@ -137,7 +144,7 @@ export default function KnowledgeBasePage() {
       await post(`/api/ai/knowledge/${kb.pid}/toggle-status`);
       fetchKbs();
     } catch {
-      toast.showErrorToast('Failed to toggle status');
+      toast.showErrorToast(t('ai.knowledge.toast.toggleFailed', undefined, 'Failed to toggle status'));
     }
   };
 
@@ -159,12 +166,19 @@ export default function KnowledgeBasePage() {
     <div className="flex h-full">
       {/* Main content */}
       <div className={`flex-1 overflow-auto p-6 ${isFormOpen ? 'mr-96' : ''}`}>
-        <div className="mb-6 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Knowledge Base</h1>
-            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Manage RAG knowledge bases for AI-augmented responses
-            </p>
+        <div className="mb-6 flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-2.5 shadow-sm">
+              <CircleStackIcon className="h-6 w-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+                {t('ai.knowledge.title', undefined, 'Knowledge Base')}
+              </h1>
+              <p className="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
+                {t('ai.knowledge.subtitle', undefined, 'Manage RAG knowledge bases for AI-augmented responses')}
+              </p>
+            </div>
           </div>
           <button
             onClick={() => {
@@ -172,10 +186,10 @@ export default function KnowledgeBasePage() {
               setShowCreate(true);
               setEditingKb(null);
             }}
-            className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white transition-colors hover:bg-blue-700"
+            className="flex shrink-0 items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-blue-700"
           >
             <PlusIcon className="h-5 w-5" />
-            New Knowledge Base
+            {t('ai.knowledge.new', undefined, 'New Knowledge Base')}
           </button>
         </div>
 
@@ -184,10 +198,14 @@ export default function KnowledgeBasePage() {
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
           </div>
         ) : kbs.length === 0 ? (
-          <div className="flex h-64 flex-col items-center justify-center text-gray-400">
-            <CircleStackIcon className="mb-4 h-16 w-16" />
-            <p className="text-lg">No knowledge bases yet</p>
-            <p className="text-sm">Create one to start building your AI knowledge</p>
+          <div className="flex h-72 flex-col items-center justify-center rounded-2xl border border-dashed border-gray-200 text-gray-400 dark:border-gray-700">
+            <CircleStackIcon className="mb-4 h-14 w-14 opacity-60" />
+            <p className="text-base font-medium text-gray-500 dark:text-gray-400">
+              {t('ai.knowledge.empty.title', undefined, 'No knowledge bases yet')}
+            </p>
+            <p className="mt-1 text-sm">
+              {t('ai.knowledge.empty.desc', undefined, 'Create one to start building your AI knowledge')}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -195,6 +213,7 @@ export default function KnowledgeBasePage() {
               <KbCard
                 key={kb.pid}
                 kb={kb}
+                t={t}
                 onEdit={() => openEdit(kb)}
                 onDelete={() => handleDelete(kb)}
                 onToggleStatus={() => handleToggleStatus(kb)}
@@ -210,7 +229,9 @@ export default function KnowledgeBasePage() {
           <div className="p-6">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {editingKb ? 'Edit Knowledge Base' : 'New Knowledge Base'}
+                {editingKb
+                  ? t('ai.knowledge.form.editTitle', undefined, 'Edit Knowledge Base')
+                  : t('ai.knowledge.form.newTitle', undefined, 'New Knowledge Base')}
               </h2>
               <button
                 onClick={() => {
@@ -224,9 +245,14 @@ export default function KnowledgeBasePage() {
 
             <KbForm
               form={form}
+              t={t}
               onChange={setForm}
               onSubmit={editingKb ? handleUpdate : handleCreate}
-              submitLabel={editingKb ? 'Update' : 'Create'}
+              submitLabel={
+                editingKb
+                  ? t('ai.knowledge.form.update', undefined, 'Update')
+                  : t('ai.knowledge.form.create', undefined, 'Create')
+              }
             />
           </div>
         </div>
@@ -239,13 +265,17 @@ export default function KnowledgeBasePage() {
 // Sub-components
 // ---------------------------------------------------------------------------
 
+type TFn = (key: string, params?: Record<string, any>, fallback?: string) => string;
+
 function KbCard({
   kb,
+  t,
   onEdit,
   onDelete,
   onToggleStatus,
 }: {
   kb: KnowledgeBase;
+  t: TFn;
   onEdit: () => void;
   onDelete: () => void;
   onToggleStatus: () => void;
@@ -254,10 +284,10 @@ function KbCard({
 
   return (
     <div
-      className={`rounded-xl border p-5 transition-all hover:shadow-md ${
+      className={`group rounded-xl border p-5 transition-all hover:-translate-y-0.5 hover:shadow-md ${
         isActive
           ? 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
-          : 'border-gray-200 bg-gray-50 opacity-60 dark:border-gray-700 dark:bg-gray-900'
+          : 'border-gray-200 bg-gray-50 opacity-70 dark:border-gray-700 dark:bg-gray-900'
       }`}
     >
       <div className="mb-3 flex items-start justify-between">
@@ -268,13 +298,16 @@ function KbCard({
           <div>
             <h3 className="font-semibold text-gray-900 dark:text-white">{kb.name}</h3>
             <span
-              className={`rounded-full px-2 py-0.5 text-xs ${
+              className={`mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
                 isActive
                   ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                   : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
               }`}
             >
-              {kb.status}
+              <span className={`h-1.5 w-1.5 rounded-full ${isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
+              {isActive
+                ? t('ai.knowledge.status.active', undefined, 'Active')
+                : t('ai.knowledge.status.disabled', undefined, 'Disabled')}
             </span>
           </div>
         </div>
@@ -286,42 +319,46 @@ function KbCard({
         </p>
       )}
 
-      <div className="mb-4 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+      <div className="mb-3 flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
         <span className="flex items-center gap-1">
           <DocumentTextIcon className="h-4 w-4" />
-          {kb.docCount} docs
+          {kb.docCount} {t('ai.knowledge.card.docs', undefined, 'docs')}
         </span>
         <span className="flex items-center gap-1">
-          <MagnifyingGlassIcon className="h-4 w-4" />
-          {kb.chunkCount} chunks
+          <Squares2X2Icon className="h-4 w-4" />
+          {kb.chunkCount} {t('ai.knowledge.card.chunks', undefined, 'chunks')}
         </span>
       </div>
 
-      <div className="mb-4 text-xs text-gray-400 dark:text-gray-500">
+      <div className="mb-4 inline-flex items-center rounded-md bg-gray-50 px-2 py-1 font-mono text-xs text-gray-400 dark:bg-gray-900/40 dark:text-gray-500">
         {kb.embeddingProvider} / {kb.embeddingModel}
       </div>
 
       <div className="flex items-center gap-2 border-t border-gray-100 pt-3 dark:border-gray-700">
         <a
           href={`/aurabot/knowledge/${kb.pid}`}
-          className="flex-1 rounded-lg py-1.5 text-center text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+          className="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-center text-sm font-medium text-blue-600 transition-colors hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
         >
-          Open
+          {t('ai.knowledge.card.open', undefined, 'Open')}
+          <ArrowRightIcon className="h-3.5 w-3.5" />
         </a>
         <button
           onClick={onEdit}
+          title={t('ai.knowledge.action.edit', undefined, 'Edit')}
           className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
         >
           <PencilIcon className="h-4 w-4" />
         </button>
         <button
           onClick={onToggleStatus}
+          title={isActive ? t('ai.knowledge.action.disable', undefined, 'Disable') : t('ai.knowledge.action.enable', undefined, 'Enable')}
           className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-700 dark:hover:text-gray-300"
         >
-          {kb.status === 'active' ? '⏸' : '▶'}
+          {isActive ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
         </button>
         <button
           onClick={onDelete}
+          title={t('ai.knowledge.action.delete', undefined, 'Delete')}
           className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
         >
           <TrashIcon className="h-4 w-4" />
@@ -333,11 +370,13 @@ function KbCard({
 
 function KbForm({
   form,
+  t,
   onChange,
   onSubmit,
   submitLabel,
 }: {
   form: CreateKbForm;
+  t: TFn;
   onChange: (f: CreateKbForm) => void;
   onSubmit: () => void;
   submitLabel: string;
@@ -348,34 +387,34 @@ function KbForm({
     <div className="space-y-4">
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Name *
+          {t('ai.knowledge.form.name', undefined, 'Name')} *
         </label>
         <input
           type="text"
           value={form.name}
           onChange={(e) => update('name', e.target.value)}
           className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          placeholder="e.g. Product Documentation"
+          placeholder={t('ai.knowledge.form.namePlaceholder', undefined, 'e.g. Product Documentation')}
         />
       </div>
 
       <div>
         <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Description
+          {t('ai.knowledge.form.description', undefined, 'Description')}
         </label>
         <textarea
           value={form.description}
           onChange={(e) => update('description', e.target.value)}
           rows={3}
           className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-gray-900 focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-          placeholder="What kind of knowledge will this base contain?"
+          placeholder={t('ai.knowledge.form.descPlaceholder', undefined, 'What kind of knowledge will this base contain?')}
         />
       </div>
 
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Provider
+            {t('ai.knowledge.form.provider', undefined, 'Provider')}
           </label>
           <select
             data-testid="kb-provider-select"
@@ -414,7 +453,7 @@ function KbForm({
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Model
+            {t('ai.knowledge.form.model', undefined, 'Model')}
           </label>
           <input
             type="text"
@@ -428,7 +467,7 @@ function KbForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Chunk Size
+            {t('ai.knowledge.form.chunkSize', undefined, 'Chunk Size')}
           </label>
           <input
             type="number"
@@ -439,7 +478,7 @@ function KbForm({
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Chunk Overlap
+            {t('ai.knowledge.form.chunkOverlap', undefined, 'Chunk Overlap')}
           </label>
           <input
             type="number"
