@@ -328,6 +328,55 @@ describe('ExecutionLogTraceBlock', () => {
     expect(screen.queryByTestId('elta-open-permission-audit')).not.toBeInTheDocument();
   });
 
+  it('links model permission logs back to audit by the low-code resource code', async () => {
+    const permissionLog = {
+      ...recentLog,
+      pid: 'permission-model-log-1',
+      traceId: 'trace-permission-model-1',
+      decisionCode: 'permission_model_replay',
+      callerType: 'PERMISSION',
+      callerRef: 'model.wd_leave_request.approve',
+    };
+    http.get.mockImplementation((endpoint: string, params?: Record<string, unknown>) => {
+      if (endpoint === '/decision/logs/recent') {
+        return Promise.resolve({
+          data: {
+            records: [permissionLog],
+            total: 1,
+            size: params?.size ?? 50,
+            current: 1,
+            pages: 1,
+          },
+        });
+      }
+      if (endpoint === '/decision/logs') {
+        return Promise.resolve({ data: [permissionLog] });
+      }
+      if (endpoint === '/decision/logs/permission-model-log-1') {
+        return Promise.resolve({ data: permissionLog });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/p/decisionops_execution_logs?traceId=trace-permission-model-1']}>
+        <ExecutionLogTraceBlock block={{ props: { mode: 'list', pageSize: 50 } }} />
+      </MemoryRouter>,
+    );
+
+    await screen.findByTestId('elta-row-permission-model-log-1');
+    fireEvent.click(screen.getByTestId('elta-open-trace-permission-model-log-1'));
+
+    const link = await screen.findByTestId('elta-open-permission-audit');
+    expect(link).toHaveAttribute(
+      'href',
+      '/enterprise/permissions?tab=audit&traceId=trace-permission-model-1&resourceCode=wd_leave_request',
+    );
+    expect(await screen.findByTestId('elta-chain-caller-permission-model-log-1')).toHaveTextContent(
+      '权限 / model.wd_leave_request.approve',
+    );
+  });
+
   it('links Automation execution logs back to the automation designer', async () => {
     const automationLog = {
       ...recentLog,
