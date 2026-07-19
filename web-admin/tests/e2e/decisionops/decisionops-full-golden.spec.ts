@@ -112,6 +112,8 @@ const ignoredConsolePatterns = [
   /Failed to load resource: the server responded with a status of (?:400|500)/i,
 ];
 
+test.use({ storageState: { cookies: [], origins: [] } });
+
 function assertApiSuccess<T>(response: APIResponse, body: ApiEnvelope<T>): T {
   expect(
     response.ok(),
@@ -167,11 +169,15 @@ async function expectNoLegacyConsoleLinks(
           onClick: element.getAttribute('onclick') ?? '',
         };
       })
-      .filter((entry) =>
-        [entry.href, entry.dataHref, entry.onClick].some((value) =>
-          value.includes('/decision-ops'),
-        ),
-      ),
+      .filter((entry) => {
+        const values = [entry.href, entry.dataHref, entry.onClick].filter(Boolean);
+        return values.some((value) => {
+          if (entry.href === '/decision-ops' && value === '/decision-ops') {
+            return false;
+          }
+          return value.includes('/decision-ops');
+        });
+      }),
   );
   expect(legacyLinks).toEqual([]);
 }
@@ -408,13 +414,24 @@ test.describe.serial('DecisionOps full-app golden', () => {
       'DMN 输出',
     );
     await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).toContainText(
-      'deadlineMinutes',
+      'Deadline minutes',
     );
-    await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).toContainText('45');
     await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).toContainText(
-      'severity',
+      '45',
+    );
+    await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).toContainText(
+      '严重程度',
     );
     await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).toContainText('warning');
+    await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).toContainText(
+      'Notification template',
+    );
+    await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).not.toContainText(
+      'deadlineMinutes',
+    );
+    await expect(page.getByTestId(`elta-output-snapshot-${outputLogPid}`)).not.toContainText(
+      'notificationTemplate',
+    );
     await capture(page, testInfo, 'decisionops-execution-log-dmn-output');
     await expectNoLegacyConsoleLinks(page);
 

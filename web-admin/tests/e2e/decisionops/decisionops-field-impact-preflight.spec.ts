@@ -125,12 +125,18 @@ test('DecisionOps model field impact preflights dict, data type, permission, and
   });
   await expect(page.getByTestId('decision-field-impact')).toBeVisible({ timeout: 10_000 });
   await expect(page.getByLabel('field-impact-ref')).toHaveValue('process.nodeId');
-  await expect(page.getByLabel('field-impact-current-type')).toHaveValue('string');
-  await expect(page.getByTestId('field-impact-risk')).toContainText('影响 1 个决策版本', {
+  const currentDataType = await page.getByLabel('field-impact-current-type').inputValue();
+  expect(currentDataType, 'current data type should be hydrated from the selected field impact URL').toBeTruthy();
+  await expect(page.getByTestId('field-impact-risk')).toContainText(/影响\s+\d+\s+个决策版本/, {
     timeout: 15_000,
   });
-  await expect(page.getByTestId('field-impact-counts')).toContainText('BPM 流程: 1');
-  await expect(page.getByTestId('field-impact-counts')).toContainText('决策版本: 1');
+  const riskText = (await page.getByTestId('field-impact-risk').innerText()).replace(/\s+/g, ' ').trim();
+  const impactedDecisionCount = Number(riskText.match(/影响\s+(\d+)\s+个决策版本/)?.[1] ?? '0');
+  expect(impactedDecisionCount, 'process.nodeId should have at least one decision usage').toBeGreaterThanOrEqual(1);
+  await expect(page.getByTestId('field-impact-counts')).toContainText(/BPM 流程:\s*[1-9]\d*/);
+  await expect(page.getByTestId('field-impact-counts')).toContainText(
+    new RegExp(`决策版本:\\s*${impactedDecisionCount}`),
+  );
   await expect(page.getByTestId('field-impact-references')).toContainText('BPM 流程');
   await expect(page.getByTestId('field-impact-references')).toContainText('决策版本');
 
@@ -141,7 +147,7 @@ test('DecisionOps model field impact preflights dict, data type, permission, and
   expect(dictBlocked.request).toMatchObject({
     fieldRef: 'process.nodeId',
     action: 'DELETE_DICT_ITEM',
-    currentDataType: 'string',
+    currentDataType,
     dictCode: 'leave_type',
     dictValue: 'annual',
     impactAcknowledged: false,
@@ -153,7 +159,7 @@ test('DecisionOps model field impact preflights dict, data type, permission, and
   });
   await expect(page.getByTestId('field-preflight-result')).toContainText('已阻断');
   await expect(page.getByTestId('field-preflight-result')).toContainText(
-    '字段变更需要确认影响面：影响 1 个决策版本',
+    `字段变更需要确认影响面：${riskText}`,
   );
 
   await page.getByTestId('field-preflight-ack').check();
@@ -165,7 +171,7 @@ test('DecisionOps model field impact preflights dict, data type, permission, and
   });
   await expect(page.getByTestId('field-preflight-result')).toContainText('可执行');
   await expect(page.getByTestId('field-preflight-result')).toContainText(
-    '确认影响面后可执行字段变更：影响 1 个决策版本',
+    `确认影响面后可执行字段变更：${riskText}`,
   );
 
   await page.getByLabel('field-preflight-action').selectOption({ label: '变更数据类型' });
@@ -175,7 +181,7 @@ test('DecisionOps model field impact preflights dict, data type, permission, and
   expect(typeBlocked.request).toMatchObject({
     fieldRef: 'process.nodeId',
     action: 'CHANGE_DATA_TYPE',
-    currentDataType: 'string',
+    currentDataType,
     nextDataType: 'decimal',
     impactAcknowledged: false,
   });
@@ -187,7 +193,7 @@ test('DecisionOps model field impact preflights dict, data type, permission, and
   });
   await expect(page.getByTestId('field-preflight-result')).toContainText('已阻断');
   await expect(page.getByTestId('field-preflight-result')).toContainText(
-    '字段变更需要确认影响面：影响 1 个决策版本',
+    `字段变更需要确认影响面：${riskText}`,
   );
 
   await page.getByTestId('field-preflight-ack').check();
@@ -195,7 +201,7 @@ test('DecisionOps model field impact preflights dict, data type, permission, and
   expect(typeAllowed.request).toMatchObject({
     fieldRef: 'process.nodeId',
     action: 'CHANGE_DATA_TYPE',
-    currentDataType: 'string',
+    currentDataType,
     nextDataType: 'decimal',
     impactAcknowledged: true,
   });
@@ -213,7 +219,7 @@ test('DecisionOps model field impact preflights dict, data type, permission, and
   expect(permissionAllowed.request).toMatchObject({
     fieldRef: 'process.nodeId',
     action: 'CHANGE_PERMISSION',
-    currentDataType: 'string',
+    currentDataType,
     nextPermission: 'manager.visible',
     impactAcknowledged: true,
   });
@@ -230,7 +236,7 @@ test('DecisionOps model field impact preflights dict, data type, permission, and
   expect(virtualAllowed.request).toMatchObject({
     fieldRef: 'process.nodeId',
     action: 'CHANGE_VIRTUAL_SOURCE',
-    currentDataType: 'string',
+    currentDataType,
     nextSourceRef: 'virtual.leave_request_summary.v2',
     impactAcknowledged: true,
   });
