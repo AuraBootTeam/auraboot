@@ -208,6 +208,34 @@ class TurnCompletionObservationListenerTest {
     }
 
     @Test
+    @DisplayName("detail never contains null values — AgentEvent snapshots with Map.copyOf, which NPEs on nulls")
+    void detailHasNoNullValues_mapCopyOfContract() {
+        // The ctx built here is deliberately null-heavy (channel/profileId/traceId
+        // all absent). Caught live 2026-07-19: three swallowed NPEs, zero
+        // ab_agent_observation rows, while the mocked service kept this suite green.
+        TurnOutcome[] outcomes = {
+                new TurnOutcome.Success("ok", Map.of()),
+                new TurnOutcome.Failed(null, null),            // null errorMessage on purpose
+                new TurnOutcome.Interrupted("partial", null),  // null reason on purpose
+        };
+        for (TurnOutcome outcome : outcomes) {
+            org.mockito.Mockito.reset(observationService);
+            listener.onTurnCompleted(new TurnCompletedEvent(newCtx(null, 100L, 42L, null), outcome));
+
+            ArgumentCaptor<Map<String, Object>> captor = ArgumentCaptor.forClass(Map.class);
+            verify(observationService, times(1)).publish(
+                    eq(42L), anyString(), anyString(), isNull(), anyString(), captor.capture());
+            Map<String, Object> detail = captor.getValue();
+            assertThat(detail.values()).as("outcome: %s", outcome.getClass().getSimpleName())
+                    .doesNotContainNull();
+            assertThatCode(() -> Map.copyOf(detail))
+                    .as("AgentEvent's Map.copyOf must accept the detail for outcome %s",
+                            outcome.getClass().getSimpleName())
+                    .doesNotThrowAnyException();
+        }
+    }
+
+    @Test
     @DisplayName("Null event / null outcome -> no publish, no exception")
     void nullSafety() {
         assertThatCode(() -> listener.onTurnCompleted(null)).doesNotThrowAnyException();
