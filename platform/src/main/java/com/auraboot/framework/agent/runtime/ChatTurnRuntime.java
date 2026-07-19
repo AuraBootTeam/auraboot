@@ -372,7 +372,11 @@ public class ChatTurnRuntime {
             ExecutionEnvelope envelope = executionEnvelopePlanner.plan(new ExecutionEnvelopePlanner.Request(
                     callbacks.executionEnvelope(preliminaryRound),
                     !catalogAllowedDefinitions.isEmpty(),
-                    false,
+                    // G10: read-only triage verdict feeds the planner directly. Note the
+                    // explicit envelope above short-circuits this input for the default
+                    // aurabot adapter (which caps in toolLoopEnvelope); this path matters
+                    // for callback impls that return a null explicit envelope.
+                    spec.ctx() != null && spec.ctx().readOnlyContextualTurn(),
                     false,
                     spec.agentProfile(),
                     tenantPolicyFromCatalog(catalogAllowedDefinitions)));
