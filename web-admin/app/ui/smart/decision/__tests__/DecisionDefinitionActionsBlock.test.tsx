@@ -284,6 +284,20 @@ describe('DecisionDefinitionActionsBlock', () => {
     );
   });
 
+  it('opens filtered execution logs from the definition detail action bar', async () => {
+    mockDefinitionApi({
+      versions: [{ pid: 'version-pid-1', decisionCode: 'sla_deadline', version: 1, status: 'PUBLISHED' }],
+    });
+
+    renderAtDetail();
+
+    fireEvent.click(await screen.findByTestId('dda-open-logs'));
+
+    expect(routerMocks.navigate).toHaveBeenCalledWith(
+      '/p/decisionops_execution_logs?decisionCode=sla_deadline',
+    );
+  });
+
   it('can derive the decision code from a DSL runtime record', async () => {
     mockDefinitionApi({
       versions: [{ pid: 'version-pid-1', decisionCode: 'sla_deadline', version: 1, status: 'PUBLISHED' }],
