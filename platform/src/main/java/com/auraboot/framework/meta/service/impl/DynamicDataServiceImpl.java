@@ -1780,6 +1780,81 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         return response;
     }
 
+    /**
+     * Bulk create fast path. Runs the same per-row validation/enrichment/PK/type-conversion as
+     * {@link #create} but accumulates all rows into ONE multi-row INSERT inside a single
+     * transaction, and skips the per-row post-insert tail (getById reload, change-log, automation
+     * triggers, SLA activation, virtual-field materialization). Returns the enriched rows (with
+     * generated primary keys) in input order so callers can correlate ids without a select-back.
+     *
+     * <p>Intended for mechanical bulk loads (BOM import). Per-row side effects that {@code create}
+     * fires are intentionally NOT run here — do not use for models that rely on create-time
+     * automations/SLA. Any downstream recompute (pricing, process-fee, rollup) materializes
+     * computed fields afterward.
+     */
+    @Override
+    @Transactional
+    public List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList) {
+        validateModelCode(modelCode);
+        assertWritable(modelCode);
+        if (dataList == null || dataList.isEmpty()) {
+            throw new MetaServiceException("Data list cannot be null or empty");
+        }
+
+        logOperation("bulkCreate", modelCode, dataList.size());
+
+        ModelDefinition model = getModelDefinition(modelCode);
+        ensureTableExists(modelCode);
+        FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
+        Set<String> jsonbColumns = JsonbFieldHelper.getJsonbHostColumns(model);
+
+        Object currentUserId = getCurrentUserId();
+        Object currentTenantId = getCurrentTenantId();
+        java.time.Instant now = java.time.Instant.now();
+
+        List<Map<String, Object>> columnDataList = new ArrayList<>(dataList.size());
+        List<Map<String, Object>> createdRecords = new ArrayList<>(dataList.size());
+
+        for (Map<String, Object> input : dataList) {
+            if (input == null || input.isEmpty()) {
+                throw new MetaServiceException("Data cannot be null or empty");
+            }
+            // Per-row prefix identical to create(): strip → normalize → validate → enrich → PK →
+            // convert types → filter virtual → toColumnData. Work on a copy so caller maps stay intact.
+            Map<String, Object> data = new HashMap<>(input);
+            stripNonWritableFields(modelCode, data);
+            payloadTemporalNormalizer.normalize(data, model);
+            validationService.validateAndThrow(model, data, ValidationContext.CREATE);
+
+            Map<String, Object> enrichedData = new HashMap<>(data);
+            enrichedData.put("created_at", now);
+            enrichedData.put("created_by", currentUserId);
+            enrichedData.put("updated_at", now);
+            enrichedData.put("updated_by", currentUserId);
+            enrichedData.put("tenant_id", currentTenantId);
+
+            if (!enrichedData.containsKey(primaryKey.getCode())) {
+                enrichedData.put(primaryKey.getCode(), typeSystemManager.generatePrimaryKey(primaryKey));
+            }
+
+            enrichedData = convertDataTypes(model, enrichedData);
+            filterVirtualFields(model, enrichedData);
+
+            columnDataList.add(toColumnData(model, enrichedData));
+            createdRecords.add(enrichedData); // carries generated PK, in input order
+        }
+
+        int inserted = jsonbColumns.isEmpty()
+                ? dynamicDataMapper.batchInsert(model.getTableName(), columnDataList)
+                : dynamicDataMapper.batchInsertWithJsonb(model.getTableName(), columnDataList, jsonbColumns);
+        if (inserted != dataList.size()) {
+            throw new MetaServiceException(
+                    "Bulk create expected " + dataList.size() + " rows inserted but got " + inserted);
+        }
+
+        return createdRecords;
+    }
+
     private boolean isRecordNotFound(MetaServiceException e) {
         String message = e.getMessage();
         return message != null && message.startsWith("Record not found:");

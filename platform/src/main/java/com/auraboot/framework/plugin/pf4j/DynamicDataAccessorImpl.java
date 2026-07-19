@@ -121,6 +121,12 @@ public class DynamicDataAccessorImpl implements DataAccessor {
     }
 
     @Override
+    public List<Map<String, Object>> bulkCreate(String modelCode, List<Map<String, Object>> dataList) {
+        log.debug("Plugin DataAccessor: bulkCreate({}, {} records)", modelCode, dataList != null ? dataList.size() : 0);
+        return dynamicDataService.bulkCreate(modelCode, dataList);
+    }
+
+    @Override
     public void delete(String modelCode, String recordId) {
         log.debug("Plugin DataAccessor: delete({}, {})", modelCode, recordId);
         dynamicDataService.delete(modelCode, recordId);
