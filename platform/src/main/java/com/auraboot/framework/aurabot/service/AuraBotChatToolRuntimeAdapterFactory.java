@@ -25,6 +25,7 @@ class AuraBotChatToolRuntimeAdapterFactory {
     private final ChatToolResolver chatToolResolver;
     private final ChatToolExecutor chatToolExecutor;
     private final ObjectMapper objectMapper;
+    private final ReadOnlyProfilePolicy readOnlyProfilePolicy;
 
     TurnOutcome run(TurnContext ctx,
                     String providerCode,
@@ -53,6 +54,7 @@ class AuraBotChatToolRuntimeAdapterFactory {
                 pendingToolStore,
                 pendingToolSnapshotFactory,
                 objectMapper,
+                readOnlyProfilePolicy,
                 maxToolRounds)
                 .run(ctx, providerCode, config, model, systemPrompt,
                         history, userMessage, maxTokens, tools, resolved,
