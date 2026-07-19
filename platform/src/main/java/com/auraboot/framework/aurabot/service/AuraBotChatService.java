@@ -164,7 +164,8 @@ public class AuraBotChatService {
                         llmProviderFactory,
                         chatToolResolver,
                         chatToolExecutor,
-                        objectMapper));
+                        objectMapper,
+                        new ReadOnlyProfilePolicy()));
     }
 
     public AuraBotChatService(LlmProviderFactory llmProviderFactory,

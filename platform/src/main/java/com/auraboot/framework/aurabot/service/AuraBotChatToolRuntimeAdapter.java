@@ -44,6 +44,7 @@ class AuraBotChatToolRuntimeAdapter {
     private final PendingToolStore pendingToolStore;
     private final PendingToolSnapshotFactory pendingToolSnapshotFactory;
     private final ObjectMapper objectMapper;
+    private final ReadOnlyProfilePolicy readOnlyProfilePolicy;
     private final int maxToolRounds;
 
     TurnOutcome run(TurnContext ctx,
@@ -267,24 +268,36 @@ class AuraBotChatToolRuntimeAdapter {
         ExecutionEnvelope base = hasWrite
                 ? ExecutionEnvelope.writeCatalogWithGate()
                 : ExecutionEnvelope.readOnlyCatalog();
-        return capForReadOnlyVerdict(base, ctx);
+        return capForReadOnlyVerdict(base, ctx, readOnlyProfilePolicy);
     }
 
     /**
-     * G10 (execution-architecture review): honor the triage read-only verdict.
-     * A CONTEXTUAL_ANSWER turn that was granted only read-only context tools
-     * must not expose write-capable tools, even when the resolved catalog
-     * contains them — cap the envelope at read-only so the policy engine
-     * drops write metadata from the round catalog. Strictly a CAP: an
-     * already-tighter envelope (answer-only / read-only) is never loosened.
-     * This is the enforcement the "read-only tier" label always claimed;
-     * before 2026-07-19 the verdict had no consumer at all.
+     * G10 + D2 (execution-architecture review): cap the tool envelope at
+     * read-only when either
+     * <ul>
+     *   <li>the triage verdict granted only read-only context tools
+     *       (CONTEXTUAL_ANSWER read tier, G10), or</li>
+     *   <li>the turn's user profile is designated read-only
+     *       ({@code aurabot.policy.read-only-profiles}, D2) — the hard
+     *       tool-scope half of the G11 ruling: a support-chat profile must
+     *       not expose write tools even when routing (or a routing bug)
+     *       says otherwise.</li>
+     * </ul>
+     * Strictly a CAP: an already-tighter envelope (answer-only / read-only)
+     * is never loosened. This is the enforcement the "read-only tier" label
+     * always claimed; before 2026-07-19 the verdict had no consumer at all.
      */
-    static ExecutionEnvelope capForReadOnlyVerdict(ExecutionEnvelope base, TurnContext ctx) {
-        if (base == null || ctx == null || !ctx.readOnlyContextualTurn()) {
+    static ExecutionEnvelope capForReadOnlyVerdict(ExecutionEnvelope base, TurnContext ctx,
+                                                   ReadOnlyProfilePolicy profilePolicy) {
+        if (base == null || ctx == null) {
             return base;
         }
-        if (base.capabilityCeiling() == ToolCapabilityCeiling.WRITE_CAPABLE) {
+        if (base.capabilityCeiling() != ToolCapabilityCeiling.WRITE_CAPABLE) {
+            return base;
+        }
+        boolean readOnlyVerdict = ctx.readOnlyContextualTurn();
+        boolean readOnlyProfile = profilePolicy != null && profilePolicy.isReadOnlyProfile(ctx.profileId());
+        if (readOnlyVerdict || readOnlyProfile) {
             return ExecutionEnvelope.readOnlyCatalog();
         }
         return base;

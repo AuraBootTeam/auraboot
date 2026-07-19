@@ -269,6 +269,20 @@ public class MemoryL1L2Promoter {
      */
     public Outcome promoteCandidate(Long tenantId, String runId,
                                     Map<String, Object> row, Instant now) {
+        return promoteCandidate(tenantId, runId, row, now, "session");
+    }
+
+    /**
+     * D1 (execution-architecture review, owner-approved 2026-07-19):
+     * category-parameterized variant so the chat-memory promotion channel
+     * ({@code ChatMemoryPromotionScanner}, source category
+     * {@code conversation_turn}) reuses the identical scoring + hash-dedup +
+     * cosine-dedup pipeline. The final category flip guards on
+     * {@code sourceCategory} so a raced/foreign row is never silently
+     * promoted from the wrong tier.
+     */
+    public Outcome promoteCandidate(Long tenantId, String runId,
+                                    Map<String, Object> row, Instant now, String sourceCategory) {
         String pid = (String) row.get("pid");
         int importance = ((Number) row.get("importance")).intValue();
         int accessCount = row.get("access_count") == null
@@ -372,9 +386,9 @@ public class MemoryL1L2Promoter {
                         + "       content_hash = ?, "
                         + "       updated_at = NOW() "
                         + " WHERE pid = ? "
-                        + "   AND category = 'session' "
+                        + "   AND category = ? "
                         + "   AND (deleted_flag IS NULL OR deleted_flag = FALSE)",
-                runId, scoreJson, hash, pid);
+                runId, scoreJson, hash, pid, sourceCategory);
 
         if (updated == 0) {
             // Race — someone else flipped this row between our SELECT and
