@@ -167,6 +167,7 @@ const SCENARIOS: StrategyScenario[] = [
     fields: [
       { scope: 'actor', path: 'orgPath', label: '组织路径', dataType: 'department' },
       { scope: 'record', path: 'data.departmentId', label: '记录部门', dataType: 'department' },
+      LEAVE_APPLICANT_REFERENCE_FIELD,
       { scope: 'tenant', path: 'id', label: '租户', dataType: 'string' },
     ],
   },
@@ -581,8 +582,20 @@ function editableFragmentStatus(status?: string): boolean {
 function conditionSpecFromBinding(binding: RuleConsumerBindingDraft | undefined, fallbackRoot: GroupNode) {
   return {
     root: binding?.conditionSpec?.root ?? fallbackRoot,
-    decisionBindings: binding?.conditionSpec?.decisionBindings ?? [],
+    decisionBindings: decisionBindingsFromRuleBinding(binding),
   }
+}
+
+function decisionBindingsFromRuleBinding(binding: RuleConsumerBindingDraft | undefined): unknown[] {
+  const decisionBindings = binding?.conditionSpec?.decisionBindings ?? []
+  const decisionBinding = binding?.decisionBinding
+  if (!decisionBinding?.decisionCode) return decisionBindings
+
+  const alreadyIncluded = decisionBindings.some((candidate) => {
+    if (!candidate || typeof candidate !== 'object') return false
+    return (candidate as { decisionCode?: unknown }).decisionCode === decisionBinding.decisionCode
+  })
+  return alreadyIncluded ? decisionBindings : [...decisionBindings, decisionBinding]
 }
 
 function normalizeFragmentCode(value: string): string {
@@ -701,6 +714,36 @@ function latestRestorableTableVersion(
         && isDecisionTable(version.contentJson)
     })
     .sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0]
+}
+
+function normalizeRestoredTable(table: DecisionTable, fallback: DecisionTable): DecisionTable {
+  const inputs = table.inputs
+    .map((input) => {
+      const restored = input as typeof input & {
+        expr?: { scope?: unknown; path?: unknown; dataType?: unknown }
+      }
+      const scope = restored.scope ?? restored.expr?.scope
+      const path = restored.path ?? restored.expr?.path
+      if (!scope || !path) return null
+      return {
+        ...restored,
+        scope: scope as typeof input.scope,
+        path: String(path),
+        dataType: (restored.dataType ?? restored.expr?.dataType ?? 'string') as typeof input.dataType,
+      }
+    })
+    .filter((input): input is DecisionTable['inputs'][number] => Boolean(input))
+  const outputs = table.outputs.filter((output) => output.id && output.label && output.dataType)
+
+  if (inputs.length === 0 || outputs.length === 0) return fallback
+  return {
+    ...fallback,
+    ...table,
+    inputs,
+    outputs,
+    rules: Array.isArray(table.rules) ? table.rules : fallback.rules,
+    defaultOutput: table.defaultOutput ?? fallback.defaultOutput,
+  }
 }
 
 function tableInputRefs(table: DecisionTable): string[] {
@@ -854,9 +897,10 @@ export function StrategyStudioWorkbench({
         if (cancelled) return
         const latest = latestRestorableTableVersion(versions)
         if (!latest || !isDecisionTable(latest.contentJson)) return
+        const restoredTable = normalizeRestoredTable(latest.contentJson, buildScenarioTable(activeScenario))
         const drafts = {
           ...tableDraftsRef.current,
-          [activeScenario.key]: latest.contentJson,
+          [activeScenario.key]: restoredTable,
         }
         tableDraftsRef.current = drafts
         setTableDrafts(drafts)
@@ -1158,11 +1202,18 @@ export function StrategyStudioWorkbench({
     if (!pid) return
     try {
       if (saved?.conditionFragmentPid) {
-        await api.validateConditionFragmentVersion(saved.conditionFragmentPid)
-        await api.publishConditionFragmentVersion(saved.conditionFragmentPid, {
+        const validatedFragment = await api.validateConditionFragmentVersion(saved.conditionFragmentPid)
+        setConditionFragmentDrafts((current) =>
+          upsertConditionFragmentDraft(current, validatedFragment),
+        )
+        const publishedFragment = await api.publishConditionFragmentVersion(saved.conditionFragmentPid, {
           impactAcknowledged: true,
           note: `Published from Strategy Studio for ${activeScenario.consumer}`,
         })
+        setConditionFragmentDrafts((current) =>
+          upsertConditionFragmentDraft(current, publishedFragment),
+        )
+        setSelectedFragmentCode(publishedFragment.fragmentCode)
       }
       const validation = await api.validateVersion(pid)
       if (!validation) {

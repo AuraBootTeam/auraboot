@@ -27,6 +27,18 @@ type DecisionFact = {
   allowedValues?: Array<{ value?: unknown; label?: string }>;
 };
 
+type UserOption = {
+  pid?: string;
+  id?: string;
+  displayName?: string;
+  name?: string;
+  realName?: string;
+  nickName?: string;
+  nickname?: string;
+  username?: string;
+  email?: string;
+};
+
 type DecisionVersion = {
   pid: string;
   status?: string;
@@ -43,6 +55,7 @@ type DecisionResult = {
 type TraceFactMetadata = {
   label?: string;
   factKey?: string;
+  dataType?: string;
   path?: string;
   modelCode?: string;
   dictCode?: string;
@@ -101,6 +114,16 @@ function findLeaveTypeFact(catalog: DecisionFactCatalog): DecisionFact | undefin
   return facts.find((fact) => fact.path === 'record.data.wd_req_type' || fact.path === 'data.wd_req_type');
 }
 
+function findApplicantFact(catalog: DecisionFactCatalog): DecisionFact | undefined {
+  const facts = [
+    ...(catalog.facts ?? []),
+    ...(catalog.entities ?? []).flatMap((entity) => entity.facts ?? []),
+  ];
+  return facts.find(
+    (fact) => fact.path === 'record.data.wd_req_applicant' || fact.path === 'data.wd_req_applicant',
+  );
+}
+
 function metadataForLeaveType(log: DecisionLogRecord): TraceFactMetadata | undefined {
   const metadata = log.traceSnapshot?.factMetadata ?? {};
   const aliases = [
@@ -125,6 +148,47 @@ function metadataForLeaveType(log: DecisionLogRecord): TraceFactMetadata | undef
     }),
     {},
   );
+}
+
+function metadataForApplicant(log: DecisionLogRecord): TraceFactMetadata | undefined {
+  const metadata = log.traceSnapshot?.factMetadata ?? {};
+  const aliases = [
+    metadata['record.data.wd_req_applicant'],
+    metadata['data.wd_req_applicant'],
+    metadata.wd_req_applicant,
+  ].filter((item): item is TraceFactMetadata => Boolean(item));
+  if (!aliases.length) return undefined;
+  return aliases.reduce<TraceFactMetadata>(
+    (merged, item) => ({
+      ...merged,
+      ...item,
+      label: merged.label ?? item.label,
+      factKey: merged.factKey ?? item.factKey,
+      path: merged.path ?? item.path,
+      dataType: merged.dataType ?? item.dataType,
+      modelCode: merged.modelCode ?? item.modelCode,
+      dictCode: merged.dictCode ?? item.dictCode,
+      valueLabels: {
+        ...(item.valueLabels ?? {}),
+        ...(merged.valueLabels ?? {}),
+      },
+    }),
+    {},
+  );
+}
+
+async function resolveFirstUser(page: Page): Promise<{ pid: string; label: string }> {
+  const users = await getApi<UserOption[]>(page, '/api/admin/users/search?keyword=&size=20');
+  const user = users.find((item) => item.pid || item.id);
+  expect(user, 'at least one user must exist for user reference trace evidence').toBeTruthy();
+  const pid = String(user?.pid ?? user?.id ?? '');
+  const label = String(
+    user?.displayName ?? user?.name ?? user?.realName ?? user?.nickName ?? user?.nickname
+    ?? user?.username ?? user?.email ?? pid,
+  );
+  expect(pid).not.toEqual('');
+  expect(label).not.toEqual('');
+  return { pid, label };
 }
 
 async function createAndPublishLeaveTypeDecision(
@@ -160,6 +224,55 @@ async function createAndPublishLeaveTypeDecision(
           type: 'literal',
           value: 'annual',
           dataType: 'enum',
+        },
+      },
+    },
+  );
+  expect(draft.pid).toBeTruthy();
+
+  const validation = await postApi<{ valid?: boolean }>(
+    page,
+    `/api/decision/versions/${encodeURIComponent(draft.pid)}/validate`,
+  );
+  expect(validation.valid).toBe(true);
+
+  return postApi<DecisionVersion>(page, `/api/decision/versions/${encodeURIComponent(draft.pid)}/publish`);
+}
+
+async function createAndPublishApplicantDecision(
+  page: Page,
+  decisionCode: string,
+  applicantPid: string,
+): Promise<DecisionVersion> {
+  await postApi(page, '/api/decision/definitions', {
+    decisionCode,
+    decisionName: `User Reference Trace ${decisionCode}`,
+    description: 'E2E decision verifies user reference metadata is visible in Trace',
+    scopeType: 'GOVERNANCE',
+    ownerModule: 'decision',
+    enabled: true,
+  });
+
+  const draft = await postApi<DecisionVersion>(
+    page,
+    `/api/decision/definitions/${encodeURIComponent(decisionCode)}/versions`,
+    {
+      kind: 'SIMPLE_CONDITION',
+      runtimeAdapter: 'AST_EVALUATOR',
+      versionTag: `user-reference-${Date.now()}`,
+      contentJson: {
+        type: 'compare',
+        left: {
+          type: 'path',
+          scope: 'record',
+          path: 'data.wd_req_applicant',
+          dataType: 'user',
+        },
+        operator: 'EQ',
+        right: {
+          type: 'literal',
+          value: applicantPid,
+          dataType: 'user',
         },
       },
     },
@@ -309,6 +422,111 @@ test('DecisionOps Trace shows low-code model fact metadata and dict value labels
 
   await page.screenshot({
     path: testInfo.outputPath('decisionops-fact-metadata-trace.png'),
+    fullPage: true,
+  });
+  expect(consoleErrors).toEqual([]);
+});
+
+test('DecisionOps Trace shows user reference fact metadata value labels @golden', async ({
+  page,
+}, testInfo) => {
+  const consoleErrors: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'error' && !isDevNoise(msg.text())) {
+      consoleErrors.push(msg.text());
+    }
+  });
+  page.on('pageerror', (error) => consoleErrors.push(`PAGEERROR: ${error.message}`));
+
+  await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  await expect(page).not.toHaveURL(/\/login(?:$|\?)/);
+
+  const catalog = await getApi<DecisionFactCatalog>(
+    page,
+    '/api/decision/facts/catalog?modelCode=wd_leave_request',
+  );
+  const applicantFact = findApplicantFact(catalog);
+  expect(applicantFact).toMatchObject({
+    label: expect.stringMatching(/申请人|Applicant/i),
+    dataType: expect.stringMatching(/user|reference/i),
+  });
+  const user = await resolveFirstUser(page);
+
+  const suffix = uniqueId('user_ref_meta').replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+  const decisionCode = `drt_e2e_user_ref_meta_${suffix}`;
+  const correlationId = `drt-e2e-user-ref-meta-${suffix}`;
+  const published = await createAndPublishApplicantDecision(page, decisionCode, user.pid);
+  expect(String(published.status ?? '')).toMatch(/published/i);
+
+  const evaluation = await postApi<DecisionResult>(page, '/api/decision/evaluate', {
+    decisionCode,
+    binding: 'LATEST',
+    callerType: 'E2E',
+    callerRef: 'decisionops-user-reference-fact-metadata-trace',
+    correlationId,
+    routingKey: suffix,
+    context: {
+      record: {
+        modelCode: 'wd_leave_request',
+        data: {
+          wd_req_applicant: user.pid,
+        },
+      },
+    },
+  });
+  expect(evaluation.matched).toBe(true);
+  expect(String(evaluation.status ?? '')).toMatch(/MATCHED|SUCCESS/i);
+  expect(evaluation.traceId).toBeTruthy();
+  expect(evaluation.unknownReasons ?? []).toEqual([]);
+
+  const logPage = await getApi<DecisionLogPage>(
+    page,
+    `/api/decision/logs/recent?decisionCode=${encodeURIComponent(decisionCode)}&keyword=${encodeURIComponent(
+      evaluation.traceId ?? correlationId,
+    )}&size=5`,
+  );
+  const log = logPage.records?.find(
+    (record) => record.traceId === evaluation.traceId || record.correlationId === correlationId,
+  );
+  expect(log?.pid).toBeTruthy();
+  const applicantMetadata = metadataForApplicant(log!);
+  expect(applicantMetadata).toMatchObject({
+    label: expect.stringMatching(/申请人|Applicant/i),
+    modelCode: 'wd_leave_request',
+    dataType: expect.stringMatching(/user|reference/i),
+  });
+  expect(applicantMetadata?.valueLabels?.[user.pid]).toContain(user.label);
+
+  await openExecutionLogsFromSidebar(page);
+  await page.getByLabel('log-keyword').fill(evaluation.traceId!);
+  await page.getByLabel('log-decision-code').fill(decisionCode);
+  const logsResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === 'GET' &&
+      response.url().includes('/api/decision/logs/recent') &&
+      response.url().includes(encodeURIComponent(decisionCode)),
+    { timeout: 15_000 },
+  );
+  await page.getByTestId('elta-apply').click();
+  await logsResponse;
+
+  const row = page.getByTestId(`elta-row-${log!.pid}`);
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId(`elta-open-trace-${log!.pid}`).click();
+  await expect(page.getByTestId('elta-trace-drawer')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('elta-trace-chain')).toBeVisible();
+
+  const factMetadata = page.getByTestId(`elta-fact-metadata-${log!.pid}`);
+  await expect(factMetadata).toBeVisible({ timeout: 10_000 });
+  await expect(factMetadata).toContainText('事实快照');
+  await expect(factMetadata).toContainText(/申请人|Applicant/i);
+  await expect(factMetadata).toContainText('record.data.wd_req_applicant');
+  await expect(factMetadata).toContainText('模型 wd_leave_request');
+  await expect(factMetadata).toContainText(/类型 (user|reference)/i);
+  await expect(factMetadata).toContainText(user.label);
+
+  await page.screenshot({
+    path: testInfo.outputPath('decisionops-user-reference-fact-metadata-trace.png'),
     fullPage: true,
   });
   expect(consoleErrors).toEqual([]);
