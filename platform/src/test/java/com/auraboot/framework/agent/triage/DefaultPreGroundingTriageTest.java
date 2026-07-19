@@ -92,7 +92,7 @@ class DefaultPreGroundingTriageTest {
         assertThat(triage.triage(req("web", null, "批量删除客户", false, false)).bucket())
                 .isEqualTo(TriageBucket.ACP_RUN);
         assertThat(triage.triage(req("web", null, "创建一个客户", false, false)).bucket())
-                .isEqualTo(TriageBucket.LIGHT_CHAT);
+                .isEqualTo(TriageBucket.SYNC_ACTION);
         assertThat(triage.triage(req("web", null, "创建一个客户", false, false)).reasonCodes())
                 .contains("rule:keyword_platform_action_sync");
     }
@@ -102,13 +102,13 @@ class DefaultPreGroundingTriageTest {
     // =====================================================================
 
     @Test
-    @DisplayName("Rule 4: simple write intent stays in chat runtime for late tool-policy binding")
-    void rule4_simpleWriteIntentStaysInChatTurn() {
+    @DisplayName("Rule 4 (G3): simple write intent -> SYNC_ACTION, chat runtime with platform semantics")
+    void rule4_simpleWriteIntentIsSyncAction() {
         for (String msg : new String[] {"创建客户", "新增跟进任务", "更新订单", "create customer"}) {
             TriageVerdict v = triage.triage(req("web", null, msg, true, false));
             assertThat(v.bucket())
                     .as("message: %s", msg)
-                    .isEqualTo(TriageBucket.LIGHT_CHAT);
+                    .isEqualTo(TriageBucket.SYNC_ACTION);
             assertThat(v.reasonCodes()).contains("rule:keyword_platform_action_sync");
         }
     }

@@ -136,8 +136,11 @@ public class DefaultPreGroundingTriage implements PreGroundingTriage {
                     Set.of());
         }
         if (platformActionKeyword) {
+            // Review G3: a synchronous write action is NOT light chat — it gets
+            // its own bucket so memory/observation/telemetry see it as the
+            // platform action it is, while still executing on the chat runtime.
             return new TriageVerdict(
-                    TriageBucket.LIGHT_CHAT, 0.80,
+                    TriageBucket.SYNC_ACTION, 0.80,
                     List.of("rule:keyword_platform_action_sync"),
                     Set.of());
         }
