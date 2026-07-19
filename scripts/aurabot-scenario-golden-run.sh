@@ -100,11 +100,22 @@ if [[ "$SKIP_TIER_A" -eq 0 ]]; then
 fi
 
 # --- Tier B: live scenario golden on an isolated stack --------------------
+# Evidence-preservation policy (owner rule, 2026-07-19): auto-teardown is
+# ONLY for the stub-mode all-green gate run. A red run keeps the stack (the
+# failure forensics ARE the point); a live-LLM run keeps the stack (it is
+# verification evidence the owner may want to inspect — destroying a
+# verification environment destroys its evidence). Manual cleanup:
+#   ./scripts/oss-golden-stack.sh destroy <runtime>
 teardown() {
-  if [[ "$KEEP" -eq 1 ]]; then
-    step "--keep: stack '$RUNTIME' left running for inspection (slot $SLOT)"
+  local failed=${#FAIL[@]}
+  local live=0
+  [[ "${AGENT_LLM_STUB_MODE:-true}" != "true" ]] && live=1
+  if [[ "$KEEP" -eq 1 || "$failed" -gt 0 || "$live" -eq 1 ]]; then
+    step "KEEPING stack '$RUNTIME' (slot $SLOT): keep=$KEEP failed=$failed live=$live"
+    step "  entry: backend http://localhost:$BE_PORT  db=$DB  logs=.workspace/golden/$RUNTIME/"
+    step "  destroy manually when done: ./scripts/oss-golden-stack.sh destroy $RUNTIME"
   else
-    step "teardown: destroying '$RUNTIME'"
+    step "teardown: destroying '$RUNTIME' (stub-mode all-green gate run)"
     "$REPO_ROOT/scripts/oss-golden-stack.sh" destroy "$RUNTIME" >/dev/null 2>&1 || true
   fi
 }
