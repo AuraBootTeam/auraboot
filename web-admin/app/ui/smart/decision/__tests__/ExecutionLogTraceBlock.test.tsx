@@ -297,6 +297,9 @@ describe('ExecutionLogTraceBlock', () => {
 
     const link = await screen.findByTestId('elta-open-sla-config');
     expect(link).toHaveAttribute('href', '/p/sla_config/view/01SLA_CONFIG');
+    expect(await screen.findByTestId('elta-chain-caller-sla-log-1')).toHaveTextContent(
+      'SLA / 01SLA_CONFIG',
+    );
     expect(screen.queryByTestId('elta-open-permission-audit')).not.toBeInTheDocument();
   });
 

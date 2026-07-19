@@ -1347,7 +1347,15 @@ export function StrategyStudioWorkbench({
           </div>
           <ul className="strategy-fact-list">
             {scenarioFields.slice(0, 8).map((field) => (
-              <li key={fieldKey(field)} title={formatFieldPath(field)}>
+              <li
+                key={fieldKey(field)}
+                title={formatFieldPath(field)}
+                data-testid={`strategy-fact-${field.scope}-${sanitizeTableId(field.path)}`}
+                data-scope={field.scope}
+                data-path={field.path}
+                data-model-code={field.modelCode ?? ''}
+                data-data-type={field.dataType}
+              >
                 <span>{fieldDisplayLabel(field)}</span>
                 <small>{fieldContextLabel(field)} · {dataTypeLabel(field.dataType)}</small>
               </li>

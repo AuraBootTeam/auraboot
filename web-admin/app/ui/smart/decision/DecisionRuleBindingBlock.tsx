@@ -34,6 +34,29 @@ export interface DecisionOption {
   outputSchemaJson?: unknown;
 }
 
+interface DecisionDefinitionRecord {
+  decisionCode?: string;
+  code?: string;
+  decisionName?: string;
+  name?: string;
+  enabled?: boolean;
+  outputs?: DecisionOutputSchemaSource[];
+  outputSchemaJson?: unknown;
+}
+
+type DecisionDefinitionListPayload =
+  | DecisionDefinitionRecord[]
+  | {
+      records?: DecisionDefinitionRecord[];
+      data?: DecisionDefinitionRecord[];
+      content?: DecisionDefinitionRecord[];
+    };
+
+type DecisionDefinitionPagePayload = Exclude<
+  DecisionDefinitionListPayload,
+  DecisionDefinitionRecord[]
+>;
+
 type RuleBindingWorkspacePanel = 'condition' | 'decision' | 'impact' | 'test';
 
 interface RuleBindingWorkspaceTab {
@@ -135,6 +158,11 @@ export interface RuleBindingDecisionApi {
   }) => Promise<DecisionResult>;
   getFactCatalog?: (modelCode?: string) => Promise<DecisionFactCatalog>;
   getModelFields?: () => Promise<DecisionModelField[]>;
+  listDefinitions?: (filters?: {
+    keyword?: string;
+    page?: number;
+    size?: number;
+  }) => Promise<unknown>;
 }
 
 type JsonBindingEnvelope = {
@@ -225,6 +253,31 @@ function mergeDecisionOptions(configured?: DecisionOption[]): DecisionOption[] {
     });
   });
   return Array.from(byCode.values());
+}
+
+function recordsFromDecisionDefinitionPayload(raw: unknown): DecisionDefinitionRecord[] {
+  if (Array.isArray(raw)) return raw as DecisionDefinitionRecord[];
+  if (!raw || typeof raw !== 'object') return [];
+  const payload = raw as DecisionDefinitionPagePayload;
+  if (Array.isArray(payload.records)) return payload.records;
+  if (Array.isArray(payload.data)) return payload.data;
+  if (Array.isArray(payload.content)) return payload.content;
+  return [];
+}
+
+function decisionDefinitionsToOptions(raw: unknown): DecisionOption[] {
+  return recordsFromDecisionDefinitionPayload(raw).reduce<DecisionOption[]>((options, record) => {
+    if (!record || record.enabled === false) return options;
+    const code = record.decisionCode || record.code || '';
+    if (!code.trim()) return options;
+    options.push({
+      code,
+      name: record.decisionName || record.name || code,
+      outputs: record.outputs,
+      outputSchemaJson: record.outputSchemaJson,
+    });
+    return options;
+  }, []);
 }
 
 const VERSION_POLICIES: DecisionVersionPolicy[] = [
@@ -1476,12 +1529,16 @@ export function DecisionRuleBindingBlock({
     mode === 'decision' ? 'decision' : 'condition',
   );
   const [catalogFields, setCatalogFields] = useState<FieldOption[]>([]);
+  const [definitionDecisionOptions, setDefinitionDecisionOptions] = useState<DecisionOption[]>([]);
   const fallbackFields = configuredFields ?? (fieldCatalogModelCode ? [] : DEFAULT_FIELDS);
   const baseFields =
     fieldCatalogMode === 'merge'
       ? mergeFieldOptions(catalogFields, fallbackFields)
       : (configuredFields ?? mergeFieldOptions(catalogFields, DEFAULT_FIELDS));
-  const decisions = useMemo(() => mergeDecisionOptions(props.decisions), [props.decisions]);
+  const decisions = useMemo(
+    () => mergeDecisionOptions([...(props.decisions ?? []), ...definitionDecisionOptions]),
+    [definitionDecisionOptions, props.decisions],
+  );
   const defaultApiRef = useRef<RuleBindingDecisionApi | null>(null);
   const incomingRawBindingValue =
     value ??
@@ -1631,6 +1688,29 @@ export function DecisionRuleBindingBlock({
       cancelled = true;
     };
   }, [configuredFields, fieldCatalogMode, fieldCatalogModelCode, getDecisionApi]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadDecisionDefinitions = async () => {
+      const decisionApi = getDecisionApi();
+      if (typeof decisionApi.listDefinitions !== 'function') {
+        return [];
+      }
+      return decisionDefinitionsToOptions(
+        await decisionApi.listDefinitions({ page: 1, size: 100 }),
+      );
+    };
+    loadDecisionDefinitions()
+      .then((nextOptions) => {
+        if (!cancelled) setDefinitionDecisionOptions(nextOptions);
+      })
+      .catch(() => {
+        if (!cancelled) setDefinitionDecisionOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [getDecisionApi]);
 
   useEffect(() => {
     const nextFingerprint = bindingValueFingerprint(incomingRawBindingValue);

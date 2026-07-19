@@ -570,6 +570,21 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('流程节点');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('当前记录');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('文本');
+    expect(screen.getByTestId('strategy-fact-record-data_wd_req_applicant')).toHaveTextContent(
+      '申请人',
+    );
+    expect(screen.getByTestId('strategy-fact-record-data_wd_req_applicant')).toHaveAttribute(
+      'data-path',
+      'data.wd_req_applicant',
+    );
+    expect(screen.getByTestId('strategy-fact-record-data_wd_req_applicant')).toHaveAttribute(
+      'data-model-code',
+      'wd_leave_request',
+    );
+    expect(screen.getByTestId('strategy-fact-record-data_wd_req_applicant')).toHaveAttribute(
+      'data-data-type',
+      'user',
+    );
     expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent(
       'record.data.targetKey',
     );
@@ -845,7 +860,7 @@ describe('DecisionOpsConsole', () => {
       getModelFields,
     } as unknown as Partial<DecisionApi>);
 
-    await waitFor(() => expect(listDefinitions).toHaveBeenCalledOnce());
+    await waitFor(() => expect(listDefinitions).toHaveBeenCalled());
     await waitFor(() => expect(getFactCatalog).toHaveBeenCalledOnce());
     expect(getModelFields).not.toHaveBeenCalled();
 
@@ -857,6 +872,13 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('申请金额');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('请假申请');
     expect(screen.getByTestId('strategy-fact-catalog')).toHaveTextContent('小数');
+    expect(screen.getByTestId('strategy-fact-record-data_wd_req_applicant')).toHaveTextContent(
+      '申请人',
+    );
+    expect(screen.getByTestId('strategy-fact-record-data_wd_req_applicant')).toHaveAttribute(
+      'data-path',
+      'data.wd_req_applicant',
+    );
     expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('record.data.amount');
     expect(screen.getByTestId('strategy-fact-catalog')).not.toHaveTextContent('访问次数');
   });

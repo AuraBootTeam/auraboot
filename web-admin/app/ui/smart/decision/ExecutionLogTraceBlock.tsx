@@ -1477,6 +1477,13 @@ export function ExecutionLogTraceBlock({ block, runtime }: ExecutionLogTraceBloc
                     </span>
                   </div>
                   <div className="elta-chain-sub">
+                    <span
+                      className="mono"
+                      data-testid={`elta-chain-caller-${log.pid ?? index}`}
+                      title={callerDisplay(log)}
+                    >
+                      {callerDisplay(log)}
+                    </span>
                     <span>v{display(log.selectedVersion ?? log.decisionVersion)}</span>
                     <span>{display(log.runtimeAdapter)}</span>
                     <span>{log.durationMs != null ? `${log.durationMs}ms` : '-'}</span>

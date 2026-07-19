@@ -25,6 +25,13 @@ type DecisionVersion = {
   status?: string;
 };
 
+type DecisionResult = {
+  status?: string;
+  matched?: boolean;
+  outputs?: Record<string, unknown>;
+  traceId?: string;
+};
+
 type SlaConfigRecord = {
   pid: string;
   name?: string;
@@ -69,6 +76,18 @@ type CurrentUser = {
   pid: string;
 };
 
+type UserOption = {
+  pid?: string;
+  id?: string;
+  displayName?: string;
+  name?: string;
+  realName?: string;
+  nickName?: string;
+  nickname?: string;
+  username?: string;
+  email?: string;
+};
+
 type DecisionFactCatalog = {
   entities?: Array<{
     modelCode?: string;
@@ -76,6 +95,7 @@ type DecisionFactCatalog = {
       scope?: string;
       path?: string;
       label?: string;
+      dataType?: string;
       allowedValues?: Array<{ value?: string; label?: string }>;
     }>;
   }>;
@@ -187,6 +207,17 @@ async function postApi<T>(page: Page, endpoint: string, data?: unknown): Promise
   return readApi<T>(await requestPost(page, endpoint, { data }));
 }
 
+function recordsFromPayload<T>(payload: unknown): T[] {
+  if (Array.isArray(payload)) return payload as T[];
+  if (!payload || typeof payload !== 'object') return [];
+  const value = payload as Record<string, unknown>;
+  if (Array.isArray(value.records)) return value.records as T[];
+  if (Array.isArray(value.content)) return value.content as T[];
+  if (Array.isArray(value.list)) return value.list as T[];
+  if (Array.isArray(value.data)) return value.data as T[];
+  return [];
+}
+
 async function ensureDecisionDefinition(page: Page, decisionCode: string): Promise<void> {
   const existing = await requestGet(page, `/api/decision/definitions/${decisionCode}`);
   const body = (await existing.json().catch(() => null)) as ApiEnvelope<unknown> | null;
@@ -244,6 +275,43 @@ async function publishSlaDecisionVersion(
   return postApi(page, `/api/decision/versions/${draft.pid}/publish`, {
     impactAcknowledged: true,
     note: 'SLA rule-center binding E2E fixture',
+  });
+}
+
+async function publishSlaApplicantDecisionVersion(
+  page: Page,
+  decisionCode: string,
+  applicantPid: string,
+): Promise<DecisionVersion> {
+  await ensureDecisionDefinition(page, decisionCode);
+  const draft = await postApi<DecisionVersion>(
+    page,
+    `/api/decision/definitions/${encodeURIComponent(decisionCode)}/versions`,
+    {
+      kind: 'SIMPLE_CONDITION',
+      runtimeAdapter: 'AST_EVALUATOR',
+      versionTag: `sla-applicant-${Date.now()}`,
+      contentJson: {
+        type: 'compare',
+        left: {
+          type: 'path',
+          scope: 'record',
+          path: 'data.wd_req_applicant',
+          dataType: 'user',
+        },
+        operator: 'EQ',
+        right: {
+          type: 'literal',
+          value: applicantPid,
+          dataType: 'user',
+        },
+      },
+    },
+  );
+  await postApi(page, `/api/decision/versions/${draft.pid}/validate`);
+  return postApi(page, `/api/decision/versions/${draft.pid}/publish`, {
+    impactAcknowledged: true,
+    note: 'SLA applicant reference rule-center binding E2E fixture',
   });
 }
 
@@ -711,6 +779,29 @@ async function resolveCurrentUserPid(page: Page): Promise<string> {
   return pid;
 }
 
+async function resolveFirstUser(page: Page): Promise<{ pid: string; label: string }> {
+  const payload = await readApi<unknown>(
+    await requestGet(page, '/api/admin/users/search?keyword=&size=20'),
+  );
+  const users = recordsFromPayload<UserOption>(payload);
+  const user = users.find((item) => item.pid || item.id);
+  expect(user, 'at least one user must exist for applicant reference evidence').toBeTruthy();
+  const pid = String(user?.pid ?? user?.id ?? '');
+  const label = String(
+    user?.displayName ??
+      user?.name ??
+      user?.realName ??
+      user?.nickName ??
+      user?.nickname ??
+      user?.username ??
+      user?.email ??
+      pid,
+  );
+  expect(pid, 'user pid must be resolved from /api/admin/users/search').toBeTruthy();
+  expect(label, 'user label must be resolved from /api/admin/users/search').toBeTruthy();
+  return { pid, label };
+}
+
 async function createLeaveRequestDraft(
   page: Page,
   applicantPid: string,
@@ -1056,6 +1147,162 @@ test('SLA config form hosts rule-center binding with backend field catalog and i
       path: testInfo.outputPath('sla-rule-binding-trace-back-to-config-detail.png'),
       fullPage: true,
     });
+  } finally {
+    await deleteSlaConfig(page, pid);
+  }
+});
+
+test('SLA rule binding test-run traces applicant user reference fact metadata @golden', async ({
+  page,
+}, testInfo) => {
+  await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  await expect(page).not.toHaveURL(/\/login(?:$|\?)/);
+
+  const user = await resolveFirstUser(page);
+  const suffix = uniqueId('sla_applicant_trace').replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+  const decisionCode = `sla_applicant_reference_${suffix}`;
+  const catalogFieldPath = 'data.wd_req_applicant';
+  const catalogFieldRef = `record.${catalogFieldPath}`;
+  const slaName = `Codex SLA Applicant Trace ${suffix}`;
+  const targetKey = `applicant_${suffix}`;
+
+  await publishSlaApplicantDecisionVersion(page, decisionCode, user.pid);
+  await postApi(page, '/api/decision/usage-index/rebuild');
+
+  const pid = await createSlaConfig(page, slaName, targetKey);
+
+  try {
+    const factCatalogResponse = page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/decision/facts/catalog') &&
+        response.url().includes('modelCode=wd_leave_request') &&
+        response.status() < 400,
+      { timeout: 15_000 },
+    );
+    await openSlaConfigEditor(page, slaName);
+    const block = page.getByTestId('decision-rule-binding-block');
+    const factCatalog = await readApi<DecisionFactCatalog>(await factCatalogResponse);
+    const leaveFacts = factCatalog.entities?.flatMap((entity) => entity.facts ?? []) ?? [];
+    const applicantFact = leaveFacts.find(
+      (field) => field.scope === 'record' && field.path === catalogFieldPath,
+    );
+    expect(
+      applicantFact,
+      `fact catalog should include ${catalogFieldRef}: ${JSON.stringify(factCatalog)}`,
+    ).toBeTruthy();
+    expect(applicantFact?.label ?? '').toMatch(/申请人|Applicant/i);
+    expect(applicantFact?.dataType ?? '').toMatch(/user|reference/i);
+
+    await block.getByLabel('decision-code').selectOption(decisionCode);
+    await block.getByLabel('version-policy').selectOption('LATEST_PUBLISHED');
+    await block.getByLabel('fallback-mode').selectOption('FAIL_CLOSED');
+    await block.getByRole('button', { name: '添加映射' }).click();
+    await expect(
+      block.locator(
+        `select[aria-label="mapping-field-0"] option[value="record:${catalogFieldPath}"]`,
+      ),
+    ).toHaveCount(1);
+    await block.getByLabel('mapping-input-0').fill('wd_req_applicant');
+    await block.getByLabel('mapping-field-0').selectOption(`record:${catalogFieldPath}`);
+
+    const testTab = block.getByTestId('decision-rule-section-tab-test');
+    if (await testTab.isVisible().catch(() => false)) {
+      await testTab.click();
+    } else {
+      await block.getByTestId('decision-test-runner').scrollIntoViewIfNeeded();
+    }
+    await block.getByLabel('open-test-context-drawer').click();
+    await block.getByLabel('test-context-field-record-data-wd_req_applicant').fill(user.pid);
+    const runResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' && response.url().includes('/api/decision/evaluate'),
+      { timeout: 15_000 },
+    );
+    await block.getByLabel('run-decision-test').click();
+    const runResult = await readApi<DecisionResult>(await runResponse);
+    expect(runResult.traceId).toBeTruthy();
+    expect(runResult.matched).toBe(true);
+    await expect(block.getByTestId('decision-test-result')).toContainText(/已命中|MATCHED/i, {
+      timeout: 15_000,
+    });
+
+    const traceLink = block.getByTestId('decision-test-open-trace');
+    await expect(traceLink).toBeVisible();
+    const traceHref = await traceLink.getAttribute('href');
+    expect(traceHref).toBeTruthy();
+    const traceUrl = new URL(traceHref!, page.url());
+    expect(traceUrl.pathname).toBe('/p/decisionops_execution_logs');
+    expect(traceUrl.searchParams.get('traceId')).toBe(runResult.traceId);
+    expect(traceUrl.searchParams.get('decisionCode')).toBe(decisionCode);
+    expect(traceUrl.searchParams.get('callerType')).toBe('SLA');
+    expect(traceUrl.searchParams.get('callerRef')).toBe(pid);
+    const decisionTraceHref = `${traceUrl.pathname}${traceUrl.search}`;
+
+    const saveResponse = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes('/api/meta/commands/execute/admin:update_sla_config'),
+      { timeout: 15_000 },
+    );
+    await page.getByRole('button', { name: /^保存$|^Save$/ }).click();
+    await readApi(await saveResponse);
+
+    const saved = await readApi<SlaConfigRecord>(
+      await requestGet(page, `/api/bpm/sla-configs/${pid}`),
+    );
+    const ruleBinding = (saved.ruleBinding ?? saved.rule_binding) as Record<string, unknown>;
+    expect(ruleBinding).toMatchObject({
+      consumerType: 'SLA',
+      consumerCode: pid,
+      bindingKind: 'DECISION_REF',
+      decisionBinding: {
+        decisionCode,
+        versionPolicy: 'LATEST_PUBLISHED',
+        inputMappings: [
+          {
+            input: 'wd_req_applicant',
+            source: { kind: 'FIELD', scope: 'record', path: catalogFieldPath },
+          },
+        ],
+      },
+    });
+
+    await page.goto(decisionTraceHref, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByLabel('log-keyword')).toHaveValue(runResult.traceId!);
+    await expect(page.getByLabel('log-decision-code')).toHaveValue(decisionCode);
+    await expect(page.getByLabel('log-caller-type')).toHaveValue('SLA');
+    expect(new URL(page.url()).searchParams.get('callerRef')).toBe(pid);
+
+    const traceRow = page
+      .locator('tr[data-testid^="elta-row-"]')
+      .filter({ hasText: runResult.traceId! })
+      .first();
+    await expect(traceRow).toBeVisible({ timeout: 15_000 });
+    await expect(traceRow).toContainText('SLA');
+    await traceRow.getByRole('button', { name: '追踪' }).click();
+    await expect(page.getByTestId('elta-trace-drawer')).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByTestId('elta-trace-chain')).toContainText('SLA');
+
+    const factMetadata = page.locator('[data-testid^="elta-fact-metadata-"]').first();
+    await expect(factMetadata).toBeVisible({ timeout: 10_000 });
+    await expect(factMetadata).toContainText('事实快照');
+    await expect(factMetadata).toContainText(/申请人|Applicant/i);
+    await expect(factMetadata).toContainText('record.data.wd_req_applicant');
+    await expect(factMetadata).toContainText('模型 wd_leave_request');
+    await expect(factMetadata).toContainText(/类型 (user|reference)/i);
+    await expect(factMetadata).toContainText(user.pid);
+    await expect(factMetadata).toContainText(user.label);
+
+    const openSlaConfig = page.getByTestId('elta-open-sla-config');
+    await expect(openSlaConfig).toHaveAttribute('href', `/p/sla_config/view/${pid}`);
+    await page.screenshot({
+      path: testInfo.outputPath('sla-applicant-reference-trace-fact-metadata.png'),
+      fullPage: true,
+    });
+    await openSlaConfig.click();
+    await expect(page).toHaveURL(new RegExp(`/p/sla_config/view/${pid}`), { timeout: 15_000 });
+    await expect(page.getByTestId('decision-rule-binding-block')).toBeVisible({ timeout: 15_000 });
   } finally {
     await deleteSlaConfig(page, pid);
   }
