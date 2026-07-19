@@ -38,6 +38,19 @@ interface StrategyScenario {
   fields: FieldOption[]
 }
 
+type RuntimeDecisionTableInput = Omit<DecisionTable['inputs'][number], 'scope' | 'path' | 'dataType'> & {
+  expr: {
+    type: 'path'
+    scope: Scope
+    path: string
+    dataType: DecisionTable['inputs'][number]['dataType']
+  }
+}
+
+type RuntimeDecisionTable = Omit<DecisionTable, 'inputs'> & {
+  inputs: RuntimeDecisionTableInput[]
+}
+
 const SLA_NODE_VALUE_LABELS: Record<string, string> = {
   task_manager_approve: '主管审批节点',
   task_hr_approve: 'HR 审批节点',
@@ -47,6 +60,24 @@ const PROCESS_NODE_VALUE_LABELS: Record<string, string> = {
   task_manager_approve: '主管审批节点',
   task_hr_approve: 'HR 审批节点',
   gw_manager: '主管审批网关',
+};
+
+const LEAVE_TYPE_VALUE_LABELS: Record<string, string> = {
+  annual: '年假',
+  sick: '病假',
+  personal: '事假',
+};
+
+const LEAVE_TYPE_FIELD: FieldOption = {
+  scope: 'record',
+  path: 'data.wd_req_type',
+  label: '请假类型',
+  dataType: 'dict',
+  options: Object.keys(LEAVE_TYPE_VALUE_LABELS),
+  valueLabels: LEAVE_TYPE_VALUE_LABELS,
+  modelCode: 'wd_leave_request',
+  modelName: '请假申请',
+  dictCode: 'wd_leave_type',
 };
 
 const LEAVE_APPLICANT_REFERENCE_FIELD: FieldOption = {
@@ -96,6 +127,7 @@ const SCENARIOS: StrategyScenario[] = [
       },
       { scope: 'sla', path: 'deadlineMinutes', label: '截止分钟', dataType: 'integer' },
       { scope: 'sla', path: 'warningBeforeMinutes', label: '提前提醒', dataType: 'integer' },
+      LEAVE_TYPE_FIELD,
       LEAVE_APPLICANT_REFERENCE_FIELD,
       {
         scope: 'process',
@@ -129,6 +161,7 @@ const SCENARIOS: StrategyScenario[] = [
         valueLabels: PROCESS_NODE_VALUE_LABELS,
       },
       { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
+      LEAVE_TYPE_FIELD,
       LEAVE_APPLICANT_REFERENCE_FIELD,
       { scope: 'actor', path: 'roles', label: '审批角色', dataType: 'collection' },
     ],
@@ -147,6 +180,7 @@ const SCENARIOS: StrategyScenario[] = [
     modelCodes: ['wd_leave_request'],
     fields: [
       { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
+      LEAVE_TYPE_FIELD,
       LEAVE_APPLICANT_REFERENCE_FIELD,
       { scope: 'record', path: 'pid', label: '申请记录', dataType: 'string' },
       { scope: 'time', path: 'now', label: '触发时间', dataType: 'datetime' },
@@ -167,6 +201,7 @@ const SCENARIOS: StrategyScenario[] = [
     fields: [
       { scope: 'actor', path: 'orgPath', label: '组织路径', dataType: 'department' },
       { scope: 'record', path: 'data.departmentId', label: '记录部门', dataType: 'department' },
+      LEAVE_TYPE_FIELD,
       LEAVE_APPLICANT_REFERENCE_FIELD,
       { scope: 'tenant', path: 'id', label: '租户', dataType: 'string' },
     ],
@@ -186,6 +221,7 @@ const SCENARIOS: StrategyScenario[] = [
     fields: [
       { scope: 'event', path: 'type', label: '事件类型', dataType: 'string' },
       { scope: 'record', path: 'data.wd_req_days', label: '请假天数', dataType: 'decimal' },
+      LEAVE_TYPE_FIELD,
       LEAVE_APPLICANT_REFERENCE_FIELD,
       { scope: 'actor', path: 'roles', label: '触发人角色', dataType: 'collection' },
     ],
@@ -598,7 +634,7 @@ function buildFragmentInitialValue(
       decisionBindings: [],
     },
     decisionBinding: {
-      decisionCode: fragment?.decisionRefs?.[0] || scenario.decisionCode,
+      decisionCode: scenario.decisionCode,
       versionPolicy: 'LATEST_PUBLISHED' as const,
       inputMappings: [],
       outputMappings: [],
@@ -756,6 +792,11 @@ function latestRestorableTableVersion(
     .sort((a, b) => (b.version ?? 0) - (a.version ?? 0))[0]
 }
 
+function restoredOutputsMatchScenario(outputs: DecisionTable['outputs'], fallback: DecisionTable): boolean {
+  const restoredIds = new Set(outputs.map((output) => output.id))
+  return fallback.outputs.some((output) => restoredIds.has(output.id))
+}
+
 function normalizeRestoredTable(table: DecisionTable, fallback: DecisionTable): DecisionTable {
   const inputs = table.inputs
     .map((input) => {
@@ -776,18 +817,37 @@ function normalizeRestoredTable(table: DecisionTable, fallback: DecisionTable): 
   const outputs = table.outputs.filter((output) => output.id && output.label && output.dataType)
 
   if (inputs.length === 0 || outputs.length === 0) return fallback
+  const outputsMatchScenario = restoredOutputsMatchScenario(outputs, fallback)
   return {
     ...fallback,
     ...table,
     inputs,
-    outputs,
-    rules: Array.isArray(table.rules) ? table.rules : fallback.rules,
-    defaultOutput: table.defaultOutput ?? fallback.defaultOutput,
+    outputs: outputsMatchScenario ? outputs : fallback.outputs,
+    rules: outputsMatchScenario && Array.isArray(table.rules) ? table.rules : [],
+    defaultOutput: outputsMatchScenario ? table.defaultOutput ?? fallback.defaultOutput : fallback.defaultOutput,
   }
 }
 
 function tableInputRefs(table: DecisionTable): string[] {
   return table.inputs.map((input) => `${input.scope}.${input.path}`)
+}
+
+function toRuntimeDecisionTable(table: DecisionTable): RuntimeDecisionTable {
+  return {
+    ...table,
+    inputs: table.inputs.map((input) => {
+      const { scope, path, dataType, ...rest } = input
+      return {
+        ...rest,
+        expr: {
+          type: 'path',
+          scope,
+          path,
+          dataType,
+        },
+      }
+    }),
+  }
 }
 
 function errorMessage(error: unknown): string {
@@ -854,6 +914,7 @@ export function StrategyStudioWorkbench({
     initialScenarioTables,
   )
   const tableDraftsRef = useRef(tableDrafts)
+  const dirtyScenarioTablesRef = useRef<Set<StrategyScenarioKey>>(new Set())
   const restoredScenarioTablesRef = useRef<Set<string>>(new Set())
   const [tableAnalyses, setTableAnalyses] = useState<Partial<Record<StrategyScenarioKey, DecisionTableAnalysis | null>>>({})
   const [tableAnalysisErrors, setTableAnalysisErrors] = useState<Partial<Record<StrategyScenarioKey, string | null>>>({})
@@ -873,21 +934,28 @@ export function StrategyStudioWorkbench({
     () => latestConditionFragments(conditionFragmentRows),
     [conditionFragmentRows],
   )
+  const explicitSelectedFragment = useMemo(
+    () =>
+      selectedFragmentCode
+        ? compatibleFragments.find((fragment) =>
+          fragment.fragmentCode === selectedFragmentCode && scenarioForFragment(fragment)?.key === scenario.key,
+        )
+        : undefined,
+    [compatibleFragments, scenario.key, selectedFragmentCode],
+  )
   const selectedFragment = useMemo(
     () =>
-      compatibleFragments.find((fragment) =>
-        fragment.fragmentCode === selectedFragmentCode && scenarioForFragment(fragment)?.key === scenario.key,
-      ) ??
+      explicitSelectedFragment ??
       compatibleFragments.find((fragment) => scenarioForFragment(fragment)?.key === scenario.key),
-    [compatibleFragments, scenario.key, selectedFragmentCode],
+    [compatibleFragments, explicitSelectedFragment, scenario.key],
   )
   const activeScenario = useMemo<StrategyScenario>(
     () => ({
       ...scenario,
-      decisionCode: selectedFragment?.decisionRefs?.[0] || scenario.decisionCode,
+      decisionCode: explicitSelectedFragment?.decisionRefs?.[0] || scenario.decisionCode,
       fragment: selectedFragment ? fragmentLabel(selectedFragment) : NO_FRAGMENT_LABEL,
     }),
-    [scenario, selectedFragment],
+    [scenario, explicitSelectedFragment, selectedFragment],
   )
   const studioEyebrow = st('$i18n:decisionops.header.eyebrow', 'Strategy Studio')
   const decisionOptions = useMemo(() => mergeDecisions(decisions, DECISIONS), [decisions])
@@ -935,6 +1003,7 @@ export function StrategyStudioWorkbench({
     api.listVersions(activeScenario.decisionCode)
       .then((versions) => {
         if (cancelled) return
+        if (dirtyScenarioTablesRef.current.has(activeScenario.key)) return
         const latest = latestRestorableTableVersion(versions)
         if (!latest || !isDecisionTable(latest.contentJson)) return
         const restoredTable = normalizeRestoredTable(latest.contentJson, buildScenarioTable(activeScenario))
@@ -980,6 +1049,7 @@ export function StrategyStudioWorkbench({
   }
 
   const updateScenarioTable = (key: StrategyScenarioKey, next: DecisionTable) => {
+    dirtyScenarioTablesRef.current.add(key)
     const drafts = { ...tableDraftsRef.current, [key]: next }
     tableDraftsRef.current = drafts
     setTableDrafts(drafts)
@@ -1169,11 +1239,12 @@ export function StrategyStudioWorkbench({
   const saveDecisionTableDraft = async (target: StrategyScenario): Promise<string | null> => {
     await ensureDefinition(target)
     const table = getScenarioTable(target)
+    const runtimeTable = toRuntimeDecisionTable(table)
     const draft = await api.createDraftVersion(target.decisionCode, {
       kind: 'DECISION_TABLE',
       runtimeAdapter: 'PLATFORM_DECISION_TABLE',
       versionTag: `studio-${target.key.toLowerCase()}`,
-      contentJson: table,
+      contentJson: runtimeTable,
       inputSchemaJson: { fields: tableInputRefs(table) },
       outputSchemaJson: {
         outputs: tableOutputSchema(table),
@@ -1191,21 +1262,72 @@ export function StrategyStudioWorkbench({
     target: StrategyScenario,
   ): Promise<string | null> => {
     const fragment = target.key === activeScenario.key ? selectedFragment : undefined
+    const defaultCode = defaultFragmentCode(target)
+    let existingDefaultFragment =
+      conditionFragmentRows.find((candidate) => candidate.fragmentCode === defaultCode) ??
+      (fragment?.fragmentCode === defaultCode ? fragment : undefined)
+    if (!existingDefaultFragment) {
+      const remoteFragments = await api.listConditionFragments({
+        keyword: defaultCode,
+        scopeType: target.key,
+        page: 1,
+        size: 20,
+      })
+      existingDefaultFragment = remoteFragments.records.find(
+        (candidate) => candidate.fragmentCode === defaultCode,
+      )
+    }
     const bindingKey = ruleBindingKey(target, fragment)
     const binding =
       ruleBindingDrafts[bindingKey] ?? buildFragmentInitialValue(target, fragment)
-    const request = buildConditionFragmentRequest(target, fragment, binding)
+    const request = buildConditionFragmentRequest(target, existingDefaultFragment ?? fragment, binding)
+    const updateExistingDraftVersion = async (
+      code: string,
+      originalError: unknown,
+    ): Promise<ConditionFragment> => {
+      const versions = await api.listConditionFragmentVersions(code).catch(() => [])
+      const draft = versions.find((candidate) => candidate.pid && editableFragmentStatus(candidate.status))
+      if (draft?.pid) {
+        return api.updateConditionFragmentDraft(draft.pid, request)
+      }
+      throw originalError instanceof Error ? originalError : new Error('条件片段版本创建失败')
+    }
+    const saveExistingFragmentDraft = async (candidate: ConditionFragment): Promise<ConditionFragment> => {
+      if (candidate.pid && editableFragmentStatus(candidate.status)) {
+        try {
+          return await api.updateConditionFragmentDraft(candidate.pid, request)
+        } catch {
+          if (!candidate.fragmentCode) throw new Error('条件片段草稿更新失败')
+        }
+      }
+      if (candidate.fragmentCode) {
+        try {
+          return await api.createConditionFragmentVersion(candidate.fragmentCode, request)
+        } catch (error) {
+          return updateExistingDraftVersion(candidate.fragmentCode, error)
+        }
+      }
+      throw new Error('条件片段缺少编码，无法保存新版本')
+    }
     let saved: ConditionFragment
-    if (fragment?.pid && editableFragmentStatus(fragment.status)) {
-      saved = await api.updateConditionFragmentDraft(fragment.pid, request)
-    } else if (fragment?.fragmentCode) {
-      saved = await api.createConditionFragmentVersion(fragment.fragmentCode, request)
+    if (existingDefaultFragment) {
+      saved = await saveExistingFragmentDraft(existingDefaultFragment)
+    } else if (fragment) {
+      saved = await saveExistingFragmentDraft(fragment)
     } else {
-      saved = await api.createConditionFragment({
-        ...request,
-        fragmentCode: defaultFragmentCode(target),
-        fragmentName: request.fragmentName,
-      })
+      try {
+        saved = await api.createConditionFragment({
+          ...request,
+          fragmentCode: defaultCode,
+          fragmentName: request.fragmentName,
+        })
+      } catch {
+        try {
+          saved = await api.createConditionFragmentVersion(defaultCode, request)
+        } catch (error) {
+          saved = await updateExistingDraftVersion(defaultCode, error)
+        }
+      }
     }
     setConditionFragmentDrafts((current) => upsertConditionFragmentDraft(current, saved))
     setSelectedFragmentCode(saved.fragmentCode)

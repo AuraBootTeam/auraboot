@@ -86,6 +86,12 @@ type DecisionTableModel = {
     scope?: string;
     path?: string;
     dataType?: string;
+    expr?: {
+      type?: string;
+      scope?: string;
+      path?: string;
+      dataType?: string;
+    };
     allowedValues?: string[];
     valueLabels?: Record<string, string>;
   }>;
@@ -151,8 +157,23 @@ function recordsFromPayload<T>(payload: unknown): T[] {
   return [];
 }
 
+async function gotoHome(page: Page): Promise<void> {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      await page.goto('/home', { waitUntil: 'domcontentloaded' });
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const onHome = new URL(page.url()).pathname === '/home';
+      if (!message.includes('ERR_ABORTED') || attempt === 2) throw error;
+      if (onHome) return;
+      await page.waitForLoadState('domcontentloaded').catch(() => undefined);
+    }
+  }
+}
+
 async function openRuleCenterFromSidebar(page: Page): Promise<void> {
-  await page.goto('/home', { waitUntil: 'domcontentloaded' });
+  await gotoHome(page);
   await ensureSidebarExpanded(page);
   const nav = page.locator('nav, aside, [role="navigation"]').first();
   const ruleCenterLink = nav
@@ -281,12 +302,13 @@ async function deleteAllDecisionTableRows(page: Page): Promise<void> {
 }
 
 async function resetConditionBuilderToSingleRow(page: Page): Promise<void> {
-  const deleteButtons = page.locator('button[aria-label^="delete-"]');
+  const builder = page.getByTestId('condition-builder');
+  const rows = builder.locator('[data-testid^="cb-row-"]');
   for (let guard = 0; guard < 20; guard += 1) {
-    const count = await deleteButtons.count();
+    const count = await rows.count();
     if (count === 0) break;
-    await deleteButtons.first().click();
-    await expect.poll(() => deleteButtons.count()).toBeLessThan(count);
+    await rows.first().locator('button[aria-label^="delete-"]').first().click();
+    await expect(rows).toHaveCount(count - 1);
   }
   await page.getByTestId('cb-add').click();
   await expect(page.getByTestId('cb-row-0')).toBeVisible({ timeout: 10_000 });
@@ -298,6 +320,30 @@ function isConditionFragmentDraftWrite(response: Response): boolean {
   return path === '/api/decision/condition-fragments'
     || /^\/api\/decision\/condition-fragments\/[^/]+\/versions$/.test(path)
     || /^\/api\/decision\/condition-fragment-versions\/[^/]+\/draft$/.test(path);
+}
+
+function conditionSpecUsesApplicant(conditionSpec: unknown, userPid: string): boolean {
+  const root = (conditionSpec as { root?: { children?: Array<Record<string, any>> } } | undefined)?.root;
+  const children = Array.isArray(root?.children) ? root.children : [];
+  return children.some(
+    (child) =>
+      child?.operator === 'EQ' &&
+      child?.left?.scope === 'record' &&
+      child?.left?.path === 'data.wd_req_applicant' &&
+      child?.right?.value === userPid,
+  );
+}
+
+function isConditionFragmentDraftWriteFor(scenario: { scopeType: string }, userPid: string) {
+  return (response: Response): boolean => {
+    if (!isConditionFragmentDraftWrite(response)) return false;
+    try {
+      const body = response.request().postDataJSON() as Record<string, unknown>;
+      return body.scopeType === scenario.scopeType && conditionSpecUsesApplicant(body.conditionSpec, userPid);
+    } catch {
+      return false;
+    }
+  };
 }
 
 function isConditionFragmentValidate(response: Response): boolean {
@@ -344,11 +390,38 @@ async function configureLeaveTypeRule(
   );
 }
 
-async function saveDraftAndPublishStrategyTable(page: Page): Promise<DecisionVersion> {
+async function switchStrategyScenario(
+  page: Page,
+  key: 'SLA' | 'BPM' | 'AUTOMATION' | 'PERMISSION' | 'EVENT_POLICY',
+  expectedSummary: RegExp,
+): Promise<void> {
+  const scenarioButton = page.getByTestId(`strategy-scenario-${key}`);
+  const summary = page.getByTestId('strategy-consumer-summary');
+  await expect(scenarioButton).toBeVisible({ timeout: 15_000 });
+  await scenarioButton.scrollIntoViewIfNeeded();
+  await expect
+    .poll(
+      async () => {
+        await scenarioButton.click().catch(() => {});
+        return (await summary.textContent()) ?? '';
+      },
+      { message: `Strategy Studio should switch to the ${key} scenario`, timeout: 15_000 },
+    )
+    .toMatch(expectedSummary);
+}
+
+async function selectAutomationScenario(page: Page): Promise<void> {
+  await switchStrategyScenario(page, 'AUTOMATION', /自动化|条件触发/);
+}
+
+async function saveDraftAndPublishStrategyTable(
+  page: Page,
+  decisionCode: string,
+): Promise<DecisionVersion> {
   const waitForDraftSave = () => page.waitForResponse(
     (response) =>
       response.request().method() === 'POST' &&
-      response.url().includes('/api/decision/definitions/complaint_sla_deadline/versions'),
+      response.url().includes(`/api/decision/definitions/${decisionCode}/versions`),
     { timeout: 15_000 },
   );
   const waitForVersionAction = (action: 'validate' | 'publish') => page.waitForResponse(
@@ -367,21 +440,19 @@ async function saveDraftAndPublishStrategyTable(page: Page): Promise<DecisionVer
     timeout: 15_000,
   });
 
-  const publishDraftResponsePromise = waitForDraftSave();
   const validateResponsePromise = waitForVersionAction('validate');
   const publishResponsePromise = waitForVersionAction('publish');
   await page.getByTestId('strategy-publish').click();
-  const publishDraft = await readApi<DecisionVersion>(await publishDraftResponsePromise);
-  expect(publishDraft.pid).toBeTruthy();
 
   const validateResponse = await validateResponsePromise;
-  expect(validateResponse.url()).toContain(`/api/decision/versions/${encodeURIComponent(publishDraft.pid)}/validate`);
+  const validatePid = new URL(validateResponse.url()).pathname.match(/\/api\/decision\/versions\/([^/]+)\/validate$/)?.[1];
+  expect(validatePid).toBeTruthy();
   const validation = await readApi<{ valid?: boolean }>(validateResponse);
   expect(validation.valid).toBe(true);
   const publishResponse = await publishResponsePromise;
-  expect(publishResponse.url()).toContain(`/api/decision/versions/${encodeURIComponent(publishDraft.pid)}/publish`);
+  expect(publishResponse.url()).toContain(`/api/decision/versions/${validatePid}/publish`);
   const published = await readApi<DecisionVersion>(publishResponse);
-  expect(published.pid).toBe(publishDraft.pid);
+  expect(published.pid).toBe(decodeURIComponent(validatePid!));
   expect(String(published.status ?? '')).toMatch(/published/i);
   await expect(page.getByTestId('strategy-operation-status')).toContainText('发布成功', {
     timeout: 15_000,
@@ -423,6 +494,56 @@ function leaveTypeCell(version: DecisionVersion) {
   return version.contentJson?.rules?.[0]?.when?.record_data_wd_req_type;
 }
 
+function decisionInputPath(input: NonNullable<DecisionTableModel['inputs']>[number] | undefined) {
+  return input?.path ?? input?.expr?.path;
+}
+
+async function restoreWorkflowAutomationDecision(page: Page): Promise<void> {
+  const raw = await readFile(
+    new URL('../../../../plugins/workflow-demo/config/decision-definitions.json', import.meta.url),
+    'utf8',
+  );
+  const seed = (JSON.parse(raw) as Array<Record<string, any>>).find(
+    (definition) => definition.decisionCode === 'leave_request_automation',
+  );
+  expect(seed, 'workflow-demo leave_request_automation seed must exist').toBeTruthy();
+  const draft = await postApi<DecisionVersion>(
+    page,
+    `/api/decision/definitions/${encodeURIComponent(seed!.decisionCode)}/versions`,
+    {
+      kind: seed!.kind,
+      runtimeAdapter: seed!.runtimeAdapter,
+      versionTag: `workflow-demo-e2e-restore-${Date.now()}`,
+      contentJson: seed!.contentJson,
+      inputSchemaJson: seed!.inputSchemaJson ?? { fields: ['record.data.leaveDays', 'record.data.wd_req_applicant'] },
+      outputSchemaJson:
+        seed!.outputSchemaJson ??
+        {
+          outputs: [
+            { id: 'severity', label: 'Severity', dataType: 'string' },
+            { id: 'message', label: 'Message', dataType: 'string' },
+            { id: 'actionType', label: 'Action type', dataType: 'string' },
+          ],
+        },
+      contextSchemaJson: seed!.contextSchemaJson ?? {},
+    },
+  );
+  const validation = await postApi<{ valid?: boolean }>(
+    page,
+    `/api/decision/versions/${encodeURIComponent(draft.pid)}/validate`,
+  );
+  expect(validation.valid).toBe(true);
+  const published = await postApi<DecisionVersion>(
+    page,
+    `/api/decision/versions/${encodeURIComponent(draft.pid)}/publish`,
+    {
+      impactAcknowledged: true,
+      note: 'Restore workflow-demo automation seed after Strategy Studio E2E',
+    },
+  );
+  expect(String(published.status ?? '')).toMatch(/published/i);
+}
+
 test('Strategy Studio DMN round-trip preserves fact catalog valueLabels @golden', async ({
   page,
 }, testInfo) => {
@@ -442,7 +563,7 @@ test('Strategy Studio DMN round-trip preserves fact catalog valueLabels @golden'
   const sickLabel = optionLabel(leaveTypeFact, 'sick');
 
   await openRuleCenterFromSidebar(page);
-  await expect(page.getByTestId('strategy-consumer-summary')).toContainText(/SLA|超时通知/);
+  await selectAutomationScenario(page);
   await activateStrategyWorkspace(page, 'dmn');
   await expect(page.getByTestId('strategy-dmn-panel')).toContainText('DMN 决策输出');
 
@@ -470,7 +591,10 @@ test('Strategy Studio DMN round-trip preserves fact catalog valueLabels @golden'
   );
   await page.getByTestId('dt-roundtrip-dmn').click();
   const roundTrip = await readApi<DecisionTableDmnXmlResult>(await roundTripResponsePromise);
-  expect(roundTrip.valid).toBe(true);
+  expect(
+    roundTrip.valid,
+    `Round-trip failed: ${JSON.stringify(roundTrip.errors)}\n${roundTrip.dmnXml ?? ''}`,
+  ).toBe(true);
   expect(roundTrip.dmnXml).toContain('aura:valueLabels');
   expect(roundTrip.dmnXml).toContain('value="annual"');
   expect(roundTrip.dmnXml).toContain(`label="${escapeXmlAttribute(annualLabel)}"`);
@@ -572,81 +696,96 @@ test('Strategy Studio saves, publishes and reloads dict IN and NOT_IN raw arrays
   const sickLabel = optionLabel(leaveTypeFact, 'sick');
 
   await openRuleCenterFromSidebar(page);
-  await configureLeaveTypeRule(page, 'IN', { annual: annualLabel, sick: sickLabel });
-  const inVersion = await saveDraftAndPublishStrategyTable(page);
-  expect(inVersion.kind).toBe('DECISION_TABLE');
-  expect(inVersion.runtimeAdapter).toBe('PLATFORM_DECISION_TABLE');
-  expect(inVersion.contentJson?.inputs?.[0]).toEqual(
-    expect.objectContaining({
-      id: 'record_data_wd_req_type',
-      path: 'data.wd_req_type',
-      allowedValues: expect.arrayContaining(['annual', 'sick']),
-      valueLabels: expect.objectContaining({
-        annual: expect.stringMatching(/年假|Annual/i),
-        sick: expect.stringMatching(/病假|Sick/i),
+  try {
+    await selectAutomationScenario(page);
+    await configureLeaveTypeRule(page, 'IN', { annual: annualLabel, sick: sickLabel });
+    const inVersion = await saveDraftAndPublishStrategyTable(page, 'leave_request_automation');
+    expect(inVersion.kind).toBe('DECISION_TABLE');
+    expect(inVersion.runtimeAdapter).toBe('PLATFORM_DECISION_TABLE');
+    const leaveTypeInput = inVersion.contentJson?.inputs?.find(
+      (input) => input.id === 'record_data_wd_req_type',
+    );
+    expect(leaveTypeInput).toEqual(
+      expect.objectContaining({
+        id: 'record_data_wd_req_type',
+        expr: expect.objectContaining({
+          type: 'path',
+          scope: 'record',
+          path: 'data.wd_req_type',
+        }),
+        allowedValues: expect.arrayContaining(['annual', 'sick']),
+        valueLabels: expect.objectContaining({
+          annual: expect.stringMatching(/年假|Annual/i),
+          sick: expect.stringMatching(/病假|Sick/i),
+        }),
       }),
-    }),
-  );
-  expect(leaveTypeCell(inVersion)).toEqual(
-    expect.objectContaining({
-      operator: 'IN',
-      value: ['annual', 'sick'],
-    }),
-  );
+    );
+    expect(decisionInputPath(leaveTypeInput)).toBe('data.wd_req_type');
+    expect(leaveTypeInput).not.toHaveProperty('path');
+    expect(leaveTypeCell(inVersion)).toEqual(
+      expect.objectContaining({
+        operator: 'IN',
+        value: ['annual', 'sick'],
+      }),
+    );
 
-  const uiEvaluateResponsePromise = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'POST' &&
-      response.url().includes('/api/decision/evaluate'),
-  );
-  await page.getByTestId('strategy-run-test').click();
-  const uiEvaluate = await readApi<DecisionResult>(await uiEvaluateResponsePromise);
-  expect(uiEvaluate.matched).toBe(true);
-  await expect(page.getByTestId('strategy-operation-status')).toContainText('测试通过', {
-    timeout: 15_000,
-  });
+    const uiEvaluateResponsePromise = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        response.url().includes('/api/decision/evaluate'),
+    );
+    await page.getByTestId('strategy-run-test').click();
+    const uiEvaluate = await readApi<DecisionResult>(await uiEvaluateResponsePromise);
+    expect(uiEvaluate.matched).toBe(true);
+    await expect(page.getByTestId('strategy-operation-status')).toContainText('测试通过', {
+      timeout: 15_000,
+    });
 
-  const inHit = await runDraftTable(page, tableWithoutDefaultOutput(inVersion), 'annual');
-  expect(inHit.status).toBe('MATCHED');
-  expect(inHit.matched).toBe(true);
-  expect(inHit.outputs?.route).toBe('notify');
-  const inMiss = await runDraftTable(page, tableWithoutDefaultOutput(inVersion), 'personal');
-  expect(inMiss.status).toBe('NOT_MATCHED');
-  expect(inMiss.matched).toBe(false);
+    const inHit = await runDraftTable(page, tableWithoutDefaultOutput(inVersion), 'annual');
+    expect(inHit.status).toBe('MATCHED');
+    expect(inHit.matched).toBe(true);
+    expect(inHit.outputs?.route).toBe('notify');
+    const inMiss = await runDraftTable(page, tableWithoutDefaultOutput(inVersion), 'personal');
+    expect(inMiss.status).toBe('NOT_MATCHED');
+    expect(inMiss.matched).toBe(false);
 
-  await configureLeaveTypeRule(page, 'NOT_IN', { annual: annualLabel, sick: sickLabel });
-  const notInVersion = await saveDraftAndPublishStrategyTable(page);
-  expect(leaveTypeCell(notInVersion)).toEqual(
-    expect.objectContaining({
-      operator: 'NOT_IN',
-      value: ['annual', 'sick'],
-    }),
-  );
+    await configureLeaveTypeRule(page, 'NOT_IN', { annual: annualLabel, sick: sickLabel });
+    const notInVersion = await saveDraftAndPublishStrategyTable(page, 'leave_request_automation');
+    expect(leaveTypeCell(notInVersion)).toEqual(
+      expect.objectContaining({
+        operator: 'NOT_IN',
+        value: ['annual', 'sick'],
+      }),
+    );
 
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(page.getByTestId('strategy-studio')).toBeVisible({ timeout: 15_000 });
-  await activateStrategyWorkspace(page, 'dmn');
-  await expect(page.getByTestId('dt-in-record_data_wd_req_type')).toContainText(/请假类型|Leave Type/i, {
-    timeout: 15_000,
-  });
-  await expect(page.getByLabel('op-0-record_data_wd_req_type')).toHaveValue('NOT_IN');
-  await expect.poll(() => selectedOptionLabels(page, 'val-0-record_data_wd_req_type')).toEqual(
-    expect.arrayContaining([annualLabel, sickLabel]),
-  );
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('strategy-studio')).toBeVisible({ timeout: 15_000 });
+    await selectAutomationScenario(page);
+    await activateStrategyWorkspace(page, 'dmn');
+    await expect(page.getByTestId('dt-in-record_data_wd_req_type')).toContainText(/请假类型|Leave Type/i, {
+      timeout: 15_000,
+    });
+    await expect(page.getByLabel('op-0-record_data_wd_req_type')).toHaveValue('NOT_IN');
+    await expect.poll(() => selectedOptionLabels(page, 'val-0-record_data_wd_req_type')).toEqual(
+      expect.arrayContaining([annualLabel, sickLabel]),
+    );
 
-  const notInHit = await runDraftTable(page, tableWithoutDefaultOutput(notInVersion), 'personal');
-  expect(notInHit.status).toBe('MATCHED');
-  expect(notInHit.matched).toBe(true);
-  expect(notInHit.outputs?.route).toBe('notify');
-  const notInMiss = await runDraftTable(page, tableWithoutDefaultOutput(notInVersion), 'annual');
-  expect(notInMiss.status).toBe('NOT_MATCHED');
-  expect(notInMiss.matched).toBe(false);
+    const notInHit = await runDraftTable(page, tableWithoutDefaultOutput(notInVersion), 'personal');
+    expect(notInHit.status).toBe('MATCHED');
+    expect(notInHit.matched).toBe(true);
+    expect(notInHit.outputs?.route).toBe('notify');
+    const notInMiss = await runDraftTable(page, tableWithoutDefaultOutput(notInVersion), 'annual');
+    expect(notInMiss.status).toBe('NOT_MATCHED');
+    expect(notInMiss.matched).toBe(false);
 
-  await page.getByLabel('op-0-record_data_wd_req_type').scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: testInfo.outputPath('strategy-studio-dict-in-not-in-reload.png'),
-    fullPage: true,
-  });
+    await page.getByLabel('op-0-record_data_wd_req_type').scrollIntoViewIfNeeded();
+    await page.screenshot({
+      path: testInfo.outputPath('strategy-studio-dict-in-not-in-reload.png'),
+      fullPage: true,
+    });
+  } finally {
+    await restoreWorkflowAutomationDecision(page);
+  }
 });
 
 test('Strategy Studio saves, publishes and reloads BPM user reference condition fragment raw pid @golden', async ({
@@ -667,8 +806,7 @@ test('Strategy Studio saves, publishes and reloads BPM user reference condition 
   const user = await resolveFirstUser(page);
 
   await openRuleCenterFromSidebar(page);
-  await page.getByTestId('strategy-scenario-BPM').click();
-  await expect(page.getByTestId('strategy-consumer-summary')).toContainText(/BPM|审批人分派/);
+  await switchStrategyScenario(page, 'BPM', /BPM|审批人分派/);
   await activateStrategyWorkspace(page, 'rule');
   await expect(page.getByTestId('condition-builder')).toBeVisible({ timeout: 15_000 });
 
@@ -734,7 +872,7 @@ test('Strategy Studio saves, publishes and reloads BPM user reference condition 
 
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('strategy-studio')).toBeVisible({ timeout: 15_000 });
-  await page.getByTestId('strategy-scenario-BPM').click();
+  await switchStrategyScenario(page, 'BPM', /BPM|审批人分派/);
   await expect(page.getByTestId(`strategy-fragment-${savedFragment.fragmentCode}`)).toBeVisible({ timeout: 15_000 });
   await page.getByTestId(`strategy-fragment-${savedFragment.fragmentCode}`).click();
   await activateStrategyWorkspace(page, 'rule');
@@ -920,7 +1058,7 @@ test('Strategy Studio reuses user reference conditions across SLA Automation Eve
     await expect(page.getByTestId('cb-preview')).toContainText(/申请人|Applicant/i);
     await expect(page.getByTestId('cb-preview')).toContainText(user.label);
 
-    const fragmentSaveResponsePromise = page.waitForResponse(isConditionFragmentDraftWrite, {
+    const fragmentSaveResponsePromise = page.waitForResponse(isConditionFragmentDraftWriteFor(scenario, user.pid), {
       timeout: 15_000,
     });
     const decisionDraftResponsePromise = page.waitForResponse(
@@ -938,14 +1076,14 @@ test('Strategy Studio reuses user reference conditions across SLA Automation Eve
     expect(decisionDraft.pid).toBeTruthy();
     expect(savedFragment).toMatchObject({
       scopeType: scenario.scopeType,
-      scopeRef: scenario.scopeRef,
       status: 'DRAFT',
     });
+    expect(savedFragment.scopeRef).toBeTruthy();
     expect(savedFragment.fieldRefs).toEqual(expect.arrayContaining(['record.data.wd_req_applicant']));
     expect(savedFragment.decisionRefs).toEqual(expect.arrayContaining([scenario.decisionCode]));
     expect(fragmentSaveRequest).toMatchObject({
       scopeType: scenario.scopeType,
-      scopeRef: scenario.scopeRef,
+      scopeRef: savedFragment.scopeRef,
       conditionSpec: {
         root: {
           children: [

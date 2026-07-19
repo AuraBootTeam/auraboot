@@ -174,7 +174,7 @@ describe('PermissionAuditTab', () => {
                   {
                     grantId: 900,
                     matched: false,
-                    ruleTraceId: 'trace-permission-nested-001',
+                    ruleTraceId: 'decision-01222993-910e-4004-9dbb-f8a3b6960e60',
                     decisionCode: 'permission_applicant_trace',
                     decisionVersion: 1,
                     decisionStatus: 'NOT_MATCHED',
@@ -204,12 +204,17 @@ describe('PermissionAuditTab', () => {
     renderAuditTab();
 
     await waitFor(() => expect(screen.getByTestId('permission-audit-row-88')).toBeTruthy());
-    expect(screen.getByTestId('permission-audit-rule-meta-88-0')).toHaveTextContent('trace-permission-nested-001');
+    expect(screen.getByTestId('permission-audit-rule-meta-88-0')).toHaveTextContent(
+      'decision-***-910e-4004-9dbb-f8a3b6960e60',
+    );
+    expect(screen.getByTestId('permission-audit-rule-meta-88-0')).not.toHaveTextContent(
+      'decision-01222993-910e-4004-9dbb-f8a3b6960e60',
+    );
     expect(screen.getByTestId('permission-audit-rule-meta-88-0')).toHaveTextContent('permission_applicant_trace');
     expect(screen.getByTestId('permission-audit-rule-meta-88-0')).toHaveTextContent('NOT_MATCHED');
     expect(screen.getByTestId('permission-audit-open-decision-trace-88-0')).toHaveAttribute(
       'href',
-      '/p/decisionops_execution_logs?traceId=trace-permission-nested-001',
+      '/p/decisionops_execution_logs?traceId=decision-01222993-910e-4004-9dbb-f8a3b6960e60',
     );
     expect(screen.getByTestId('permission-audit-field-governance-88-0')).toHaveTextContent('字段治理');
     expect(screen.getByTestId('permission-audit-field-governance-88-0')).toHaveTextContent('record.data.wd_req_applicant');

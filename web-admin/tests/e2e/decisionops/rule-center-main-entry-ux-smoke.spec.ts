@@ -96,8 +96,8 @@ const ENTRIES: EntrySpec[] = [
       await expect(page.getByTestId('sla-dashboard-configs')).toBeVisible({ timeout: 15_000 });
       await expect(page.getByTestId('sla-dashboard-active-records')).toBeVisible({ timeout: 15_000 });
       await expect(page.getByTestId('sla-strategy-chain')).toBeVisible({ timeout: 15_000 });
-      await expect(page.locator('main').first()).toContainText('SLA 监控');
-      await expect(page.locator('main').first()).not.toContainText('SLA Monitor');
+      await expect(page.getByRole('heading', { name: 'SLA 监控', exact: true })).toBeVisible();
+      await expect(page.getByText('实时 SLA 状态概览', { exact: true })).toBeVisible();
     },
   },
   {
@@ -166,6 +166,16 @@ async function assertSidebarIsInsideViewport(page: Page) {
     .toBeGreaterThanOrEqual(-1);
 }
 
+async function clearSidebarCollapsedPreference(page: Page) {
+  await page.evaluate(() => {
+    localStorage.removeItem('sidebar-collapsed');
+  });
+}
+
+async function waitForHeaderHydrated(page: Page) {
+  await expect(page.locator('header[data-hydrated="true"]')).toBeVisible({ timeout: 15_000 });
+}
+
 test('RC-UX-01: rule center main entries stay usable in desktop and compact Chinese layouts @golden', async ({
   page,
 }, testInfo) => {
@@ -194,9 +204,10 @@ test('RC-UX-01: compact shell sidebar exposes rule center entries without horizo
 }, testInfo) => {
   await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
   await expect(page).not.toHaveURL(/\/login(?:$|\?)/);
+  await clearSidebarCollapsedPreference(page);
   await page.setViewportSize({ width: 632, height: 900 });
   await page.goto('/home', { waitUntil: 'domcontentloaded' });
-  await ensureSidebarExpanded(page);
+  await waitForHeaderHydrated(page);
 
   const toggle = page.getByTestId('header-sidebar-toggle');
   await expect(toggle).toBeVisible({ timeout: 10_000 });

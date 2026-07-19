@@ -107,6 +107,11 @@ function uniqueInputId(baseId: string, inputs: TableInput[], currentIndex: numbe
   return `${baseId}_${index}`;
 }
 
+function stripRuntimeExpr(input: TableInput): TableInput {
+  const { expr: _expr, ...rest } = input as TableInput & { expr?: unknown };
+  return rest;
+}
+
 function normalizedDataType(dataType: DataType): DataType {
   return DATA_TYPES.includes(dataType) ? dataType : 'string';
 }
@@ -237,7 +242,7 @@ export function DecisionTableEditor({
   const emitOutputs = (outputs: TableOutput[]) => onChange({ ...value, outputs });
 
   const updateInput = (idx: number, patch: Partial<TableInput>) => {
-    emitInputs(value.inputs.map((input, i) => (i === idx ? { ...input, ...patch } : input)));
+    emitInputs(value.inputs.map((input, i) => (i === idx ? { ...stripRuntimeExpr(input), ...patch } : input)));
   };
 
   const selectInputField = (idx: number, field: FieldOption) => {
@@ -246,7 +251,7 @@ export function DecisionTableEditor({
 
     const nextId = uniqueInputId(fieldInputId(field), value.inputs, idx);
     const nextInput: TableInput = {
-      ...currentInput,
+      ...stripRuntimeExpr(currentInput),
       id: nextId,
       label: field.label,
       scope: field.scope,

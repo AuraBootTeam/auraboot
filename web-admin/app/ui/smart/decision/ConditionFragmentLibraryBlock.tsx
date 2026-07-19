@@ -623,6 +623,22 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
     const selected = new Set(decisionBindings.map((binding) => binding.decisionCode));
     return decisionDefinitions.filter((definition) => !selected.has(definition.decisionCode));
   }, [decisionBindings, decisionDefinitions]);
+  const decisionDefinitionLabels = useMemo(
+    () =>
+      new Map(
+        decisionDefinitions.map((definition) => [
+          definition.decisionCode,
+          definition.decisionName?.trim() || definition.decisionCode,
+        ]),
+      ),
+    [decisionDefinitions],
+  );
+  const decisionDisplayLabel = (decisionCode: string) => {
+    const loadedLabel = decisionDefinitionLabels.get(decisionCode);
+    return loadedLabel && loadedLabel !== decisionCode
+      ? loadedLabel
+      : decisionRefDisplayLabel(decisionCode);
+  };
   const incomingImpactCount = impact?.incomingCount ?? 0;
   const publishRequiresImpactAck = Boolean(
     selectedFragment?.pid &&
@@ -1071,7 +1087,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
                     data-testid={`cfl-decision-binding-${testIdPart(binding.decisionCode)}`}
                   >
                     <a href={decisionDefinitionUrl(binding.decisionCode)}>
-                      {decisionRefDisplayLabel(binding.decisionCode)}
+                      {decisionDisplayLabel(binding.decisionCode)}
                     </a>
                     <button
                       type="button"
@@ -1242,7 +1258,7 @@ export function ConditionFragmentLibraryBlock({ block }: ConditionFragmentLibrar
                             title={decisionCode}
                             data-testid={`cfl-decision-link-${testIdPart(decisionCode)}`}
                           >
-                            {decisionRefDisplayLabel(decisionCode)}
+                            {decisionDisplayLabel(decisionCode)}
                           </a>
                           <a
                             href={decisionLogsUrl(decisionCode)}

@@ -245,6 +245,7 @@ function api(overrides: Partial<DecisionApi> = {}): DecisionApi {
       version: 2,
       status: 'DRAFT',
     })),
+    listConditionFragmentVersions: vi.fn(async () => []),
     validateConditionFragmentVersion: vi.fn(async (pid) => ({
       fragmentCode: 'leave_sla_node_match',
       pid,
@@ -1078,8 +1079,11 @@ describe('DecisionOpsConsole', () => {
           inputs: expect.arrayContaining([
             expect.objectContaining({
               id: 'sla_deadlineMinutes',
-              scope: 'sla',
-              path: 'deadlineMinutes',
+              expr: expect.objectContaining({
+                type: 'path',
+                scope: 'sla',
+                path: 'deadlineMinutes',
+              }),
             }),
           ]),
         }),
@@ -1119,8 +1123,11 @@ describe('DecisionOpsConsole', () => {
           inputs: expect.arrayContaining([
             expect.objectContaining({
               id: 'process_nodeId',
-              scope: 'process',
-              path: 'nodeId',
+              expr: expect.objectContaining({
+                type: 'path',
+                scope: 'process',
+                path: 'nodeId',
+              }),
             }),
           ]),
         }),
@@ -1178,6 +1185,20 @@ describe('DecisionOpsConsole', () => {
         ],
       },
     });
+    const draftContent = (draftRequest as { contentJson: { inputs: Array<Record<string, unknown>> } }).contentJson;
+    const firstInput = draftContent.inputs.find((input) => input.id === 'sla_deadlineMinutes');
+    expect(firstInput).toMatchObject({
+      id: 'sla_deadlineMinutes',
+      expr: {
+        type: 'path',
+        scope: 'sla',
+        path: 'deadlineMinutes',
+        dataType: 'integer',
+      },
+    });
+    expect(firstInput).not.toHaveProperty('scope');
+    expect(firstInput).not.toHaveProperty('path');
+    expect(firstInput).not.toHaveProperty('dataType');
   });
 
   it('restores the latest saved Strategy Studio table with dict NOT_IN value labels', async () => {
@@ -1275,6 +1296,54 @@ describe('DecisionOpsConsole', () => {
     expect(screen.getByTestId('dt-in-record_data_wd_req_applicant')).toHaveTextContent('申请人');
   });
 
+  it('keeps scenario outputs when a restored Strategy Studio table has another output contract', async () => {
+    const listVersions = vi.fn(async (decisionCode: string) => {
+      if (decisionCode !== 'leave_request_automation') return [];
+      return [
+        {
+          pid: 'workflow-seed-table',
+          version: 12,
+          status: 'PUBLISHED',
+          kind: 'DECISION_TABLE',
+          runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+          contentJson: {
+            hitPolicy: 'FIRST',
+            inputs: [
+              {
+                id: 'record_data_wd_req_days',
+                label: '请假天数',
+                scope: 'record',
+                path: 'data.wd_req_days',
+                dataType: 'decimal',
+              },
+            ],
+            outputs: [
+              { id: 'severity', label: 'Severity', dataType: 'string' },
+              { id: 'message', label: 'Message', dataType: 'string' },
+              { id: 'actionType', label: 'Action type', dataType: 'string' },
+            ],
+            rules: [
+              {
+                ruleId: 'seed',
+                priority: 10,
+                when: { record_data_wd_req_days: { operator: 'GT', value: 3 } },
+                then: { severity: 'warning', message: 'notify', actionType: 'NOTIFY' },
+              },
+            ],
+          },
+        },
+      ];
+    });
+
+    renderConsole(undefined, { listVersions } as unknown as Partial<DecisionApi>);
+    fireEvent.click(screen.getByTestId('strategy-scenario-AUTOMATION'));
+
+    await waitFor(() => expect(listVersions).toHaveBeenCalledWith('leave_request_automation'));
+    await waitFor(() => expect(screen.getByTestId('dt-out-route')).toHaveTextContent('Route'));
+    expect(screen.getByTestId('dt-out-actions')).toHaveTextContent('Actions');
+    expect(screen.queryByTestId('dt-out-severity')).not.toBeInTheDocument();
+  });
+
   it('exposes the scenario fact catalog inside the Strategy Studio DMN input picker', () => {
     renderConsole();
 
@@ -1289,6 +1358,77 @@ describe('DecisionOpsConsole', () => {
 
     expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('截止分钟');
     expect(screen.getByTestId('dt-input-field-picker-panel-0')).not.toHaveTextContent('SLA 节点');
+  });
+
+  it('keeps leave type available in the Automation Strategy Studio DMN picker', async () => {
+    renderConsole();
+
+    fireEvent.click(screen.getByTestId('strategy-scenario-AUTOMATION'));
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-consumer-summary')).toHaveTextContent('自动化 / 条件触发'),
+    );
+
+    fireEvent.click(screen.getByTestId('dt-input-field-picker-0'));
+    fireEvent.change(screen.getByLabelText('input-field-search-0'), {
+      target: { value: 'wd_req_type' },
+    });
+
+    expect(screen.getByTestId('dt-input-field-picker-panel-0')).toHaveTextContent('请假类型');
+    expect(screen.getByTestId('dt-input-field-option-0-record-data_wd_req_type')).toBeInTheDocument();
+  });
+
+  it('does not let a late Strategy Studio table restore overwrite local DMN edits', async () => {
+    let resolveAutomationRestore: (versions: Array<Record<string, unknown>>) => void = () => {};
+    const automationRestore = new Promise<Array<Record<string, unknown>>>((resolve) => {
+      resolveAutomationRestore = resolve;
+    });
+    const listVersions = vi.fn(async (decisionCode: string) => {
+      if (decisionCode === 'leave_request_automation') return automationRestore;
+      return [];
+    });
+
+    renderConsole(undefined, { listVersions } as unknown as Partial<DecisionApi>);
+    fireEvent.click(screen.getByTestId('strategy-scenario-AUTOMATION'));
+    await waitFor(() => expect(listVersions).toHaveBeenCalledWith('leave_request_automation'));
+
+    fireEvent.click(screen.getByTestId('dt-input-field-picker-0'));
+    fireEvent.change(screen.getByLabelText('input-field-search-0'), {
+      target: { value: 'wd_req_type' },
+    });
+    fireEvent.click(screen.getByTestId('dt-input-field-option-0-record-data_wd_req_type'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('dt-in-record_data_wd_req_type')).toHaveTextContent('请假类型'),
+    );
+
+    resolveAutomationRestore([
+      {
+        pid: 'late-automation-table',
+        version: 12,
+        status: 'PUBLISHED',
+        kind: 'DECISION_TABLE',
+        runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+        contentJson: {
+          hitPolicy: 'FIRST',
+          inputs: [
+            {
+              id: 'record_data_wd_req_days',
+              label: 'Leave days',
+              scope: 'record',
+              path: 'data.leaveDays',
+              dataType: 'decimal',
+            },
+          ],
+          outputs: [{ id: 'route', label: 'Route', dataType: 'string' }],
+          rules: [],
+        },
+      },
+    ]);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('dt-in-record_data_wd_req_type')).toHaveTextContent('请假类型'),
+    );
+    expect(screen.queryByTestId('dt-in-record_data_wd_req_days')).not.toBeInTheDocument();
   });
 
   it('runs Strategy Studio DMN analysis and XML round-trip from the scenario table editor', async () => {
@@ -1477,6 +1617,60 @@ describe('DecisionOpsConsole', () => {
     expect(updateConditionFragmentDraft).not.toHaveBeenCalled();
   });
 
+  it('updates an existing Strategy Studio condition fragment draft when the runtime rejects a new version', async () => {
+    const createConditionFragmentVersion = vi.fn(async () => {
+      throw new Error('Bad parameter');
+    });
+    const listConditionFragmentVersions = vi.fn(async (code: string) => [
+      {
+        fragmentCode: code,
+        fragmentName: '请假 SLA 节点匹配',
+        pid: 'fragment-existing-draft',
+        version: 7,
+        status: 'DRAFT',
+      },
+    ]);
+    const updateConditionFragmentDraft = vi.fn(async (pid: string, req: unknown) => ({
+      ...(req as object),
+      fragmentCode: 'leave_sla_node_match',
+      pid,
+      version: 7,
+      status: 'DRAFT',
+    }));
+
+    renderConsole(undefined, {
+      createConditionFragmentVersion,
+      listConditionFragmentVersions,
+      updateConditionFragmentDraft,
+    } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent(
+        '请假 SLA 节点匹配',
+      ),
+    );
+    fireEvent.click(screen.getByTestId('strategy-save-draft'));
+
+    await waitFor(() =>
+      expect(updateConditionFragmentDraft).toHaveBeenCalledWith(
+        'fragment-existing-draft',
+        expect.objectContaining({
+          fragmentName: '请假 SLA 节点匹配',
+          scopeType: 'SLA',
+        }),
+      ),
+    );
+    expect(createConditionFragmentVersion).toHaveBeenCalledWith(
+      'leave_sla_node_match',
+      expect.objectContaining({
+        fragmentName: '请假 SLA 节点匹配',
+        scopeType: 'SLA',
+      }),
+    );
+    expect(listConditionFragmentVersions).toHaveBeenCalledWith('leave_sla_node_match');
+    expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('草稿已保存');
+  });
+
   it('prefers a locally published Strategy Studio fragment over a stale query draft before the next save', async () => {
     const staleFragment = {
       pid: 'fragment-draft-2',
@@ -1613,6 +1807,71 @@ describe('DecisionOpsConsole', () => {
       expect.objectContaining({
         kind: 'DECISION_TABLE',
         runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+      }),
+    );
+  });
+
+  it('keeps the scenario decision code when an auto-loaded fragment has stale decision refs', async () => {
+    const createDraftVersion = vi.fn(async () => ({ pid: 'draft-sla-stable', status: 'DRAFT' }));
+    const createConditionFragmentVersion = vi.fn(async (code: string, req: unknown) => ({
+      ...(req as object),
+      fragmentCode: code,
+      pid: 'fragment-sla-stable',
+      status: 'DRAFT',
+    }));
+    const listConditionFragments = vi.fn(async () => ({
+      records: [
+        {
+          fragmentCode: 'leave_sla_stale_ref',
+          fragmentName: 'SLA 自动加载旧片段',
+          scopeType: 'SLA',
+          scopeRef: 'wd_leave_approval',
+          ownerModule: 'SLA',
+          version: 7,
+          status: 'PUBLISHED',
+          fieldRefs: ['record.data.targetKey'],
+          decisionRefs: ['approval_routing'],
+          conditionSpec: {
+            root: {
+              type: 'predicate',
+              left: { type: 'field', scope: 'record', path: 'data.targetKey' },
+              operator: 'EQ',
+              right: { type: 'literal', value: 'task_manager_approve' },
+            },
+          },
+        },
+      ],
+      total: 1,
+      current: 1,
+      size: 20,
+    }));
+
+    renderConsole(undefined, {
+      listConditionFragments,
+      createDraftVersion,
+      createConditionFragmentVersion,
+    } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent('SLA 自动加载旧片段'),
+    );
+    fireEvent.click(screen.getByTestId('strategy-save-draft'));
+
+    await waitFor(() =>
+      expect(createDraftVersion).toHaveBeenCalledWith(
+        'complaint_sla_deadline',
+        expect.objectContaining({ kind: 'DECISION_TABLE' }),
+      ),
+    );
+    expect(createConditionFragmentVersion).toHaveBeenCalledWith(
+      'leave_sla_stale_ref',
+      expect.objectContaining({
+        scopeType: 'SLA',
+        conditionSpec: expect.objectContaining({
+          decisionBindings: expect.arrayContaining([
+            expect.objectContaining({ decisionCode: 'complaint_sla_deadline' }),
+          ]),
+        }),
       }),
     );
   });

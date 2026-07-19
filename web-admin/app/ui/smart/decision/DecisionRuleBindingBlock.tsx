@@ -1578,6 +1578,7 @@ export function DecisionRuleBindingBlock({
     [baseFields, binding.inputMappings],
   );
   const ruleInputFields = useMemo(() => fields.filter(isRuleInputSelectable), [fields]);
+  const canAddInputMapping = ruleInputFields.length > 0;
   const selectedDecisionOutputFields = useMemo(() => {
     const decision = decisions.find((candidate) => candidate.code === binding.decisionCode);
     return normalizeDecisionOutputFields(decision?.outputs, decision?.outputSchemaJson);
@@ -2048,14 +2049,19 @@ export function DecisionRuleBindingBlock({
 
               <div className="decision-rule-mapping-header">
                 <strong>输入映射</strong>
-                <button type="button" onClick={addInputMapping}>
+                <button
+                  type="button"
+                  onClick={addInputMapping}
+                  disabled={!canAddInputMapping}
+                  title={canAddInputMapping ? undefined : '暂无可映射输入字段'}
+                >
                   添加映射
                 </button>
               </div>
 
               {binding.inputMappings.length === 0 && (
                 <div className="decision-rule-empty" data-testid="decision-binding-empty">
-                  暂无输入映射
+                  {canAddInputMapping ? '暂无输入映射' : '暂无可映射输入字段'}
                 </div>
               )}
 
