@@ -734,6 +734,78 @@ class ChatTurnRuntimeTest {
                 .build();
     }
 
+    @Test
+    @DisplayName("G12: durable-required tool blocked in chat feeds a structured result back — no dead-end suspension")
+    void runToolLoop_escalatedDurableToolFeedsResultInsteadOfSuspending() throws Exception {
+        LlmProvider provider = mock(LlmProvider.class);
+        RecordingSink sink = new RecordingSink();
+        List<LlmChatRequest.Message> messages = new ArrayList<>();
+        messages.add(LlmChatRequest.Message.builder().role("user").content("send the update email").build());
+        LlmChatRequest.Tool externalTool = LlmChatRequest.Tool.builder()
+                .name("mcp:send_email")
+                .description("Send external email")
+                .inputSchema(Map.of("type", "object"))
+                .build();
+        ToolDefinition externalDefinition = ToolDefinition.builder()
+                .toolCode("mcp:send_email")
+                .toolType("mcp")
+                .riskLevel("L2")
+                .build();
+        when(provider.chat(any(LlmChatRequest.class), eq("sk-test"), eq("https://llm.test")))
+                .thenReturn(LlmChatResponse.builder()
+                        .stopReason("tool_use")
+                        .content(List.of(LlmChatResponse.ContentBlock.builder()
+                                .type("tool_use")
+                                .id("tool-email")
+                                .name("mcp:send_email")
+                                .input(Map.of("to", "a@b.c"))
+                                .build()))
+                        .build())
+                .thenReturn(response("I can't send that from chat; it needs a background task."));
+        PolicyCallbacks callbacks = new PolicyCallbacks(null);
+
+        TurnOutcome outcome = runtime.runToolLoop(
+                new ChatTurnRuntime.ChatToolLoopSpec(
+                        new TurnContext("turn-escalate-durable", 1L, 2L, null, null, "aurabot",
+                                null, null, null, null, java.util.Set.of(), null, null, Instant.now()),
+                        "aurabot",
+                        provider,
+                        "test",
+                        "sk-test",
+                        "https://llm.test",
+                        "escalate durable test",
+                        "test-model",
+                        "system",
+                        256,
+                        messages,
+                        List.of(externalTool),
+                        List.of(externalDefinition),
+                        null,
+                        null,
+                        "session-escalate-durable",
+                        sink,
+                        false,
+                        false,
+                        2,
+                        null,
+                        "trace-escalate-durable",
+                        null),
+                callbacks);
+
+        // The durable-required tool must NOT execute in chat...
+        assertThat(callbacks.executeCalls).isZero();
+        // ...but the block is surfaced as a structured tool result the model can relay...
+        assertThat(sink.toolResults).hasSize(1);
+        assertThat(sink.toolResults.get(0))
+                .containsEntry("success", false)
+                .containsEntry("durableWorkflowRequired", true);
+        // ...and the turn COMPLETES with the model's explanation. Before this fix it
+        // suspended into an approval-pending state whose durableWorkflowRequired flag
+        // had no consumer — an un-resumable dead end (this assertion was red then).
+        assertThat(outcome).isEqualTo(new TurnOutcome.Success(
+                "I can't send that from chat; it needs a background task.", Map.of()));
+    }
+
     private static final class RecordingSink implements ResponseSink {
         private final List<String> textChunks = new ArrayList<>();
         private final List<String> donePayloads = new ArrayList<>();

@@ -536,10 +536,24 @@ public class ChatTurnRuntime {
                             pendingToolId = toolId;
                             break;
                         }
-                        if (policyDecision.type() == ToolPolicyDecision.Type.REQUIRE_HUMAN_APPROVAL
-                                || policyDecision.type() == ToolPolicyDecision.Type.ESCALATE_DURABLE_WORKFLOW) {
-                            if (policyDecision.type() == ToolPolicyDecision.Type.REQUIRE_HUMAN_APPROVAL
-                                    && policyDef.isRequiresApproval()) {
+                        if (policyDecision.type() == ToolPolicyDecision.Type.ESCALATE_DURABLE_WORKFLOW) {
+                            // G12 (execution-architecture review): this used to suspend the turn
+                            // into an approval-pending state whose durableWorkflowRequired flag
+                            // had no consumer anywhere — an un-resumable dead end. Until a real
+                            // chat→durable handoff exists, surface the block like a DENY: the
+                            // tool does NOT execute and the model receives a structured result
+                            // to relay, so the turn ends in a coherent answer instead of limbo.
+                            Map<String, Object> escalatedResult = escalatedDurableResult(policyDecision);
+                            spec.sink().onToolResult(toolId, escalatedResult, false);
+                            runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolResultRecorded(
+                                    round, toolId, toolName, escalatedResult));
+                            lastRuntimeState = runtimeState;
+                            toolResultBlocks.add(LlmMessageTapeSupport.buildToolResultBlock(
+                                    spec.objectMapper(), toolId, escalatedResult));
+                            continue;
+                        }
+                        if (policyDecision.type() == ToolPolicyDecision.Type.REQUIRE_HUMAN_APPROVAL) {
+                            if (policyDef.isRequiresApproval()) {
                                 // Existing approved-tool path owns approvalPid creation until DurableWorkflowEngine
                                 // becomes the execution substrate for all human approvals.
                             } else {
@@ -880,12 +894,24 @@ public class ChatTurnRuntime {
         result.put("success", false);
         result.put("approvalRequired", true);
         result.put("reasonCode", decision.reasonCode());
-        if (decision.type() == ToolPolicyDecision.Type.ESCALATE_DURABLE_WORKFLOW) {
-            result.put("durableWorkflowRequired", true);
-            result.put("message", "This action requires durable workflow execution.");
-        } else {
-            result.put("message", "This action requires human approval.");
-        }
+        result.put("message", "This action requires human approval.");
+        return result;
+    }
+
+    /**
+     * G12: structured tool feedback for a durable-required tool blocked in
+     * chat. Fed back to the model (deny-style), NOT stored as a pending
+     * approval — the old suspended state was un-resumable because its
+     * {@code durableWorkflowRequired} flag had no consumer.
+     */
+    private Map<String, Object> escalatedDurableResult(ToolPolicyDecision decision) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("success", false);
+        result.put("durableWorkflowRequired", true);
+        result.put("reasonCode", decision.reasonCode());
+        result.put("message", "This action requires durable background execution and cannot run inside a"
+                + " chat turn. Tell the user it needs to run as a background task and how to proceed;"
+                + " do not retry the tool in this conversation.");
         return result;
     }
 
