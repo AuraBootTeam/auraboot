@@ -51,8 +51,16 @@ public class PermissionFieldVocabulary {
      * @return a context exposing {@code record.data.*} and {@code actor.roles}
      */
     public DecisionContext buildContext(Long memberId, Object record) {
+        return buildContext(memberId, null, record);
+    }
+
+    /**
+     * Build the {@link DecisionContext} and carry the low-code model resource into the record
+     * scope when permission is guarding a model record.
+     */
+    public DecisionContext buildContext(Long memberId, String resourceCode, Object record) {
         DecisionContext.Builder builder = DecisionContext.builder();
-        buildScopes(memberId, record).forEach(builder::scope);
+        buildScopes(memberId, resourceCode, record).forEach(builder::scope);
         return builder.build();
     }
 
@@ -60,11 +68,30 @@ public class PermissionFieldVocabulary {
      * Build the raw scoped fact map used by Rule Center bindings.
      */
     public Map<Scope, Map<String, Object>> buildScopes(Long memberId, Object record) {
+        return buildScopes(memberId, null, record);
+    }
+
+    /**
+     * Build the raw scoped fact map used by Rule Center bindings.
+     *
+     * <p>Dynamic model permission checks pass a flat low-code record and the model code as the
+     * permission resource. Rule Center needs that model code at {@code record.modelCode} to attach
+     * Fact Catalog metadata to DecisionOps traces.
+     */
+    public Map<Scope, Map<String, Object>> buildScopes(Long memberId, String resourceCode, Object record) {
         Map<String, Object> recordData = extractRecordData(record);
         Map<String, Object> meta = extractMeta(record);
+        String modelCode = resolveModelCode(resourceCode, record, meta);
+
+        Map<String, Object> recordScope = new LinkedHashMap<>();
+        if (hasText(modelCode)) {
+            recordScope.put("modelCode", modelCode);
+            recordScope.put("entityCode", modelCode);
+        }
+        recordScope.put("data", recordData);
 
         Map<Scope, Map<String, Object>> scopes = new EnumMap<>(Scope.class);
-        scopes.put(Scope.RECORD, Map.of("data", recordData));
+        scopes.put(Scope.RECORD, Collections.unmodifiableMap(recordScope));
         scopes.put(Scope.ACTOR, buildActorScope(memberId));
         if (!meta.isEmpty()) {
             scopes.put(Scope.META, meta);
@@ -76,6 +103,14 @@ public class PermissionFieldVocabulary {
         if (!(record instanceof Map<?, ?> raw)) {
             return Map.of();
         }
+        Object nestedData = raw.get("data");
+        if (nestedData instanceof Map<?, ?> nested) {
+            return copyRecordData(nested);
+        }
+        return copyRecordData(raw);
+    }
+
+    private Map<String, Object> copyRecordData(Map<?, ?> raw) {
         Map<String, Object> recordData = new LinkedHashMap<>();
         raw.forEach((key, value) -> {
             if (key == null) {
@@ -114,8 +149,56 @@ public class PermissionFieldVocabulary {
         return Collections.unmodifiableMap(copy);
     }
 
+    private String resolveModelCode(String resourceCode, Object record, Map<String, Object> meta) {
+        String explicit = firstText(record, "modelCode", "entityCode");
+        if (hasText(explicit)) {
+            return explicit;
+        }
+        explicit = firstText(meta, "modelCode", "entityCode");
+        if (hasText(explicit)) {
+            return explicit;
+        }
+        if (!hasText(resourceCode)) {
+            return "";
+        }
+        String normalized = resourceCode.trim();
+        if (normalized.startsWith("function.")) {
+            return "";
+        }
+        if (normalized.startsWith("model.")) {
+            normalized = normalized.substring("model.".length());
+        }
+        int actionSeparator = normalized.indexOf(':');
+        if (actionSeparator > 0) {
+            normalized = normalized.substring(0, actionSeparator);
+        }
+        return normalized;
+    }
+
+    private String firstText(Object value, String... keys) {
+        if (!(value instanceof Map<?, ?> raw)) {
+            return "";
+        }
+        for (String key : keys) {
+            Object candidate = raw.get(key);
+            if (candidate instanceof String text && hasText(text)) {
+                return text.trim();
+            }
+        }
+        return "";
+    }
+
     private boolean isMetaField(String field) {
-        return "meta".equals(field) || "_meta".equals(field) || "ruleMeta".equals(field);
+        return "meta".equals(field)
+                || "_meta".equals(field)
+                || "ruleMeta".equals(field)
+                || "modelCode".equals(field)
+                || "entityCode".equals(field)
+                || "data".equals(field);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     /**
