@@ -8,6 +8,7 @@ import com.auraboot.framework.meta.mapper.MetaFieldMapper;
 import com.auraboot.framework.meta.entity.payload.InstanceDataBean;
 import com.auraboot.framework.meta.entity.payload.MapBean;
 import com.auraboot.framework.permission.mapper.PermissionAuditLogMapper;
+import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.mapping.BoundSql;
@@ -225,6 +226,26 @@ class TypeHandlersAndInterceptorsTest {
                     .as("%s must use the entity autoResultMap so evaluation_trace JSONB is parsed", method.getName())
                     .isNotNull();
             assertThat(resultMap.value()).containsExactly("mybatis-plus_PermissionAuditLog");
+        }
+    }
+
+    @Test
+    void rolePermissionMapperReadsUseResultMapForJsonbPolicyColumns() throws NoSuchMethodException {
+        List<Method> methods = List.of(
+                RolePermissionMapper.class.getMethod("findByRole", Long.class),
+                RolePermissionMapper.class.getMethod("findByPermission", Long.class),
+                RolePermissionMapper.class.getMethod("findEffectiveByRole", Long.class, java.time.LocalDate.class),
+                RolePermissionMapper.class.getMethod("findDenyBindings", Long.class),
+                RolePermissionMapper.class.getMethod("findExpiredBindings", java.time.LocalDate.class),
+                RolePermissionMapper.class.getMethod("findByRoleAndPermission", Long.class, Long.class),
+                RolePermissionMapper.class.getMethod("findByRoleId", Long.class, Long.class));
+
+        for (Method method : methods) {
+            ResultMap resultMap = method.getAnnotation(ResultMap.class);
+            assertThat(resultMap)
+                    .as("%s must use the RolePermission autoResultMap so conditions JSONB is parsed", method.getName())
+                    .isNotNull();
+            assertThat(resultMap.value()).containsExactly("mybatis-plus_RolePermission");
         }
     }
 

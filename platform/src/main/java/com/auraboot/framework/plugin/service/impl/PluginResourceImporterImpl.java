@@ -1321,8 +1321,8 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
                     roleId, logSafe(policy.getPermissionCode()));
             return;
         }
-        String conditionsJson = toJson(policy.getConditions());
-        rolePermissionMapper.updateConditionsById(binding.getId(), conditionsJson);
+        binding.setConditions(policy.getConditions());
+        rolePermissionMapper.updateById(binding);
         refreshPermissionPolicyUsageIndex(binding);
     }
 

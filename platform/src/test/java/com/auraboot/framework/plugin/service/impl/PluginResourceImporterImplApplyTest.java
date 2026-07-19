@@ -481,8 +481,6 @@ class PluginResourceImporterImplApplyTest {
                         "bindingKind", "DECISION_REF",
                         "conditionFragmentRefs", List.of("shared_leave_approval_guard"),
                         "decisionBinding", Map.of("decisionCode", "leave_request_automation"))));
-        when(objectMapper.writeValueAsString(conditions))
-                .thenReturn("{\"dynamicAbac\":{\"ruleBinding\":{\"conditionFragmentRefs\":[\"shared_leave_approval_guard\"]}}}");
         when(usageIndexServiceProvider.getIfAvailable()).thenReturn(usageIndexService);
 
         RoleDefinitionDTO dto = RoleDefinitionDTO.builder()
@@ -500,9 +498,8 @@ class PluginResourceImporterImplApplyTest {
 
         assertThat(result.getAction()).isEqualTo(ResourceAction.CREATE.code());
         verify(rolePermissionService).assignPermissionsToRole(200L, List.of(1001L));
-        verify(rolePermissionMapper).updateConditionsById(
-                eq(7001L),
-                eq("{\"dynamicAbac\":{\"ruleBinding\":{\"conditionFragmentRefs\":[\"shared_leave_approval_guard\"]}}}"));
+        verify(rolePermissionMapper).updateById(binding);
+        assertThat(binding.getConditions()).isEqualTo(conditions);
         verify(usageIndexService).refreshSource("PERMISSION_POLICY", "rp-policy-pid");
     }
 
