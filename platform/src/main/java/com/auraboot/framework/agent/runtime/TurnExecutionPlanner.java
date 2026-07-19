@@ -25,6 +25,16 @@ public class TurnExecutionPlanner {
 
     public enum DecisionReason {
         NAMED_AGENT_PROFILE,
+        /**
+         * Named agent requested together with an explicit durable execution
+         * flag (explicitDurableRequest / externalSideEffect / batch). The
+         * conversation durable engine runs as the default agent only, and
+         * silently downgrading to named-agent chat would drop the
+         * checkpoint/resume semantics the caller explicitly asked for
+         * (execution-architecture review G8). The chokepoint must surface
+         * this as an explicit failure, never dispatch.
+         */
+        NAMED_AGENT_DURABLE_UNSUPPORTED,
         DURABLE_TRIAGE_SIGNAL,
         DURABLE_EXECUTION_POLICY,
         SYNC_READ_ONLY_TURN,
@@ -92,12 +102,30 @@ public class TurnExecutionPlanner {
                 : input;
         String normalizedAgentCode = normalizeAgentCode(effective.agentCode());
         if (!isDefaultAgentPath(effective.agentCode())) {
+            // Review G8: named-agent identity used to silently swallow every durable
+            // requirement (this rule fires before the bucket and flag checks below).
+            // Two-tier fix: explicit caller flags hard-conflict (the caller asked for
+            // durability the named-agent chat path cannot provide); the noisy v1
+            // keyword bucket only becomes a policy signal so telemetry can count the
+            // shadowing without keyword misfires breaking named-agent conversations.
+            EnumSet<PolicySignal> signals = EnumSet.of(PolicySignal.EXPLICIT_NAMED_AGENT);
+            if (effective.triageBucket() == TriageBucket.ACP_RUN) {
+                signals.add(PolicySignal.DURABLE_TRIAGE_BUCKET);
+            }
+            if (effective.explicitDurableRequest()) {
+                signals.add(PolicySignal.EXPLICIT_DURABLE_REQUEST);
+            }
+            if (effective.requiresApproval() || effective.externalSideEffect() || effective.batch()) {
+                signals.add(PolicySignal.DURABLE_LIFECYCLE_SIGNAL);
+            }
             return new TurnExecutionPlan(
                     InitialExecutionMode.NAMED_AGENT_TURN,
-                    DecisionReason.NAMED_AGENT_PROFILE,
+                    effective.durablePolicyRequired()
+                            ? DecisionReason.NAMED_AGENT_DURABLE_UNSUPPORTED
+                            : DecisionReason.NAMED_AGENT_PROFILE,
                     normalizedAgentCode,
                     effective.triageBucket(),
-                    EnumSet.of(PolicySignal.EXPLICIT_NAMED_AGENT));
+                    signals);
         }
         if (effective.triageBucket() == TriageBucket.ACP_RUN) {
             return new TurnExecutionPlan(

@@ -170,6 +170,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             ChatRequest legacyRequest = request.legacyRequest();
             String agentCode = request.agentCode();
             TurnExecutionPlanner.InitialExecutionMode initialMode;
+            TurnExecutionPlanner.TurnExecutionPlan turnPlan = null;
             if (TurnExecutionPlanner.isRagOnlyChannel(request.channel())) {
                 // RAG-only channel (embeddable CS widget): pure knowledge Q&A. Never route to the
                 // durable/planner path regardless of triage bucket — otherwise a "cancel account /
@@ -181,7 +182,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 log.debug("Agent turn execution plan: turnId={}, RAG-only channel {} forced to SYNC_AGENT_TURN",
                         ctx.turnId(), request.channel());
             } else {
-                TurnExecutionPlanner.TurnExecutionPlan turnPlan = turnExecutionPlanner.decide(
+                turnPlan = turnExecutionPlanner.decide(
                         new TurnExecutionPlanner.TurnExecutionInput(
                                 agentCode,
                                 ctx.triageBucket(),
@@ -195,7 +196,23 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 log.debug("Agent turn execution plan: turnId={}, initialMode={}, reason={}, signals={}",
                         ctx.turnId(), initialMode, turnPlan.reason(), turnPlan.policySignals());
             }
-            if (initialMode == TurnExecutionPlanner.InitialExecutionMode.NAMED_AGENT_TURN) {
+            if (turnPlan != null
+                    && turnPlan.reason() == TurnExecutionPlanner.DecisionReason.NAMED_AGENT_DURABLE_UNSUPPORTED) {
+                // Review G8: an explicit durable flag addressed at a named agent is a
+                // contradiction — the conversation durable engine runs as the default
+                // agent only (AcpDurableWorkflowEngine pins assignee to DEFAULT_AGENT),
+                // and silently downgrading to chat would drop the checkpoint/resume
+                // semantics the caller asked for. Fail loudly instead of guessing.
+                String msg = "Named agent '" + turnPlan.normalizedAgentCode()
+                        + "' cannot execute an explicitly durable request"
+                        + " (explicitDurableRequest / externalSideEffect / batch):"
+                        + " durable conversation runs execute as the default agent only."
+                        + " Drop the durable option or address the default assistant.";
+                log.warn("runTurn rejected named-agent durable conflict: turnId={}, agent={}, signals={}",
+                        ctx.turnId(), turnPlan.normalizedAgentCode(), turnPlan.policySignals());
+                capturingSink.onError(msg, null);
+                outcome = new TurnOutcome.Failed(msg, null);
+            } else if (initialMode == TurnExecutionPlanner.InitialExecutionMode.NAMED_AGENT_TURN) {
                 outcome = dispatchToNamedAgent(ctx, request, legacyRequest, capturingSink, agentCode);
             } else {
                 if (initialMode == TurnExecutionPlanner.InitialExecutionMode.DURABLE_WORKFLOW) {

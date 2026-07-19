@@ -107,6 +107,34 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
                 legacy);
     }
 
+    private TurnRequest buildTurnRequestWithOptions(String agentCode, String message,
+                                                    java.util.Map<String, Object> options) {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        Long memberId = getTestTenantMember().getId();
+        ChatRequest legacy = new ChatRequest();
+        legacy.setMessage(message);
+        legacy.setSessionId("test-session-" + System.currentTimeMillis());
+        legacy.setAgentCode(agentCode);
+        return new TurnRequest(
+                tenantId,
+                userId,
+                memberId,
+                "web",
+                agentCode,
+                null,
+                null,
+                message,
+                null,
+                options,
+                InboundMode.NEW_FROM_REQUEST,
+                null,
+                null,
+                null,
+                null,
+                legacy);
+    }
+
     private void withTestIdentity(Runnable body) {
         Long tenantId = getTestTenant().getId();
         Long userId = getTestUser().getId();
@@ -193,6 +221,29 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
             verify(agentChatPort, never()).runAgentTurn(any(), any(), any());
             verify(chatService, never()).executeAuraBotTurn(any(), any(), any());
             verify(sink, atLeastOnce()).onError(contains("Agent not found"), any());
+        });
+    }
+
+    @Test
+    @DisplayName("named agent + explicit durable flag -> explicit Failed before dispatch (review G8)")
+    void namedAgentWithDurableFlag_failsExplicitly() {
+        withTestIdentity(() -> {
+            TurnOutcome outcome = turnService.runTurn(
+                    buildTurnRequestWithOptions("test_agent", "run the monthly batch",
+                            java.util.Map.of("batch", true)),
+                    sink);
+
+            assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+            assertThat(((TurnOutcome.Failed) outcome).errorMessage())
+                    .contains("durable")
+                    .contains("test_agent");
+
+            // The contradiction is rejected BEFORE any dispatch: neither the named-agent
+            // port nor the default chat service may run, and existence is never probed.
+            verify(agentChatPort, never()).agentExists(any(), any());
+            verify(agentChatPort, never()).runAgentTurn(any(), any(), any());
+            verify(chatService, never()).executeAuraBotTurn(any(), any(), any());
+            verify(sink, atLeastOnce()).onError(contains("durable"), any());
         });
     }
 
