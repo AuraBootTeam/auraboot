@@ -1,4 +1,4 @@
-import { test, expect, type APIResponse, type Page, type Request } from '@playwright/test';
+import { test, expect, type APIResponse, type Page, type Request, type TestInfo } from '@playwright/test';
 import { Client } from 'pg';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { PG_CONN } from '../../helpers/environments';
@@ -190,6 +190,66 @@ function shortSuffix(): string {
 
 function modelRow(page: Page, code: string) {
   return page.locator('tbody tr', { hasText: code }).first();
+}
+
+async function expectPermissionReplayTraceLinkOpensDecisionOps(
+  page: Page,
+  args: {
+    traceId: string;
+    permissionCode: string;
+    resourceCode: string;
+    testInfo: TestInfo;
+  },
+) {
+  const traceLink = page.getByTestId('model-publish-replay-open-permission-trace');
+  await expect(traceLink).toHaveAttribute(
+    'href',
+    new RegExp(`/p/decisionops_execution_logs\\?traceId=${args.traceId}`),
+  );
+
+  const [tracePage] = await Promise.all([
+    page.context().waitForEvent('page', { timeout: 10_000 }),
+    traceLink.click({ button: 'middle' }),
+  ]);
+  await tracePage.waitForLoadState('domcontentloaded');
+  await tracePage.waitForURL(/\/p\/decisionops_execution_logs(?:\?|$)/, { timeout: 15_000 });
+
+  const traceUrl = new URL(tracePage.url());
+  expect(traceUrl.pathname).toBe('/p/decisionops_execution_logs');
+  expect(traceUrl.searchParams.get('traceId')).toBe(args.traceId);
+  expect(traceUrl.searchParams.get('callerType')).toBe('PERMISSION');
+  expect(traceUrl.searchParams.get('callerRef')).toBe(args.permissionCode);
+
+  await expect(tracePage.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 20_000 });
+  const traceRow = tracePage.locator('tr[data-testid^="elta-row-"]').filter({ hasText: args.traceId }).first();
+  await expect(traceRow).toBeVisible({ timeout: 20_000 });
+  await expect(traceRow).toContainText(args.permissionCode);
+  await expect(traceRow).toContainText(/权限|PERMISSION/);
+  const rowTestId = await traceRow.getAttribute('data-testid');
+  expect(rowTestId, `Expected DecisionOps row test id for trace ${args.traceId}`).toBeTruthy();
+  const logKey = rowTestId!.replace('elta-row-', '');
+
+  await tracePage.getByTestId(`elta-open-trace-${logKey}`).click();
+  await expect(tracePage.getByTestId('elta-trace-drawer')).toBeVisible({ timeout: 10_000 });
+  await expect(tracePage.getByTestId('elta-trace-drawer')).toContainText(args.traceId);
+  await expect(tracePage.getByTestId('elta-trace-drawer')).toContainText(args.permissionCode);
+  await expect(tracePage.getByTestId(`elta-chain-caller-${logKey}`)).toContainText(/权限|PERMISSION/);
+  await expect(tracePage.getByTestId(`elta-chain-caller-${logKey}`)).toContainText(args.permissionCode);
+
+  const auditBackLink = tracePage.getByTestId('elta-open-permission-audit');
+  await expect(auditBackLink).toHaveText('打开权限审计');
+  const auditHref = await auditBackLink.getAttribute('href');
+  expect(auditHref).toContain('/enterprise/permissions?');
+  const auditUrl = new URL(auditHref!, tracePage.url());
+  expect(auditUrl.searchParams.get('tab')).toBe('audit');
+  expect(auditUrl.searchParams.get('traceId')).toBe(args.traceId);
+  expect(auditUrl.searchParams.get('resourceCode')).toBe(args.resourceCode);
+
+  await tracePage.screenshot({
+    path: args.testInfo.outputPath('model-publish-permission-trace-click-decisionops.png'),
+    fullPage: true,
+  });
+  await tracePage.close();
 }
 
 async function navigateToModelListViaMenu(page: Page) {
@@ -1332,6 +1392,13 @@ test('RC-MODEL-01: model detail publish governance blocks low-code field refs un
 
   await replayReport.screenshot({
     path: testInfo.outputPath('model-publish-permission-deny-report.png'),
+  });
+
+  await expectPermissionReplayTraceLinkOpensDecisionOps(page, {
+    traceId: denyPermissionResult.traceId!,
+    permissionCode,
+    resourceCode: modelCode,
+    testInfo,
   });
 
   const slaProcessInstanceId = `PROC-${suffix}`;

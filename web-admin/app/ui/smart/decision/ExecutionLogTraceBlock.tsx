@@ -416,6 +416,10 @@ function callerDisplay(log: DecisionLogRecord): string {
 function permissionResourceCode(log: DecisionLogRecord): string | undefined {
   const callerRef = stringValue(log.callerRef);
   if (!callerRef) return undefined;
+  const segments = callerRef.split('.').filter(Boolean);
+  if (segments.length >= 3 && ['function', 'model'].includes(segments[0].toLowerCase())) {
+    return segments.slice(1, -1).join('.');
+  }
   const actionSeparator = callerRef.lastIndexOf('.');
   return actionSeparator > 0 ? callerRef.slice(0, actionSeparator) : callerRef;
 }
