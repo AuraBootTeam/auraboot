@@ -10,7 +10,11 @@ vi.mock('~/contexts/ThemeContext', () => ({
   useTheme: () => ({ theme: 'light', setTheme: vi.fn(), isDark: false }),
 }));
 vi.mock('~/contexts/I18nContext', () => ({
-  useI18n: () => ({ t: (k: string) => k, locale: 'en-US', setLocale: vi.fn() }),
+  useI18n: () => ({
+    t: (k: string, _params?: Record<string, unknown>, fallback?: string) => fallback ?? k,
+    locale: 'en-US',
+    setLocale: vi.fn(),
+  }),
 }));
 vi.mock('~/hooks/useHydrated', () => ({ useHydrated: () => true }));
 vi.mock('~/hooks/useSSE', () => ({ useSSE: () => null }));
@@ -69,5 +73,30 @@ describe('Header — polish', () => {
     );
     const chip = screen.getByTestId('header-env-chip');
     expect(chip.textContent?.trim().length).toBeGreaterThan(0);
+  });
+
+  it('localizes the mobile sidebar toggle aria contract', () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <Header sidebarOpen={false} setSidebarOpen={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    const toggle = screen.getByTestId('header-sidebar-toggle');
+    expect(toggle).toHaveAttribute('aria-controls', 'app-sidebar');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-label', 'Open navigation menu');
+
+    rerender(
+      <MemoryRouter>
+        <Header sidebarOpen={true} setSidebarOpen={vi.fn()} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId('header-sidebar-toggle')).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByTestId('header-sidebar-toggle')).toHaveAttribute(
+      'aria-label',
+      'Close navigation menu',
+    );
   });
 });
