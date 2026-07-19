@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Response, type TestInfo } from '@playwright/test';
+import { test, expect, type APIResponse, type Page, type Response, type TestInfo } from '@playwright/test';
 import { DEFAULT_TEST_ACCOUNT } from '../../helpers/test-accounts';
 import { loginViaUI } from '../../helpers/wd-fixtures';
 import { ensureSidebarExpanded, uniqueId, waitForDynamicPageLoad } from '../helpers';
@@ -28,10 +28,26 @@ type ConditionFragmentEvaluation = {
   result?: string;
 };
 
+type DecisionImpactRef = {
+  sourceType?: string;
+  sourceCode?: string;
+  sourcePid?: string;
+  sourceName?: string;
+  targetType?: string;
+  targetCode?: string;
+  binding?: string;
+};
+
+type ConditionFragmentImpact = {
+  fragmentCode?: string;
+  incoming?: DecisionImpactRef[];
+  incomingCount?: number;
+};
+
 test.use({ storageState: { cookies: [], origins: [] } });
 test.setTimeout(120_000);
 
-async function readApi<T>(response: Response): Promise<T> {
+async function readApi<T>(response: Response | APIResponse): Promise<T> {
   const body = (await response.json().catch(async () => ({
     message: await response.text().catch(() => ''),
   }))) as ApiEnvelope<T>;
@@ -76,6 +92,91 @@ async function captureLibrary(page: Page, testInfo: TestInfo, name: string): Pro
     path: testInfo.outputPath(`${name}.png`),
   });
 }
+
+async function selectSharedLeaveApprovalGuard(page: Page): Promise<void> {
+  await page.getByLabel('condition-fragment-keyword').fill('shared_leave_approval_guard');
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/decision/condition-fragments') &&
+        !response.url().includes('/impact') &&
+        response.request().method() === 'GET',
+      { timeout: 15_000 },
+    ),
+    page.getByTestId('cfl-refresh').click(),
+  ]);
+  await expect(page.getByTestId('cfl-row-shared_leave_approval_guard')).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByTestId('cfl-row-shared_leave_approval_guard').click();
+  await expect(page.getByTestId('condition-fragment-library')).toContainText('共享请假审批准入条件');
+}
+
+function expectImpactRef(
+  impact: ConditionFragmentImpact,
+  sourceType: string,
+  sourceName: string,
+  binding: string,
+): void {
+  expect(impact.incoming ?? []).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        sourceType,
+        sourceName,
+        targetType: 'CONDITION_FRAGMENT',
+        targetCode: 'shared_leave_approval_guard',
+        binding,
+      }),
+    ]),
+  );
+}
+
+test('Condition fragment library shows the workflow-demo shared guard reused by every rule consumer @golden', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 1280, height: 1100 });
+  await loginViaUI(page, DEFAULT_TEST_ACCOUNT.email, DEFAULT_TEST_ACCOUNT.password);
+  await expect(page).not.toHaveURL(/\/login(?:$|\?)/);
+
+  await openConditionFragmentsFromSidebar(page);
+  await selectSharedLeaveApprovalGuard(page);
+
+  const impact = await readApi<ConditionFragmentImpact>(
+    await page.request.get('/api/decision/condition-fragments/shared_leave_approval_guard/impact'),
+  );
+
+  expect(impact).toMatchObject({
+    fragmentCode: 'shared_leave_approval_guard',
+  });
+  expectImpactRef(impact, 'SLA_RULE', '主管审批 SLA', 'RULE_BINDING');
+  expectImpactRef(impact, 'SLA_RULE', 'HR 审批 SLA', 'RULE_BINDING');
+  expectImpactRef(impact, 'BPM_PROCESS', '请假审批', 'DESIGNER_NODE');
+  expectImpactRef(impact, 'AUTOMATION', '长假申请提醒', 'RULE_BINDING');
+  expectImpactRef(impact, 'EVENT_POLICY', '请假事件动作策略', 'VERSION_RULES');
+  expectImpactRef(impact, 'PERMISSION_POLICY', '审批请假申请', 'ROLE_PERMISSION_CONDITION');
+
+  const impactPanel = page.getByTestId('cfl-impact');
+  await expect(impactPanel).toContainText('被哪些链路复用');
+  await expect(impactPanel).toContainText('SLA / 超时策略');
+  await expect(impactPanel).toContainText('BPM / 审批路由');
+  await expect(impactPanel).toContainText('自动化');
+  await expect(impactPanel).toContainText('事件策略');
+  await expect(impactPanel).toContainText('权限策略');
+  await expect(impactPanel.locator('a[href^="/p/sla_config/view/"]').filter({ hasText: '主管审批 SLA' }).first())
+    .toBeVisible();
+  await expect(impactPanel.locator('a[href^="/p/sla_config/view/"]').filter({ hasText: 'HR 审批 SLA' }).first())
+    .toBeVisible();
+  await expect(impactPanel.locator('a[href^="/p/bpm_process_management/edit/"]').filter({ hasText: '请假审批' }).first())
+    .toBeVisible();
+  await expect(impactPanel.locator('a[href^="/automation/"]').filter({ hasText: '长假申请提醒' }).first())
+    .toBeVisible();
+  await expect(impactPanel.locator('a[href="/p/decisionops_event_policies/view/leave_request_event_policy"]'))
+    .toContainText('请假事件动作策略');
+  await expect(impactPanel.locator('a[href="/enterprise/permissions"]').filter({ hasText: '审批请假申请' }).first())
+    .toBeVisible();
+
+  await captureLibrary(page, testInfo, 'condition-fragment-shared-guard-cross-consumer-impact');
+});
 
 test('Condition fragment library creates, reuses, publishes, and impact-acks a shared v2 fragment @golden', async ({
   page,
