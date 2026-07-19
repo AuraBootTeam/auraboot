@@ -1477,6 +1477,103 @@ describe('DecisionOpsConsole', () => {
     expect(updateConditionFragmentDraft).not.toHaveBeenCalled();
   });
 
+  it('prefers a locally published Strategy Studio fragment over a stale query draft before the next save', async () => {
+    const staleFragment = {
+      pid: 'fragment-draft-2',
+      fragmentCode: 'leave_sla_node_match',
+      fragmentName: '请假 SLA 节点匹配',
+      scopeType: 'SLA',
+      scopeRef: 'wd_leave_approval',
+      ownerModule: 'workflow-demo',
+      version: 2,
+      status: 'DRAFT',
+      fieldRefs: ['record.data.wd_req_applicant'],
+      decisionRefs: ['complaint_sla_deadline'],
+      conditionSpec: {
+        root: {
+          type: 'group',
+          op: 'OR',
+          children: [
+            {
+              type: 'compare',
+              enabled: true,
+              left: { type: 'path', scope: 'record', path: 'data.wd_req_applicant' },
+              operator: 'EQ',
+              right: { type: 'literal', value: 'user-owner', dataType: 'user' },
+            },
+          ],
+        },
+      },
+    };
+    const listConditionFragments = vi.fn(async () => ({
+      records: [staleFragment],
+      total: 1,
+      current: 1,
+      size: 20,
+    }));
+    const updateConditionFragmentDraft = vi.fn(async (pid: string, req: unknown) => ({
+      ...(req as object),
+      fragmentCode: 'leave_sla_node_match',
+      pid,
+      version: 2,
+      status: 'DRAFT',
+    }));
+    const validateConditionFragmentVersion = vi.fn(async (pid: string) => ({
+      ...staleFragment,
+      pid,
+      status: 'VALIDATED',
+    }));
+    const publishConditionFragmentVersion = vi.fn(async (pid: string) => ({
+      ...staleFragment,
+      pid,
+      status: 'PUBLISHED',
+    }));
+    const createConditionFragmentVersion = vi.fn(async (code: string, req: unknown) => ({
+      ...(req as object),
+      fragmentCode: code,
+      pid: 'fragment-draft-3',
+      version: 3,
+      status: 'DRAFT',
+    }));
+
+    renderConsole(undefined, {
+      listConditionFragments,
+      updateConditionFragmentDraft,
+      validateConditionFragmentVersion,
+      publishConditionFragmentVersion,
+      createConditionFragmentVersion,
+    } as unknown as Partial<DecisionApi>);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-fragment-library')).toHaveTextContent(
+        '请假 SLA 节点匹配',
+      ),
+    );
+    fireEvent.click(screen.getByTestId('strategy-publish'));
+    await waitFor(() =>
+      expect(publishConditionFragmentVersion).toHaveBeenCalledWith(
+        'fragment-draft-2',
+        expect.objectContaining({ impactAcknowledged: true }),
+      ),
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId('strategy-operation-status')).toHaveTextContent('发布成功'),
+    );
+
+    updateConditionFragmentDraft.mockClear();
+    fireEvent.click(screen.getByTestId('strategy-save-draft'));
+
+    await waitFor(() => expect(createConditionFragmentVersion).toHaveBeenCalledOnce());
+    expect(createConditionFragmentVersion).toHaveBeenCalledWith(
+      'leave_sla_node_match',
+      expect.objectContaining({
+        fragmentName: '请假 SLA 节点匹配',
+        scopeType: 'SLA',
+      }),
+    );
+    expect(updateConditionFragmentDraft).not.toHaveBeenCalled();
+  });
+
   it('shows a stable Strategy Studio test-run failure when the runtime returns no result body', async () => {
     const evaluate = vi.fn(async () => null);
 

@@ -22,6 +22,7 @@ import {
   loginAsAdmin as loginApiAsAdmin,
   queryInstanceStatus,
   startProcessInstance,
+  waitForTodoTask,
 } from './_helpers/bpm-lifecycle';
 import { uniqueId } from '../helpers';
 import { BASE_URL } from '../../helpers/environments';
@@ -52,9 +53,17 @@ const ACTION_MODERN_FAILURE_UID = uniqueId('BPMACTMOD').toLowerCase();
 const ACTION_MODERN_FAILURE_PROCESS_KEY = `bpm_action_modern_fail_${ACTION_MODERN_FAILURE_UID}`;
 const ACTION_MODERN_FAILURE_PROCESS_NAME = `BPM Action Modern Failure ${ACTION_MODERN_FAILURE_UID}`;
 const ACTION_MODERN_FAILURE_BUSINESS_KEY = `E2E-BPM-ACTION-MODERN-${ACTION_MODERN_FAILURE_UID}`;
+const APPLICANT_UID = uniqueId('BPMAPP').toLowerCase();
+const APPLICANT_PROCESS_KEY = `bpm_applicant_assignment_${APPLICANT_UID}`;
+const APPLICANT_PROCESS_NAME = `BPM Applicant Assignment ${APPLICANT_UID}`;
+const APPLICANT_BUSINESS_KEY = `E2E-BPM-APPLICANT-${APPLICANT_UID}`;
+const APPLICANT_DECISION_CODE = `bpm_applicant_assignment_${APPLICANT_UID}`;
 
 let adminToken = '';
 let currentUserId = '';
+let currentBpmActorId = '';
+let applicantUserPid = '';
+let applicantUserLabel = '';
 let processPid = '';
 let instanceId = '';
 let actionProcessPid = '';
@@ -63,6 +72,27 @@ let actionSuccessProcessPid = '';
 let actionSuccessInstanceId = '';
 let actionModernFailureProcessPid = '';
 let actionModernFailureInstanceId = '';
+let applicantProcessPid = '';
+let applicantInstanceId = '';
+let applicantDecisionTraceId = '';
+
+type UserOption = {
+  id?: string | number;
+  pid?: string;
+  displayName?: string;
+  name?: string;
+  realName?: string;
+  nickName?: string;
+  nickname?: string;
+  username?: string;
+  email?: string;
+};
+
+type DecisionVersion = {
+  pid?: string;
+  version?: number;
+  status?: string;
+};
 
 function authHeaders(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -85,6 +115,113 @@ async function readApi<T>(response: Awaited<ReturnType<APIRequestContext['get']>
   ).toBe(true);
   expect(isApiSuccess(body), `API failed: ${JSON.stringify(body).slice(0, 500)}`).toBe(true);
   return body.data as T;
+}
+
+async function resolveFirstUser(request: APIRequestContext): Promise<{ pid: string; label: string }> {
+  const users = await readApi<UserOption[]>(
+    await request.get('/api/admin/users/search?keyword=&size=20', {
+      headers: authHeaders(adminToken),
+    }),
+  );
+  const user = users.find((item) => item.pid || item.id);
+  expect(user, 'at least one user must exist for BPM applicant reference trace evidence').toBeTruthy();
+  const pid = String(user?.pid ?? user?.id ?? '');
+  const label = String(
+    user?.displayName ??
+      user?.name ??
+      user?.realName ??
+      user?.nickName ??
+      user?.nickname ??
+      user?.username ??
+      user?.email ??
+      pid,
+  );
+  expect(pid).not.toEqual('');
+  expect(label).not.toEqual('');
+  return { pid, label };
+}
+
+async function createAndPublishApplicantAssignmentDecision(
+  request: APIRequestContext,
+): Promise<DecisionVersion> {
+  await readApi<unknown>(
+    await request.post('/api/decision/definitions', {
+      headers: authHeaders(adminToken),
+      data: {
+        decisionCode: APPLICANT_DECISION_CODE,
+        decisionName: `BPM Applicant Assignment ${APPLICANT_UID}`,
+        description: 'E2E BPM rule assignment fixture using wd_leave_request.wd_req_applicant',
+        scopeType: 'BPM',
+        ownerModule: 'bpm',
+        enabled: true,
+      },
+    }),
+  );
+
+  const draft = await readApi<DecisionVersion>(
+    await request.post(
+      `/api/decision/definitions/${encodeURIComponent(APPLICANT_DECISION_CODE)}/versions`,
+      {
+        headers: authHeaders(adminToken),
+        data: {
+          kind: 'DECISION_TABLE',
+          runtimeAdapter: 'PLATFORM_DECISION_TABLE',
+          versionTag: `bpm-applicant-${Date.now()}`,
+          contentJson: {
+            hitPolicy: 'FIRST',
+            inputs: [
+              {
+                id: 'wd_req_applicant',
+                label: '申请人',
+                expr: {
+                  type: 'path',
+                  scope: 'record',
+                  path: 'data.wd_req_applicant',
+                  dataType: 'user',
+                },
+              },
+            ],
+            outputs: [
+              {
+                id: 'candidateUserIds',
+                label: '候选审批人',
+                dataType: 'string',
+              },
+            ],
+            rules: [
+              {
+                ruleId: 'applicant-to-admin-assignee',
+                priority: 10,
+                when: { wd_req_applicant: { operator: 'EQ', value: applicantUserPid } },
+                then: { candidateUserIds: currentBpmActorId },
+              },
+            ],
+            defaultOutput: {},
+          },
+        },
+      },
+    ),
+  );
+  expect(draft.pid, 'BPM applicant assignment draft pid must be returned').toBeTruthy();
+
+  const validation = await readApi<{ valid?: boolean }>(
+    await request.post(`/api/decision/versions/${encodeURIComponent(draft.pid!)}/validate`, {
+      headers: authHeaders(adminToken),
+    }),
+  );
+  expect(validation.valid).toBe(true);
+
+  const published = await readApi<DecisionVersion>(
+    await request.post(`/api/decision/versions/${encodeURIComponent(draft.pid!)}/publish`, {
+      headers: authHeaders(adminToken),
+      data: {
+        impactAcknowledged: true,
+        note: 'BPM applicant low-code model trace E2E fixture',
+      },
+    }),
+  );
+  expect(String(published.status ?? '')).toMatch(/published/i);
+  return published;
 }
 
 async function loginWebAsAdmin(page: Page, baseURL: string): Promise<void> {
@@ -164,7 +301,7 @@ function buildRuleBindingJson(): string {
 
 function buildBpmnXml(): string {
   const binding = xmlAttr(buildRuleBindingJson());
-  const staticFallbackAssignee = xmlAttr(currentUserId);
+  const staticFallbackAssignee = xmlAttr(currentBpmActorId);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -205,8 +342,98 @@ function buildDesignerJson(): string {
           label: '规则分派审批',
           config: {
             assigneeType: 'user',
-            assigneeId: currentUserId,
+            assigneeId: currentBpmActorId,
             ruleBinding: JSON.parse(buildRuleBindingJson()),
+          },
+        },
+      },
+      {
+        id: 'end',
+        type: 'endEvent',
+        position: { x: 600, y: 220 },
+        data: { type: 'endEvent', label: '结束' },
+      },
+    ],
+    edges: [
+      { id: 'f_start_approve', source: 'start', target: 'approve', type: 'smoothstep' },
+      { id: 'f_approve_end', source: 'approve', target: 'end', type: 'smoothstep' },
+    ],
+  });
+}
+
+function buildApplicantRuleBindingJson(): string {
+  return JSON.stringify({
+    consumerType: 'BPM',
+    consumerCode: APPLICANT_PROCESS_KEY,
+    consumerNodeId: 'approve',
+    bindingKind: 'DECISION_REF',
+    decisionBinding: {
+      decisionCode: APPLICANT_DECISION_CODE,
+      versionPolicy: 'LATEST_PUBLISHED',
+      inputMappings: [
+        {
+          input: 'wd_req_applicant',
+          source: { kind: 'FIELD', scope: 'record', path: 'data.wd_req_applicant' },
+        },
+      ],
+      outputMappings: [
+        {
+          output: 'candidateUserIds',
+          target: { kind: 'ACTION_PARAM', path: 'candidateUsers' },
+        },
+      ],
+      fallbackPolicy: { mode: 'FAIL_CLOSED' },
+      traceMode: 'ALWAYS',
+      enabled: true,
+    },
+    enabled: true,
+  });
+}
+
+function buildApplicantBpmnXml(): string {
+  const binding = xmlAttr(buildApplicantRuleBindingJson());
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:smart="http://smartengine.org/schema/process"
+             targetNamespace="http://auraboot.com/bpm">
+  <process id="${APPLICANT_PROCESS_KEY}" name="${xmlAttr(APPLICANT_PROCESS_NAME)}" isExecutable="true">
+    <startEvent id="start"/>
+    <sequenceFlow id="f_start_approve" sourceRef="start" targetRef="approve"/>
+    <userTask id="approve" name="Applicant Rule Assigned Approval"
+              smart:assigneeType="user" smart:assigneeId="static-fallback-user">
+      <extensionElements>
+        <smart:properties>
+          <smart:property name="aura.ruleBinding" value="${binding}"/>
+        </smart:properties>
+      </extensionElements>
+    </userTask>
+    <sequenceFlow id="f_approve_end" sourceRef="approve" targetRef="end"/>
+    <endEvent id="end"/>
+  </process>
+</definitions>`;
+}
+
+function buildApplicantDesignerJson(): string {
+  return JSON.stringify({
+    nodes: [
+      {
+        id: 'start',
+        type: 'startEvent',
+        position: { x: 100, y: 220 },
+        data: { type: 'startEvent', label: '开始' },
+      },
+      {
+        id: 'approve',
+        type: 'userTask',
+        position: { x: 330, y: 220 },
+        data: {
+          type: 'userTask',
+          label: '申请人规则分派审批',
+          config: {
+            assigneeType: 'user',
+            assigneeId: 'static-fallback-user',
+            ruleBinding: JSON.parse(buildApplicantRuleBindingJson()),
           },
         },
       },
@@ -439,6 +666,30 @@ async function createAndDeployProcess(request: APIRequestContext): Promise<void>
   );
 }
 
+async function createAndDeployApplicantProcess(request: APIRequestContext): Promise<void> {
+  const createBody = await readApi<{ pid?: string; id?: string }>(
+    await request.post('/api/bpm/process-definitions', {
+      headers: authHeaders(adminToken),
+      data: {
+        processKey: APPLICANT_PROCESS_KEY,
+        processName: APPLICANT_PROCESS_NAME,
+        description: 'E2E BPM applicant field rule assignment fixture',
+        category: 'e2e-test',
+        bpmnContent: buildApplicantBpmnXml(),
+        designerJson: buildApplicantDesignerJson(),
+      },
+    }),
+  );
+  applicantProcessPid = String(createBody?.pid ?? createBody?.id ?? '');
+  expect(applicantProcessPid, 'applicant process definition create must return pid').toBeTruthy();
+
+  await readApi<unknown>(
+    await request.post(`/api/bpm/process-definitions/${applicantProcessPid}/deploy`, {
+      headers: authHeaders(adminToken),
+    }),
+  );
+}
+
 async function createAndDeployActionProcess(request: APIRequestContext): Promise<void> {
   const createBody = await readApi<{ pid?: string; id?: string }>(
     await request.post('/api/bpm/process-definitions', {
@@ -615,7 +866,14 @@ test.beforeAll(async ({ request }) => {
     await request.get('/api/auth/me', { headers: authHeaders(adminToken) }),
   );
   currentUserId = String(me?.user?.id ?? '');
-  expect(currentUserId, `current user id must be available: ${JSON.stringify(me)}`).toMatch(/^\d+$/);
+  currentBpmActorId = String(me?.user?.pid ?? '');
+  expect(currentUserId, `current numeric user id must be available: ${JSON.stringify(me)}`).toMatch(/^\d+$/);
+  expect(currentBpmActorId, `current BPM actor id must be available: ${JSON.stringify(me)}`)
+    .toMatch(/^01[A-Z0-9]+$/);
+
+  const applicantUser = await resolveFirstUser(request);
+  applicantUserPid = applicantUser.pid;
+  applicantUserLabel = applicantUser.label;
 
   await createAndDeployProcess(request);
 
@@ -642,6 +900,66 @@ test.beforeAll(async ({ request }) => {
       },
     )
     .toBe(true);
+
+  await createAndPublishApplicantAssignmentDecision(request);
+  await createAndDeployApplicantProcess(request);
+  const applicantStarted = await startProcessInstance(request, adminToken, {
+    processDefinitionId: APPLICANT_PROCESS_KEY,
+    businessKey: APPLICANT_BUSINESS_KEY,
+    variables: {
+      record: {
+        modelCode: 'wd_leave_request',
+        entityCode: 'wd_leave_request',
+        recordPid: APPLICANT_BUSINESS_KEY,
+        data: {
+          wd_req_applicant: applicantUserPid,
+          wd_req_type: 'annual',
+        },
+      },
+      recordPid: APPLICANT_BUSINESS_KEY,
+    },
+  });
+  applicantInstanceId = applicantStarted.instanceId;
+  expect(applicantInstanceId, 'applicant assignment process instance id must be returned')
+    .toBeTruthy();
+
+  await expect
+    .poll(
+      async () => {
+        const timeline = await listExecutionTimeline(request, adminToken, applicantInstanceId);
+        const trace = timeline
+          .filter((entry) => entry.nodeId === 'approve')
+          .map((entry) => entry.outputData?.ruleBinding as Record<string, unknown> | undefined)
+          .find((item) => item?.decisionCode === APPLICANT_DECISION_CODE);
+        applicantDecisionTraceId = String(trace?.traceId ?? '');
+        return {
+          status: trace?.status ?? '',
+          matched: trace?.matched ?? false,
+          candidateUserIds: (trace?.outputs as Record<string, unknown> | undefined)?.candidateUserIds,
+        };
+      },
+      {
+        timeout: 20_000,
+        message: 'applicant rule assignment trace should be MATCHED and return current BPM actor candidate',
+      },
+    )
+    .toEqual({
+      status: 'MATCHED',
+      matched: true,
+      candidateUserIds: currentBpmActorId,
+    });
+  expect(applicantDecisionTraceId, 'BPM applicant assignment must expose DecisionOps trace id')
+    .toBeTruthy();
+
+  await waitForTodoTask(
+    request,
+    adminToken,
+    (task) => task.processInstanceId === applicantInstanceId || task.businessKey === APPLICANT_BUSINESS_KEY,
+    {
+      timeout: 20_000,
+      message: 'rule output candidateUserIds should create a current-actor todo task',
+    },
+  );
 
   await createAndDeployActionProcess(request);
   await startActionFailureProcess(request);
@@ -783,6 +1101,126 @@ test('BPM userTask fail-closed blocks static assignee and renders localized Rule
     path: testInfo.outputPath('bpm-rule-binding-fail-closed-process-status.png'),
     fullPage: true,
   });
+});
+
+test('BPM userTask applicant field assignment links ProcessStatus and unified DecisionOps Trace', async ({
+  page,
+  request,
+  baseURL,
+}, testInfo) => {
+  test.setTimeout(120_000);
+
+  expect(applicantInstanceId, 'applicant assignment process instance id must be captured')
+    .toBeTruthy();
+  expect(applicantDecisionTraceId, 'applicant assignment decision trace id must be captured')
+    .toBeTruthy();
+
+  const status = await queryInstanceStatus(request, adminToken, {
+    processKey: APPLICANT_PROCESS_KEY,
+    businessKey: APPLICANT_BUSINESS_KEY,
+  });
+  expect(status.currentNodes.map((node) => node.nodeId)).toContain('approve');
+
+  const todo = await waitForTodoTask(
+    request,
+    adminToken,
+    (task) => task.processInstanceId === applicantInstanceId || task.businessKey === APPLICANT_BUSINESS_KEY,
+    {
+      timeout: 20_000,
+      message: 'admin todo task should remain visible after applicant rule assignment',
+    },
+  );
+  expect(todo.processDefinitionActivityId).toBe('approve');
+
+  const timeline = await listExecutionTimeline(request, adminToken, applicantInstanceId);
+  const trace = timeline
+    .filter((entry) => entry.nodeId === 'approve')
+    .map((entry) => entry.outputData?.ruleBinding as Record<string, unknown> | undefined)
+    .find((item) => item?.decisionCode === APPLICANT_DECISION_CODE);
+  expect(trace, 'backend timeline must retain applicant rule assignment trace').toBeTruthy();
+  expect(trace).toMatchObject({
+    decisionCode: APPLICANT_DECISION_CODE,
+    consumerType: 'BPM',
+    consumerCode: APPLICANT_PROCESS_KEY,
+    consumerNodeId: 'approve',
+    status: 'MATCHED',
+    matched: true,
+    fallbackApplied: false,
+  });
+  expect(trace?.inputs).toEqual({ wd_req_applicant: applicantUserPid });
+  expect(trace?.outputs).toEqual({ candidateUserIds: currentBpmActorId });
+
+  await loginWebAsAdmin(page, baseURL ?? BASE_URL);
+  await page.goto(`/bpm/process-status?processInstanceId=${encodeURIComponent(applicantInstanceId)}`, {
+    waitUntil: 'domcontentloaded',
+  });
+
+  await expect(page.getByRole('heading', { name: /流程状态|Process Status/i })).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByTestId('bpm-process-status-rule-trace')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('bpm-rule-trace-item-approve')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('bpm-rule-trace-decision')).toContainText(APPLICANT_DECISION_CODE);
+  await expect(page.getByTestId('bpm-rule-trace-status')).toContainText('已命中');
+  await expect(page.getByTestId('bpm-rule-trace-output')).toContainText('候选审批人');
+  await expect(page.getByTestId('bpm-rule-trace-output')).toContainText(currentBpmActorId);
+  await expect(page.getByTestId('bpm-rule-trace-id')).toContainText(applicantDecisionTraceId);
+
+  const processTraceLink = page.getByTestId('bpm-rule-trace-open-decisionops-approve');
+  await expect(processTraceLink).toHaveAttribute(
+    'href',
+    `/p/decisionops_execution_logs?traceId=${encodeURIComponent(
+      applicantDecisionTraceId,
+    )}&decisionCode=${encodeURIComponent(
+      APPLICANT_DECISION_CODE,
+    )}&callerType=BPM&callerRef=${encodeURIComponent(APPLICANT_PROCESS_KEY)}`,
+  );
+
+  await page.screenshot({
+    path: testInfo.outputPath('bpm-applicant-rule-assignment-process-status.png'),
+    fullPage: true,
+  });
+
+  await Promise.all([
+    page.waitForURL(/\/p\/decisionops_execution_logs\?/, { timeout: 15_000 }),
+    processTraceLink.click(),
+  ]);
+  await expect(page.getByTestId('execution-log-trace-block')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByLabel('log-keyword')).toHaveValue(applicantDecisionTraceId);
+  await expect(page.getByLabel('log-caller-type')).toHaveValue('BPM');
+
+  const traceRow = page
+    .locator('tr[data-testid^="elta-row-"]')
+    .filter({ hasText: applicantDecisionTraceId })
+    .first();
+  await expect(traceRow).toBeVisible({ timeout: 20_000 });
+  await traceRow.getByRole('button', { name: '追踪' }).click();
+
+  await expect(page.getByTestId('elta-trace-drawer')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('elta-trace-drawer')).toContainText('BPM /');
+  await expect(page.getByTestId('elta-trace-drawer')).toContainText(APPLICANT_PROCESS_KEY);
+  await expect(page.getByTestId('elta-trace-drawer')).toContainText('候选审批人');
+  await expect(page.getByTestId('elta-trace-drawer')).toContainText(currentBpmActorId);
+  await expect(page.getByTestId('elta-trace-drawer')).toContainText('申请人');
+  await expect(page.getByTestId('elta-trace-drawer')).toContainText('record.data.wd_req_applicant');
+  await expect(page.getByTestId('elta-trace-drawer')).toContainText('模型 wd_leave_request');
+  await expect(page.getByTestId('elta-trace-drawer')).toContainText(applicantUserPid);
+  await expect(page.getByTestId('elta-open-bpm-process-status')).toHaveAttribute(
+    'href',
+    `/bpm/process-status?processInstanceId=${encodeURIComponent(applicantInstanceId)}`,
+  );
+
+  await page.screenshot({
+    path: testInfo.outputPath('bpm-applicant-rule-assignment-decisionops-trace.png'),
+    fullPage: true,
+  });
+
+  await Promise.all([
+    page.waitForURL(/\/bpm\/process-status\?processInstanceId=/, { timeout: 15_000 }),
+    page.getByTestId('elta-open-bpm-process-status').click(),
+  ]);
+  expect(new URL(page.url()).searchParams.get('processInstanceId')).toBe(applicantInstanceId);
+  await expect(page.getByTestId('bpm-rule-trace-item-approve')).toBeVisible({ timeout: 15_000 });
 });
 
 test('BPM serviceTask action provider failure renders productized ProcessStatus trace', async ({

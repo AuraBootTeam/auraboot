@@ -45,6 +45,19 @@ const recentLog = {
     wd_req_type: 'annual',
   },
   traceSnapshot: {
+    outputMetadata: {
+      deadlineMinutes: {
+        label: '处理时限',
+        dataType: 'integer',
+      },
+      severity: {
+        label: '风险等级',
+        dataType: 'enum',
+        valueLabels: {
+          warning: '预警',
+        },
+      },
+    },
     factMetadata: {
       review_status: {
         scope: 'record',
@@ -97,6 +110,16 @@ const eventPolicyLog = {
   callerType: 'EVENT_POLICY',
   callerRef: 'leave_request_event_policy',
   matchedRulesJson: [{ ruleId: 'notify_long_leave' }],
+};
+
+const bpmLog = {
+  ...recentLog,
+  pid: 'bpm-log-1',
+  traceId: 'trace-bpm-1',
+  correlationId: 'bpm-01BPMINSTANCE-approve',
+  decisionCode: 'approval_routing',
+  callerType: 'BPM',
+  callerRef: 'wd_leave_approval',
 };
 
 function mockLogApi() {
@@ -350,6 +373,46 @@ describe('ExecutionLogTraceBlock', () => {
     expect(screen.queryByTestId('elta-open-permission-audit')).not.toBeInTheDocument();
   });
 
+  it('links BPM execution logs back to the process status viewer', async () => {
+    http.get.mockImplementation((endpoint: string, params?: Record<string, unknown>) => {
+      if (endpoint === '/decision/logs/recent') {
+        return Promise.resolve({
+          data: {
+            records: [bpmLog],
+            total: 1,
+            size: params?.size ?? 50,
+            current: 1,
+            pages: 1,
+          },
+        });
+      }
+      if (endpoint === '/decision/logs') {
+        return Promise.resolve({ data: [bpmLog] });
+      }
+      if (endpoint === '/decision/logs/bpm-log-1') {
+        return Promise.resolve({ data: bpmLog });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/p/decisionops_execution_logs?traceId=trace-bpm-1']}>
+        <ExecutionLogTraceBlock block={{ props: { mode: 'list', pageSize: 50 } }} />
+      </MemoryRouter>,
+    );
+
+    await screen.findByTestId('elta-row-bpm-log-1');
+    fireEvent.click(screen.getByTestId('elta-open-trace-bpm-log-1'));
+
+    const link = await screen.findByTestId('elta-open-bpm-process-status');
+    expect(link).toHaveAttribute('href', '/bpm/process-status?processInstanceId=01BPMINSTANCE');
+    expect(await screen.findByTestId('elta-chain-caller-bpm-log-1')).toHaveTextContent(
+      'BPM / wd_leave_approval',
+    );
+    expect(screen.queryByTestId('elta-open-sla-config')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('elta-open-automation')).not.toBeInTheDocument();
+  });
+
   it('links EventPolicy execution logs back to policy detail and designer pages', async () => {
     http.get.mockImplementation((endpoint: string, params?: Record<string, unknown>) => {
       if (endpoint === '/decision/logs/recent') {
@@ -406,14 +469,17 @@ describe('ExecutionLogTraceBlock', () => {
 
     const output = await screen.findByTestId('elta-output-snapshot-log-1');
     expect(output).toHaveTextContent('DMN 输出');
-    expect(output).toHaveTextContent('deadlineMinutes');
+    expect(output).toHaveTextContent('处理时限');
     expect(output).toHaveTextContent('45');
-    expect(output).toHaveTextContent('severity');
-    expect(output).toHaveTextContent('warning');
+    expect(output).toHaveTextContent('风险等级');
+    expect(output).toHaveTextContent('预警');
     expect(output).toHaveTextContent('审批状态');
     expect(output).toHaveTextContent('待审批');
     expect(output).toHaveTextContent('请假类型');
     expect(output).toHaveTextContent('年假');
+    expect(output).not.toHaveTextContent('deadlineMinutes');
+    expect(output).not.toHaveTextContent('severity');
+    expect(output).not.toHaveTextContent('warning');
     expect(output).not.toHaveTextContent('annual');
     expect(output).not.toHaveTextContent('review_status');
     expect(output).not.toHaveTextContent('pending');

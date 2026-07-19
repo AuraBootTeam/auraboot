@@ -2,6 +2,7 @@ package com.auraboot.framework.decision;
 
 import com.auraboot.framework.decision.dto.DrtDefinitionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtEvaluateRequest;
+import com.auraboot.framework.decision.dto.DrtLogDTO;
 import com.auraboot.framework.decision.dto.DrtVersionCreateRequest;
 import com.auraboot.framework.decision.dto.DrtVersionDTO;
 import com.auraboot.framework.decision.model.DecisionResult;
@@ -17,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -101,6 +103,12 @@ class DecisionTableIntegrationTest extends BaseIntegrationTest {
         assertThat(director.status()).isEqualTo(DecisionStatus.MATCHED);
         assertThat(director.outputs()).containsEntry("route", "director");
         assertThat(director.matchedRules()).extracting(DecisionResult.MatchedRule::ruleId).contains("row-2");
+        List<DrtLogDTO> logs = evaluationService.findLogsByTraceId(director.traceId());
+        assertThat(logs).hasSize(1);
+        assertThat(logs.get(0).getTraceSnapshot().path("outputMetadata").path("route").path("label").asText())
+                .isEqualTo("Route");
+        assertThat(logs.get(0).getTraceSnapshot().path("outputMetadata").path("route").path("dataType").asText())
+                .isEqualTo("string");
 
         // no row matches → default → manager
         DecisionResult fallback = evaluationService.evaluate(evalReq(code, 500, "NORMAL"));

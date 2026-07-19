@@ -756,9 +756,9 @@ test('EventPolicy applicant user reference rule executes action and opens unifie
   await expect(page.getByTestId('epa-editor')).toBeVisible({ timeout: 10_000 });
   await page.getByLabel('policy-code').fill(policyCode);
   await page.getByLabel('policy-name').fill(`Codex Applicant EventPolicy ${suffix}`);
-  await page.getByLabel('policy-event-type').fill(eventType);
-  await page.getByLabel('policy-target-type').fill('MODEL');
-  await page.getByLabel('policy-target-key').fill('wd_leave_request');
+  await page.getByTestId('epa-policy-event-type').fill(eventType);
+  await page.getByTestId('epa-policy-target-type').fill('MODEL');
+  await page.getByTestId('epa-policy-target-key').fill('wd_leave_request');
   await page.getByTestId('epa-save-policy').click();
   await expect(page).toHaveURL(new RegExp(`/p/decisionops_event_policies/view/${policyCode}`), {
     timeout: 15_000,

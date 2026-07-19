@@ -80,6 +80,11 @@ describe('BpmRuleTraceSection', () => {
     expect(screen.getByTestId('bpm-rule-trace-output')).toHaveTextContent('审批组');
     expect(screen.getByTestId('bpm-rule-trace-output')).toHaveTextContent('wd_manager');
     expect(screen.getByTestId('bpm-rule-trace-id')).toHaveTextContent('trace-bpm-1');
+    expect(screen.getByTestId('bpm-rule-trace-open-decisionops-task_manager_approve'))
+      .toHaveAttribute(
+        'href',
+        '/p/decisionops_execution_logs?traceId=trace-bpm-1&decisionCode=approval_routing&callerType=BPM&callerRef=wd_leave_approval',
+      );
     expect(screen.queryByTestId('bpm-rule-trace-item-log-node-start')).toBeNull();
   });
 

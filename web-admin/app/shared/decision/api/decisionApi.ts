@@ -72,10 +72,18 @@ export interface DecisionTraceFactMetadata {
   permission?: string;
 }
 
+export interface DecisionTraceOutputMetadata {
+  label?: string;
+  dataType?: string;
+  allowedValues?: unknown[];
+  valueLabels?: Record<string, string>;
+}
+
 export interface DecisionTraceSnapshot {
   virtualSources?: DecisionVirtualSourceTrace[];
   unknownReasons?: string[];
   factMetadata?: Record<string, DecisionTraceFactMetadata>;
+  outputMetadata?: Record<string, DecisionTraceOutputMetadata>;
 }
 
 export interface DecisionLogRecord {
