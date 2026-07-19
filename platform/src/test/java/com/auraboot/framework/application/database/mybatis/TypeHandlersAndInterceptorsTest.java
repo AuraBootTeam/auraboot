@@ -219,8 +219,9 @@ class TypeHandlersAndInterceptorsTest {
         Method findRecent = PermissionAuditLogMapper.class.getMethod("findRecent", Long.class, int.class);
         Method findByMember = PermissionAuditLogMapper.class.getMethod("findByMember", Long.class, Long.class, int.class);
         Method findByResource = PermissionAuditLogMapper.class.getMethod("findByResource", Long.class, String.class, int.class);
+        Method findByTraceId = PermissionAuditLogMapper.class.getMethod("findByTraceId", Long.class, String.class, int.class);
 
-        for (Method method : List.of(findRecent, findByMember, findByResource)) {
+        for (Method method : List.of(findRecent, findByMember, findByResource, findByTraceId)) {
             ResultMap resultMap = method.getAnnotation(ResultMap.class);
             assertThat(resultMap)
                     .as("%s must use the entity autoResultMap so evaluation_trace JSONB is parsed", method.getName())
