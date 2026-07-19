@@ -271,6 +271,78 @@ async function clickDecisionDefinitionFromSidebar(page: Page): Promise<void> {
   await waitForDynamicPageLoad(page);
 }
 
+async function openDecisionOpsSidebarLink(
+  page: Page,
+  href: string,
+  linkName: RegExp,
+  expectedUrl: RegExp,
+): Promise<void> {
+  await page.goto('/home', { waitUntil: 'domcontentloaded' });
+  await ensureSidebarExpanded(page);
+  const sidebar = page.getByTestId('sidebar');
+  const sidebarInViewport = async () =>
+    sidebar
+      .evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return (
+          rect.right > 0 &&
+          rect.left < window.innerWidth &&
+          rect.bottom > 0 &&
+          rect.top < window.innerHeight
+        );
+      })
+      .catch(() => false);
+  const sidebarToggle = page.getByTestId('header-sidebar-toggle');
+  if (await sidebarToggle.isVisible({ timeout: 1000 }).catch(() => false)) {
+    if (!(await sidebarInViewport())) {
+      await sidebarToggle.click();
+    }
+    await expect.poll(sidebarInViewport, { timeout: 5000, intervals: [100, 250, 500] }).toBe(true);
+  }
+  const nav = (await sidebar.count()) > 0 ? sidebar : page.locator('nav, aside, [role="navigation"]').first();
+  const parent = nav
+    .getByRole('button', { name: /规则中心|决策中心|Rule Center|DecisionOps/i })
+    .or(nav.getByRole('link', { name: /规则中心|决策中心|Rule Center|DecisionOps/i }))
+    .first();
+  const link = nav.locator(`a[href="${href}"]`).or(nav.getByRole('link', { name: linkName })).first();
+  if (!(await link.isVisible({ timeout: 1000 }).catch(() => false))) {
+    await expect(parent).toBeVisible({ timeout: 10000 });
+    await parent.click();
+  }
+  await expect(link).toBeVisible({ timeout: 10000 });
+  await link.scrollIntoViewIfNeeded();
+  await link.click();
+  await expect(page).toHaveURL(expectedUrl, { timeout: 15000 });
+  await waitForDynamicPageLoad(page);
+}
+
+async function openEventPolicyListFromSidebar(page: Page): Promise<void> {
+  await openDecisionOpsSidebarLink(
+    page,
+    '/p/decisionops_event_policies',
+    /事件策略|Event Policy/i,
+    /\/p\/decisionops_event_policies(?:$|\?)/,
+  );
+}
+
+async function openDecisionTableWorkbenchFromSidebar(page: Page): Promise<void> {
+  await openDecisionOpsSidebarLink(
+    page,
+    '/p/decisionops_tables',
+    /决策表|Decision Tables/i,
+    /\/p\/decisionops_tables(?:$|\?)/,
+  );
+}
+
+async function openRuleCenterFromSidebar(page: Page): Promise<void> {
+  await openDecisionOpsSidebarLink(
+    page,
+    '/decision-ops',
+    /策略工作台|规则中心|Rule Center|DecisionOps/i,
+    /\/decision-ops(?:$|\?)/,
+  );
+}
+
 async function assertAnonymousBlocked(browser: Browser): Promise<void> {
   const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
   const anonymous = await context.newPage();
@@ -435,7 +507,7 @@ test.describe.serial('DecisionOps full-app golden', () => {
     await capture(page, testInfo, 'decisionops-execution-log-dmn-output');
     await expectNoLegacyConsoleLinks(page);
 
-    await page.goto('/p/decisionops_event_policies', { waitUntil: 'domcontentloaded' });
+    await openEventPolicyListFromSidebar(page);
     await expect(page.getByTestId('event-policy-actions-block')).toBeVisible({ timeout: 10000 });
     await page.getByTestId('epa-new-policy').click();
     await expect(page.getByTestId('epa-editor')).toBeVisible();
@@ -482,7 +554,7 @@ test.describe.serial('DecisionOps full-app golden', () => {
     await capture(page, testInfo, 'decisionops-event-policy-designer');
     await expectNoLegacyConsoleLinks(page);
 
-    await page.goto('/p/decisionops_tables', { waitUntil: 'domcontentloaded' });
+    await openDecisionTableWorkbenchFromSidebar(page);
     await expect(page.getByTestId('decision-table-workbench-block')).toBeVisible({
       timeout: 15000,
     });
@@ -596,14 +668,14 @@ test.describe.serial('DecisionOps full-app golden', () => {
       .toBe(true);
     await expectNoLegacyConsoleLinks(page);
 
-    await page.goto('/decision-ops', { waitUntil: 'domcontentloaded' });
+    await openRuleCenterFromSidebar(page);
     await expect(page).toHaveURL(/\/decision-ops(?:$|\?)/, { timeout: 10000 });
     await expect(page.getByTestId('decisionops-console')).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('doc-panel-studio')).toBeVisible({ timeout: 15000 });
     await expectNoLegacyConsoleLinks(page, { allowConsoleContainer: true });
 
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/p/decisionops_tables', { waitUntil: 'domcontentloaded' });
+    await openDecisionTableWorkbenchFromSidebar(page);
     await expect(page.getByTestId('decision-table-workbench-block')).toBeVisible({
       timeout: 15000,
     });
