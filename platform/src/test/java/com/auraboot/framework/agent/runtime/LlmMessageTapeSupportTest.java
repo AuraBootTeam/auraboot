@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -15,6 +16,66 @@ import static org.assertj.core.api.Assertions.assertThat;
 class LlmMessageTapeSupportTest {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Test
+    @DisplayName("F5: unexecuted sibling tool calls get truthful placeholder results")
+    void completeDanglingToolResults_answersUnexecutedSiblings() {
+        // Exactly the tape shape DeepSeek rejects: one assistant message requesting
+        // TWO tools, only one answered (the confirmed one), the sibling dangling.
+        // Provider verbatim: "An assistant message with 'tool_calls' must be
+        // followed by tool messages responding to each 'tool_call_id'."
+        List<LlmChatRequest.Message> messages = new ArrayList<>();
+        messages.add(LlmChatRequest.Message.text("user", "list and delete"));
+        messages.add(LlmMessageTapeSupport.buildAssistantMessage(List.of(
+                LlmChatResponse.ContentBlock.builder()
+                        .type("tool_use").id("tool-list").name("list:crm_lead").input(Map.of()).build(),
+                LlmChatResponse.ContentBlock.builder()
+                        .type("tool_use").id("tool-delete").name("cmd:crm:delete_lead").input(Map.of()).build())));
+        messages.add(LlmMessageTapeSupport.buildToolResultMessage(List.of(
+                LlmMessageTapeSupport.buildToolResultBlock(objectMapper, "tool-delete",
+                        Map.of("success", true)))));
+
+        int synthesized = LlmMessageTapeSupport.completeDanglingToolResults(objectMapper, messages);
+
+        assertThat(synthesized).isEqualTo(1);
+        // Every requested id is now answered — the invariant the provider enforces.
+        assertThat(collectAnsweredIds(messages)).contains("tool-list", "tool-delete");
+        // And the placeholder is honest about not having run.
+        assertThat(messages.get(messages.size() - 1).getContent().toString())
+                .contains("not executed");
+    }
+
+    @Test
+    @DisplayName("F5: a tape whose tool calls are all answered is left untouched")
+    void completeDanglingToolResults_noopWhenComplete() {
+        List<LlmChatRequest.Message> messages = new ArrayList<>();
+        messages.add(LlmMessageTapeSupport.buildAssistantMessage(List.of(
+                LlmChatResponse.ContentBlock.builder()
+                        .type("tool_use").id("tool-only").name("list:crm_lead").input(Map.of()).build())));
+        messages.add(LlmMessageTapeSupport.buildToolResultMessage(List.of(
+                LlmMessageTapeSupport.buildToolResultBlock(objectMapper, "tool-only",
+                        Map.of("success", true)))));
+        int before = messages.size();
+
+        assertThat(LlmMessageTapeSupport.completeDanglingToolResults(objectMapper, messages)).isZero();
+        assertThat(messages).hasSize(before);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static java.util.List<String> collectAnsweredIds(List<LlmChatRequest.Message> messages) {
+        java.util.List<String> ids = new ArrayList<>();
+        for (LlmChatRequest.Message m : messages) {
+            if (!(m.getContent() instanceof List<?> list)) {
+                continue;
+            }
+            for (Object o : list) {
+                if (o instanceof LlmChatRequest.ContentBlock b && "tool_result".equals(b.getType())) {
+                    ids.add(b.getToolUseId());
+                }
+            }
+        }
+        return ids;
+    }
 
     @Test
     @DisplayName("assistant message preserves text and tool_use response blocks")
