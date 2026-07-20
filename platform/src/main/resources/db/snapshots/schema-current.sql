@@ -452,7 +452,8 @@ CREATE TABLE public.ab_agent_approval (
     approval_subject_type character varying(20) DEFAULT 'action'::character varying,
     approval_snapshot jsonb,
     snapshot_hash character varying(64),
-    revalidate_policy character varying(20) DEFAULT 'none'::character varying
+    revalidate_policy character varying(20) DEFAULT 'none'::character varying,
+    consumed_at timestamp without time zone
 );
 
 
@@ -461,6 +462,13 @@ CREATE TABLE public.ab_agent_approval (
 --
 
 COMMENT ON TABLE public.ab_agent_approval IS 'Approval requests for sensitive agent operations';
+
+
+--
+-- Name: COLUMN ab_agent_approval.consumed_at; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_approval.consumed_at IS 'When an approved grant was claimed by an executing run (F8 single-use guard); NULL = not yet consumed';
 
 
 --
@@ -21284,6 +21292,13 @@ CREATE INDEX idx_admin_division_parent_level_sort ON public.ab_administrative_di
 --
 
 CREATE INDEX idx_admin_division_status ON public.ab_administrative_division USING btree (status) WHERE (deleted_flag = false);
+
+
+--
+-- Name: idx_agent_approval_grant_lookup; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_approval_grant_lookup ON public.ab_agent_approval USING btree (tenant_id, task_id) WHERE (((approval_status)::text = 'approved'::text) AND (consumed_at IS NULL));
 
 
 --
