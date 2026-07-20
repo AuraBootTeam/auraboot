@@ -173,11 +173,23 @@ try {
 
   // Models answer in markdown. A bubble that shows literal ** around the emphasised words is the
   // kind of defect that only a screenshot (or this assertion) ever catches.
+  //
+  // What is asserted is the widget's rendering, not the model's prose style. Requiring strong > 0
+  // outright made this a test of whether the model felt like emphasising something: deepseek
+  // answered "**37 months**" and passed, qwen answered "The Acme Widget warranty is 37 months from
+  // the date of purchase." — complete, correct, no emphasis anywhere — and was scored as a
+  // rendering failure. The invariant that actually belongs to the widget is that a visitor never
+  // sees raw markers; whether emphasis appears at all is the model's business.
   const boldRendered = await page.locator('[data-testid="cs-msg-agent"]').last().locator('strong').count();
+  const leaksMarkers = answerText.includes('**');
   record(
     'markdown emphasis is rendered, not shown as literal asterisks',
-    !answerText.includes('**') && boldRendered > 0,
-    `strong=${boldRendered}`,
+    !leaksMarkers,
+    leaksMarkers
+      ? `literal ** left in the bubble: ${JSON.stringify(answerText.slice(0, 90))}`
+      : boldRendered > 0
+        ? `strong=${boldRendered}`
+        : 'model used no emphasis this turn — nothing to render, no markers leaked',
   );
   await shot(page, '04-ai-answer');
 
