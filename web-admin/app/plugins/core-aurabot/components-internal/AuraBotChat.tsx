@@ -261,7 +261,14 @@ function MessageBubble({ message, onConfirm, onCancel, isLoading }: MessageBubbl
 
   // Default: text message
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+    // The role is carried in a testid because nothing else in this DOM distinguishes who spoke —
+    // only the flex alignment did. Assertions written against "the last long text on the page"
+    // matched the question just sent, and then the agent description in the header, and passed
+    // both times while proving nothing about the reply.
+    <div
+      className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}
+      data-testid={isUser ? 'chat-msg-user' : 'chat-msg-agent'}
+    >
       <div
         className={`max-w-[85%] rounded-2xl px-4 py-2.5 ${
           isUser

@@ -43,4 +43,27 @@ public interface AgentOrganizationService {
      * @return the member ID to use for permission checks
      */
     Long getAgentMemberId(Long agentId, Long triggerUserId);
+
+    /**
+     * Where this agent sits in the org chart, or {@code enrolled=false} if it does not.
+     *
+     * <p>Exists because the enrolled state was invisible to the UI: the agent detail page reads the
+     * dynamic-model projection, which does not carry {@code employee_id}, so an enrolled colleague
+     * still offered "Enroll as Employee" and a second click produced an error about system
+     * accounts that had nothing to do with the real reason. Declaring {@code employee_id} on the
+     * projection would have pushed an internal bigint across the browser boundary, so the state
+     * comes back described instead: pid for identity, names for display.
+     */
+    OrgPlacement getOrgPlacement(Long agentId);
+
+    /** Read model for {@link #getOrgPlacement(Long)} — public identifiers only. */
+    record OrgPlacement(boolean enrolled,
+                        String employeePid,
+                        String departmentName,
+                        String positionName) {
+
+        public static OrgPlacement notEnrolled() {
+            return new OrgPlacement(false, null, null, null);
+        }
+    }
 }

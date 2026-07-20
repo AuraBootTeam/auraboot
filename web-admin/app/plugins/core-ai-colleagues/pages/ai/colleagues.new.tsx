@@ -7,7 +7,7 @@
  * Step 3: Review & Create (summary + submit)
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import {
   ArrowLeftIcon,
@@ -21,10 +21,34 @@ import {
   ChevronUpIcon,
   CpuChipIcon,
 } from '@heroicons/react/24/outline';
-import { post } from '~/shared/services/http-client';
+import { get, post } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
+
+// ---------------------------------------------------------------------------
+// Agent code
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the `agent_code` the backend requires on create.
+ *
+ * The wizard collects a display name, but `agent_code` is a separate NOT NULL column with a
+ * `(tenant_id, agent_code)` unique index, so it cannot simply be the name. A name is also not
+ * guaranteed to survive slugging — a purely non-ASCII name ("小艾") slugs to the empty string —
+ * hence the `agent` fallback rather than an empty prefix.
+ *
+ * The suffix is supplied by the caller so this stays pure and testable; callers pass a
+ * time-derived value, which is what keeps two colleagues created from the same template apart.
+ */
+export function deriveAgentCode(name: string, uniqueSuffix: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60);
+  return `${slug || 'agent'}_${uniqueSuffix}`;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -38,6 +62,14 @@ interface WizardData {
   personality: string;
   communication_style: string;
   system_prompt: string;
+  /** Provider code the colleague talks through, e.g. "qianwen". See ConfiguredProvider. */
+  provider: string;
+}
+
+/** An LLM service the tenant has actually configured a key for. */
+interface ConfiguredProvider {
+  providerCode: string;
+  displayName: string;
 }
 
 interface AgentTemplate {
@@ -45,7 +77,13 @@ interface AgentTemplate {
   icon: string;
   nameKey: string;
   descriptionKey: string;
-  defaults: Omit<WizardData, 'avatarIcon'>;
+  /**
+   * A template describes a role — persona, tone, prompt. It deliberately does not carry a
+   * provider: which AI service the tenant has a key for is a property of the tenant, not of
+   * "procurement approver", and a template that pinned one would recreate the dead-default bug
+   * the moment it named a vendor this tenant does not use.
+   */
+  defaults: Omit<WizardData, 'avatarIcon' | 'provider'>;
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +187,7 @@ const INITIAL_DATA: WizardData = {
   personality: '',
   communication_style: 'professional',
   system_prompt: '',
+  provider: '',
 };
 
 const AGENT_TYPES = [
@@ -593,9 +632,13 @@ function StepPersonality({
 function StepReview({
   data,
   t,
+  providers,
+  onChange,
 }: {
   data: WizardData;
   t: (key: string, params?: Record<string, any>, fallback?: string) => string;
+  providers: ConfiguredProvider[];
+  onChange: (patch: Partial<WizardData>) => void;
 }) {
   const agentTypeLabel = AGENT_TYPES.find((at) => at.value === data.agent_type);
   const commStyleLabel = COMM_STYLES.find((cs) => cs.value === data.communication_style);
@@ -637,6 +680,33 @@ function StepReview({
               }
               testId="review-agent-type"
             />
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center">
+              <span className="w-40 shrink-0 text-sm text-gray-500 dark:text-gray-400">
+                {t('ai.wizard.field.provider', undefined, 'AI service')}
+              </span>
+              {providers.length > 0 ? (
+                <select
+                  value={data.provider}
+                  onChange={(e) => onChange({ provider: e.target.value })}
+                  className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+                  data-testid="review-provider-select"
+                >
+                  {providers.map((p) => (
+                    <option key={p.providerCode} value={p.providerCode}>
+                      {p.displayName}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span className="text-sm text-amber-600 dark:text-amber-500" data-testid="review-provider-none">
+                  {t(
+                    'ai.wizard.field.provider.none',
+                    undefined,
+                    'No AI service is configured yet — add an API key under AI Settings first, or this colleague will not be able to answer.',
+                  )}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -715,6 +785,35 @@ export default function AIColleagueNewPage() {
   const [data, setData] = useState<WizardData>(INITIAL_DATA);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [creating, setCreating] = useState(false);
+  const [providers, setProviders] = useState<ConfiguredProvider[]>([]);
+
+  // Which LLM services this tenant has a key for. Without this the colleague is created against
+  // the column default, which names a vendor the tenant may never have configured — the record
+  // saves, appears in the list, enrols into the org chart, and then cannot answer a single
+  // message. Offering only configured providers means a colleague that exists can talk.
+  useEffect(() => {
+    let cancelled = false;
+    // Plain fetch, not the shared `get()`. This endpoint answers with a bare array rather than the
+    // {code, data} envelope the rest of the API uses — a shape an existing e2e spec pins down — and
+    // the shared client normalises every response into that envelope. Spreading an array through
+    // that normaliser turns it into an object with numeric keys and a null `data`, so the list
+    // arrives empty and the wizard reports "no AI service configured" for a tenant that has two.
+    fetch('/api/agent/providers/configured', { headers: { Accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((body: unknown) => {
+        if (cancelled) return;
+        const list = Array.isArray(body) ? (body as ConfiguredProvider[]) : [];
+        if (list.length === 0) return;
+        setProviders(list);
+        setData((prev) => (prev.provider ? prev : { ...prev, provider: list[0].providerCode }));
+      })
+      .catch(() => {
+        /* Leave the selector empty; create() refuses rather than binding to a dead default. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const onChange = useCallback(
     (patch: Partial<WizardData>) => {
@@ -730,11 +829,17 @@ export default function AIColleagueNewPage() {
   );
 
   /** Apply a template preset and jump directly into Step 1 (identity) */
+  // Both handlers keep the resolved provider. It is not part of the template — it comes from what
+  // the tenant has configured, and the fetch that resolves it has usually already landed by the
+  // time anyone clicks. Resetting to INITIAL_DATA wholesale blanked it, and the colleague was
+  // created with an empty provider: model cleared, nothing to use in its place, and the failure
+  // only visible when someone tried to talk to it.
   const handleSelectTemplate = (tpl: AgentTemplate) => {
-    setData({
+    setData((prev) => ({
       ...INITIAL_DATA,
       ...tpl.defaults,
-    });
+      provider: prev.provider,
+    }));
     setErrors({});
     setStep(0);
     setShowTemplatePicker(false);
@@ -742,7 +847,7 @@ export default function AIColleagueNewPage() {
 
   /** Skip template selection and start fresh */
   const handleSkipTemplate = () => {
-    setData(INITIAL_DATA);
+    setData((prev) => ({ ...INITIAL_DATA, provider: prev.provider }));
     setErrors({});
     setStep(0);
     setShowTemplatePicker(false);
@@ -778,13 +883,34 @@ export default function AIColleagueNewPage() {
       setStep(0);
       return;
     }
+    // Refuse rather than create a colleague that cannot answer. Without a provider the record
+    // still saves and still enrols — the only place the emptiness shows up is the first message,
+    // long after whoever created it has moved on.
+    if (!data.provider) {
+      toast.showErrorToast(
+        t(
+          'ai.wizard.error.noProvider',
+          undefined,
+          'Choose an AI service first — a colleague without one cannot answer. Add an API key under AI Settings if the list is empty.',
+        ),
+      );
+      return;
+    }
     setCreating(true);
     try {
       const payload: Record<string, any> = {
         name: data.name.trim(),
+        agent_code: deriveAgentCode(data.name.trim(), Date.now().toString(36)),
         agent_type: data.agent_type,
         communication_style: data.communication_style,
         status: 'active',
+        // Bind the colleague to a service the tenant has configured, and clear the model so the
+        // provider's own default is used. Both halves are needed: `model` carries a column default
+        // naming one vendor's model, and leaving it set would send that model name to whichever
+        // provider was chosen here — an agent that resolves a provider and then asks it for a
+        // model it has never heard of.
+        guardrails: JSON.stringify({ provider: data.provider }),
+        model: null,
       };
       if (data.description.trim()) payload.description = data.description.trim();
       if (data.personality.trim()) payload.personality = data.personality.trim();
@@ -837,7 +963,9 @@ export default function AIColleagueNewPage() {
             <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm sm:p-8 dark:border-gray-700 dark:bg-gray-900">
               {step === 0 && <StepIdentity data={data} onChange={onChange} errors={errors} t={t} />}
               {step === 1 && <StepPersonality data={data} onChange={onChange} t={t} />}
-              {step === 2 && <StepReview data={data} t={t} />}
+              {step === 2 && (
+                <StepReview data={data} t={t} providers={providers} onChange={onChange} />
+              )}
 
               {/* Navigation Buttons */}
               <div className="mt-8 flex items-center justify-between border-t border-gray-200 pt-6 dark:border-gray-700">
