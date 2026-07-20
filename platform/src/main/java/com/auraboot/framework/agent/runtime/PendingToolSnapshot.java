@@ -29,6 +29,12 @@ public class PendingToolSnapshot {
     private String channel;
     private String profileId;
     private String channelSessionPid;
+    /** F1 (review 2026-07-19): original triage bucket, preserved across the
+     *  suspend→resume hop so the resumed turn's terminal observation row and
+     *  memory importance keep the real routing semantics (a confirmed write
+     *  action is SYNC_ACTION, not "bucket unknown"). Enum name as String for
+     *  serialization stability; null on pre-F1 rows. */
+    private String triageBucket;
 
     private String toolId;
     private String toolName;

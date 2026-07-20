@@ -9,7 +9,9 @@
 #   |---|------------------------------|----------------------------------|----------------------------------------------------------|
 #   | S1| 员工问数(上下文只读问答)   | "查询本月订单统计"               | bucket=CONTEXTUAL_ANSWER + reason=SYNC_READ_ONLY_TURN    |
 #   | S2| 对话建单(同步写操作)       | "创建一个客户"                   | bucket=SYNC_ACTION + reason=SYNC_ACTION_TURN,并写入      |
-#   |   |                              |                                  | L1 记忆 importance=4                                     |
+#   |   |                              |                                  | L1 记忆 importance=4。live 档若 LLM 走确认工具则自动批准  |
+#   |   |                              |                                  | (挂起→/execute 批准→同 turnId 恢复→终态),断言不变——   |
+#   |   |                              |                                  | F1 保证恢复后桶/记忆语义保留                              |
 #   | S3| 批量/后台任务(durable)     | "批量删除过期线索"               | bucket=ACP_RUN + ab_agent_task 落任务行(引擎路由,      |
 #   |   |                              |                                  | 不断言 stub-LLM 的任务质量)                              |
 #   | S4| 咨询不误触发(G4)           | "为什么导出会失败"               | 走解释路径,绝不进 durable(全局 ACP_RUN 行数=1,即仅 S3)|
@@ -185,12 +187,54 @@ drive_turn() { # $1=label $2=message $3=agentCode-or-empty $4=options-json-or-em
           -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
           -H 'Accept: text/event-stream' -d "$body" || true)
   echo "$out" | grep -q "event:" || step "warn: turn '$label' produced no SSE events"
+  LAST_SSE="$out"
   step "turn '$label' driven"
+}
+
+# Full enterprise loop for suspended write actions (live mode): a real LLM may
+# route a write through a confirmation-gated tool — the turn suspends with
+# event:confirm_required + pendingTurnId. That is DESIGNED behavior, so the
+# golden answers the confirmation like a human would (POST /execute
+# confirmed=true) and the turn resumes ON THE SAME turnId to a terminal
+# outcome. With F1, the resumed terminal observation keeps the original
+# SYNC_ACTION bucket and the memory row lands at importance 4 — so the S2
+# assertions below hold for BOTH provider behaviors (direct completion and
+# suspend+approve). Stub mode never suspends; this is a no-op there.
+approve_if_suspended() {
+  # A real LLM may CHAIN confirmations (approve tool A -> it proposes gated
+  # tool B -> suspends again; observed with deepseek-chat 2026-07-20). Approve
+  # in a loop, bounded, and keep every resume stream — an approve that dies
+  # (provider failure, expired pending) is exactly what forensics need.
+  local label="$1" rounds=0 pending resume_out
+  while echo "$LAST_SSE" | grep -q "event:confirm_required" && [[ $rounds -lt 3 ]]; do
+    pending=$(echo "$LAST_SSE" | grep -o '"pendingTurnId":"[A-Z0-9]*"' | head -1 | cut -d'"' -f4)
+    if [[ -z "$pending" ]]; then
+      step "warn: '$label' suspended but no pendingTurnId parsed"
+      return 0
+    fi
+    rounds=$((rounds+1))
+    step "turn '$label' suspended (approval round $rounds, pendingTurnId=$pending) — approving"
+    resume_out=$(curl -s --noproxy '*' -N --max-time 150 -X POST \
+        "http://localhost:${BE_PORT}/api/ai/aurabot/execute" \
+        -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
+        -H 'Accept: text/event-stream' \
+        -d "{\"pendingTurnId\":\"${pending}\",\"confirmed\":true}" || true)
+    if echo "$resume_out" | grep -q "event:error"; then
+      step "warn: '$label' resume round $rounds returned error frame: $(echo "$resume_out" | grep -A1 'event:error' | tail -1 | head -c 200)"
+      LAST_SSE="$resume_out"
+      return 0
+    fi
+    step "turn '$label' resume round $rounds: $(echo "$resume_out" | grep -c 'event:') SSE events"
+    LAST_SSE="$resume_out"
+  done
+  [[ $rounds -gt 0 ]] && step "turn '$label' reached terminal after $rounds approval round(s)"
+  return 0
 }
 
 step "driving scenario turns"
 drive_turn S1 "查询本月订单统计" "" ""
 drive_turn S2 "创建一个客户" "" ""
+approve_if_suspended S2
 drive_turn S3 "批量删除过期线索" "" ""
 drive_turn S4 "为什么导出会失败" "" ""
 drive_turn S6 "帮我跑月度对账" "scenario_golden_missing_agent" ""
@@ -212,8 +256,8 @@ assert_eq "G1 seam: every row carries route telemetry" \
   "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb ? 'triageBucket' AND detail::jsonb ? 'initialMode' AND detail::jsonb ? 'decisionReason' AND detail::jsonb ? 'latencyMs'")" "5"
 assert_eq "S1 员工问数: CONTEXTUAL + read-only tier" \
   "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'triageBucket'='CONTEXTUAL_ANSWER' AND detail::jsonb->>'decisionReason'='SYNC_READ_ONLY_TURN'")" "1"
-assert_eq "S2 对话建单: SYNC_ACTION routed" \
-  "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'triageBucket'='SYNC_ACTION' AND detail::jsonb->>'decisionReason'='SYNC_ACTION_TURN'")" "1"
+assert_eq "S2 对话建单: SYNC_ACTION routed (direct or resumed)" \
+  "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'triageBucket'='SYNC_ACTION' AND detail::jsonb->>'decisionReason' IN ('SYNC_ACTION_TURN','RESUMED_AFTER_CONFIRMATION')")" "1"
 assert_eq "S2 记忆: L1 row importance=4 written" \
   "$(q "SELECT COUNT(*) FROM ab_agent_memory WHERE category='conversation_turn' AND importance=4")" "1"
 assert_eq "S3 后台任务: ACP_RUN routed (exactly one durable turn)" \

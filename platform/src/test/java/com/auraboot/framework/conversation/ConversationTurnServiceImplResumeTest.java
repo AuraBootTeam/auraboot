@@ -136,6 +136,50 @@ class ConversationTurnServiceImplResumeTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("F1: resumed TurnContext restores the original triage bucket; stale values degrade to null")
+    void approved_restoresTriageBucketFromSnapshot() {
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+
+        PendingToolSnapshot pending = buildPending("01HW3KF1BUCKET", "tool-f1", tenantId, userId);
+        pending.setTriageBucket("SYNC_ACTION");
+        when(pendingToolStore.consumePendingForOwner(eq("01HW3KF1BUCKET"), eq(tenantId), eq(userId)))
+                .thenReturn(pending);
+        when(pendingContinuationService.resumeApprovedChatTool(any(), same(pending), any()))
+                .thenReturn(new TurnOutcome.Success("done", Map.of()));
+
+        turnService.resumeTurn("01HW3KF1BUCKET", ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+        // The resumed turn's terminal observation/memory keep SYNC_ACTION
+        // semantics only if the rebuilt ctx carries the original bucket.
+        verify(pendingContinuationService).resumeApprovedChatTool(
+                argThat(ctx -> ctx.triageBucket() == com.auraboot.framework.agent.triage.TriageBucket.SYNC_ACTION),
+                same(pending), any());
+    }
+
+    @Test
+    @DisplayName("F1: stale / unknown snapshot bucket degrades to null, never fails the resume")
+    void approved_staleBucketDegradesToNull() {
+        // Separate @Test on purpose: each resume's finalize touches the real
+        // persistence layer; two resumes in one transactional test poison the
+        // tx on the known shared-DB drift and the second dies with 25P02.
+        Long tenantId = getTestTenant().getId();
+        Long userId = getTestUser().getId();
+        PendingToolSnapshot stale = buildPending("01HW3KF1STALE", "tool-f1b", tenantId, userId);
+        stale.setTriageBucket("NOT_A_BUCKET");
+        when(pendingToolStore.consumePendingForOwner(eq("01HW3KF1STALE"), eq(tenantId), eq(userId)))
+                .thenReturn(stale);
+        when(pendingContinuationService.resumeApprovedChatTool(any(), same(stale), any()))
+                .thenReturn(new TurnOutcome.Success("done", Map.of()));
+
+        turnService.resumeTurn("01HW3KF1STALE", ConversationTurnService.ConfirmDecision.APPROVED, sink);
+
+        verify(pendingContinuationService).resumeApprovedChatTool(
+                argThat(ctx -> "01HW3KF1STALE".equals(ctx.turnId()) && ctx.triageBucket() == null),
+                same(stale), any());
+    }
+
+    @Test
     @DisplayName("APPROVED + expired pending -> Failed; continuation service never called")
     void approvedExpiredPendingFailsBeforeContinuation() {
         Long tenantId = getTestTenant().getId();
