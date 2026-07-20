@@ -294,4 +294,36 @@ class CloudConfigServiceImplTest {
                 .contains("ENC:api-key")
                 .doesNotContain("sk-live-secret");
     }
+
+    @Test
+    void listConfigs_normalizesLevelSoTheDocumentedUppercaseValueWorks() {
+        // The public contract is documented as `?level=PLATFORM|TENANT`, writes store it
+        // lower-cased, and listByLevel matches lowercase literals in its WHERE clause and
+        // its tenant-scoping <if> branches. Passing PLATFORM through raw silently returned
+        // an empty list -- which reads as "nothing configured" and invites duplicate rows.
+        MetaContext.setContext(100L, 200L, "user-pid", "tester");
+        ArgumentCaptor<String> level = ArgumentCaptor.forClass(String.class);
+        when(cloudConfigMapper.listByLevel(anyString(), any())).thenReturn(List.of());
+
+        cloudConfigService.listConfigs("PLATFORM");
+
+        verify(cloudConfigMapper).listByLevel(level.capture(), any());
+        assertThat(level.getValue())
+                .as("uppercase level must be normalized to the stored lowercase form")
+                .isEqualTo("platform");
+    }
+
+    @Test
+    void listConfigs_tolerantOfMixedCaseAndNull() {
+        MetaContext.setContext(100L, 200L, "user-pid", "tester");
+        when(cloudConfigMapper.listByLevel(any(), any())).thenReturn(List.of());
+
+        cloudConfigService.listConfigs("Tenant");
+        cloudConfigService.listConfigs(null);
+
+        ArgumentCaptor<String> level = ArgumentCaptor.forClass(String.class);
+        verify(cloudConfigMapper, times(2)).listByLevel(level.capture(), any());
+        assertThat(level.getAllValues()).containsExactly("tenant", null);
+    }
+
 }
