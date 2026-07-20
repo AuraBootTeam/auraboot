@@ -39,7 +39,7 @@ class PendingToolSnapshotFactoryTest {
                 "channel-1",
                 400L,
                 500L,
-                null,
+                com.auraboot.framework.agent.triage.TriageBucket.SYNC_ACTION,
                 java.util.Set.of(),
                 "trace-1",
                 "task-1",
@@ -78,6 +78,9 @@ class PendingToolSnapshotFactoryTest {
                 .build());
 
         assertThat(pending.getTurnId()).isEqualTo("turn-1");
+        // F1: the original routing bucket survives the suspend snapshot so the
+        // resumed turn's observation/memory keep SYNC_ACTION semantics.
+        assertThat(pending.getTriageBucket()).isEqualTo("SYNC_ACTION");
         assertThat(pending.getTenantId()).isEqualTo(1L);
         assertThat(pending.getUserId()).isEqualTo(100L);
         assertThat(pending.getHumanMemberId()).isEqualTo(200L);

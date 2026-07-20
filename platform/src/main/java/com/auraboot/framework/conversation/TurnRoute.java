@@ -38,6 +38,21 @@ public record TurnRoute(String initialMode, String decisionReason, List<String> 
     }
 
     /**
+     * F1 companion (2026-07-20): a resumed turn (confirmation approved) has no
+     * fresh planner decision — fabricating one would lie to telemetry, but
+     * omitting route info entirely left resumed terminals as the only rows
+     * without it. Stamp the truth instead: the continuation factually runs on
+     * the sync chat runtime, and the reason marks it as a resume so dashboards
+     * can distinguish resumed terminals from first-pass ones.
+     */
+    public static TurnRoute resumedAfterConfirmation() {
+        return new TurnRoute(
+                TurnExecutionPlanner.InitialExecutionMode.SYNC_AGENT_TURN.name(),
+                "RESUMED_AFTER_CONFIRMATION",
+                List.of("RESUME_PATH"));
+    }
+
+    /**
      * RAG-only channels (embeddable CS widget) bypass the planner entirely —
      * {@code runTurnDispatch} forces SYNC before {@code decide()} runs. Record
      * that as an explicit forced route so these turns don't show up as

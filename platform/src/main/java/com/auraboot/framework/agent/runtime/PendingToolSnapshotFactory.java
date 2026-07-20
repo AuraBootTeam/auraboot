@@ -96,6 +96,7 @@ public class PendingToolSnapshotFactory {
                 .profileId(firstNonBlank(snapshot.getProfileId(), ctx != null ? ctx.profileId() : null))
                 .channelSessionPid(firstNonBlank(snapshot.getChannelSessionPid(),
                         ctx != null ? ctx.channelSessionId() : null))
+                .triageBucket(ctx != null && ctx.triageBucket() != null ? ctx.triageBucket().name() : null)
                 .toolId(snapshot.getToolId())
                 .toolName(snapshot.getToolName())
                 .toolVersion(toolVersion)

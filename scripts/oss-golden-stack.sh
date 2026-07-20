@@ -258,7 +258,16 @@ cmd_up() {
   echo "$server_port $vite_port $bff_port" >"$sd/ports"
   poll_http "http://127.0.0.1:$server_port/actuator/health" '"status":"UP"' 150 backend \
     || die "backend did not become healthy — see $sd/backend.log"
-  log "    backend UP (pid $(cat "$sd/backend.pid"))"
+  # Port-ownership guard (2026-07-20): a FOREIGN listener on the slot port
+  # (e.g. an enterprise stack whose range overlaps) answers the health poll
+  # and everything downstream silently runs against the wrong stack
+  # (bootstrap skipped, login 401). Health UP is not ownership — verify the
+  # listener is OUR spawned pid before proceeding.
+  own_pid="$(cat "$sd/backend.pid")"
+  if ! lsof -ti ":$server_port" 2>/dev/null | grep -qx "$own_pid"; then
+    die "port $server_port is served by a foreign process ($(lsof -ti ":$server_port" 2>/dev/null | head -1)), not our backend pid $own_pid — pick another slot; see $sd/backend.log"
+  fi
+  log "    backend UP (pid $own_pid, port ownership verified)"
 
   log "6/9 bootstrap (minimal admin + tenant; idempotent)"
   if ! curl --noproxy '*' -s -m 10 "http://127.0.0.1:$server_port/api/bootstrap/status" 2>/dev/null | grep -q '"initialized":true'; then

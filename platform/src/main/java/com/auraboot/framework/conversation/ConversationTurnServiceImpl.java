@@ -358,7 +358,8 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
 
         try {
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
-                    capturingSink.capturedContent(), capturingSink.capturedSignature()));
+                    capturingSink.capturedContent(), capturingSink.capturedSignature()),
+                    TurnRoute.resumedAfterConfirmation());
         } catch (Exception e) {
             recordFinalizeFailure(ctx, outcome, e);
         }
@@ -483,8 +484,13 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         }
 
         try {
+            // ACP approval resume: continuation executes on the durable engine.
             finalizeTurn(ctx, outcome, TurnArtifacts.of(
-                    capturingSink.capturedContent(), capturingSink.capturedSignature()));
+                    capturingSink.capturedContent(), capturingSink.capturedSignature()),
+                    new TurnRoute(
+                            TurnExecutionPlanner.InitialExecutionMode.DURABLE_WORKFLOW.name(),
+                            "RESUMED_AFTER_APPROVAL",
+                            java.util.List.of("RESUME_PATH")));
         } catch (Exception e) {
             recordFinalizeFailure(ctx, outcome, e);
         }
@@ -686,6 +692,19 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         return value != null && !value.isBlank();
     }
 
+    /** F1: tolerate null / unknown names from pre-F1 pending rows — a stale
+     *  snapshot must degrade to "bucket unknown", never fail the resume. */
+    private static TriageBucket parseTriageBucket(String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        try {
+            return TriageBucket.valueOf(name);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
     private TurnContext rebuildContext(PendingToolSnapshot pending) {
         // GAP-295 resume path: re-attach the channel session captured at
         // suspend. We trust the stored pid (PendingTool already passed
@@ -706,7 +725,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                 channelSessionId,                      // GAP-295 resume: re-attached via findByPid
                 pending.getConversationId(),
                 null,                                  // inboundMessageId — already persisted at suspend time
-                null,                                  // triageBucket
+                parseTriageBucket(pending.getTriageBucket()),  // F1: restore routing semantics across resume
                 Set.of(),                              // allowedReadOnlyTools — already suspended
                 null,                                  // traceId — chat impl re-attaches via aiTraceService.findActiveTrace
                 pending.getTaskPid(),                  // DC.3c: resume finalization closes the original named-agent task
