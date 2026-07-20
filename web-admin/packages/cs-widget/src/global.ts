@@ -1,4 +1,5 @@
-import { CsWidget } from './ui';
+import { CsWidget, type WidgetStrings } from './ui';
+import { detectHostLanguage, resolveLocaleStrings } from './locales';
 import type { CsIdentity } from './client';
 
 /**
@@ -14,12 +15,19 @@ import type { CsIdentity } from './client';
  * identity whose userHash was computed on your server:
  *
  *   AuraCS.init({ siteKey: 'csk_...', identity: { externalUserId, userHash } })
+ *
+ * The chrome (button labels) follows the host page's language automatically — `<html lang="zh">`
+ * is enough. Override with data-lang on the tag, or pass `strings` to init() for full control.
  */
 
 export interface InitOptions {
   siteKey?: string;
   apiBase?: string;
   identity?: CsIdentity;
+  /** BCP-47 tag for the chrome, e.g. 'zh-CN'. Defaults to the host page's declared language. */
+  lang?: string;
+  /** Per-string overrides. Wins over the resolved locale; anything omitted falls through. */
+  strings?: Partial<WidgetStrings>;
 }
 
 let widget: CsWidget | null = null;
@@ -35,7 +43,11 @@ export function init(options: InitOptions = {}): CsWidget | null {
   }
   if (widget) return widget;
 
-  widget = new CsWidget({ apiBase, siteKey, identity: options.identity });
+  // Precedence: explicit strings > explicit lang > data-lang > host page language > English.
+  const lang = options.lang ?? script?.getAttribute('data-lang') ?? detectHostLanguage();
+  const strings: Partial<WidgetStrings> = { ...resolveLocaleStrings(lang), ...options.strings };
+
+  widget = new CsWidget({ apiBase, siteKey, identity: options.identity, strings });
   return widget;
 }
 
