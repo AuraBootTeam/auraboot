@@ -193,14 +193,19 @@ class ToolProviderRegistryTest extends BaseIntegrationTest {
     }
 
     @Test
-    void discoverByProvider_dslWithoutModelHint_returnsEmpty() {
-        // DslToolProvider.discover() returns empty without a modelHint
+    void discoverByProvider_dslWithoutModelHint_returnsBoundedCommandSet() {
+        // F10 (2026-07-20): DslToolProvider used to return NOTHING without a
+        // modelHint, leaving the agent with no way to act whenever grounding could
+        // not infer the object. It now falls back to a bounded, deterministic
+        // command scan — the registry must pass that through, still capped by
+        // maxResults.
         var ctx = ToolDiscoveryContext.builder()
                 .tenantId(testTenant.getId())
                 .maxResults(50)
                 .build();
         var tools = registry.discoverByProvider("dsl", ctx);
 
-        assertThat(tools).isEmpty();
+        assertThat(tools).isNotEmpty();
+        assertThat(tools).hasSizeLessThanOrEqualTo(50);
     }
 }

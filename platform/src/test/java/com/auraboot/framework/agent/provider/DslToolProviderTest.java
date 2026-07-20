@@ -98,18 +98,35 @@ class DslToolProviderTest extends BaseIntegrationTest {
     // ========== Discover ==========
 
     @Test
-    void discover_withoutModelHint_returnsEmpty() {
+    void discover_withoutModelHint_stillOffersCommandsButNoPerModelTools() {
+        // F10 (2026-07-20): this used to assert isEmpty() — pinning the behavior
+        // where a turn whose object could not be inferred got ZERO DSL tools, i.e.
+        // the agent was incapable of acting (live-reproduced: the @critical
+        // competitive-intelligence scenario failed with "Tool is not available in
+        // this turn"). The original concern behind the amputation — do not sweep
+        // the whole tenant — is preserved and asserted below: the scan is bounded
+        // by maxResults, and the per-model list/get tools and the prefix-based
+        // named-query sweep stay off without a hint.
         Long tenantId = getTestTenant().getId();
         var ctx = ToolDiscoveryContext.builder()
                 .tenantId(tenantId)
                 .maxResults(20)
                 .build();
         var tools = dslToolProvider.discover(ctx);
-        assertThat(tools).isEmpty();
+
+        assertThat(tools).as("agent must retain command capability without a model hint").isNotEmpty();
+        assertThat(tools).hasSizeLessThanOrEqualTo(20);
+        assertThat(tools).allSatisfy(t ->
+                assertThat(t.getToolCode()).startsWith("cmd:"));
+        assertThat(tools).noneSatisfy(t ->
+                assertThat(t.getToolCode()).startsWith("list:"));
+        assertThat(tools).noneSatisfy(t ->
+                assertThat(t.getToolCode()).startsWith("nq:"));
     }
 
     @Test
-    void discover_withBlankModelHint_returnsEmpty() {
+    void discover_withBlankModelHint_behavesLikeNoHint() {
+        // F10: blank hint takes the same bounded fallback path as a null hint.
         Long tenantId = getTestTenant().getId();
         var ctx = ToolDiscoveryContext.builder()
                 .tenantId(tenantId)
@@ -117,7 +134,11 @@ class DslToolProviderTest extends BaseIntegrationTest {
                 .maxResults(20)
                 .build();
         var tools = dslToolProvider.discover(ctx);
-        assertThat(tools).isEmpty();
+
+        assertThat(tools).isNotEmpty();
+        assertThat(tools).hasSizeLessThanOrEqualTo(20);
+        assertThat(tools).allSatisfy(t ->
+                assertThat(t.getToolCode()).startsWith("cmd:"));
     }
 
     @Test

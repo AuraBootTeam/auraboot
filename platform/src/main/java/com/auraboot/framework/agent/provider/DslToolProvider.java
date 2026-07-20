@@ -85,26 +85,47 @@ public class DslToolProvider implements ToolProvider {
 
     @Override
     public List<ToolDefinition> discover(ToolDiscoveryContext ctx) {
-        if (ctx.getModelHint() == null || ctx.getModelHint().isBlank()) {
-            // Too many tools to enumerate without a model hint
-            return List.of();
-        }
-
+        // F10 (execution-architecture review, 2026-07-20): this used to return
+        // NOTHING when grounding could not infer an object ("too many tools to
+        // enumerate"), which meant a turn with no model hint got ZERO DSL tools —
+        // the agent could not act at all, and any tool the model still named came
+        // back "Tool is not available in this turn" (live-reproduced on the
+        // @critical competitive-intelligence scenario). Enumeration cost is a real
+        // concern, but the answer is a bounded, deterministic scan — not amputating
+        // the agent's entire capability whenever phrasing defeats object inference.
+        // Everything downstream (permission filter here, read-only intent filter and
+        // maxTools budget upstream, tool policy at execution) is unchanged: this
+        // widens DISCOVERY only, never authorization.
         String modelHint = ctx.getModelHint();
+        boolean modelScopedHint = modelHint != null && !modelHint.isBlank();
         int maxResults = ctx.getMaxResults() > 0 ? ctx.getMaxResults() : 20;
         List<ToolDefinition> tools = new ArrayList<>();
 
         // 1. Discover commands for this model
         try {
+            // F10 (execution-architecture review, 2026-07-20): when grounding cannot
+            // infer the object (modelHint null/blank — routine for cross-model or
+            // unusual phrasings), the model_code equality predicate matched NOTHING
+            // and the agent was handed ZERO command tools for that turn: it could
+            // not act at all, and any tool the model still named came back "Tool is
+            // not available in this turn". Command capability must not be hostage to
+            // object inference — fall back to a tenant-wide, limit-bounded scan.
+            // Deterministic ORDER BY keeps the truncation stable rather than
+            // whatever the planner happened to return; policy/permission filtering
+            // below and the read-only intent filter upstream are unchanged, so this
+            // widens DISCOVERY only, never authorization.
             String sql = "SELECT code, display_name, description, agent_hint, input_schema, execution_config, cmd_risk_level " +
                     "FROM ab_command_definition " +
                     "WHERE tenant_id = #{params.tenantId} " +
-                    "AND model_code = #{params.modelCode} " +
+                    (modelScopedHint ? "AND model_code = #{params.modelCode} " : "") +
                     "AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
                     "AND (is_current = TRUE OR is_current IS NULL) " +
+                    "ORDER BY code " +
                     "LIMIT #{params.limit}";
-            List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
-                    Map.of("tenantId", ctx.getTenantId(), "modelCode", modelHint, "limit", maxResults));
+            Map<String, Object> sqlParams = modelScopedHint
+                    ? Map.of("tenantId", ctx.getTenantId(), "modelCode", modelHint, "limit", maxResults)
+                    : Map.of("tenantId", ctx.getTenantId(), "limit", maxResults);
+            List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, sqlParams);
             for (Map<String, Object> row : rows) {
                 String code = (String) row.get("code");
                 String displayName = (String) row.get("display_name");
@@ -148,7 +169,10 @@ public class DslToolProvider implements ToolProvider {
                     "AND status = 'published' " +
                     "LIMIT #{params.limit}";
             int remaining = maxResults - tools.size();
-            if (remaining > 0 && canDiscoverNamedQueries(ctx.getUserId())) {
+            // F10: the named-query scan is prefix-based on the model code, so it
+            // only makes sense when we HAVE a model hint (a bare "%" would sweep
+            // every published query in the tenant).
+            if (modelScopedHint && remaining > 0 && canDiscoverNamedQueries(ctx.getUserId())) {
                 List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
                         Map.of("tenantId", ctx.getTenantId(), "codePattern", modelHint + "%", "limit", remaining));
                 for (Map<String, Object> row : rows) {
@@ -175,8 +199,10 @@ public class DslToolProvider implements ToolProvider {
             log.warn("Failed to discover named queries for model {}: {}", modelHint, e.getMessage());
         }
 
-        // 3. Always add generic list + get tools for the model
-        boolean canReadModel = canReadModel(ctx.getUserId(), modelHint);
+        // 3. Always add generic list + get tools for the model — only meaningful
+        // when a concrete model was inferred (F10: no hint => no per-model tools,
+        // but the command scan above still gives the agent capability).
+        boolean canReadModel = modelScopedHint && canReadModel(ctx.getUserId(), modelHint);
         if (canReadModel && tools.size() < maxResults) {
             tools.add(ToolDefinition.builder()
                     .toolCode(PREFIX_LIST + modelHint)
