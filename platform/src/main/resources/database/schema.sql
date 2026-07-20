@@ -5185,7 +5185,14 @@ CREATE TABLE IF NOT EXISTS ab_agent_approval (
 ALTER TABLE ab_agent_approval ALTER COLUMN approver_id TYPE BIGINT USING approver_id::BIGINT;
 ALTER TABLE ab_agent_approval ADD COLUMN IF NOT EXISTS plan_hash VARCHAR(64);
 ALTER TABLE ab_agent_approval ADD COLUMN IF NOT EXISTS plan_snapshot TEXT;
+-- F8 (2026-07-20): single-use approval grant marker; mirrors
+-- V20260720120000__agent_approval_consumed_at.sql (golden/fresh stacks apply
+-- schema.sql directly and never run Flyway — both must carry the column).
+ALTER TABLE ab_agent_approval ADD COLUMN IF NOT EXISTS consumed_at TIMESTAMP;
 
+CREATE INDEX IF NOT EXISTS idx_agent_approval_grant_lookup
+    ON ab_agent_approval (tenant_id, task_id)
+    WHERE approval_status = 'approved' AND consumed_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_agent_approval_tenant ON ab_agent_approval (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_agent_approval_status ON ab_agent_approval (tenant_id, approval_status);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_approval_idempotency ON ab_agent_approval(idempotency_key) WHERE idempotency_key IS NOT NULL;
