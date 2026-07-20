@@ -105,6 +105,37 @@ class TurnCompletionMemoryListenerTest {
     }
 
     @Test
+    @DisplayName("F7: an answer composed after a TOOL FAILURE is never persisted as memory")
+    void toolFailureTurn_skipsMemoryWrite() {
+        // Live-reproduced poisoning loop: the model answered with an invented
+        // navigation path after its tool failed, that answer was stored as an L1
+        // memory, pre-recall fed it into every later turn, and it was repeated
+        // verbatim — overriding the prompt guardrail. Memory is read back as
+        // fact, so a failed turn's guidance must not enter it.
+        TurnCompletedEvent poisoned = new TurnCompletedEvent(
+                newCtx(TriageBucket.SYNC_ACTION, 100L, 42L),
+                new TurnOutcome.Success(
+                        "工具执行失败,建议导航至【销售】→【订单管理】→【数据概览】查看",
+                        Map.of(TurnOutcomeMeta.TOOL_FAILURE, Boolean.TRUE)));
+
+        listener.onTurnCompleted(poisoned);
+
+        verifyNoInteractions(memoryService);
+    }
+
+    @Test
+    @DisplayName("F7 guard is not over-broad: a successful tool turn still writes memory")
+    void successfulToolTurn_stillWritesMemory() {
+        listener.onTurnCompleted(new TurnCompletedEvent(
+                newCtx(TriageBucket.SYNC_ACTION, 100L, 42L),
+                new TurnOutcome.Success("Created customer TestCo.", Map.of())));
+
+        verify(memoryService, times(1)).createScopedMemory(
+                anyLong(), anyString(), anyString(), anyString(),
+                anyString(), anyString(), eq(4), anyBoolean(), anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("LIGHT_CHAT -> skipped silently")
     void lightChat_skipsMemoryWrite() {
         listener.onTurnCompleted(successEvent(TriageBucket.LIGHT_CHAT, "Hi! How can I help?"));
