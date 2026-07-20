@@ -250,10 +250,18 @@ assert_ge() {
 }
 
 step "asserting evidence tables"
-assert_eq "G1 seam: one observation row per terminal turn (5)" \
-  "$(q "SELECT COUNT(*) FROM ab_agent_observation")" "5"
-assert_eq "G1 seam: every row carries route telemetry" \
-  "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb ? 'triageBucket' AND detail::jsonb ? 'initialMode' AND detail::jsonb ? 'decisionReason' AND detail::jsonb ? 'latencyMs'")" "5"
+# One row per TERMINAL turn. Not an exact count: a suspended turn that is later
+# approved finalizes too, so a legitimate confirm→approve round adds rows (and
+# the guards below drive their own turns). The real invariant is "every terminal
+# turn is observed, and every observation carries its route" — asserted as a
+# floor plus a zero-gap check, so a missing seam still turns this red.
+# Scope: `turn.*` rows are the G1 turn seam. The durable engine publishes its own
+# lifecycle rows (`run_completed` etc.) through the same table with a different
+# payload — including them here would fail on correct behavior.
+obs_total=$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE obs_title LIKE 'turn.%'")
+assert_ge "G1 seam: at least one observation row per scenario turn" "$obs_total" 5
+assert_eq "G1 seam: every turn row carries route telemetry (zero missing)" \
+  "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE obs_title LIKE 'turn.%' AND NOT (detail::jsonb ? 'triageBucket' AND detail::jsonb ? 'initialMode' AND detail::jsonb ? 'decisionReason' AND detail::jsonb ? 'latencyMs')")" "0"
 assert_eq "S1 员工问数: CONTEXTUAL + read-only tier" \
   "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'triageBucket'='CONTEXTUAL_ANSWER' AND detail::jsonb->>'decisionReason'='SYNC_READ_ONLY_TURN'")" "1"
 assert_eq "S2 对话建单: SYNC_ACTION routed (direct or resumed)" \
@@ -270,6 +278,49 @@ assert_eq "S4 咨询不误触发: explain-prefixed turn stayed non-durable" \
   "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'triageBucket'='LIGHT_CHAT'")" "2"
 assert_eq "S6 具名路由: NAMED_AGENT_TURN routed and failure observed" \
   "$(q "SELECT COUNT(*) FROM ab_agent_observation WHERE detail::jsonb->>'initialMode'='NAMED_AGENT_TURN' AND obs_title LIKE 'turn.failed%' AND detail::jsonb->>'error' LIKE '%not found%'")" "1"
+
+# --- Campaign regression guards (2026-07-20) -------------------------------
+# The 2026-07-20 execution-architecture fixes are exactly the kind a later
+# refactor undoes silently: they are all "capability quietly disappears"
+# defects with no user-visible crash. Each guard below is a DIRECT probe of
+# the fixed behavior (not a proxy), so a regression turns this runner red
+# instead of showing up months later as "the AI just can't do that".
+
+step "campaign regression guards"
+
+# F10 — command tools must survive a turn with no inferable model.
+# Regression shape: DslToolProvider.discover() short-circuits on a blank
+# modelHint again and the agent silently has ZERO tools.
+f10_tools=$(curl -s --noproxy '*' -m 30 -X POST \
+    "http://localhost:${BE_PORT}/api/ai/aurabot/chat/stream" \
+    -H "Authorization: Bearer $TOK" -H 'Content-Type: application/json' \
+    -H 'Accept: text/event-stream' \
+    -d '{"message":"帮我处理一下这件事","sessionId":"guard-f10-'"$$"'"}' 2>/dev/null | head -c 400)
+f10_resolved=$(grep -c "resolved 0 tools via ToolDiscoveryPort" \
+    "$REPO_ROOT/../.workspace/golden/$RUNTIME/backend.log" 2>/dev/null || echo 0)
+assert_eq "F10 守卫: 无 model hint 的回合仍有工具(零工具即回归)" "$f10_resolved" "0"
+
+# F12 — keyword search must not ILIKE a physically non-text column.
+# Regression shape: the CAST guard is dropped and every keyword entry point
+# of such a model 500s (list page search box, agent list tool, plain API).
+f12_code=$(curl -s --noproxy '*' -m 20 -o /dev/null -w '%{http_code}' \
+    "http://localhost:${BE_PORT}/api/dynamic/mission/list?pageNum=1&pageSize=5&keyword=guard" \
+    -H "Authorization: Bearer $TOK" 2>/dev/null)
+# ONLY a 5xx is the regression. 403/404 mean the model is not reachable in this
+# plugin profile (not imported / not permitted) — the guard is inapplicable, and
+# failing on that would make this a born-red gate that people learn to ignore.
+if [[ "$f12_code" == 5* ]]; then
+  bad "F12 守卫: keyword 搜索返回 $f12_code (ILIKE 打到非文本列的回归)"
+else
+  ok "F12 守卫: mission keyword 搜索未 5xx (http=$f12_code)"
+fi
+
+# F8 — an approved grant must be consumed exactly once. Regression shape:
+# the grant is re-minted on every resume (infinite approval loop) or, worse,
+# replayable (double execution). Asserted structurally: no approval row may
+# be 'approved' yet unconsumed once its run finished.
+assert_eq "F8 守卫: 不存在已批准但从未被消费的授权(无限审批循环回归)" \
+  "$(q "SELECT COUNT(*) FROM ab_agent_approval a WHERE a.approval_status='approved' AND a.consumed_at IS NULL AND a.updated_at < NOW() - INTERVAL '2 minutes'")" "0"
 
 echo
 step "================ RESULT ================"
