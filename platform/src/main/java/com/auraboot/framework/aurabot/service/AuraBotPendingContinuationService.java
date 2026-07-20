@@ -104,6 +104,17 @@ public class AuraBotPendingContinuationService implements PendingContinuationSer
 
         messages.add(LlmMessageTapeSupport.buildToolResultMessage(List.of(toolResultBlock)));
 
+        // F5: the suspended assistant message may have requested SEVERAL tools; only
+        // the confirmed one ran. Answer the siblings truthfully ("not executed")
+        // before going back to the model — OpenAI-compatible providers reject a tape
+        // with unanswered tool_call_ids outright (DeepSeek: "insufficient tool
+        // messages following tool_calls message"), killing the whole resumed turn.
+        int synthesized = LlmMessageTapeSupport.completeDanglingToolResults(objectMapper, messages);
+        if (synthesized > 0) {
+            log.info("Resume tape: answered {} unexecuted sibling tool call(s) for turn {}",
+                    synthesized, ctx != null ? ctx.turnId() : null);
+        }
+
         ProviderConfig resumeConfig = resolveResumeProviderConfig(pending);
         String resumeProviderCode = resumeConfig != null
                 ? LlmProviderFactory.effectiveProviderCode(pending.getProviderCode(), resumeConfig)

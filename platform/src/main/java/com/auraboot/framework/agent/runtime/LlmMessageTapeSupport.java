@@ -8,7 +8,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 /**
@@ -63,6 +65,98 @@ public final class LlmMessageTapeSupport {
                 .role("user")
                 .content(toolResults != null ? toolResults : List.of())
                 .build();
+    }
+
+    /**
+     * F5 (execution-architecture review, 2026-07-20): every {@code tool_use} in an
+     * assistant message MUST be answered by a matching {@code tool_result} before
+     * the tape goes back to the model. OpenAI-compatible providers enforce this
+     * hard — DeepSeek rejects the request outright:
+     * <pre>An assistant message with 'tool_calls' must be followed by tool messages
+     * responding to each 'tool_call_id'. (insufficient tool messages following
+     * tool_calls message)</pre>
+     *
+     * <p>How the tape ends up malformed: the model requests SEVERAL tools in one
+     * assistant message, one of them needs human approval, and the turn suspends.
+     * On resume only the approved tool's result is appended — the siblings that
+     * never ran leave dangling ids, and the next LLM call 400s. It was
+     * intermittent purely because it needs a multi-tool round.
+     *
+     * <p>This is protocol conformance, not a fallback that hides a failure: the
+     * synthesized results state truthfully that the call did not execute, so the
+     * model can react instead of the whole turn dying.
+     *
+     * @return the number of placeholders appended (0 when the tape was already valid)
+     */
+    /**
+     * {@code Message.content} is deliberately {@code Object} (String, ContentBlock
+     * list, or multimodal block list). Only ContentBlock entries can carry tool
+     * ids, so anything else is skipped rather than cast-and-crash.
+     */
+    private static List<LlmChatRequest.ContentBlock> contentBlocks(LlmChatRequest.Message message) {
+        Object content = message != null ? message.getContent() : null;
+        if (!(content instanceof List<?> list)) {
+            return List.of();
+        }
+        List<LlmChatRequest.ContentBlock> blocks = new ArrayList<>();
+        for (Object item : list) {
+            if (item instanceof LlmChatRequest.ContentBlock block) {
+                blocks.add(block);
+            }
+        }
+        return blocks;
+    }
+
+    public static int completeDanglingToolResults(ObjectMapper objectMapper,
+                                                  List<LlmChatRequest.Message> messages) {
+        if (messages == null || messages.isEmpty()) {
+            return 0;
+        }
+        // Collect ids requested by the LAST assistant message that used tools.
+        List<String> requested = new ArrayList<>();
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            LlmChatRequest.Message message = messages.get(i);
+            if (message == null || !"assistant".equals(message.getRole())) {
+                continue;
+            }
+            for (LlmChatRequest.ContentBlock block : contentBlocks(message)) {
+                if ("tool_use".equals(block.getType()) && block.getId() != null) {
+                    requested.add(block.getId());
+                }
+            }
+            if (!requested.isEmpty()) {
+                break;
+            }
+        }
+        if (requested.isEmpty()) {
+            return 0;
+        }
+        Set<String> answered = new LinkedHashSet<>();
+        for (LlmChatRequest.Message message : messages) {
+            if (message == null) {
+                continue;
+            }
+            for (LlmChatRequest.ContentBlock block : contentBlocks(message)) {
+                if ("tool_result".equals(block.getType()) && block.getToolUseId() != null) {
+                    answered.add(block.getToolUseId());
+                }
+            }
+        }
+        List<LlmChatRequest.ContentBlock> placeholders = new ArrayList<>();
+        for (String id : requested) {
+            if (!answered.contains(id)) {
+                placeholders.add(buildToolResultBlock(objectMapper, id, Map.of(
+                        "success", false,
+                        "notExecuted", true,
+                        "error", "This tool call was not executed: the turn was suspended for "
+                                + "confirmation/approval and only the confirmed call ran.")));
+            }
+        }
+        if (placeholders.isEmpty()) {
+            return 0;
+        }
+        messages.add(buildToolResultMessage(placeholders));
+        return placeholders.size();
     }
 
     public static List<Map<String, Object>> serializeMessages(List<LlmChatRequest.Message> messages) {
