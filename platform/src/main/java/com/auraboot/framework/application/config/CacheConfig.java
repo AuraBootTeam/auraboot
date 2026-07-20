@@ -65,9 +65,6 @@ public class CacheConfig {
 
             // Permission caches (Legacy)
 
-            // Permission V4 caches
-            "user-permissions",
-
             // Permission projection caches
             "fieldMaskConfig",                                // FieldMaskServiceImpl @CacheEvict; absent here = saveConfig/deleteConfig threw "Cannot find cache" in prod (caught 2026-06-19 by the cache-name audit + FieldMaskServiceImpl coverage IT)
 
@@ -119,6 +116,11 @@ public class CacheConfig {
      * <p>Caches that use this manager:
      * <ul>
      *   <li>{@code dataScopeCondition} — resolved data scope per member/resource/action</li>
+     *   <li>{@code permission-catalog} — tenant permission-code catalog (negative lookups included)</li>
+     *   <li>{@code user-role-snapshots} — tenant user-role assignments</li>
+     *   <li>{@code role-permission-snapshots} — effective grants for a role and date</li>
+     *   <li>{@code baseline-role-snapshots} — implicit tenant-member baseline role</li>
+     *   <li>{@code user-permissions} — effective user permission snapshot</li>
      * </ul>
      */
     @Bean
@@ -129,7 +131,12 @@ public class CacheConfig {
                 .expireAfterWrite(Duration.ofMinutes(5))
                 .recordStats());
         cacheManager.setCacheNames(Arrays.asList(
-                "dataScopeCondition"
+                "dataScopeCondition",
+                "permission-catalog",
+                "user-role-snapshots",
+                "role-permission-snapshots",
+                "baseline-role-snapshots",
+                "user-permissions"
         ));
         cacheManager.setAllowNullValues(false);
         return cacheManager;

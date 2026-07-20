@@ -78,7 +78,9 @@ class PermissionConditionGuardIT extends BaseIntegrationTest {
         req.setResourceCode(resourceCode);
         req.setAction(action);
         req.setSource("integration_test");
-        return permissionService.create(req);
+        PermissionDTO created = permissionService.create(req);
+        userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
+        return created;
     }
 
     /** Insert a GRANT binding for the shared test role with an optional condition_ast (raw JSON). */
@@ -105,7 +107,7 @@ class PermissionConditionGuardIT extends BaseIntegrationTest {
                             .eq(RolePermission::getId, binding.getId()));
         }
         // RBAC cache must not mask the freshly-inserted grant.
-        userPermissionService.evictUserPermissions(getTestUser().getId());
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }
 
     private Long memberId() {

@@ -51,6 +51,9 @@ class PermissionPolicyServiceImplTest {
     private PermissionMapper permissionMapper;
 
     @Mock
+    private PermissionSnapshotCache permissionSnapshotCache;
+
+    @Mock
     private UserRoleService userRoleService;
 
     @Mock
@@ -83,13 +86,24 @@ class PermissionPolicyServiceImplTest {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of());
 
         assertThat(service.getEffectivePolicy(1L, "model.user.update")).isNull();
-        verify(permissionMapper, never()).findByCode(anyString());
+        verify(permissionSnapshotCache, never()).resolvePermissionDefinition(any(), anyString());
+    }
+
+    @Test
+    void getEffectivePolicyReusesCurrentMembersCachedRoleSnapshot() {
+        MetaContext.setMemberId(1L);
+        when(permissionSnapshotCache.getUserRoleIds(100L, 1L, 1L)).thenReturn(List.of());
+
+        assertThat(service.getEffectivePolicy(1L, "model.user.update")).isNull();
+
+        verify(permissionSnapshotCache).getUserRoleIds(100L, 1L, 1L);
+        verify(userRoleService, never()).getRoleIdsByMemberIdAndTenantId(any(), any());
     }
 
     @Test
     void getEffectivePolicyReturnsNullWhenPermissionMissing() {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
-        when(permissionMapper.findByCode("model.user.update")).thenReturn(null);
+        when(permissionSnapshotCache.resolvePermissionDefinition(100L, "model.user.update")).thenReturn(null);
 
         assertThat(service.getEffectivePolicy(1L, "model.user.update")).isNull();
     }
@@ -100,7 +114,7 @@ class PermissionPolicyServiceImplTest {
 
         Permission perm = new Permission();
         perm.setId(50L);
-        when(permissionMapper.findByCode("model.user.update")).thenReturn(perm);
+        when(permissionSnapshotCache.resolvePermissionDefinition(100L, "model.user.update")).thenReturn(perm);
 
         RolePermission rp = new RolePermission();
         rp.setId(900L);
@@ -117,7 +131,7 @@ class PermissionPolicyServiceImplTest {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L, 8L));
         Permission perm = new Permission();
         perm.setId(50L);
-        when(permissionMapper.findByCode("model.user.update")).thenReturn(perm);
+        when(permissionSnapshotCache.resolvePermissionDefinition(100L, "model.user.update")).thenReturn(perm);
 
         RolePermission rp1 = new RolePermission();
         rp1.setId(900L);
@@ -144,7 +158,7 @@ class PermissionPolicyServiceImplTest {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
         Permission perm = new Permission();
         perm.setId(50L);
-        when(permissionMapper.findByCode("model.user.update")).thenReturn(perm);
+        when(permissionSnapshotCache.resolvePermissionDefinition(100L, "model.user.update")).thenReturn(perm);
 
         when(rolePermissionMapper.selectOne(any(LambdaQueryWrapper.class)))
                 .thenReturn(null); // no rp binding
@@ -157,7 +171,7 @@ class PermissionPolicyServiceImplTest {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
         Permission perm = new Permission();
         perm.setId(50L);
-        when(permissionMapper.findByCode("model.invoice.approve")).thenReturn(perm);
+        when(permissionSnapshotCache.resolvePermissionDefinition(100L, "model.invoice.approve")).thenReturn(perm);
         RolePermissionMapper.RolePermissionConditionAstRow row =
                 new RolePermissionMapper.RolePermissionConditionAstRow();
         row.setId(900L);
@@ -174,7 +188,7 @@ class PermissionPolicyServiceImplTest {
 
     @Test
     void getPolicySchemaReturnsNullWhenPermissionMissing() {
-        when(permissionMapper.findByCode("model.user.update")).thenReturn(null);
+        when(permissionSnapshotCache.resolvePermissionDefinition(100L, "model.user.update")).thenReturn(null);
 
         assertThat(service.getPolicySchema("model.user.update")).isNull();
     }
@@ -183,7 +197,7 @@ class PermissionPolicyServiceImplTest {
     void getPolicySchemaReturnsParsedMap() {
         Permission perm = new Permission();
         perm.setPolicySchema("{\"maxAmount\":{\"type\":\"number\"}}");
-        when(permissionMapper.findByCode("model.user.update")).thenReturn(perm);
+        when(permissionSnapshotCache.resolvePermissionDefinition(100L, "model.user.update")).thenReturn(perm);
 
         Map<String, Object> schema = service.getPolicySchema("model.user.update");
 
@@ -197,7 +211,7 @@ class PermissionPolicyServiceImplTest {
         policySchema.setValue("{\"dynamicAbac\":{\"type\":\"rule-center\"}}");
         Permission perm = new Permission();
         perm.setPolicySchema(policySchema);
-        when(permissionMapper.findByCode("function.case.approve")).thenReturn(perm);
+        when(permissionSnapshotCache.resolvePermissionDefinition(100L, "function.case.approve")).thenReturn(perm);
 
         Map<String, Object> schema = service.getPolicySchema("function.case.approve");
 
@@ -213,7 +227,7 @@ class PermissionPolicyServiceImplTest {
                 "type", "jsonb",
                 "value", "{\"dynamicAbac\":{\"type\":\"rule-center\"}}",
                 "null", false));
-        when(permissionMapper.findByCode("function.case.approve")).thenReturn(perm);
+        when(permissionSnapshotCache.resolvePermissionDefinition(100L, "function.case.approve")).thenReturn(perm);
 
         Map<String, Object> schema = service.getPolicySchema("function.case.approve");
 
@@ -387,7 +401,7 @@ class PermissionPolicyServiceImplTest {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
         Permission perm = permissionWithFactCatalogModel("wd_leave_request");
         perm.setId(50L);
-        when(permissionMapper.findByCode("model.leave.approve")).thenReturn(perm);
+        when(permissionSnapshotCache.resolvePermissionDefinition(100L, "model.leave.approve")).thenReturn(perm);
         when(decisionModelFieldService.getFactCatalog("wd_leave_request"))
                 .thenReturn(factCatalog("wd_leave_request", "record", "data.salary", true, true));
         RolePermissionMapper.RolePermissionConditionAstRow row =
@@ -429,7 +443,7 @@ class PermissionPolicyServiceImplTest {
         when(userRoleService.getRoleIdsByMemberIdAndTenantId(1L, 100L)).thenReturn(List.of(7L));
         Permission perm = permissionWithFactCatalogModel("wd_leave_request");
         perm.setId(50L);
-        when(permissionMapper.findByCode("model.leave.approve")).thenReturn(perm);
+        when(permissionSnapshotCache.resolvePermissionDefinition(100L, "model.leave.approve")).thenReturn(perm);
         when(decisionModelFieldService.getFactCatalog("wd_leave_request"))
                 .thenReturn(factCatalog("wd_leave_request", "record", "data.wd_req_days", true));
         RolePermissionMapper.RolePermissionConditionAstRow row =

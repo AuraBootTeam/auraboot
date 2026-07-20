@@ -13,6 +13,7 @@ import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.permission.service.SubjectPermissionService;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.permission.service.impl.PermissionSnapshotCache;
 import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -66,6 +67,9 @@ class PermissionSystemTest extends BaseIntegrationTest {
     @Autowired
     private org.springframework.cache.CacheManager cacheManager;
 
+    @Autowired
+    private PermissionSnapshotCache permissionSnapshotCache;
+
     @BeforeEach
     void evictAllPermissionCaches() {
         // Other test classes may have populated permission caches with stale data.
@@ -74,6 +78,7 @@ class PermissionSystemTest extends BaseIntegrationTest {
             var cache = cacheManager.getCache(name);
             if (cache != null) cache.clear();
         });
+        permissionSnapshotCache.clearAll();
     }
 
     // ========================================================================
@@ -93,7 +98,9 @@ class PermissionSystemTest extends BaseIntegrationTest {
         request.setResourceCode(prefix + "_" + System.nanoTime());
         request.setAction(action);
         request.setSource("system");
-        return permissionService.create(request);
+        PermissionDTO created = permissionService.create(request);
+        userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
+        return created;
     }
 
     /**
@@ -123,6 +130,7 @@ class PermissionSystemTest extends BaseIntegrationTest {
         binding.setCreatedAt(Instant.now());
         binding.setUpdatedAt(Instant.now());
         rolePermissionMapper.insert(binding);
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }
 
     /**

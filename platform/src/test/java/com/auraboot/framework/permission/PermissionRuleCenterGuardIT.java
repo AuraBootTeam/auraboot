@@ -251,7 +251,9 @@ class PermissionRuleCenterGuardIT extends BaseIntegrationTest {
         req.setResourceCode(resource);
         req.setAction(action);
         req.setSource("integration_test");
-        return permissionService.create(req);
+        PermissionDTO created = permissionService.create(req);
+        userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
+        return created;
     }
 
     private void bindGrantWithRuleCenterGuard(Long permissionId, String permissionCode, String decisionCode) throws Exception {
@@ -297,7 +299,7 @@ class PermissionRuleCenterGuardIT extends BaseIntegrationTest {
             """).formatted(permissionCode, decisionCode));
         binding.setConditions(mapper.convertValue(conditions, Object.class));
         rolePermissionMapper.updateById(binding);
-        userPermissionService.evictUserPermissions(getTestUser().getId());
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }
 
     private void bindGrantWithApplicantRuleCenterGuard(Long permissionId,
@@ -346,6 +348,6 @@ class PermissionRuleCenterGuardIT extends BaseIntegrationTest {
             """).formatted(permissionCode, decisionCode, fieldCode, fieldCode));
         binding.setConditions(mapper.convertValue(conditions, Object.class));
         rolePermissionMapper.updateById(binding);
-        userPermissionService.evictUserPermissions(getTestUser().getId());
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }
 }

@@ -9,6 +9,8 @@ import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.dto.PermissionReferenceDTO;
 import com.auraboot.framework.permission.dto.PermissionUpdateRequest;
 import com.auraboot.framework.permission.entity.Permission;
+import com.auraboot.framework.permission.event.PermissionDefinitionChangedEvent;
+import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.PermissionService;
 import com.auraboot.framework.common.util.DateUtil;
@@ -16,6 +18,7 @@ import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -46,6 +49,7 @@ public class PermissionServiceImpl implements PermissionService {
     private final com.auraboot.framework.permission.service.UserPermissionService userPermissionService;
     private final com.auraboot.framework.rbac.mapper.RolePermissionMapper rolePermissionMapper;
     private final com.auraboot.framework.rbac.mapper.RoleMapper roleMapper;
+    private final ApplicationEventPublisher eventPublisher;
     
     /**
      * 创建Permission
@@ -91,6 +95,7 @@ public class PermissionServiceImpl implements PermissionService {
         permissionMapper.insert(permission);
         
         log.info("Permission created: id={}, code={}", permission.getId(), permission.getCode());
+        publishDefinitionChange(permission, "CREATE");
 
         // 6. 返回DTO
         return permissionConverter.toDTO(permission);
@@ -124,7 +129,7 @@ public class PermissionServiceImpl implements PermissionService {
         permissionMapper.updateById(permission);
         
         log.info("Permission updated: id={}, code={}", permission.getId(), permission.getCode());
-        
+        publishDefinitionChange(permission, "UPDATE");
 
         
         return permissionConverter.toDTO(permission);
@@ -161,7 +166,7 @@ public class PermissionServiceImpl implements PermissionService {
         permissionMapper.update(null, updateWrapper);
 
         log.info("Permission deleted: id={}, code={}", permission.getId(), permission.getCode());
-        
+        publishDefinitionChange(permission, "DELETE");
 
     }
     
@@ -269,6 +274,7 @@ public class PermissionServiceImpl implements PermissionService {
 
         log.warn("Permission deprecated: id={}, code={}, will be archived after 6 months",
             permission.getId(), permission.getCode());
+        publishDefinitionChange(permission, "DEPRECATE");
     }
     
     /**
@@ -306,6 +312,7 @@ public class PermissionServiceImpl implements PermissionService {
         permissionMapper.update(null, updateWrapper);
 
         log.warn("Permission archived: id={}, code={}", permission.getId(), permission.getCode());
+        publishDefinitionChange(permission, "ARCHIVE");
     }
     
     /**
@@ -462,6 +469,8 @@ public class PermissionServiceImpl implements PermissionService {
         
         log.info("Permission bound to role: roleId={}, permissionId={}, bindingId={}",
             roleId, permissionId, binding.getId());
+        eventPublisher.publishEvent(new RolePermissionChangedEvent(
+                this, binding.getTenantId(), roleId, permissionId, "CREATE"));
     }
     
     /**
@@ -493,6 +502,8 @@ public class PermissionServiceImpl implements PermissionService {
             log.info("Permission unbound from role: roleId={}, permissionId={}, bindingId={}",
                 roleId, permissionId, binding.getId());
         }
+        eventPublisher.publishEvent(new RolePermissionChangedEvent(
+                this, MetaContext.getCurrentTenantId(), roleId, permissionId, "DELETE"));
     }
     
     /**
@@ -560,5 +571,10 @@ public class PermissionServiceImpl implements PermissionService {
         }
         
         return dto;
+    }
+
+    private void publishDefinitionChange(Permission permission, String operation) {
+        eventPublisher.publishEvent(new PermissionDefinitionChangedEvent(
+                this, permission.getTenantId(), permission.getCode(), operation));
     }
 }

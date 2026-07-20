@@ -61,7 +61,8 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
         grantTenantAdminRoleToTestUser();
         revokeFromTestRole(MetaPermission.ROLE_READ);
         revokeFromTestRole(MetaPermission.ROLE_MANAGE);
-        userPermissionService.evictUserPermissions(getTestUser().getId());
+        userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }
 
     private MockMvc mvc() {
@@ -195,6 +196,8 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
             rp.setUpdatedAt(java.time.Instant.now());
             rolePermissionMapper.insert(rp);
         }
+        userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }
 
     private void revokeFromTestRole(String code) {
@@ -205,5 +208,6 @@ class CapabilityControllerEnforcementIT extends BaseIntegrationTest {
         rolePermissionMapper.delete(new LambdaQueryWrapper<RolePermission>()
                 .eq(RolePermission::getRoleId, getTestRole().getId())
                 .eq(RolePermission::getPermissionId, permission.getId()));
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }
 }

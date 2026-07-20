@@ -47,6 +47,7 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
 
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
+    private final PermissionSnapshotCache permissionSnapshotCache;
     private final UserRoleService userRoleService;
     private final ObjectMapper objectMapper;
     private final ObjectProvider<DecisionUsageIndexService> usageIndexServiceProvider;
@@ -57,12 +58,12 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     @Override
     public List<ConditionGuard> getConditionGuards(Long memberId, String permissionCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
+        List<Long> roleIds = resolveRoleIds(memberId, tenantId);
         if (roleIds.isEmpty()) {
             return Collections.emptyList();
         }
 
-        Permission permission = permissionMapper.findByCode(permissionCode);
+        Permission permission = permissionSnapshotCache.resolvePermissionDefinition(tenantId, permissionCode);
         if (permission == null) {
             return Collections.emptyList();
         }
@@ -87,14 +88,14 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
     @Override
     public Map<String, Object> getEffectivePolicy(Long memberId, String permissionCode) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<Long> roleIds = userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
+        List<Long> roleIds = resolveRoleIds(memberId, tenantId);
 
         if (roleIds.isEmpty()) {
             return null;
         }
 
         // Find the permission by code
-        Permission permission = permissionMapper.findByCode(permissionCode);
+        Permission permission = permissionSnapshotCache.resolvePermissionDefinition(tenantId, permissionCode);
         if (permission == null) {
             return null;
         }
@@ -125,11 +126,23 @@ public class PermissionPolicyServiceImpl implements PermissionPolicyService {
 
     @Override
     public Map<String, Object> getPolicySchema(String permissionCode) {
-        Permission permission = permissionMapper.findByCode(permissionCode);
+        Permission permission = permissionSnapshotCache.resolvePermissionDefinition(
+                MetaContext.getCurrentTenantId(), permissionCode);
         if (permission == null || permission.getPolicySchema() == null) {
             return null;
         }
         return convertToMap(permission.getPolicySchema());
+    }
+
+    private List<Long> resolveRoleIds(Long memberId, Long tenantId) {
+        Long currentMemberId = MetaContext.getCurrentMemberId();
+        Long currentUserId = MetaContext.getCurrentUserId();
+        if (Objects.equals(memberId, currentMemberId) && currentUserId != null) {
+            return permissionSnapshotCache.getUserRoleIds(tenantId, currentUserId, memberId);
+        }
+        // Administrative policy inspection may target a member other than the caller. Do not put
+        // that subject under the caller's cache key; use the canonical service for this rare path.
+        return userRoleService.getRoleIdsByMemberIdAndTenantId(memberId, tenantId);
     }
 
     @Override

@@ -102,7 +102,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             }
 
             // 清除用户Permission缓存
-            eventPublisher.publishEvent(new RolePermissionChangedEvent(this, roleId, null, "UPDATE"));
+            eventPublisher.publishEvent(new RolePermissionChangedEvent(
+                    this, tenantId, roleId, null, "UPDATE"));
 
             return true;
             
@@ -122,7 +123,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
         try {
             Long tenantId = MetaContext.getCurrentTenantId();
             inheritDefaultDataScope(tenantId, roleId, permissionIds);
-            eventPublisher.publishEvent(new RolePermissionChangedEvent(this, roleId, null, "UPDATE"));
+            eventPublisher.publishEvent(new RolePermissionChangedEvent(
+                    this, tenantId, roleId, null, "UPDATE"));
             return true;
         } catch (Exception e) {
             log.error("继承角色默认数据范围失败: roleId={}", roleId, e);
@@ -176,7 +178,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
                 roleId, permissionId, deletedCount);
             
             // 清除用户Permission缓存
-            eventPublisher.publishEvent(new RolePermissionChangedEvent(this, roleId, null, "UPDATE"));
+            eventPublisher.publishEvent(new RolePermissionChangedEvent(
+                    this, tenantId, roleId, null, "UPDATE"));
             
             return deletedCount > 0;
             
@@ -201,7 +204,8 @@ public class RolePermissionServiceImpl implements RolePermissionService {
             log.info("成功移除角色的所有Permission: roleId={}, deletedCount={}", roleId, deletedCount);
             
             // 清除用户Permission缓存
-            eventPublisher.publishEvent(new RolePermissionChangedEvent(this, roleId, null, "UPDATE"));
+            eventPublisher.publishEvent(new RolePermissionChangedEvent(
+                    this, tenantId, roleId, null, "UPDATE"));
             
             return true;
             

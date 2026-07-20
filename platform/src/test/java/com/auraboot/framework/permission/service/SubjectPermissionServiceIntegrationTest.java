@@ -81,7 +81,7 @@ class SubjectPermissionServiceIntegrationTest {
     private UserRoleService userRoleService;
 
     @Autowired
-    private org.springframework.cache.CacheManager cacheManager;
+    private com.auraboot.framework.permission.service.impl.PermissionSnapshotCache permissionSnapshotCache;
 
     // Test context data
     private String testSuffix;
@@ -122,13 +122,7 @@ class SubjectPermissionServiceIntegrationTest {
     }
     
     private void evictUserPermissionCache() {
-        org.springframework.cache.Cache cache = cacheManager.getCache("user-permissions");
-        if (cache != null) {
-            // Cache key format: "{tenantId}:{userId}" — must match @Cacheable in UserPermissionServiceImpl
-            String cacheKey = com.auraboot.framework.meta.cache.MetaCacheKeyGenerator.getTenantContextSuffix()
-                    + ":" + testUser.getId();
-            cache.evict(cacheKey);
-        }
+        permissionSnapshotCache.evictUser(testTenant.getId(), testUser.getId());
     }
 
     @AfterEach

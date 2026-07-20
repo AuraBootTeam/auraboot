@@ -10,15 +10,15 @@ import java.util.Set;
  * 
  * <p>Key Features:
  * <ul>
- *   <li>L1 Cache: User permissions (TTL: 30 minutes)</li>
+ *   <li>Permission snapshots (TTL: 5 minutes with event-driven eviction)</li>
  *   <li>Cache eviction on role binding changes</li>
  *   <li>Batch eviction for role users</li>
  * </ul>
  * 
  * <p>Cache Strategy:
  * <pre>
- * Cache Key: user-permissions:{userId}
- * Cache TTL: 30 minutes
+ * Cache Key: tenant + user + effective date
+ * Cache TTL: 5 minutes
  * Eviction Triggers:
  *   - Role-Permission binding changed
  *   - User-Role binding changed
@@ -39,8 +39,8 @@ public interface UserPermissionService {
      * <p>Cache Strategy:
      * <ul>
      *   <li>Cache Name: user-permissions</li>
-     *   <li>Cache Key: userId</li>
-     *   <li>TTL: 30 minutes</li>
+     *   <li>Cache Key: tenant + user + effective date</li>
+     *   <li>TTL: 5 minutes</li>
      * </ul>
      * 
      * @param userId User ID
@@ -72,6 +72,9 @@ public interface UserPermissionService {
      * @param userId User ID
      */
     void evictUserPermissions(Long userId);
+
+    /** Evict one user's role and effective-permission snapshots for an explicit tenant. */
+    void evictUserPermissions(Long tenantId, Long userId);
     
     /**
      * Evict all users' permission cache for a specific role
@@ -91,6 +94,12 @@ public interface UserPermissionService {
      * @param roleId Role ID
      */
     void evictRoleUsers(Long roleId);
+
+    /** Evict one role's grant snapshot and all derived effective-user snapshots. */
+    void evictRoleUsers(Long tenantId, Long roleId);
+
+    /** Evict the tenant permission-definition catalog, including cached misses. */
+    void evictPermissionDefinitions(Long tenantId);
     
     /**
      * Batch get users' permission IDs
