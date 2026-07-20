@@ -130,7 +130,13 @@ public class CloudConfigServiceImpl implements CloudConfigService {
     @Override
     public List<CloudConfigResponse> listConfigs(String configLevel) {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<CloudConfig> configs = cloudConfigMapper.listByLevel(configLevel, tenantId);
+        // Normalize on the way IN, exactly as saveConfig does. Writes store the level
+        // lower-cased, and listByLevel compares it against the lowercase literals
+        // 'tenant'/'platform' in BOTH its WHERE clause and its tenant-scoping <if>
+        // branches. Passing the documented `PLATFORM` through raw therefore matched
+        // nothing AND skipped scoping — an empty list that reads as "nothing is
+        // configured", which is how duplicate provider rows get created.
+        List<CloudConfig> configs = cloudConfigMapper.listByLevel(normalize(configLevel), tenantId);
         return configs.stream().map(this::toMaskedResponse).toList();
     }
 
