@@ -69,7 +69,8 @@ class PermissionMatrixPolicyControllerIT extends BaseIntegrationTest {
     void grantPolicyManageAccess() {
         grantTenantAdminRoleToTestUser();
         grantToTestRole(MetaPermission.PERMISSION_MANAGE);
-        userPermissionService.evictUserPermissions(getTestUser().getId());
+        userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }
 
     @Test
@@ -296,5 +297,7 @@ class PermissionMatrixPolicyControllerIT extends BaseIntegrationTest {
             rp.setUpdatedAt(Instant.now());
             rolePermissionMapper.insert(rp);
         }
+        userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), getTestRole().getId());
     }
 }

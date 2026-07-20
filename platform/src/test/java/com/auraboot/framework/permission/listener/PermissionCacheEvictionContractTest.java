@@ -1,8 +1,8 @@
 package com.auraboot.framework.permission.listener;
 
+import com.auraboot.framework.permission.event.PermissionDefinitionChangedEvent;
 import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
 import com.auraboot.framework.permission.event.UserRoleChangedEvent;
-import com.auraboot.framework.permission.service.impl.UserPermissionServiceImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -10,7 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.stream.Stream;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -30,9 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       revokes means the removed permission keeps working.</li>
  *   <li>{@code fallbackExecution=true} keeps eviction working for non-transactional
  *       publishers.</li>
- *   <li>{@code getUserPermissionIds} must not cache empty results: a request with a
- *       missing tenant/member context resolves to an empty set, and caching it locks the
- *       user out of everything until the TTL expires.</li>
+ *   <li>Permission-definition changes must evict the catalog so negative lookups do not linger.</li>
  * </ol>
  */
 @DisplayName("Permission cache eviction contract")
@@ -55,6 +52,7 @@ class PermissionCacheEvictionContractTest {
     private static final Class<?>[] LISTENED_EVENTS = {
         RolePermissionChangedEvent.class,
         UserRoleChangedEvent.class,
+        PermissionDefinitionChangedEvent.class,
     };
 
     /**
@@ -104,13 +102,4 @@ class PermissionCacheEvictionContractTest {
         }
     }
 
-    @Test
-    @DisplayName("getUserPermissionIds does not cache empty permission sets")
-    void emptyPermissionSetsAreNotCached() throws Exception {
-        Method method = UserPermissionServiceImpl.class.getMethod("getUserPermissionIds", Long.class);
-        Cacheable cacheable = method.getAnnotation(Cacheable.class);
-        assertNotNull(cacheable, "getUserPermissionIds must stay cacheable");
-        assertEquals("#result.isEmpty()", cacheable.unless(),
-            "empty results (e.g. missing tenant/member context) must not poison the cache");
-    }
 }

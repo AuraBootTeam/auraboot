@@ -3,9 +3,11 @@ package com.auraboot.framework.permission.service;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
-import com.auraboot.framework.meta.cache.MetaCacheKeyGenerator;
+import com.auraboot.framework.permission.dto.PermissionCreateRequest;
+import com.auraboot.framework.permission.dto.PermissionDTO;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
+import com.auraboot.framework.permission.service.impl.PermissionSnapshotCache;
 import com.auraboot.framework.permission.service.impl.UserPermissionServiceImpl;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.entity.RolePermission;
@@ -22,13 +24,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.cache.Cache;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.CacheManager;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -86,9 +89,17 @@ class UserPermissionServiceIntegrationTest {
     private UserRoleService userRoleService;
 
     @Autowired
-    private CacheManager cacheManager;
+    private PermissionSnapshotCache permissionSnapshotCache;
 
-    private static final String CACHE_NAME = "user-permissions";
+    @Autowired
+    @Qualifier("permissionCacheManager")
+    private CacheManager permissionCacheManager;
+
+    @Autowired
+    private PermissionService permissionService;
+
+    @Autowired
+    private RolePermissionService rolePermissionService;
 
     // Test context data – created once per class
     private String testSuffix;
@@ -122,8 +133,7 @@ class UserPermissionServiceIntegrationTest {
     @BeforeEach
     void evictCacheBeforeEachTest() {
         // Ensure a clean cache state before each test to avoid cross-test interference
-        evictUserPermissionCache();
-        userPermissionServiceImpl.clearPermissionCodeCache();
+        permissionSnapshotCache.clearAll();
     }
 
     @AfterAll
@@ -232,14 +242,6 @@ class UserPermissionServiceIntegrationTest {
         binding.setCreatedAt(Instant.now());
         binding.setUpdatedAt(Instant.now());
         rolePermissionMapper.insert(binding);
-    }
-
-    private void evictUserPermissionCache() {
-        Cache cache = cacheManager.getCache(CACHE_NAME);
-        if (cache != null) {
-            String key = MetaCacheKeyGenerator.getTenantContextSuffix() + ":" + testUser.getId();
-            cache.evict(key);
-        }
     }
 
     // ==================== Tests ====================
@@ -422,5 +424,94 @@ class UserPermissionServiceIntegrationTest {
         assertThat(userPermissionService.hasPermission((Long) null, testPermission.getId())).isFalse();
         assertThat(userPermissionService.hasPermission(testUser.getId(), (Long) null)).isFalse();
         assertThat(userPermissionService.hasPermission((Long) null, (Long) null)).isFalse();
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("UP-11: repeated authorization checks load each database snapshot once")
+    void up11_repeatedChecksLoadDatabaseSnapshotsOnce() {
+        com.github.benmanes.caffeine.cache.stats.CacheStats catalogBefore =
+                nativeStats(PermissionSnapshotCache.PERMISSION_CATALOG_CACHE);
+        com.github.benmanes.caffeine.cache.stats.CacheStats effectiveBefore =
+                nativeStats(PermissionSnapshotCache.EFFECTIVE_PERMISSION_CACHE);
+
+        for (int i = 0; i < 100; i++) {
+            assertThat(userPermissionService.hasPermission(
+                    testUser.getId(), testPermission.getCode())).isTrue();
+        }
+
+        com.github.benmanes.caffeine.cache.stats.CacheStats catalogAfter =
+                nativeStats(PermissionSnapshotCache.PERMISSION_CATALOG_CACHE);
+        com.github.benmanes.caffeine.cache.stats.CacheStats effectiveAfter =
+                nativeStats(PermissionSnapshotCache.EFFECTIVE_PERMISSION_CACHE);
+        assertThat(catalogAfter.loadSuccessCount() - catalogBefore.loadSuccessCount()).isEqualTo(1);
+        assertThat(catalogAfter.missCount() - catalogBefore.missCount()).isEqualTo(1);
+        assertThat(catalogAfter.hitCount() - catalogBefore.hitCount()).isEqualTo(99);
+        assertThat(effectiveAfter.loadSuccessCount() - effectiveBefore.loadSuccessCount()).isEqualTo(1);
+        assertThat(effectiveAfter.missCount() - effectiveBefore.missCount()).isEqualTo(1);
+        assertThat(effectiveAfter.hitCount() - effectiveBefore.hitCount()).isEqualTo(99);
+    }
+
+    @Test
+    @Order(13)
+    @DisplayName("UP-12: creating a permission invalidates a cached missing code")
+    void up12_permissionCreateInvalidatesNegativeCatalogEntry() {
+        String code = "up_negative_" + System.nanoTime();
+        assertThat(userPermissionService.hasPermission(testUser.getId(), code)).isFalse();
+
+        PermissionCreateRequest request = new PermissionCreateRequest();
+        request.setCode(code);
+        request.setName("Negative cache invalidation permission");
+        request.setResourceType("model");
+        request.setResourceCode("permission_cache_test");
+        request.setAction("read");
+        PermissionDTO created = permissionService.create(request);
+        rolePermissionService.assignPermissionsToRole(testRole.getId(), List.of(created.getId()));
+
+        assertThat(userPermissionService.hasPermission(testUser.getId(), code)).isTrue();
+    }
+
+    @Test
+    @Order(14)
+    @DisplayName("UP-13: revoking a role grant invalidates an already cached authorization")
+    void up13_roleGrantRevocationInvalidatesEffectiveSnapshot() {
+        Permission permission = createTestPermission("up_revoke");
+        rolePermissionService.assignPermissionsToRole(testRole.getId(), List.of(permission.getId()));
+        assertThat(userPermissionService.hasPermission(testUser.getId(), permission.getCode())).isTrue();
+
+        rolePermissionService.removePermission(testRole.getId(), permission.getId());
+
+        assertThat(userPermissionService.hasPermission(testUser.getId(), permission.getCode())).isFalse();
+    }
+
+    @Test
+    @Order(15)
+    @DisplayName("UP-14: future role grants remain unavailable until effective")
+    void up14_futureRoleGrantFailsClosed() {
+        Permission permission = createTestPermission("up_future");
+        RolePermission binding = new RolePermission();
+        binding.setPid(UniqueIdGenerator.generate());
+        binding.setTenantId(testTenant.getId());
+        binding.setRoleId(testRole.getId());
+        binding.setPermissionId(permission.getId());
+        binding.setGrantType("grant");
+        binding.setPriority(100);
+        binding.setStatus("active");
+        binding.setEffectiveDate(LocalDate.now().plusDays(1));
+        binding.setDeletedFlag(false);
+        binding.setCreatedAt(Instant.now());
+        binding.setUpdatedAt(Instant.now());
+        rolePermissionMapper.insert(binding);
+        permissionSnapshotCache.clearAll();
+
+        assertThat(userPermissionService.hasPermission(testUser.getId(), permission.getCode())).isFalse();
+    }
+
+    private com.github.benmanes.caffeine.cache.stats.CacheStats nativeStats(String cacheName) {
+        org.springframework.cache.Cache springCache = permissionCacheManager.getCache(cacheName);
+        assertThat(springCache).isNotNull();
+        Object nativeCache = springCache.getNativeCache();
+        assertThat(nativeCache).isInstanceOf(com.github.benmanes.caffeine.cache.Cache.class);
+        return ((com.github.benmanes.caffeine.cache.Cache<?, ?>) nativeCache).stats();
     }
 }

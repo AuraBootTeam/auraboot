@@ -1,39 +1,25 @@
 package com.auraboot.framework.permission.service.impl;
 
 import com.auraboot.framework.application.tenant.MetaContext;
-import com.auraboot.framework.meta.cache.MetaCacheKeyGenerator;
-import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.service.UserPermissionService;
-import com.auraboot.framework.rbac.entity.Role;
-import com.auraboot.framework.rbac.entity.UserRole;
-import com.auraboot.framework.rbac.mapper.RoleMapper;
-import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
-import com.auraboot.framework.rbac.mapper.UserRoleMapper;
 import io.micrometer.observation.annotation.Observed;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cache.Cache;
-import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * User Permission Service Implementation
  * 
- * <p>Implements L1 cache for user permissions with automatic eviction.
+ * <p>Resolves user permissions through {@link PermissionSnapshotCache}.
  * 
  * <p>Cache Hierarchy:
  * <pre>
- * L1: user-permissions:{userId} (TTL: 30min)
- *     ↓
- * (An L2 subject-evaluation cache was described here and in CacheConfig, but nothing ever
- *  populated it — subject visibility is evaluated on every call. Removed 2026-07-14.)
- *     ↓
- * L3: subject-declarations:{subjectType}:{subjectId} (TTL: 60min)
+ * permission-catalog (tenant)
+ * user-role-snapshots (tenant + user)
+ * role-permission-snapshots (tenant + role + date)
+ * user-permissions (tenant + user + date)
  * </pre>
  * 
  * <p>Eviction Strategy:
@@ -50,28 +36,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class UserPermissionServiceImpl implements UserPermissionService {
-    
-    private final RolePermissionMapper rolePermissionMapper;
-    private final UserRoleMapper userRoleMapper;
-    private final RoleMapper roleMapper;
-    private final CacheManager cacheManager;
-    private final com.auraboot.framework.permission.mapper.PermissionMapper permissionMapper;
-
-    private static final String CACHE_NAME = "user-permissions";
-
-    /**
-     * L1 baseline role code (DDR-2026-06-30). Every tenant member implicitly inherits this role's
-     * permissions during resolution — with NO {@code ab_user_role} row — so render-support reads are
-     * guaranteed for all members and cannot be dropped by any provisioning path.
-     */
-    private static final String BASELINE_ROLE_CODE = "tenant_member";
-
-    /**
-     * Local cache for permissionCode → permissionId mapping.
-     * Permission definitions rarely change, so a simple ConcurrentHashMap suffices.
-     * Cleared when permissions are modified (e.g., plugin import, permission CRUD).
-     */
-    private final ConcurrentHashMap<String, Long> permissionCodeCache = new ConcurrentHashMap<>();
+    private final PermissionSnapshotCache permissionSnapshotCache;
     
     /**
      * Get user's permission IDs (with cache)
@@ -79,8 +44,8 @@ public class UserPermissionServiceImpl implements UserPermissionService {
      * <p>Cache Strategy:
      * <ul>
      *   <li>Cache Name: user-permissions</li>
-     *   <li>Cache Key: userId</li>
-     *   <li>TTL: 30 minutes (configured in application.yml)</li>
+     *   <li>Cache Key: tenant + user + effective date</li>
+     *   <li>TTL: 5 minutes in the dedicated security cache manager</li>
      * </ul>
      * 
      * <p>Query Logic:
@@ -95,54 +60,21 @@ public class UserPermissionServiceImpl implements UserPermissionService {
      * @return Set of permission IDs
      */
     @Override
-    @Cacheable(value = CACHE_NAME, key = "T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix() + ':' + #userId",
-        unless = "#result.isEmpty()")
     public Set<Long> getUserPermissionIds(Long userId) {
-        log.debug("Loading user permissions from database: userId={}", userId);
-
+        if (userId == null || !MetaContext.exists()) {
+            return Collections.emptySet();
+        }
         Long tenantId = MetaContext.getCurrentTenantId();
         if (tenantId == null) {
             log.warn("Tenant context missing when loading user permissions: userId={}", userId);
             return Collections.emptySet();
         }
-
-        // Phase 2: ab_user_role uses member_id. Get memberId from MetaContext.
         Long memberId = MetaContext.getCurrentMemberId();
         if (memberId == null) {
             log.warn("MemberId not available in MetaContext for userId={}, cannot resolve permissions", userId);
             return Collections.emptySet();
         }
-
-        // 1. Permissions from the member's explicitly-assigned roles in this tenant.
-        List<UserRole> userRoles = userRoleMapper.findByMemberIdAndTenantId(memberId, tenantId);
-        List<Long> roleIds = userRoles.stream()
-            .map(UserRole::getRoleId)
-            .filter(Objects::nonNull)
-            .distinct()
-            .collect(Collectors.toList());
-
-        Set<Long> permissionIds = new HashSet<>();
-        if (!roleIds.isEmpty()) {
-            permissionIds.addAll(rolePermissionMapper.findPermissionIdsByRoles(roleIds));
-        }
-
-        // 2. L1 implicit baseline (DDR-2026-06-30): every tenant member additionally inherits the
-        // tenant_member baseline role's permissions — WITHOUT an ab_user_role row — so render-support
-        // reads are guaranteed for every member and cannot be dropped by any provisioning path (the
-        // original incident: a member provisioned WITH business roles but WITHOUT the baseline could
-        // not render pages). The baseline role is resolved by (tenant, code); if it is not yet seeded
-        // for this tenant it simply contributes nothing (safe degradation). NOTE: because the baseline
-        // is applied here (no member rows), a change to its grants must clear the whole cache — see
-        // evictRoleUsers, which no longer early-returns on an empty member set.
-        Role baseline = roleMapper.findByTenantIdAndCode(tenantId, BASELINE_ROLE_CODE);
-        if (baseline != null && baseline.getId() != null) {
-            permissionIds.addAll(rolePermissionMapper.findPermissionIdsByRoles(List.of(baseline.getId())));
-        }
-
-        log.debug("Resolved {} permissions for memberId={}, userId={} ({} own-role ids, baseline={})",
-            permissionIds.size(), memberId, userId, roleIds.size(), baseline != null);
-
-        return permissionIds;
+        return permissionSnapshotCache.getEffectivePermissionIds(tenantId, userId, memberId);
     }
 
     @Override
@@ -150,14 +82,11 @@ public class UserPermissionServiceImpl implements UserPermissionService {
         if (userId == null) {
             return Collections.emptySet();
         }
-        Set<Long> permissionIds = getUserPermissionIds(userId);
-        if (permissionIds == null || permissionIds.isEmpty()) {
+        if (!MetaContext.exists()) {
             return Collections.emptySet();
         }
-        return permissionMapper.findByIds(new ArrayList<>(permissionIds)).stream()
-                .map(Permission::getCode)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet::new));
+        return permissionSnapshotCache.resolvePermissionCodes(
+                MetaContext.getCurrentTenantId(), getUserPermissionIds(userId));
     }
     
     /**
@@ -173,16 +102,14 @@ public class UserPermissionServiceImpl implements UserPermissionService {
      */
     @Override
     public void evictUserPermissions(Long userId) {
-        Cache cache = cacheManager.getCache(CACHE_NAME);
-        if (cache != null) {
-            String cacheKey = MetaCacheKeyGenerator.getTenantContextSuffix() + ":" + userId;
-            cache.evict(cacheKey);
-            log.info("Evicted user permissions cache: userId={}, key={}", userId, cacheKey);
-        } else {
-            log.warn("Cache not found: {}", CACHE_NAME);
-        }
-        // Also clear permissionCode→ID cache since permission data may have changed
-        clearPermissionCodeCache();
+        Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        evictUserPermissions(tenantId, userId);
+    }
+
+    @Override
+    public void evictUserPermissions(Long tenantId, Long userId) {
+        permissionSnapshotCache.evictUser(tenantId, userId);
+        log.info("Evicted user permission snapshots: tenantId={}, userId={}", tenantId, userId);
     }
     
     /**
@@ -194,38 +121,22 @@ public class UserPermissionServiceImpl implements UserPermissionService {
      *   <li>Role deleted</li>
      * </ul>
      * 
-     * <p>Implementation:
-     * <ol>
-     *   <li>Query all users assigned to the role</li>
-     *   <li>Evict each user's permission cache</li>
-     * </ol>
+     * <p>The role snapshot is evicted directly. Derived effective-user snapshots are cleared because
+     * the implicit baseline role has no membership rows and cannot be safely fanned out by query.
      * 
      * @param roleId Role ID
      */
     @Override
     public void evictRoleUsers(Long roleId) {
-        log.info("Evicting permissions cache for all users of role: roleId={}", roleId);
-        
-        // 1. Query members assigned to the role (informational only).
-        List<Long> memberIds = userRoleMapper.findMemberIdsByRoleId(roleId);
+        Long tenantId = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
+        evictRoleUsers(tenantId, roleId);
+    }
 
-        // Do NOT early-return when memberIds is empty: the L1 tenant_member baseline role is applied
-        // implicitly during resolution (no ab_user_role rows), so a baseline grant change has zero
-        // member rows yet affects every member's cached permissions — we must still clear.
-        log.info("Evicting permission caches for role change: roleId={}, directMemberRows={}",
-            roleId, memberIds.size());
-
-        // 2. Evict the permission cache
-        // Note: cache key still uses userId for backward compatibility with hasPermission(userId, ...)
-        // The cache eviction here is best-effort; a full cache clear may be needed
-        Cache cache = cacheManager.getCache(CACHE_NAME);
-        if (cache != null) {
-            // Clear all entries since we can't easily map memberId back to userId for cache keys
-            cache.clear();
-            log.info("Cleared all permission caches for role change: roleId={}", roleId);
-        } else {
-            log.warn("Cache not found: {}", CACHE_NAME);
-        }
+    @Override
+    public void evictRoleUsers(Long tenantId, Long roleId) {
+        permissionSnapshotCache.evictRole(tenantId, roleId);
+        log.info("Evicted role and effective permission snapshots: tenantId={}, roleId={}",
+                tenantId, roleId);
     }
     
     /**
@@ -291,7 +202,11 @@ public class UserPermissionServiceImpl implements UserPermissionService {
         log.debug("Checking permission by code: userId={}, permissionCode={}",
             userId, permissionCode);
 
-        Long permissionId = resolvePermissionId(permissionCode);
+        if (!MetaContext.exists()) {
+            return false;
+        }
+        Long permissionId = permissionSnapshotCache.resolvePermissionId(
+                MetaContext.getCurrentTenantId(), permissionCode);
         if (permissionId == null) {
             log.debug("Permission check result: userId={}, permissionCode={}, hasPermission=false (unregistered code)",
                 userId, permissionCode);
@@ -309,33 +224,14 @@ public class UserPermissionServiceImpl implements UserPermissionService {
      * Should be called when permission definitions change (plugin import, permission CRUD).
      */
     public void clearPermissionCodeCache() {
-        int size = permissionCodeCache.size();
-        permissionCodeCache.clear();
-        log.info("Cleared permission code cache: {} entries removed", size);
+        permissionSnapshotCache.clearPermissionCatalogs();
+        log.info("Cleared permission catalogs");
     }
 
-    private String buildPermissionCodeCacheKey(String permissionCode) {
-        return MetaCacheKeyGenerator.getTenantContextSuffix() + ":" + permissionCode;
-    }
-
-    private Long resolvePermissionId(String permissionCode) {
-        String permissionCacheKey = buildPermissionCodeCacheKey(permissionCode);
-        Long permissionId = permissionCodeCache.get(permissionCacheKey);
-        if (permissionId != null) {
-            return permissionId;
-        }
-
-        com.auraboot.framework.permission.entity.Permission permission =
-            permissionMapper.findByCode(permissionCode);
-        if (permission == null) {
-            log.debug("Permission definition not found for candidate code: {}", permissionCode);
-            return null;
-        }
-
-        permissionId = permission.getId();
-        permissionCodeCache.put(permissionCacheKey, permissionId);
-        log.debug("Cached permission mapping: {}={}", permissionCacheKey, permissionId);
-        return permissionId;
+    @Override
+    public void evictPermissionDefinitions(Long tenantId) {
+        permissionSnapshotCache.evictPermissionCatalog(tenantId);
+        log.info("Evicted permission catalog: tenantId={}", tenantId);
     }
     
     /**
