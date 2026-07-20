@@ -22,6 +22,7 @@ import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
+import com.auraboot.framework.conversation.TurnOutcomeMeta;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -255,13 +256,41 @@ public class ChatTurnRuntime {
                                              Consumer<List<LlmChatRequest.Message>> persistMessages,
                                              ResponseSink sink,
                                              String traceId) {
+        return completeFinalResponse(response, messages, persistMessages, sink, traceId, false);
+    }
+
+    /**
+     * F7 (execution-architecture review, 2026-07-20): {@code anyToolFailed} marks
+     * a turn whose answer was composed AFTER at least one tool call failed. Such
+     * an answer is guidance/speculation, not an established fact — persisting it
+     * as memory lets a hallucination be recalled on later turns as if it were
+     * ground truth (live-reproduced: an invented navigation path was written back
+     * as an L1 memory and then repeated verbatim across sessions, overriding the
+     * prompt guardrail). Surfaced in the Success meta so the memory listener can
+     * refuse it; the user still gets the answer.
+     */
+    public TurnOutcome completeFinalResponse(LlmChatResponse response,
+                                             List<LlmChatRequest.Message> messages,
+                                             Consumer<List<LlmChatRequest.Message>> persistMessages,
+                                             ResponseSink sink,
+                                             String traceId,
+                                             boolean anyToolFailed) {
         if (messages != null) {
             messages.add(LlmMessageTapeSupport.buildAssistantMessage(response.getContent()));
         }
         if (persistMessages != null) {
             persistMessages.accept(messages != null ? messages : List.of());
         }
-        return streamFinalResponse(response, sink, traceId);
+        TurnOutcome outcome = streamFinalResponse(response, sink, traceId);
+        if (anyToolFailed && outcome instanceof TurnOutcome.Success success) {
+            // Decorate rather than branch inside streamFinalResponse: that method is
+            // shared by paths with no tool loop at all, and it should stay unaware
+            // of tool semantics.
+            Map<String, Object> meta = new LinkedHashMap<>(success.meta());
+            meta.put(TurnOutcomeMeta.TOOL_FAILURE, Boolean.TRUE);
+            return new TurnOutcome.Success(success.finalResponse(), Map.copyOf(meta));
+        }
+        return outcome;
     }
 
     public void recordToolUseResponse(LlmChatResponse response,
@@ -353,6 +382,7 @@ public class ChatTurnRuntime {
         }
 
         AgentExecutionState lastRuntimeState = null;
+        boolean anyToolFailed = false;   // F7: any failed tool call in this turn
         for (int round = 0; round < spec.maxToolRounds(); round++) {
             ChatToolLoopRound preliminaryRound = new ChatToolLoopRound(
                     spec.ctx(),
@@ -463,7 +493,7 @@ public class ChatTurnRuntime {
                         spec.persistTape()
                                 ? finalMessages -> callbacks.persistMessages(spec.sessionId(), finalMessages)
                                 : null,
-                        spec.sink(), spec.traceId());
+                        spec.sink(), spec.traceId(), anyToolFailed);
             }
 
             if ("tool_use".equals(stopReason)) {
@@ -597,6 +627,9 @@ public class ChatTurnRuntime {
                     spec.sink().onToolStart(toolId, toolName, input);
                     Map<String, Object> result = callbacks.executeTool(toolCall);
                     boolean success = Boolean.TRUE.equals(result.get("success"));
+                    if (!success) {
+                        anyToolFailed = true;   // F7: taints memory writeback for this turn
+                    }
                     spec.sink().onToolResult(toolId, result, success);
                     runtimeState = reduceRuntimeState(callbacks, runtimeState, AgentRuntimeEvent.toolResultRecorded(
                             round, toolId, toolName, result));

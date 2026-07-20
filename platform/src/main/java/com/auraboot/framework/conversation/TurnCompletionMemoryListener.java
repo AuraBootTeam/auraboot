@@ -107,6 +107,19 @@ public class TurnCompletionMemoryListener {
             return;
         }
 
+        // 2b. F7: refuse turns whose answer was composed after a TOOL FAILURE.
+        // Such an answer is guidance/speculation ("try navigating to X"), not an
+        // established fact — and memory is read back as fact. Live-reproduced:
+        // an invented navigation path was persisted here, then pre-recalled into
+        // every later turn and repeated verbatim, overriding the prompt
+        // guardrail. Hallucination that launders itself into memory stops being
+        // a one-off and becomes the assistant's belief.
+        if (Boolean.TRUE.equals(success.meta().get(TurnOutcomeMeta.TOOL_FAILURE))) {
+            log.debug("Skipping memory writeback for turn {} — a tool failed, the answer is not a fact",
+                    ctx.turnId());
+            return;
+        }
+
         // 3. Memory rows are user-scoped; system/cron turns have no user owner.
         Long tenantId = ctx.tenantId();
         Long userId = ctx.userId();
