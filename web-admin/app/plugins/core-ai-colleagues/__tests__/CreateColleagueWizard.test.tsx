@@ -6,11 +6,9 @@ import { I18nProvider } from '~/contexts/I18nContext';
 import CreateColleaguePage, { deriveAgentCode } from '../pages/ai/colleagues.new';
 
 const postMock = vi.fn();
-const getMock = vi.fn();
 
 vi.mock('~/shared/services/http-client', () => ({
   post: (...args: unknown[]) => postMock(...args),
-  get: (...args: unknown[]) => getMock(...args),
 }));
 
 vi.mock('~/contexts/ToastContext', () => ({
@@ -57,14 +55,18 @@ describe('create colleague wizard', () => {
   beforeEach(() => {
     postMock.mockReset();
     postMock.mockResolvedValue({ code: '0', data: { pid: 'p1' } });
-    getMock.mockReset();
-    getMock.mockResolvedValue({
-      code: '0',
-      data: [
-        { providerCode: 'qianwen', displayName: '通义千问 (Qwen)' },
-        { providerCode: 'deepseek', displayName: 'DeepSeek' },
-      ],
-    });
+    // The endpoint answers with a bare array; the component fetches it directly for that reason,
+    // so the stub has to be shaped like the wire, not like the shared client's envelope.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => [
+          { providerCode: 'qianwen', displayName: '通义千问 (Qwen)' },
+          { providerCode: 'deepseek', displayName: 'DeepSeek' },
+        ],
+      })),
+    );
   });
 
   // The regression: the wizard posted name/agent_type/communication_style/status and no
@@ -78,6 +80,12 @@ describe('create colleague wizard', () => {
     fireEvent.change(screen.getByTestId('wizard-input-name'), {
       target: { value: 'Customer Service Agent' },
     });
+
+    // Creation is refused until a provider has resolved, so the wait is part of the flow rather
+    // than test hygiene: without it this submits nothing and the payload assertions never run.
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith('/api/agent/providers/configured', expect.anything()),
+    );
 
     for (let i = 0; i < 5; i++) {
       const create = screen.queryByTestId('wizard-btn-create');
@@ -109,7 +117,9 @@ describe('create colleague wizard', () => {
     fireEvent.click(screen.getByTestId('wizard-template-skip'));
     fireEvent.change(screen.getByTestId('wizard-input-name'), { target: { value: 'Support Bot' } });
 
-    await waitFor(() => expect(getMock).toHaveBeenCalledWith('/api/agent/providers/configured'));
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith('/api/agent/providers/configured', expect.anything()),
+    );
 
     for (let i = 0; i < 5; i++) {
       const create = screen.queryByTestId('wizard-btn-create');

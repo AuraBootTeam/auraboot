@@ -793,12 +793,19 @@ export default function AIColleagueNewPage() {
   // message. Offering only configured providers means a colleague that exists can talk.
   useEffect(() => {
     let cancelled = false;
-    get<ConfiguredProvider[]>('/api/agent/providers/configured')
-      .then((res) => {
-        if (cancelled || !ResultHelper.isSuccess(res) || !Array.isArray(res.data)) return;
-        const list = res.data ?? [];
+    // Plain fetch, not the shared `get()`. This endpoint answers with a bare array rather than the
+    // {code, data} envelope the rest of the API uses — a shape an existing e2e spec pins down — and
+    // the shared client normalises every response into that envelope. Spreading an array through
+    // that normaliser turns it into an object with numeric keys and a null `data`, so the list
+    // arrives empty and the wizard reports "no AI service configured" for a tenant that has two.
+    fetch('/api/agent/providers/configured', { headers: { Accept: 'application/json' } })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((body: unknown) => {
+        if (cancelled) return;
+        const list = Array.isArray(body) ? (body as ConfiguredProvider[]) : [];
+        if (list.length === 0) return;
         setProviders(list);
-        setData((prev) => (prev.provider ? prev : { ...prev, provider: list[0]?.providerCode ?? '' }));
+        setData((prev) => (prev.provider ? prev : { ...prev, provider: list[0].providerCode }));
       })
       .catch(() => {
         /* Leave the selector empty; create() refuses rather than binding to a dead default. */
@@ -822,11 +829,17 @@ export default function AIColleagueNewPage() {
   );
 
   /** Apply a template preset and jump directly into Step 1 (identity) */
+  // Both handlers keep the resolved provider. It is not part of the template — it comes from what
+  // the tenant has configured, and the fetch that resolves it has usually already landed by the
+  // time anyone clicks. Resetting to INITIAL_DATA wholesale blanked it, and the colleague was
+  // created with an empty provider: model cleared, nothing to use in its place, and the failure
+  // only visible when someone tried to talk to it.
   const handleSelectTemplate = (tpl: AgentTemplate) => {
-    setData({
+    setData((prev) => ({
       ...INITIAL_DATA,
       ...tpl.defaults,
-    });
+      provider: prev.provider,
+    }));
     setErrors({});
     setStep(0);
     setShowTemplatePicker(false);
@@ -834,7 +847,7 @@ export default function AIColleagueNewPage() {
 
   /** Skip template selection and start fresh */
   const handleSkipTemplate = () => {
-    setData(INITIAL_DATA);
+    setData((prev) => ({ ...INITIAL_DATA, provider: prev.provider }));
     setErrors({});
     setStep(0);
     setShowTemplatePicker(false);
@@ -868,6 +881,19 @@ export default function AIColleagueNewPage() {
   const handleCreate = async () => {
     if (!validateStep(0)) {
       setStep(0);
+      return;
+    }
+    // Refuse rather than create a colleague that cannot answer. Without a provider the record
+    // still saves and still enrols — the only place the emptiness shows up is the first message,
+    // long after whoever created it has moved on.
+    if (!data.provider) {
+      toast.showErrorToast(
+        t(
+          'ai.wizard.error.noProvider',
+          undefined,
+          'Choose an AI service first — a colleague without one cannot answer. Add an API key under AI Settings if the list is empty.',
+        ),
+      );
       return;
     }
     setCreating(true);
