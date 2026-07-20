@@ -34,6 +34,14 @@ import { useI18n } from '~/contexts/I18nContext';
 // Types
 // ---------------------------------------------------------------------------
 
+/** Where an agent sits in the org chart. Public identifiers only — see the endpoint's javadoc. */
+interface OrgPlacement {
+  enrolled: boolean;
+  employeePid: string | null;
+  departmentName: string | null;
+  positionName: string | null;
+}
+
 interface AgentDetail {
   pid: string;
   agent_code: string;
@@ -1748,7 +1756,23 @@ export default function AIColleagueDetailPage() {
 
   const isAuraBot = agent?.agent_code === AURABOT_CODE;
   const readOnly = isAuraBot;
-  const isEnrolled = !!agent?.employee_id;
+  // Enrolment state comes from its own endpoint, not from the agent record. The dynamic-model
+  // projection does not carry employee_id — and declaring it there would push an internal bigint
+  // into the browser — so an enrolled colleague used to keep offering "Enroll as Employee", and a
+  // second click answered with an error about system accounts that had nothing to do with the
+  // real reason.
+  const [placement, setPlacement] = useState<OrgPlacement | null>(null);
+  const isEnrolled = !!placement?.enrolled;
+
+  const fetchPlacement = useCallback(async () => {
+    if (!agentPid) return;
+    const res = await get<OrgPlacement>(`/api/agent/definitions/${agentPid}/org-placement`);
+    if (ResultHelper.isSuccess(res) && res.data) setPlacement(res.data);
+  }, [agentPid]);
+
+  useEffect(() => {
+    void fetchPlacement();
+  }, [fetchPlacement]);
 
   const fetchAgent = useCallback(async () => {
     if (!agentPid) return;
@@ -1815,7 +1839,7 @@ export default function AIColleagueDetailPage() {
           agentPid={agentPid}
           agentName={agent.name}
           onClose={() => setShowEnrollDialog(false)}
-          onSuccess={() => { setShowEnrollDialog(false); fetchAgent(); }}
+          onSuccess={() => { setShowEnrollDialog(false); fetchAgent(); void fetchPlacement(); }}
         />
       )}
       {showRemoveOrgDialog && agentPid && (
@@ -1823,7 +1847,7 @@ export default function AIColleagueDetailPage() {
           agentPid={agentPid}
           agentName={agent.name}
           onClose={() => setShowRemoveOrgDialog(false)}
-          onSuccess={() => { setShowRemoveOrgDialog(false); fetchAgent(); }}
+          onSuccess={() => { setShowRemoveOrgDialog(false); fetchAgent(); void fetchPlacement(); }}
         />
       )}
 
@@ -1846,9 +1870,15 @@ export default function AIColleagueDetailPage() {
               </span>
             )}
             {isEnrolled && (
-              <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-400">
+              <span
+                className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-400"
+                data-testid="digital-employee-badge"
+              >
                 <BuildingOfficeIcon className="h-3 w-3" />
-                {t('ai.colleagues.badge.employee', undefined, 'Digital Employee')}
+                {/* Say where, not just that. "Digital Employee" alone leaves the reader to go and
+                    look up which department it landed in. */}
+                {[placement?.departmentName, placement?.positionName].filter(Boolean).join(' · ') ||
+                  t('ai.colleagues.badge.employee', undefined, 'Digital Employee')}
               </span>
             )}
           </p>

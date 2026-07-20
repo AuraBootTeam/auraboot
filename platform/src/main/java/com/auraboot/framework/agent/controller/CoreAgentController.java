@@ -244,6 +244,21 @@ public class CoreAgentController {
      *   <li>{@code positionPid}   — optional, position PID within the department</li>
      * </ul>
      */
+    /**
+     * Where this agent sits in the org chart. Public identifiers only — the enrolment link itself
+     * is an internal bigint, and the page that needs this state renders in a browser.
+     */
+    @GetMapping("/definitions/{agentPid}/org-placement")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    public ResponseEntity<ApiResponse<AgentOrganizationService.OrgPlacement>> getOrgPlacement(
+            @PathVariable String agentPid) {
+        AgentDefinition agent = agentDefinitionService.findByPid(agentPid);
+        if (agent == null) {
+            return ResponseEntity.ok(ApiResponse.error("Agent not found: " + agentPid));
+        }
+        return ResponseEntity.ok(ApiResponse.success(agentOrganizationService.getOrgPlacement(agent.getId())));
+    }
+
     @PostMapping("/definitions/{agentPid}/enroll-employee")
     @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")

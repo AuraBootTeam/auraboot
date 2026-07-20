@@ -41,6 +41,8 @@ import java.util.Map;
 public class AgentOrganizationServiceImpl implements AgentOrganizationService {
 
     private static final String MODEL_EMPLOYEE = "org_employee";
+    private static final String MODEL_DEPARTMENT = "org_department";
+    private static final String MODEL_POSITION = "org_position";
 
     // Employee field codes (matching OrgEmployeeServiceImpl constants)
     private static final String EMP_NAME = "org_emp_name";
@@ -159,6 +161,51 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
         agentDefinitionMapper.updateById(agent);
 
         log.info("Agent removed from org: agentId={}, former employeeId={}", agentId, employeeId);
+    }
+
+    @Override
+    public OrgPlacement getOrgPlacement(Long agentId) {
+        AgentDefinition agent = agentDefinitionMapper.selectById(agentId);
+        if (agent == null || agent.getEmployeeId() == null) {
+            return OrgPlacement.notEnrolled();
+        }
+        Map<String, Object> employee = findEmployeeById(agent.getEmployeeId());
+        if (employee == null) {
+            // The link says enrolled but the row is gone — deactivated, or removed by hand. Report
+            // it as not enrolled rather than as enrolled-with-blank-fields, so the page offers the
+            // action that will actually work.
+            return OrgPlacement.notEnrolled();
+        }
+        return new OrgPlacement(
+                true,
+                (String) employee.get("pid"),
+                displayName(MODEL_DEPARTMENT, employee.get(EMP_DEPT_ID), "org_dept_name"),
+                displayName(MODEL_POSITION, employee.get(EMP_POSITION_ID), "org_pos_name"));
+    }
+
+    private Map<String, Object> findEmployeeById(Long employeeId) {
+        DynamicQueryRequest queryReq = DynamicQueryRequest.builder()
+                .pageNum(1)
+                .pageSize(1)
+                .conditions(List.of(QueryCondition.builder()
+                        .fieldName("id")
+                        .operator(QueryCondition.Operator.EQ)
+                        .value(employeeId)
+                        .build()))
+                .build();
+        PaginationResult<Map<String, Object>> result = dynamicDataService.list(MODEL_EMPLOYEE, queryReq);
+        return result != null && result.getRecords() != null && !result.getRecords().isEmpty()
+                ? result.getRecords().get(0)
+                : null;
+    }
+
+    /** Resolves a referenced record's display name, or null — a missing name is not an error here. */
+    private String displayName(String modelCode, Object pid, String nameField) {
+        if (pid == null || String.valueOf(pid).isBlank()) {
+            return null;
+        }
+        Map<String, Object> record = dynamicDataService.getById(modelCode, String.valueOf(pid));
+        return record != null ? (String) record.get(nameField) : null;
     }
 
     @Override
