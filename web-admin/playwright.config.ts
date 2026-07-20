@@ -67,6 +67,7 @@ const quoteOpsCurrentSpecNames = [
   'quote-process-fee-review',
   'quote-gerber-runtime',
   'quote-excel-download',
+  'quote-bulk-import-price-cache-golden',
   // Per-role suites (DDR-2026-06-29 §8). These were listed on the gate script's
   // command line but the `quoteops` project testMatch dropped them silently, so the
   // gate went green WITHOUT running them — they must be in this list to actually run.
