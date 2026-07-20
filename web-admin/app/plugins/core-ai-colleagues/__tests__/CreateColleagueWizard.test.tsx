@@ -6,9 +6,11 @@ import { I18nProvider } from '~/contexts/I18nContext';
 import CreateColleaguePage, { deriveAgentCode } from '../pages/ai/colleagues.new';
 
 const postMock = vi.fn();
+const getMock = vi.fn();
 
 vi.mock('~/shared/services/http-client', () => ({
   post: (...args: unknown[]) => postMock(...args),
+  get: (...args: unknown[]) => getMock(...args),
 }));
 
 vi.mock('~/contexts/ToastContext', () => ({
@@ -55,6 +57,14 @@ describe('create colleague wizard', () => {
   beforeEach(() => {
     postMock.mockReset();
     postMock.mockResolvedValue({ code: '0', data: { pid: 'p1' } });
+    getMock.mockReset();
+    getMock.mockResolvedValue({
+      code: '0',
+      data: [
+        { providerCode: 'qianwen', displayName: '通义千问 (Qwen)' },
+        { providerCode: 'deepseek', displayName: 'DeepSeek' },
+      ],
+    });
   });
 
   // The regression: the wizard posted name/agent_type/communication_style/status and no
@@ -86,5 +96,36 @@ describe('create colleague wizard', () => {
     expect(url).toBe('/api/dynamic/agent-definition/create');
     expect(payload.agent_code).toBeTruthy();
     expect(String(payload.agent_code)).toMatch(/^customer_service_agent_/);
+  });
+
+  // The second half of the same defect. A colleague created without a provider takes the model
+  // column's default, which names a vendor the tenant may have no key for: the record saves, shows
+  // up in the list, enrols into the org chart, and cannot answer a single message. The payload has
+  // to bind a configured provider AND clear the model, because a provider chosen here plus a model
+  // name from the column default is an agent asking one vendor for another vendor's model.
+  it('binds a configured provider and clears the vendor-specific model default', async () => {
+    renderWizard();
+
+    fireEvent.click(screen.getByTestId('wizard-template-skip'));
+    fireEvent.change(screen.getByTestId('wizard-input-name'), { target: { value: 'Support Bot' } });
+
+    await waitFor(() => expect(getMock).toHaveBeenCalledWith('/api/agent/providers/configured'));
+
+    for (let i = 0; i < 5; i++) {
+      const create = screen.queryByTestId('wizard-btn-create');
+      if (create) {
+        fireEvent.click(create);
+        break;
+      }
+      const next = screen.queryByTestId('wizard-btn-next');
+      if (!next) break;
+      fireEvent.click(next);
+    }
+
+    await waitFor(() => expect(postMock).toHaveBeenCalled());
+
+    const [, payload] = postMock.mock.calls[0] as [string, Record<string, unknown>];
+    expect(JSON.parse(String(payload.guardrails)).provider).toBe('qianwen');
+    expect(payload.model).toBeNull();
   });
 });
