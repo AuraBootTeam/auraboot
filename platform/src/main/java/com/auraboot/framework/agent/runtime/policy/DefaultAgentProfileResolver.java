@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -12,6 +13,14 @@ import java.util.Set;
  */
 public enum DefaultAgentProfileResolver implements AgentProfileResolver {
     INSTANCE;
+
+    /**
+     * Operations that make an agent write-capable. Anything outside this set — "query" today —
+     * leaves it read-only. Kept here rather than inferred from the string so that adding an
+     * operation to the UI cannot quietly widen what an agent is allowed to do.
+     */
+    private static final Set<String> WRITE_OPERATIONS =
+            Set.of("create", "update", "delete", "transition");
 
     @Override
     public AgentProfile resolve(ObjectMapper objectMapper, Map<String, Object> agentDefinition) {
@@ -24,14 +33,43 @@ public enum DefaultAgentProfileResolver implements AgentProfileResolver {
         return new AgentProfile(
                 stringValue(agentDefinition.get("agent_code")),
                 permissions,
-                contextPolicy(guardrails),
+                contextPolicy(guardrails, agentDefinition),
                 guardrails != null && Boolean.TRUE.equals(guardrails.get("evidenceFirst")));
     }
 
+    /**
+     * The ceiling an agent's stored {@code allowed_operations} implies, or null when the field says
+     * nothing useful.
+     *
+     * <p>That column is what the "allowed operations" checkboxes write, and until now nothing read
+     * it: clearing Delete saved, displayed as cleared, and changed nothing about what the agent
+     * could do. A permission control that does not control anything is worse than none, because
+     * someone configures it and believes the boundary is there.
+     *
+     * <p>The mapping goes through the capability ceiling that already governs every tool call
+     * rather than adding a second enforcement path — an operation set with no write verbs is a
+     * read-only agent, which is exactly what {@code READ_ONLY} already means. An empty set is left
+     * alone: it reads as "not configured", not as "forbidden from everything", and treating it as
+     * the latter would silently mute every agent whose row predates this field.
+     */
+    private ToolCapabilityCeiling ceilingFromAllowedOperations(Map<String, Object> agentDefinition) {
+        Set<String> operations = stringSet(agentDefinition.get("allowed_operations"));
+        if (operations.isEmpty()) {
+            return null;
+        }
+        boolean writes = operations.stream()
+                .map(op -> op.trim().toLowerCase(Locale.ROOT))
+                .anyMatch(op -> WRITE_OPERATIONS.contains(op));
+        return writes ? ToolCapabilityCeiling.WRITE_CAPABLE : ToolCapabilityCeiling.READ_ONLY;
+    }
+
     @SuppressWarnings("unchecked")
-    private AgentContextPolicy contextPolicy(Map<String, Object> guardrails) {
+    private AgentContextPolicy contextPolicy(Map<String, Object> guardrails, Map<String, Object> agentDefinition) {
+        ToolCapabilityCeiling operationCeiling = ceilingFromAllowedOperations(agentDefinition);
         if (guardrails == null || guardrails.isEmpty()) {
-            return AgentContextPolicy.defaults();
+            return operationCeiling == null
+                    ? AgentContextPolicy.defaults()
+                    : new AgentContextPolicy(Set.<String>of(), false, operationCeiling, null, null);
         }
         Object rawPolicy = guardrails.get("contextPolicy");
         if (rawPolicy instanceof Map<?, ?> rawMap) {
@@ -39,14 +77,22 @@ public enum DefaultAgentProfileResolver implements AgentProfileResolver {
             return new AgentContextPolicy(
                     stringSet(firstNonNull(policy.get("scopes"), policy.get("contextScopes"))),
                     booleanValue(firstNonNull(policy.get("allowSensitiveContext"), policy.get("allowSensitive"))),
-                    enumValue(ToolCapabilityCeiling.class, firstNonNull(policy.get("capabilityCeiling"), policy.get("capability"))),
+                    // An explicitly written ceiling wins. Someone who spelled it out in guardrails
+                    // meant it, and deriving over the top would make their setting unexplainable.
+                    ceilingOrDerived(
+                            enumValue(ToolCapabilityCeiling.class,
+                                    firstNonNull(policy.get("capabilityCeiling"), policy.get("capability"))),
+                            operationCeiling),
                     enumValue(ToolExposure.class, policy.get("toolExposure")),
                     enumValue(DurabilityPreference.class, policy.get("durabilityPreference")));
         }
         return new AgentContextPolicy(
                 stringSet(firstNonNull(guardrails.get("contextScopes"), guardrails.get("scopes"))),
                 booleanValue(firstNonNull(guardrails.get("allowSensitiveContext"), guardrails.get("allowSensitive"))),
-                enumValue(ToolCapabilityCeiling.class, firstNonNull(guardrails.get("capabilityCeiling"), guardrails.get("capability"))),
+                ceilingOrDerived(
+                        enumValue(ToolCapabilityCeiling.class,
+                                firstNonNull(guardrails.get("capabilityCeiling"), guardrails.get("capability"))),
+                        operationCeiling),
                 enumValue(ToolExposure.class, guardrails.get("toolExposure")),
                 enumValue(DurabilityPreference.class, guardrails.get("durabilityPreference")));
     }
@@ -100,6 +146,12 @@ public enum DefaultAgentProfileResolver implements AgentProfileResolver {
         } catch (IllegalArgumentException ignored) {
             return null;
         }
+    }
+
+    /** An explicit ceiling wins over one derived from allowed_operations. */
+    private ToolCapabilityCeiling ceilingOrDerived(ToolCapabilityCeiling explicit,
+                                                   ToolCapabilityCeiling derived) {
+        return explicit != null ? explicit : derived;
     }
 
     private Object firstNonNull(Object... values) {
