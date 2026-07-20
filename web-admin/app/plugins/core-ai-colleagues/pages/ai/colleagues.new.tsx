@@ -27,6 +27,30 @@ import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
 
 // ---------------------------------------------------------------------------
+// Agent code
+// ---------------------------------------------------------------------------
+
+/**
+ * Builds the `agent_code` the backend requires on create.
+ *
+ * The wizard collects a display name, but `agent_code` is a separate NOT NULL column with a
+ * `(tenant_id, agent_code)` unique index, so it cannot simply be the name. A name is also not
+ * guaranteed to survive slugging — a purely non-ASCII name ("小艾") slugs to the empty string —
+ * hence the `agent` fallback rather than an empty prefix.
+ *
+ * The suffix is supplied by the caller so this stays pure and testable; callers pass a
+ * time-derived value, which is what keeps two colleagues created from the same template apart.
+ */
+export function deriveAgentCode(name: string, uniqueSuffix: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60);
+  return `${slug || 'agent'}_${uniqueSuffix}`;
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -782,6 +806,7 @@ export default function AIColleagueNewPage() {
     try {
       const payload: Record<string, any> = {
         name: data.name.trim(),
+        agent_code: deriveAgentCode(data.name.trim(), Date.now().toString(36)),
         agent_type: data.agent_type,
         communication_style: data.communication_style,
         status: 'active',

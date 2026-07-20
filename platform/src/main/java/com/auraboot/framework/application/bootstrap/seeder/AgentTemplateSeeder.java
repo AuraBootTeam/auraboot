@@ -1,5 +1,6 @@
 package com.auraboot.framework.application.bootstrap.seeder;
 
+import com.auraboot.framework.agent.service.SystemAgentUserProvisioner;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +44,9 @@ public class AgentTemplateSeeder {
     private static final long SYSTEM_TENANT_ID = SystemTenantContextExecutor.SYSTEM_TENANT_ID;
 
     /** Email domain for synthetic agent system users — never used for login. */
-    public static final String AGENT_USER_EMAIL_DOMAIN = "@system.auraboot.local";
+    // Defined by SystemAgentUserProvisioner, which provisions the same account on demand when a
+    // tenant-created agent is enrolled. Two literals would drift into two users for one agent.
+    public static final String AGENT_USER_EMAIL_DOMAIN = SystemAgentUserProvisioner.EMAIL_DOMAIN;
 
     private final JdbcTemplate jdbcTemplate;
 

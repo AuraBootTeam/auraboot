@@ -1749,7 +1749,6 @@ export default function AIColleagueDetailPage() {
   const isAuraBot = agent?.agent_code === AURABOT_CODE;
   const readOnly = isAuraBot;
   const isEnrolled = !!agent?.employee_id;
-  const hasSystemUser = !!agent?.system_user_id;
 
   const fetchAgent = useCallback(async () => {
     if (!agentPid) return;
@@ -1856,7 +1855,10 @@ export default function AIColleagueDetailPage() {
         </div>
 
         {/* Enrollment Actions — only for non-AuraBot agents that have a system user */}
-        {!isAuraBot && hasSystemUser && (
+        {/* Enrollment provisions the agent's backing system user on demand, so the button no
+            longer waits for system_user_id — gating on it hid enrollment from every
+            tenant-created agent, which never had one. */}
+        {!isAuraBot && (
           <div className="ml-auto">
             {isEnrolled ? (
               <button

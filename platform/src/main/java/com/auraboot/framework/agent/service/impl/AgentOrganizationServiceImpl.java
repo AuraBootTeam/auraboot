@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.service.impl;
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.agent.service.AgentOrganizationService;
+import com.auraboot.framework.agent.service.SystemAgentUserProvisioner;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.constant.StatusConstants;
 import com.auraboot.framework.exception.BusinessException;
@@ -54,6 +55,7 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
     private final DynamicDataService dynamicDataService;
     private final TenantMemberService tenantMemberService;
     private final UserService userService;
+    private final SystemAgentUserProvisioner systemAgentUserProvisioner;
 
     @Override
     @Transactional
@@ -68,11 +70,16 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
 
         Long tenantId = MetaContext.getCurrentTenantId();
 
-        // 1. Resolve user for the service member.
-        //    Use the agent's system_user_id if available, otherwise fail.
+        // 1. Resolve user for the service member, provisioning one if the agent has none.
+        //    Only AgentTemplateSeeder used to set system_user_id, and only for the system tenant,
+        //    so every tenant-created agent arrived here with null and was refused — the enrollment
+        //    path was unreachable for exactly the agents tenants actually build.
         Long systemUserId = agent.getSystemUserId();
         if (systemUserId == null) {
-            throw new BusinessException("Agent has no system_user_id — cannot create service member without a user");
+            systemUserId = systemAgentUserProvisioner.ensureSystemAgentUser(
+                    agent.getAgentCode(), agent.getName());
+            agent.setSystemUserId(systemUserId);
+            agentDefinitionMapper.updateById(agent);
         }
 
         // 2. Create or find service tenant_member for this agent's system user
