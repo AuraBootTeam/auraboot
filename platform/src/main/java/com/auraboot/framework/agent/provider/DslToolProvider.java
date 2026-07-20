@@ -47,6 +47,15 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class DslToolProvider implements ToolProvider {
 
+    /**
+     * F9: command types that act on an EXISTING record and therefore must expose
+     * {@code recordPid} to the model when the command declares no explicit
+     * inputFields / inputSchema. Without it the agent can only send {@code {}} and
+     * the command fails its assert phase — i.e. the command is unusable by agents.
+     */
+    private static final Set<String> RECORD_TARGETED_COMMAND_TYPES =
+            Set.of("state_transition", "delete", "update");
+
     private static final String PREFIX_CMD = "cmd:";
     private static final String PREFIX_NQ = "nq:";
     private static final String PREFIX_LIST = "list:";
@@ -209,10 +218,20 @@ public class DslToolProvider implements ToolProvider {
 
         Object inputFieldsObj = executionConfig != null ? executionConfig.get("inputFields") : null;
         if (!(inputFieldsObj instanceof List<?> inputFields) || inputFields.isEmpty()) {
-            Object type = executionConfig != null ? executionConfig.get("type") : null;
-            if (type != null && "state_transition".equalsIgnoreCase(String.valueOf(type))) {
+            // F9 (execution-architecture review, 2026-07-20): record-targeted command
+            // types MUST expose recordPid, otherwise the agent literally cannot say
+            // WHICH record to act on — it emits `{}`, the executor gets no
+            // targetRecordId, and the command dies at the assert phase
+            // ("Precondition failed"). Live-reproduced: crm:delete_lead (type=delete,
+            // no inputFields) was unusable by the agent no matter how the user
+            // phrased it, even after a human approved the action. Only
+            // state_transition carried the pid before; delete/update need it just
+            // as much (ToolLoopService already maps recordPid -> targetRecordId).
+            String type = executionConfig != null && executionConfig.get("type") != null
+                    ? String.valueOf(executionConfig.get("type")) : "";
+            if (RECORD_TARGETED_COMMAND_TYPES.contains(type.toLowerCase(java.util.Locale.ROOT))) {
                 return objectSchema(
-                        recordPidProperties("Record pid to transition"),
+                        recordPidProperties("Pid of the record this command acts on"),
                         List.of("recordPid"));
             }
             return objectSchema(Map.of(), List.of());
