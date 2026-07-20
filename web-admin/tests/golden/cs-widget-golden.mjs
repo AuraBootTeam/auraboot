@@ -122,11 +122,27 @@ try {
   //
   // NOTE the null: waitForFunction's second parameter is the ARG passed to the page function, not
   // the options — putting options there silently leaves the default 30s timeout in place.
+  // Wait for the stream to FINISH, not for it to have produced some text. The widget disables the
+  // send button for the duration of a turn and re-enables it in onDone/onError, and onDone replaces
+  // the bubble with the answer carried by the final frame — so send-enabled is the point at which
+  // the bubble holds the whole answer.
+  //
+  // This used to wait for `last.length > 20`, which is satisfied by the first fragment of the
+  // reply. Whether that mattered depended on how the provider chunked its output: a model that
+  // emits the answer in one piece passed, and one that opens with a preamble — deepseek begins
+  // "Based on the retrieved information," — was read at 35 characters, before the fact the
+  // grounding assertion looks for had arrived. The suite then reported an ungrounded answer and a
+  // missing markdown emphasis, neither of which was true.
+  //
+  // Requiring the agent bubble to exist first also removes the race with the click: the bubble is
+  // appended after setBusy(true), so once it is there, an enabled send button means the turn ended.
   await page.waitForFunction(
     (welcome) => {
       const root = document.querySelector('[data-aura-cs="root"]')?.shadowRoot;
       const bubbles = root?.querySelectorAll('[data-testid="cs-msg-agent"]');
       if (!bubbles || bubbles.length < 2) return false;
+      const send = root?.querySelector('[data-testid="cs-send"]');
+      if (!send || send.disabled) return false;
       const last = bubbles[bubbles.length - 1].textContent?.trim() ?? '';
       return last.length > 20 && last !== welcome;
     },
@@ -157,11 +173,23 @@ try {
 
   // Models answer in markdown. A bubble that shows literal ** around the emphasised words is the
   // kind of defect that only a screenshot (or this assertion) ever catches.
+  //
+  // What is asserted is the widget's rendering, not the model's prose style. Requiring strong > 0
+  // outright made this a test of whether the model felt like emphasising something: deepseek
+  // answered "**37 months**" and passed, qwen answered "The Acme Widget warranty is 37 months from
+  // the date of purchase." — complete, correct, no emphasis anywhere — and was scored as a
+  // rendering failure. The invariant that actually belongs to the widget is that a visitor never
+  // sees raw markers; whether emphasis appears at all is the model's business.
   const boldRendered = await page.locator('[data-testid="cs-msg-agent"]').last().locator('strong').count();
+  const leaksMarkers = answerText.includes('**');
   record(
     'markdown emphasis is rendered, not shown as literal asterisks',
-    !answerText.includes('**') && boldRendered > 0,
-    `strong=${boldRendered}`,
+    !leaksMarkers,
+    leaksMarkers
+      ? `literal ** left in the bubble: ${JSON.stringify(answerText.slice(0, 90))}`
+      : boldRendered > 0
+        ? `strong=${boldRendered}`
+        : 'model used no emphasis this turn — nothing to render, no markers leaked',
   );
   await shot(page, '04-ai-answer');
 
