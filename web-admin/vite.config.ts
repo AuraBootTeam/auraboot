@@ -157,6 +157,15 @@ export default defineConfig({
       'html2canvas',
       'jsbarcode',
       'jspdf',
+      // F11 (2026-07-20): echarts is only reached through LAZY chart components,
+      // so in dev the first chart render triggered on-demand dep optimization and
+      // Vite's "optimized dependencies changed. reloading" — a FULL PAGE RELOAD
+      // that wipes React state. User-visible symptom: ask AuraBot for a chart and
+      // the whole chat panel disappears mid-answer (live-reproduced; it is also
+      // why the chat-bi golden could never see its canvas). Pre-bundling removes
+      // the mid-session re-optimization entirely.
+      'echarts',
+      'echarts-for-react',
       'zustand',
       'zustand/middleware',
       'zustand/middleware/immer',
