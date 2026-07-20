@@ -30,6 +30,19 @@ public class ToolDiscoveryPortImpl implements ToolDiscoveryPort {
     private AgentRuntimeObservabilityService observabilityService;
 
     @Override
+    public List<ToolDef> discoverAlwaysOnTools(Long tenantId, String channel) {
+        ToolDiscoveryContext ctx = ToolDiscoveryContext.builder()
+                .tenantId(tenantId)
+                .userId(MetaContext.exists() ? MetaContext.getCurrentUserId() : null)
+                .channel(channel)
+                .maxResults(0) // always-on is never limited by a budget; see discoverAlwaysOn
+                .build();
+        return toolProviderRegistry.discoverAlwaysOn(ctx).stream()
+                .map(this::toToolDef)
+                .toList();
+    }
+
+    @Override
     public List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills,
                                        String modelHint, String intentHint, int maxTools, String channel) {
         boolean queryOnly = isReadIntent(intentHint);

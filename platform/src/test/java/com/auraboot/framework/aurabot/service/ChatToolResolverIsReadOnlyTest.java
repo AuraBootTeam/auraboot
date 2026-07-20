@@ -18,6 +18,32 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 class ChatToolResolverIsReadOnlyTest {
 
+    /** The discovery half of {@link ToolDiscoveryPort}, so these cases can still be written as lambdas. */
+    @FunctionalInterface
+    interface DiscoverFn {
+        List<ToolDiscoveryPort.ToolDef> discover(Long tenantId, List<String> candidateSkills, String modelHint,
+                                                 String intentHint, int maxTools, String channel);
+    }
+
+    /**
+     * Adapts a discovery lambda to the full port. Always-on returns empty: none of these cases run on a
+     * RAG-only channel, so the resolver never asks for always-on tools here.
+     */
+    private static ToolDiscoveryPort discoveryPort(DiscoverFn fn) {
+        return new ToolDiscoveryPort() {
+            @Override
+            public List<ToolDef> discoverAlwaysOnTools(Long tenantId, String channel) {
+                return List.of();
+            }
+
+            @Override
+            public List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills, String modelHint,
+                                               String intentHint, int maxTools, String channel) {
+                return fn.discover(tenantId, candidateSkills, modelHint, intentHint, maxTools, channel);
+            }
+        };
+    }
+
     private ChatToolResolver resolver;
 
     @BeforeEach
@@ -77,6 +103,12 @@ class ChatToolResolverIsReadOnlyTest {
                 new GroundingPort.GroundingResult("create", "crm_lead", 0.9, List.of(), false);
         ToolDiscoveryPort toolDiscoveryPort = new ToolDiscoveryPort() {
             @Override
+            public List<ToolDef> discoverAlwaysOnTools(Long tenantId, String channel) {
+                // These cases exercise discovered tools on a normal channel; no always-on provider.
+                return List.of();
+            }
+
+            @Override
             public List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills,
                                                String modelHint, String intentHint, int maxTools, String channel) {
                 return List.of(new ToolDef(
@@ -114,6 +146,12 @@ class ChatToolResolverIsReadOnlyTest {
                 new GroundingPort.GroundingResult("query", "crm_lead", 0.9, List.of(), true);
         ToolDiscoveryPort toolDiscoveryPort = new ToolDiscoveryPort() {
             @Override
+            public List<ToolDef> discoverAlwaysOnTools(Long tenantId, String channel) {
+                // These cases exercise discovered tools on a normal channel; no always-on provider.
+                return List.of();
+            }
+
+            @Override
             public List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills,
                                                String modelHint, String intentHint, int maxTools, String channel) {
                 return List.of(
@@ -142,8 +180,8 @@ class ChatToolResolverIsReadOnlyTest {
         GroundingPort groundingPort = (tenantId, userMessage, pageModel, recordId) -> {
             throw new IllegalStateException("grounding unavailable");
         };
-        ToolDiscoveryPort toolDiscoveryPort = (tenantId, candidateSkills, modelHint, intentHint, maxTools, channel) ->
-                List.of();
+        ToolDiscoveryPort toolDiscoveryPort =
+                discoveryPort((tenantId, candidateSkills, modelHint, intentHint, maxTools, channel) -> List.of());
         ChatToolResolver mappedResolver = new ChatToolResolver(groundingPort, toolDiscoveryPort, null);
 
         MetaContext.setSystemTenantContext(1L);
@@ -161,9 +199,10 @@ class ChatToolResolverIsReadOnlyTest {
     void resolveTools_propagatesToolDiscoveryFailureInsteadOfReturningEmptyTools() {
         GroundingPort groundingPort = (tenantId, userMessage, pageModel, recordId) ->
                 new GroundingPort.GroundingResult("query", "crm_lead", 0.9, List.of("list:crm_lead"), true);
-        ToolDiscoveryPort toolDiscoveryPort = (tenantId, candidateSkills, modelHint, intentHint, maxTools, channel) -> {
-            throw new IllegalStateException("tool registry unavailable");
-        };
+        ToolDiscoveryPort toolDiscoveryPort =
+                discoveryPort((tenantId, candidateSkills, modelHint, intentHint, maxTools, channel) -> {
+                    throw new IllegalStateException("tool registry unavailable");
+                });
         ChatToolResolver mappedResolver = new ChatToolResolver(groundingPort, toolDiscoveryPort, null);
 
         MetaContext.setSystemTenantContext(1L);
@@ -185,13 +224,13 @@ class ChatToolResolverIsReadOnlyTest {
         // return the wrong tenant's value.
         GroundingPort grounding = (t, msg, pm, rid) ->
                 new GroundingPort.GroundingResult("query", "crm_lead", 0.9, List.of(), true);
-        ToolDiscoveryPort discovery = (tenantId, skills, modelHint, intentHint, maxTools, channel) ->
+        ToolDiscoveryPort discovery = discoveryPort((tenantId, skills, modelHint, intentHint, maxTools, channel) ->
                 List.of(new ToolDiscoveryPort.ToolDef(
                         "cmd:crm:widget",
                         "Widget",
                         "tenant-specific tool",
                         Map.of("type", "object"),
-                        tenantId != null && tenantId == 1L)); // readOnly only for tenant 1
+                        tenantId != null && tenantId == 1L))); // readOnly only for tenant 1
         ChatToolResolver r = new ChatToolResolver(grounding, discovery, null);
 
         MetaContext.setSystemTenantContext(1L);
