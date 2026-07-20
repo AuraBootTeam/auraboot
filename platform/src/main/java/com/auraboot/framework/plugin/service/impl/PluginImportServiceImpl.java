@@ -1936,7 +1936,8 @@ public class PluginImportServiceImpl implements PluginImportService {
                         logSafe(permission.getCode()), logSafe(e.getMessage()));
             }
         }
-        userPermissionService.evictRoleUsers(tenantAdminRole.getId());
+        userPermissionService.evictPermissionDefinitions(tenantId);
+        userPermissionService.evictRoleUsers(tenantId, tenantAdminRole.getId());
     }
 
     private void importRoles(PluginManifestExtended manifest, ImportRequest request,

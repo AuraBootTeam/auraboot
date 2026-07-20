@@ -23,13 +23,20 @@ import org.springframework.context.ApplicationEvent;
  */
 @Getter
 public class RolePermissionChangedEvent extends ApplicationEvent {
-    
+
+    private final Long tenantId;
     private final Long roleId;
     private final Long permissionId;
     private final String operation;  // CREATE, UPDATE, DELETE
     
     public RolePermissionChangedEvent(Object source, Long roleId, Long permissionId, String operation) {
+        this(source, null, roleId, permissionId, operation);
+    }
+
+    public RolePermissionChangedEvent(
+            Object source, Long tenantId, Long roleId, Long permissionId, String operation) {
         super(source);
+        this.tenantId = tenantId;
         this.roleId = roleId;
         this.permissionId = permissionId;
         this.operation = operation;

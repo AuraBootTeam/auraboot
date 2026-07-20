@@ -683,7 +683,8 @@ public class UserRoleServiceImpl extends ServiceImpl<UserRoleMapper, UserRole> i
         if (userId == null) {
             return;
         }
-        eventPublisher.publishEvent(new UserRoleChangedEvent(this, userId, roleId, operation));
+        eventPublisher.publishEvent(new UserRoleChangedEvent(
+                this, member.getTenantId(), userId, roleId, operation));
     }
 
     private void publishUserRoleRowsChange(List<Long> userRoleIds, String operation) {

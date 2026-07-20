@@ -119,6 +119,7 @@ class CapabilityLifecycleEnforcementIT extends BaseIntegrationTest {
         // clean slate: ensure the role carries none of the capability codes from a previous run
         applyTestMetaContext();
         capabilityViewService.applyCapabilitySelection(role.getId(), Set.of());
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), role.getId());
 
         // --- 1. baseline: no capability -> command denied. hasPermission/CommandAuthorizationPhase
         // resolve roles via MetaContext.memberId (not the userId arg), so act AS the new member.
@@ -130,6 +131,7 @@ class CapabilityLifecycleEnforcementIT extends BaseIntegrationTest {
         // --- 2. grant the capability via the real v2 API -> command allowed
         applyTestMetaContext();
         capabilityViewService.applyCapabilitySelection(role.getId(), Set.of(capCode));
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), role.getId());
         actAsMember(tm.getId(), member.getId());
         assertTrue(userPermissionService.hasPermission(member.getId(), enforcedPerm),
                 "granting " + capCode + " must resolve to " + enforcedPerm);
@@ -138,6 +140,7 @@ class CapabilityLifecycleEnforcementIT extends BaseIntegrationTest {
         // --- 3. revoke the capability via the same v2 API -> command denied again
         applyTestMetaContext();
         capabilityViewService.applyCapabilitySelection(role.getId(), Set.of());
+        userPermissionService.evictRoleUsers(getTestTenant().getId(), role.getId());
         actAsMember(tm.getId(), member.getId());
         assertFalse(userPermissionService.hasPermission(member.getId(), enforcedPerm),
                 "revoking " + capCode + " must drop " + enforcedPerm);
@@ -209,6 +212,7 @@ class CapabilityLifecycleEnforcementIT extends BaseIntegrationTest {
 
     private void registerPermission(String code) {
         if (permissionMapper.findByCode(code) != null) {
+            userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
             return;
         }
         String[] parts = code.split("\\.");
@@ -226,5 +230,6 @@ class CapabilityLifecycleEnforcementIT extends BaseIntegrationTest {
         permission.setCreatedAt(Instant.now());
         permission.setUpdatedAt(Instant.now());
         permissionMapper.insert(permission);
+        userPermissionService.evictPermissionDefinitions(getTestTenant().getId());
     }
 }
