@@ -28,6 +28,12 @@ class ChatToolExecutorToolNameMappingTest {
         AtomicReference<String> executedToolCode = new AtomicReference<>();
         ToolDiscoveryPort toolDiscoveryPort = new ToolDiscoveryPort() {
             @Override
+            public List<ToolDef> discoverAlwaysOnTools(Long tenantId, String channel) {
+                // These cases exercise discovered tools on a normal channel; no always-on provider.
+                return List.of();
+            }
+
+            @Override
             public List<ToolDef> discoverTools(Long tenantId, List<String> candidateSkills,
                                                String modelHint, String intentHint, int maxTools, String channel) {
                 return List.of(new ToolDef(

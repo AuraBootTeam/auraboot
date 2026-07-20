@@ -15,6 +15,20 @@ import java.util.Map;
 public interface ToolDiscoveryPort {
 
     /**
+     * Only the tools a provider requires on every turn of this channel — nothing discovered.
+     *
+     * <p>For a RAG-only channel the answer must come from retrieved knowledge, so no business tool
+     * (execute_sql, chat-bi, fill_form) may be offered. That is not a reason to drop the channel's
+     * always-on fallback too: "hand this visitor to a human" is needed precisely when the model
+     * cannot answer, and a customer-facing bot with no way out is worse than one with no tools.
+     *
+     * @param tenantId tenant scope
+     * @param channel  request channel; providers gate their always-on tools on it
+     * @return always-on tools for this channel, possibly empty
+     */
+    List<ToolDef> discoverAlwaysOnTools(Long tenantId, String channel);
+
+    /**
      * Discover available tools matching the given criteria.
      *
      * @param tenantId        current tenant ID

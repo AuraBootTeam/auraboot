@@ -39,11 +39,15 @@ public class ChatToolResolver {
     private static final int MAX_TOOLS = 15;
 
     /**
-     * Channels whose AI answers purely from retrieved knowledge and must carry NO tools. The
+     * Channels whose AI answers purely from retrieved knowledge and must carry NO business tools. The
      * embeddable customer-service widget ({@code cs_widget}) is customer-facing: exposing execute_sql
      * / chat-bi / fill_form there invites tool loops and off-scope "let me query the database"
      * behaviour, and a public CS bot must never run SQL. The answer comes from the injected knowledge
-     * context, so the tool surface is empty.
+     * context.
+     *
+     * <p>The channel's <em>always-on</em> tools are still offered (see {@link #resolveAlwaysOnOnly}):
+     * {@code escalate_to_human} is needed exactly when the knowledge base cannot answer, so dropping
+     * it along with the business tools left the widget with no way to reach a person.
      */
     private static final Set<String> RAG_ONLY_CHANNELS = Set.of("cs_widget");
 
@@ -113,12 +117,20 @@ public class ChatToolResolver {
             return new ResolvedTools(List.of(), null, null, true);
         }
 
-        // RAG-only channel (the embeddable CS widget): answer purely from the retrieved knowledge
-        // context, never from tools. Skipping discovery here also skips ensurePlatformTools' execute_sql
-        // fallback, which is what a customer-facing bot must not carry.
+        // RAG-only channel (the embeddable CS widget): the answer comes from the retrieved knowledge
+        // context, never from a discovered business tool. Skipping discovery here also skips
+        // ensurePlatformTools' execute_sql fallback, which is what a customer-facing bot must not carry.
+        //
+        // "No business tools" is NOT "no tools". A provider's always-on tools are still offered:
+        // escalate_to_human is needed exactly when the model cannot answer, and a customer-facing bot
+        // with no way out is worse than one with no tools at all. Returning List.of() here is what
+        // made that tool unreachable on the widget — discoverAlwaysOn is merged inside
+        // discoverTools(), which this branch never reaches.
         if (channel != null && RAG_ONLY_CHANNELS.contains(channel)) {
-            log.info("AuraBot D1: RAG-only channel '{}' — no tools exposed (grounded by knowledge context)", channel);
-            return new ResolvedTools(List.of(), null, null, true);
+            List<LlmChatRequest.Tool> alwaysOn = resolveAlwaysOnOnly(channel);
+            log.info("AuraBot D1: RAG-only channel '{}' — {} always-on tool(s), no discovered tools",
+                    channel, alwaysOn.size());
+            return new ResolvedTools(alwaysOn, null, null, true);
         }
 
         try {
@@ -340,6 +352,24 @@ public class ChatToolResolver {
     }
 
     // ==================== Tool Conversion ====================
+
+    /**
+     * The always-on tools for a RAG-only channel, and nothing else.
+     *
+     * <p>Goes through {@link #convertToolDef} like every other path, which is what registers the
+     * per-turn metadata (readOnly / provider tool code / agent definition) the executor reads back.
+     * Offering a tool the executor cannot then resolve would be a worse failure than not offering it.
+     *
+     * <p>Failures are deliberately NOT swallowed here: tool resolution failure is fatal to the turn
+     * everywhere else in this class, and a silently missing escalation path is precisely the class of
+     * bug this method exists to fix.
+     */
+    private List<LlmChatRequest.Tool> resolveAlwaysOnOnly(String channel) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        return toolDiscoveryPort.discoverAlwaysOnTools(tenantId, channel).stream()
+                .map(this::convertToolDef)
+                .toList();
+    }
 
     /**
      * Convert a ToolDef from ToolDiscoveryPort into an LLM Tool definition.
