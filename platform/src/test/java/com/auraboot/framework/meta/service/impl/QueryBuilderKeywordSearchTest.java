@@ -150,4 +150,40 @@ class QueryBuilderKeywordSearchTest {
         assertFalse(sql.contains("priority ilike"), "numeric fallback should not use direct ILIKE on numeric fields");
         assertEquals(List.of("%678943%"), query.getParameters());
     }
+
+    @Test
+    @DisplayName("F12: a field DECLARED text but physically BIGINT is cast, not ILIKE'd raw")
+    void keywordSearchCastsDeclaredTextButPhysicallyNumericColumn() {
+        // ab_mission.owner_id is declared "string" in model metadata while the
+        // physical column is BIGINT. A bare ILIKE produced
+        //   ERROR: operator does not exist: bigint ~~* character varying
+        // and every keyword search on the model returned HTTP 500 (list page search
+        // box, agent list tool, everything). The declaration is not proof of the
+        // physical type — decide by live introspection.
+        ModelDefinition model = ModelDefinition.builder()
+            .code("mission")
+            .tableName("ab_mission")
+            .fields(List.of(
+                FieldDefinition.builder().code("title").columnName("title").dataType("string").searchable(true).build(),
+                FieldDefinition.builder().code("owner_id").columnName("owner_id").dataType("string").searchable(true).build()
+            ))
+            .build();
+
+        QueryBuilderServiceImpl impl = new QueryBuilderServiceImpl(null);
+        impl.setTableMetadataService(new com.auraboot.framework.meta.ddl.TableMetadataService(null, null) {
+            @Override
+            public String getColumnTypeDefinition(String tableName, String columnName) {
+                return "owner_id".equals(columnName) ? "bigint" : "VARCHAR(200)";
+            }
+        });
+
+        QueryBuilderService.QueryBuilder query = impl.buildConditionQuery(model, List.of());
+        impl.buildKeywordSearch(query, "acme", model);
+
+        String sql = query.getSql().toLowerCase(Locale.ROOT);
+        assertTrue(sql.contains("cast(owner_id as text) ilike"), sql);
+        // The genuinely-text column keeps its bare, index-friendly form.
+        assertTrue(sql.contains("title ilike"), sql);
+        assertFalse(sql.contains("cast(title as text)"), sql);
+    }
 }
