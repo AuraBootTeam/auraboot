@@ -48,6 +48,26 @@ class LlmProviderFactoryTest {
     }
 
     @Test
+    @DisplayName("F2: resolveDefaultProviderCode returns stub code in stub-mode and null when nothing is configured")
+    void resolveDefaultProviderCodeContract() {
+        LlmProviderFactory factory = new LlmProviderFactory(
+                List.of(),
+                mock(CloudConfigService.class),
+                new AgentProperties(),
+                new ObjectMapper(),
+                mock(com.auraboot.framework.agent.trace.GenAiUsageRecorder.class),
+                mock(org.springframework.beans.factory.ObjectProvider.class));
+
+        // Nothing configured -> null; callers keep their honest fail-fast.
+        assertThat(factory.resolveDefaultProviderCode(7L)).isNull();
+
+        // Stub-mode -> the stub provider, so durable runs work on golden stacks
+        // exactly like chat turns do.
+        org.springframework.test.util.ReflectionTestUtils.setField(factory, "stubMode", true);
+        assertThat(factory.resolveDefaultProviderCode(7L)).isEqualTo(StubLlmProvider.PROVIDER_CODE);
+    }
+
+    @Test
     @DisplayName("getProvider returns null instead of anthropic fallback when chat-completions adapter is missing")
     void getProviderReturnsNullWhenOpenAiCompatibleAdapterIsMissing() {
         LlmProvider anthropicProvider = mock(LlmProvider.class);

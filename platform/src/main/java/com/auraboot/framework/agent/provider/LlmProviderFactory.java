@@ -302,6 +302,26 @@ public class LlmProviderFactory {
     }
 
     /**
+     * F2 (execution-architecture review, 2026-07-20): the durable engine
+     * fail-fasted ("No LLM provider configured for agent") when agent
+     * guardrails named no provider, while the chat engine auto-resolved —
+     * same tenant, same key: chat worked, durable errored. This exposes the
+     * exact auto-resolution chat's {@link #resolveConfig} uses (first enabled
+     * provider with an API key; the stub provider in stub-mode) so both
+     * engines behave identically when nothing is explicitly configured.
+     *
+     * @return the resolved provider code, or null when nothing is configured
+     *         (callers keep their honest fail-fast for that case)
+     */
+    public String resolveDefaultProviderCode(Long tenantId) {
+        if (stubMode) {
+            return StubLlmProvider.PROVIDER_CODE;
+        }
+        List<ProviderInfo> configured = listConfiguredProviders(tenantId);
+        return configured.isEmpty() ? null : configured.get(0).getProviderCode();
+    }
+
+    /**
      * Resolve provider configuration: API key, base URL, model.
      * Tries CloudConfig first, falls back to application.yml for anthropic.
      */
