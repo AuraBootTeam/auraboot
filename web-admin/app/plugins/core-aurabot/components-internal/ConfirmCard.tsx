@@ -28,8 +28,31 @@ interface ConfirmCardProps {
 // ============================================================================
 
 /** Strip prefix (cmd__, nq__, builtin__) and replace __ with ' › ' */
+/**
+ * Turns the LLM-safe tool name into something a person can read.
+ *
+ * This card is shown at the one moment the product asks a human to authorise an action, so the
+ * name on it has to be legible. It was stripping double-underscore prefixes (`cmd__`) while the
+ * runtime emits single ones — `cmd_crm_create_account` — so nothing matched and the card asked
+ * people to approve a raw command code.
+ *
+ * The runtime builds these by replacing the namespace colon with an underscore, so the first
+ * underscore after the prefix is that separator: `cmd_crm_create_account` is `crm:create_account`.
+ */
 function formatToolName(name: string): string {
-  return name.replace(/^(cmd__|nq__|builtin__)/, '').replace(/__/g, ' › ');
+  // Already carries its namespace separator — that is the form the product uses.
+  if (name.includes(':')) {
+    return name.replace(/^(cmd|nq|builtin):/, '').replace(/_/g, ' ');
+  }
+  const withoutPrefix = name.replace(/^(cmd__|nq__|builtin__)/, '').replace(/^(cmd_|nq_|builtin_)/, '');
+  if (withoutPrefix.includes('__')) {
+    return withoutPrefix.replace(/__/g, ' › ');
+  }
+  const separator = withoutPrefix.indexOf('_');
+  if (separator <= 0 || separator >= withoutPrefix.length - 1) {
+    return withoutPrefix.replace(/_/g, ' ');
+  }
+  return `${withoutPrefix.slice(0, separator)} › ${withoutPrefix.slice(separator + 1).replace(/_/g, ' ')}`;
 }
 
 /** Keys to exclude from the displayed parameters */
