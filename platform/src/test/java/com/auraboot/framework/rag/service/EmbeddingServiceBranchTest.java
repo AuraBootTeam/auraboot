@@ -79,6 +79,22 @@ class EmbeddingServiceBranchTest {
     }
 
     @Test
+    @DisplayName("F3: blank providerCode auto-resolves the first ENABLED embedding provider (e.g. qianwen), not hardcoded openai")
+    void embedBatchAutoResolvesEnabledEmbeddingProvider() {
+        // Deployment provisioned qianwen embedding (DASHSCOPE key) — the old
+        // hardcoded 'openai' lookup left semantic recall silently dead here.
+        com.auraboot.framework.cloudconfig.entity.CloudConfig qianwen =
+                new com.auraboot.framework.cloudconfig.entity.CloudConfig();
+        qianwen.setProviderCode("qianwen");
+        when(cloudConfigService.getEnabledProviders(1L, "embedding")).thenReturn(List.of(qianwen));
+        when(cloudConfigService.getEffectiveConfig(anyLong(), anyString(), anyString())).thenReturn(null);
+
+        service.embedBatch(1L, List.of("a"), null);
+
+        verify(cloudConfigService).getEffectiveConfig(1L, "embedding", "qianwen");
+    }
+
+    @Test
     @DisplayName("embedBatch returns empty when CloudConfig present but config blank")
     void embedBatchBlankConfig() {
         CloudConfig cc = new CloudConfig();

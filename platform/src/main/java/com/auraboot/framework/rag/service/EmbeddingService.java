@@ -155,7 +155,23 @@ public class EmbeddingService {
     @SuppressWarnings("unchecked")
     EmbeddingConfig resolveConfig(Long tenantId, String providerCode) {
         if (providerCode == null || providerCode.isBlank()) {
-            providerCode = "openai";
+            // F3 (execution-architecture review, 2026-07-20): 'openai' was
+            // hardcoded here while the seeder provisions whatever vendor key the
+            // deployment actually has (e.g. qianwen) — semantic recall silently
+            // dead on every non-openai deployment ("No EMBEDDING provider
+            // configured for code=openai"). Auto-resolve the first enabled
+            // embedding provider, same posture as the chat LLM resolution;
+            // 'openai' stays as the legacy last resort.
+            java.util.List<com.auraboot.framework.cloudconfig.entity.CloudConfig> enabled =
+                    cloudConfigService.getEnabledProviders(tenantId, "embedding");
+            if (enabled != null && !enabled.isEmpty()
+                    && enabled.get(0).getProviderCode() != null
+                    && !enabled.get(0).getProviderCode().isBlank()) {
+                providerCode = enabled.get(0).getProviderCode();
+                log.debug("Auto-resolved EMBEDDING provider: {}", providerCode);
+            } else {
+                providerCode = "openai";
+            }
         }
 
         try {

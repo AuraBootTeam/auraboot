@@ -214,6 +214,17 @@ public class AgentRunService {
                 return new RunOutcome.Failed(runPid, agentMissingMsg);
             }
             String providerCode = LlmRuntimeResolver.resolveAgentProviderCode(objectMapper, providerFactory, agentDef);
+            if (providerCode == null || providerCode.isBlank()) {
+                // F2: chat-parity auto-resolution — guardrails naming no provider
+                // must not fail the run when the tenant HAS a configured provider
+                // (the chat engine auto-resolves the same way). The fail-fast
+                // below still guards the nothing-configured case.
+                providerCode = providerFactory.resolveDefaultProviderCode(tenantId);
+                if (providerCode != null && !providerCode.isBlank()) {
+                    log.info("Agent '{}' guardrails name no provider — auto-resolved '{}' (F2 chat-parity)",
+                            agentCode, providerCode);
+                }
+            }
             String preferredProviderCode = providerCode;
             String model = LlmRuntimeResolver.resolveAgentModel(providerFactory, agentDef, providerCode);
 
