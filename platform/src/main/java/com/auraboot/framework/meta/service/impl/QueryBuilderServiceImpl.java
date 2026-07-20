@@ -40,6 +40,8 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
 
     /** Cache of {@code table.column -> isJsonb} to avoid per-query DB introspection. */
     private final Map<String, Boolean> jsonbColumnCache = new java.util.concurrent.ConcurrentHashMap<>();
+    /** F12: cache of {@code table.column -> isTextType} for the same reason. */
+    private final Map<String, Boolean> textColumnCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     /** Test seam: inject a (possibly stubbed) TableMetadataService without Spring. */
     void setTableMetadataService(com.auraboot.framework.meta.ddl.TableMetadataService svc) {
@@ -860,6 +862,16 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
         if (declaredText && isActualJsonbColumn(tableName, columnName)) {
             return "CAST(" + columnName + " AS TEXT)";
         }
+        // F12 (execution-architecture review, 2026-07-20): the declared dataType is
+        // NOT proof of the physical column type — ab_mission.owner_id is declared
+        // "string" but is physically BIGINT, so a bare ILIKE produced
+        //   ERROR: operator does not exist: bigint ~~* character varying
+        // and every keyword search on such a model returned HTTP 500 (the list
+        // page's search box, the agent's list tool, anything). Same shape as the
+        // JSONB case above; decide by the LIVE column type, not the declaration.
+        if (declaredText && !isActualTextColumn(tableName, columnName)) {
+            return "CAST(" + columnName + " AS TEXT)";
+        }
         return declaredText ? columnName : "CAST(" + columnName + " AS TEXT)";
     }
 
@@ -879,6 +891,30 @@ public class QueryBuilderServiceImpl extends BaseMetaService implements QueryBui
             } catch (Exception e) {
                 // Column/table not found or no datasource — fall back to declared dataType.
                 return false;
+            }
+        });
+    }
+
+    /**
+     * F12: true when the physical column really is a text-ish type (so a bare ILIKE
+     * is valid). Unknown / uintrospectable columns return TRUE so behavior stays
+     * exactly as before wherever there is no datasource (unit tests, unknown
+     * tables) — this guard only fires on columns we positively know are non-text.
+     */
+    private boolean isActualTextColumn(String tableName, String columnName) {
+        if (tableMetadataService == null || tableName == null || columnName == null) {
+            return true;
+        }
+        return textColumnCache.computeIfAbsent(tableName + "." + columnName, k -> {
+            try {
+                String type = tableMetadataService.getColumnTypeDefinition(tableName, columnName);
+                if (type == null || type.isBlank()) {
+                    return true;
+                }
+                String upper = type.toUpperCase(Locale.ROOT);
+                return upper.contains("CHAR") || upper.contains("TEXT") || upper.contains("ENUM");
+            } catch (Exception e) {
+                return true;
             }
         });
     }
