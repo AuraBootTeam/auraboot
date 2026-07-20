@@ -113,6 +113,28 @@ public class AuraBotChatService {
             "Be concise, accurate, and helpful. Respond in the user's language.";
 
     /**
+     * F6 (execution-architecture review, 2026-07-20): on tool failure the model
+     * invented UI navigation paths ("【销售】→【订单管理】→【数据概览】", a
+     * "本月订单数 KPI card ... 无需权限配置") that do not exist in the product —
+     * live-reproduced on missing-model queries. The RAG path already carries
+     * hard grounding ({@link #EMPTY_KB_MARKER} / {@link #RAG_ONLY_GROUNDING});
+     * this is the tool path's equivalent. RECENCY-POSITIONED (appended last on
+     * tool-capable turns, both template and fallback paths) — the v1
+     * head-of-prompt placement was live-verified to be ignored by the model.
+     */
+    private static final String TOOL_FAILURE_GROUNDING =
+            "\n\n【工具失败时的硬约束(必须遵守)】\n"
+            + "1. 严禁描述或推荐任何你未经工具结果验证存在的菜单路径、页面、看板、KPI 卡片、表名或字段名——"
+            + "编造导航路径比说“查不到”危害更大。\n"
+            + "2. 工具执行失败或目标模型/数据不存在时:如实说明失败原因,列出你通过工具确认真实存在的可选项"
+            + "(如可用模型/页面),或建议用户咨询管理员;不要用猜测填补。\n"
+            + "3. 不确定就说不确定。\n"
+            + "(HARD RULE on tool failure: NEVER describe or recommend menu paths, pages, dashboards, KPI "
+            + "cards, table or field names you have not verified via tool results — an invented navigation "
+            + "path is worse than an honest 'not found'. State the failure plainly, offer only options "
+            + "verified to exist, and say so when unsure.)";
+
+    /**
      * Injected in place of the knowledge context when a tool-less (RAG-only) turn has an explicit
      * knowledge base bound but retrieval returned nothing. Absence of context is NOT "answer freely":
      * without this an LLM fills the gap from general knowledge (e.g. an empty-KB tenant answering a
@@ -609,6 +631,9 @@ public class AuraBotChatService {
             if (ragOnlyGrounding) {
                 prompt += RAG_ONLY_GROUNDING;
             }
+            if (hasTools) {
+                prompt += TOOL_FAILURE_GROUNDING;
+            }
             return prompt;
         }
 
@@ -622,6 +647,9 @@ public class AuraBotChatService {
         }
         if (ragOnlyGrounding) {
             sb.append(RAG_ONLY_GROUNDING);
+        }
+        if (hasTools) {
+            sb.append(TOOL_FAILURE_GROUNDING);
         }
         return sb.toString();
     }
