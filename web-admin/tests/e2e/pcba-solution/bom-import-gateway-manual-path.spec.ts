@@ -244,12 +244,19 @@ test.describe('BOM import gateway manual path @smoke', () => {
       // the operator must be told which one happened — never left staring at an
       // unchanged screen:
       //   a) matching starts  -> the task leaves adjustment_required
-      //   b) it cannot start  -> the task STAYS parked, but the response carries
-      //      a reason and a human-readable message (e.g. the material master is
-      //      not reconciled yet), so the work is recoverable rather than stuck.
+      //   b) it cannot start  -> the task STAYS parked, but the operator is told
+      //      what to fix, so the work is recoverable rather than stuck.
       // Asserting only (a) would make this test environment-dependent; asserting
       // neither would make it vacuous. So: require that one of them is true, and
       // that (b) is never silent.
+      //
+      // What (b) actually carries, verified against a real parked task: a
+      // populated `userMessage` plus a machine-readable `issues[]` (entries like
+      // {code: 'refdes_qty_mismatch', standardField, rowNumber, suggestion}).
+      // An earlier draft of this test also demanded a top-level `reason`; the
+      // command does not set one on this path, so that assertion would have
+      // failed for a product behaviour that is fine. Assert the contract that
+      // exists — the operator gets a message and something specific to act on.
       const outcome = await post(page, 'bom:confirm_import_and_continue', {}, 'update', taskPid);
       expect(outcome.status, 'confirm command is accepted').toBe(200);
       const inner = (outcome.body as any)?.data?.data ?? {};
@@ -260,12 +267,17 @@ test.describe('BOM import gateway manual path @smoke', () => {
 
       if (statusNow === 'adjustment_required') {
         expect(
-          String(inner.reason || ''),
-          `staying parked must come with a machine-readable reason (body=${JSON.stringify(inner).slice(0, 300)})`,
-        ).not.toBe('');
-        expect(
           String(inner.userMessage || ''),
-          'staying parked must come with an operator-facing explanation',
+          `staying parked must come with an operator-facing explanation (body=${JSON.stringify(inner).slice(0, 300)})`,
+        ).not.toBe('');
+        const issues = Array.isArray(inner.issues) ? inner.issues : [];
+        expect(
+          issues.length,
+          'staying parked must name at least one specific thing to fix',
+        ).toBeGreaterThan(0);
+        expect(
+          String(issues[0]?.code || ''),
+          'each issue carries a machine-readable code, not just prose',
         ).not.toBe('');
       } else {
         expect(statusNow, 'matching started, so the task left adjustment_required').not.toBe(
