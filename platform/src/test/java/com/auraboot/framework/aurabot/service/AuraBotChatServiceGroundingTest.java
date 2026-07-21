@@ -606,10 +606,13 @@ class AuraBotChatServiceGroundingTest {
         TurnOutcome.PendingConfirmation pending = (TurnOutcome.PendingConfirmation) outcome;
         assertThat(pending.pendingTurnId()).isEqualTo("turn-create-customer");
         assertThat(pending.pendingToolId()).isEqualTo("tool-create");
+        // The tool id stays the model-facing alias (that is what resume matches on),
+        // but the sentence a person reads carries the product's command form — #1386.
+        // This expectation was left on the pre-#1386 alias text and has been red on main since.
         verify(sink).onConfirmRequired(
                 eq("tool-create"),
                 eq("cmd_crm_customer_create"),
-                contains("Execute cmd_crm_customer_create"),
+                contains("Execute crm:customer_create"),
                 eq(Map.of("name", "Acme")),
                 eq("turn-create-customer"));
         ArgumentCaptor<PendingToolSnapshotFactory.Snapshot> snapshotCaptor =

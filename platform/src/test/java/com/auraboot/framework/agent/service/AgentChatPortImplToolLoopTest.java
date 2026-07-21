@@ -1151,8 +1151,11 @@ class AgentChatPortImplToolLoopTest {
         assertThat(stored.getIdempotencyKey()).isEqualTo(
                 "cmd_pe_create_procurement_comparison_draft:v1:" + stored.getArgsHash());
         assertThat(stored.getPolicyDecisionReason()).isEqualTo("user_confirmation_required");
+        // #1386 made the approval sentence show the command as the product names it
+        // (namespace + colon) instead of the LLM-safe alias; this expectation was left
+        // on the pre-#1386 alias text and has been red on main since.
         assertThat(stored.getPreview()).isEqualTo(
-                "Execute cmd_pe_create_procurement_comparison_draft with 1 argument(s).");
+                "Execute pe:create_procurement_comparison_draft with 1 argument(s).");
         assertProviderSecretNotPersisted(stored);
         assertRuntimeStateExtension(stored);
         verify(chatMessageTapeStore).storeConversationMessages(eq(SESSION_ID), any());
