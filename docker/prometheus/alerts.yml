@@ -82,3 +82,47 @@ groups:
           severity: warning
         annotations:
           summary: "PostgreSQL buffer cache hit ratio below 99%"
+
+  # Agent runtime. Deliberately narrow: every expression below is written against
+  # a metric verified as actually exported by a running backend
+  # (/actuator/prometheus on a live stack, 2026-07-21). Alerting on a metric that
+  # is never emitted is worse than not alerting — it is a rule that can only ever
+  # be silent, and it looks like coverage.
+  - name: auraboot_agent
+    rules:
+      - alert: AgentToolExecutionFailureRate
+        # The agent's hands. Tools failing in bulk means it is answering without
+        # being able to act, which reads to a user as a confidently useless
+        # assistant rather than as an outage.
+        expr: |
+          sum(rate(aurabot_agent_tool_execution_total{outcome="failed"}[10m]))
+            / clamp_min(sum(rate(aurabot_agent_tool_execution_total[10m])), 0.001) > 0.25
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than a quarter of agent tool executions are failing"
+
+      - alert: AgentAuthorizationDenialSpike
+        # A sustained run of denials is either a policy regression locking people
+        # out of their own tools, or something repeatedly trying what it may not.
+        # Both are worth a look, and neither shows up anywhere else.
+        expr: sum(rate(aurabot_agent_authorization_decision_total{decision="denied"}[10m])) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent authorization denials sustained above 30/min"
+
+      - alert: AgentToolDiscoveryReturnsNothing
+        # Discovery running while handing back zero tools is the shape of the
+        # F10 defect: the agent keeps taking turns and silently cannot act,
+        # with no error anywhere. Only visible as a ratio.
+        expr: |
+          rate(aurabot_agent_tool_discovery_tools_sum[15m])
+            / clamp_min(rate(aurabot_agent_tool_discovery_calls_total[15m]), 0.001) < 0.5
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Agent tool discovery is returning almost no tools"
