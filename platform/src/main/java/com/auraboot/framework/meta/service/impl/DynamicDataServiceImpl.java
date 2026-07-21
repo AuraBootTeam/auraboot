@@ -269,7 +269,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         
         // 执行查询
         List<Map<String, Object>> records = dynamicDataMapper.selectByQuery(sql, paramMap);
-        
+
+        // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
+        JsonbFieldHelper.normalizeJsonReadValues(model, records);
+
         // Build count query with same filters (including row-level data permission)
         QueryBuilderService.QueryBuilder countBuilder = queryBuilderService.buildConditionQuery(
                 model, request.getConditions());
@@ -997,6 +1000,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
 
         Map<String, Object> record = records.get(0);
+
+        // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
+        JsonbFieldHelper.normalizeJsonReadValues(model, record);
 
         if (!MetaContext.isDataPermissionBypassed()) {
             // Apply the Rule Center-backed permission pipeline before the
@@ -2271,6 +2277,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 throw new MetaServiceException("Field masking failed for relation query", e);
             }
 
+            // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
+            JsonbFieldHelper.normalizeJsonReadValues(getModelDefinition(targetModelCode), targetResults);
+
             return targetResults;
         } else {
             // One-to-many / Many-to-one: direct query on target table
@@ -2323,6 +2332,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 log.error("Failed to apply field masking in getRelationData for target: {} — denying access", logSafe(targetModelCode), e);
                 throw new MetaServiceException("Field masking failed for relation query", e);
             }
+
+            // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
+            JsonbFieldHelper.normalizeJsonReadValues(getModelDefinition(targetModelCode), relationResults);
 
             return relationResults;
         }
