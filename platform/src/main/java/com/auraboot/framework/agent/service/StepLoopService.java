@@ -628,9 +628,15 @@ public class StepLoopService {
     void checkTimeout(String runPid, LocalDateTime startedAt) {
         LocalDateTime now = LocalDateTime.now();
         try {
-            String sql = "SELECT timeout_at FROM ab_agent_run WHERE pid = #{params.runPid}";
+            // pid is selected alongside deliberately. A projection of only a NULL
+            // column comes back as a null row map, so `rows.get(0).get(...)` threw
+            // a NullPointerException for any run without a deadline — and because
+            // the catch below rethrows RuntimeException untouched, that surfaced
+            // as though the run had timed out. The `!= null` guard shows the author
+            // expected the null; it was written against the wrong shape.
+            String sql = "SELECT pid, timeout_at FROM ab_agent_run WHERE pid = #{params.runPid}";
             List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql, Map.of("runPid", runPid));
-            if (!rows.isEmpty() && rows.get(0).get("timeout_at") != null) {
+            if (!rows.isEmpty() && rows.get(0) != null && rows.get(0).get("timeout_at") != null) {
                 Object timeoutAtObj = rows.get(0).get("timeout_at");
                 LocalDateTime timeoutAt;
                 if (timeoutAtObj instanceof java.sql.Timestamp ts) {
