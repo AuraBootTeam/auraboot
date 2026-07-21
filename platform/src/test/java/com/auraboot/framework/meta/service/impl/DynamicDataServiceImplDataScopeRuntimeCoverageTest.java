@@ -26,8 +26,12 @@ import com.auraboot.framework.meta.service.TypeSystemManager;
 import com.auraboot.framework.meta.service.ValidationService;
 import com.auraboot.framework.meta.service.VirtualFieldEngine;
 import com.auraboot.framework.meta.service.executor.ExecutorRegistry;
+import com.auraboot.framework.permission.engine.model.EvaluationStep;
+import com.auraboot.framework.permission.engine.model.EvaluationVerdict;
 import com.auraboot.framework.permission.engine.model.FieldPermissionSet;
+import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.permission.service.FieldPermissionService;
+import com.auraboot.framework.permission.service.PermissionFacade;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -49,6 +53,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -97,10 +102,20 @@ class DynamicDataServiceImplDataScopeRuntimeCoverageTest {
     @InjectMocks
     private DynamicDataServiceImpl service;
 
+    @Mock private PermissionFacade permissionFacade;
+
     @BeforeEach
     void setUp() {
         MetaContext.setContext(TENANT_ID, USER_ID, "user-pid", "tester");
         MetaContext.setMemberId(MEMBER_ID);
+        // getById runs the Rule Center record gate before the legacy DataScope gate.
+        // These tests are about the DataScope gate, so let the Rule Center one pass —
+        // without this the facade is an unstubbed bean lookup (null) and every case
+        // dies with "Permission facade unavailable" before reaching what it asserts.
+        lenient().when(applicationContext.getBean(PermissionFacade.class)).thenReturn(permissionFacade);
+        lenient().when(permissionFacade.canOperate(anyLong(), anyString(), eq("read"), anyMap()))
+                .thenReturn(PermissionResult.allow(List.of(
+                        new EvaluationStep("RolePermission", EvaluationVerdict.ALLOW, "rbac ok"))));
     }
 
     @AfterEach
