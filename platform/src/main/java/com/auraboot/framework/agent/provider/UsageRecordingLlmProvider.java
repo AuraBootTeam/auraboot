@@ -75,7 +75,8 @@ public class UsageRecordingLlmProvider implements LlmProvider {
         if (response == null) {
             return;
         }
-        usageRecorder.record(tenantId, traceId, request != null ? request.getModel() : null,
+        usageRecorder.record(tenantId, traceId, delegate.getProviderCode(),
+                request != null ? request.getModel() : null,
                 response.getInputTokens(), response.getOutputTokens(),
                 response.getCacheReadInputTokens(), response.getCacheCreationInputTokens(), null);
     }
