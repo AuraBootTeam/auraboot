@@ -141,14 +141,17 @@ test.describe('QuoteOps visual feedback golden', () => {
       await expect(page.getByText(/任务执行失败\s*\/\s*Failed/i).first()).toBeVisible({
         timeout: 20_000,
       });
-      // ImportCorrectedBomHandler.requireStandardBomFormat now rejects any upload whose
-      // fixed 12-column standard-BOM header isn't on row 4 (see the workbook's "Part
-      // Number"/"Count" 2-column header above), surfacing this message instead of the
-      // old generic "missing required header row" text.
-      await expect(page.getByText(/不是标准BOM格式/i).first()).toBeVisible({
+      // The standard-BOM-only requirement was lifted: a customer/raw BOM now parses
+      // into the quick lane, so "not a standard BOM" is no longer a rejection reason.
+      // This workbook is rejected for a different reason — its "Part Number"/"Count"
+      // 2-column header (above) matches neither an MPN/spec column nor a QTY column,
+      // so no usable header row is found at all. Assert the user-facing Chinese message
+      // for that, and its diagnostic tail, so a raw English exception can never leak
+      // back into the UI unnoticed.
+      await expect(page.getByText(/无法识别为有效的BOM/i).first()).toBeVisible({
         timeout: 20_000,
       });
-      await expect(page.getByText(/第4行.*12列表头/i).first()).toBeVisible();
+      await expect(page.getByText(/未找到同时包含.*表头行/i).first()).toBeVisible();
 
       const imports = await queryDynamicRecords(page, 'qo_bom_import_common', [
         { fieldName: 'qo_bi_quote_id', operator: 'EQ', value: created.quoteId },
