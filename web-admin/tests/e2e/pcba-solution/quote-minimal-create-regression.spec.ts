@@ -18,8 +18,14 @@ async function readDynamicRecord(
 ): Promise<Record<string, unknown>> {
   const resp = await page.request.get(`/api/dynamic/${model}/${pid}`, { timeout: 15_000 });
   const body = await resp.json().catch(() => ({}));
-  expect(resp.ok(), `${model}/${pid} HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`).toBe(true);
-  const record = ((body as any).data?.data ?? (body as any).data ?? body) as Record<string, unknown>;
+  expect(
+    resp.ok(),
+    `${model}/${pid} HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`,
+  ).toBe(true);
+  const record = ((body as any).data?.data ?? (body as any).data ?? body) as Record<
+    string,
+    unknown
+  >;
   expect(record?.pid ?? record?.id, `${model}/${pid} should return a record`).toBeTruthy();
   return record;
 }
@@ -59,7 +65,8 @@ async function uploadSmartUploadFile(
   const field = page.getByTestId(fieldTestId);
   await expect(field).toBeVisible({ timeout: 15_000 });
   const uploadResponsePromise = page.waitForResponse(
-    (response) => response.url().includes('/api/file/upload') && response.request().method() === 'POST',
+    (response) =>
+      response.url().includes('/api/file/upload') && response.request().method() === 'POST',
     { timeout: 30_000 },
   );
   const input = field.locator('input[type="file"]').first();
@@ -141,9 +148,7 @@ async function tableHeaders(page: Page): Promise<string[]> {
   const headers = page.locator('thead th, [role="columnheader"]');
   await expect(headers.first()).toBeVisible({ timeout: 15_000 });
   return headers.evaluateAll((nodes) =>
-    nodes
-      .map((node) => (node.textContent || '').replace(/\s+/g, ' ').trim())
-      .filter(Boolean),
+    nodes.map((node) => (node.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean),
   );
 }
 
@@ -224,9 +229,9 @@ test.describe('PCBA quote minimal create regression', () => {
       await expect(page.getByTestId('form-field-gerber_source_file')).toBeVisible();
       await expect(page.getByTestId('form-field-cpl_source_file')).toBeVisible();
       await expect(page.getByTestId('form-field-corrected_bom_file')).toBeVisible();
-      await expect(page.getByTestId('form-field-corrected_bom_file')).toContainText(
-        'BOM资料(必填,必须是转化过的BOM)',
-      );
+      const bomUploadField = page.getByTestId('form-field-corrected_bom_file');
+      await expect(bomUploadField).toContainText('BOM资料');
+      await expect(bomUploadField).not.toContainText('必须是转化过的BOM');
       await expect(page.getByTestId('form-field-qo_quote_customer')).toHaveCount(0);
       await expect(page.getByTestId('form-field-qo_quote_tax_rate')).toHaveCount(0);
       await expect(page.getByTestId('form-field-qo_quote_valid_until')).toHaveCount(0);
@@ -324,7 +329,9 @@ test.describe('PCBA quote minimal create regression', () => {
       const quoteLines = await queryDynamicRecords(page, 'qo_quote_line_common', [
         { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: quoteId },
       ]);
-      expect(quoteLines.length, 'converted BOM upload should create quote lines').toBeGreaterThan(0);
+      expect(quoteLines.length, 'converted BOM upload should create quote lines').toBeGreaterThan(
+        0,
+      );
       const importRows = await queryDynamicRecords(page, 'qo_bom_import_row_common', [
         { fieldName: 'qo_bir_quote_id', operator: 'EQ', value: quoteId },
       ]);

@@ -124,13 +124,19 @@ export function isTransientViteDynamicImportIssue(text: string): boolean {
   return (
     /Failed to fetch dynamically imported module:\s+https?:\/\/(?:127\.0\.0\.1|localhost):\d+\/app\//i.test(
       text,
-    ) || /React Router caught the following error during render.*Failed to fetch dynamically imported module/i.test(text)
+    ) ||
+    /React Router caught the following error during render.*Failed to fetch dynamically imported module/i.test(
+      text,
+    )
   );
 }
 
 export async function clickSidebarPage(page: Page, href: string, label: RegExp): Promise<void> {
   const nav = page.locator('nav, aside, [role="navigation"]').first();
-  const link = nav.locator(`a[href="${href}"]`).or(nav.getByRole('link', { name: label })).first();
+  const link = nav
+    .locator(`a[href="${href}"]`)
+    .or(nav.getByRole('link', { name: label }))
+    .first();
   await expect(link).toBeVisible({ timeout: 10_000 });
   for (let attempt = 0; attempt < 2; attempt += 1) {
     await link.scrollIntoViewIfNeeded();
@@ -210,11 +216,7 @@ const BOM_INTERNAL_FIXTURE_MODELS = [
 
 const MODEL_FIXTURE_ACTIONS = ['read', 'create', 'update', 'delete', 'export', 'import'];
 
-export function makeQuoteRoleUser(
-  key: string,
-  uid: string,
-  roleCodes: string[],
-): QuoteRoleUser {
+export function makeQuoteRoleUser(key: string, uid: string, roleCodes: string[]): QuoteRoleUser {
   const normalized = key.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
   return {
     key,
@@ -328,8 +330,14 @@ export async function fetchRoleSnapshot(page: Page): Promise<RoleSnapshot> {
     roleCodes,
     permissionCodes,
     menus,
-    menuCodes: menus.map((menu) => menu.code).filter(Boolean).sort(),
-    menuPaths: menus.map((menu) => menu.path).filter(Boolean).sort(),
+    menuCodes: menus
+      .map((menu) => menu.code)
+      .filter(Boolean)
+      .sort(),
+    menuPaths: menus
+      .map((menu) => menu.path)
+      .filter(Boolean)
+      .sort(),
   };
 }
 
@@ -589,10 +597,16 @@ async function fetchTenantAdminRole(page: Page): Promise<Record<string, unknown>
     timeout: 15_000,
   });
   const body = await resp.json().catch(() => ({}));
-  expect(resp.ok(), `tenant_admin role lookup HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`).toBe(true);
+  expect(
+    resp.ok(),
+    `tenant_admin role lookup HTTP ${resp.status()}: ${JSON.stringify(body).slice(0, 500)}`,
+  ).toBe(true);
   const roles = Array.isArray((body as any).data?.records) ? (body as any).data.records : [];
   const role = roles.find((item: Record<string, unknown>) => item.code === 'tenant_admin');
-  expect(role, `tenant_admin role should exist: ${JSON.stringify(body).slice(0, 800)}`).toBeTruthy();
+  expect(
+    role,
+    `tenant_admin role should exist: ${JSON.stringify(body).slice(0, 800)}`,
+  ).toBeTruthy();
   return role as Record<string, unknown>;
 }
 
@@ -635,10 +649,7 @@ async function fetchModelPermissionPids(page: Page, modelCodes: string[]): Promi
   }
   const byCode = new Map(
     permissions
-      .map((permission) => [
-        String(permission.code ?? ''),
-        String(permission.pid ?? ''),
-      ] as const)
+      .map((permission) => [String(permission.code ?? ''), String(permission.pid ?? '')] as const)
       .filter(([code, pid]) => code && pid),
   );
 
@@ -684,9 +695,12 @@ export async function ensureTenantAdminModelPermissions(
   const rolePid = String(role.pid ?? '');
   expect(rolePid, 'tenant_admin role should expose pid').toBeTruthy();
 
-  const currentResp = await page.request.get(`/api/roles/${encodeURIComponent(rolePid)}/permissions`, {
-    timeout: 15_000,
-  });
+  const currentResp = await page.request.get(
+    `/api/roles/${encodeURIComponent(rolePid)}/permissions`,
+    {
+      timeout: 15_000,
+    },
+  );
   const currentBody = await currentResp.json().catch(() => ({}));
   expect(
     currentResp.ok(),
@@ -700,10 +714,13 @@ export async function ensureTenantAdminModelPermissions(
   const missing = neededPids.filter((pid) => !currentSet.has(pid));
   if (missing.length === 0) return;
 
-  const assignResp = await page.request.post(`/api/roles/${encodeURIComponent(rolePid)}/permissions`, {
-    data: [...currentPids, ...missing],
-    timeout: 20_000,
-  });
+  const assignResp = await page.request.post(
+    `/api/roles/${encodeURIComponent(rolePid)}/permissions`,
+    {
+      data: [...currentPids, ...missing],
+      timeout: 20_000,
+    },
+  );
   const assignBody = await assignResp.json().catch(() => ({}));
   expect(
     assignResp.ok(),
@@ -722,8 +739,34 @@ export function createCorrectedBomWorkbook(filePath: string): string {
     ['捷嘉智造工业互联网(深圳)有限公司', '', '', '', '', '', '', '', '', '', '', ''],
     ['型号: E2E', '', '', '', '', '', '', '', '', '', '', ''],
     ['发行日期: 2026-01-01', '', '', '', '', '', '', '', 'PCBA 编码: E2E', '', '', ''],
-    ['序号', '层级', '物料编码', '物料名称', '规格描述', '单位', '用量', '位置', '工段', '品牌/制造商', '原料号', '备注'],
-    ['1', '1', 'RC0603FR-0710KL', '10K resistor', '10K resistor 0603', 'pcs', 7600, 'R1,R2', '', '', '', ''],
+    [
+      '序号',
+      '层级',
+      '物料编码',
+      '物料名称',
+      '规格描述',
+      '单位',
+      '用量',
+      '位置',
+      '工段',
+      '品牌/制造商',
+      '原料号',
+      '备注',
+    ],
+    [
+      '1',
+      '1',
+      'RC0603FR-0710KL',
+      '10K resistor',
+      '10K resistor 0603',
+      'pcs',
+      7600,
+      'R1,R2',
+      '',
+      '',
+      '',
+      '',
+    ],
     ['2', '1', 'STM32F103C8T6', 'MCU', 'LQFP48 MCU', 'pcs', 200, 'U1', '', '', '', ''],
     ['3', '1', '', 'missing mpn row', '0603', 'pcs', 10, 'C1', '', '', '', ''],
   ]);
@@ -908,14 +951,17 @@ async function seedQuoteScaffold(
  * Chinese names — NOT the fixed 12-column standard deliverable. The upload entry auto-detects this as
  * a "quick" import (qo_bi_source_mode='quick'), captures the raw columns for the Yunhan upload-bom lane
  * (qo_bi_raw_head / qo_bir_raw_cells), and parses lines via header-scan + Chinese-alias detection.
- * D1 uses a real MPN (1N4148W) the Yunhan sandbox catalog prices, so a live pricing leg can assert > 0.
+ * The first row mirrors the reported edge case: package is blank, while the description contains a
+ * standalone 0201 token. Process-fee matching must still resolve the fixed-point resistor rule from
+ * the combined line content. The remaining rows exercise real Yunhan upload-bom lookup results.
  */
 export function createNonStandardBomWorkbook(filePath: string): string {
   mkdirSync(path.dirname(filePath), { recursive: true });
   const workbook = XLSXUtils.book_new();
   const worksheet = XLSXUtils.aoa_to_sheet([
     ['位号', '规格描述', '封装', '数量', '品牌', '料号'],
-    ['R1,R2', '10kΩ ±1% 贴片电阻', '0603', 2, 'YAGEO', 'RC0603FR-0710KL'],
+    ['R1,R2,R3', '240Ω ±1% 1/20W 0201', '', 3, '', 'WMF2400TEE'],
+    ['R4,R5', '10kΩ ±1% 贴片电阻', '0603', 2, 'YAGEO', 'RC0603FR-0710KL'],
     ['C1', '0.1uF 50V X7R 贴片电容', '0603', 1, 'SAMSUNG', 'CL10B104KB8NNNC'],
     ['D1', '开关二极管', 'SOD-123', 10, 'MDD', '1N4148W'],
   ]);
@@ -974,7 +1020,9 @@ export async function reassignRecordOwnerByEmail(
     ]);
     const ownerId = uid.rows[0]?.id;
     if (!ownerId) {
-      throw new Error(`reassignRecordOwnerByEmail: no ab_user for email ${ownerEmail} (db=${database})`);
+      throw new Error(
+        `reassignRecordOwnerByEmail: no ab_user for email ${ownerEmail} (db=${database})`,
+      );
     }
     for (const { model, pid } of targets) {
       if (!/^[a-z0-9_]+$/.test(model)) {
