@@ -26,11 +26,32 @@ public class UsageRecordingLlmProvider implements LlmProvider {
     private final LlmProvider delegate;
     private final GenAiUsageRecorder usageRecorder;
     private final Tracer tracer;
+    /**
+     * The vendor as the tenant configured it, which is not what the delegate
+     * answers. Several vendors are served by the OpenAI-compatible adapter, and
+     * its {@code getProviderCode()} returns the adapter family — so attributing
+     * by the delegate stamps every Qwen, Zhipu and Moonshot call as "openai",
+     * naming the wrong vendor rather than none. Null falls back to the delegate,
+     * for callers that construct this without a configured code.
+     */
+    private final String configuredProviderCode;
 
     public UsageRecordingLlmProvider(LlmProvider delegate, GenAiUsageRecorder usageRecorder, Tracer tracer) {
+        this(delegate, usageRecorder, tracer, null);
+    }
+
+    public UsageRecordingLlmProvider(LlmProvider delegate, GenAiUsageRecorder usageRecorder, Tracer tracer,
+                                     String configuredProviderCode) {
         this.delegate = delegate;
         this.usageRecorder = usageRecorder;
         this.tracer = tracer;
+        this.configuredProviderCode = configuredProviderCode;
+    }
+
+    private String attributedProviderCode() {
+        return configuredProviderCode != null && !configuredProviderCode.isBlank()
+                ? configuredProviderCode
+                : delegate.getProviderCode();
     }
 
     @Override
@@ -75,7 +96,7 @@ public class UsageRecordingLlmProvider implements LlmProvider {
         if (response == null) {
             return;
         }
-        usageRecorder.record(tenantId, traceId, delegate.getProviderCode(),
+        usageRecorder.record(tenantId, traceId, attributedProviderCode(),
                 request != null ? request.getModel() : null,
                 response.getInputTokens(), response.getOutputTokens(),
                 response.getCacheReadInputTokens(), response.getCacheCreationInputTokens(), null);

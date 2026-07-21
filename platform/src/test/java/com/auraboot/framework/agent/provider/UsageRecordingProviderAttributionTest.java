@@ -37,7 +37,13 @@ class UsageRecordingProviderAttributionTest {
         GenAiUsageRecorder recorder = mock(GenAiUsageRecorder.class);
         Tracer tracer = mock(Tracer.class);
 
-        when(delegate.getProviderCode()).thenReturn("qianwen");
+        // Production shape, and the reason the first version of this fix was wrong:
+        // Qwen is served by the OpenAI-compatible adapter, whose getProviderCode()
+        // answers "openai". Attributing by the delegate therefore names the wrong
+        // vendor on every Qwen/Zhipu/Moonshot call. A mock that answers "qianwen"
+        // here would let this test pass for a reason that does not exist in
+        // production — verified against a real stack, where the ledger said openai.
+        when(delegate.getProviderCode()).thenReturn("openai");
         LlmChatResponse response = new LlmChatResponse();
         response.setInputTokens(11);
         response.setOutputTokens(7);
@@ -46,7 +52,7 @@ class UsageRecordingProviderAttributionTest {
         LlmChatRequest request = LlmChatRequest.builder().model("qwen-plus").build();
         MetaContext.setSystemTenantContext(7L);
         try {
-            new UsageRecordingLlmProvider(delegate, recorder, tracer)
+            new UsageRecordingLlmProvider(delegate, recorder, tracer, "qianwen")
                     .chat(request, "k", "https://example.invalid");
         } finally {
             MetaContext.clear();
@@ -58,7 +64,7 @@ class UsageRecordingProviderAttributionTest {
                 eq(11), eq(7), any(), any(), any());
 
         assertThat(provider.getValue())
-                .as("a ledger row that cannot name its vendor cannot attribute spend")
+                .as("the configured vendor must win over the adapter family that serves it")
                 .isEqualTo("qianwen");
         assertThat(model.getValue()).isEqualTo("qwen-plus");
     }
