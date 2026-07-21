@@ -223,11 +223,22 @@ cmd_up() {
      Re-applying schema.sql cannot repair it. Either:
        $0 destroy $name          # then 'up' again on a clean database
        $0 up $name --slot $slot --fresh-db   # drop + recreate the database in place"
+  else
+    # The drift check just established that this database matches schema.sql, so
+    # replaying it would do no work — and cannot succeed anyway: the file carries
+    # 40 unguarded ALTER TABLE ... ADD CONSTRAINT statements (Postgres has no
+    # ADD CONSTRAINT IF NOT EXISTS), so a second apply always dies on the first
+    # one. That made `up` impossible on any existing database: every backend
+    # rebuild forced --fresh-db and a full plugin re-import.
+    log "    database already matches schema.sql — skipping replay"
+    skip_schema=1
   fi
 
-  PGPASSWORD=auraboot psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U auraboot -d "$pg_db" \
-    -q -f "$REPO_ROOT/platform/src/main/resources/database/schema.sql" >"$sd/schema-apply.log" 2>&1 \
-    || { tail -5 "$sd/schema-apply.log" >&2; die "schema apply failed — see $sd/schema-apply.log"; }
+  if [ "${skip_schema:-0}" != "1" ]; then
+    PGPASSWORD=auraboot psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U auraboot -d "$pg_db" \
+      -q -f "$REPO_ROOT/platform/src/main/resources/database/schema.sql" >"$sd/schema-apply.log" 2>&1 \
+      || { tail -5 "$sd/schema-apply.log" >&2; die "schema apply failed — see $sd/schema-apply.log"; }
+  fi
 
   log "3/9 seed gradle wrapper jar (fresh-worktree gotcha)"
   if [ ! -f "$REPO_ROOT/platform/gradle/wrapper/gradle-wrapper.jar" ]; then

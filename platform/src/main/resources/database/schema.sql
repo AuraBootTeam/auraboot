@@ -768,7 +768,7 @@ CREATE TABLE IF NOT EXISTS ab_named_query_version (
 CREATE INDEX IF NOT EXISTS ix_nq_version_query ON ab_named_query_version(tenant_id, query_code);
 
 -- 页面Schema主表
-CREATE TABLE ab_page_schema (
+CREATE TABLE IF NOT EXISTS ab_page_schema (
     id BIGSERIAL PRIMARY KEY,
     pid VARCHAR(32) NOT NULL,
     tenant_id BIGINT NOT NULL,
@@ -834,19 +834,19 @@ CREATE TABLE ab_page_schema (
 -- versions for history without clashing with the new is_current row.
 -- NULLS NOT DISTINCT (PG 15+) treats two NULL env_ids as the same key, preserving
 -- "one row per page_key" guarantee for legacy / batch-1 rows.
-CREATE UNIQUE INDEX uk_page_schema_page_key
+CREATE UNIQUE INDEX IF NOT EXISTS uk_page_schema_page_key
 ON ab_page_schema (tenant_id, namespace, page_key, env_id) NULLS NOT DISTINCT
 WHERE deleted_flag = FALSE AND is_current = TRUE;
 
 -- Indexes
-CREATE INDEX idx_page_schema_tenant
+CREATE INDEX IF NOT EXISTS idx_page_schema_tenant
 ON ab_page_schema(tenant_id);
 
-CREATE INDEX idx_page_schema_model_code
+CREATE INDEX IF NOT EXISTS idx_page_schema_model_code
 ON ab_page_schema(tenant_id, model_code)
 WHERE deleted_flag = FALSE AND model_code IS NOT NULL;
 
-CREATE INDEX idx_page_schema_kind
+CREATE INDEX IF NOT EXISTS idx_page_schema_kind
 ON ab_page_schema(tenant_id, kind)
 WHERE deleted_flag = FALSE;
 
@@ -3806,11 +3806,11 @@ CREATE TABLE IF NOT EXISTS ab_design_version_history (
 );
 
 -- Indexes for common query patterns
-CREATE INDEX idx_dvh_resource ON ab_design_version_history (resource_type, resource_id);
-CREATE INDEX idx_dvh_tenant ON ab_design_version_history (tenant_id);
-CREATE INDEX idx_dvh_resource_id ON ab_design_version_history (resource_id);
-CREATE INDEX idx_dvh_operation_at ON ab_design_version_history (operation_at DESC);
-CREATE INDEX idx_dvh_pid ON ab_design_version_history (pid);
+CREATE INDEX IF NOT EXISTS idx_dvh_resource ON ab_design_version_history (resource_type, resource_id);
+CREATE INDEX IF NOT EXISTS idx_dvh_tenant ON ab_design_version_history (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_dvh_resource_id ON ab_design_version_history (resource_id);
+CREATE INDEX IF NOT EXISTS idx_dvh_operation_at ON ab_design_version_history (operation_at DESC);
+CREATE INDEX IF NOT EXISTS idx_dvh_pid ON ab_design_version_history (pid);
 
 COMMENT ON TABLE ab_design_version_history IS 'Unified version history for all designer types';
 COMMENT ON COLUMN ab_design_version_history.resource_type IS 'Designer type: PAGE, DASHBOARD, BPMN, REPORT';
@@ -3868,9 +3868,9 @@ CREATE TABLE IF NOT EXISTS ab_automation_debug_session (
     created_by VARCHAR(100)
 );
 
-CREATE UNIQUE INDEX idx_debug_session_pid ON ab_automation_debug_session(pid);
-CREATE INDEX idx_debug_session_automation ON ab_automation_debug_session(automation_id);
-CREATE INDEX idx_debug_session_status ON ab_automation_debug_session(status);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_debug_session_pid ON ab_automation_debug_session(pid);
+CREATE INDEX IF NOT EXISTS idx_debug_session_automation ON ab_automation_debug_session(automation_id);
+CREATE INDEX IF NOT EXISTS idx_debug_session_status ON ab_automation_debug_session(status);
 
 COMMENT ON TABLE ab_automation_debug_session IS 'Automation debug sessions for step-through debugging';
 COMMENT ON COLUMN ab_automation_debug_session.pid IS 'ULID unique identifier';
@@ -3897,7 +3897,7 @@ ALTER TABLE ab_sla_record ADD COLUMN IF NOT EXISTS total_paused_ms BIGINT DEFAUL
 
 -- Rebuild index to include paused status
 DROP INDEX IF EXISTS idx_sla_record_deadline;
-CREATE INDEX idx_sla_record_deadline ON ab_sla_record (deadline_time)
+CREATE INDEX IF NOT EXISTS idx_sla_record_deadline ON ab_sla_record (deadline_time)
   WHERE status IN ('running', 'warning', 'paused');
 
 -- BPM Notify Record table for CC (carbon copy) and URGE (reminder) notifications
@@ -5401,11 +5401,11 @@ CREATE TABLE IF NOT EXISTS ab_capability (
     deleted_flag        BOOLEAN DEFAULT FALSE,
     CONSTRAINT uk_capability_tenant_code UNIQUE (tenant_id, code)
 );
-CREATE INDEX idx_capability_tenant_model ON ab_capability(tenant_id, model_code);
-CREATE INDEX idx_capability_tenant_type ON ab_capability(tenant_id, type);
-CREATE INDEX idx_capability_status ON ab_capability(tenant_id, status);
-CREATE INDEX idx_capability_source ON ab_capability(type, source_id);
-CREATE INDEX idx_capability_plugin ON ab_capability(tenant_id, plugin_code);
+CREATE INDEX IF NOT EXISTS idx_capability_tenant_model ON ab_capability(tenant_id, model_code);
+CREATE INDEX IF NOT EXISTS idx_capability_tenant_type ON ab_capability(tenant_id, type);
+CREATE INDEX IF NOT EXISTS idx_capability_status ON ab_capability(tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_capability_source ON ab_capability(type, source_id);
+CREATE INDEX IF NOT EXISTS idx_capability_plugin ON ab_capability(tenant_id, plugin_code);
 
 -- Capability Evaluation Run (stores evaluation results for regression tracking)
 CREATE TABLE IF NOT EXISTS ab_capability_eval_run (
@@ -5424,7 +5424,7 @@ CREATE TABLE IF NOT EXISTS ab_capability_eval_run (
     report                   JSONB,
     created_at               TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
-CREATE INDEX idx_eval_run_tenant ON ab_capability_eval_run(tenant_id, run_at DESC);
+CREATE INDEX IF NOT EXISTS idx_eval_run_tenant ON ab_capability_eval_run(tenant_id, run_at DESC);
 
 
 -- =====================================================================

@@ -1572,6 +1572,20 @@ function EnrollEmployeeDialog({
           </label>
           {loadingDepts ? (
             <div className="h-9 w-full animate-pulse rounded-lg bg-gray-100 dark:bg-gray-800" />
+          ) : departments.length === 0 ? (
+            /* A required field with nothing selectable is a dead end: the only
+               feedback used to be "Please select a department" on submit, for a
+               list that had none to offer. Say what is missing and where to fix it. */
+            <div
+              className="rounded-lg border border-dashed border-gray-300 px-3 py-2.5 text-sm text-gray-500 dark:border-gray-600 dark:text-gray-400"
+              data-testid="enroll-dept-empty"
+            >
+              {t(
+                'ai.colleagues.enroll.empty.department',
+                undefined,
+                'No departments yet — create one under Organization first, then enrol this colleague.',
+              )}
+            </div>
           ) : (
             <div className="relative">
               <select
@@ -1597,7 +1611,7 @@ function EnrollEmployeeDialog({
         {/* Position */}
         <div className="mb-6">
           <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {t('ai.colleagues.enroll.field.position', undefined, 'Position')}
+            {t('ai.colleagues.enroll.field.position', undefined, 'Position')} *
             <span className="ml-1 text-xs text-gray-400">
               {t('ai.colleagues.enroll.optional', undefined, '(optional)')}
             </span>
@@ -1613,7 +1627,7 @@ function EnrollEmployeeDialog({
               <option value="">
                 {loadingPos
                   ? t('ai.colleagues.enroll.loading', undefined, 'Loading...')
-                  : t('ai.colleagues.enroll.placeholder.position', undefined, '— No Position —')}
+                  : t('ai.colleagues.enroll.placeholder.position', undefined, '— Select Position —')}
               </option>
               {positions.map((p) => (
                 <option key={p.pid} value={p.pid}>
@@ -1626,6 +1640,15 @@ function EnrollEmployeeDialog({
           {!selectedDeptPid && (
             <p className="mt-1 text-xs text-gray-400">
               {t('ai.colleagues.enroll.hint.selectDeptFirst', undefined, 'Select a department first to load positions')}
+            </p>
+          )}
+          {selectedDeptPid && !loadingPos && positions.length === 0 && (
+            <p className="mt-1 text-xs text-amber-600 dark:text-amber-500" data-testid="enroll-position-empty">
+              {t(
+                'ai.colleagues.enroll.empty.position',
+                undefined,
+                'This department has no positions yet — add one under Organization before enrolling.',
+              )}
             </p>
           )}
         </div>
@@ -1641,7 +1664,7 @@ function EnrollEmployeeDialog({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting || !selectedDeptPid}
+            disabled={submitting || !selectedDeptPid || !selectedPosPid}
             className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
             data-testid="enroll-confirm-btn"
           >
