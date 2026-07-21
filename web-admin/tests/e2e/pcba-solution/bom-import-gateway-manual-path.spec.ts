@@ -250,13 +250,16 @@ test.describe('BOM import gateway manual path @smoke', () => {
       // neither would make it vacuous. So: require that one of them is true, and
       // that (b) is never silent.
       //
-      // What (b) actually carries, verified against a real parked task: a
-      // populated `userMessage` plus a machine-readable `issues[]` (entries like
-      // {code: 'refdes_qty_mismatch', standardField, rowNumber, suggestion}).
-      // An earlier draft of this test also demanded a top-level `reason`; the
-      // command does not set one on this path, so that assertion would have
-      // failed for a product behaviour that is fine. Assert the contract that
-      // exists — the operator gets a message and something specific to act on.
+      // What (b) actually carries, established by running two different parked
+      // tasks rather than by reading the handler: `userMessage` is populated in
+      // both. `issues[]` is not — a workbook with per-row problems returns 18
+      // entries ({code: 'refdes_qty_mismatch', standardField, rowNumber,
+      // suggestion}), a workbook parked for other reasons returns none. A
+      // top-level `reason` is never set on this path at all.
+      // So the invariant is: the operator is always told something, and any
+      // issue that IS reported is machine-readable rather than prose alone.
+      // Two earlier drafts of this assertion demanded `reason`, then a non-empty
+      // `issues[]`; both would have failed for product behaviour that is fine.
       const outcome = await post(page, 'bom:confirm_import_and_continue', {}, 'update', taskPid);
       expect(outcome.status, 'confirm command is accepted').toBe(200);
       const inner = (outcome.body as any)?.data?.data ?? {};
@@ -272,13 +275,9 @@ test.describe('BOM import gateway manual path @smoke', () => {
         ).not.toBe('');
         const issues = Array.isArray(inner.issues) ? inner.issues : [];
         expect(
-          issues.length,
-          'staying parked must name at least one specific thing to fix',
-        ).toBeGreaterThan(0);
-        expect(
-          String(issues[0]?.code || ''),
-          'each issue carries a machine-readable code, not just prose',
-        ).not.toBe('');
+          issues.filter((issue: any) => !String(issue?.code || '')),
+          'every reported issue carries a machine-readable code, not prose alone',
+        ).toEqual([]);
       } else {
         expect(statusNow, 'matching started, so the task left adjustment_required').not.toBe(
           'adjustment_required',
