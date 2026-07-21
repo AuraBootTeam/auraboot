@@ -40,6 +40,29 @@ class AgentChatToolDiscoveryAdapterTest {
     }
 
     @Test
+    void discover_appliesAllowedModelScopeButNeverDropsAlwaysOnTools() {
+        // B4: allowed_models must bind on the chat engine. The always-on safety
+        // tool is not model-scoped and must survive the filter.
+        ToolProviderRegistry registry = mock(ToolProviderRegistry.class);
+        GroundingService grounding = mock(GroundingService.class);
+        when(grounding.ground(anyLong(), anyString(), any())).thenReturn(null);
+        when(registry.discoverAlwaysOn(any())).thenReturn(List.of(
+                ToolDefinition.builder().toolCode("escalate_to_human").toolType("custom").build()));
+        when(registry.discoverAll(any())).thenReturn(List.of(
+                ToolDefinition.builder().toolCode("list:crm_account").toolType("dsl_query")
+                        .sourceCode("crm_account").modelCode("crm_account").operationKind("query").build(),
+                ToolDefinition.builder().toolCode("list:crm_lead").toolType("dsl_query")
+                        .sourceCode("crm_lead").modelCode("crm_lead").operationKind("query").build()));
+
+        List<ToolDefinition> result = adapter(registry, grounding)
+                .discover(1L, 2L, "cs-agent", "cs_widget", "show accounts",
+                        Map.of("allowed_models", List.of("crm_account")));
+
+        assertThat(result).extracting(ToolDefinition::getToolCode)
+                .containsExactly("escalate_to_human", "list:crm_account");
+    }
+
+    @Test
     void discover_injectsChannelGatedAlwaysOnToolsAheadOfDiscovered() {
         ToolProviderRegistry registry = mock(ToolProviderRegistry.class);
         GroundingService grounding = mock(GroundingService.class);

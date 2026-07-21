@@ -52,6 +52,7 @@ public class AgentRunService {
     private final ToolLoopService toolLoopService;
     private final DynamicDataMapper dynamicDataMapper;
     private final DeclaredAgentToolResolver declaredAgentToolResolver;
+    private final com.auraboot.framework.agent.runtime.policy.AgentToolScopePolicy agentToolScopePolicy;
     private final CommandExecutor commandExecutor;
     private final NamedQueryService namedQueryService;
     private final ObjectMapper objectMapper;
@@ -402,6 +403,14 @@ public class AgentRunService {
                             agentCode, added);
                 }
             }
+
+            // B4: the allowed_models / allowed_operations guardrails restrict what the
+            // assembled tool list may contain. The tool list is the enforcement
+            // boundary on this engine — ToolLoopService rejects any call not in it —
+            // so filtering here is what makes the wizard checkboxes actually bind.
+            // Restriction wins over declared tools by design.
+            tools = agentToolScopePolicy.filterAgentTools(
+                    agentToolScopePolicy.scopeOf(agentDef), tools, agentCode);
 
             log.info("Agent {} tools: selected={}, d1={}, provider={}, model={}",
                     agentCode, tools.size(),
@@ -1086,53 +1095,8 @@ public class AgentRunService {
     }
 
     // =========================================================================
-    // Model Scope enforcement
+    // Tool conversion
     // =========================================================================
-
-    /**
-     * Filter tools to only those whose source model is in the agent's allowed_models list.
-     * If allowed_models is null/empty, all tools are allowed (backward compatible).
-     */
-    @SuppressWarnings("unchecked")
-    private List<AgentToolDefinition> enforceModelScope(List<AgentToolDefinition> tools,
-                                                         Map<String, Object> agentDef) {
-        Object allowedRaw = agentDef.get("allowed_models");
-        if (allowedRaw == null) return tools;
-
-        List<String> allowedModels;
-        if (allowedRaw instanceof String s && !s.isBlank()) {
-            try {
-                allowedModels = objectMapper.readValue(s, List.class);
-            } catch (Exception e) {
-                return tools;
-            }
-        } else if (allowedRaw instanceof List<?> list) {
-            allowedModels = (List<String>) list;
-        } else {
-            return tools;
-        }
-
-        if (allowedModels.isEmpty()) return tools;
-
-        Set<String> allowedSet = new HashSet<>(allowedModels);
-        List<AgentToolDefinition> filtered = tools.stream()
-                .filter(t -> {
-                    String sourceCode = t.getSourceCode();
-                    if (sourceCode == null) return true; // API tools without source model pass through
-                    // Extract model code from command code like "crm:create_lead" -> model prefix "crm"
-                    // or from NQ code like "crm_lead_pipeline" -> check if any allowed model is a prefix
-                    String modelPrefix = sourceCode.contains(":") ? sourceCode.split(":")[0] : null;
-                    return allowedSet.stream().anyMatch(m ->
-                            sourceCode.startsWith(m) || (modelPrefix != null && m.startsWith(modelPrefix)));
-                })
-                .toList();
-
-        if (filtered.size() < tools.size()) {
-            log.info("Model scope: {} tools filtered to {} (allowed models: {})",
-                    tools.size(), filtered.size(), allowedModels);
-        }
-        return filtered;
-    }
 
     /**
      * Convert ToolDefinition (from ToolProviderRegistry) to AgentToolDefinition (used downstream).
@@ -1145,6 +1109,8 @@ public class AgentRunService {
                         .inputSchema(td.getParameterSchema())
                         .toolType(td.getToolType())
                         .sourceCode(td.getSourceCode())
+                        .modelCode(td.getModelCode())
+                        .operationKind(td.getOperationKind())
                         .requiresApproval(td.isRequiresApproval())
                         .requiresConfirmation(td.isRequiresConfirmation())
                         .riskLevel(td.getRiskLevel())

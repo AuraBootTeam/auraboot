@@ -23,6 +23,8 @@ public class AgentToolDefinition {
     // Internal routing info (not sent to Claude)
     private String toolType;
     private String sourceCode;
+    private String modelCode;      // dynamic model the tool targets (null for non-model tools)
+    private String operationKind;  // query, create, update, delete, transition (null when unknown)
     private boolean requiresApproval;
     private boolean requiresConfirmation;
     private String riskLevel;

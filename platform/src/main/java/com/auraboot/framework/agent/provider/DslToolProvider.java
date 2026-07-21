@@ -114,7 +114,7 @@ public class DslToolProvider implements ToolProvider {
             // whatever the planner happened to return; policy/permission filtering
             // below and the read-only intent filter upstream are unchanged, so this
             // widens DISCOVERY only, never authorization.
-            String sql = "SELECT code, display_name, description, agent_hint, input_schema, execution_config, cmd_risk_level " +
+            String sql = "SELECT code, display_name, description, agent_hint, input_schema, execution_config, cmd_risk_level, model_code " +
                     "FROM ab_command_definition " +
                     "WHERE tenant_id = #{params.tenantId} " +
                     (modelScopedHint ? "AND model_code = #{params.modelCode} " : "") +
@@ -141,6 +141,7 @@ public class DslToolProvider implements ToolProvider {
                 String riskLevel = readQuery ? "L0" : normalizeRiskLevel(row.get("cmd_risk_level"), "L1");
                 Map<String, Object> parameterSchema = buildCommandParameterSchema(
                         ctx.getTenantId(), modelHint, row.get("input_schema"), executionConfig);
+                String configType = String.valueOf(executionConfig.getOrDefault("type", "")).trim();
                 tools.add(ToolDefinition.builder()
                         .toolCode(PREFIX_CMD + code)
                         .toolName(displayName != null ? displayName : code)
@@ -148,6 +149,8 @@ public class DslToolProvider implements ToolProvider {
                         .providerCode("dsl")
                         .toolType(readQuery ? "dsl_query" : "dsl_command")
                         .sourceCode(code)
+                        .modelCode((String) row.get("model_code"))
+                        .operationKind(readQuery ? "query" : (configType.isEmpty() ? null : configType))
                         .riskLevel(riskLevel)
                         .requiredPermissions(Set.copyOf(requiredPermissions))
                         .confirmationPolicy(confirmationPolicy(riskLevel))
@@ -188,6 +191,8 @@ public class DslToolProvider implements ToolProvider {
                             .providerCode("dsl")
                             .toolType("dsl_query")
                             .sourceCode(code)
+                            .modelCode(modelHint)
+                            .operationKind("query")
                             .riskLevel("L0")
                             .confirmationPolicy("none")
                             .parameterSchema(buildNamedQueryParameterSchema(
@@ -211,6 +216,8 @@ public class DslToolProvider implements ToolProvider {
                     .providerCode("dsl")
                     .toolType("dsl_query")
                     .sourceCode(modelHint)
+                    .modelCode(modelHint)
+                    .operationKind("query")
                     .riskLevel("L0")
                     .confirmationPolicy("none")
                     .parameterSchema(listParameterSchema())
@@ -224,6 +231,8 @@ public class DslToolProvider implements ToolProvider {
                     .providerCode("dsl")
                     .toolType("dsl_query")
                     .sourceCode(modelHint)
+                    .modelCode(modelHint)
+                    .operationKind("query")
                     .riskLevel("L0")
                     .confirmationPolicy("none")
                     .parameterSchema(getParameterSchema())
