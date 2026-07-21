@@ -12,9 +12,9 @@
  * about whether the user can actually reach and drive it, which is precisely
  * what breaks first for complex customer workbooks.
  *
- * All three real customer fixtures probed for this (E2 missing default unit,
- * E3 missing component type, E11 unparseable) park in `adjustment_required`,
- * so this is the common case for real files, not an edge case.
+ * Which customer fixture parks depends on the stack, not only on the file, so
+ * the first test walks a list of candidates and keeps the first one that parks
+ * rather than asserting that a chosen file will.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -29,12 +29,23 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** Detail route of the workbench task, matching the existing pcba-solution specs. */
 const WORKBENCH = '/p/bom_conversion_task_pcba_workbench';
 
-/** A workbook that genuinely cannot be auto-parsed, so the gateway must ask.
- *  Verified empirically: this parks in `adjustment_required` and stays there. */
-const VERIFY_REL = 'auraboot-enterprise/doa/jiejia_tech/bom-verify';
-const PREFERRED_FIXTURES = [/^E3-/, /^E2-/, /^E11-/];
+/** Statuses the conversion pipeline settles on. */
+const TERMINAL = new Set(['adjustment_required', 'plan_ready', 'completed', 'failed', 'format_exploration_required']);
 
-function findGatewayFixture(): string | undefined {
+/** Workbooks that are candidates for parking the gateway.
+ *
+ *  Which one actually parks is NOT a property of the file alone — it depends on
+ *  the stack: a fresh library with no learned source-format profiles parses E3
+ *  straight through to `completed`, while a stack carrying profiles and a large
+ *  material master parks it. An earlier version of this spec hard-coded the
+ *  first fixture it found and asserted it would park, which made the suite pass
+ *  or fail on stack history rather than on the behaviour under test.
+ *
+ *  So: try them in order and keep the first that parks. */
+const VERIFY_REL = 'auraboot-enterprise/doa/jiejia_tech/bom-verify';
+const PREFERRED_FIXTURES = [/^E11-/, /^E3-/, /^E2-/, /^E1-/];
+
+function findGatewayFixtures(): string[] {
   const roots = [
     process.env.BOM_VERIFY_DIR,
     path.resolve(HERE, '../../../../../' + VERIFY_REL),
@@ -43,12 +54,14 @@ function findGatewayFixture(): string | undefined {
   for (const root of roots) {
     if (!fs.existsSync(root)) continue;
     const files = fs.readdirSync(root).filter((f) => /\.xlsx$/i.test(f));
+    const picked: string[] = [];
     for (const pattern of PREFERRED_FIXTURES) {
       const hit = files.find((f) => pattern.test(f));
-      if (hit) return path.join(root, hit);
+      if (hit) picked.push(path.join(root, hit));
     }
+    if (picked.length) return picked;
   }
-  return undefined;
+  return [];
 }
 
 async function post(page: Page, code: string, payload: unknown, op = 'create', target?: string) {
@@ -88,61 +101,75 @@ test.describe('BOM import gateway manual path @smoke', () => {
   let openQuestionsBefore = -1;
 
   test('an unparseable customer workbook parks in adjustment_required and raises questions', async ({ browser }) => {
-    const fixture = findGatewayFixture();
+    const fixtures = findGatewayFixtures();
     expect(
-      fixture,
-      'gateway fixture must exist; set BOM_VERIFY_DIR or keep auraboot-enterprise/doa/jiejia_tech/bom-verify available',
-    ).toBeTruthy();
+      fixtures.length,
+      'gateway fixtures must exist; set BOM_VERIFY_DIR or keep auraboot-enterprise/doa/jiejia_tech/bom-verify available',
+    ).toBeGreaterThan(0);
 
     const ctx = await browser.newContext({
       storageState: process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json',
     });
     const page = await ctx.newPage();
     try {
-      const uid = String(Date.now()).slice(-7);
-      sourcePackage = `gw-${uid}`;
-
-      const proj = await post(page, 'bom:create_project', {
-        bom_project_name: `Gateway ${uid}`,
-        bom_pcba_code: `GW-${uid}`,
-        bom_project_library_source: 'excel_current_library',
-      });
-      const projId = pidOf(proj.body);
-      expect(projId, 'project created').toBeTruthy();
-
-      const up = await page.request.post('/api/file/upload', {
-        multipart: {
-          file: {
-            name: path.basename(fixture!),
-            mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            buffer: fs.readFileSync(fixture!),
-          },
-        },
-      });
-      const fileId = (await up.json())?.data?.fileId;
-      expect(fileId, 'fixture uploaded').toBeTruthy();
-
-      const started = await post(page, 'bom:start_conversion', {
-        bom_task_project_id: projId,
-        bom_task_source_package: sourcePackage,
-        bom_task_raw_file_id: fileId,
-      });
-      expect(started.status, 'conversion started').toBe(200);
-
-      // The gateway must PARK here. If auto-parsing silently completed, the
-      // manual path would never be reachable and this suite would be vacuous.
       let task: any;
-      await expect
-        .poll(
-          async () => {
-            task = (await listTasks(page)).find(
-              (t) => String(t.bom_task_source_package || '') === sourcePackage,
-            );
-            return String(task?.bom_task_status || '');
+      const outcomes: string[] = [];
+
+      for (const fixture of fixtures) {
+        const uid = String(Date.now()).slice(-7);
+        sourcePackage = `gw-${uid}`;
+
+        const proj = await post(page, 'bom:create_project', {
+          bom_project_name: `Gateway ${uid}`,
+          bom_pcba_code: `GW-${uid}`,
+          bom_project_library_source: 'excel_current_library',
+        });
+        const projId = pidOf(proj.body);
+        expect(projId, 'project created').toBeTruthy();
+
+        const up = await page.request.post('/api/file/upload', {
+          multipart: {
+            file: {
+              name: path.basename(fixture),
+              mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              buffer: fs.readFileSync(fixture),
+            },
           },
-          { timeout: 180_000, intervals: [2_000, 3_000, 5_000] },
-        )
-        .toBe('adjustment_required');
+        });
+        const fileId = (await up.json())?.data?.fileId;
+        expect(fileId, 'fixture uploaded').toBeTruthy();
+
+        const started = await post(page, 'bom:start_conversion', {
+          bom_task_project_id: projId,
+          bom_task_source_package: sourcePackage,
+          bom_task_raw_file_id: fileId,
+        });
+        expect(started.status, 'conversion started').toBe(200);
+
+        let status = '';
+        await expect
+          .poll(
+            async () => {
+              task = (await listTasks(page)).find(
+                (t) => String(t.bom_task_source_package || '') === sourcePackage,
+              );
+              status = String(task?.bom_task_status || '');
+              return TERMINAL.has(status) ? status : '';
+            },
+            { timeout: 180_000, intervals: [2_000, 3_000, 5_000] },
+          )
+          .not.toBe('');
+        outcomes.push(`${path.basename(fixture)} -> ${status}`);
+        if (status === 'adjustment_required') break;
+      }
+
+      // If nothing parked, the manual path is unreachable on this stack and the
+      // rest of the suite would be testing nothing. Say which files were tried
+      // and what each did, so the next reader is not left guessing.
+      expect(
+        String(task?.bom_task_status || ''),
+        `no fixture parked the gateway on this stack: ${outcomes.join('; ')}`,
+      ).toBe('adjustment_required');
 
       taskPid = task?.pid || task?.id || '';
       expect(taskPid, 'parked task has a pid').toBeTruthy();

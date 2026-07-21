@@ -81,6 +81,7 @@ const quoteOpsCurrentSpecNames = [
   // Manual-intervention path through the import gateway. The automatic path is
   // heavily guarded; this one had no UI coverage at all until now.
   'bom-import-gateway-manual-path',
+  'bom-material-library-golden',
 ];
 const quoteOpsCurrentGatePattern = new RegExp(
   String.raw`.*\/pcba-solution\/(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$`,
