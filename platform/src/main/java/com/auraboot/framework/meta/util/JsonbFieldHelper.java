@@ -194,4 +194,85 @@ public class JsonbFieldHelper {
                 || value instanceof Collection<?>
                 || (value != null && value.getClass().isArray());
     }
+
+    /**
+     * Read-shape contract: a {@code json}/{@code jsonb} dynamic field leaves the
+     * platform as a plain <b>JSON string</b> — never as the driver's raw
+     * {@code org.postgresql.util.PGobject}.
+     *
+     * <p>The dynamic read paths use a generic no-type-handler query, so the PG
+     * driver hands back a {@code PGobject} for jsonb columns. Consumers written
+     * against the string shape ({@code String.valueOf(...)} + parse — the
+     * dominant idiom across plugins) survived that only by accident of
+     * {@code PGobject.toString()}, while {@code (String)} casts threw
+     * {@code ClassCastException} and {@code instanceof}-branch parsers silently
+     * dropped values (2026-07-21 quote quick-lane outage: every BOM row was
+     * filtered out and nothing was priced, with no error anywhere). REST callers
+     * saw the serialized wrapper {@code {"type":"jsonb","value":"..."}} instead
+     * of the field value.
+     *
+     * <p>JSON string is the pinned target because it is the one shape every
+     * surveyed consumer accepts, and it matches the platform's own entity-level
+     * convention ({@code JsonbStringTypeHandler} returns {@code obj.toString()}).
+     *
+     * <p>Mutates the given records in place. Values that are already strings
+     * (or parsed structures handed back by non-physical model executors) are
+     * serialized/kept as JSON text; {@code null} stays {@code null}.
+     */
+    public static void normalizeJsonReadValues(ModelDefinition model, List<Map<String, Object>> records) {
+        if (model == null || records == null || records.isEmpty() || model.getFields() == null) return;
+        List<String[]> jsonKeys = jsonReadKeys(model);
+        if (jsonKeys.isEmpty()) return;
+        for (Map<String, Object> record : records) {
+            normalizeRecord(jsonKeys, record);
+        }
+    }
+
+    /** Single-record variant of {@link #normalizeJsonReadValues(ModelDefinition, List)}. */
+    public static void normalizeJsonReadValues(ModelDefinition model, Map<String, Object> record) {
+        if (model == null || record == null || model.getFields() == null) return;
+        normalizeRecord(jsonReadKeys(model), record);
+    }
+
+    /** [columnName, code] pairs for every non-virtual json/jsonb field. */
+    private static List<String[]> jsonReadKeys(ModelDefinition model) {
+        List<String[]> keys = new ArrayList<>();
+        for (FieldDefinition field : model.getFields()) {
+            String dt = field.getDataType();
+            if (("jsonb".equalsIgnoreCase(dt) || "json".equalsIgnoreCase(dt)) && !field.isJsonbVirtual()) {
+                keys.add(new String[]{field.getColumnName(), field.getCode()});
+            }
+        }
+        return keys;
+    }
+
+    private static void normalizeRecord(List<String[]> jsonKeys, Map<String, Object> record) {
+        if (record == null) return;
+        for (String[] pair : jsonKeys) {
+            for (String key : pair) {
+                if (key == null || !record.containsKey(key)) continue;
+                Object value = record.get(key);
+                Object normalized = toJsonReadShape(value);
+                if (normalized != value) {
+                    record.put(key, normalized);
+                }
+            }
+        }
+    }
+
+    /**
+     * Normalize one json-field value to the JSON-string read shape.
+     * {@code PGobject.toString()} returns its {@code getValue()} — the JSON text —
+     * but is matched by class name so this helper stays driver-agnostic.
+     */
+    private static Object toJsonReadShape(Object value) {
+        if (value == null || value instanceof String) return value;
+        if ("org.postgresql.util.PGobject".equals(value.getClass().getName())) {
+            return value.toString();
+        }
+        if (shouldSerializeJsonValue(value)) {
+            return JsonUtil.toJson(value);
+        }
+        return value;
+    }
 }
