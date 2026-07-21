@@ -86,6 +86,29 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
                 Map.of("tenantId", getTestTenant().getId()));
     }
 
+    /**
+     * Approvals persist deliberately (no rollback), so without this the rows this
+     * run created stay behind — and because an APPROVED, unconsumed grant for a
+     * task+tool authorizes the next execution of that pair (F8), the next run
+     * against the same database found last run's grant and was told "already
+     * authorized", so {@code checkAndRequestApproval} returned null where a fresh
+     * pid was expected. Task ids are now namespaced per execution as well, which
+     * is what actually makes a re-run independent; this keeps the table from
+     * growing without bound.
+     */
+    @AfterAll
+    void cleanupApprovalsFromThisRun() {
+        // @AfterAll runs outside the per-test context the base class installs, and
+        // the mapper refuses to run without a tenant bound to the thread.
+        applyTestMetaContext();
+        dynamicDataMapper.deleteByQuery(
+                "DELETE FROM ab_agent_approval WHERE task_id LIKE #{params.taskLike}",
+                Map.of("taskLike", "%-" + testRunId));
+        dynamicDataMapper.deleteByQuery(
+                "DELETE FROM ab_approval_policy WHERE policy_name = #{params.name}",
+                Map.of("name", "wildcard-test-policy-" + testRunId));
+    }
+
     // ========== Test 1: checkAndRequestApproval - tool requires approval ==========
 
     @Test
@@ -93,7 +116,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
     void checkAndRequestApproval_toolRequiresApproval_createsApprovalRecord() {
         Long tenantId = getTestTenant().getId();
         String runId = "run-" + testRunId + "-001";
-        String taskId = "task-001";
+        String taskId = "task-001-" + testRunId;
 
         String result = approvalGateService.checkAndRequestApproval(
                 tenantId, runId, taskId,
@@ -112,7 +135,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
     void checkAndRequestApproval_toolNoApproval_returnsNull() {
         Long tenantId = getTestTenant().getId();
         String runId = "run-" + testRunId + "-no-approval";
-        String taskId = "task-no-approval";
+        String taskId = "task-no-approval-" + testRunId;
 
         String result = approvalGateService.checkAndRequestApproval(
                 tenantId, runId, taskId,
@@ -146,7 +169,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         approvalPid2 = approvalGateService.checkAndRequestApproval(
                 tenantId,
                 "run-" + testRunId + "-002",
-                "task-002",
+                "task-002-" + testRunId,
                 "code_execute", "Execute code",
                 Map.of("code", "print('hello')"),
                 true);
@@ -171,7 +194,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         String pid3 = approvalGateService.checkAndRequestApproval(
                 tenantId,
                 "run-" + testRunId + "-003",
-                "task-003",
+                "task-003-" + testRunId,
                 "api_call", "Call external API",
                 Map.of("url", "https://example.com"),
                 true);
@@ -195,7 +218,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         String pid4 = approvalGateService.checkAndRequestApproval(
                 tenantId,
                 "run-" + testRunId + "-004",
-                "task-004",
+                "task-004-" + testRunId,
                 "db_drop", "Drop database",
                 Map.of(),
                 true);
@@ -249,7 +272,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
     void checkAndRequestApproval_expiresAtIsSetAndNonNull() {
         Long tenantId = getTestTenant().getId();
         String runId = "run-" + testRunId + "-expiry";
-        String taskId = "task-expiry";
+        String taskId = "task-expiry-" + testRunId;
 
         LocalDateTime before = LocalDateTime.now();
 
@@ -301,7 +324,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         String approvalPid = createApprovalWithoutPolicy(
                 tenantId,
                 "run-" + testRunId + "-perm-010",
-                "task-perm-010");
+                "task-perm-010-" + testRunId);
         assertNotNull(approvalPid, "Approval PID must be created");
 
         boolean authorized = approvalGateService.isAuthorizedApprover(
@@ -401,7 +424,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         String approvalPid = approvalGateService.checkAndRequestApproval(
                 tenantId,
                 "run-" + testRunId + "-perm-015",
-                "task-perm-015",
+                "task-perm-015-" + testRunId,
                 "file_write", "Write file",
                 Map.of(),
                 true);
@@ -448,7 +471,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
 
         // First call creates the approval
         String firstPid = approvalGateService.checkAndRequestApproval(
-                tenantId, runId, "task-idem-001",
+                tenantId, runId, "task-idem-001-" + testRunId,
                 toolCode, "Idempotency test tool",
                 Map.of("param", "value"),
                 true);
@@ -456,7 +479,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
 
         // Second call with the same runId+toolCode must return the same PID — no duplicate
         String secondPid = approvalGateService.checkAndRequestApproval(
-                tenantId, runId, "task-idem-002",  // different taskId, same run+tool
+                tenantId, runId, "task-idem-002-" + testRunId,  // different taskId, same run+tool
                 toolCode, "Idempotency test tool (retry)",
                 Map.of("param", "other"),
                 true);
@@ -484,7 +507,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         String toolCode = "persist_key_tool";
 
         String pid = approvalGateService.checkAndRequestApproval(
-                tenantId, runId, "task-key-persist",
+                tenantId, runId, "task-key-persist-" + testRunId,
                 toolCode, "Persist key test",
                 Map.of(),
                 true);
@@ -512,7 +535,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         String pid = approvalGateService.checkAndRequestApproval(
                 tenantId,
                 "run-double-exec-" + testRunId,
-                "task-double-exec",
+                "task-double-exec-" + testRunId,
                 "double_exec_tool", "Double execution test",
                 Map.of(),
                 true);
@@ -540,7 +563,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
 
         // Create approval under real tenant
         String realPid = approvalGateService.checkAndRequestApproval(
-                tenantId, runId, "task-ct-001",
+                tenantId, runId, "task-ct-001-" + testRunId,
                 toolCode, "Cross-tenant test",
                 Map.of(),
                 true);
@@ -551,7 +574,7 @@ public class AgentApprovalGateIntegrationTest extends BaseIntegrationTest {
         // What matters: no collision with realPid
         try {
             String otherPid = approvalGateService.checkAndRequestApproval(
-                    otherTenantId, runId, "task-ct-002",
+                    otherTenantId, runId, "task-ct-002-" + testRunId,
                     toolCode, "Cross-tenant test",
                     Map.of(),
                     true);

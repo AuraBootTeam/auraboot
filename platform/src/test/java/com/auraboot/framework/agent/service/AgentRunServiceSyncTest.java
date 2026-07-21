@@ -105,6 +105,7 @@ class AgentRunServiceSyncTest {
                 toolLoopService,
                 dynamicDataMapper,
                 declaredAgentToolResolver,
+                new com.auraboot.framework.agent.runtime.policy.AgentToolScopePolicy(objectMapper),
                 commandExecutor,
                 namedQueryService,
                 objectMapper,

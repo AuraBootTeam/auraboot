@@ -34,6 +34,12 @@ class AgentChatToolDiscoveryAdapter {
     private final GroundingService groundingService;
     private final ObjectMapper objectMapper;
 
+    private com.auraboot.framework.agent.runtime.policy.AgentToolScopePolicy toolScopePolicy() {
+        // Stateless; constructed on demand so the adapter's constructor signature
+        // (used by AgentChatPortImpl's two constructors and tests) stays stable.
+        return new com.auraboot.framework.agent.runtime.policy.AgentToolScopePolicy(objectMapper);
+    }
+
     List<ToolDefinition> discover(Long tenantId,
                                   Long userId,
                                   String agentCode,
@@ -74,7 +80,12 @@ class AgentChatToolDiscoveryAdapter {
                     .build();
 
             List<ToolDefinition> defs = toolProviderRegistry.discoverAll(ctx);
-            return mergeTools(alwaysOnDefs, explicitDefs, defs);
+            List<ToolDefinition> merged = mergeTools(alwaysOnDefs, explicitDefs, defs);
+            // B4: allowed_models / allowed_operations bind on the chat engine too.
+            // Non-model tools (always-on escalation, platform, custom, mcp) pass
+            // through untouched; restriction wins over explicitly declared tools.
+            com.auraboot.framework.agent.runtime.policy.AgentToolScopePolicy policy = toolScopePolicy();
+            return policy.filterDefinitions(policy.scopeOf(agentDef), merged, agentCode);
         } catch (Exception e) {
             String error = safeExceptionMessage(e);
             log.error("Tool discovery failed for agent {}: {}", agentCode, error, e);

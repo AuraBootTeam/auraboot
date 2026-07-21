@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.service;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.auraboot.framework.agent.memory.MemorySecretGuard;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -53,6 +54,9 @@ public class AgentMemoryService {
                                String memoryType, String category,
                                String title, String content,
                                int importance, boolean shareable) {
+        if (rejectedAsSecretBearing(tenantId, agentCode, memoryType, title, content)) {
+            return null;
+        }
         String pid = UniqueIdGenerator.generate();
         jdbcTemplate.update(
                 "INSERT INTO ab_agent_memory "
@@ -65,6 +69,24 @@ public class AgentMemoryService {
 
         log.debug("Created memory {} type={} agent={} shareable={}", pid, memoryType, agentCode, shareable);
         return pid;
+    }
+
+    /**
+     * Refuse to persist anything that carries a credential, and say so loudly
+     * enough to be findable — a memory row outlives the turn that produced it
+     * and is replayed into later prompts as fact, so a secret written here does
+     * not stay where it was said. Returning {@code null} rather than throwing
+     * keeps the answer flowing to the user: the durable copy is what is refused,
+     * not the conversation.
+     */
+    private boolean rejectedAsSecretBearing(Long tenantId, String agentCode, String memoryType,
+                                            String title, String content) {
+        if (!MemorySecretGuard.containsSecret(title, content)) {
+            return false;
+        }
+        log.warn("Refused memory writeback carrying a credential: tenant={} agent={} type={} "
+                + "(content not logged)", tenantId, agentCode, memoryType);
+        return true;
     }
 
     // =========================================================================
@@ -408,6 +430,9 @@ public class AgentMemoryService {
         assertValidScope(scope);
         if ("user".equals(scope) && (scopeKey == null || scopeKey.isBlank())) {
             throw new IllegalArgumentException("scope='user' requires non-blank scope_key (user_id)");
+        }
+        if (rejectedAsSecretBearing(tenantId, agentCode, memoryType, title, content)) {
+            return null;
         }
         String pid = UniqueIdGenerator.generate();
         jdbcTemplate.update(

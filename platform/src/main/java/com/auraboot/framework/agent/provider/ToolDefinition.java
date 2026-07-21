@@ -19,6 +19,8 @@ public class ToolDefinition {
     private String providerCode;   // which provider owns this tool
     private String toolType;       // dsl_command, dsl_query, platform, custom, mcp
     private String sourceCode;     // underlying command/query/platform code
+    private String modelCode;      // dynamic model the tool targets (null for non-model tools)
+    private String operationKind;  // query, create, update, delete, transition (null when unknown)
     private String riskLevel;      // L0-L4
     private Set<String> requiredPermissions;
     private String confirmationPolicy;
