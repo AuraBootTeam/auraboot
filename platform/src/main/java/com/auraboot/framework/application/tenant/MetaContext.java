@@ -233,8 +233,16 @@ public class MetaContext {
     /**
      * Run a block without dynamic-data permission projection. Intended for
      * internal background components that already receive an explicit tenant
-     * id, for example plugin workers and scheduled jobs. Request handlers
-     * should not use this path.
+     * id, for example plugin workers and scheduled jobs.
+     *
+     * <p>Also legitimate on a request thread for a platform-internal read-back:
+     * reading back the row the platform itself just wrote, to build a
+     * change-log snapshot or an automation/SLA event payload. That read is the
+     * platform reading its own write, not the caller reading data, and the
+     * write was already authorized by the caller-facing layer.
+     *
+     * <p>Request handlers must NOT use this path to serve data the caller
+     * asked for — that would bypass the caller's read permissions.
      */
     public static <T> T runWithoutDataPermission(java.util.function.Supplier<T> action) {
         Boolean prior = DATA_PERMISSION_BYPASSED.get();

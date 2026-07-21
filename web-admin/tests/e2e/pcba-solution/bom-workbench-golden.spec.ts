@@ -84,6 +84,7 @@ function validateStandardBomWorkbook(filePath: string, created: BomWorkbenchSeed
     '候选编码',
     '颜色',
     '错误原因',
+    '数量语义证据',
   ]);
   const resistorDetail = detailRows.find((row) => cell(row, 1) === '10K 1% 0603');
   expect(resistorDetail, 'detail sheet should include unresolved resistor evidence').toBeTruthy();

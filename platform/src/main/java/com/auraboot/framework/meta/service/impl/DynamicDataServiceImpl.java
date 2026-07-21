@@ -1188,8 +1188,17 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         String recordIdValue = enrichedData.get(primaryKey.getCode()).toString();
         virtualFieldEngine.materialize(modelCode, recordIdValue, changedFields);
 
-        // Record change log
-        Map<String, Object> createdRecord = getById(modelCode, recordIdValue);
+        // Record change log.
+        //
+        // This read-back is the platform reading the row it just wrote, not the
+        // caller reading data: the record feeds the change-log snapshot, the
+        // automation trigger payload and the SLA activation payload. Projecting
+        // it through the caller's read permissions would (a) fail the whole
+        // create for a caller that may create but not read the model, and
+        // (b) hand automations and SLA a field-masked, incomplete record.
+        // The create itself is already authorized by the caller-facing layer.
+        Map<String, Object> createdRecord =
+                MetaContext.runWithoutDataPermission(() -> getById(modelCode, recordIdValue));
         try {
             List<FieldChange> changes = changeTracker.diff(null, createdRecord, modelCode);
             changeTracker.recordChange(ChangeRecord.builder()
@@ -1508,8 +1517,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // Materialize computed fields after update
             virtualFieldEngine.materialize(modelCode, recordId, changedFields);
 
-            // Record change log
-            Map<String, Object> updatedRecord = getById(modelCode, recordId);
+            // Record change log. Same platform-internal read-back as create():
+            // the caller's read permissions must not gate the row we just wrote.
+            // The pre-update read of existingRecord above deliberately keeps the
+            // permission projection — you may not modify a record you cannot see.
+            Map<String, Object> updatedRecord =
+                    MetaContext.runWithoutDataPermission(() -> getById(modelCode, recordId));
             try {
                 List<FieldChange> changes = changeTracker.diff(existingRecord, updatedRecord, modelCode);
                 if (!changes.isEmpty()) {

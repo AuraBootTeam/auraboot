@@ -212,7 +212,11 @@ async function fetchLeafMenus(page: Page): Promise<LeafMenu[]> {
 
 async function settle(page: Page): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
-  await page.waitForLoadState('networkidle', { timeout: 15_000 }).catch(() => {});
+  // networkidle is best-effort only (hence the catch): the shell keeps background
+  // requests in flight, so on many pages it never settles and we simply burn the
+  // whole timeout before continuing. Keep the budget small — a long timeout here
+  // buys nothing and inflates every menu hop by that amount.
+  await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => {});
 }
 
 /**
@@ -233,25 +237,34 @@ async function traverseMenus(
     const label = `${menu.code || '?'} ${menu.path}`;
     setMenu(label);
     const sidebar = page.getByTestId('sidebar');
-    await expect(sidebar).toBeVisible({ timeout: 15_000 });
+    // This is the one hard assertion in the loop, and it is what fails when the
+    // machine is loaded (observed: full-gate run rendered nothing within 15s while
+    // the same spec passed 4/4 in isolation). Give it real headroom so a slow
+    // render is not reported as a missing sidebar.
+    await expect(sidebar).toBeVisible({ timeout: 30_000 });
     const link = sidebar.locator(`a[href="${menu.path}"]`).first();
     if ((await link.count()) === 0) {
       problems.push(`${label}: menu link not found in sidebar (API says visible)`);
       continue;
     }
     const targetPath = menu.path.split('?')[0];
-    const reachedTarget = () =>
+    const reachedTarget = (timeout: number) =>
       page
-        .waitForURL((url) => url.pathname.startsWith(targetPath), { timeout: 15_000 })
+        .waitForURL((url) => url.pathname.startsWith(targetPath), { timeout })
         .then(() => true)
         .catch(() => false);
     await link.scrollIntoViewIfNeeded().catch(() => {});
     await link.click();
-    let reached = await reachedTarget();
+    // The first click frequently does not navigate (the retry below is why this
+    // spec passes at all). Since a retry follows, waiting the full budget on the
+    // first attempt only wastes wall-clock — fail fast and re-click instead.
+    let reached = await reachedTarget(5_000);
     if (!reached) {
       // one retry: SPA may still have been hydrating on the first click
+      // eslint-disable-next-line no-console
+      console.warn(`[menu-smoke] first click did not navigate, retrying: ${label}`);
       await link.click().catch(() => {});
-      reached = await reachedTarget();
+      reached = await reachedTarget(15_000);
     }
     if (!reached) {
       problems.push(`${label}: navigation did not reach ${menu.path} (still at ${page.url()})`);
