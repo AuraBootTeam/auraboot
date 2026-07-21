@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.auraboot.framework.agent.entity.AgentDefinition;
 import com.auraboot.framework.agent.mapper.AgentDefinitionMapper;
 import com.auraboot.framework.agent.service.AgentOrganizationService;
@@ -156,9 +157,20 @@ public class AgentOrganizationServiceImpl implements AgentOrganizationService {
             log.info("Deactivated org_employee: pid={}", employeePid);
         }
 
-        // 2. Clear agent_definition.employee_id
-        agent.setEmployeeId(null);
-        agentDefinitionMapper.updateById(agent);
+        // 2. Clear agent_definition.employee_id.
+        //
+        // Deliberately an explicit SET rather than updateById: MyBatis-Plus's
+        // default field strategy omits null values from the generated UPDATE, so
+        // `setEmployeeId(null); updateById(agent)` produced a statement that did
+        // not mention the column at all — the link survived every removal. Nothing
+        // downstream noticed: the DELETE answered 200, the employee row really was
+        // deactivated, and the log said "Agent removed from org". Only the page
+        // disagreed, because getOrgPlacement still saw a non-null employee_id and
+        // went on reporting the colleague as a digital employee sitting in a
+        // department that no longer employed it.
+        agentDefinitionMapper.update(null, new LambdaUpdateWrapper<AgentDefinition>()
+                .eq(AgentDefinition::getId, agentId)
+                .set(AgentDefinition::getEmployeeId, null));
 
         log.info("Agent removed from org: agentId={}, former employeeId={}", agentId, employeeId);
     }

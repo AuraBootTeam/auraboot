@@ -487,12 +487,22 @@ public class RunLifecycleService {
                 log.warn("Stale run detected: pid={}, marking as FAILED", pid);
                 stopHeartbeat(pid); // Clean up any orphaned heartbeat
 
+                // Borrow the thread's tenant scope, then put back whatever was
+                // there. An unconditional clear() is safe only while the caller is
+                // the scheduler; this method is public, and a caller that had its
+                // own context would find it wiped out from under it — the same
+                // shape as the sink-clears-instead-of-restores defect.
+                Long previousTenant = MetaContext.exists() ? MetaContext.getCurrentTenantId() : null;
                 MetaContext.setSystemTenantContext(tenantId);
                 try {
                     failRun(tenantId, pid, taskPid, startedAt,
                             "Run stalled — no heartbeat for " + STALE_RUN_THRESHOLD_MINUTES + " minutes");
                 } finally {
-                    MetaContext.clear();
+                    if (previousTenant != null) {
+                        MetaContext.setSystemTenantContext(previousTenant);
+                    } else {
+                        MetaContext.clear();
+                    }
                 }
             }
 

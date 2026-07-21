@@ -275,7 +275,17 @@ public class CoreAgentController {
         if (departmentPid == null || departmentPid.isBlank()) {
             return ResponseEntity.ok(ApiResponse.error("departmentPid is required"));
         }
+        // The employee model requires a position (org_employee binding,
+        // org_emp_position_id required=true). Omitting it used to reach the
+        // validator and surface as an unhandled 500 "Unexpected system
+        // exception" — a dead end that said nothing about the missing field,
+        // for a control the dialog presented as optional. Refuse it here, in
+        // the same shape as the department check, so the caller is told what
+        // is actually wrong.
         String positionPid = (String) body.get("positionPid");
+        if (positionPid == null || positionPid.isBlank()) {
+            return ResponseEntity.ok(ApiResponse.error("positionPid is required"));
+        }
 
         agentOrganizationService.enrollAsEmployee(agent.getId(), departmentPid, positionPid);
 

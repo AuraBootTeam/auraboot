@@ -34,6 +34,24 @@ public class GenAiUsageRecorder {
                        Integer inputTokens, Integer outputTokens,
                        Integer cacheReadTokens, Integer cacheWriteTokens,
                        BigDecimal diagnosticCost) {
+        record(tenantId, traceId, null, model, inputTokens, outputTokens,
+                cacheReadTokens, cacheWriteTokens, diagnosticCost);
+    }
+
+    /**
+     * Records one model call, attributed to the vendor that served it.
+     *
+     * <p>The provider column existed but nothing ever wrote it, so every row in
+     * the ledger said only which model was asked for. That is enough to price a
+     * call and useless for the question a multi-vendor deployment actually asks —
+     * how much is going to whom — and it also erases the evidence of which vendor
+     * a given run really used, which is the one thing a live run most needs to be
+     * able to prove afterwards.
+     */
+    public void record(Long tenantId, String traceId, String providerCode, String model,
+                       Integer inputTokens, Integer outputTokens,
+                       Integer cacheReadTokens, Integer cacheWriteTokens,
+                       BigDecimal diagnosticCost) {
         try {
             Long resolved = tenantId != null ? tenantId : MetaContext.getCurrentTenantId();
             if (resolved == null) {
@@ -42,6 +60,7 @@ public class GenAiUsageRecorder {
             GenAiUsageRecord usage = new GenAiUsageRecord();
             usage.setTenantId(resolved);
             usage.setTraceId(traceId);
+            usage.setProvider(providerCode);
             usage.setRequestModel(model);
             usage.setResponseModel(model);
             usage.setInputTokens(inputTokens);

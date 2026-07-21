@@ -87,7 +87,7 @@ public class LlmProviderFactory {
             return raw;
         }
         // A-G6 chokepoint: every resolved provider records usage at chat/streamChat.
-        return new UsageRecordingLlmProvider(raw, genAiUsageRecorder, tracer);
+        return new UsageRecordingLlmProvider(raw, genAiUsageRecorder, tracer, providerCode);
     }
 
     private LlmProvider resolveRawProvider(String providerCode) {
