@@ -8,6 +8,7 @@ import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
 import com.auraboot.framework.agent.provider.ToolProviderRegistry;
 import com.auraboot.framework.agent.service.AgentDefinitionService;
 import com.auraboot.framework.agent.service.AgentEventDispatchService;
+import com.auraboot.framework.agent.service.AgentLifecycleService;
 import com.auraboot.framework.agent.service.AgentOrganizationService;
 import com.auraboot.framework.agent.service.McpServerConfigService;
 import com.auraboot.framework.agent.spi.AgentExecutionService;
@@ -35,6 +36,7 @@ public class CoreAgentController {
     private final AgentEventDispatchService agentEventDispatchService;
     private final AgentOrganizationService agentOrganizationService;
     private final AgentDefinitionService agentDefinitionService;
+    private final AgentLifecycleService agentLifecycleService;
     private final ToolProviderRegistry toolProviderRegistry;
 
     @GetMapping("/status")
@@ -295,6 +297,40 @@ public class CoreAgentController {
         }
         agentOrganizationService.removeFromOrg(agent.getId());
         return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    /**
+     * Stop this one agent. Every entry (dispatch, chat, delegation) resolves
+     * agent definitions with {@code status = 'active'}, so suspending closes all
+     * of them at once — without the global kill switch that silences every agent
+     * in the deployment.
+     */
+    @PostMapping("/definitions/{agentPid}/suspend")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    public ResponseEntity<ApiResponse<AgentLifecycleService.Transition>> suspendAgent(
+            @PathVariable String agentPid,
+            @RequestBody(required = false) Map<String, Object> body) {
+        String reason = body == null ? null : (String) body.get("reason");
+        return lifecycle(() -> agentLifecycleService.suspend(
+                agentPid, MetaContext.exists() ? MetaContext.getCurrentUserId() : null, reason));
+    }
+
+    /** Let a suspended agent run again. */
+    @PostMapping("/definitions/{agentPid}/resume")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    public ResponseEntity<ApiResponse<AgentLifecycleService.Transition>> resumeAgent(
+            @PathVariable String agentPid) {
+        return lifecycle(() -> agentLifecycleService.resume(
+                agentPid, MetaContext.exists() ? MetaContext.getCurrentUserId() : null));
+    }
+
+    private ResponseEntity<ApiResponse<AgentLifecycleService.Transition>> lifecycle(
+            java.util.function.Supplier<AgentLifecycleService.Transition> action) {
+        try {
+            return ResponseEntity.ok(ApiResponse.success(action.get()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(ApiResponse.error(e.getMessage()));
+        }
     }
 
 }
