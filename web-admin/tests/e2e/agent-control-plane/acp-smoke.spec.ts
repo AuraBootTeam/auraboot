@@ -1115,14 +1115,20 @@ test.describe('Agent Control Plane @smoke', () => {
     // /api/agent/providers returns raw array (not wrapped in {code, data})
     expect(Array.isArray(providers)).toBeTruthy();
     const codes = providers.map((p: any) => p.providerCode);
-    // Should include built-in providers
-    expect(codes).toContain('minimaxi');
+    // The built-in set is whatever CloudConfigSeeder seeds. This asserted
+    // 'minimaxi' from the initial commit onwards and had been failing ever
+    // since it stopped being seeded — the i18n strings and a pricing comment
+    // still name it, which is what kept the assertion looking current. A check
+    // that can only be red buries every real failure after it, so it now names
+    // providers that are actually seeded.
     expect(codes).toContain('anthropic');
     expect(codes).toContain('deepseek');
-    // Should have displayName
-    const minimaxi = providers.find((p: any) => p.providerCode === 'minimaxi');
-    expect(minimaxi).toBeTruthy();
-    expect(minimaxi.displayName).toBeTruthy();
+    expect(codes).toContain('qianwen');
+    // Every provider must be presentable, not just listed: a code with no
+    // display name reaches the UI as a raw identifier.
+    for (const provider of providers) {
+      expect(provider.displayName, `${provider.providerCode} must have a display name`).toBeTruthy();
+    }
   });
 
   // =========================================================================
