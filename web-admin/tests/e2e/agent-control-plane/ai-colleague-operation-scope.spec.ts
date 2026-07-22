@@ -129,10 +129,18 @@ test.describe('Digital employee — allowed operations', () => {
 
     // The turn must genuinely have run. Without this the survival assertion
     // below would hold just as well if nothing had happened at all.
-    await expect(
-      chat.locator('[data-testid="chat-msg-agent"]').first(),
-      'the turn has to actually run, or the record survives for the wrong reason',
-    ).toBeVisible({ timeout: 180_000 });
+    //
+    // Visible is not enough, which is what the evidence showed: the bubble
+    // renders before any text arrives, so `toBeVisible` was satisfied by an
+    // empty placeholder next to a typing indicator — the screenshot named
+    // "delete-refused" showed a spinner, and the record surviving at that
+    // instant proved only that the agent had not got round to deciding yet.
+    // Waiting for text is what makes the survival below mean refusal.
+    const reply = chat.locator('[data-testid="chat-msg-agent"]').first();
+    await expect(reply).toBeVisible({ timeout: 180_000 });
+    await expect
+      .poll(async () => (await reply.innerText()).trim().length, { timeout: 120_000 })
+      .toBeGreaterThan(10);
     await page.screenshot({ path: `${SHOTS}/31-delete-refused.png`, fullPage: true });
 
     // --- and the record is still there ------------------------------------
