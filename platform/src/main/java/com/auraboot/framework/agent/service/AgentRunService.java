@@ -58,7 +58,6 @@ public class AgentRunService {
     private final ObjectMapper objectMapper;
     private final LlmProviderFactory providerFactory;
     private final AgentMemoryService memoryService;
-    private final ContextWindowManager contextWindowManager;
     private final PlanService planService;
     private final StepLoopService stepLoopService;
     private final RunLifecycleService runLifecycleService;
