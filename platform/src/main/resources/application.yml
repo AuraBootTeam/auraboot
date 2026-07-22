@@ -51,9 +51,13 @@ logging:
     org.apache.coyote: INFO
     com.zaxxer.hikari.pool: INFO
     org.postgresql: INFO
-    org.springframework.transaction.interceptor: DEBUG
-    org.springframework.transaction.support: DEBUG
-    org.springframework.jdbc.datasource: DEBUG
+    # Transaction/datasource tracing is per-statement noisy, so it defaults to INFO.
+    # Turn it back up per environment with the matching env var, e.g.
+    #   LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TRANSACTION_INTERCEPTOR=DEBUG
+    # (same name Spring Boot's relaxed binding uses, so there is only one knob).
+    org.springframework.transaction.interceptor: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TRANSACTION_INTERCEPTOR:INFO}
+    org.springframework.transaction.support: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TRANSACTION_SUPPORT:INFO}
+    org.springframework.jdbc.datasource: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_JDBC_DATASOURCE:INFO}
 
 # Security configuration
 # IMPORTANT: Set JWT_SECRET environment variable in production
