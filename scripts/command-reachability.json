@@ -1,0 +1,38 @@
+{
+  "$comment": "A declared command with no UI entry point cannot have UI coverage. Exceptions must carry a reason. See scripts/check-command-reachability.mjs.",
+  "roots": [
+    "plugins"
+  ],
+  "exemptPrefixes": [
+    "seed_",
+    "internal_"
+  ],
+  "allow": {},
+  "baseline": {
+    "agent-control-plane": [
+      "acp:create_agent_observation",
+      "acp:create_agent_run",
+      "acp:delete_agent_observation",
+      "acp:delete_agent_run",
+      "acp:delete_mcp_server",
+      "acp:delete_object_alias",
+      "acp:delete_semantic_term"
+    ],
+    "page-manager": [
+      "pgm:update_page_schema"
+    ],
+    "platform-admin": [
+      "admin:create_member"
+    ],
+    "test-fixtures": [
+      "e2et:touch_order_noperm",
+      "e2eto:create_e2et_order"
+    ],
+    "workflow-demo": [
+      "wd:create_leave_balance",
+      "wd:delete_leave_request",
+      "wd:update_leave_balance",
+      "wd:update_leave_request"
+    ]
+  }
+}
