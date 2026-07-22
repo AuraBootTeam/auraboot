@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
@@ -81,14 +82,21 @@ public class HandlerPhase implements CommandPhase {
     @Autowired(required = false)
     private StorageProvider storageProvider;
 
+    /**
+     * Whether a handler inherits the authority its command boundary granted (DDR-2026-07-22 step 3).
+     * Off until observe mode shows no command would newly reach a target its caller cannot read.
+     */
+    @org.springframework.beans.factory.annotation.Value("${aura.command.data-authority.enabled:false}")
+    private boolean commandDataAuthorityEnabled;
+
     @Override public String name() { return "handler"; }
 
     @Override
     public void execute(CommandPipelineContext ctx) {
         var handlerRules = ctx.getRulesByType().getOrDefault("handler", Collections.emptyList());
-        Map<String, Object> handlerResults = executeHandlerPhase(
+        Map<String, Object> handlerResults = withCommandAuthority(ctx, () -> executeHandlerPhase(
                 handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
-                ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig());
+                ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig()));
         ctx.setHandlerResults(handlerResults);
         persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
                 handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
@@ -395,6 +403,26 @@ public class HandlerPhase implements CommandPhase {
 
     // ==================== Helper methods ====================
 
+    /**
+     * Open the command's authority for the handler stage when the boundary actually granted one
+     * (DDR-2026-07-22). Only an AUTHORIZED verdict qualifies: a command that declared no
+     * permissions granted nothing, and NOT_APPLICABLE must keep today's behaviour exactly.
+     *
+     * <p>Disabled by default. The flip is gated on what observe mode reports from a real workload —
+     * whether any command would newly reach a target its caller cannot read.
+     */
+    // package-private: the safety property (only AUTHORIZED opens a scope) is directly tested.
+    <T> T withCommandAuthority(CommandPipelineContext ctx, java.util.function.Supplier<T> body) {
+        if (!commandDataAuthorityEnabled) {
+            return body.get();
+        }
+        CommandAuthorizationVerdict verdict = ctx.getAuthorizationVerdict();
+        if (verdict == null || !verdict.isAuthorized()) {
+            return body.get();
+        }
+        return MetaContext.runWithCommandAuthority(verdict.permissionCode(), body);
+    }
+
     private void executePluginCommandHandler(String commandCode, String modelCode,
                                               Map<String, Object> payload, Long tenantId, Long userId,
                                               CommandExecuteRequest request,
@@ -575,6 +603,14 @@ public class HandlerPhase implements CommandPhase {
         input.put("recordPid", recordPid);
         input.put("payload", payload != null ? payload : Collections.emptyMap());
         input.put("handlerParams", handlerParams);
+        // The async executor never re-enters the pipeline, so the boundary's decision would be lost
+        // at the thread hand-off — and the handler would run with no authority at all, which is the
+        // exact path that failed in production. Persist the verdict WITH the task, so background
+        // work carries an authority someone can point at rather than an inherited bypass flag.
+        String commandAuthority = MetaContext.getCommandAuthority();
+        if (commandAuthority != null) {
+            input.put("commandAuthority", commandAuthority);
+        }
 
         AsyncTaskSubmitRequest taskRequest = new AsyncTaskSubmitRequest();
         taskRequest.setTaskType(CommandHandlerAsyncTaskExecutor.TASK_TYPE);
