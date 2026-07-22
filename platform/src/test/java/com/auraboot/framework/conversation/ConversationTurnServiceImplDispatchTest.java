@@ -214,13 +214,19 @@ class ConversationTurnServiceImplDispatchTest extends BaseIntegrationTest {
             TurnOutcome outcome = turnService.runTurn(buildTurnRequest("nonexistent", "hi"), sink);
 
             assertThat(outcome).isInstanceOf(TurnOutcome.Failed.class);
+            // The message no longer names the agent_code: it is an internal
+            // identifier the reader did not choose and cannot act on (§2.2), and
+            // one sentence used to cover both "you suspended this" and "this is
+            // gone" — which sent operators looking for a deleted record instead
+            // of the Resume button. This agent genuinely does not exist.
             assertThat(((TurnOutcome.Failed) outcome).errorMessage())
-                    .contains("Agent not found or inactive: nonexistent");
+                    .contains("no longer available")
+                    .doesNotContain("nonexistent");
 
             verify(agentChatPort, times(1)).agentExists(eq(tenantId), eq("nonexistent"));
             verify(agentChatPort, never()).runAgentTurn(any(), any(), any());
             verify(chatService, never()).executeAuraBotTurn(any(), any(), any());
-            verify(sink, atLeastOnce()).onError(contains("Agent not found"), any());
+            verify(sink, atLeastOnce()).onError(contains("no longer available"), any());
         });
     }
 
