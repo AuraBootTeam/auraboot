@@ -322,6 +322,36 @@ fi
 assert_eq "F8 守卫: 不存在已批准但从未被消费的授权(无限审批循环回归)" \
   "$(q "SELECT COUNT(*) FROM ab_agent_approval a WHERE a.approval_status='approved' AND a.consumed_at IS NULL AND a.updated_at < NOW() - INTERVAL '2 minutes'")" "0"
 
+# --- live provenance: prove WHICH vendor served this run ------------------
+# Only meaningful in live mode. With two keys in the environment the seeder
+# provisions both providers and chat resolution picks by seed priority
+# (deepseek=30 beats qianwen=50) — which is how an entire live run was
+# reported as Qwen on 2026-07-19. --llm withholds the other key so only one
+# provider exists, but withholding is an input; this is the output. A run
+# that cannot say who served it has not established what it claims to.
+#
+# response_model is the strongest of the two columns: the platform sets
+# request_model, the remote service echoes response_model back.
+if [[ -n "$LLM" && "${AGENT_LLM_STUB_MODE:-false}" != "true" ]]; then
+  calls=$(q "SELECT COUNT(*) FROM ab_gen_ai_usage")
+  if [[ "${calls:-0}" -eq 0 ]]; then
+    bad "live 供货方核验: 本轮零 LLM 调用账本行(live 档却没真调?)"
+  else
+    served=$(q "SELECT DISTINCT COALESCE(provider,'(null)') FROM ab_gen_ai_usage" | tr -d ' ' | paste -sd, -)
+    models=$(q "SELECT DISTINCT COALESCE(response_model,'(null)') FROM ab_gen_ai_usage" | tr -d ' ' | paste -sd, -)
+    case "$LLM" in
+      qianwen|qwen) want="qianwen" ;;
+      deepseek)     want="deepseek" ;;
+      *)            want="" ;;
+    esac
+    if [[ -n "$want" && "$served" == "$want" ]]; then
+      ok "live 供货方核验: --llm $LLM 实际由 '$served' 服务, response_model=$models ($calls 次调用)"
+    else
+      bad "live 供货方核验: 要 '$want' 实得 '$served' (response_model=$models, $calls 次调用) — 贴着标签跑了别家"
+    fi
+  fi
+fi
+
 echo
 step "================ RESULT ================"
 step "pass: ${#PASS[@]}  fail: ${#FAIL[@]}"

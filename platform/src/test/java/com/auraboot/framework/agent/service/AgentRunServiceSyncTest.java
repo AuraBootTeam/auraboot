@@ -78,7 +78,6 @@ class AgentRunServiceSyncTest {
     @Mock private NamedQueryService namedQueryService;
     @Mock private LlmProviderFactory providerFactory;
     @Mock private AgentMemoryService memoryService;
-    @Mock private ContextWindowManager contextWindowManager;
     @Mock private PlanService planService;
     @Mock private StepLoopService stepLoopService;
     @Mock private RunLifecycleService runLifecycleService;
@@ -111,7 +110,6 @@ class AgentRunServiceSyncTest {
                 objectMapper,
                 providerFactory,
                 memoryService,
-                contextWindowManager,
                 planService,
                 stepLoopService,
                 runLifecycleService,

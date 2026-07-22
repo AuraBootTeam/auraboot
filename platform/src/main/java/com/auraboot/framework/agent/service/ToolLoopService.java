@@ -113,10 +113,12 @@ public class ToolLoopService {
                                    String toolName, Map<String, Object> input,
                                    List<AgentToolDefinition> tools, TraceContext traceCtx) {
         StepContext.setRunPid(runPid);
+        StepContext.setAgentCode(agentCode);
         try {
             return executeToolCallInternal(tenantId, runPid, taskPid, agentCode, toolName, input, tools, traceCtx);
         } finally {
             StepContext.clearRunPid();
+            StepContext.clearAgentCode();
         }
     }
 

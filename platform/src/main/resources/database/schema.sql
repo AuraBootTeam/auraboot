@@ -7161,7 +7161,8 @@ CREATE TABLE IF NOT EXISTS ab_agent_action (
 
     -- audit
     actor_type      VARCHAR(20) DEFAULT 'agent',
-    actor_id        VARCHAR(100),
+    actor_id        VARCHAR(100),                          -- the agent that performed it
+    on_behalf_of_user_id BIGINT,                           -- the user whose authority it used
     executed_at     TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     created_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP

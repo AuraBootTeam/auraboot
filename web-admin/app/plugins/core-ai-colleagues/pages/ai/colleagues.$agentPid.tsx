@@ -22,10 +22,12 @@ import {
   UserGroupIcon,
   GlobeAltIcon,
   BuildingOfficeIcon,
+  PauseCircleIcon,
+  PlayCircleIcon,
   XMarkIcon,
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
-import { get, post, del } from '~/shared/services/http-client';
+import { get, post, put, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
@@ -557,6 +559,28 @@ function modelGroup(code: string): string {
   return MODEL_GROUP_MAP[prefix] ?? 'Other';
 }
 
+/**
+ * Reads a jsonb list column as it can actually arrive. The dynamic read path
+ * hands these back as a JSON string, not a parsed array, so an Array.isArray
+ * check alone silently falls through to the default — which is how a cleared
+ * Delete checkbox came back ticked on reload while the database held the
+ * cleared value all along.
+ */
+function asStringList(value: unknown): string[] | null {
+  if (Array.isArray(value)) return value as string[];
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === '*') return null;
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? (parsed as string[]) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 const ALL_OPERATIONS = ['query', 'create', 'update', 'delete', 'transition'] as const;
 
 const OPERATION_LABELS: Record<string, { label: string; description: string }> = {
@@ -587,17 +611,15 @@ function ToolsSkillsTab({
   const [loadingSkills, setLoadingSkills] = useState(true);
 
   // Derive "all access" from allowed_models
-  const isAllModelsAccess = agent.allowed_models == null || agent.allowed_models === '*';
+  const isAllModelsAccess = asStringList(agent.allowed_models) === null;
 
   const [allAccess, setAllAccess] = useState(isAllModelsAccess);
   const [selectedModels, setSelectedModels] = useState<Set<string>>(() => {
     if (isAllModelsAccess) return new Set<string>();
-    if (Array.isArray(agent.allowed_models)) return new Set(agent.allowed_models);
-    return new Set<string>();
+    return new Set(asStringList(agent.allowed_models) ?? []);
   });
   const [selectedOps, setSelectedOps] = useState<Set<string>>(() => {
-    if (Array.isArray(agent.allowed_operations)) return new Set(agent.allowed_operations);
-    return new Set(ALL_OPERATIONS);
+    return new Set(asStringList(agent.allowed_operations) ?? ALL_OPERATIONS);
   });
   const [dirty, setDirty] = useState(false);
 
@@ -715,7 +737,11 @@ function ToolsSkillsTab({
   };
 
   const handleSaveScope = () => {
-    const allowedModels = allAccess ? '*' : Array.from(selectedModels);
+    // null, not '*': the column is jsonb and a bare asterisk is not valid JSON,
+    // so the write failed at the database with a syntax error the page never
+    // showed. Null already means "no restriction" to both the reader above and
+    // the policy that enforces it.
+    const allowedModels = allAccess ? null : Array.from(selectedModels);
     const allowedOperations = Array.from(selectedOps);
     onSave({
       allowed_models: allowedModels,
@@ -1776,6 +1802,41 @@ export default function AIColleagueDetailPage() {
   const [saving, setSaving] = useState(false);
   const [showEnrollDialog, setShowEnrollDialog] = useState(false);
   const [showRemoveOrgDialog, setShowRemoveOrgDialog] = useState(false);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  const isSuspended = agent?.status === 'suspended';
+
+  /**
+   * Halt or release this one colleague. Refetches rather than flipping local
+   * state, so what the page shows is what the server actually stored — a
+   * button that recolours itself on click looks identical whether the write
+   * landed or not.
+   */
+  const handleToggleSuspend = async () => {
+    if (!agentPid) return;
+    setLifecycleBusy(true);
+    try {
+      const action = isSuspended ? 'resume' : 'suspend';
+      const res = await post(`/api/agent/definitions/${agentPid}/${action}`, {});
+      if (ResultHelper.isSuccess(res)) {
+        toast.showSuccessToast(
+          isSuspended
+            ? t('ai.colleagues.resume.success', undefined, 'Colleague resumed')
+            : t('ai.colleagues.suspend.success', undefined, 'Colleague suspended — it will not take new work'),
+        );
+        await fetchAgent();
+      } else {
+        toast.showErrorToast(
+          t('ai.colleagues.suspend.failed', undefined, 'Could not change the colleague state'),
+        );
+      }
+    } catch {
+      toast.showErrorToast(
+        t('ai.colleagues.suspend.failed', undefined, 'Could not change the colleague state'),
+      );
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
 
   const isAuraBot = agent?.agent_code === AURABOT_CODE;
   const readOnly = isAuraBot;
@@ -1822,7 +1883,12 @@ export default function AIColleagueDetailPage() {
     if (!agentPid || readOnly) return;
     setSaving(true);
     try {
-      const res = await post(`/api/dynamic/agent-definition/${agentPid}/update`, data);
+      // PUT /{model}/{pid} is the route the platform actually maps. The old
+      // POST .../update matched nothing, so every save on this page answered
+      // 404 and was swallowed — the form kept the values on screen, the toast
+      // said saved, and the record never changed. That is why clearing an
+      // allowed operation appeared to work and then came back on reload.
+      const res = await put(`/api/dynamic/agent-definition/${agentPid}`, data);
       if (ResultHelper.isSuccess(res)) {
         toast.showSuccessToast(
           t('ai.colleagues.success.saved', undefined, 'Agent saved successfully'),
@@ -1892,6 +1958,15 @@ export default function AIColleagueDetailPage() {
                 {t('ai.colleagues.badge.official', undefined, 'Official')}
               </span>
             )}
+            {isSuspended && (
+              <span
+                className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                data-testid="agent-suspended-badge"
+              >
+                <PauseCircleIcon className="h-3 w-3" />
+                {t('ai.colleagues.badge.suspended', undefined, 'Suspended — takes no new work')}
+              </span>
+            )}
             {isEnrolled && (
               <span
                 className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-400"
@@ -1907,12 +1982,40 @@ export default function AIColleagueDetailPage() {
           </p>
         </div>
 
+        {/* Lifecycle: stop this one colleague without silencing every agent in the
+            deployment. Both engines resolve definitions with status='active', so
+            suspending closes chat, dispatch and delegation at once. The backend
+            could already do this; until now nothing in the interface could ask. */}
+        {!isAuraBot && (
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={handleToggleSuspend}
+              disabled={lifecycleBusy}
+              className={
+                isSuspended
+                  ? 'inline-flex items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 disabled:opacity-50 dark:border-green-800 dark:bg-gray-900 dark:text-green-400'
+                  : 'inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:bg-gray-900 dark:text-amber-400'
+              }
+              data-testid={isSuspended ? 'agent-resume-btn' : 'agent-suspend-btn'}
+            >
+              {isSuspended ? (
+                <PlayCircleIcon className="h-4 w-4" />
+              ) : (
+                <PauseCircleIcon className="h-4 w-4" />
+              )}
+              {isSuspended
+                ? t('ai.colleagues.action.resume', undefined, 'Resume')
+                : t('ai.colleagues.action.suspend', undefined, 'Suspend')}
+            </button>
+          </div>
+        )}
+
         {/* Enrollment Actions — only for non-AuraBot agents that have a system user */}
         {/* Enrollment provisions the agent's backing system user on demand, so the button no
             longer waits for system_user_id — gating on it hid enrollment from every
             tenant-created agent, which never had one. */}
         {!isAuraBot && (
-          <div className="ml-auto">
+          <div>
             {isEnrolled ? (
               <button
                 onClick={() => setShowRemoveOrgDialog(true)}
