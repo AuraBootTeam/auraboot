@@ -43,6 +43,29 @@ import java.util.Set;
 @Service
 public class DefaultRuntimeAuthorizationService implements RuntimeAuthorizationService {
 
+    /**
+     * What the decision row is allowed to claim while no policy engine exists.
+     *
+     * <p>These rows used to read {@code policy_id='default-policy'},
+     * {@code decision_reason='granted'}, with granted_effects equal to
+     * requested — indistinguishable, in the audit, from a policy that had
+     * considered the call and permitted it. Nothing evaluated anything. An
+     * audit trail that cannot tell "allowed" apart from "never asked" is worse
+     * than one that is missing, because it answers the question confidently and
+     * wrongly, and the enforcement that does exist (tool ACL, capability
+     * ceiling, approval gate, data permissions) lives elsewhere and is not
+     * reflected here at all.
+     *
+     * <p>Behaviour is unchanged — this records the truth about it. The
+     * intersection engine that would make these rows meaningful is a design
+     * item, and it turns on a question nobody has answered yet: whether a tool
+     * with no ACL rule should be denied rather than allowed.
+     */
+    static final String NOT_EVALUATED_REASON =
+            "not_evaluated: no runtime policy engine is installed; "
+            + "enforcement for this call came from tool ACL, capability ceiling, "
+            + "approval gate and data permissions, none of which are recorded here";
+
     private static final String INSERT_DECISION = """
             INSERT INTO ab_agent_authorization_decision (
                 pid, tenant_id, run_id, step_index, tool_call_index,
@@ -101,7 +124,7 @@ public class DefaultRuntimeAuthorizationService implements RuntimeAuthorizationS
                 "plan", null, null, null, null,
                 allEffects, allEffects, Map.of(),
                 input.planHash(), null,
-                "default-policy", 1, "default impl: all effects granted",
+                "no-policy-engine", 1, NOT_EVALUATED_REASON,
                 false, null,
                 buildSessionScopeKey(input.tenantId(), input.userId(), null, input.channelSessionId()));
         recordAuthorizationDecision("plan", "granted");
@@ -128,7 +151,7 @@ public class DefaultRuntimeAuthorizationService implements RuntimeAuthorizationS
                 intent.blastRadius() != null ? intent.blastRadius().name() : null,
                 requested, requested, Map.of(),
                 intent.currentPlanHash(), null,
-                "default-policy", 1, "default impl: granted",
+                "no-policy-engine", 1, NOT_EVALUATED_REASON,
                 false, null,
                 buildSessionScopeKey(intent.tenantId(), null, null, intent.channelSessionId()));
         recordAuthorizationDecision("incremental", "granted");

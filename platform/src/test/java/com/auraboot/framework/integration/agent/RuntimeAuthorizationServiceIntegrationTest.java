@@ -98,9 +98,18 @@ class RuntimeAuthorizationServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(result.requireApproval()).isFalse();
 
         Map<String, Object> row = jdbc.queryForMap(
-                "SELECT tool_ref, skill_code, arg_hash, blast_radius, decision_kind, session_scope_key " +
-                        "FROM ab_agent_authorization_decision WHERE tenant_id = ? AND decision_kind = 'incremental'",
+                "SELECT tool_ref, skill_code, arg_hash, blast_radius, decision_kind, session_scope_key, "
+                        + "policy_id, decision_reason "
+                        + "FROM ab_agent_authorization_decision WHERE tenant_id = ? AND decision_kind = 'incremental'",
                 tenantId);
+        // The row must not read as a policy decision. Nothing evaluated this call —
+        // enforcement came from the tool ACL, capability ceiling, approval gate and
+        // data permissions, none of which write here. An audit that cannot tell
+        // "allowed" from "never asked" answers the question confidently and wrongly.
+        assertThat(row.get("decision_reason")).asString()
+                .startsWith("not_evaluated")
+                .contains("no runtime policy engine");
+        assertThat(row.get("policy_id")).isEqualTo("no-policy-engine");
         assertThat(row.get("tool_ref")).isEqualTo("dsl:cmd_crm_lead_transition");
         assertThat(row.get("skill_code")).isEqualTo("crm.lead.advance");
         assertThat(row.get("arg_hash")).isEqualTo("abc123hashprefix");
