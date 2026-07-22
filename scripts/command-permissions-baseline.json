@@ -1,0 +1,16 @@
+{
+  "_comment": "Commands whose handler stage runs but which declare no permissions. RATCHET: this list may only shrink. Each entry is a command that cannot inherit its boundary authority (DDR-2026-07-22) and is therefore still exposed to the write-then-read-back failure.",
+  "commands": [
+    "admin:approve_member",
+    "admin:delete_member",
+    "admin:leave_member",
+    "admin:provision_member_from_employee",
+    "admin:reject_member",
+    "admin:reset_member_password",
+    "admin:restore_member",
+    "admin:suspend_member",
+    "pgm:archive_page_schema",
+    "pgm:duplicate_page_schema",
+    "pgm:publish_page_schema"
+  ]
+}
