@@ -391,6 +391,7 @@ CREATE TABLE public.ab_agent_action (
     rejected_by jsonb,
     target_record_pid character varying(64),
     target_record_pids jsonb,
+    on_behalf_of_user_id bigint,
     CONSTRAINT ab_agent_action_actual_effects_check CHECK (((actual_effects IS NULL) OR public.valid_effect_class_array(actual_effects)))
 );
 
@@ -400,6 +401,20 @@ CREATE TABLE public.ab_agent_action (
 --
 
 COMMENT ON TABLE public.ab_agent_action IS 'ACP ActionEngine: audit trail for every business action executed by agents';
+
+
+--
+-- Name: COLUMN ab_agent_action.actor_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_action.actor_id IS 'The agent that performed the action (agent_code), as opposed to the human it acted for';
+
+
+--
+-- Name: COLUMN ab_agent_action.on_behalf_of_user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_action.on_behalf_of_user_id IS 'The user whose permissions and data scope this agent action executed under; NULL for system-initiated runs';
 
 
 --
@@ -21292,6 +21307,13 @@ CREATE INDEX idx_admin_division_parent_level_sort ON public.ab_administrative_di
 --
 
 CREATE INDEX idx_admin_division_status ON public.ab_administrative_division USING btree (status) WHERE (deleted_flag = false);
+
+
+--
+-- Name: idx_agent_action_actor_on_behalf; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_agent_action_actor_on_behalf ON public.ab_agent_action USING btree (tenant_id, actor_id, on_behalf_of_user_id);
 
 
 --
