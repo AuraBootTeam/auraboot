@@ -12,6 +12,7 @@ import {
   resolveAfterSubmitRedirect,
   resolveAsyncCommandDispatch,
   resolveEditRecordEndpoint,
+  resolveFormBackLink,
   resolveFormSubmitEndpoint,
   resolveSubmitCommandCode,
   shouldBypassFormSubmit,
@@ -323,6 +324,44 @@ describe('resolveAfterSubmitRedirect', () => {
         undefined,
       ),
     ).toBe('/p/bom_conversion_task_pcba_workbench/view/TASK-LEGACY-1');
+  });
+});
+
+describe('resolveFormBackLink', () => {
+  it('falls back to the model list page when the schema declares no back target', () => {
+    expect(resolveFormBackLink({}, 'crm_account_common')).toBe('/p/crm_account_common');
+  });
+
+  it('sends a command-entry form back to the pageKey it declares', () => {
+    // Regression: /p/bom_start_conversion/new linked back to /p/bom_start_conversion,
+    // which derives the pageKey bom_start_conversion_list — a page that does not exist,
+    // so the back link rendered an error instead of the conversion workbench.
+    expect(
+      resolveFormBackLink(
+        { extension: { backTo: 'bom_conversion_task_pcba_workbench_list' } },
+        'bom_start_conversion',
+      ),
+    ).toBe('/p/bom_conversion_task_pcba_workbench');
+  });
+
+  it('accepts an absolute path back target', () => {
+    expect(resolveFormBackLink({ extension: { backTo: '/p/c/quote_console' } }, 'anything')).toBe(
+      '/p/c/quote_console',
+    );
+  });
+
+  it('drops the back link when the page declares it has nowhere to go back to', () => {
+    // A singleton settings form reached straight from a top-level menu has no
+    // parent page; rendering a link to a derived list page invents a dead end.
+    expect(resolveFormBackLink({ extension: { backTo: 'none' } }, 'system_preferences_form')).toBe(
+      null,
+    );
+  });
+
+  it('ignores a blank back target', () => {
+    expect(resolveFormBackLink({ extension: { backTo: '   ' } }, 'crm_account_common')).toBe(
+      '/p/crm_account_common',
+    );
   });
 });
 

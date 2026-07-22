@@ -2900,6 +2900,7 @@
       "skipFieldMeta": true,
       "skipDynamicFieldMeta": true,
       "afterSubmitRedirect": "/p/c/enterprise_info_detail",
+      "backTo": "/p/c/enterprise_info_detail",
       "submitEndpoint": {
         "type": "api",
         "method": "put",
@@ -3312,6 +3313,7 @@
         "endpoint": "/api/admin/system-preferences"
       },
       "afterSubmitRedirect": "/p/c/system_preferences_form",
+      "backTo": "none",
       "submitEndpoint": {
         "type": "api",
         "method": "put",

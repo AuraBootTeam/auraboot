@@ -70,6 +70,7 @@ import {
   resolvePromptUploadFilenameKey,
 } from '~/framework/meta/utils/promptUpload';
 import { promptInputForm } from '~/framework/meta/runtime/actions/ActionRegistry';
+import { resolvePageTargetPath } from '~/framework/meta/runtime/actions/resolvePageTarget';
 import type { AsyncTask } from '~/framework/meta/rendering/components/AsyncTaskProgressModal';
 import { useAsyncTaskModalSink } from '~/framework/meta/rendering/components/AsyncTaskModalContext';
 import {
@@ -530,67 +531,7 @@ export function useActionHandler(options: UseActionHandlerOptions): UseActionHan
         console.error('[useActionHandler] navigate action is missing both "to" and "url" fields');
         return '';
       }
-      const recordPid = getLegacyCompatibleRecordPid(record);
-
-      // Absolute path with template variables — OCP compliant
-      // DSL can write navigateTo: "/dashboard-designer/{pid}" or "/bpmn-designer?pid={pid}"
-      if (pageKey.startsWith('/')) {
-        return pageKey.replace(/\{(\w+)\}/g, (_, key) => {
-          if (record && key in record) return encodeURIComponent(String(record[key] ?? ''));
-          if (key === 'pid' || key === 'id') return encodeURIComponent(String(recordPid ?? ''));
-          return '';
-        });
-      }
-
-      // Cross-designer navigation: dashboard:{code}
-      if (pageKey.startsWith('dashboard:')) {
-        const code = pageKey.substring('dashboard:'.length);
-        return `/dashboards/view/${code}`;
-      }
-
-      // Cross-designer navigation: bpmn-status:{processKey}
-      if (pageKey.startsWith('bpmn-status:')) {
-        const processKey = pageKey.substring('bpmn-status:'.length);
-        const params = new URLSearchParams({ processKey });
-        if (recordPid) {
-          params.set('businessKey', String(recordPid));
-        }
-        return `/bpm/process-status?${params.toString()}`;
-      }
-
-      // Cross-designer navigation: automation:{pid}
-      if (pageKey.startsWith('automation:')) {
-        const pid = pageKey.substring('automation:'.length);
-        return `/automation/${pid}`;
-      }
-
-      // Cross-designer navigation: bpmn-designer:{pid}
-      if (pageKey.startsWith('bpmn-designer:')) {
-        const pid = pageKey.substring('bpmn-designer:'.length);
-        return pid ? `/bpmn-designer?pid=${pid}` : '/bpmn-designer';
-      }
-
-      // Legacy format: "{modelCode}_{pageType}"
-      // Parse pageKey: last segment is the page type (list/form/detail)
-      const lastUnderscoreIdx = pageKey.lastIndexOf('_');
-      const suffix = pageKey.substring(lastUnderscoreIdx + 1);
-      const modelCodePart = pageKey.substring(0, lastUnderscoreIdx);
-
-      // Keep model code as-is (underscores) to match page schema keys
-
-      switch (suffix) {
-        case 'form':
-          // Route pattern: /p/:pageKey/edit/:recordPid (see routes.ts)
-          return recordPid ? `/p/${modelCodePart}/edit/${recordPid}` : `/p/${modelCodePart}/new`;
-        case 'detail':
-        case 'view':
-          return `/p/${modelCodePart}/view/${recordPid}`;
-        case 'list':
-          return `/p/${modelCodePart}`;
-        default:
-          // Fallback: treat as list page
-          return `/p/${modelCodePart}`;
-      }
+      return resolvePageTargetPath(pageKey, record, getLegacyCompatibleRecordPid(record));
     },
     [],
   );

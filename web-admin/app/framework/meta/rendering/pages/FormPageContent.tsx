@@ -41,6 +41,7 @@ import { mergeRules as crossFieldMergeRules } from '~/framework/meta/validation/
 import { evaluateCondition as crossFieldEvalCondition } from '~/framework/meta/validation/conditionEvaluator';
 import { evaluateAssert as crossFieldEvalAssert } from '~/framework/meta/validation/assertEvaluator';
 import { deriveTestId, buttonTestId } from '~/framework/meta/rendering/utils/deriveTestId';
+import { resolvePageTargetPath } from '~/framework/meta/runtime/actions/resolvePageTarget';
 import { useModelCapabilities } from '~/shared/hooks/useModelCapabilities';
 import { checkKindCompatibility } from '~/shared/utils/kindCapability';
 import type { ComputedFieldDef } from '~/framework/meta/runtime/computed/types';
@@ -697,6 +698,29 @@ export function resolveAfterSubmitRedirect(
     const value = bag[key];
     return value != null ? String(value) : '';
   });
+}
+
+/**
+ * Resolve the target of the header back link.
+ *
+ * Honors `schema.extension.backTo`, which takes the same shape as a `navigate`
+ * action target (pageKey, cross-designer reference, or absolute path), plus the
+ * literal `"none"` for a page with no parent to return to. Falls back to
+ * `/p/{tableName}` — correct for a CRUD form reached from its own list page,
+ * wrong for a command-entry form whose URL prefix is a pageKey rather than a
+ * model (there is no `{prefix}_list` page to land on).
+ *
+ * @returns the back-link path, or null when the header should render no link
+ */
+export function resolveFormBackLink(schema: any, tableName: string): string | null {
+  const target = (schema?.extension as any)?.backTo;
+  if (typeof target === 'string' && target.trim()) {
+    const trimmed = target.trim();
+    if (trimmed === 'none') return null;
+    const resolved = resolvePageTargetPath(trimmed);
+    if (resolved) return resolved;
+  }
+  return `/p/${tableName}`;
 }
 
 /**
@@ -2246,6 +2270,7 @@ export function FormPageContent(props: PageContentProps) {
   const miscFormBlocks = allBlocks.filter(
     (block: any) => !FORM_SPECIALIZED_BLOCK_TYPES.has(block.blockType),
   );
+  const backLink = resolveFormBackLink(schema, tableName);
 
   return (
     <DataSourceProvider manager={dataSourceManager}>
@@ -2265,13 +2290,15 @@ export function FormPageContent(props: PageContentProps) {
               <h2 className="text-text text-lg font-medium">
                 {getLocalizedText(schema.title, locale, t)}
               </h2>
-              <Link
-                to={`/p/${tableName}`}
-                data-testid="form-back-link"
-                className="text-accent text-sm hover:text-blue-800"
-              >
-                {t('action.back')}
-              </Link>
+              {backLink ? (
+                <Link
+                  to={backLink}
+                  data-testid="form-back-link"
+                  className="text-accent text-sm hover:text-blue-800"
+                >
+                  {t('action.back')}
+                </Link>
+              ) : null}
             </div>
           </div>
 
