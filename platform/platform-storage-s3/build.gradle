@@ -22,11 +22,11 @@ dependencies {
     compileOnly project(':')  // Platform core (StorageProvider, StorageProperties, StorageType)
 
     // AWS SDK v2
-    implementation platform('software.amazon.awssdk:bom:2.46.6')
+    implementation platform('software.amazon.awssdk:bom:2.48.3')
     implementation 'software.amazon.awssdk:s3'
 
-    compileOnly 'org.projectlombok:lombok:1.18.40'
-    annotationProcessor 'org.projectlombok:lombok:1.18.40'
+    compileOnly 'org.projectlombok:lombok:1.18.46'
+    annotationProcessor 'org.projectlombok:lombok:1.18.46'
 
     // Spring conditional
     compileOnly 'org.springframework.boot:spring-boot-autoconfigure:3.5.14'
@@ -42,10 +42,10 @@ dependencies {
     testImplementation 'org.springframework:spring-beans:6.2.18'  // DisposableBean
     testImplementation 'org.springframework.boot:spring-boot-autoconfigure:3.5.14'  // @ConditionalOnProperty
     testImplementation 'org.springframework:spring-context:6.2.18'  // @Component
-    testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.16'  // @EnumValue
-    testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.21'  // @JsonValue
-    testImplementation 'org.projectlombok:lombok:1.18.40'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.40'
+    testImplementation 'com.baomidou:mybatis-plus-annotation:3.5.17'  // @EnumValue
+    testImplementation 'com.fasterxml.jackson.core:jackson-annotations:2.22'  // @JsonValue
+    testImplementation 'org.projectlombok:lombok:1.18.46'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.46'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.14.4'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.14.4'
     testImplementation 'org.mockito:mockito-core:5.23.0'
