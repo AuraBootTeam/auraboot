@@ -56,6 +56,13 @@ public final class StepContext {
      * "is this still the job we were asked to do" had no way to be asked.
      */
     private static final ThreadLocal<String> OPENING_INTENT = new ThreadLocal<>();
+    /**
+     * The capability ceiling in force for this turn, as the envelope planner
+     * resolved it. Carried so the authorization record can be computed against
+     * the same constraint the tool loop is already enforcing, instead of the
+     * two agreeing only by coincidence.
+     */
+    private static final ThreadLocal<String> CAPABILITY_CEILING = new ThreadLocal<>();
 
     private StepContext() {}
 
@@ -135,9 +142,22 @@ public final class StepContext {
         OPENING_INTENT.remove();
     }
 
+    public static void setCapabilityCeiling(String ceiling) {
+        CAPABILITY_CEILING.set(ceiling);
+    }
+
+    public static String getCapabilityCeiling() {
+        return CAPABILITY_CEILING.get();
+    }
+
+    public static void clearCapabilityCeiling() {
+        CAPABILITY_CEILING.remove();
+    }
+
     public static void clear() {
         CURRENT_AGENT_CODE.remove();
         OPENING_INTENT.remove();
+        CAPABILITY_CEILING.remove();
         CURRENT_STEP_INDEX.remove();
         PARALLEL_GROUP_ID.remove();
         PARALLEL_INDEX.remove();
