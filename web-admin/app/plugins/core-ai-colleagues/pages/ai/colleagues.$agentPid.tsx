@@ -27,7 +27,7 @@ import {
   XMarkIcon,
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
-import { get, post, del } from '~/shared/services/http-client';
+import { get, post, put, del } from '~/shared/services/http-client';
 import { ResultHelper } from '~/utils/type';
 import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
@@ -559,6 +559,28 @@ function modelGroup(code: string): string {
   return MODEL_GROUP_MAP[prefix] ?? 'Other';
 }
 
+/**
+ * Reads a jsonb list column as it can actually arrive. The dynamic read path
+ * hands these back as a JSON string, not a parsed array, so an Array.isArray
+ * check alone silently falls through to the default — which is how a cleared
+ * Delete checkbox came back ticked on reload while the database held the
+ * cleared value all along.
+ */
+function asStringList(value: unknown): string[] | null {
+  if (Array.isArray(value)) return value as string[];
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === '*') return null;
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? (parsed as string[]) : null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 const ALL_OPERATIONS = ['query', 'create', 'update', 'delete', 'transition'] as const;
 
 const OPERATION_LABELS: Record<string, { label: string; description: string }> = {
@@ -589,17 +611,15 @@ function ToolsSkillsTab({
   const [loadingSkills, setLoadingSkills] = useState(true);
 
   // Derive "all access" from allowed_models
-  const isAllModelsAccess = agent.allowed_models == null || agent.allowed_models === '*';
+  const isAllModelsAccess = asStringList(agent.allowed_models) === null;
 
   const [allAccess, setAllAccess] = useState(isAllModelsAccess);
   const [selectedModels, setSelectedModels] = useState<Set<string>>(() => {
     if (isAllModelsAccess) return new Set<string>();
-    if (Array.isArray(agent.allowed_models)) return new Set(agent.allowed_models);
-    return new Set<string>();
+    return new Set(asStringList(agent.allowed_models) ?? []);
   });
   const [selectedOps, setSelectedOps] = useState<Set<string>>(() => {
-    if (Array.isArray(agent.allowed_operations)) return new Set(agent.allowed_operations);
-    return new Set(ALL_OPERATIONS);
+    return new Set(asStringList(agent.allowed_operations) ?? ALL_OPERATIONS);
   });
   const [dirty, setDirty] = useState(false);
 
@@ -717,7 +737,11 @@ function ToolsSkillsTab({
   };
 
   const handleSaveScope = () => {
-    const allowedModels = allAccess ? '*' : Array.from(selectedModels);
+    // null, not '*': the column is jsonb and a bare asterisk is not valid JSON,
+    // so the write failed at the database with a syntax error the page never
+    // showed. Null already means "no restriction" to both the reader above and
+    // the policy that enforces it.
+    const allowedModels = allAccess ? null : Array.from(selectedModels);
     const allowedOperations = Array.from(selectedOps);
     onSave({
       allowed_models: allowedModels,
@@ -1859,7 +1883,12 @@ export default function AIColleagueDetailPage() {
     if (!agentPid || readOnly) return;
     setSaving(true);
     try {
-      const res = await post(`/api/dynamic/agent-definition/${agentPid}/update`, data);
+      // PUT /{model}/{pid} is the route the platform actually maps. The old
+      // POST .../update matched nothing, so every save on this page answered
+      // 404 and was swallowed — the form kept the values on screen, the toast
+      // said saved, and the record never changed. That is why clearing an
+      // allowed operation appeared to work and then came back on reload.
+      const res = await put(`/api/dynamic/agent-definition/${agentPid}`, data);
       if (ResultHelper.isSuccess(res)) {
         toast.showSuccessToast(
           t('ai.colleagues.success.saved', undefined, 'Agent saved successfully'),

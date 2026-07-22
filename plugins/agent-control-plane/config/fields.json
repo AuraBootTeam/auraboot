@@ -1275,7 +1275,6 @@
     "dataType": "boolean",
     "defaultValue": false
   },
-
   {
     "code": "action_code",
     "displayName:zh-CN": "动作编码",
@@ -1363,7 +1362,6 @@
     "displayName:en": "Executed At",
     "dataType": "datetime"
   },
-
   {
     "code": "model_code",
     "displayName:zh-CN": "模型编码",
@@ -1399,7 +1397,6 @@
     },
     "defaultValue": "zh-CN"
   },
-
   {
     "code": "term",
     "displayName:zh-CN": "术语",
@@ -1469,9 +1466,21 @@
     "dataType": "enum",
     "extension": {
       "options": [
-        {"value": "stdio", "label:zh-CN": "STDIO", "label:en": "STDIO"},
-        {"value": "sse", "label:zh-CN": "SSE", "label:en": "SSE"},
-        {"value": "http", "label:zh-CN": "HTTP", "label:en": "HTTP"}
+        {
+          "value": "stdio",
+          "label:zh-CN": "STDIO",
+          "label:en": "STDIO"
+        },
+        {
+          "value": "sse",
+          "label:zh-CN": "SSE",
+          "label:en": "SSE"
+        },
+        {
+          "value": "http",
+          "label:zh-CN": "HTTP",
+          "label:en": "HTTP"
+        }
       ]
     }
   },
@@ -1482,9 +1491,21 @@
     "dataType": "enum",
     "extension": {
       "options": [
-        {"value": "none", "label:zh-CN": "无", "label:en": "None"},
-        {"value": "bearer", "label:zh-CN": "Bearer Token", "label:en": "Bearer Token"},
-        {"value": "api_key", "label:zh-CN": "API Key", "label:en": "API Key"}
+        {
+          "value": "none",
+          "label:zh-CN": "无",
+          "label:en": "None"
+        },
+        {
+          "value": "bearer",
+          "label:zh-CN": "Bearer Token",
+          "label:en": "Bearer Token"
+        },
+        {
+          "value": "api_key",
+          "label:zh-CN": "API Key",
+          "label:en": "API Key"
+        }
       ]
     }
   },
@@ -1514,6 +1535,28 @@
     "dataType": "datetime",
     "extension": {
       "readonly": true
+    }
+  },
+  {
+    "code": "allowed_models",
+    "displayName:zh-CN": "可访问模型",
+    "displayName:en": "Allowed Models",
+    "dataType": "json",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON 数组,或 * 表示全部",
+      "placeholder:en": "JSON array, or * for all"
+    }
+  },
+  {
+    "code": "allowed_operations",
+    "displayName:zh-CN": "允许操作",
+    "displayName:en": "Allowed Operations",
+    "dataType": "json",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "JSON 数组:query/create/update/delete/transition",
+      "placeholder:en": "JSON array: query/create/update/delete/transition"
     }
   }
 ]
