@@ -343,6 +343,13 @@ public class AgentRunService {
                     .maxResults(toolLimit)
                     .build();
 
+            // Remember what this run was opened to do. The frame is recomputed
+            // every turn, so without holding the first one there is nothing for a
+            // later step to be compared against.
+            if (bif != null && bif.getIntent() != null) {
+                StepContext.setOpeningIntent(bif.getIntent());
+            }
+
             // Quality gate: if D1 quality insufficient, discover all tools
             String qualityIssue = groundingService.checkQualityGate(bif);
             List<AgentToolDefinition> tools;

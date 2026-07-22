@@ -60,6 +60,11 @@ import java.util.stream.Collectors;
 public class ToolLoopService {
 
     private static final int MAX_HALLUCINATION_COUNT = 3;
+    /** Openings that asked a question rather than requested a change. */
+    private static final Set<String> READ_ONLY_OPENINGS =
+            Set.of("query", "analyze", "summarize", "compare", "explain", "report", "recommend");
+    private static final Set<String> WRITE_OPERATION_KINDS =
+            Set.of("create", "update", "delete", "transition", "state_transition");
     private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {};
 
     private final ActionRecorder actionRecorder;
@@ -79,6 +84,9 @@ public class ToolLoopService {
 
     @Autowired(required = false)
     private AgentRuntimeObservabilityService observabilityService;
+
+    @Autowired(required = false)
+    private AgentObservationService agentObservationService;
 
     @Autowired(required = false)
     private DurableToolExecutionLedger durableToolExecutionLedger;
@@ -122,6 +130,47 @@ public class ToolLoopService {
         }
     }
 
+
+    /**
+     * Notices when a run that was asked a question starts changing things.
+     *
+     * <p>The intent frame is recomputed every turn, so nothing was left to
+     * compare a later step against and the question "is this still the job we
+     * were asked to do" could not be asked at all. The opening intent is carried
+     * for the run, and a write executed under a read-only opening is recorded.
+     *
+     * <p>Deliberately an observation, not a block. A run legitimately touches
+     * several objects, and refusing a step on a signal nobody has measured yet
+     * would break real work to prevent a hypothesis. Recording it first is what
+     * makes it possible to know whether blocking would ever be right — and it
+     * lands as an {@code alert_} event, which the online quality judge already
+     * consumes. The chat path does not need this: a read-only turn there gets a
+     * capability ceiling that refuses writes outright.
+     */
+    private void noteGoalDrift(Long tenantId, String runPid, String agentCode,
+                               AgentToolDefinition toolDef, String toolName) {
+        if (agentObservationService == null || toolDef == null) {
+            return;
+        }
+        String opening = StepContext.getOpeningIntent();
+        if (opening == null || !READ_ONLY_OPENINGS.contains(opening.toLowerCase(Locale.ROOT))) {
+            return;
+        }
+        String kind = toolDef.getOperationKind();
+        if (kind == null || !WRITE_OPERATION_KINDS.contains(kind.toLowerCase(Locale.ROOT))) {
+            return;
+        }
+        try {
+            agentObservationService.publish(tenantId, "alert_goal_drift", agentCode, null, runPid,
+                    Map.of("openingIntent", opening,
+                           "tool", toolName == null ? "" : toolName,
+                           "operationKind", kind));
+        } catch (Exception e) {
+            // Observability must never be the reason a turn fails.
+            log.debug("Could not record goal-drift observation for run {}: {}", runPid, e.getMessage());
+        }
+    }
+
     private String executeToolCallInternal(Long tenantId, String runPid, String taskPid, String agentCode,
                                             String toolName, Map<String, Object> input,
                                             List<AgentToolDefinition> tools, TraceContext traceCtx) {
@@ -148,6 +197,8 @@ public class ToolLoopService {
         // ACL denies, there's nothing for a human to approve. Fail-secure:
         // no rule match → deny. BIF's profile_id/channel flow in naturally;
         // run_kind defaults to 'interactive' for the tool-loop path.
+        noteGoalDrift(tenantId, runPid, agentCode, toolDef, toolName);
+
         com.auraboot.framework.agent.dto.BusinessIntentFrame bifForAcl = BifContext.getCurrentBif();
         String profileId = bifForAcl != null ? bifForAcl.getProfileId() : null;
         String channel   = bifForAcl != null ? bifForAcl.getChannel()   : null;

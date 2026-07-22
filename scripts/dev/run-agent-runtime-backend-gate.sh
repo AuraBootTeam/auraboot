@@ -53,6 +53,7 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.agent.PromptInjectionBoundaryTest' \
   --tests 'com.auraboot.framework.agent.service.ActionIdentityAuditIT' \
   --tests 'com.auraboot.framework.agent.dto.AiActionRiskLevelBridgeTest' \
+  --tests 'com.auraboot.framework.agent.service.GoalDriftObservationTest' \
   --tests 'com.auraboot.framework.agent.service.RunDeadlineEnforcementIT' \
   --tests 'com.auraboot.framework.agent.service.AgentLoopCostLimitIT' \
   --tests 'com.auraboot.framework.agent.provider.McpExternalDescriptionTest' \
