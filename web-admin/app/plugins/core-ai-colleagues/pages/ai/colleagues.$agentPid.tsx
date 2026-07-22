@@ -22,6 +22,8 @@ import {
   UserGroupIcon,
   GlobeAltIcon,
   BuildingOfficeIcon,
+  PauseCircleIcon,
+  PlayCircleIcon,
   XMarkIcon,
   ChevronDownIcon,
 } from '@heroicons/react/24/outline';
@@ -1776,6 +1778,41 @@ export default function AIColleagueDetailPage() {
   const [saving, setSaving] = useState(false);
   const [showEnrollDialog, setShowEnrollDialog] = useState(false);
   const [showRemoveOrgDialog, setShowRemoveOrgDialog] = useState(false);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+  const isSuspended = agent?.status === 'suspended';
+
+  /**
+   * Halt or release this one colleague. Refetches rather than flipping local
+   * state, so what the page shows is what the server actually stored — a
+   * button that recolours itself on click looks identical whether the write
+   * landed or not.
+   */
+  const handleToggleSuspend = async () => {
+    if (!agentPid) return;
+    setLifecycleBusy(true);
+    try {
+      const action = isSuspended ? 'resume' : 'suspend';
+      const res = await post(`/api/agent/definitions/${agentPid}/${action}`, {});
+      if (ResultHelper.isSuccess(res)) {
+        toast.showSuccessToast(
+          isSuspended
+            ? t('ai.colleagues.resume.success', undefined, 'Colleague resumed')
+            : t('ai.colleagues.suspend.success', undefined, 'Colleague suspended — it will not take new work'),
+        );
+        await fetchAgent();
+      } else {
+        toast.showErrorToast(
+          t('ai.colleagues.suspend.failed', undefined, 'Could not change the colleague state'),
+        );
+      }
+    } catch {
+      toast.showErrorToast(
+        t('ai.colleagues.suspend.failed', undefined, 'Could not change the colleague state'),
+      );
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
 
   const isAuraBot = agent?.agent_code === AURABOT_CODE;
   const readOnly = isAuraBot;
@@ -1892,6 +1929,15 @@ export default function AIColleagueDetailPage() {
                 {t('ai.colleagues.badge.official', undefined, 'Official')}
               </span>
             )}
+            {isSuspended && (
+              <span
+                className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                data-testid="agent-suspended-badge"
+              >
+                <PauseCircleIcon className="h-3 w-3" />
+                {t('ai.colleagues.badge.suspended', undefined, 'Suspended — takes no new work')}
+              </span>
+            )}
             {isEnrolled && (
               <span
                 className="ml-2 inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-semibold text-green-700 dark:bg-green-900/40 dark:text-green-400"
@@ -1907,12 +1953,40 @@ export default function AIColleagueDetailPage() {
           </p>
         </div>
 
+        {/* Lifecycle: stop this one colleague without silencing every agent in the
+            deployment. Both engines resolve definitions with status='active', so
+            suspending closes chat, dispatch and delegation at once. The backend
+            could already do this; until now nothing in the interface could ask. */}
+        {!isAuraBot && (
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={handleToggleSuspend}
+              disabled={lifecycleBusy}
+              className={
+                isSuspended
+                  ? 'inline-flex items-center gap-2 rounded-lg border border-green-200 bg-white px-3 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-50 disabled:opacity-50 dark:border-green-800 dark:bg-gray-900 dark:text-green-400'
+                  : 'inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-50 disabled:opacity-50 dark:border-amber-800 dark:bg-gray-900 dark:text-amber-400'
+              }
+              data-testid={isSuspended ? 'agent-resume-btn' : 'agent-suspend-btn'}
+            >
+              {isSuspended ? (
+                <PlayCircleIcon className="h-4 w-4" />
+              ) : (
+                <PauseCircleIcon className="h-4 w-4" />
+              )}
+              {isSuspended
+                ? t('ai.colleagues.action.resume', undefined, 'Resume')
+                : t('ai.colleagues.action.suspend', undefined, 'Suspend')}
+            </button>
+          </div>
+        )}
+
         {/* Enrollment Actions — only for non-AuraBot agents that have a system user */}
         {/* Enrollment provisions the agent's backing system user on demand, so the button no
             longer waits for system_user_id — gating on it hid enrollment from every
             tenant-created agent, which never had one. */}
         {!isAuraBot && (
-          <div className="ml-auto">
+          <div>
             {isEnrolled ? (
               <button
                 onClick={() => setShowRemoveOrgDialog(true)}

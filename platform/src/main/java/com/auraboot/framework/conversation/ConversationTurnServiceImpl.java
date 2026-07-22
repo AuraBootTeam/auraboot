@@ -153,6 +153,24 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         }
     }
 
+
+    /**
+     * Whether a definition exists at all, regardless of status — the difference
+     * between "an operator suspended this colleague" and "this colleague is
+     * gone", which the caller needs in order to say something useful.
+     */
+    private boolean agentDefinitionExists(Long tenantId, String agentCode) {
+        try {
+            String sql = "SELECT pid FROM ab_agent_definition WHERE tenant_id = #{params.tenantId} "
+                    + "AND agent_code = #{params.agentCode} AND deleted_flag = FALSE";
+            return !dynamicDataMapper.selectByQuery(sql,
+                    Map.of("tenantId", tenantId, "agentCode", agentCode)).isEmpty();
+        } catch (Exception e) {
+            // Never let the nicety of a better message become a second failure.
+            return false;
+        }
+    }
+
     private TurnOutcome runTurnDispatch(TurnRequest request, ResponseSink sink) {
         TurnContext ctx = beginTurn(request);
         sideEffects.metricsRecorder().recordTurnBegin(ctx);
@@ -798,7 +816,16 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
             return new TurnOutcome.Failed(msg, e);
         }
         if (!agentExists) {
-            String msg = "Agent not found or inactive: " + agentCode;
+            // Two very different situations shared one sentence, and it named the
+            // agent_code — an internal identifier the reader did not choose and
+            // cannot act on (§2.2 forbids raw codes in user-facing text). The
+            // common case by far is an operator having suspended this colleague
+            // on purpose; being told it "was not found" sends them looking for a
+            // deleted record instead of the Resume button.
+            String msg = agentDefinitionExists(ctx.tenantId(), agentCode)
+                    ? "This AI colleague is suspended and is not taking new work. "
+                      + "An administrator can resume it from its profile page."
+                    : "This AI colleague is no longer available.";
             sink.onError(msg, null);
             return new TurnOutcome.Failed(msg, null);
         }
