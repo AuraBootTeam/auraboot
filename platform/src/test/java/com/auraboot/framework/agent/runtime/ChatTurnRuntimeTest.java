@@ -13,7 +13,9 @@ import com.auraboot.framework.agent.runtime.policy.ExecutionEnvelope;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import reactor.core.publisher.Flux;
@@ -708,6 +710,95 @@ class ChatTurnRuntimeTest {
         assertThat(pending.preview()).isEqualTo("Execute cmd:create_draft with 1 argument(s).");
         assertThat(pending.expiresAt()).isAfter(Instant.now().minusSeconds(1));
         assertThat(pending.contextBlocks()).containsExactlyElementsOf(contextBlocks);
+    }
+
+    /**
+     * The ceiling has to actually be in scope while the loop runs.
+     *
+     * <p>Without this, the authorization service can compute a flawless
+     * intersection against a constraint nobody ever published, and every test
+     * of that computation stays green while the production path decides
+     * nothing — the failure mode where all the pieces exist and none of them
+     * are connected.
+     *
+     * <p>So this asserts the call site rather than the helper: delete the line
+     * in runToolLoop that publishes the planned ceiling and this goes red,
+     * which is the only thing that makes the other tests mean anything.
+     */
+    @Nested
+    @DisplayName("The planned ceiling is in scope while the tool loop runs")
+    class CapabilityCeilingPublication {
+
+        @AfterEach
+        void clearCeiling() {
+            com.auraboot.framework.agent.service.StepContext.clearCapabilityCeiling();
+        }
+
+        private String ceilingObservedDuringLoop(ExecutionEnvelope envelope) throws Exception {
+            LlmProvider provider = mock(LlmProvider.class);
+            java.util.concurrent.atomic.AtomicReference<String> observed =
+                    new java.util.concurrent.atomic.AtomicReference<>();
+            // Read it at the moment the model is called: inside the loop, after
+            // planning and after tool filtering, which is exactly the window in
+            // which an authorization decision gets taken.
+            when(provider.chat(any(LlmChatRequest.class), eq("sk-test"), eq("https://llm.test")))
+                    .thenAnswer(inv -> {
+                        observed.set(com.auraboot.framework.agent.service.StepContext
+                                .getCapabilityCeiling());
+                        return response("done");
+                    });
+
+            List<LlmChatRequest.Message> messages = new ArrayList<>();
+            messages.add(LlmChatRequest.Message.builder().role("user").content("hello").build());
+            // The catalog holds a write tool in both cases on purpose. The
+            // ceiling under test is the one policy resolved, not the one the
+            // catalog happens to permit — a read-only catalog would produce
+            // READ_ONLY whatever the envelope said, and the assertion would
+            // pass without the envelope being consulted at all.
+            LlmChatRequest.Tool readTool = LlmChatRequest.Tool.builder()
+                    .name("nq:crm_customer_stats").description("Customer stats")
+                    .inputSchema(Map.of("type", "object")).build();
+            LlmChatRequest.Tool writeTool = LlmChatRequest.Tool.builder()
+                    .name("cmd:crm_customer_delete").description("Delete customer")
+                    .inputSchema(Map.of("type", "object")).build();
+            ToolDefinition readDefinition = ToolDefinition.builder()
+                    .toolCode("nq:crm_customer_stats").toolType("dsl_query").riskLevel("L0").build();
+            ToolDefinition writeDefinition = ToolDefinition.builder()
+                    .toolCode("cmd:crm_customer_delete").toolType("dsl_command").riskLevel("L2").build();
+
+            com.auraboot.framework.agent.service.StepContext.clearCapabilityCeiling();
+            runtime.runToolLoop(
+                    new ChatTurnRuntime.ChatToolLoopSpec(
+                            new TurnContext("turn-ceiling", 1L, 2L, null, null, "aurabot",
+                                    null, null, null, null, java.util.Set.of(), null, null,
+                                    Instant.now()),
+                            "aurabot", provider, "test", "sk-test", "https://llm.test",
+                            "ceiling publication test", "test-model", "system", 256,
+                            messages, List.of(readTool, writeTool),
+                            List.of(readDefinition, writeDefinition),
+                            null, null, "session-ceiling", new RecordingSink(),
+                            false, false, 1, null, "trace-ceiling", null),
+                    new PolicyCallbacks(envelope));
+            return observed.get();
+        }
+
+        @Test
+        @DisplayName("a write-capable catalog capped read-only runs with READ_ONLY in scope")
+        void readOnlyEnvelopePublishesItsCeiling() throws Exception {
+            assertThat(ceilingObservedDuringLoop(ExecutionEnvelope.readOnlyCatalog()))
+                    .as("the authorization record must be computable "
+                            + "against the constraint the loop enforces")
+                    .isEqualTo("READ_ONLY");
+        }
+
+        @Test
+        @DisplayName("a write-capable turn publishes its own ceiling rather than the previous one")
+        void writeCapableEnvelopePublishesItsCeiling() throws Exception {
+            // The control. A publication that always wrote READ_ONLY would
+            // satisfy the case above while silently refusing every real write.
+            assertThat(ceilingObservedDuringLoop(ExecutionEnvelope.writeCatalogWithGate()))
+                    .isEqualTo("WRITE_CAPABLE");
+        }
     }
 
     private LlmChatResponse response(String text) {
