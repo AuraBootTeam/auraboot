@@ -25,6 +25,10 @@ on:
       - 'web-admin/app/framework/meta/runtime/renderers/CellRendererRegistry.tsx'
       - 'web-admin/app/framework/meta/rendering/blocks/workbenchBlockUtils.ts'
       - 'web-admin/app/framework/meta/runtime/actions/ActionRegistry.ts'
+      - 'plugins/**/config/commands.json'
+      - 'plugins/**/config/bindingRules*.json'
+      - 'scripts/check-command-permissions.mjs'
+      - 'scripts/command-permissions-baseline.json'
       - '.github/workflows/dsl-command-convention.yml'
   pull_request:
     branches: [main]
@@ -40,6 +44,10 @@ on:
       - 'web-admin/app/framework/meta/runtime/renderers/CellRendererRegistry.tsx'
       - 'web-admin/app/framework/meta/rendering/blocks/workbenchBlockUtils.ts'
       - 'web-admin/app/framework/meta/runtime/actions/ActionRegistry.ts'
+      - 'plugins/**/config/commands.json'
+      - 'plugins/**/config/bindingRules*.json'
+      - 'scripts/check-command-permissions.mjs'
+      - 'scripts/command-permissions-baseline.json'
       - '.github/workflows/dsl-command-convention.yml'
   workflow_dispatch:
 
@@ -73,3 +81,9 @@ jobs:
 
       - name: Check workbench actions use a real verb + fresh action catalog
         run: node scripts/check-dsl-actions.mjs
+
+      # A handler command with no declared permission cannot inherit its boundary
+      # authority (DDR-2026-07-22), so it stays exposed to the write-then-read-back
+      # failure. Born green against an explicit baseline that may only shrink.
+      - name: Check handler commands declare the permission that authorizes them
+        run: node scripts/check-command-permissions.mjs
