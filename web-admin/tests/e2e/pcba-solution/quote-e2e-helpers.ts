@@ -954,16 +954,24 @@ async function seedQuoteScaffold(
  * The first row mirrors the reported edge case: package is blank, while the description contains a
  * standalone 0201 token. Process-fee matching must still resolve the fixed-point resistor rule from
  * the combined line content. The remaining rows exercise real Yunhan upload-bom lookup results.
+ *
+ * <p><b>The leading unnamed, entirely empty column is load-bearing, not sloppiness.</b> Real exported
+ * customer BOMs routinely carry one (a spacer or a dropped index column), and Yunhan rejects the
+ * <em>whole</em> upload with `203001103 生成bom失败` if any `excel_head` entry is blank — verified
+ * against the live API on 2026-07-22, where an 83-line quote consequently got no prices at all while
+ * this golden stayed green, because the fixture's every column happened to be named. The client
+ * sanitises such columns before upload; keeping one here is what makes that sanitisation falsifiable
+ * (remove it from the client and the Yunhan evidence assertions below go red).
  */
 export function createNonStandardBomWorkbook(filePath: string): string {
   mkdirSync(path.dirname(filePath), { recursive: true });
   const workbook = XLSXUtils.book_new();
   const worksheet = XLSXUtils.aoa_to_sheet([
-    ['位号', '规格描述', '封装', '数量', '品牌', '料号'],
-    ['R1,R2,R3', '240Ω ±1% 1/20W 0201', '', 3, '', 'WMF2400TEE'],
-    ['R4,R5', '10kΩ ±1% 贴片电阻', '0603', 2, 'YAGEO', 'RC0603FR-0710KL'],
-    ['C1', '0.1uF 50V X7R 贴片电容', '0603', 1, 'SAMSUNG', 'CL10B104KB8NNNC'],
-    ['D1', '开关二极管', 'SOD-123', 10, 'MDD', '1N4148W'],
+    ['', '位号', '规格描述', '封装', '数量', '品牌', '料号'],
+    ['', 'R1,R2,R3', '240Ω ±1% 1/20W 0201', '', 3, '', 'WMF2400TEE'],
+    ['', 'R4,R5', '10kΩ ±1% 贴片电阻', '0603', 2, 'YAGEO', 'RC0603FR-0710KL'],
+    ['', 'C1', '0.1uF 50V X7R 贴片电容', '0603', 1, 'SAMSUNG', 'CL10B104KB8NNNC'],
+    ['', 'D1', '开关二极管', 'SOD-123', 10, 'MDD', '1N4148W'],
   ]);
   XLSXUtils.book_append_sheet(workbook, worksheet, 'BOM');
   const bytes = write(workbook, { bookType: 'xlsx', type: 'buffer' });
