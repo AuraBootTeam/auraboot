@@ -48,6 +48,14 @@ public final class StepContext {
      * and every one of their callers.
      */
     private static final ThreadLocal<String> CURRENT_AGENT_CODE = new ThreadLocal<>();
+    /**
+     * What the run was opened to do, as grounded from the first message.
+     *
+     * <p>Kept because the intent frame is recomputed every turn, so by the time a
+     * later step runs there is nothing left to compare it against — the question
+     * "is this still the job we were asked to do" had no way to be asked.
+     */
+    private static final ThreadLocal<String> OPENING_INTENT = new ThreadLocal<>();
 
     private StepContext() {}
 
@@ -115,8 +123,21 @@ public final class StepContext {
         CURRENT_AGENT_CODE.remove();
     }
 
+    public static void setOpeningIntent(String intent) {
+        OPENING_INTENT.set(intent);
+    }
+
+    public static String getOpeningIntent() {
+        return OPENING_INTENT.get();
+    }
+
+    public static void clearOpeningIntent() {
+        OPENING_INTENT.remove();
+    }
+
     public static void clear() {
         CURRENT_AGENT_CODE.remove();
+        OPENING_INTENT.remove();
         CURRENT_STEP_INDEX.remove();
         PARALLEL_GROUP_ID.remove();
         PARALLEL_INDEX.remove();
