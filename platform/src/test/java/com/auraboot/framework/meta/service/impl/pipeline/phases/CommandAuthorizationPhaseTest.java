@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.permission.service.UserPermissionService;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -32,6 +34,48 @@ class CommandAuthorizationPhaseTest {
 
         phase.execute(contextWithPermissions(null, 42L));
 
+        verifyNoInteractions(userPermissionService);
+    }
+
+    @Test
+    void executeRecordsWhichPermissionAuthorizedTheCaller() {
+        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(true);
+        CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), 42L);
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getAuthorizationVerdict().isAuthorized()).isTrue();
+        assertThat(ctx.getAuthorizationVerdict().permissionCode()).isEqualTo("dashboard.manage");
+    }
+
+    /**
+     * A command that declares nothing has granted nothing. Downstream stages may only inherit the
+     * boundary's authority from an AUTHORIZED verdict, so this must be distinguishable from one —
+     * and it must never read as authorized just because nothing was thrown.
+     */
+    @Test
+    void executeRecordsThatNoDecisionWasMadeWhenNothingIsDeclared() {
+        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandPipelineContext ctx = contextWithPermissions(null, 42L);
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getAuthorizationVerdict().isAuthorized()).isFalse();
+        assertThat(ctx.getAuthorizationVerdict().reason())
+                .isEqualTo(CommandAuthorizationVerdict.REASON_NO_DECLARED_PERMISSIONS);
+    }
+
+    @Test
+    void executeRecordsThatNoDecisionWasMadeWithoutAUserInContext() {
+        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), null);
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getAuthorizationVerdict().isAuthorized()).isFalse();
+        assertThat(ctx.getAuthorizationVerdict().reason())
+                .isEqualTo(CommandAuthorizationVerdict.REASON_NO_USER_CONTEXT);
         verifyNoInteractions(userPermissionService);
     }
 
