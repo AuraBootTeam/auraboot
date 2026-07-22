@@ -410,6 +410,12 @@ public class ChatTurnRuntime {
                     false,
                     spec.agentProfile(),
                     tenantPolicyFromCatalog(catalogAllowedDefinitions)));
+            // Publish the ceiling the planner just resolved, so the authorization
+            // record is computed against the same constraint this loop enforces
+            // rather than the two agreeing only by coincidence.
+            com.auraboot.framework.agent.service.StepContext.setCapabilityCeiling(
+                    envelope.capabilityCeiling() == null ? null : envelope.capabilityCeiling().name());
+
             List<ToolDefinition> roundToolDefinitions = filterToolDefinitions(
                     envelope, catalogAllowedDefinitions, spec.ctx(), spec.actorPermissions());
             List<LlmChatRequest.Tool> roundTools = filterLlmTools(spec.tools(), roundToolDefinitions);

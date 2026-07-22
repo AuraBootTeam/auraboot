@@ -217,6 +217,20 @@ cmd_up() {
     PGPASSWORD=auraboot psql -h 127.0.0.1 -p 5432 -U auraboot -d postgres -q \
       -c "DROP DATABASE IF EXISTS $pg_db WITH (FORCE)" -c "CREATE DATABASE $pg_db" \
       || die "could not recreate $pg_db"
+  elif [ "$(PGPASSWORD=auraboot psql -h 127.0.0.1 -p 5432 -U auraboot -d "$pg_db" -tAc \
+            "SELECT count(*) FROM information_schema.tables WHERE table_schema='public'" \
+            2>/dev/null || echo 0)" = "0" ]; then
+    # An empty database is the one case the drift check cannot speak to. It
+    # answers "is anything missing from the tables you have", and a database
+    # with no tables has nothing missing — so it reports no drift, and the
+    # branch below would skip the apply and leave the schema unbuilt. The
+    # backend then dies on `relation "ab_scheduled_task" does not exist`,
+    # which reads like a migration problem and is not one.
+    #
+    # This is the path every gate runner takes: `destroy` then `up` is the
+    # documented way to guarantee a fresh database, and it lands here every
+    # single run.
+    log "    $pg_db has no tables yet — applying schema.sql"
   elif ! PG_HOST=127.0.0.1 PG_PORT=5432 PG_USER=auraboot PG_PASSWORD=auraboot \
        "$REPO_ROOT/scripts/db/check-db-matches-schema-sql.sh" "$pg_db" --quiet; then
     die "database '$pg_db' predates the current schema.sql (see the missing columns above).

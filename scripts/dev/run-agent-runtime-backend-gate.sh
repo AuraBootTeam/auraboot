@@ -18,6 +18,7 @@ cd "$PROJECT_ROOT/platform"
 ./gradlew :test \
   --tests 'com.auraboot.framework.agent.runtime.*' \
   --tests 'com.auraboot.framework.agent.runtime.policy.*' \
+  --tests 'com.auraboot.framework.agent.authorization.*' \
   --tests 'com.auraboot.framework.agent.runtime.context.AgentContextAssemblerTest' \
   --tests 'com.auraboot.framework.agent.service.ToolLoopServiceSafetyTest' \
   --tests 'com.auraboot.framework.agent.service.StepLoopServiceCheckpointTest' \

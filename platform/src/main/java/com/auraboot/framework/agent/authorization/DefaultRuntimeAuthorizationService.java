@@ -13,6 +13,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 
@@ -144,19 +146,90 @@ public class DefaultRuntimeAuthorizationService implements RuntimeAuthorizationS
                 ? intent.requiredEffects()
                 : Set.of();
 
+        // The intersection, over the sources that are actually configured.
+        //
+        // An unconfigured source contributes no constraint, which is exactly the
+        // behaviour the runtime has always had — this narrows nothing that was
+        // previously wide. What changes is that the decision is computed and
+        // recorded rather than asserted: a call under a read-only ceiling asking
+        // for a mutating effect is refused here as well as by the tool loop, so
+        // the two agree by construction instead of by coincidence.
+        //
+        // Making an absent ceiling mean denial is a defensible policy and a
+        // breaking one, so it stays a decision taken on purpose rather than a
+        // side effect of this class learning to compute an intersection.
+        Ceiling ceiling = Ceiling.current();
+        Map<EffectClass, String> rejected = new LinkedHashMap<>();
+        Set<EffectClass> granted = new LinkedHashSet<>();
+        for (EffectClass effect : requested) {
+            String refusal = ceiling.refuse(effect);
+            if (refusal == null) {
+                granted.add(effect);
+            } else {
+                rejected.put(effect, refusal);
+            }
+        }
+        boolean allowed = rejected.isEmpty();
+
         persistDecision(
                 intent.tenantId(), intent.runId(), intent.stepIndex(), intent.toolCallIndex(),
                 "incremental", intent.toolRef(), intent.skillCode(),
                 intent.argHash(),
                 intent.blastRadius() != null ? intent.blastRadius().name() : null,
-                requested, requested, Map.of(),
+                requested, granted, rejected,
                 intent.currentPlanHash(), null,
-                "no-policy-engine", 1, NOT_EVALUATED_REASON,
+                ceiling.policyId(), 1,
+                allowed ? ceiling.grantReason() : "capability_ceiling_" + ceiling.name(),
                 false, null,
                 buildSessionScopeKey(intent.tenantId(), null, null, intent.channelSessionId()));
-        recordAuthorizationDecision("incremental", "granted");
+        recordAuthorizationDecision("incremental", allowed ? "granted" : "rejected");
 
-        return IncrementalAuthorization.grant();
+        if (allowed) {
+            return IncrementalAuthorization.grant();
+        }
+        return new IncrementalAuthorization(false, false, null,
+                "capability ceiling " + ceiling.name() + " does not permit " + rejected.keySet(),
+                "runtime-authorization");
+    }
+
+    /** Effects that change something; a read-only ceiling exists to keep these out. */
+    private static final Set<EffectClass> MUTATING_EFFECTS = Set.of(
+            EffectClass.WRITE_PLATFORM_STATE,
+            EffectClass.EXTERNAL_NETWORK,
+            EffectClass.FILE_WRITE,
+            EffectClass.TERMINAL_EXEC);
+
+    /** The turn's capability ceiling, or the absence of one. */
+    private record Ceiling(String name, boolean known) {
+        static Ceiling current() {
+            String raw = com.auraboot.framework.agent.service.StepContext.getCapabilityCeiling();
+            return raw == null || raw.isBlank()
+                    ? new Ceiling("UNCONSTRAINED", false)
+                    : new Ceiling(raw.toUpperCase(java.util.Locale.ROOT), true);
+        }
+
+        /** Null when the effect is permitted; otherwise why it is not. */
+        String refuse(EffectClass effect) {
+            if (!known || !MUTATING_EFFECTS.contains(effect)) {
+                return null;
+            }
+            return switch (name) {
+                case "NO_TOOLS" -> "no_tools_ceiling";
+                case "READ_ONLY" -> "read_only_ceiling";
+                case "PROPOSE_ONLY" -> "propose_only_ceiling";
+                default -> null;
+            };
+        }
+
+        String policyId() {
+            return known ? "capability-ceiling" : "no-policy-engine";
+        }
+
+        String grantReason() {
+            return known
+                    ? "granted: requested effects are within the " + name + " capability ceiling"
+                    : NOT_EVALUATED_REASON;
+        }
     }
 
     private void persistDecision(
