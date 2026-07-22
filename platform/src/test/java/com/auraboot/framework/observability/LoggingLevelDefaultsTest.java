@@ -3,57 +3,120 @@ package com.auraboot.framework.observability;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.MutablePropertySources;
 import org.springframework.core.env.PropertiesPropertySource;
-import org.springframework.core.env.StandardEnvironment;
+import org.springframework.core.env.PropertySourcesPropertyResolver;
 import org.springframework.core.io.ClassPathResource;
 
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.TreeMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The transaction/datasource loggers used to be pinned to DEBUG as literals, which made every
- * deployment pay for per-statement transaction logs with no way to turn them down. They now
- * default to INFO through a placeholder, so an operator can raise them per environment.
+ * The logger levels in application.yml are defaults, not pins. They used to be literals — three of
+ * them stuck at DEBUG since the initial commit — so every environment paid for per-statement
+ * transaction logging and no environment could turn it down. Each level now reads
+ * LOGGING_LEVEL_&lt;PROPERTY_PATH_UPPER_SNAKE&gt;, the same name Spring Boot's relaxed binding accepts.
+ *
+ * <p>These tests are written against whatever the file contains rather than a hardcoded list, so a
+ * future literal level, or one wired to an off-convention env var name, fails here.
  */
 class LoggingLevelDefaultsTest {
 
-    private static final String TX_INTERCEPTOR = "logging.level.org.springframework.transaction.interceptor";
-    private static final String TX_SUPPORT = "logging.level.org.springframework.transaction.support";
-    private static final String JDBC_DATASOURCE = "logging.level.org.springframework.jdbc.datasource";
+    private static final String PREFIX = "logging.level.";
 
-    private static Properties applicationYaml() {
+    /** ${LOGGING_LEVEL_SOMETHING:INFO} — group 1 is the env var, group 2 the fallback level. */
+    private static final Pattern OVERRIDABLE = Pattern.compile("\\$\\{(LOGGING_LEVEL_[A-Z0-9_]+):([A-Za-z]+)}");
+
+    private static Map<String, String> declaredLevels() {
+        YamlPropertiesFactoryBean factory = new YamlPropertiesFactoryBean();
+        factory.setResources(new ClassPathResource("application.yml"));
+        Properties properties = factory.getObject();
+
+        Map<String, String> levels = new TreeMap<>();
+        properties.forEach((key, value) -> {
+            if (key.toString().startsWith(PREFIX)) {
+                levels.put(key.toString(), value.toString());
+            }
+        });
+        return levels;
+    }
+
+    /** LOGGING_LEVEL_ORG_POSTGRESQL for logging.level.org.postgresql — the convention under test. */
+    private static String expectedEnvVar(String propertyKey) {
+        return propertyKey.replace('.', '_').toUpperCase(Locale.ROOT);
+    }
+
+    /**
+     * Resolves against the yaml plus a stand-in for the process environment. Deliberately not a
+     * StandardEnvironment: the real system environment would make the default assertions depend on
+     * the shell the test happens to run in.
+     */
+    private static PropertySourcesPropertyResolver resolverWith(Map<String, Object> fakeEnvironment) {
+        MutablePropertySources sources = new MutablePropertySources();
+        sources.addLast(new PropertiesPropertySource("application.yml", yaml()));
+        sources.addFirst(new MapPropertySource("fake-environment", fakeEnvironment));
+        return new PropertySourcesPropertyResolver(sources);
+    }
+
+    private static Properties yaml() {
         YamlPropertiesFactoryBean factory = new YamlPropertiesFactoryBean();
         factory.setResources(new ClassPathResource("application.yml"));
         return factory.getObject();
     }
 
-    private static StandardEnvironment environmentWith(Map<String, Object> fakeEnvVars) {
-        StandardEnvironment environment = new StandardEnvironment();
-        environment.getPropertySources().addLast(new PropertiesPropertySource("application.yml", applicationYaml()));
-        environment.getPropertySources().addFirst(new MapPropertySource("fake-env", fakeEnvVars));
-        return environment;
+    @Test
+    void everyLoggerLevelIsOverridableByAConventionallyNamedEnvironmentVariable() {
+        Map<String, String> levels = declaredLevels();
+
+        // Guard the assertions below against passing on an empty map.
+        assertThat(levels)
+                .hasSizeGreaterThanOrEqualTo(7)
+                .containsKeys(
+                        PREFIX + "org.apache.tomcat.util.net.jsse.JSSESupport",
+                        PREFIX + "org.apache.coyote",
+                        PREFIX + "com.zaxxer.hikari.pool",
+                        PREFIX + "org.postgresql",
+                        PREFIX + "org.springframework.transaction.interceptor",
+                        PREFIX + "org.springframework.transaction.support",
+                        PREFIX + "org.springframework.jdbc.datasource");
+
+        levels.forEach((key, value) -> {
+            Matcher matcher = OVERRIDABLE.matcher(value);
+            assertThat(matcher.matches())
+                    .as("%s is pinned to '%s'; write it as ${%s:<level>} so an environment can change it",
+                            key, value, expectedEnvVar(key))
+                    .isTrue();
+            assertThat(matcher.group(1))
+                    .as("%s reads an off-convention env var; Spring Boot's relaxed binding uses the other name",
+                            key)
+                    .isEqualTo(expectedEnvVar(key));
+        });
     }
 
     @Test
-    void transactionAndDatasourceLoggersDefaultToInfo() {
-        StandardEnvironment environment = environmentWith(Map.of());
+    void everyLoggerLevelDefaultsToInfoWhenNothingIsSet() {
+        PropertySourcesPropertyResolver resolver = resolverWith(Map.of());
 
-        assertThat(environment.getProperty(TX_INTERCEPTOR)).isEqualTo("INFO");
-        assertThat(environment.getProperty(TX_SUPPORT)).isEqualTo("INFO");
-        assertThat(environment.getProperty(JDBC_DATASOURCE)).isEqualTo("INFO");
+        declaredLevels().keySet().forEach(key ->
+                assertThat(resolver.getProperty(key)).as(key).isEqualTo("INFO"));
     }
 
     @Test
-    void transactionAndDatasourceLoggersCanBeRaisedByEnvironmentVariable() {
-        StandardEnvironment environment = environmentWith(Map.of(
-                "LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TRANSACTION_INTERCEPTOR", "DEBUG",
-                "LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TRANSACTION_SUPPORT", "TRACE",
-                "LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_JDBC_DATASOURCE", "WARN"));
+    void everyLoggerLevelCanBeRaisedByItsEnvironmentVariable() {
+        Map<String, String> levels = declaredLevels();
+        Map<String, Object> fakeEnvironment = new HashMap<>();
+        levels.keySet().forEach(key -> fakeEnvironment.put(expectedEnvVar(key), "TRACE"));
 
-        assertThat(environment.getProperty(TX_INTERCEPTOR)).isEqualTo("DEBUG");
-        assertThat(environment.getProperty(TX_SUPPORT)).isEqualTo("TRACE");
-        assertThat(environment.getProperty(JDBC_DATASOURCE)).isEqualTo("WARN");
+        PropertySourcesPropertyResolver resolver = resolverWith(fakeEnvironment);
+
+        levels.keySet().forEach(key ->
+                assertThat(resolver.getProperty(key)).as(key).isEqualTo("TRACE"));
     }
 }

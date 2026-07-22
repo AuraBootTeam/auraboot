@@ -46,15 +46,19 @@ logging:
     # in its finally) so request logs can be filtered by tenant/user; empty off-request.
     console: '%clr(%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}}){faint} %clr(${LOG_LEVEL_PATTERN:-%5p}){} %clr(${PID:-}){magenta} %clr(--- [%15.15t]){faint} %clr([%X{traceId:-},%X{spanId:-},t=%X{tenantId:-},u=%X{userId:-}]){faint} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
     file: '%d{${LOG_DATEFORMAT_PATTERN:-yyyy-MM-dd''T''HH:mm:ss.SSSXXX}} ${LOG_LEVEL_PATTERN:-%5p} ${PID:-} --- [%t] [%X{traceId:-},%X{spanId:-},t=%X{tenantId:-},u=%X{userId:-}] %-40.40logger{39} : %replace(%msg){''[\r\n\t]'',''_''}%n${LOG_EXCEPTION_CONVERSION_WORD:-%wEx}'
+  # Every level below is a default, not a pin: it reads LOGGING_LEVEL_<PROPERTY_PATH_UPPER_SNAKE>
+  # and falls back to the value written here, e.g. LOGGING_LEVEL_ORG_POSTGRESQL=DEBUG while
+  # chasing a driver problem. That is the same env var name Spring Boot's own relaxed binding
+  # accepts, so each logger has one knob rather than two competing mechanisms.
   level:
-    org.apache.tomcat.util.net.jsse.JSSESupport: INFO
-    org.apache.coyote: INFO
-    com.zaxxer.hikari.pool: INFO
-    org.postgresql: INFO
-    # Transaction/datasource tracing is per-statement noisy, so it defaults to INFO.
-    # Turn it back up per environment with the matching env var, e.g.
-    #   LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TRANSACTION_INTERCEPTOR=DEBUG
-    # (same name Spring Boot's relaxed binding uses, so there is only one knob).
+    # Noise suppression — raise these while debugging TLS handshakes, HTTP parsing or pool waits.
+    org.apache.tomcat.util.net.jsse.JSSESupport: ${LOGGING_LEVEL_ORG_APACHE_TOMCAT_UTIL_NET_JSSE_JSSESUPPORT:INFO}
+    org.apache.coyote: ${LOGGING_LEVEL_ORG_APACHE_COYOTE:INFO}
+    com.zaxxer.hikari.pool: ${LOGGING_LEVEL_COM_ZAXXER_HIKARI_POOL:INFO}
+    org.postgresql: ${LOGGING_LEVEL_ORG_POSTGRESQL:INFO}
+    # Per-statement transaction/datasource tracing. These were pinned at DEBUG, which the dev
+    # profile could not turn down: its `org.springframework.transaction: warn` loses to the more
+    # specific keys below.
     org.springframework.transaction.interceptor: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TRANSACTION_INTERCEPTOR:INFO}
     org.springframework.transaction.support: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_TRANSACTION_SUPPORT:INFO}
     org.springframework.jdbc.datasource: ${LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_JDBC_DATASOURCE:INFO}
