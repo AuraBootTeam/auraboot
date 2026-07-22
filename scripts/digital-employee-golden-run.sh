@@ -148,8 +148,8 @@ PW_ARGS=(tests/e2e/agent-control-plane/ --project=contract
          --repeat-each="$REPEAT" --reporter=line)
 [[ "$LIVE" == 1 ]] || PW_ARGS+=(--grep-invert "conversation")
 NO_PROXY=localhost,127.0.0.1 PW_PROFILE=contract \
-  pnpm exec playwright test "${PW_ARGS[@]}"
-GOLDEN_RC=$?
+  pnpm exec playwright test "${PW_ARGS[@]}" 2>&1 | tee /tmp/de-golden-run.$$.log
+GOLDEN_RC=${PIPESTATUS[0]}
 set -e 2>/dev/null || true
 
 echo "[de-golden] 4/4 result"
@@ -158,6 +158,13 @@ if [[ "$GOLDEN_RC" == 0 ]]; then
   echo "[de-golden] ============================================"
   echo "[de-golden]   DIGITAL EMPLOYEE GOLDEN: PASS  (name=$NAME slot=$SLOT, mode=$([[ "$LIVE" == 1 ]] && echo LIVE || echo STUB))"
   [[ "$LIVE" == 1 ]] || echo "[de-golden]   NOT COVERED HERE: $STUB_EXCLUDED_SPEC — a stub answers, so it cannot fail the way a mute colleague does"
+  # Skips are printed because a pass that quietly swallowed them reads exactly
+  # like a pass that ran everything. Some of this suite's skips fire when the
+  # row under test cannot be found — which declares success for the case where
+  # the thing being tested is missing — so the count is worth a person's eye
+  # even though it does not fail the gate.
+  SKIPPED=$(grep -aoE '[0-9]+ skipped' "/tmp/de-golden-run.$$.log" 2>/dev/null | tail -1)
+  [[ -n "$SKIPPED" ]] && echo "[de-golden]   $SKIPPED — check what, a skip on 'row not found' is a pass for a missing thing"
   echo "[de-golden]   screenshots: web-admin/test-results/digital-employee/ ($SHOTS)"
   echo "[de-golden] ============================================"
   # A pass with no screenshots means the evidence step silently stopped
@@ -176,4 +183,5 @@ else
   echo "[de-golden] ############################################"
 fi
 
+rm -f "/tmp/de-golden-run.$$.log"
 exit "$GOLDEN_RC"
