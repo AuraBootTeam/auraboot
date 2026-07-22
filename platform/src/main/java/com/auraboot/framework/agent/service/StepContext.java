@@ -41,6 +41,13 @@ public final class StepContext {
      * {@code ToolProvider.execute} signature.
      */
     private static final ThreadLocal<String> CURRENT_RUN_PID = new ThreadLocal<>();
+    /**
+     * Which agent is executing. Kept beside the run pid because the audit needs
+     * to separate what carried an action out from whose authority it spent, and
+     * the alternative was threading the code through three recorder signatures
+     * and every one of their callers.
+     */
+    private static final ThreadLocal<String> CURRENT_AGENT_CODE = new ThreadLocal<>();
 
     private StepContext() {}
 
@@ -96,7 +103,20 @@ public final class StepContext {
         CURRENT_RUN_PID.remove();
     }
 
+    public static void setAgentCode(String agentCode) {
+        CURRENT_AGENT_CODE.set(agentCode);
+    }
+
+    public static String getAgentCode() {
+        return CURRENT_AGENT_CODE.get();
+    }
+
+    public static void clearAgentCode() {
+        CURRENT_AGENT_CODE.remove();
+    }
+
     public static void clear() {
+        CURRENT_AGENT_CODE.remove();
         CURRENT_STEP_INDEX.remove();
         PARALLEL_GROUP_ID.remove();
         PARALLEL_INDEX.remove();

@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.agent.authorization.EffectClass;
 import com.auraboot.framework.agent.dto.ActionRecord;
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
@@ -40,6 +41,29 @@ public class ActionRecorder {
      * NOT parsed from tool name (which uses namespace:operation_model format, not model_operation).
      */
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
+
+    /**
+     * Records which agent acted and whose authority it spent.
+     *
+     * <p>An agent runs inside the initiating user's MetaContext — its tools carry
+     * that person's permissions and data scope — so the user is not incidental
+     * context, it is the authority the action was taken under. A system-initiated
+     * run has no such user, and leaving the column null says exactly that rather
+     * than inventing an owner.
+     */
+    private void stampIdentity(Map<String, Object> row) {
+        String agentCode = StepContext.getAgentCode();
+        if (agentCode != null && !agentCode.isBlank()) {
+            row.put("actor_id", agentCode);
+        }
+        if (MetaContext.exists()) {
+            Long onBehalfOf = MetaContext.getCurrentUserId();
+            if (onBehalfOf != null) {
+                row.put("on_behalf_of_user_id", onBehalfOf);
+            }
+        }
+    }
+
     public String recordAction(Long tenantId, String runPid, String commandCode,
                                 AgentToolDefinition toolDef, Map<String, Object> input,
                                 CommandExecuteResult cmdResult,
@@ -102,6 +126,10 @@ public class ActionRecorder {
             row.put("action_status", isSuccess ? "success" : "failed");
             row.put("error_message", error);
             row.put("actor_type", "agent");
+            // Three identities, not one. actor_id had a column and never a value,
+            // so the trail said "an agent did this" — true, unactionable, and in
+            // an incident the only question anyone asks is which agent, for whom.
+            stampIdentity(row);
             row.put("executed_at", LocalDateTime.now());
             row.put("created_at", LocalDateTime.now());
 
@@ -195,6 +223,10 @@ public class ActionRecorder {
             row.put("action_status", isSuccess ? "success" : "failed");
             row.put("error_message", error);
             row.put("actor_type", "agent");
+            // Three identities, not one. actor_id had a column and never a value,
+            // so the trail said "an agent did this" — true, unactionable, and in
+            // an incident the only question anyone asks is which agent, for whom.
+            stampIdentity(row);
             row.put("executed_at", LocalDateTime.now());
             row.put("created_at", LocalDateTime.now());
 
@@ -277,6 +309,10 @@ public class ActionRecorder {
             row.put("action_status", success ? "success" : "failed");
             row.put("error_message", error);
             row.put("actor_type", "agent");
+            // Three identities, not one. actor_id had a column and never a value,
+            // so the trail said "an agent did this" — true, unactionable, and in
+            // an incident the only question anyone asks is which agent, for whom.
+            stampIdentity(row);
             row.put("executed_at", LocalDateTime.now());
             row.put("created_at", LocalDateTime.now());
             row.put("fidelity", fidelityGrader.grade(toolDef != null ? toolDef.getToolType() : "provider"));
