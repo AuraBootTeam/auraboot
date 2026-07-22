@@ -20,6 +20,7 @@ public class MetaContext {
     private static final ThreadLocal<Boolean> ENV_FILTER_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Boolean> LOCK_GUARD_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Boolean> DATA_PERMISSION_BYPASSED = ThreadLocal.withInitial(() -> false);
+    private static final ThreadLocal<String> COMMAND_AUTHORITY = new ThreadLocal<>();
 
     @Getter
     private final Long tenantId;
@@ -87,6 +88,7 @@ public class MetaContext {
         ENV_FILTER_BYPASSED.remove();
         LOCK_GUARD_BYPASSED.remove();
         DATA_PERMISSION_BYPASSED.remove();
+        COMMAND_AUTHORITY.remove();
     }
 
     /**
@@ -259,6 +261,60 @@ public class MetaContext {
             action.run();
             return null;
         });
+    }
+
+    /**
+     * Run {@code action} under the authority a command boundary already granted — the permission
+     * the caller was checked against before the handler was allowed to run at all
+     * (DDR-2026-07-22, command-scoped data authority).
+     *
+     * <p>This carries a DECISION, not a switch. It is only ever opened for a verdict of
+     * {@code AUTHORIZED}: a command that declared no permissions granted nothing, and opening a
+     * scope on its behalf would hand it authority nobody conferred. Consumers must treat the code
+     * as the reason they are permitted to act, and it is recorded so an audit can name it.</p>
+     *
+     * <p>What this does NOT relax: the tenant partition (a different holder entirely — identity is
+     * not a permission), the actor recorded on writes, and any read the caller themselves asked
+     * for. It changes only whether a HANDLER's own bookkeeping is re-projected through the read
+     * permission of the caller who was already authorized to trigger it.</p>
+     *
+     * <p>Like the guard-bypass flags, this is deliberately NOT part of {@link Snapshot}: it must
+     * never ride into a worker thread implicitly. The async command path re-establishes it from the
+     * persisted verdict instead, so background work carries an authority someone can point at.</p>
+     */
+    public static <T> T runWithCommandAuthority(String permissionCode, java.util.function.Supplier<T> action) {
+        if (permissionCode == null || permissionCode.isBlank()) {
+            // An authority with no permission behind it is a contradiction: there would be nothing to
+            // point at when asked why the work was allowed. Without this, opening a scope for a
+            // NOT_APPLICABLE verdict would be silently harmless-looking (its code is null, so nothing
+            // reads as authorized) while encoding exactly the mistake this design exists to prevent.
+            throw new IllegalArgumentException(
+                    "A command authority scope must name the permission that granted it");
+        }
+        String prior = COMMAND_AUTHORITY.get();
+        COMMAND_AUTHORITY.set(permissionCode);
+        try {
+            return action.get();
+        } finally {
+            // Restore, never clear: nested commands must not strip the outer scope on the way out.
+            COMMAND_AUTHORITY.set(prior);
+        }
+    }
+
+    public static void runWithCommandAuthority(String permissionCode, Runnable action) {
+        runWithCommandAuthority(permissionCode, () -> {
+            action.run();
+            return null;
+        });
+    }
+
+    /** The permission a command boundary granted for the work running on this thread, or null. */
+    public static String getCommandAuthority() {
+        return COMMAND_AUTHORITY.get();
+    }
+
+    public static boolean hasCommandAuthority() {
+        return COMMAND_AUTHORITY.get() != null;
     }
 
     public static Long getCurrentMemberId() {

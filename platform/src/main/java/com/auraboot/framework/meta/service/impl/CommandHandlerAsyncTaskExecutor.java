@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.file.service.FileService;
 import com.auraboot.framework.infrastructure.storage.StorageProvider;
@@ -136,13 +137,33 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
                             .dryRun(false)
                             .build();
 
-            Object result = handler.execute(pluginContext);
+            // Re-establish the authority the command boundary granted on the request thread. This
+            // path never re-enters the pipeline, so without this the handler runs with none at all —
+            // which is precisely where production broke: the boundary said yes, and then the row the
+            // run had just created could not be updated by the run itself.
+            // The verdict travels WITH the task rather than riding a thread-local across the
+            // hand-off, so what background work carries is a decision that can be named, not an
+            // inherited bypass.
+            String commandAuthority = text(inputParams, "commandAuthority");
+            Object result = commandAuthority == null
+                    ? handler.execute(pluginContext)
+                    : MetaContext.runWithCommandAuthority(commandAuthority, () -> {
+                        try {
+                            return handler.execute(pluginContext);
+                        } catch (Exception ex) {
+                            throw new CommandHandlerInvocationException(ex);
+                        }
+                    });
             callback.report(100, "Completed");
 
             JsonNode data = result == null
                     ? objectMapper.createObjectNode()
                     : objectMapper.valueToTree(result);
             return AsyncTaskResult.ok(data);
+        } catch (CommandHandlerInvocationException wrapped) {
+            log.error("Async command handler {} failed", handlerCode, wrapped.getCause());
+            Throwable cause = wrapped.getCause();
+            return AsyncTaskResult.fail(cause.getMessage() != null ? cause.getMessage() : cause.toString());
         } catch (Exception ex) {
             // Async-task boundary: any handler failure (CommandHandlerExtension.execute
             // declares `throws Exception`) must be reported as a task failure result —
@@ -163,6 +184,17 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
     private Long longValue(JsonNode node, String field) {
         JsonNode v = node.get(field);
         return (v == null || v.isNull()) ? null : v.asLong();
+    }
+
+    /**
+     * Carries a handler's checked exception out of the authority scope's Supplier. Unwrapped and
+     * reported as a task failure exactly like the direct path — the scope must not change how a
+     * handler failure surfaces.
+     */
+    private static final class CommandHandlerInvocationException extends RuntimeException {
+        CommandHandlerInvocationException(Throwable cause) {
+            super(cause);
+        }
     }
 
     private Map<String, Object> mapValue(JsonNode node) {
