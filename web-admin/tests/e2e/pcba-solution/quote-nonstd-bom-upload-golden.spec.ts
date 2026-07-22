@@ -185,12 +185,22 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
                   String(parseSnapshot(row.qo_pe_snapshot).matchedBy),
                 ),
               ),
+            // At least one line must have been priced by a *live* Yunhan call this run, not served
+            // from the recent-price cache — otherwise a stale database lets this golden pass while
+            // the upload lane is completely broken.
+            //
+            // This used to also require `qo_pe_source_ref === 'yunhan:refresh'`, which quietly made
+            // it assert something else: `<source>:refresh` is only the placeholder written while the
+            // row is pending; onCaptured overwrites it with the Yunhan goods id and only onNotFound
+            // leaves it in place. So the check really meant "some line was NOT found", and passed
+            // because the fixture always happened to contain one unmatched row. Improving the match
+            // rate then turned it red — a green that depended on the product working *less* well.
             freshYunhanRequestObserved: evidence.some((row) => {
               const snapshot = parseSnapshot(row.qo_pe_snapshot);
               return (
-                row.qo_pe_source_ref === 'yunhan:refresh' &&
                 snapshot.commandCode === 'qo_quote_common:batch_source_prices' &&
-                String(snapshot.refreshedAt ?? '').length > 0
+                String(snapshot.refreshedAt ?? '').length > 0 &&
+                String(snapshot.matchedBy) !== 'recent_cache'
               );
             }),
           };
