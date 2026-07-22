@@ -1,0 +1,10 @@
+{
+  "$comment": "Committed coverage manifests and how to regenerate them. Freshness is checked by regenerating and diffing, not by file mtime — see scripts/check-coverage-manifest-freshness.mjs.",
+  "targets": [
+    {
+      "manifest": "docs/coverage/oss-coverage-manifest.json",
+      "pluginRoot": "plugins",
+      "specRoots": ["web-admin/tests/e2e"]
+    }
+  ]
+}
