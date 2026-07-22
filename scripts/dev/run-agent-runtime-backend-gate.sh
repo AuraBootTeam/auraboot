@@ -41,4 +41,16 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.aurabot.service.ChatSessionStoreReliabilityTest' \
   --tests 'com.auraboot.framework.integration.agent.AgentRunControllerIntegrationTest.runtimeOps_surfacesExecutionStateDiagnostics' \
   --tests 'com.auraboot.framework.architecture.AgentRuntimeArchitectureTest' \
+  `# --- guardrails added 2026-07-21/22; see docs/backlog/2026-07-22-agent-remaining-gaps-execution-spec.md §A1.` \
+  `# Named class by class rather than widening to agent.service.* / agent.provider.*: a broad` \
+  `# pattern would sweep heavy shared-DB integration tests into this gate, and a gate that is` \
+  `# slow and flaky is one somebody eventually switches off. A gate nobody runs protects nothing. #` \
+  --tests 'com.auraboot.framework.agent.AgentApprovalGrantConsumptionIT' \
+  --tests 'com.auraboot.framework.agent.AgentLifecycleSuspendIT' \
+  --tests 'com.auraboot.framework.agent.MemorySecretWritebackIT' \
+  --tests 'com.auraboot.framework.agent.StaleRunRecoveryIT' \
+  --tests 'com.auraboot.framework.agent.memory.MemorySecretGuardTest' \
+  --tests 'com.auraboot.framework.agent.service.RunDeadlineEnforcementIT' \
+  --tests 'com.auraboot.framework.agent.provider.McpExternalDescriptionTest' \
+  --tests 'com.auraboot.framework.agent.provider.UsageRecordingProviderAttributionTest' \
   --no-daemon
