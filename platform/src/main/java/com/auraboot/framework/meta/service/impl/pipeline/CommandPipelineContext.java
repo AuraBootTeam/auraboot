@@ -56,6 +56,22 @@ public class CommandPipelineContext {
     @Builder.Default
     private Map<String, Object> handlerResults = new HashMap<>();
 
+    /**
+     * What the boundary decided about the caller (set by CommandAuthorizationPhase).
+     * Never null once that phase has run.
+     */
+    private CommandAuthorizationVerdict authorizationVerdict;
+
+    /**
+     * Whether the caller may read the record they named in the request — evaluated at the boundary
+     * by CommandTargetScopePhase. Null when the command has no user-named target to check.
+     *
+     * <p>Currently observed, not enforced: today the caller's record-level projection still runs
+     * deeper in the data layer, so enforcing here would only duplicate it. It becomes the surviving
+     * check once that deep projection stops applying to a handler's own bookkeeping writes.</p>
+     */
+    private Boolean targetRecordReadable;
+
     /** Target state resolved by STATE_CHECK phase */
     private String targetState;
 
