@@ -58,29 +58,51 @@ class SkillAssetLayerTenantIntegrationTest extends BaseIntegrationTest {
     // permissions does not mask the tenant-bypass being under test.
     @MockBean UserPermissionService userPermissionService;
 
+    /** A tenant the test user is NOT a member of — used for the isolation case. */
+    private static final long OTHER_TENANT_ID = 999_000_999L;
+
+    private final java.util.Set<String> seededCodes = new java.util.HashSet<>();
     private String skillCode;
 
     @BeforeEach
     void setUp() {
-        skillCode = "it_asset_" + UniqueIdGenerator.generate().toLowerCase().substring(0, 8);
-        // Seed a SYSTEM-tenant builtin orchestration skill whose only tool is a dynamic
-        // DSL list: code — exactly the shape of the seeded crm_quarterly_review skill.
-        jdbcTemplate.update(
-                "INSERT INTO ab_agent_skill "
-                        + "(pid, tenant_id, skill_code, skill_name, skill_level, skill_category, "
-                        + " skill_tools, execution_mode, is_builtin, skill_status, deleted_flag) "
-                        + "VALUES (?, ?, ?, ?, 'workflow', 'test', ?::jsonb, 'orchestration', "
-                        + " TRUE, 'active', FALSE)",
-                UniqueIdGenerator.generate(), SYSTEM_TENANT_ID, skillCode, "IT Asset Skill",
-                "[\"list:" + MODEL_CODE + "\"]");
+        // A SYSTEM-tenant builtin orchestration skill whose only tool is a dynamic DSL
+        // list: code — exactly the shape of the seeded crm_quarterly_review skill.
+        skillCode = seedSkill(SYSTEM_TENANT_ID, true, "[\"list:" + MODEL_CODE + "\"]");
         // Non-system tenant + a user, so the tenant interceptor would filter the builtin.
         applyTestMetaContext();
     }
 
     @AfterEach
     void tearDown() {
-        jdbcTemplate.update("DELETE FROM ab_agent_skill WHERE skill_code = ?", skillCode);
+        for (String code : seededCodes) {
+            jdbcTemplate.update("DELETE FROM ab_agent_skill WHERE skill_code = ?", code);
+        }
         MetaContext.clear();
+    }
+
+    /** Seed one skill row, track it for cleanup, and return its unique code. */
+    private String seedSkill(long tenantId, boolean builtin, String toolsJson) {
+        // Full id, not a truncated prefix: snowflake ids minted milliseconds apart
+        // share their leading chars, and a truncated code would collide across the
+        // several skills a single test seeds — which would make the isolation case
+        // pass for the wrong reason (finding a same-coded visible skill).
+        String code = "it_asset_" + UniqueIdGenerator.generate().toLowerCase();
+        jdbcTemplate.update(
+                "INSERT INTO ab_agent_skill "
+                        + "(pid, tenant_id, skill_code, skill_name, skill_level, skill_category, "
+                        + " skill_tools, execution_mode, is_builtin, skill_status, deleted_flag) "
+                        + "VALUES (?, ?, ?, ?, 'workflow', 'test', ?::jsonb, 'orchestration', "
+                        + " ?, 'active', FALSE)",
+                UniqueIdGenerator.generate(), tenantId, code, "IT Asset Skill", toolsJson, builtin);
+        seededCodes.add(code);
+        return code;
+    }
+
+    private void grantModelRead() {
+        when(userPermissionService.hasPermission(
+                        eq(MetaContext.getCurrentUserId()), eq("model." + MODEL_CODE + ".read")))
+                .thenReturn(true);
     }
 
     @Test
@@ -112,5 +134,54 @@ class SkillAssetLayerTenantIntegrationTest extends BaseIntegrationTest {
                 .as("bound skill must contribute its governed DSL list tool (Gap A + Gap B)")
                 .extracting(AgentToolDefinition::getName)
                 .contains("list:" + MODEL_CODE);
+    }
+
+    @Test
+    @DisplayName("resolveSkillTools withholds the tool when the user cannot read the model (safety envelope)")
+    void resolveSkillTools_withholdsToolWhenUserLacksModelReadPermission() {
+        // No permission stub — hasPermission(...) returns false, so canReadModel is
+        // false and the list tool is NOT discovered. Binding a skill must not grant a
+        // governed tool to a user who could not reach it directly. Non-vacuous: the
+        // permitted case above returns it.
+        List<AgentToolDefinition> tools =
+                agentSkillService.resolveSkillTools(getTestTenant().getId(), skillCode);
+
+        assertThat(tools)
+                .as("a user without model.<M>.read must not receive the skill's governed tool")
+                .extracting(AgentToolDefinition::getName)
+                .doesNotContain("list:" + MODEL_CODE);
+    }
+
+    @Test
+    @DisplayName("loadSkill does not leak another tenant's private (non-builtin) skill")
+    void loadSkill_doesNotLeakAnotherTenantsPrivateSkill() {
+        // The interceptor bypass (selectByQueryWithoutTenant) leans entirely on the
+        // query's own WHERE for isolation. This proves that WHERE still isolates: a
+        // private skill owned by ANOTHER tenant (not builtin) is invisible here — the
+        // bypass widened visibility to platform builtins only, never cross-tenant.
+        String otherTenantsSkill = seedSkill(OTHER_TENANT_ID, false, "[\"list:" + MODEL_CODE + "\"]");
+
+        Map<String, Object> leaked =
+                agentSkillService.loadSkill(getTestTenant().getId(), otherTenantsSkill);
+
+        assertThat(leaked)
+                .as("bypassing the tenant interceptor must NOT leak another tenant's private skill")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("resolveSkillTools resolves every governed DSL tool a skill declares")
+    void resolveSkillTools_resolvesMultipleGovernedTools() {
+        String multiToolSkill =
+                seedSkill(SYSTEM_TENANT_ID, true, "[\"list:" + MODEL_CODE + "\",\"get:" + MODEL_CODE + "\"]");
+        grantModelRead();
+
+        List<AgentToolDefinition> tools =
+                agentSkillService.resolveSkillTools(getTestTenant().getId(), multiToolSkill);
+
+        assertThat(tools)
+                .as("a skill declaring several DSL tools must contribute all of them")
+                .extracting(AgentToolDefinition::getName)
+                .contains("list:" + MODEL_CODE, "get:" + MODEL_CODE);
     }
 }
