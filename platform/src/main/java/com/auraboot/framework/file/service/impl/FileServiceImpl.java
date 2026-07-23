@@ -25,9 +25,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.auraboot.framework.exception.BusinessException;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -72,10 +75,16 @@ public class FileServiceImpl implements FileService {
     );
 
     /**
-     * Manufacturing packages often contain CAM/EDA text files without a stable
-     * browser MIME type. Keep the octet-stream fallback extension-scoped.
+     * Extensions we trust by name. The browser-reported Content-Type is
+     * client-controlled and unreliable — a RAR archive alone surfaces as
+     * {@code application/vnd.rar}, {@code application/x-rar-compressed},
+     * {@code application/x-rar} or {@code application/octet-stream} depending on
+     * the OS/browser, and manufacturing CAM/EDA files often carry no stable MIME
+     * at all. For these known-safe extensions we accept the upload regardless of
+     * the reported MIME; dangerous extensions are already rejected up front by
+     * {@link #BLOCKED_EXTENSIONS}, which is the real guard.
      */
-    private static final Set<String> OCTET_STREAM_ALLOWED_EXTENSIONS = Set.of(
+    private static final Set<String> TRUSTED_EXTENSIONS = Set.of(
             "zip", "rar", "7z", "pcb",
             "gbr", "gtl", "gbl", "gto", "gbo", "gts", "gbs", "gko",
             "gm", "gm1", "gbp", "gdd", "gd1", "g1", "g2",
@@ -126,9 +135,10 @@ public class FileServiceImpl implements FileService {
                 throw new BusinessException("File extension not allowed: " + extension);
             }
 
-            // Validate MIME type
+            // Validate the file type from its actual content, not the
+            // client-declared Content-Type (which is unreliable and spoofable).
             String contentType = file.getContentType();
-            if (!isAllowedMimeType(contentType, extension)) {
+            if (!isAllowedUpload(file, extension)) {
                 throw new BusinessException("File type not allowed: " + contentType);
             }
 
@@ -346,17 +356,102 @@ public class FileServiceImpl implements FileService {
         return lastDotIndex > 0 ? filename.substring(lastDotIndex + 1) : "";
     }
 
-    private boolean isAllowedMimeType(String contentType, String extension) {
-        if (contentType == null) {
+    private enum ContentSignature { ALLOWED, DANGEROUS, UNKNOWN }
+
+    /** Bytes to inspect for a magic-number signature (covers our longest signature). */
+    private static final int SIGNATURE_PEEK_BYTES = 16;
+
+    /**
+     * Decide whether an upload is allowed based on its <em>actual bytes</em>
+     * rather than the client-declared {@code Content-Type} or file extension,
+     * both of which are client-controlled and unreliable (the same RAR archive
+     * is variously labelled {@code application/vnd.rar}, {@code x-rar-compressed}
+     * or {@code x-rar}). The content signature is authoritative:
+     * <ul>
+     *   <li>a recognised executable is rejected no matter how it is named/labelled;</li>
+     *   <li>a recognised archive/document/image is accepted regardless of the label.</li>
+     * </ul>
+     * Only when the content has no decisive magic number — genuinely format-less
+     * files such as CAM/EDA (Gerber, drill), CSV or plain text — do we fall back
+     * to the extension and MIME allowlists.
+     */
+    private boolean isAllowedUpload(MultipartFile file, String extension) {
+        ContentSignature signature = detectSignature(readHeader(file, SIGNATURE_PEEK_BYTES));
+        if (signature == ContentSignature.DANGEROUS) {
             return false;
         }
-        String normalizedContentType = contentType.toLowerCase();
-        if (ALLOWED_MIME_TYPES.contains(normalizedContentType)) {
+        if (signature == ContentSignature.ALLOWED) {
             return true;
         }
-        return "application/octet-stream".equals(normalizedContentType)
-                && extension != null
-                && OCTET_STREAM_ALLOWED_EXTENSIONS.contains(extension.toLowerCase());
+        // No decisive magic number: fall back to name/label allowlists.
+        if (extension != null && TRUSTED_EXTENSIONS.contains(extension.toLowerCase())) {
+            return true;
+        }
+        String contentType = file.getContentType();
+        return contentType != null && ALLOWED_MIME_TYPES.contains(contentType.toLowerCase());
+    }
+
+    private static byte[] readHeader(MultipartFile file, int max) {
+        try (InputStream in = file.getInputStream()) {
+            byte[] buffer = new byte[max];
+            int read = 0;
+            int r;
+            while (read < max && (r = in.read(buffer, read, max - read)) != -1) {
+                read += r;
+            }
+            return read == max ? buffer : Arrays.copyOf(buffer, read);
+        } catch (IOException e) {
+            // Unreadable header → treat as no signature; name/label fallback applies.
+            return new byte[0];
+        }
+    }
+
+    private static ContentSignature detectSignature(byte[] head) {
+        // Executables and other code artifacts — rejected regardless of name/label.
+        if (startsWith(head, 0x4D, 0x5A)                            // "MZ"  DOS/PE (exe/dll)
+                || startsWith(head, 0x7F, 0x45, 0x4C, 0x46)         // ELF (Linux binaries)
+                || startsWith(head, 0xCA, 0xFE, 0xBA, 0xBE)         // Java .class / Mach-O fat binary
+                || startsWith(head, 0xFE, 0xED, 0xFA, 0xCE)         // Mach-O 32-bit
+                || startsWith(head, 0xFE, 0xED, 0xFA, 0xCF)         // Mach-O 64-bit
+                || startsWith(head, 0xCE, 0xFA, 0xED, 0xFE)         // Mach-O 32-bit (reverse)
+                || startsWith(head, 0xCF, 0xFA, 0xED, 0xFE)) {      // Mach-O 64-bit (reverse)
+            return ContentSignature.DANGEROUS;
+        }
+        // Known-good binary containers, documents and images — accepted on content.
+        if (startsWith(head, 0x50, 0x4B, 0x03, 0x04)               // ZIP / OOXML (docx/xlsx/pptx)
+                || startsWith(head, 0x50, 0x4B, 0x05, 0x06)         // ZIP (empty archive)
+                || startsWith(head, 0x50, 0x4B, 0x07, 0x08)         // ZIP (spanned)
+                || startsWith(head, 0x52, 0x61, 0x72, 0x21, 0x1A, 0x07)   // "Rar!" RAR v4/v5
+                || startsWith(head, 0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C)   // 7z
+                || startsWith(head, 0x1F, 0x8B)                     // gzip
+                || startsWith(head, 0x25, 0x50, 0x44, 0x46)         // "%PDF"
+                || startsWith(head, 0x89, 0x50, 0x4E, 0x47)         // PNG
+                || startsWith(head, 0xFF, 0xD8, 0xFF)               // JPEG
+                || startsWith(head, 0x47, 0x49, 0x46, 0x38)         // "GIF8"
+                || startsWith(head, 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1)   // OLE2 (legacy Office)
+                || isWebp(head)) {                                 // RIFF....WEBP
+            return ContentSignature.ALLOWED;
+        }
+        return ContentSignature.UNKNOWN;
+    }
+
+    private static boolean isWebp(byte[] head) {
+        return startsWith(head, 0x52, 0x49, 0x46, 0x46)            // "RIFF"
+                && head.length >= 12
+                && (head[8] & 0xFF) == 0x57 && (head[9] & 0xFF) == 0x45   // "WE"
+                && (head[10] & 0xFF) == 0x42 && (head[11] & 0xFF) == 0x50; // "BP"
+    }
+
+    private static boolean startsWith(byte[] data, int... signature) {
+        if (data.length < signature.length) {
+            return false;
+        }
+        for (int i = 0; i < signature.length; i++) {
+            if ((data[i] & 0xFF) != (signature[i] & 0xFF)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private FileEntity findByGeneratedStorageFileName(String fileId) {

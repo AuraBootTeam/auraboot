@@ -187,6 +187,128 @@ class FileServiceImplTest {
     }
 
     @Test
+    void uploadFile_xRarMimeType_persistsAndReturnsResponse() {
+        // Some browsers/OSes label .rar as application/x-rar (not the IANA
+        // vnd.rar nor the legacy x-rar-compressed). A trusted extension must
+        // be accepted regardless of the browser-reported MIME.
+        MultipartFile good = new MockMultipartFile(
+                "file", "gerber-package.rar", "application/x-rar", "rar-bytes".getBytes());
+
+        when(storageProvider.upload(anyString(), any(), anyLong(), anyString()))
+                .thenReturn("/uploads/gerber-package.rar");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+
+        var resp = fileService.uploadFile(good, 42L);
+
+        assertThat(resp).isNotNull();
+        assertThat(resp.getOriginalName()).isEqualTo("gerber-package.rar");
+        verify(fileMapper).insert(any(FileEntity.class));
+    }
+
+    @Test
+    void uploadFile_trustedExtensionUnknownMime_persistsAndReturnsResponse() {
+        // Gerber/CAM files come with no stable MIME; the extension is trusted,
+        // so an unrecognized (but non-blocked) content type is still accepted.
+        MultipartFile good = new MockMultipartFile(
+                "file", "top-copper.gbr", "application/x-gerber", "gerber".getBytes());
+
+        when(storageProvider.upload(anyString(), any(), anyLong(), anyString()))
+                .thenReturn("/uploads/top-copper.gbr");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+
+        var resp = fileService.uploadFile(good, 42L);
+
+        assertThat(resp).isNotNull();
+        assertThat(resp.getOriginalName()).isEqualTo("top-copper.gbr");
+        verify(fileMapper).insert(any(FileEntity.class));
+    }
+
+    @Test
+    void uploadFile_trustedExtensionNullContentType_persistsAndReturnsResponse() {
+        // A client may omit Content-Type entirely; a trusted extension still passes.
+        MultipartFile good = new MockMultipartFile(
+                "file", "package.rar", null, "rar-bytes".getBytes());
+
+        // Content-Type is null here, so the 4th arg matcher must accept null (any(), not anyString()).
+        when(storageProvider.upload(anyString(), any(), anyLong(), any()))
+                .thenReturn("/uploads/package.rar");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+
+        var resp = fileService.uploadFile(good, 42L);
+
+        assertThat(resp).isNotNull();
+        assertThat(resp.getOriginalName()).isEqualTo("package.rar");
+        verify(fileMapper).insert(any(FileEntity.class));
+    }
+
+    @Test
+    void uploadFile_blockedExtensionWithTrustedMime_stillThrows() {
+        // Security invariant: a blocked extension cannot be smuggled in by
+        // spoofing a trusted archive MIME — BLOCKED_EXTENSIONS wins first.
+        MultipartFile bad = new MockMultipartFile(
+                "file", "evil.exe", "application/zip", "MZ".getBytes());
+
+        assertThatThrownBy(() -> fileService.uploadFile(bad, 1L))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    // --- content-signature (magic-number) detection: the file's bytes are authoritative ---
+
+    private static byte[] withPrefix(byte[] magic, String tail) {
+        byte[] tailBytes = tail.getBytes();
+        byte[] out = new byte[magic.length + tailBytes.length];
+        System.arraycopy(magic, 0, out, 0, magic.length);
+        System.arraycopy(tailBytes, 0, out, magic.length, tailBytes.length);
+        return out;
+    }
+
+    @Test
+    void uploadFile_rarContentUntrustedExtensionAndOctetStream_acceptedByContent() {
+        // Real "Rar!" magic bytes, but named .dat (untrusted) and labelled octet-stream:
+        // neither the extension nor the MIME allowlist would pass — content wins.
+        byte[] rar = withPrefix(new byte[]{0x52, 0x61, 0x72, 0x21, 0x1A, 0x07}, "payload");
+        MultipartFile good = new MockMultipartFile(
+                "file", "archive.dat", "application/octet-stream", rar);
+
+        when(storageProvider.upload(anyString(), any(), anyLong(), any()))
+                .thenReturn("/uploads/archive.dat");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+
+        var resp = fileService.uploadFile(good, 42L);
+
+        assertThat(resp).isNotNull();
+        verify(fileMapper).insert(any(FileEntity.class));
+    }
+
+    @Test
+    void uploadFile_pngContentMislabeledOctetStream_acceptedByContent() {
+        byte[] png = withPrefix(new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}, "img");
+        MultipartFile good = new MockMultipartFile(
+                "file", "blob.dat", "application/octet-stream", png);
+
+        when(storageProvider.upload(anyString(), any(), anyLong(), any()))
+                .thenReturn("/uploads/blob.dat");
+        when(storageProvider.type()).thenReturn(StorageType.LOCAL);
+
+        var resp = fileService.uploadFile(good, 42L);
+
+        assertThat(resp).isNotNull();
+        verify(fileMapper).insert(any(FileEntity.class));
+    }
+
+    @Test
+    void uploadFile_executableDisguisedAsImage_rejectedByContent() {
+        // A Windows executable ("MZ") renamed to photo.png and labelled image/png:
+        // the label and extension both look allowed, but the bytes give it away.
+        byte[] exe = withPrefix(new byte[]{0x4D, 0x5A, (byte) 0x90, 0x00}, "this-is-an-exe");
+        MultipartFile bad = new MockMultipartFile(
+                "file", "photo.png", "image/png", exe);
+
+        assertThatThrownBy(() -> fileService.uploadFile(bad, 1L))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
     void uploadFiles_iteratesAndReturnsList() {
         MultipartFile a = new MockMultipartFile("a", "a.png", "image/png", "a".getBytes());
         MultipartFile b = new MockMultipartFile("b", "b.png", "image/png", "b".getBytes());
