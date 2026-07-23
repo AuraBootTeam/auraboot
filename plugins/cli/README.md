@@ -221,6 +221,34 @@ Bundled skills: `auraboot-data-modeling`, `auraboot-ui-builder`, `auraboot-workf
 to `list` / `check` for JSON output. Restart the agent client after install so it
 re-scans the skills directory.
 
+### `aura dsl plan / apply / drift` (desired-state reconciler)
+
+Manage a plugin's DSL as version-controlled desired state. `plan` fingerprints
+every resource and diffs it against the last-applied baseline
+(`<plugin>/.aura/dsl-state.json`), producing a create / update / destroy plan
+with a **risk level**:
+
+| Risk | Meaning |
+|---|---|
+| `L0` | no changes |
+| `L1` | create-only (new resources) |
+| `L2` | updates to existing resources |
+| `L3` | destroys (deleted/dropped resources) |
+
+```bash
+aura dsl plan .                 # what would change vs last apply (+ risk level)
+aura dsl plan . --agent-mode    # JSON: { pluginId, hasBaseline, create[], update[], destroy[], riskLevel, changed }
+aura dsl drift .                # exit 1 if local DSL drifted from last apply
+aura dsl apply . --dry-run      # show the plan without publishing
+aura dsl apply .                # publish to the instance, then record the new baseline
+aura dsl apply . --yes          # required to approve an L3 (destructive) plan
+```
+
+`plan` / `drift` / `apply --dry-run` are fully local. `apply` (without `--dry-run`)
+publishes to a reachable instance and needs a running backend; L3 plans are
+refused unless `--yes` is passed, aligning with the platform approval gate. A live
+`pull` (fetch instance → baseline) and live drift-vs-instance are the next step.
+
 ## Plugin Directory Structure
 
 ```

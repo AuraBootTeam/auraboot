@@ -16,6 +16,7 @@ import { depsCommand } from './commands/dsl/deps.js';
 import { scaffoldCommand } from './commands/dsl/scaffold.js';
 import { syncI18nCommand } from './commands/dsl/sync-i18n.js';
 import { diagnoseCommand } from './commands/dsl/diagnose.js';
+import { dslPlanCommand, dslApplyCommand, dslDriftCommand } from './commands/dsl/reconcile.js';
 
 // ── New commands ────────────────────────────────────────────────────────────
 import { loginCommand } from './commands/login.js';
@@ -854,6 +855,34 @@ dsl
   .option('--severity <level>', 'Filter by severity (error, warning, info)')
   .action(async (options: any) => {
     await diagnoseCommand(options);
+  });
+
+// ── dsl reconciler (desired-state: plan / apply / drift) ──────────────────────
+
+dsl
+  .command('plan [dir]')
+  .description('Compute the create/update/destroy plan vs the last-applied state, with a risk level')
+  .action(async (dir: string | undefined, _cmdOpts: any, cmd: any) => {
+    await dslPlanCommand(dir || '.', { ...program.opts(), ...cmd.opts() });
+  });
+
+dsl
+  .command('drift [dir]')
+  .description('Report whether the local DSL has drifted from the last-applied state')
+  .action(async (dir: string | undefined, _cmdOpts: any, cmd: any) => {
+    await dslDriftCommand(dir || '.', { ...program.opts(), ...cmd.opts() });
+  });
+
+dsl
+  .command('apply [dir]')
+  .description('Apply the plan to the instance (publish) and record the new state baseline')
+  .option('-t, --target <url>', 'Target platform URL', 'http://localhost:6443')
+  .option('-u, --user <email>', 'Login email')
+  .option('-p, --password <password>', 'Login password')
+  .option('--dry-run', 'Show the plan without publishing')
+  .option('--yes', 'Approve destructive (L3) plans')
+  .action(async (dir: string | undefined, cmdOpts: any) => {
+    await dslApplyCommand(dir || '.', { ...program.opts(), ...cmdOpts, dryRun: cmdOpts.dryRun });
   });
 
 // ── pipe (workflow) ─────────────────────────────────────────────────────────
