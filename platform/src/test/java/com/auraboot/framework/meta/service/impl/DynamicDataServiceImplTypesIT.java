@@ -131,16 +131,18 @@ class DynamicDataServiceImplTypesIT {
         String pid = String.valueOf(created.get("pid"));
         assertNotNull(pid);
 
-        Map<String, Object> fetched = dynamicDataService.getById(modelCode, pid);
+        Map<String, Object> fetched = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.getById(modelCode, pid));
         assertEquals("widget", String.valueOf(fetched.get("name")));
 
         Map<String, Object> upd = new HashMap<>();
         upd.put("qty", 9);
         upd.put("active", false);
-        Map<String, Object> updated = dynamicDataService.update(modelCode, pid, upd);
+        Map<String, Object> updated = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.update(modelCode, pid, upd));
         assertNotNull(updated);
 
-        dynamicDataService.delete(modelCode, pid);
+        MetaContext.runWithoutDataPermission(() -> { dynamicDataService.delete(modelCode, pid); });
     }
 
     @Test

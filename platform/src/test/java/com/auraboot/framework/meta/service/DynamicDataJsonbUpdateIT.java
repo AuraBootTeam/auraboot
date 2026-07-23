@@ -167,12 +167,14 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         Map<String, Object> patch = new HashMap<>();
         patch.put(configField, newUrls);
 
-        assertThatCode(() -> dynamicDataService.update(modelCode, pid, patch))
+        assertThatCode(() -> MetaContext.runWithoutDataPermission(
+                () -> { dynamicDataService.update(modelCode, pid, patch); }))
                 .as("DynamicDataService.update must not throw PSQLException for jsonb column")
                 .doesNotThrowAnyException();
 
         // Verify the new value is actually persisted (not the old one)
-        Map<String, Object> reloaded = dynamicDataService.getById(modelCode, pid);
+        Map<String, Object> reloaded = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.getById(modelCode, pid));
         assertThat(reloaded).isNotNull();
         Object rawConfig = reloaded.get(configField);
         assertThat(rawConfig).isNotNull();
@@ -210,12 +212,14 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         Map<String, Object> patch = new HashMap<>();
         patch.put(configField, newConfig);
 
-        assertThatCode(() -> backgroundDataAccessor.update(tenantId, modelCode, pid, patch))
+        assertThatCode(() -> MetaContext.runWithoutDataPermission(
+                () -> { backgroundDataAccessor.update(tenantId, modelCode, pid, patch); }))
                 .as("BackgroundDataAccessor.update must not throw PSQLException for jsonb column")
                 .doesNotThrowAnyException();
 
         // Verify value persisted
-        Map<String, Object> reloaded = dynamicDataService.getById(modelCode, pid);
+        Map<String, Object> reloaded = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.getById(modelCode, pid));
         assertThat(reloaded).isNotNull();
         Object rawConfig = reloaded.get(configField);
         assertThat(rawConfig).isNotNull();
@@ -242,11 +246,13 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
 
         Map<String, Object> patch = Map.of(nameField, "updated-name");
 
-        assertThatCode(() -> dynamicDataService.update(modelCode, pid, patch))
+        assertThatCode(() -> MetaContext.runWithoutDataPermission(
+                () -> { dynamicDataService.update(modelCode, pid, patch); }))
                 .as("Non-jsonb field update on model with jsonb fields must not throw")
                 .doesNotThrowAnyException();
 
-        Map<String, Object> reloaded = dynamicDataService.getById(modelCode, pid);
+        Map<String, Object> reloaded = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.getById(modelCode, pid));
         assertThat(reloaded.get(nameField)).isEqualTo("updated-name");
     }
 
@@ -323,12 +329,14 @@ class DynamicDataJsonbUpdateIT extends BaseIntegrationTest {
         // Map.of is deliberate: the caller's map must survive being handed to the service.
         Map<String, Object> immutablePatch = Map.of(nameField, "patched", stampField, stamp);
 
-        assertThatCode(() -> dynamicDataService.update(modelCode, pid, immutablePatch))
+        assertThatCode(() -> MetaContext.runWithoutDataPermission(
+                () -> { dynamicDataService.update(modelCode, pid, immutablePatch); }))
                 .as("update must not mutate the caller's map — an immutable patch with a "
                         + "temporal field previously threw a message-less UnsupportedOperationException")
                 .doesNotThrowAnyException();
 
-        Map<String, Object> reloaded = dynamicDataService.getById(modelCode, pid);
+        Map<String, Object> reloaded = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.getById(modelCode, pid));
         assertThat(reloaded).isNotNull();
         assertThat(Objects.toString(reloaded.get(nameField))).isEqualTo("patched");
         assertThat(reloaded.get(stampField))
