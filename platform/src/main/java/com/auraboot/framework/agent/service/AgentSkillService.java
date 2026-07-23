@@ -1,7 +1,9 @@
 package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.agent.dto.AgentToolDefinition;
+import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.util.JsonbColumns;
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.saas.executor.SystemTenantContextExecutor;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -31,6 +33,7 @@ public class AgentSkillService {
     private final DynamicDataMapper dynamicDataMapper;
     private final AgentObservationService observationService;
     private final ObjectMapper objectMapper;
+    private final DeclaredAgentToolResolver declaredAgentToolResolver;
 
     /**
      * Load a skill definition by code.
@@ -92,7 +95,73 @@ public class AgentSkillService {
         // dsl_dispatch skills have no pre-registered tools — SkillEngine handles dispatch directly
         if (toolCodes.isEmpty()) return List.of();
 
-        return loadToolsByCode(tenantId, toolCodes);
+        return resolveToolCodes(tenantId, toolCodes);
+    }
+
+    /**
+     * Resolve declared tool codes across BOTH tool spaces a real agent turn draws
+     * from — this is the wiring that lets a bound skill actually contribute
+     * governed system-of-record tools:
+     *
+     * <ul>
+     *   <li>Native/custom tools registered in {@code ab_agent_tool} —
+     *       {@link #loadToolsByCode}.</li>
+     *   <li>Dynamic DSL tools ({@code cmd:}/{@code list:}/{@code get:}) that live
+     *       in NO table: they are produced on the fly by {@code DslToolProvider}
+     *       exactly as a normal turn discovers them via
+     *       {@code ToolProviderRegistry}. We resolve those through the same
+     *       registry (via {@link DeclaredAgentToolResolver}) using the current
+     *       user from {@link MetaContext}, so permission-scoped discovery matches
+     *       what the turn itself would see.</li>
+     * </ul>
+     *
+     * <p>Before this, {@code resolveSkillTools} read only {@code ab_agent_tool},
+     * so a skill whose {@code skill_tools} were DSL codes resolved to an empty
+     * list — the bound skill contributed nothing and orchestration mode failed
+     * with "No active tools found". Codes already resolved from
+     * {@code ab_agent_tool} are not re-resolved. ({@code nq:} codes are not
+     * resolvable here: named-query discovery requires a model hint that a bare
+     * {@code nq:} code does not carry — use {@code list:}/{@code get:}/{@code cmd:}
+     * in {@code skill_tools} for governed reads/writes.)
+     */
+    private List<AgentToolDefinition> resolveToolCodes(Long tenantId, List<String> toolCodes) {
+        List<AgentToolDefinition> tools = new ArrayList<>(loadToolsByCode(tenantId, toolCodes));
+
+        Set<String> resolved = new HashSet<>();
+        for (AgentToolDefinition tool : tools) {
+            resolved.add(tool.getName());
+        }
+        List<String> missing = new ArrayList<>();
+        for (String code : toolCodes) {
+            if (!resolved.contains(code)) missing.add(code);
+        }
+        if (missing.isEmpty()) return tools;
+
+        // agentCode is only used by discovery for channel gating / logging; the
+        // governed command/query discovery keys off tenant + user, so null is fine.
+        Long userId = MetaContext.exists() ? MetaContext.getCurrentUserId() : null;
+        List<ToolDefinition> discovered =
+                declaredAgentToolResolver.resolveDeclaredTools(tenantId, userId, null, missing);
+        for (ToolDefinition def : discovered) {
+            if (def == null || def.getToolCode() == null || def.getToolCode().isBlank()) {
+                continue;
+            }
+            tools.add(AgentToolDefinition.builder()
+                    .name(def.getToolCode())
+                    .description(def.getDescription())
+                    .inputSchema(def.getParameterSchema())
+                    .toolType(def.getToolType())
+                    .sourceCode(def.getSourceCode())
+                    .modelCode(def.getModelCode())
+                    .operationKind(def.getOperationKind())
+                    .requiresApproval(def.isRequiresApproval())
+                    .requiresConfirmation(def.isRequiresConfirmation())
+                    .riskLevel(def.getRiskLevel())
+                    .requiredPermissions(def.getRequiredPermissions())
+                    .confirmationPolicy(def.getConfirmationPolicy())
+                    .build());
+        }
+        return tools;
     }
 
     /**
