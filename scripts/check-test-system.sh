@@ -16,7 +16,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 status=0
-for gate in check-e2e-spec-registration check-command-reachability check-coverage-manifest-freshness check-derived-field-writers; do
+for gate in check-e2e-spec-registration check-command-reachability check-coverage-manifest-freshness check-derived-field-writers check-scripts-index; do
   echo "───── $gate"
   if ! node "scripts/$gate.mjs" "$@"; then
     status=1
