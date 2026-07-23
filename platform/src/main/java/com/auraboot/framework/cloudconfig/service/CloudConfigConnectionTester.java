@@ -1,6 +1,7 @@
 package com.auraboot.framework.cloudconfig.service;
 
 import com.auraboot.framework.cloudconfig.entity.CloudConfig;
+import com.auraboot.framework.common.util.SsrfValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -173,6 +174,18 @@ public class CloudConfigConnectionTester {
 
         if (host.isBlank()) {
             return Map.of("status", "error", "message", "Missing required field: host");
+        }
+
+        // SSRF guard (SEC-20260723-11 sibling / SEC-20260723-07): host is caller-supplied
+        // (CloudConfig). Reject private/loopback/link-local targets so this connection test
+        // cannot be used to probe internal SMTP servers or scan internal ports. Reuse
+        // SsrfValidator via a scheme-only synthetic URL; the SMTP port is validated by the
+        // mail library, not here (a DNS-unresolvable host returns null and is allowed
+        // through — the connection simply fails later, which is not an SSRF concern).
+        try {
+            SsrfValidator.validate("http://" + host);
+        } catch (IllegalArgumentException ssrf) {
+            return Map.of("status", "error", "message", "SMTP host not allowed: " + ssrf.getMessage());
         }
 
         try {
