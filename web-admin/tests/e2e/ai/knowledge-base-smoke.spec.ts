@@ -40,6 +40,14 @@ let kbPid: string;
 test.describe('RAG Knowledge Base', () => {
   test.describe.configure({ mode: 'serial' });
 
+  // App defaults to zh-CN (localStorage 'locale' / cookie); these KB specs assert
+  // the English UI. Force the en-US locale cookie so SSR renders English strings.
+  test.beforeEach(async ({ context }) => {
+    await context.addCookies([
+      { name: 'locale', value: 'en-US', domain: '127.0.0.1', path: '/' },
+    ]);
+  });
+
   test('should navigate to KB list via menu', async ({ page }) => {
     await page.goto('/');
     // Wait for app shell
