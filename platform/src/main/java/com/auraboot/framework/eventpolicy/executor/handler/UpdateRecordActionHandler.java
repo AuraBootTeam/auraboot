@@ -1,5 +1,6 @@
 package com.auraboot.framework.eventpolicy.executor.handler;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.decision.ast.DecisionContext;
 import com.auraboot.framework.decision.ast.Scope;
 import com.auraboot.framework.eventpolicy.executor.ActionExecutionException;
@@ -71,7 +72,14 @@ public class UpdateRecordActionHandler implements ActionHandler {
         Map<String, Object> fieldMap = new LinkedHashMap<>();
         fields.forEach((key, value) -> fieldMap.put(String.valueOf(key), value));
         try {
-            dynamicDataService.update(modelCode, recordPid, fieldMap);
+            // System-triggered policy action: the event runtime already selected this record
+            // (recordPid comes from the decision context), and AFTER_COMMIT policies run without
+            // a caller's data-permission projection. Bypass data permission so the platform's
+            // internal pre-update read-back (a visibility gate meant for interactive callers)
+            // does not deny a write the policy engine is authorized to make.
+            MetaContext.runWithoutDataPermission(() -> {
+                dynamicDataService.update(modelCode, recordPid, fieldMap);
+            });
         } catch (RuntimeException e) {
             throw new ActionExecutionException(
                     "UPDATE_RECORD failed: " + messageOf(e),

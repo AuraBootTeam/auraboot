@@ -381,6 +381,15 @@ public class ChatTurnRuntime {
             throw new IllegalArgumentException("Chat tool-loop spec and callbacks are required");
         }
 
+        // The per-round setCapabilityCeiling below publishes the planner-resolved
+        // ceiling so the authorization record matches what this loop enforces. That
+        // thread-local is loop-scoped and MUST NOT outlive the loop: worker threads are
+        // pooled (SSE handlers, async executors, the single test worker), so a leaked
+        // NO_TOOLS / READ_ONLY ceiling would spuriously deny the next turn's writes on
+        // the same thread. Capture the caller's ceiling and restore it on every exit.
+        String previousCapabilityCeiling =
+                com.auraboot.framework.agent.service.StepContext.getCapabilityCeiling();
+        try {
         AgentExecutionState lastRuntimeState = null;
         boolean anyToolFailed = false;   // F7: any failed tool call in this turn
         for (int round = 0; round < spec.maxToolRounds(); round++) {
@@ -699,6 +708,13 @@ public class ChatTurnRuntime {
         callbacks.onLoopExhausted(exhaustedMsg);
         spec.sink().onError(exhaustedMsg, spec.traceId());
         return new TurnOutcome.Failed(exhaustedMsg, null);
+        } finally {
+            if (previousCapabilityCeiling == null) {
+                com.auraboot.framework.agent.service.StepContext.clearCapabilityCeiling();
+            } else {
+                com.auraboot.framework.agent.service.StepContext.setCapabilityCeiling(previousCapabilityCeiling);
+            }
+        }
     }
 
     private PendingChatTool pendingContext(ChatToolLoopSpec spec,

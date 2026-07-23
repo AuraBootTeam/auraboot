@@ -116,11 +116,12 @@ class DynamicDataAccessorQueryInIntegrationTest {
         String activePid = seedOne("A-100", "active");
         String deletedPid = seedOne("B-200", "active");
         String inactivePid = seedOne("C-300", "inactive");
-        dynamicDataService.delete(modelCode, deletedPid);
+        MetaContext.runWithoutDataPermission(() -> { dynamicDataService.delete(modelCode, deletedPid); });
         insertOtherTenantRow("X-999");
 
-        List<Map<String, Object>> rows = accessor.queryIn(modelCode, "code",
-                List.of("A-100", "B-200", "C-300", "X-999", "A-100"));
+        List<Map<String, Object>> rows = MetaContext.runWithoutDataPermission(
+                () -> accessor.queryIn(modelCode, "code",
+                        List.of("A-100", "B-200", "C-300", "X-999", "A-100")));
 
         assertThat(rows)
                 .extracting(row -> String.valueOf(row.get("code")))

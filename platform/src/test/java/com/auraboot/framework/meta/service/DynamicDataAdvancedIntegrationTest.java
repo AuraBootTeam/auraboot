@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.constant.DataType;
@@ -267,8 +268,9 @@ class DynamicDataAdvancedIntegrationTest extends BaseIntegrationTest {
         String pid = created.get("pid").toString();
         createdRecordPids.add(pid);
         
-        Map<String, Object> retrieved = dynamicDataService.getById(modelCode, pid);
-        
+        Map<String, Object> retrieved = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.getById(modelCode, pid));
+
         assertNotNull(retrieved, "Retrieved record should not be null");
         assertEquals(pid, retrieved.get("pid").toString());
         log.info("Created and retrieved record with pid: {}", pid);
@@ -305,8 +307,9 @@ class DynamicDataAdvancedIntegrationTest extends BaseIntegrationTest {
         updateData.put("name", "Updated Name");
         updateData.put("status", "updated");
 
-        Map<String, Object> updated = dynamicDataService.update(modelCode, pid, updateData);
-        
+        Map<String, Object> updated = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.update(modelCode, pid, updateData));
+
         assertNotNull(updated, "Updated record should not be null");
         log.info("Updated record with pid: {}", pid);
     }
@@ -320,7 +323,8 @@ class DynamicDataAdvancedIntegrationTest extends BaseIntegrationTest {
         String pid = pids.get(0);
         createdRecordPids.remove(pid);  // Remove from cleanup list since we're deleting it
 
-        assertDoesNotThrow(() -> dynamicDataService.delete(modelCode, pid));
+        assertDoesNotThrow(() -> MetaContext.runWithoutDataPermission(
+                () -> { dynamicDataService.delete(modelCode, pid); }));
         log.info("Deleted record with pid: {}", pid);
     }
 

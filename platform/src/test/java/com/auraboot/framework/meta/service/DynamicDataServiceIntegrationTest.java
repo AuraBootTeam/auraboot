@@ -262,7 +262,8 @@ class DynamicDataServiceIntegrationTest {
         createdRecordPids.add(pid);
 
         // Verify record can be queried
-        Map<String, Object> queried = dynamicDataService.getById(testModelCode, pid);
+        Map<String, Object> queried = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.getById(testModelCode, pid));
         assertNotNull(queried);
         assertEquals(pid, queried.get("pid"));
         assertEquals("测试记录-1", queried.get("name"));
@@ -330,7 +331,8 @@ class DynamicDataServiceIntegrationTest {
         String latestUpdatedPid = pids.get(0);
         Map<String, Object> updateData = new HashMap<>();
         updateData.put("status", "published");
-        dynamicDataService.update(testModelCode, latestUpdatedPid, updateData);
+        MetaContext.runWithoutDataPermission(
+                () -> { dynamicDataService.update(testModelCode, latestUpdatedPid, updateData); });
 
         DynamicQueryRequest request = DynamicQueryRequest.builder()
                 .pageNum(1)
@@ -363,7 +365,8 @@ class DynamicDataServiceIntegrationTest {
         createdRecordPids.add(pid);
 
         // When
-        Map<String, Object> result = dynamicDataService.getById(testModelCode, pid);
+        Map<String, Object> result = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.getById(testModelCode, pid));
 
         // Then
         assertNotNull(result);
@@ -395,12 +398,14 @@ class DynamicDataServiceIntegrationTest {
         updateData.put("name", "更新后");
         updateData.put("status", "published");
 
-        Map<String, Object> result = dynamicDataService.update(testModelCode, pid, updateData);
+        Map<String, Object> result = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.update(testModelCode, pid, updateData));
 
         // Then
         assertNotNull(result);
 
-        Map<String, Object> updated = dynamicDataService.getById(testModelCode, pid);
+        Map<String, Object> updated = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.getById(testModelCode, pid));
         assertEquals("更新后", updated.get("name"));
         assertEquals("published", updated.get("status"));
 
@@ -424,11 +429,11 @@ class DynamicDataServiceIntegrationTest {
         String pid = created.get("pid").toString();
 
         // When
-        dynamicDataService.delete(testModelCode, pid);
+        MetaContext.runWithoutDataPermission(() -> { dynamicDataService.delete(testModelCode, pid); });
 
         // Then
         assertThrows(Exception.class, () -> {
-            dynamicDataService.getById(testModelCode, pid);
+            MetaContext.runWithoutDataPermission(() -> { dynamicDataService.getById(testModelCode, pid); });
         }, "Query after delete should throw exception");
 
         log.info("✓ Delete successful: {}", pid);
