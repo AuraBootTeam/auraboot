@@ -23,7 +23,14 @@ Validate plugin configuration with 3-layer checks.
 ```bash
 aura plugin validate .
 aura plugin validate ../pcba-base
+aura plugin validate . --agent-mode   # aggregated JSON for AI agents
 ```
+
+Add `--agent-mode` (or `--format json`) to emit a single aggregated report —
+`{ ok, errorCount, warningCount, errors[], warnings[] }` — so an AI agent can fix
+a whole batch of problems in one pass, then retry. Each entry carries `code`,
+`message`, and (where the validator provides them) `path`, `expected`, and an
+imperative `agentInstruction`. Exit code is non-zero when there are errors.
 
 **Validation layers:**
 1. **Structural** — JSON schema validation (plugin.json, models, fields, etc.)
@@ -119,19 +126,34 @@ Ready-made copies live in [`examples/cursor.mcp.json.example`](./examples/cursor
 
 The server REFUSES to start if the JWT carries no `tenantId` claim. Run `aura login --tenant <name>` first so writes always land on the intended tenant. Every tool invocation is journaled to `~/.aura/mcp-audit.log` so you can review what an AI session actually did.
 
-**Tools currently exposed** (10 total, expanding to 12 in W2):
+**Tool profiles** — the server exposes a **minimal default** and requires high-risk
+capabilities to be enabled explicitly (mirrors NocoBase's `x-mcp-packages`). Select
+a profile with `aura mcp serve --profile <name>` or the `AURA_MCP_PROFILE` env var:
 
-| Tool | Purpose |
-|---|---|
-| `query_entity` | Fetch records from any entity model with filters / sort. |
-| `run_named_query` | Run a NamedQuery for aggregations / dashboards. |
-| `list_agents` / `list_tools` | Inspect the ACP agent registry. |
-| `dispatch_agent` | Hand a task off to an agent (Professional license). |
-| `ask_aurabot` | Forward a natural-language question to AuraBot. |
-| `query_dsl_capabilities` | Canonical map of supported kinds / blocks / data types — call before generating any schema. |
-| `query_existing_models` | List models in tenant; call before `create_model` to avoid collisions. |
-| `query_page_schemas` | List V2 page schemas; call before `create_page_schema`. |
-| `describe_command_pipeline` | The 20+4-stage pipeline reference (no HTTP, pure docs). |
+| Profile | Tools | Use when |
+|---|---|---|
+| `read` (default) | the 10 read/discovery tools | querying, dashboards, analysis |
+| `dsl-authoring` | `read` + `create_model` / `create_page_schema` / `create_command` | building models & pages |
+| `full` | everything, incl. `import_plugin` / `rollback_import` | trusted deploy / rollback sessions |
+
+**Tools** (15 total: 10 read + 5 write, all writes default to `dryRun:true`):
+
+| Tool | Tier | Purpose |
+|---|---|---|
+| `query_entity` | read | Fetch records from any entity model with filters / sort. |
+| `run_named_query` | read | Run a NamedQuery for aggregations / dashboards. |
+| `list_agents` / `list_tools` | read | Inspect the ACP agent registry. |
+| `dispatch_agent` | read | Hand a task off to an agent (Professional license). |
+| `ask_aurabot` | read | Forward a natural-language question to AuraBot. |
+| `query_dsl_capabilities` | read | Canonical map of supported kinds / blocks / data types — call before generating any schema. |
+| `query_existing_models` | read | List models in tenant; call before `create_model` to avoid collisions. |
+| `query_page_schemas` | read | List V2 page schemas; call before `create_page_schema`. |
+| `describe_command_pipeline` | read | The 20+4-stage pipeline reference (no HTTP, pure docs). |
+| `create_model` | author | Create a dynamic model (dryRun-safe). |
+| `create_page_schema` | author | Create a V2 page schema (dryRun-safe). |
+| `create_command` | author | Create a command definition (dryRun-safe). |
+| `import_plugin` | admin | Import a plugin config bundle. |
+| `rollback_import` | admin | Roll back a prior plugin import. |
 
 ### `aura mcp list / add / remove / test / tools`
 
@@ -173,6 +195,7 @@ Both flat file mode (single JSON array per resource type) and directory mode (on
 | `AURA_USER` | Login email (used only when `AURA_TOKEN` is not set) | `admin@auraboot.com` |
 | `AURA_PASSWORD` | Login password (used only when `AURA_TOKEN` is not set) | `Test2026x` |
 | `AURA_DEBUG` | When non-empty, prints a stderr debug line confirming `AURA_TOKEN` is active | — |
+| `AURA_MCP_PROFILE` | MCP tool scope for `aura mcp serve`: `read` / `dsl-authoring` / `full` (overridden by `--profile`) | `read` |
 
 Credential priority: `--token` flag > `AURA_TOKEN` env var > `~/.aura/credentials.json` > interactive login.
 

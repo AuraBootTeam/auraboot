@@ -5,11 +5,22 @@ import { validateStructural } from '../validation/structural.js';
 import { validateSemantic } from '../validation/semantic.js';
 import { validateGovernance } from '../validation/governance.js';
 import { type ValidationResult, type ValidationMessage, createResult, mergeResults } from '../validation/types.js';
+import { toAgentErrorReport } from '../validation/agent-report.js';
 
 /**
  * Validate a plugin directory.
+ *
+ * In agent mode (`--agent-mode` or `--format json`) the command emits a single
+ * aggregated JSON report on stdout so an AI agent can fix a whole batch of
+ * problems in one pass, then exits non-zero if there are errors.
  */
-export async function validateCommand(dir: string): Promise<void> {
+export async function validateCommand(
+  dir: string,
+  opts: { agentMode?: boolean; format?: string } = {},
+): Promise<void> {
+  if (opts.agentMode || opts.format === 'json') {
+    return validateAgentMode(dir);
+  }
   try {
     const plugin = loadPlugin(dir);
     const resourceCount = countResources(plugin);
@@ -62,6 +73,41 @@ export async function validateCommand(dir: string): Promise<void> {
     }
   } catch (e) {
     log.error((e as Error).message);
+    process.exit(1);
+  }
+}
+
+/**
+ * Agent-mode validation: run all layers silently (same short-circuit rules as
+ * the human path) and print one aggregated JSON report to stdout.
+ */
+async function validateAgentMode(dir: string): Promise<void> {
+  try {
+    const plugin = loadPlugin(dir);
+    const overall = createResult();
+
+    const structural = validateStructural(plugin);
+    mergeResults(overall, structural);
+    if (structural.errorCount === 0) {
+      const semantic = validateSemantic(plugin);
+      mergeResults(overall, semantic);
+      if (semantic.errorCount === 0) {
+        mergeResults(overall, validateGovernance(plugin));
+      }
+    }
+
+    console.log(JSON.stringify(toAgentErrorReport(overall)));
+    process.exit(overall.errorCount > 0 ? 1 : 0);
+  } catch (e) {
+    console.log(
+      JSON.stringify({
+        ok: false,
+        errorCount: 1,
+        warningCount: 0,
+        errors: [{ code: 'E-LOAD', message: (e as Error).message }],
+        warnings: [],
+      }),
+    );
     process.exit(1);
   }
 }

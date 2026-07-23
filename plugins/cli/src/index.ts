@@ -575,8 +575,12 @@ const mcp = program
 mcp
   .command('serve')
   .description('Start the AuraBoot MCP stdio server (for Cursor / Claude Code)')
-  .action(async () => {
-    await startMcpServer(program.opts());
+  .option(
+    '--profile <name>',
+    'Tool scope: read (default) | dsl-authoring | full. Overrides AURA_MCP_PROFILE.',
+  )
+  .action(async (cmdOpts: any) => {
+    await startMcpServer({ ...program.opts(), ...cmdOpts });
   });
 
 mcp
@@ -629,8 +633,8 @@ const plugin = program
 plugin
   .command('validate [dir]')
   .description('Validate plugin configuration')
-  .action(async (dir?: string) => {
-    await validateCommand(dir || '.');
+  .action(async (dir: string | undefined) => {
+    await validateCommand(dir || '.', program.opts());
   });
 
 plugin
