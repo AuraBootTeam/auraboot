@@ -7,6 +7,6 @@
     "build": "vite build --config vite.lib.config.ts"
   },
   "devDependencies": {
-    "vite": "^8.0.16"
+    "vite": "^8.1.5"
   }
 }
