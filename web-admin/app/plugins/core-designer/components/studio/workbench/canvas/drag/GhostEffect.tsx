@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
+import { sanitizeHtml } from '~/framework/meta/utils/sanitizeHtml';
 import { useDragPreview } from '~/plugins/core-designer/components/studio/workbench/canvas/drag/DragPreviewProvider';
 
 export interface GhostEffectProps {
@@ -290,7 +291,10 @@ export const DragPreviewGhost: React.FC<DragPreviewGhostProps> = ({
         {previewRef.current && (
           <div
             dangerouslySetInnerHTML={{
-              __html: previewRef.current.innerHTML,
+              // Defense-in-depth (SEC-20260723-13): the ghost echoes the innerHTML of an
+              // already-rendered canvas node; sanitize it so no unsanitized markup can ever
+              // reach the DOM through the drag-preview path.
+              __html: sanitizeHtml(previewRef.current.innerHTML),
             }}
           />
         )}
