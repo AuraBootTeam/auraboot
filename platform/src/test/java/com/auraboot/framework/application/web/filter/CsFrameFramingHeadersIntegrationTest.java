@@ -59,14 +59,17 @@ class CsFrameFramingHeadersIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("embed path carries NO X-Frame-Options (per-site frame-ancestors owns framing there)")
     void framePath_hasNoXFrameOptions_throughFullSecurityChain() throws Exception {
-        mockMvc().perform(get(FRAME_PATH))
+        // MockMvc leaves getServletPath() empty unless set; a real container populates it to the
+        // request path (DispatcherServlet mapped to "/"). SecurityHeadersFilter keys the embed
+        // exemption off getServletPath(), so set it to mirror production faithfully.
+        mockMvc().perform(get(FRAME_PATH).servletPath(FRAME_PATH))
                 .andExpect(header().doesNotExist("X-Frame-Options"));
     }
 
     @Test
     @DisplayName("a non-embed public path still carries X-Frame-Options: DENY (lock intact)")
     void nonFramePublicPath_stillDenies_throughFullSecurityChain() throws Exception {
-        mockMvc().perform(get(NON_FRAME_PUBLIC_PATH))
+        mockMvc().perform(get(NON_FRAME_PUBLIC_PATH).servletPath(NON_FRAME_PUBLIC_PATH))
                 .andExpect(header().string("X-Frame-Options", "DENY"));
     }
 }
