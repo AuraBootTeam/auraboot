@@ -24,6 +24,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadConfigList, loadConfigText } from './lib/plugin-config.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_CONFIG = 'scripts/command-reachability.json';
@@ -36,17 +37,9 @@ function readJson(abs) {
   return JSON.parse(fs.readFileSync(abs, 'utf8'));
 }
 
-function asList(doc, key) {
-  if (Array.isArray(doc)) return doc;
-  const v = doc?.[key];
-  return Array.isArray(v) ? v : [];
-}
-
-/** Every command code declared by a plugin. */
+/** Every command code declared by a plugin (single-file or sharded layout). */
 export function declaredCommands(pluginDir) {
-  const abs = path.join(pluginDir, 'config', 'commands.json');
-  if (!fs.existsSync(abs)) return [];
-  return asList(readJson(abs), 'commands')
+  return loadConfigList(pluginDir, 'commands')
     .map((c) => c?.code)
     .filter((c) => typeof c === 'string' && c.length > 0);
 }
@@ -63,28 +56,14 @@ export function declaredCommands(pluginDir) {
  */
 export function referencedCommands(pluginDir) {
   const found = new Set();
-  const dir = path.join(pluginDir, 'config');
-  if (!fs.existsSync(dir)) return found;
-
-  // Both shapes are in use and the directory form is easy to miss: workflow-demo
-  // keeps one JSON per page under config/pages/, so a scanner that only opens
-  // config/pages.json calls nineteen reachable commands unreachable. That false
-  // positive rate is how a gate gets switched off.
-  const targets = [];
-  const collect = (abs) => {
-    if (!fs.existsSync(abs)) return;
-    if (fs.statSync(abs).isDirectory()) {
-      for (const name of fs.readdirSync(abs)) collect(path.join(abs, name));
-    } else if (abs.endsWith('.json')) {
-      targets.push(abs);
-    }
-  };
-  for (const base of ['pages.json', 'pages', 'menus.json', 'menus']) collect(path.join(dir, base));
-
-  for (const abs of targets) {
-    const text = fs.readFileSync(abs, 'utf8');
-    for (const m of text.matchAll(/"([a-z0-9_-]+:[a-z0-9_]+)"/gi)) found.add(m[1]);
-  }
+  // Scan the raw text of every page/menu file, single-file or sharded — the
+  // directory form is easy to miss (workflow-demo keeps one JSON per page under
+  // config/pages/, and the first version of this gate only opened pages.json,
+  // producing 19 false positives). Substring over raw JSON on purpose: the DSL
+  // reaches commands through several unrelated shapes, and a structured matcher
+  // that knows four of five reports reachable commands as unreachable.
+  const text = loadConfigText(pluginDir, 'pages', 'menus');
+  for (const m of text.matchAll(/"([a-z0-9_-]+:[a-z0-9_]+)"/gi)) found.add(m[1]);
   return found;
 }
 

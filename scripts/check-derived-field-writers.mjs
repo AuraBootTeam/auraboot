@@ -33,21 +33,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { loadConfigList } from './lib/plugin-config.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 function readJson(abs) { return JSON.parse(fs.readFileSync(abs, 'utf8')); }
-function asList(doc, key) {
-  if (Array.isArray(doc)) return doc;
-  const v = doc?.[key];
-  return Array.isArray(v) ? v : [];
-}
 
 /** `feature.derived === true` on a field marks it deriver-only. */
 export function derivedFields(pluginDir) {
-  const abs = path.join(pluginDir, 'config', 'fields.json');
-  if (!fs.existsSync(abs)) return [];
-  return asList(readJson(abs), 'fields')
+  return loadConfigList(pluginDir, 'fields')
     .filter((f) => f?.feature && typeof f.feature === 'object' && f.feature.derived === true)
     .map((f) => f.code)
     .filter(Boolean);
@@ -57,10 +51,8 @@ export function derivedFields(pluginDir) {
  *  cross-contaminates models — bom_cl_* fields leak into a bom model that only
  *  shares the `bom` namespace). */
 export function fieldModel(pluginDir) {
-  const abs = path.join(pluginDir, 'config', 'bindings.json');
   const map = new Map();
-  if (!fs.existsSync(abs)) return map;
-  for (const b of asList(readJson(abs), 'bindings')) {
+  for (const b of loadConfigList(pluginDir, 'bindings')) {
     if (b?.fieldCode && b?.modelCode) map.set(b.fieldCode, b.modelCode);
   }
   return map;
@@ -68,10 +60,8 @@ export function fieldModel(pluginDir) {
 
 /** Handler-less declarative create/update commands, by target model. */
 function declarativeWriters(pluginDir) {
-  const abs = path.join(pluginDir, 'config', 'commands.json');
   const byModel = new Map();
-  if (!fs.existsSync(abs)) return byModel;
-  for (const c of asList(readJson(abs), 'commands')) {
+  for (const c of loadConfigList(pluginDir, 'commands')) {
     if (!c?.modelCode) continue;
     if (!['create', 'update'].includes(c.type)) continue;
     if (c.handler) continue; // a handler is the sanctioned place to run the deriver
