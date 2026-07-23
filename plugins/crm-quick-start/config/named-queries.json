@@ -8,15 +8,35 @@
     "parameter_schema": {
       "type": "object",
       "properties": {
-        "tenantId": { "type": "string", "description": "Tenant ID (auto-injected)" }
+        "tenantId": {
+          "type": "string",
+          "description": "Tenant ID (auto-injected)"
+        }
       },
-      "required": ["tenantId"]
+      "required": [
+        "tenantId"
+      ]
     },
     "fromSql": "SELECT tcrm_op_stage AS stage, COUNT(*) AS deal_count, COALESCE(SUM(tcrm_op_amount), 0) AS total_amount FROM mt_tcrm_opportunity WHERE tenant_id = #{params.tenantId} GROUP BY tcrm_op_stage ORDER BY CASE tcrm_op_stage WHEN 'prospecting' THEN 1 WHEN 'proposal' THEN 2 WHEN 'negotiation' THEN 3 WHEN 'closed_won' THEN 4 WHEN 'closed_lost' THEN 5 ELSE 6 END",
     "outputFields": [
-      { "code": "stage", "columnExpr": "stage", "dataType": "string", "searchable": true },
-      { "code": "deal_count", "columnExpr": "deal_count", "dataType": "number", "sortable": true },
-      { "code": "total_amount", "columnExpr": "total_amount", "dataType": "number", "sortable": true }
+      {
+        "code": "stage",
+        "columnExpr": "stage",
+        "dataType": "string",
+        "searchable": true
+      },
+      {
+        "code": "deal_count",
+        "columnExpr": "deal_count",
+        "dataType": "number",
+        "sortable": true
+      },
+      {
+        "code": "total_amount",
+        "columnExpr": "total_amount",
+        "dataType": "number",
+        "sortable": true
+      }
     ]
   },
   {
@@ -28,14 +48,78 @@
     "parameter_schema": {
       "type": "object",
       "properties": {
-        "tenantId": { "type": "string", "description": "Tenant ID (auto-injected)" }
+        "tenantId": {
+          "type": "string",
+          "description": "Tenant ID (auto-injected)"
+        }
       },
-      "required": ["tenantId"]
+      "required": [
+        "tenantId"
+      ]
     },
     "fromSql": "SELECT tcrm_ld_status AS status, COUNT(*) AS count FROM mt_tcrm_lead WHERE tenant_id = #{params.tenantId} GROUP BY tcrm_ld_status ORDER BY CASE tcrm_ld_status WHEN 'new' THEN 1 WHEN 'contacted' THEN 2 WHEN 'qualified' THEN 3 WHEN 'lost' THEN 4 ELSE 5 END",
     "outputFields": [
-      { "code": "status", "columnExpr": "status", "dataType": "string", "searchable": true },
-      { "code": "count", "columnExpr": "count", "dataType": "number", "sortable": true }
+      {
+        "code": "status",
+        "columnExpr": "status",
+        "dataType": "string",
+        "searchable": true
+      },
+      {
+        "code": "count",
+        "columnExpr": "count",
+        "dataType": "number",
+        "sortable": true
+      }
+    ]
+  },
+  {
+    "code": "crm_account_list",
+    "name:zh-CN": "客户列表",
+    "name:en": "Customer Account List",
+    "description": "List customer accounts with their key fields (name, industry, phone, status, code).",
+    "purpose": "Returns customer accounts so the assistant can count, search and report on customers. Use this to answer 'how many customers' or 'list customers'.",
+    "parameter_schema": {
+      "type": "object",
+      "properties": {
+        "tenantId": {
+          "type": "string",
+          "description": "Tenant ID (auto-injected)"
+        }
+      },
+      "required": [
+        "tenantId"
+      ]
+    },
+    "fromSql": "SELECT crm_acc_name, crm_acc_industry, crm_acc_phone, crm_acc_status, crm_acc_code FROM mt_crm_account WHERE tenant_id = #{params.tenantId} ORDER BY id DESC LIMIT 200",
+    "outputFields": [
+      {
+        "code": "crm_acc_name",
+        "columnExpr": "crm_acc_name",
+        "dataType": "string",
+        "searchable": true
+      },
+      {
+        "code": "crm_acc_industry",
+        "columnExpr": "crm_acc_industry",
+        "dataType": "string",
+        "searchable": true
+      },
+      {
+        "code": "crm_acc_phone",
+        "columnExpr": "crm_acc_phone",
+        "dataType": "string"
+      },
+      {
+        "code": "crm_acc_status",
+        "columnExpr": "crm_acc_status",
+        "dataType": "string"
+      },
+      {
+        "code": "crm_acc_code",
+        "columnExpr": "crm_acc_code",
+        "dataType": "string"
+      }
     ]
   }
 ]
