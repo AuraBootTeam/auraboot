@@ -166,6 +166,33 @@ aura mcp test slack
 aura mcp tools slack
 ```
 
+### `aura init`
+
+One-shot onboarding for a workspace: install the end-user Skills into your agent
+clients **and** wire up the AuraBoot MCP server config, in one command.
+
+```bash
+aura init                                   # all clients, under cwd
+aura init --client claude,cursor --root .   # explicit clients + root
+```
+
+Writes the `mcpServers.auraboot` entry into `.cursor/mcp.json` (Cursor) and
+`.mcp.json` (Claude Code), merging with any existing servers. Codex (TOML config)
+is reported as a manual step. Then run `aura doctor` to verify.
+
+### `aura doctor`
+
+Verify the setup end to end:
+
+```bash
+aura doctor            # human-readable
+aura doctor --agent-mode   # JSON: { ok, checks: [{ name, ok, detail }] }
+```
+
+Checks: **skills** installed & fresh, **credentials** present, **tenant** pinned,
+**backend** reachable (`/actuator/health`). Exits non-zero if any check fails;
+offline checks (skills) still report correctly when the backend is down.
+
 ### `aura skills`
 
 Install AuraBoot's **end-user Skills** into your agent client (Claude Code / Cursor / Codex).

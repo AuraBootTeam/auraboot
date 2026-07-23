@@ -81,6 +81,8 @@ import {
   skillsInstallCommand,
   skillsRemoveCommand,
 } from './commands/skills.js';
+import { onboardCommand } from './commands/onboard.js';
+import { doctorCommand } from './commands/doctor.js';
 
 const program = new Command();
 
@@ -120,6 +122,27 @@ program
   .action(async (cmdOpts: any) => {
     const opts = { ...program.opts(), ...cmdOpts };
     await loginCommand(opts);
+  });
+
+// ── init (onboard agent clients) ─────────────────────────────────────────────
+
+program
+  .command('init')
+  .description('Onboard agent clients: install Skills + wire up the MCP server config')
+  .option('--client <name>', 'claude | cursor | codex | all (comma-separated)', 'all')
+  .option('--root <dir>', 'Workspace root to onboard (default: cwd)')
+  .action(async (cmdOpts: any) => {
+    await onboardCommand({ ...program.opts(), ...cmdOpts });
+  });
+
+// ── doctor (verify setup) ─────────────────────────────────────────────────────
+
+program
+  .command('doctor')
+  .description('Verify Skills installed, MCP/auth configured, tenant pinned, backend reachable')
+  .option('--root <dir>', 'Workspace root to check (default: cwd)')
+  .action(async (cmdOpts: any) => {
+    await doctorCommand({ ...program.opts(), ...cmdOpts });
   });
 
 // ── ask ─────────────────────────────────────────────────────────────────────
