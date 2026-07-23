@@ -7,6 +7,10 @@ export interface ValidationMessage {
   message: string;
   path?: string;
   suggestion?: string;
+  /** The value the validator expected (e.g. the correct property name). */
+  expected?: string;
+  /** Imperative fix an AI agent can apply directly, e.g. "Rename x to y". */
+  agentInstruction?: string;
 }
 
 export interface ValidationResult {

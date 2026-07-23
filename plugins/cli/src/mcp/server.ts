@@ -3,6 +3,12 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import chalk from 'chalk';
 import { ApiClient } from '../client/api-client.js';
 import { makeAuditWrapper } from './audit.js';
+import {
+  DEFAULT_MCP_PROFILE,
+  filterToolsByProfile,
+  resolveMcpProfile,
+  type McpProfileName,
+} from './profiles.js';
 import { ToolRegistry } from './registry.js';
 import { pinTenant } from './tenant-pin.js';
 import { askAuraBotTool } from './tools/read/askAuraBot.js';
@@ -45,36 +51,51 @@ import { rollbackImportTool } from './tools/write/rollbackImport.js';
  * non-stdio entry point — Streamable HTTP, in-process embedding) can
  * exercise the same wiring as the production stdio server.
  */
-export function buildToolRegistry(client: ApiClient): ToolRegistry {
+export function buildToolRegistry(
+  client: ApiClient,
+  opts: { profile?: McpProfileName } = {},
+): ToolRegistry {
+  // Default to the full set so existing callers/tests keep every tool; the
+  // user-facing `read` default is applied by startMcpServer via resolveMcpProfile.
+  const profile = opts.profile ?? 'full';
+
+  const tools = [
+    // Read tools (preserved from v1.x — behavior must remain identical).
+    queryEntityTool(client),
+    runNamedQueryTool(client),
+    listAgentsTool(client),
+    listToolsTool(client),
+    dispatchAgentTool(client),
+    askAuraBotTool(client),
+    // Discovery tools — pre-create context for write tools.
+    queryDslCapabilitiesTool(client),
+    queryExistingModelsTool(client),
+    queryPageSchemasTool(client),
+    // Static doc tool — pipeline phase reference for LLM context.
+    describeCommandPipelineTool(),
+    // Write tools — destructive, dryRun=true keeps LLM iteration safe.
+    createModelTool(client),
+    createPageSchemaTool(client),
+    createCommandTool(client),
+    importPluginTool(client),
+    rollbackImportTool(client),
+  ];
+
   const registry = new ToolRegistry();
-
-  // Read tools (preserved from v1.x — behavior must remain identical).
-  registry.register(queryEntityTool(client));
-  registry.register(runNamedQueryTool(client));
-  registry.register(listAgentsTool(client));
-  registry.register(listToolsTool(client));
-  registry.register(dispatchAgentTool(client));
-  registry.register(askAuraBotTool(client));
-
-  // Discovery tools — pre-create context for write tools coming in W2.
-  registry.register(queryDslCapabilitiesTool(client));
-  registry.register(queryExistingModelsTool(client));
-  registry.register(queryPageSchemasTool(client));
-
-  // Static doc tool — pipeline phase reference for LLM context (D3).
-  registry.register(describeCommandPipelineTool());
-
-  // Write tools (W2) — destructive, dryRun=true keeps LLM iteration safe.
-  registry.register(createModelTool(client));
-  registry.register(createPageSchemaTool(client));
-  registry.register(createCommandTool(client));
-  registry.register(importPluginTool(client));
-  registry.register(rollbackImportTool(client));
-
+  for (const tool of filterToolsByProfile(tools, profile)) {
+    registry.register(tool);
+  }
   return registry;
 }
 
-export async function startMcpServer(options: { token?: string; env?: string }): Promise<void> {
+export async function startMcpServer(options: {
+  token?: string;
+  env?: string;
+  profile?: string;
+}): Promise<void> {
+  // Profile precedence: --profile flag > AURA_MCP_PROFILE env > minimal default.
+  const profile = resolveMcpProfile(options.profile ?? process.env.AURA_MCP_PROFILE);
+
   // `interactive: false` so that 403 / 404 from a single tool call returns
   // an ApiResponse instead of killing the long-lived MCP server process.
   const client = new ApiClient({ ...options, interactive: false });
@@ -86,7 +107,7 @@ export async function startMcpServer(options: { token?: string; env?: string }):
     version: '2.0.0',
   });
 
-  const registry = buildToolRegistry(client);
+  const registry = buildToolRegistry(client, { profile });
   registry.attachTo(server, audit);
 
   const transport = new StdioServerTransport();
@@ -98,5 +119,13 @@ export async function startMcpServer(options: { token?: string; env?: string }):
       `[aura-mcp] Connected as ${ctx.email ?? '<unknown>'} @ tenant=${ctx.tenantName ?? ctx.tenantId}`,
     ),
   );
-  console.error(chalk.dim(`[aura-mcp] Server ready — ${registry.size()} tools available`));
+  const profileHint =
+    profile === DEFAULT_MCP_PROFILE
+      ? ` (default; use --profile dsl-authoring|full to widen)`
+      : '';
+  console.error(
+    chalk.dim(
+      `[aura-mcp] Server ready — profile=${profile}, ${registry.size()} tools available${profileHint}`,
+    ),
+  );
 }
