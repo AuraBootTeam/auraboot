@@ -8,7 +8,9 @@ import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
+import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.plugin.service.PluginResourceService;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ import java.util.*;
 public class PluginResourceController {
 
     private final PluginResourceService pluginResourceService;
+    private final PluginResourceMapper pluginResourceMapper;
     private final PluginRecordMapper pluginRecordMapper;
 
     /**
@@ -111,9 +114,13 @@ public class PluginResourceController {
             return ApiResponse.success(new LinkedHashMap<>());
         }
 
-        List<PluginResource> resources = pluginResourceService.findByPluginPid(record.getPid());
-        // Group by resourceType in import order so the pulled config imports cleanly.
-        resources.sort(Comparator.comparingInt(r -> r.getSequence() != null ? r.getSequence() : 0));
+        // BaseMapper.selectList applies the entity's autoResultMap, so the JSONB
+        // importSnapshot deserializes via its TypeHandler; the custom @Select
+        // findByPluginPid uses plain auto-mapping and would leave it null.
+        List<PluginResource> resources = pluginResourceMapper.selectList(
+                Wrappers.<PluginResource>lambdaQuery()
+                        .eq(PluginResource::getPluginPid, record.getPid())
+                        .orderByAsc(PluginResource::getSequence));
 
         Map<String, List<Map<String, Object>>> byType = new LinkedHashMap<>();
         for (PluginResource r : resources) {
