@@ -102,7 +102,7 @@ test.describe('List Page UX Features', () => {
     await sortTarget.click();
 
     // SVG sort indicator has blue fill
-    const bluePath = targetHeader.locator('svg path[fill="#2563eb"]');
+    const bluePath = targetHeader.locator('svg path[fill="var(--color-accent)"]');
     await expect(bluePath.first()).toBeVisible({ timeout: 5_000 });
 
     // Second click — descending. The blue indicator stays visible (now desc).
@@ -209,7 +209,7 @@ test.describe('List Page UX Features', () => {
     await clearActiveSorts(page);
     const targetHeader = page.getByTestId('table-header-sc_code');
     await page.getByTestId('table-header-sort-sc_code').click();
-    await expect(targetHeader.locator('svg path[fill="#2563eb"]').first()).toBeVisible({
+    await expect(targetHeader.locator('svg path[fill="var(--color-accent)"]').first()).toBeVisible({
       timeout: 5_000,
     });
 
@@ -317,7 +317,7 @@ test.describe('List Page UX Features', () => {
     expect(page.url()).toContain('sort=');
 
     // Sort indicator still visible
-    const bluePath = page.getByTestId('table-header-sc_code').locator('svg path[fill="#2563eb"]');
+    const bluePath = page.getByTestId('table-header-sc_code').locator('svg path[fill="var(--color-accent)"]');
     await expect(bluePath.first()).toBeVisible({ timeout: 5_000 });
   });
 

@@ -356,12 +356,13 @@ test.describe('Phase 6 — showcase_all_fields runtime rendering', () => {
       document.querySelectorAll('vite-error-overlay').forEach((el) => el.remove());
     });
 
-    // Assert all 9 form-section containers rendered (FormSectionBlockRenderer
+    // Assert all 8 form-section containers rendered (FormSectionBlockRenderer
     // emits .form-section className per section — the only stable selector).
+    // showcase_all_fields_form.json defines 8 form-section blocks.
     const sections = page.locator('.form-section');
     await expect(sections.first()).toBeVisible({ timeout: 10_000 });
     const sectionCount = await sections.count();
-    expect(sectionCount, 'form must render exactly 9 form-section blocks').toBe(9);
+    expect(sectionCount, 'form must render exactly 8 form-section blocks').toBe(8);
 
     // Spot-check several widget categories actually mounted: text, number,
     // enum (select), boolean, date.

@@ -31,6 +31,12 @@ import { test, expect, type Page } from '../../fixtures';
 import { uniqueId } from '../helpers/index';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
+// Flow/BPMN designer uses a compact layout below 1600px (palette/inspector collapse
+// behind toggles + a drawer backdrop intercepts canvas clicks). These specs assert the
+// palette/canvas/nodes directly, so run them at the wide layout the designer targets.
+// See FlowDesigner.tsx COMPACT_FLOW_DESIGNER_QUERY '(max-width: 1599px)'.
+test.use({ viewport: { width: 1680, height: 1050 } });
+
 // ---------------------------------------------------------------------------
 // LLM stub strategy
 // ---------------------------------------------------------------------------

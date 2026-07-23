@@ -17,6 +17,12 @@ import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
+// Flow/BPMN designer uses a compact layout below 1600px (palette/inspector collapse
+// behind toggles + a drawer backdrop intercepts canvas clicks). These specs assert the
+// palette/canvas/nodes directly, so run them at the wide layout the designer targets.
+// See FlowDesigner.tsx COMPACT_FLOW_DESIGNER_QUERY '(max-width: 1599px)'.
+test.use({ viewport: { width: 1680, height: 1050 } });
+
 function nameInput(page: import('@playwright/test').Page) {
   return page.getByTestId('automation-editor-name-input');
 }
@@ -24,7 +30,7 @@ function saveButton(page: import('@playwright/test').Page) {
   return page.getByTestId('automation-editor-toolbar-btn-save');
 }
 function propertyPanel(page: import('@playwright/test').Page) {
-  return page.locator('.w-80.border-l').first();
+  return page.locator('.w-96.border-l').first();
 }
 
 /**
