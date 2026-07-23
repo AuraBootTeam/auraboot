@@ -166,6 +166,34 @@ aura mcp test slack
 aura mcp tools slack
 ```
 
+### `aura skills`
+
+Install AuraBoot's **end-user Skills** into your agent client (Claude Code / Cursor / Codex).
+Skills are the discovery + workflow layer: they tell your agent *when* to use AuraBoot and
+*in what order*, and route everything through the `aura` CLI. They never execute writes
+themselves — the platform stays the sole authority on permissions.
+
+```bash
+aura skills list                                  # the 6 bundled skills
+aura skills install                               # into all clients under cwd
+aura skills install --client claude --root .      # just Claude Code, explicit root
+aura skills check                                 # installed / stale / not-installed
+aura skills remove --client cursor
+```
+
+Clients and their skill directories:
+
+| Client | Directory |
+|---|---|
+| `claude` | `.claude/skills/` |
+| `cursor` | `.cursor/skills/` |
+| `codex` | `.agents/skills/` |
+
+Bundled skills: `auraboot-data-modeling`, `auraboot-ui-builder`, `auraboot-workflow`,
+`auraboot-permissions`, `auraboot-runtime-ops`, `auraboot-dsl-gitops`. Add `--agent-mode`
+to `list` / `check` for JSON output. Restart the agent client after install so it
+re-scans the skills directory.
+
 ## Plugin Directory Structure
 
 ```

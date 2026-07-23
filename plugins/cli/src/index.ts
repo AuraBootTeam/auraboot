@@ -74,6 +74,14 @@ import {
   mcpToolsCommand,
 } from './commands/mcp.js';
 
+// ── skills (end-user agent skills) ──────────────────────────────────────────
+import {
+  skillsListCommand,
+  skillsCheckCommand,
+  skillsInstallCommand,
+  skillsRemoveCommand,
+} from './commands/skills.js';
+
 const program = new Command();
 
 program
@@ -622,6 +630,46 @@ mcp
   .description('List tools provided by an MCP server')
   .action(async (name: string) => {
     await mcpToolsCommand(name, program.opts());
+  });
+
+// ── skills (end-user agent skills) ──────────────────────────────────────────
+
+const skills = program
+  .command('skills')
+  .description('Install AuraBoot end-user Skills into agent clients (Claude Code / Cursor / Codex)');
+
+skills
+  .command('list')
+  .description('List the Skills bundled with this CLI')
+  .action(async () => {
+    await skillsListCommand(program.opts());
+  });
+
+skills
+  .command('check')
+  .description('Report which Skills are installed in each agent client')
+  .option('--client <name>', 'claude | cursor | codex | all (comma-separated)', 'all')
+  .option('--root <dir>', 'Workspace root to check (default: cwd)')
+  .action(async (cmdOpts: any) => {
+    await skillsCheckCommand({ ...program.opts(), ...cmdOpts });
+  });
+
+skills
+  .command('install')
+  .description('Install bundled Skills into agent clients')
+  .option('--client <name>', 'claude | cursor | codex | all (comma-separated)', 'all')
+  .option('--root <dir>', 'Workspace root to install into (default: cwd)')
+  .action(async (cmdOpts: any) => {
+    await skillsInstallCommand({ ...program.opts(), ...cmdOpts });
+  });
+
+skills
+  .command('remove')
+  .description('Remove installed Skills from agent clients')
+  .option('--client <name>', 'claude | cursor | codex | all (comma-separated)', 'all')
+  .option('--root <dir>', 'Workspace root to remove from (default: cwd)')
+  .action(async (cmdOpts: any) => {
+    await skillsRemoveCommand({ ...program.opts(), ...cmdOpts });
   });
 
 // ── plugin (existing) ───────────────────────────────────────────────────────
