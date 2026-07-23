@@ -95,8 +95,8 @@ else
       exit 1 ;;
     *)
       log "❌ integration-test DB '$IT_DB' is BEHIND the migrations: chk_doc_source still forbids 'conversation'."
-      log "   This is environment drift, not a product failure — the migration, schema.sql and"
-      log "   KbTextIngestService.DB_SOURCE_TYPES all carry 'conversation' on main."
+      log "   This is environment drift, not a product failure — the migration and"
+      log "   KbTextIngestService.DB_SOURCE_TYPES both carry 'conversation' on main."
       log "   Fix: refresh that database (scripts/reset-db.sh, PG_DB=$IT_DB) when no other worktree"
       log "   is using it, then re-run. Do NOT 'fix' the product."
       exit 1 ;;

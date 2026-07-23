@@ -1,1 +1,0 @@
-../../../main/resources/database/schema.sql

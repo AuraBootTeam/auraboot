@@ -53,10 +53,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 class SpringContextLoadsSmokeTest {
 
     /**
-     * Canonical schema.sql contains PL/pgSQL DO $$ ... $$ blocks that
-     * TestContainers' built-in ScriptUtils cannot parse, so we copy the file
-     * into the container and execute it via psql which understands the full
-     * dialect.
+     * The Flyway-generated snapshot (db/snapshots/schema-current.sql) may contain
+     * PL/pgSQL function bodies that TestContainers' built-in ScriptUtils cannot parse,
+     * so we copy the file into the container and execute it via psql (the entrypoint
+     * init script) which understands the full dialect. The snapshot is the same
+     * artifact golden and fresh stacks load, so this smoke test exercises the real
+     * bring-up path.
      */
     @Container
     @SuppressWarnings("resource")
@@ -67,11 +69,11 @@ class SpringContextLoadsSmokeTest {
             .withUsername("auraboot")
             .withPassword("auraboot")
             .withCopyFileToContainer(
-                    MountableFile.forClasspathResource("database/schema-pg-test-bootstrap.sql"),
+                    MountableFile.forClasspathResource("db/snapshots/schema-current.sql"),
                     "/docker-entrypoint-initdb.d/00-schema.sql")
-            // The 9000-line canonical schema takes ~60-90s to apply via the
-            // entrypoint init script; bump TC's default 60s startup window so
-            // the wait strategy doesn't time out before psql finishes.
+            // The full schema takes ~60-90s to apply via the entrypoint init script;
+            // bump TC's default 60s startup window so the wait strategy doesn't time
+            // out before psql finishes.
             .withStartupTimeout(Duration.ofMinutes(3))
             .waitingFor(Wait.forLogMessage(".*database system is ready to accept connections.*\\n", 2));
 

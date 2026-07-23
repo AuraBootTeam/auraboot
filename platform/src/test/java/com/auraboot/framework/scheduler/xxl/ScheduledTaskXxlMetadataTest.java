@@ -37,7 +37,7 @@ class ScheduledTaskXxlMetadataTest {
 
     @Test
     void schema_containsExternalSchedulerMetadataColumns() throws Exception {
-        String schema = Files.readString(Path.of("src/main/resources/database/schema.sql"));
+        String schema = Files.readString(Path.of("src/main/resources/db/snapshots/schema-current.sql"));
 
         assertThat(schema).contains("scheduler_type");
         assertThat(schema).contains("external_job_id");

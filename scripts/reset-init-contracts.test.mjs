@@ -327,24 +327,22 @@ test('customer service agent integration scenario follows OSS CRM starter activi
 });
 
 test('direct schema init includes agent observability and command audit correlation tables', () => {
-  const schema = read('platform/src/main/resources/database/schema.sql');
-  const commandAudit = schema.slice(
-    schema.indexOf('CREATE TABLE IF NOT EXISTS ab_command_audit_log'),
-    schema.indexOf('CREATE INDEX IF NOT EXISTS idx_cmd_audit_tenant_code'),
-  );
-  assert.match(commandAudit, /trace_id\s+VARCHAR\(36\)/);
-  assert.match(commandAudit, /span_id\s+VARCHAR\(36\)/);
+  // The direct-init schema is now the Flyway-generated snapshot (pg_dump format:
+  // `CREATE TABLE public.<t> (...)` with lowercase types, indexes in a trailing section).
+  const schema = read('platform/src/main/resources/db/snapshots/schema-current.sql');
+  const auditStart = schema.indexOf('CREATE TABLE public.ab_command_audit_log (');
+  const commandAudit = schema.slice(auditStart, schema.indexOf('\n);', auditStart));
+  assert.match(commandAudit, /trace_id character varying\(36\)/);
+  assert.match(commandAudit, /span_id character varying\(36\)/);
 
-  const aiTrace = schema.slice(
-    schema.indexOf('CREATE TABLE IF NOT EXISTS ab_ai_trace'),
-    schema.indexOf('CREATE INDEX IF NOT EXISTS idx_ai_trace_tenant'),
-  );
-  assert.match(aiTrace, /otel_trace_id\s+VARCHAR\(32\)/);
-  assert.match(schema, /CREATE INDEX IF NOT EXISTS idx_ab_ai_trace_otel_trace_id/);
+  const traceStart = schema.indexOf('CREATE TABLE public.ab_ai_trace (');
+  const aiTrace = schema.slice(traceStart, schema.indexOf('\n);', traceStart));
+  assert.match(aiTrace, /otel_trace_id character varying\(32\)/);
+  assert.match(schema, /CREATE INDEX idx_ab_ai_trace_otel_trace_id ON public\.ab_ai_trace/);
 
-  assert.match(schema, /CREATE TABLE IF NOT EXISTS ab_gen_ai_usage/);
-  assert.match(schema, /CREATE INDEX IF NOT EXISTS idx_ab_gen_ai_usage_tenant_created/);
-  assert.match(schema, /CREATE INDEX IF NOT EXISTS idx_ab_gen_ai_usage_trace/);
+  assert.match(schema, /CREATE TABLE public\.ab_gen_ai_usage/);
+  assert.match(schema, /CREATE INDEX idx_ab_gen_ai_usage_tenant_created ON public\.ab_gen_ai_usage/);
+  assert.match(schema, /CREATE INDEX idx_ab_gen_ai_usage_trace ON public\.ab_gen_ai_usage/);
 });
 
 test('plugin import retries each plugin before importing dependents', () => {

@@ -104,17 +104,20 @@ class KnowledgeBaseDocTypeContractTest {
     }
 
     /**
-     * Read the constraint out of database/schema.sql — the consolidated DDL that golden-stack and
-     * fresh-stack apply directly (they do not run Flyway), so it is the copy that actually decides
+     * Read the constraint out of db/snapshots/schema-current.sql — the Flyway-generated snapshot
+     * that golden-stack and fresh-stack apply directly, so it is the copy that actually decides
      * whether an insert succeeds on a fresh environment.
      */
     private String readChkDocTypeConstraint() throws IOException {
-        Path schema = Path.of("src/main/resources/database/schema.sql");
-        assertTrue(Files.exists(schema), "schema.sql not found at " + schema.toAbsolutePath());
+        Path schema = Path.of("src/main/resources/db/snapshots/schema-current.sql");
+        assertTrue(Files.exists(schema), "snapshot not found at " + schema.toAbsolutePath());
 
         String sql = Files.readString(schema, StandardCharsets.UTF_8);
-        Matcher m = Pattern.compile("CONSTRAINT chk_doc_type CHECK \\(doc_type IN \\(([^)]*)\\)\\)").matcher(sql);
-        assertTrue(m.find(), "chk_doc_type constraint not found in schema.sql");
+        // pg_dump renders the CHECK on one line, normalising `IN (...)` to `= ANY (ARRAY[...])`:
+        //   CONSTRAINT chk_doc_type CHECK (((doc_type)::text = ANY ((ARRAY['pdf'::character varying, ...])::text[])))
+        // Capture the whole CHECK body — callers only test .contains("'<type>'").
+        Matcher m = Pattern.compile("CONSTRAINT chk_doc_type CHECK \\((.*)\\)").matcher(sql);
+        assertTrue(m.find(), "chk_doc_type constraint not found in snapshot");
         return m.group(1);
     }
 }
