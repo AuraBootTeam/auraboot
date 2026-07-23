@@ -36,12 +36,17 @@ import org.springframework.test.context.ActiveProfiles;
  *       an agent turn uses, not the (empty) {@code ab_agent_tool} table.</li>
  * </ul>
  *
- * <p><b>Mutation check (done by hand, documented for the reviewer):</b> reverting
- * {@code selectByQueryWithoutTenant} back to {@code selectByQuery} in
- * {@code AgentSkillService.loadSkill} makes {@link #loadSkill_findsSystemBuiltinFromTenantContext}
- * fail (skill is null); reverting the provider-registry resolution in {@code resolveToolCodes}
- * makes {@link #resolveSkillTools_resolvesGovernedDslListTool} fail (tools are empty). Neither
- * assertion is vacuous.
+ * <p><b>Mutation checks (done by hand with a forced recompile, documented for the
+ * reviewer):</b>
+ * <ul>
+ *   <li>revert {@code selectByQueryWithoutTenant} → {@code selectByQuery} in
+ *       {@code loadSkill} ⇒ the loadSkill/resolve cases fail (skill is null);</li>
+ *   <li>skip the provider-registry resolution in {@code resolveToolCodes} ⇒ the
+ *       resolve cases fail (tools empty) while the loadSkill case still passes;</li>
+ *   <li>make {@code loadSkill}'s WHERE tenant-blind ({@code 1 = 1}) ⇒
+ *       {@link #loadSkill_doesNotLeakAnotherTenantsPrivateSkill} fails (it leaks).</li>
+ * </ul>
+ * Every assertion here has been seen red for the right reason.
  */
 @ActiveProfiles("integration-test")
 class SkillAssetLayerTenantIntegrationTest extends BaseIntegrationTest {
