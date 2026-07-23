@@ -25,6 +25,8 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { declaredCommands, referencedCommands } from './check-command-reachability.mjs';
 
+import { resolveRepoRoot } from './lib/repo-root.mjs';
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 /** Where a command's coverage could live, and what each location means in axes. */
@@ -155,7 +157,7 @@ function arg(argv, name, fallback = null) {
 }
 
 function main(argv) {
-  const repoRoot = path.resolve(HERE, '..');
+  const repoRoot = resolveRepoRoot(argv, path.resolve(HERE, '..'));
   const pluginRoot = path.resolve(repoRoot, arg(argv, '--plugin-root', 'plugins'));
   const out = arg(argv, '--out');
   const only = arg(argv, '--plugin');
