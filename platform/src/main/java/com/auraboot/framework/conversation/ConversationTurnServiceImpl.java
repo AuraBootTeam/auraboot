@@ -171,6 +171,64 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
         }
     }
 
+    /**
+     * Make the built-in assistant honour its own configured model, the way named agents
+     * already do.
+     *
+     * <p>A named agent picks its provider from {@code agent_definition.model}
+     * (AgentRunService via LlmRuntimeResolver). The aurabot path did not: it resolved the
+     * provider from the per-request options alone, and when the caller sent neither a model
+     * nor a provider it fell to "the first enabled provider with a key" — an order-dependent
+     * default that ignored the aurabot row's own {@code model} column entirely. So an admin
+     * who set the tenant assistant to qwen still got whichever vendor happened to be first,
+     * and setting the column looked like it did nothing.
+     *
+     * <p>This fills the model in from the aurabot definition when — and only when — the
+     * request specified neither model nor provider. An explicit per-request choice always
+     * wins, and a null column (the seeded default) is a no-op, so existing tenants are
+     * unchanged until someone deliberately configures the assistant's model.
+     */
+    private void applyConfiguredAssistantModel(Long tenantId, ChatRequest legacyRequest) {
+        if (legacyRequest == null || tenantId == null) {
+            return;
+        }
+        ChatRequest.ChatOptions options = legacyRequest.getOptions();
+        if (options != null
+                && ((options.getModel() != null && !options.getModel().isBlank())
+                    || (options.getProvider() != null && !options.getProvider().isBlank()))) {
+            return; // an explicit per-request choice wins
+        }
+        String configuredModel = configuredAgentModel(tenantId, "aurabot");
+        if (configuredModel == null || configuredModel.isBlank()) {
+            return; // no configured model — keep today's default-provider behaviour
+        }
+        if (options == null) {
+            options = new ChatRequest.ChatOptions();
+            legacyRequest.setOptions(options);
+        }
+        options.setModel(configuredModel);
+    }
+
+    /** The {@code model} column of an agent definition, or {@code null} if unset/absent. */
+    private String configuredAgentModel(Long tenantId, String agentCode) {
+        try {
+            String sql = "SELECT model FROM ab_agent_definition WHERE tenant_id = #{params.tenantId} "
+                    + "AND agent_code = #{params.agentCode} AND deleted_flag = FALSE LIMIT 1";
+            java.util.List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
+                    Map.of("tenantId", tenantId, "agentCode", agentCode));
+            if (rows.isEmpty()) {
+                return null;
+            }
+            Object model = rows.get(0).get("model");
+            return model == null ? null : model.toString();
+        } catch (Exception e) {
+            // Provider resolution has its own fallback; an optional lookup must never
+            // break the turn.
+            log.debug("assistant model lookup failed for tenant {}: {}", tenantId, e.getMessage());
+            return null;
+        }
+    }
+
     private TurnOutcome runTurnDispatch(TurnRequest request, ResponseSink sink) {
         TurnContext ctx = beginTurn(request);
         sideEffects.metricsRecorder().recordTurnBegin(ctx);
@@ -238,6 +296,7 @@ public class ConversationTurnServiceImpl implements ConversationTurnService {
                             ? dispatchToAcpRun(ctx, legacyRequest, capturingSink)
                             : acpRuntimeUnavailableOutcome(ctx, capturingSink);
                 } else {
+                    applyConfiguredAssistantModel(ctx.tenantId(), legacyRequest);
                     outcome = chatService.executeAuraBotTurn(ctx, legacyRequest, capturingSink);
                 }
             }

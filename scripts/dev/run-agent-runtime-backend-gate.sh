@@ -36,6 +36,7 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpDispatchTest' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpResumeTest' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplDispatchTest' \
+  --tests 'com.auraboot.framework.conversation.AssistantModelFallbackTest' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplNamedAgentTaskTest' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplResumeTest' \
   --tests 'com.auraboot.framework.aurabot.service.AuraBotChatServiceGroundingTest' \
