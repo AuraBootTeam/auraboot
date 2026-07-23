@@ -94,6 +94,38 @@ public class PluginResourceController {
         return ApiResponse.success(results);
     }
 
+    /**
+     * Export a plugin's imported config, grouped by resource type, for the DSL
+     * reconciler's `aura dsl pull`. Returns each resource's importSnapshot — the
+     * manifest DTO captured at import time — which is re-importable and lets the
+     * CLI adopt a running instance's config as a local baseline.
+     */
+    @GetMapping("/export")
+    @Operation(summary = "Export a plugin's imported config", description = "Resource importSnapshots grouped by type, for `aura dsl pull`")
+    @RequirePermission(MetaPermission.PLUGIN_READ)
+    public ApiResponse<Map<String, List<Map<String, Object>>>> exportPluginConfig(
+            @RequestParam String pluginId) {
+
+        PluginRecord record = pluginRecordMapper.findByTenantAndPluginId(pluginId);
+        if (record == null || record.getPid() == null) {
+            return ApiResponse.success(new LinkedHashMap<>());
+        }
+
+        List<PluginResource> resources = pluginResourceService.findByPluginPid(record.getPid());
+        // Group by resourceType in import order so the pulled config imports cleanly.
+        resources.sort(Comparator.comparingInt(r -> r.getSequence() != null ? r.getSequence() : 0));
+
+        Map<String, List<Map<String, Object>>> byType = new LinkedHashMap<>();
+        for (PluginResource r : resources) {
+            Map<String, Object> snapshot = r.getImportSnapshot();
+            if (snapshot == null || snapshot.isEmpty()) {
+                continue;
+            }
+            byType.computeIfAbsent(r.getResourceType(), k -> new ArrayList<>()).add(snapshot);
+        }
+        return ApiResponse.success(byType);
+    }
+
     private ResourceOwnerDTO toOwnerDTO(PluginResource resource) {
         PluginRecord plugin = pluginRecordMapper.findByPid(resource.getPluginPid());
         String pluginName = plugin != null ? plugin.getDisplayName() : null;
