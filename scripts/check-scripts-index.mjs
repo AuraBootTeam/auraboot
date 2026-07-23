@@ -17,7 +17,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SCRIPTS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
+// `--repo <path>` lets this single OSS-resident gate check any product repo's
+// scripts/README.md (the workspace fan-out pattern). Default: this script's own repo.
+const argv = process.argv.slice(2);
+let repoArg = null;
+for (let i = 0; i < argv.length; i++) {
+  if (argv[i] === '--repo') repoArg = argv[++i];
+  else if (argv[i].startsWith('--repo=')) repoArg = argv[i].slice(7);
+}
+const SELF_SCRIPTS = path.dirname(fileURLToPath(import.meta.url));
+const REPO = repoArg ? path.resolve(repoArg) : path.dirname(SELF_SCRIPTS);
+const SCRIPTS_DIR = path.join(REPO, 'scripts');
 const README = path.join(SCRIPTS_DIR, 'README.md');
 const SCRIPT_EXT = new Set(['.mjs', '.sh', '.cjs', '.js']);
 // relative to SCRIPTS_DIR
@@ -35,8 +45,10 @@ function walk(dir, acc = []) {
 }
 
 if (!fs.existsSync(README)) {
-  console.error(`[scripts-index] FAIL: ${path.relative(process.cwd(), README)} is missing.`);
-  process.exit(1);
+  // Not onboarded to the scripts index — skip with a visible note, never a silent
+  // pass (mirrors test-system-gate-run.sh's skip-if-no-manifest philosophy).
+  console.log(`[scripts-index] SKIP ${path.basename(REPO)} — no scripts/README.md (repo not onboarded to the scripts index).`);
+  process.exit(0);
 }
 
 const actual = new Set(
