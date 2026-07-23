@@ -35,6 +35,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfigList } from './lib/plugin-config.mjs';
 
+import { resolveRepoRoot } from './lib/repo-root.mjs';
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
 function readJson(abs) { return JSON.parse(fs.readFileSync(abs, 'utf8')); }
@@ -127,7 +129,7 @@ export function auditDerivedWriters({ roots, config = {} }) {
 }
 
 function main(argv) {
-  const repoRoot = path.resolve(HERE, '..');
+  const repoRoot = resolveRepoRoot(argv, path.resolve(HERE, '..'));
   const asJson = argv.includes('--json');
   const rootFlag = argv.indexOf('--plugin-root');
   const cfgAbs = path.join(repoRoot, 'scripts/derived-field-writers.json');

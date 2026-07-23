@@ -26,6 +26,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { resolveRepoRoot } from './lib/repo-root.mjs';
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_CONFIG = 'scripts/e2e-spec-registration.json';
 
@@ -158,7 +160,7 @@ function loadConfig(root, rel) {
 }
 
 function main(argv) {
-  const root = path.resolve(HERE, '..');
+  const root = resolveRepoRoot(argv, path.resolve(HERE, '..'));
   const asJson = argv.includes('--json');
   const config = loadConfig(root, DEFAULT_CONFIG);
   const { findings, summary } = auditRegistrations({ root, config });

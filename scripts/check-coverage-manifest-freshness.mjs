@@ -24,10 +24,33 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { buildManifest } from './gen-coverage-manifest.mjs';
+import { resolveRepoRoot } from './lib/repo-root.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_CONFIG = 'scripts/coverage-manifest.json';
+
+// A committed matrix is the whole point: a manifest that is not git-tracked
+// vanishes on the next clone and lets the gate "pass" against a file nobody else
+// has. isGitTracked IS the assertion (falsifiable: untrack the manifest and the
+// gate goes red) — the evidence-persistence gate that was skipped because "reports
+// are gitignored", now aimed at the matrix (which must be committed), not at the
+// rendered evidence. isGitIgnored only refines the message: git does not apply
+// .gitignore to already-tracked files, so it is a diagnostic on the untracked
+// path, never a standalone check (that would be an unfalsifiable, always-false gate).
+export function isGitTracked(repoRoot, rel) {
+  try {
+    execFileSync('git', ['-C', repoRoot, 'ls-files', '--error-unmatch', '--', rel], { stdio: 'pipe' });
+    return true;
+  } catch { return false; }
+}
+export function isGitIgnored(repoRoot, rel) {
+  try {
+    execFileSync('git', ['-C', repoRoot, 'check-ignore', '-q', '--', rel], { stdio: 'pipe' });
+    return true; // exit 0 = ignored
+  } catch { return false; } // non-zero = not ignored
+}
 
 export function compareManifests(committed, fresh) {
   const findings = [];
@@ -59,8 +82,8 @@ export function compareManifests(committed, fresh) {
   return { findings, wasUntested, nowUntested };
 }
 
-function main() {
-  const repoRoot = path.resolve(HERE, '..');
+function main(argv = []) {
+  const repoRoot = resolveRepoRoot(argv, path.resolve(HERE, '..'));
   const cfgAbs = path.join(repoRoot, DEFAULT_CONFIG);
   if (!fs.existsSync(cfgAbs)) {
     console.log(`[manifest-freshness] no ${DEFAULT_CONFIG}; nothing to check`);
@@ -73,6 +96,16 @@ function main() {
     const committedAbs = path.resolve(repoRoot, t.manifest);
     if (!fs.existsSync(committedAbs)) {
       console.error(`[manifest-freshness] ERROR missing manifest: ${t.manifest}`);
+      status = 1;
+      continue;
+    }
+    if (!isGitTracked(repoRoot, t.manifest)) {
+      const why = isGitIgnored(repoRoot, t.manifest)
+        ? ' It also matches a .gitignore rule, so it can never be committed as-is — un-ignore it first.'
+        : '';
+      console.error(`[manifest-freshness] ERROR ${t.manifest} exists but is NOT git-tracked — `
+        + 'an uncommitted matrix is transient: it disappears on the next clone and the gate '
+        + `reads a file nobody else has. Commit it.${why}`);
       status = 1;
       continue;
     }
@@ -103,5 +136,5 @@ function main() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  process.exit(main());
+  process.exit(main(process.argv.slice(2)));
 }
