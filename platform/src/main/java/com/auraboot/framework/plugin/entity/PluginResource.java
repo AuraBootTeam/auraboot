@@ -19,7 +19,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("ab_plugin_resource")
+@TableName(value = "ab_plugin_resource", autoResultMap = true)
 public class PluginResource {
 
     @TableId(type = IdType.AUTO)

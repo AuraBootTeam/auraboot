@@ -262,7 +262,12 @@ cmd_up() {
   fi
 
   log "4/9 build bootJar (default ~/.gradle for plugin/mirror resolution; --no-daemon)"
-  ( cd "$REPO_ROOT/platform" && ./gradlew --no-daemon :bootJar -x test --console=plain ) >"$sd/bootjar.log" 2>&1 \
+  # --no-build-cache: a golden stack must produce a correct, reproducible jar. The
+  # shared local Gradle build cache can hand a fresh worktree a corrupt :compileJava
+  # entry (observed 2026-07-23: MqProvider.class/MqMessageHandler.class missing from
+  # the cached output → platform-mq-kafka fails to resolve them, masked by UP-TO-DATE),
+  # so bypass it here rather than trust a cross-worktree cache for a release build.
+  ( cd "$REPO_ROOT/platform" && ./gradlew --no-daemon --no-build-cache :bootJar -x test --console=plain ) >"$sd/bootjar.log" 2>&1 \
     || die "bootJar build failed — see $sd/bootjar.log"
   local jar; jar="$(ls "$REPO_ROOT"/platform/build/libs/*-boot.jar 2>/dev/null | head -1)"
   [ -n "$jar" ] || die "boot jar not found after build"

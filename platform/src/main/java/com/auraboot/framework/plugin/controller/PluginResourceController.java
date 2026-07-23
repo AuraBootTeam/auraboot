@@ -8,7 +8,9 @@ import com.auraboot.framework.plugin.dto.imports.ResourceType;
 import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
+import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.plugin.service.PluginResourceService;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ import java.util.*;
 public class PluginResourceController {
 
     private final PluginResourceService pluginResourceService;
+    private final PluginResourceMapper pluginResourceMapper;
     private final PluginRecordMapper pluginRecordMapper;
 
     /**
@@ -92,6 +95,42 @@ public class PluginResourceController {
         }
 
         return ApiResponse.success(results);
+    }
+
+    /**
+     * Export a plugin's imported config, grouped by resource type, for the DSL
+     * reconciler's `aura dsl pull`. Returns each resource's importSnapshot — the
+     * manifest DTO captured at import time — which is re-importable and lets the
+     * CLI adopt a running instance's config as a local baseline.
+     */
+    @GetMapping("/export")
+    @Operation(summary = "Export a plugin's imported config", description = "Resource importSnapshots grouped by type, for `aura dsl pull`")
+    @RequirePermission(MetaPermission.PLUGIN_READ)
+    public ApiResponse<Map<String, List<Map<String, Object>>>> exportPluginConfig(
+            @RequestParam String pluginId) {
+
+        PluginRecord record = pluginRecordMapper.findByTenantAndPluginId(pluginId);
+        if (record == null || record.getPid() == null) {
+            return ApiResponse.success(new LinkedHashMap<>());
+        }
+
+        // BaseMapper.selectList applies the entity's autoResultMap, so the JSONB
+        // importSnapshot deserializes via its TypeHandler; the custom @Select
+        // findByPluginPid uses plain auto-mapping and would leave it null.
+        List<PluginResource> resources = pluginResourceMapper.selectList(
+                Wrappers.<PluginResource>lambdaQuery()
+                        .eq(PluginResource::getPluginPid, record.getPid())
+                        .orderByAsc(PluginResource::getSequence));
+
+        Map<String, List<Map<String, Object>>> byType = new LinkedHashMap<>();
+        for (PluginResource r : resources) {
+            Map<String, Object> snapshot = r.getImportSnapshot();
+            if (snapshot == null || snapshot.isEmpty()) {
+                continue;
+            }
+            byType.computeIfAbsent(r.getResourceType(), k -> new ArrayList<>()).add(snapshot);
+        }
+        return ApiResponse.success(byType);
     }
 
     private ResourceOwnerDTO toOwnerDTO(PluginResource resource) {

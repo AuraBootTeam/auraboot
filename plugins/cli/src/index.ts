@@ -16,7 +16,7 @@ import { depsCommand } from './commands/dsl/deps.js';
 import { scaffoldCommand } from './commands/dsl/scaffold.js';
 import { syncI18nCommand } from './commands/dsl/sync-i18n.js';
 import { diagnoseCommand } from './commands/dsl/diagnose.js';
-import { dslPlanCommand, dslApplyCommand, dslDriftCommand } from './commands/dsl/reconcile.js';
+import { dslPlanCommand, dslApplyCommand, dslDriftCommand, dslPullCommand } from './commands/dsl/reconcile.js';
 
 // ── New commands ────────────────────────────────────────────────────────────
 import { loginCommand } from './commands/login.js';
@@ -883,6 +883,14 @@ dsl
   .description('Report whether the local DSL has drifted from the last-applied state')
   .action(async (dir: string | undefined, _cmdOpts: any, cmd: any) => {
     await dslDriftCommand(dir || '.', { ...program.opts(), ...cmd.opts() });
+  });
+
+dsl
+  .command('pull [dir]')
+  .description('Adopt a running instance\'s config for this plugin as the local baseline')
+  .option('-t, --target <url>', 'Target platform URL', 'http://localhost:6443')
+  .action(async (dir: string | undefined, cmdOpts: any) => {
+    await dslPullCommand(dir || '.', { ...program.opts(), ...cmdOpts });
   });
 
 dsl
