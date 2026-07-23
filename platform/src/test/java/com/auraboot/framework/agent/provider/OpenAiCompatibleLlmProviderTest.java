@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for OpenAiCompatibleLlmProvider — specifically the tool-support
@@ -36,6 +37,23 @@ class OpenAiCompatibleLlmProviderTest {
     private OpenAiCompatibleLlmProvider createProvider() {
         // WebClient is not needed for the method under test; pass null (won't be called)
         return new OpenAiCompatibleLlmProvider(null, new ObjectMapper());
+    }
+
+    @Test
+    void chatRejectsPrivateBaseUrlBeforeAnyHttpCall() {
+        // SEC-20260723-05: baseUrl is tenant-configurable (CloudConfig). A value pointing
+        // at an internal/loopback address must be rejected by the SSRF guard BEFORE the
+        // WebClient is touched. The provider is built with a null WebClient, so if the guard
+        // did NOT fire first this would surface as a NullPointerException instead.
+        OpenAiCompatibleLlmProvider provider = createProvider(); // webClient == null
+        LlmChatRequest request = LlmChatRequest.builder()
+                .model("gpt-4o")
+                .maxTokens(16)
+                .messages(List.of(LlmChatRequest.Message.text("user", "hi")))
+                .build();
+
+        assertThatThrownBy(() -> provider.chat(request, "sk-test", "http://127.0.0.1:8080"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

@@ -211,7 +211,15 @@ public final class SsrfValidator {
                 && TEST_PROFILE_PRIVATE_HOST_ALLOWLIST.contains(normalizedHost)) {
             return true;
         }
+        // Explicit operator allowlist for self-hosted private inference gateways
+        // and fixture servers. Read the environment variable first, then fall back
+        // to the JVM system property so the allowlist can also be set
+        // programmatically (e.g. a test fronting a loopback mock server, or a
+        // deployment that prefers -D over env).
         String configured = System.getenv("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+        if (configured == null || configured.isBlank()) {
+            configured = System.getProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+        }
         if (configured == null || configured.isBlank()) {
             return false;
         }

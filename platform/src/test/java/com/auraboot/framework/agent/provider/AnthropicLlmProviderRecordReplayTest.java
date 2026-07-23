@@ -62,9 +62,15 @@ class AnthropicLlmProviderRecordReplayTest {
     private final AtomicReference<String> capturedVersionHeader = new AtomicReference<>();
     private final AtomicReference<String> responseToServe = new AtomicReference<>(TOOL_USE_RESPONSE);
     private final AtomicInteger statusToServe = new AtomicInteger(200);
+    private String priorSsrfAllow;
 
     @BeforeEach
     void startServer() throws IOException {
+        // The provider now runs an SSRF guard over baseUrl (SEC-20260723-05), which
+        // refuses loopback by default. This test legitimately fronts a 127.0.0.1 mock,
+        // so opt loopback into the explicit allowlist for the duration of the test.
+        priorSsrfAllow = System.getProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+        System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", "127.0.0.1");
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/messages", exchange -> {
             capturedRequestBody.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
@@ -84,6 +90,11 @@ class AnthropicLlmProviderRecordReplayTest {
     void stopServer() {
         if (server != null) {
             server.stop(0);
+        }
+        if (priorSsrfAllow == null) {
+            System.clearProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS");
+        } else {
+            System.setProperty("AURA_SSRF_ALLOWED_PRIVATE_HOSTS", priorSsrfAllow);
         }
     }
 

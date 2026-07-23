@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.dto.BatchRequest;
 import com.auraboot.framework.agent.dto.BatchResult;
 import com.auraboot.framework.agent.dto.BatchStatus;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.util.SsrfValidator;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -152,6 +153,9 @@ public class AnthropicBatchService {
             throw new RuntimeException("Failed to serialise batch request body", e);
         }
 
+        // SSRF guard (SEC-20260723-05): baseUrl is config-supplied; reject private/
+        // loopback/link-local targets and disallowed schemes before the outbound call.
+        SsrfValidator.validate(cfg.getBaseUrl() + "/v1/messages/batches");
         String responseBody = webClient.post()
                 .uri(cfg.getBaseUrl() + "/v1/messages/batches")
                 .header("x-api-key", cfg.getApiKey())
@@ -212,6 +216,7 @@ public class AnthropicBatchService {
         AgentProperties.Anthropic cfg = agentProperties.getAnthropic();
         requireApiKey(cfg);
 
+        SsrfValidator.validate(cfg.getBaseUrl() + "/v1/messages/batches/" + batchId); // SEC-20260723-05
         String responseBody = webClient.get()
                 .uri(cfg.getBaseUrl() + "/v1/messages/batches/" + batchId)
                 .header("x-api-key", cfg.getApiKey())
@@ -245,6 +250,7 @@ public class AnthropicBatchService {
         AgentProperties.Anthropic cfg = agentProperties.getAnthropic();
         requireApiKey(cfg);
 
+        SsrfValidator.validate(cfg.getBaseUrl() + "/v1/messages/batches/" + batchId + "/results"); // SEC-20260723-05
         String responseBody = webClient.get()
                 .uri(cfg.getBaseUrl() + "/v1/messages/batches/" + batchId + "/results")
                 .header("x-api-key", cfg.getApiKey())
