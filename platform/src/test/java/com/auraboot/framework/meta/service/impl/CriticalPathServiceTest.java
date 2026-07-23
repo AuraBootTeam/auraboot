@@ -13,6 +13,7 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -194,5 +195,28 @@ class CriticalPathServiceTest {
         CriticalPathResult result = service.compute("test_table", "project_id", "p1", "duration_days", "dependencies");
         assertNotNull(result);
         assertTrue(result.criticalPathNodeIds().isEmpty());
+    }
+
+    @Test
+    @DisplayName("SEC-20260723-03: malicious projectIdField is rejected before any SQL runs")
+    void rejectsInjectedProjectIdField() {
+        // projectIdField comes from @RequestParam and is concatenated as a column identifier.
+        // A boolean-injection payload must be rejected by the identifier whitelist, and the
+        // mapper must never be reached.
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                service.compute("mt_pm_wbs_node", "1=1 OR pm_wbs_project_id", "p1",
+                        "pm_wbs_duration_days", "pm_wbs_dependencies"));
+        assertTrue(ex.getMessage().contains("Invalid SQL identifier"));
+        verifyNoInteractions(dynamicDataMapper);
+    }
+
+    @Test
+    @DisplayName("SEC-20260723-03: legitimate snake_case field identifiers pass validation")
+    void acceptsValidFieldIdentifiers() {
+        when(dynamicDataMapper.queryList(anyString(), isNull(), anyString(), isNull(), isNull(), isNull()))
+                .thenReturn(Collections.emptyList());
+        CriticalPathResult result = service.compute("mt_pm_wbs_node", "pm_wbs_project_id", "p1",
+                "pm_wbs_duration_days", "pm_wbs_dependencies");
+        assertNotNull(result);
     }
 }
