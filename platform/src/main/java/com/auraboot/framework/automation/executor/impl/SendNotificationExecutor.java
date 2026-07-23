@@ -1,5 +1,6 @@
 package com.auraboot.framework.automation.executor.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.automation.entity.AutomationAction;
 import com.auraboot.framework.automation.executor.ActionExecutor;
 import com.auraboot.framework.meta.service.DynamicDataService;
@@ -302,7 +303,12 @@ public class SendNotificationExecutor implements ActionExecutor {
                 ? parts[1].substring(0, parts[1].length() - 3) // asset_id -> asset
                 : parts[1];
         // DynamicDataService.getById(String modelCode, String recordPid) takes the row pid as a String.
-        Map<String, Object> refRow = dynamicDataService.getById(refModel, String.valueOf(refId));
+        // Resolving a reference hop to build the notification recipient is an internal system read
+        // (automations run subject-less on @Async threads — AutomationProcessRuntime sets tenant but no
+        // user). getById enforces per-subject record permission, which with no subject throws
+        // "Permission context missing". Bypass it here, like other internal read-backs (cf. #1405).
+        Map<String, Object> refRow = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.getById(refModel, String.valueOf(refId)));
         if (refRow == null) {
             return null;
         }
