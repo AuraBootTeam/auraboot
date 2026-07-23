@@ -606,13 +606,25 @@ const mcp = program
 
 mcp
   .command('serve')
-  .description('Start the AuraBoot MCP stdio server (for Cursor / Claude Code)')
+  .description('Start the AuraBoot MCP server (stdio by default; --http for remote agents)')
   .option(
     '--profile <name>',
     'Tool scope: read (default) | dsl-authoring | full. Overrides AURA_MCP_PROFILE.',
   )
+  .option('--http', 'Serve over Streamable HTTP instead of stdio (remote agents)')
+  .option('--port <n>', 'HTTP port (with --http; default 7878 or AURA_MCP_HTTP_PORT)')
+  .option('--host <addr>', 'HTTP bind address (with --http; default 127.0.0.1)')
   .action(async (cmdOpts: any) => {
-    await startMcpServer({ ...program.opts(), ...cmdOpts });
+    const opts = { ...program.opts(), ...cmdOpts };
+    if (cmdOpts.http) {
+      const { startHttpMcpServer } = await import('./mcp/http-server.js');
+      await startHttpMcpServer({
+        ...opts,
+        port: cmdOpts.port ? Number(cmdOpts.port) : undefined,
+      });
+    } else {
+      await startMcpServer(opts);
+    }
   });
 
 mcp

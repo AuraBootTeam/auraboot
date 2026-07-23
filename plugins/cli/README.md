@@ -155,6 +155,27 @@ a profile with `aura mcp serve --profile <name>` or the `AURA_MCP_PROFILE` env v
 | `import_plugin` | admin | Import a plugin config bundle. |
 | `rollback_import` | admin | Roll back a prior plugin import. |
 
+### `aura mcp serve --http` (remote agents)
+
+Serve MCP over **Streamable HTTP** instead of stdio, so a remote agent (or a
+hosted / multi-tenant deployment) can connect over the network:
+
+```bash
+aura mcp serve --http --port 7878 --profile read
+```
+
+**Auth: static token + tenant header.** Each request carries
+`Authorization: Bearer <aura-token>`; the tenant is resolved **per request** from
+that JWT (the multi-client analogue of the stdio server's startup tenant pin) —
+no OAuth flow, reuses your existing CLI token. Requests without a valid
+tenant-bearing token get `401`. The server runs stateless: a fresh, profile-scoped,
+audited tool registry is built per request against that caller's token, so
+different callers never share tenant state. `--profile` / `AURA_MCP_PROFILE` scope
+the tools exactly as for stdio.
+
+Client config (any MCP client that supports Streamable HTTP), pointing at the URL
+with the `Authorization` header set to a token from `aura login`.
+
 ### `aura mcp list / add / remove / test / tools`
 
 Manage *external* MCP server connections (the CLI as a client of other servers — distinct from `aura mcp serve` which makes AuraBoot itself a server).
