@@ -81,8 +81,12 @@ class SpringContextLoadsSmokeTest {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        // Disable optional features that need extra services not started by this gate
-        registry.add("spring.data.redis.url", () -> "");
+        // Point optional external services at their local defaults rather than an empty url.
+        // spring.data.redis.url="" is INVALID (Spring Boot's RedisUrl parser rejects the empty
+        // string with RedisUrlSyntaxException), which surfaced non-deterministically only when this
+        // @SpringBootTest ran alongside others in the shared TestContext cache (it passes in
+        // isolation). A syntactically-valid url is parsed lazily and never throws at context load.
+        registry.add("spring.data.redis.url", () -> "redis://localhost:6379");
         registry.add("spring.kafka.bootstrap-servers", () -> "");
     }
 
