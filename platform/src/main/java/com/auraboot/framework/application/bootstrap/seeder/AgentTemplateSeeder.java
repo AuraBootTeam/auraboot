@@ -226,6 +226,75 @@ public class AgentTemplateSeeder {
                     skill[4], skill[5], skill[6], skill[7], skill[8], skill[9], skill[10]);
         }
         log.info("AgentTemplateSeeder: upserted {} built-in skills (re-applies execution_config)", count);
+
+        seedOrchestrationSkills();
+    }
+
+    /**
+     * Orchestration-mode skills are the "asset layer" of a digital employee:
+     * a governed playbook (prompt_template) that the LLM follows within a
+     * bounded, real tool set (skill_tools) and a step ceiling (max_steps). See
+     * DDR-2026-07-23 "digital employee boundary and the skill asset layer".
+     *
+     * <p>Unlike the five template skills above (which wrap a single tool and
+     * carry placeholder tool codes), these reference <em>real registered tool
+     * codes</em> resolved by {@code DslToolProvider} ({@code nq:}/{@code cmd:}
+     * prefixes) so they actually run against the system of record. This first
+     * one — the quarterly customer-structure review — is deliberately
+     * read-only ({@code actionability=read_only}, no create/update tool in
+     * {@code skill_tools}): it analyses real accounts and <em>proposes</em>
+     * follow-up actions in prose, honouring the "propose, don't execute"
+     * boundary. The heavy reasoning is delegated to the LLM; the platform owns
+     * the governed read, the step ceiling, and the audit trail.
+     */
+    private void seedOrchestrationSkills() {
+        String sql = """
+                INSERT INTO ab_agent_skill
+                (pid, tenant_id, skill_code, skill_name, skill_description, skill_level,
+                 skill_category, skill_icon, skill_tools, prompt_template, execution_mode,
+                 max_steps, actionability, output_type, declared_effects, is_builtin, skill_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, 'orchestration',
+                        ?, 'read_only', 'text', ?::jsonb, TRUE, 'active')
+                ON CONFLICT (tenant_id, skill_code) DO UPDATE SET
+                    skill_name = EXCLUDED.skill_name,
+                    skill_description = EXCLUDED.skill_description,
+                    skill_tools = EXCLUDED.skill_tools,
+                    prompt_template = EXCLUDED.prompt_template,
+                    execution_mode = EXCLUDED.execution_mode,
+                    max_steps = EXCLUDED.max_steps,
+                    actionability = EXCLUDED.actionability,
+                    declared_effects = EXCLUDED.declared_effects,
+                    updated_at = CURRENT_TIMESTAMP
+                """;
+
+        String reviewPlaybook = """
+                你是「客户运营复盘专员」。这是一个固定的季度客户结构复盘 playbook,严格按步骤执行,不要跳步、不要即兴发挥:
+
+                1. 调用 list:crm_account 拉取全部客户。只使用查询返回的真实记录,严禁编造客户名、数字或评级。
+                2. 按行业分组统计:每个行业的客户数与占比。
+                3. 按评级分组统计:A/B/C 各级客户数与占比,并算出 A 级客户占比。
+                4. 识别结构性风险:① 客户过度集中在单一行业(占比 > 40%);② 低评级(C)客户占比偏高;③ 某行业只剩 1 家客户(一旦流失即出现空白)。
+                5. 输出一份结构化复盘:
+                   - 【总览】客户总数、行业分布、评级分布(关键数字加粗)
+                   - 【结构风险】逐条列出识别到的风险,并指名具体是哪些客户或行业
+                   - 【建议动作】针对薄弱行业与低评级客户,给出可执行的拓客/升级建议,每条以「建议:」开头
+
+                边界(必须遵守):
+                - 你只做分析与「提议」。禁止调用任何写入/创建/修改类工具;所有拓客动作以文字建议给出,由人决定是否执行。
+                - 所有结论必须基于 list:crm_account 返回的真实数据,数字精确到实际值。
+                - 用简体中文回复。
+                """;
+
+        int count = jdbcTemplate.update(sql,
+                UniqueIdGenerator.generate(), SYSTEM_TENANT_ID,
+                "crm_quarterly_review", "季度客户结构复盘",
+                "拉取全部客户,按行业与评级分析结构集中度与风险,产出结构化复盘并提议拓客动作(只读,不自动执行)",
+                "workflow", "crm", "IconReportAnalytics",
+                "[\"list:crm_account\"]",
+                reviewPlaybook,
+                6,
+                "[\"READ_PLATFORM_DATA\"]");
+        log.info("AgentTemplateSeeder: upserted {} orchestration skill(s)", count);
     }
 
     // =========================================================================
@@ -264,7 +333,7 @@ public class AgentTemplateSeeder {
                 始终用用户的语言回复（默认中文）。回答简洁、专业、有帮助。
                 对于写操作，执行前先描述将要做的事，获得用户确认后再执行。
                 """,
-                "approval_workflow,data_entry_assistant,report_analysis,crm_operations,ops_inspector",
+                "approval_workflow,data_entry_assistant,report_analysis,crm_operations,ops_inspector,crm_quarterly_review",
                 """
                 {
                   "persona": "AuraBot, a versatile enterprise AI assistant focused on process optimization",

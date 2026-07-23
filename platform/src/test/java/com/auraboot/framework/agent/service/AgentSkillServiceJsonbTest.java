@@ -24,9 +24,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class AgentSkillServiceJsonbTest {
 
-    // mapper + observationService are unused by the pure parse helpers under test.
+    // mapper + observationService + declaredAgentToolResolver are unused by the pure
+    // parse helpers under test.
     private final AgentSkillService service =
-            new AgentSkillService(null, null, new ObjectMapper());
+            new AgentSkillService(null, null, new ObjectMapper(), null);
 
     private static PGobject jsonb(String value) {
         PGobject pg = new PGobject();
