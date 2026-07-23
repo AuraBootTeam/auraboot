@@ -1,7 +1,7 @@
 {
-  "name": "@auraboot/plugin-cli",
+  "name": "@auraboot/cli",
   "version": "1.0.0",
-  "description": "AuraBoot Plugin CLI — scaffold, validate, build, and publish plugins",
+  "description": "AuraBoot CLI — the agent-native console: skills, MCP, DSL authoring, plugins, and runtime ops",
   "type": "module",
   "bin": {
     "aura": "./dist/index.js"

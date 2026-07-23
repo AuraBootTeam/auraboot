@@ -1,4 +1,4 @@
-# @auraboot/plugin-cli
+# @auraboot/cli
 
 AuraBoot Plugin CLI — scaffold, validate, build, and publish plugins.
 
@@ -10,7 +10,7 @@ cd plugins/cli && pnpm install
 npx tsx src/index.ts plugin <command>
 
 # Or install globally
-npm install -g @auraboot/plugin-cli
+npm install -g @auraboot/cli
 aura plugin <command>
 ```
 

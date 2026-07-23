@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `@auraboot/plugin-cli`. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
+All notable changes to `@auraboot/cli`. Format follows [Keep a Changelog](https://keepachangelog.com/) and the project uses [Semantic Versioning](https://semver.org/).
 
 ## 2.0.0 — pending (GAP-300 Layer 1)
 

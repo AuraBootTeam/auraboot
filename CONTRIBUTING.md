@@ -169,9 +169,9 @@ Use the [Feature Request template](https://github.com/AuraBootTeam/auraboot/issu
 AuraBoot's plugin system lets you extend the platform through declarative JSON configuration.
 
 ```bash
-npx @auraboot/plugin-cli create my-plugin
+npx @auraboot/cli create my-plugin
 # Edit config files — add models, fields, commands, pages
-npx @auraboot/plugin-cli import ./my-plugin
+npx @auraboot/cli import ./my-plugin
 ```
 
 See the [plugin development guide](https://docs.auraboot.com) for details.
