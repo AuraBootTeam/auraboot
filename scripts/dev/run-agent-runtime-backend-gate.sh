@@ -25,6 +25,7 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.agent.service.StepLoopServiceLlmResponseGuardTest' \
   --tests 'com.auraboot.framework.agent.service.StepLoopParallelToolTest' \
   --tests 'com.auraboot.framework.agent.service.AgentRunServiceSyncTest' \
+  --tests 'com.auraboot.framework.agent.service.SkillAssetLayerTenantIntegrationTest' \
   --tests 'com.auraboot.framework.agent.service.PlanServiceTest' \
   --tests 'com.auraboot.framework.agent.service.SkillEngineTest' \
   --tests 'com.auraboot.framework.agent.service.StepLoopServiceThinkingIntegrationTest' \
