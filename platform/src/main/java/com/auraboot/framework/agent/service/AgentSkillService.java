@@ -45,7 +45,14 @@ public class AgentSkillService {
                 "AND skill_code = #{params.skillCode} AND skill_status = 'active' " +
                 "AND deleted_flag = FALSE " +
                 "ORDER BY tenant_id DESC LIMIT 1";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
+        // selectByQueryWithoutTenant: the MyBatis TenantLineInnerInterceptor would
+        // inject "AND tenant_id = <current>" and AND away the "OR tenant_id =
+        // platform AND is_builtin" fallback, so a platform-tenant builtin skill
+        // (the seeded ones) is invisible from any tenant context — resolveSkillTools
+        // then returns empty and a bound builtin skill contributes nothing. Tenant
+        // isolation is enforced by this query's own WHERE clause (current tenant OR
+        // platform builtin), so bypassing the interceptor is correct and safe.
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql,
                 Map.of("tenantId", tenantId, "platformTenantId", PLATFORM_TENANT_ID, "skillCode", skillCode));
         return rows.isEmpty() ? null : rows.get(0);
     }
@@ -77,7 +84,10 @@ public class AgentSkillService {
         }
         // DISTINCT ON requires ORDER BY to start with the distinct column; tenant-specific wins over built-in
         sql.append(" ORDER BY skill_code, tenant_id DESC, usage_count DESC");
-        return dynamicDataMapper.selectByQuery(sql.toString(), params);
+        // Bypass the tenant interceptor: same reason as loadSkill — otherwise the
+        // "OR tenant_id = platform AND is_builtin" fallback is AND'd away and no
+        // platform builtin skill is listed from a tenant context. WHERE enforces scope.
+        return dynamicDataMapper.selectByQueryWithoutTenant(sql.toString(), params);
     }
 
     /**
@@ -423,7 +433,8 @@ public class AgentSkillService {
                 "WHERE (tenant_id = #{params.tenantId} OR (tenant_id = 0 AND is_builtin = TRUE)) " +
                 "AND skill_code = #{params.skillCode} AND skill_status = 'active' AND deleted_flag = FALSE " +
                 "ORDER BY tenant_id DESC LIMIT 1";
-        List<Map<String, Object>> rows = dynamicDataMapper.selectByQuery(sql,
+        // Bypass the tenant interceptor: same reason as loadSkill (WHERE enforces scope).
+        List<Map<String, Object>> rows = dynamicDataMapper.selectByQueryWithoutTenant(sql,
                 Map.of("tenantId", tenantId, "skillCode", skillCode));
         return rows.isEmpty() ? null : rows.get(0);
     }
