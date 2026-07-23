@@ -1,0 +1,165 @@
+{
+  "$comment": "A declared command with no UI entry point cannot have UI coverage. Exceptions must carry a reason. See scripts/check-command-reachability.mjs.",
+  "roots": [
+    "plugins"
+  ],
+  "exemptPrefixes": [
+    "seed_",
+    "internal_"
+  ],
+  "allow": {},
+  "baseline": {
+    "agent-control-plane": [
+      "acp:create_agent_observation",
+      "acp:create_agent_run",
+      "acp:delete_agent_observation",
+      "acp:delete_agent_run",
+      "acp:delete_mcp_server",
+      "acp:delete_object_alias",
+      "acp:delete_semantic_term"
+    ],
+    "asset-management": [
+      "tasset:detail_asset",
+      "tasset:detail_category",
+      "tasset:detail_maintenance",
+      "tasset:list_assets",
+      "tasset:list_categories",
+      "tasset:list_maintenance",
+      "tasset:report_repair",
+      "tasset:update_asset",
+      "tasset:update_category",
+      "tasset:update_maintenance"
+    ],
+    "core-site-key": [
+      "behavior_site_key:create"
+    ],
+    "crm-quick-start": [
+      "tcrm:detail_account",
+      "tcrm:detail_contact",
+      "tcrm:detail_lead",
+      "tcrm:detail_opportunity",
+      "tcrm:list_accounts",
+      "tcrm:list_contacts",
+      "tcrm:list_leads",
+      "tcrm:list_opportunities",
+      "tcrm:update_account",
+      "tcrm:update_contact",
+      "tcrm:update_lead",
+      "tcrm:update_opportunity"
+    ],
+    "crm-starter": [
+      "crm:create_account",
+      "crm:create_activity",
+      "crm:create_campaign",
+      "crm:create_lead",
+      "crm:create_opportunity",
+      "crm:delete_account",
+      "crm:delete_activity",
+      "crm:delete_campaign",
+      "crm:delete_lead",
+      "crm:delete_opportunity",
+      "crm:detail_account",
+      "crm:detail_activity",
+      "crm:detail_contact",
+      "crm:detail_lead",
+      "crm:detail_opportunity",
+      "crm:list_accounts",
+      "crm:list_activities",
+      "crm:list_campaigns",
+      "crm:list_contacts",
+      "crm:list_leads",
+      "crm:list_opportunities",
+      "crm:update_account",
+      "crm:update_activity",
+      "crm:update_campaign",
+      "crm:update_lead",
+      "crm:update_opportunity"
+    ],
+    "golden-path": [
+      "gp:approve",
+      "gp:detail_task",
+      "gp:list_approvals",
+      "gp:list_task_comments",
+      "gp:list_tasks",
+      "gp:reject",
+      "gp:request_approval",
+      "gp:update_task",
+      "gp:update_task_comment"
+    ],
+    "hr-essentials": [
+      "thr:detail_attendance",
+      "thr:detail_employee",
+      "thr:detail_leave_request",
+      "thr:list_attendance",
+      "thr:list_employees",
+      "thr:list_leave_requests",
+      "thr:update_attendance",
+      "thr:update_employee",
+      "thr:update_leave_request"
+    ],
+    "org-management": [
+      "org:create_department",
+      "org:create_employee",
+      "org:create_position",
+      "org:create_team",
+      "org:delete_department",
+      "org:delete_employee",
+      "org:delete_position",
+      "org:delete_team",
+      "org:update_department",
+      "org:update_employee",
+      "org:update_position",
+      "org:update_team"
+    ],
+    "page-manager": [
+      "pgm:update_page_schema"
+    ],
+    "platform-admin": [
+      "admin:create_member"
+    ],
+    "project-management": [
+      "tpm:detail_milestone",
+      "tpm:detail_project",
+      "tpm:detail_task",
+      "tpm:list_milestones",
+      "tpm:list_projects",
+      "tpm:list_tasks",
+      "tpm:update_milestone",
+      "tpm:update_project",
+      "tpm:update_task"
+    ],
+    "showcase": [
+      "sc:create_monthly_metric",
+      "sc:create_showcase",
+      "sc:delete_monthly_metric",
+      "sc:delete_showcase",
+      "sc:detail_showcase",
+      "sc:list_showcase",
+      "sc:update_showcase"
+    ],
+    "simple-inventory": [
+      "tinv:detail_product",
+      "tinv:detail_stock_in",
+      "tinv:detail_stock_out",
+      "tinv:detail_warehouse",
+      "tinv:list_products",
+      "tinv:list_stock_in",
+      "tinv:list_stock_out",
+      "tinv:list_warehouses",
+      "tinv:update_product",
+      "tinv:update_stock_in",
+      "tinv:update_stock_out",
+      "tinv:update_warehouse"
+    ],
+    "test-fixtures": [
+      "e2et:touch_order_noperm",
+      "e2eto:create_e2et_order"
+    ],
+    "workflow-demo": [
+      "wd:create_leave_balance",
+      "wd:delete_leave_request",
+      "wd:update_leave_balance",
+      "wd:update_leave_request"
+    ]
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "$comment": "Which spec directories are governed by a name allowlist, and which orphans are deliberate. See scripts/check-e2e-spec-registration.mjs for why an unregistered spec is an error rather than a warning.",
+  "registries": [
+    {
+      "dir": "web-admin/tests/e2e/pcba-solution",
+      "configFile": "web-admin/playwright.config.ts",
+      "arrayName": "quoteOpsCurrentSpecNames",
+      "project": "quoteops"
+    }
+  ],
+  "allow": {
+    "web-admin/tests/e2e/pcba-solution": {}
+  },
+  "baseline": {
+    "web-admin/tests/e2e/pcba-solution": [
+      "bom-format-review-ui",
+      "bom-workbench-lines",
+      "quote-actions",
+      "quote-bom-badfile-permissions",
+      "quote-bom-convert-export",
+      "quote-bom-customer-crud-isolation",
+      "quote-bom-forms-search-datascope",
+      "quote-bom-org-admin",
+      "quote-data-scope-isolation",
+      "quote-doc-excel",
+      "quote-form-dropdowns"
+    ]
+  }
+}

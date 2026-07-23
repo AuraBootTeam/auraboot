@@ -1,0 +1,3929 @@
+{
+  "run": {
+    "id": "coverage-plugins",
+    "target": "plugins",
+    "commit": "abdd85fee",
+    "generator": "scripts/gen-coverage-manifest.mjs"
+  },
+  "groups": [
+    {
+      "id": "agent-control-plane",
+      "title": "agent-control-plane",
+      "rows": [
+        {
+          "id": "acp:activate_schedule",
+          "action": "acp:activate_schedule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:approve_request",
+          "action": "acp:approve_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-approval-closeloop.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:archive_mission",
+          "action": "acp:archive_mission",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-lifecycle-deep.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:block_task",
+          "action": "acp:block_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:cancel_run",
+          "action": "acp:cancel_run",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:cancel_task",
+          "action": "acp:cancel_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:complete_mission",
+          "action": "acp:complete_mission",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-exception-feedback.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:complete_task",
+          "action": "acp:complete_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-exception-feedback.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:create_agent_artifact",
+          "action": "acp:create_agent_artifact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:create_agent_definition",
+          "action": "acp:create_agent_definition",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-dashboard-views.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-exception-feedback.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-lifecycle-deep.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:create_agent_memory",
+          "action": "acp:create_agent_memory",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-dashboard-views.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:create_agent_observation",
+          "action": "acp:create_agent_observation",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-dashboard-views.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "acp:create_agent_run",
+          "action": "acp:create_agent_run",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-dashboard-views.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-lifecycle-deep.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "acp:create_agent_schedule",
+          "action": "acp:create_agent_schedule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-lifecycle-deep.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:create_agent_skill",
+          "action": "acp:create_agent_skill",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:create_agent_task",
+          "action": "acp:create_agent_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-dashboard-views.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-exception-feedback.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-lifecycle-deep.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:create_agent_tool",
+          "action": "acp:create_agent_tool",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-dashboard-views.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-exception-feedback.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:create_approval_policy",
+          "action": "acp:create_approval_policy",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts",
+            "web-admin/tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:create_mcp_server",
+          "action": "acp:create_mcp_server",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:create_mission",
+          "action": "acp:create_mission",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-dashboard-views.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-exception-feedback.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-lifecycle-deep.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-orchestration.spec.ts",
+            "web-admin/tests/e2e/aurabot/competitive-intelligence-workbench.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:create_object_alias",
+          "action": "acp:create_object_alias",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:create_semantic_term",
+          "action": "acp:create_semantic_term",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:delete_agent_artifact",
+          "action": "acp:delete_agent_artifact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:delete_agent_definition",
+          "action": "acp:delete_agent_definition",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:delete_agent_memory",
+          "action": "acp:delete_agent_memory",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:delete_agent_observation",
+          "action": "acp:delete_agent_observation",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "acp:delete_agent_run",
+          "action": "acp:delete_agent_run",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "acp:delete_agent_schedule",
+          "action": "acp:delete_agent_schedule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:delete_agent_skill",
+          "action": "acp:delete_agent_skill",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:delete_agent_task",
+          "action": "acp:delete_agent_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:delete_agent_tool",
+          "action": "acp:delete_agent_tool",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:delete_approval_policy",
+          "action": "acp:delete_approval_policy",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:delete_mcp_server",
+          "action": "acp:delete_mcp_server",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "acp:delete_mission",
+          "action": "acp:delete_mission",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:delete_object_alias",
+          "action": "acp:delete_object_alias",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "acp:delete_semantic_term",
+          "action": "acp:delete_semantic_term",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "acp:pause_mission",
+          "action": "acp:pause_mission",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:pause_schedule",
+          "action": "acp:pause_schedule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:reject_request",
+          "action": "acp:reject_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-approval-closeloop.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:resume_mission",
+          "action": "acp:resume_mission",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:start_task",
+          "action": "acp:start_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-exception-feedback.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:update_agent_artifact",
+          "action": "acp:update_agent_artifact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:update_agent_definition",
+          "action": "acp:update_agent_definition",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:update_agent_memory",
+          "action": "acp:update_agent_memory",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:update_agent_schedule",
+          "action": "acp:update_agent_schedule",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:update_agent_skill",
+          "action": "acp:update_agent_skill",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:update_agent_task",
+          "action": "acp:update_agent_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:update_agent_tool",
+          "action": "acp:update_agent_tool",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:update_approval_policy",
+          "action": "acp:update_approval_policy",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-form-crud.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/aurabot/pcba-procurement-agent-write.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:update_mcp_server",
+          "action": "acp:update_mcp_server",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:update_mission",
+          "action": "acp:update_mission",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/acp-model-lifecycle.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/acp-smoke.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "acp:update_object_alias",
+          "action": "acp:update_object_alias",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "acp:update_semantic_term",
+          "action": "acp:update_semantic_term",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        }
+      ]
+    },
+    {
+      "id": "asset-management",
+      "title": "asset-management",
+      "rows": [
+        {
+          "id": "tasset:assign_asset",
+          "action": "tasset:assign_asset",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:complete_maintenance",
+          "action": "tasset:complete_maintenance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:create_asset",
+          "action": "tasset:create_asset",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:create_category",
+          "action": "tasset:create_category",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/ai/prompt-to-app-dynamic-form-submit-golden.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "tasset:create_maintenance",
+          "action": "tasset:create_maintenance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:delete_asset",
+          "action": "tasset:delete_asset",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:delete_category",
+          "action": "tasset:delete_category",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:delete_maintenance",
+          "action": "tasset:delete_maintenance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:detail_asset",
+          "action": "tasset:detail_asset",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tasset:detail_category",
+          "action": "tasset:detail_category",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tasset:detail_maintenance",
+          "action": "tasset:detail_maintenance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tasset:finish_maintenance",
+          "action": "tasset:finish_maintenance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:list_assets",
+          "action": "tasset:list_assets",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tasset:list_categories",
+          "action": "tasset:list_categories",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tasset:list_maintenance",
+          "action": "tasset:list_maintenance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tasset:report_repair",
+          "action": "tasset:report_repair",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tasset:retire_asset",
+          "action": "tasset:retire_asset",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:return_asset",
+          "action": "tasset:return_asset",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:send_maintenance",
+          "action": "tasset:send_maintenance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:start_maintenance",
+          "action": "tasset:start_maintenance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tasset:update_asset",
+          "action": "tasset:update_asset",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tasset:update_category",
+          "action": "tasset:update_category",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tasset:update_maintenance",
+          "action": "tasset:update_maintenance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        }
+      ]
+    },
+    {
+      "id": "core-announcement",
+      "title": "core-announcement",
+      "rows": [
+        {
+          "id": "announcement:archive",
+          "action": "announcement:archive",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "announcement:create_announcement",
+          "action": "announcement:create_announcement",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "announcement:delete_announcement",
+          "action": "announcement:delete_announcement",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "announcement:publish",
+          "action": "announcement:publish",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/announcement/announcement-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "announcement:republish",
+          "action": "announcement:republish",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "announcement:update_announcement",
+          "action": "announcement:update_announcement",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        }
+      ]
+    },
+    {
+      "id": "core-faq-loop",
+      "title": "core-faq-loop",
+      "rows": [
+        {
+          "id": "faq:approve",
+          "action": "faq:approve",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "faq:extract",
+          "action": "faq:extract",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "faq:publish",
+          "action": "faq:publish",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "faq:reject",
+          "action": "faq:reject",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "faq:unpublish",
+          "action": "faq:unpublish",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "faq:update_qa",
+          "action": "faq:update_qa",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        }
+      ]
+    },
+    {
+      "id": "core-site-key",
+      "title": "core-site-key",
+      "rows": [
+        {
+          "id": "behavior_site_key:create",
+          "action": "behavior_site_key:create",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "behavior_site_key:disable",
+          "action": "behavior_site_key:disable",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        }
+      ]
+    },
+    {
+      "id": "crm-quick-start",
+      "title": "crm-quick-start",
+      "rows": [
+        {
+          "id": "tcrm:advance_to_negotiation",
+          "action": "tcrm:advance_to_negotiation",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:advance_to_proposal",
+          "action": "tcrm:advance_to_proposal",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:contact_lead",
+          "action": "tcrm:contact_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:create_account",
+          "action": "tcrm:create_account",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:create_contact",
+          "action": "tcrm:create_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:create_lead",
+          "action": "tcrm:create_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/templates/templates-smoke.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "tcrm:create_opportunity",
+          "action": "tcrm:create_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:delete_account",
+          "action": "tcrm:delete_account",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:delete_contact",
+          "action": "tcrm:delete_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:delete_lead",
+          "action": "tcrm:delete_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:delete_opportunity",
+          "action": "tcrm:delete_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:detail_account",
+          "action": "tcrm:detail_account",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:detail_contact",
+          "action": "tcrm:detail_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:detail_lead",
+          "action": "tcrm:detail_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:detail_opportunity",
+          "action": "tcrm:detail_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:list_accounts",
+          "action": "tcrm:list_accounts",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:list_contacts",
+          "action": "tcrm:list_contacts",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:list_leads",
+          "action": "tcrm:list_leads",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:list_opportunities",
+          "action": "tcrm:list_opportunities",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:lose_lead",
+          "action": "tcrm:lose_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:lose_opportunity",
+          "action": "tcrm:lose_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:qualify_lead",
+          "action": "tcrm:qualify_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tcrm:update_account",
+          "action": "tcrm:update_account",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:update_contact",
+          "action": "tcrm:update_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:update_lead",
+          "action": "tcrm:update_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:update_opportunity",
+          "action": "tcrm:update_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tcrm:win_opportunity",
+          "action": "tcrm:win_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        }
+      ]
+    },
+    {
+      "id": "crm-starter",
+      "title": "crm-starter",
+      "rows": [
+        {
+          "id": "crm:activate_campaign",
+          "action": "crm:activate_campaign",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:advance_opp_to_negotiation",
+          "action": "crm:advance_opp_to_negotiation",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:advance_opp_to_proposal",
+          "action": "crm:advance_opp_to_proposal",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:cancel_campaign",
+          "action": "crm:cancel_campaign",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-core-entities.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:complete_campaign",
+          "action": "crm:complete_campaign",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:contact_lead",
+          "action": "crm:contact_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:convert_lead",
+          "action": "crm:convert_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_account",
+          "action": "crm:create_account",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
+            "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
+            "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
+            "web-admin/tests/e2e/crm/crm-dashboard.spec.ts",
+            "web-admin/tests/e2e/crm/crm-m4-cpq.spec.ts",
+            "web-admin/tests/e2e/crm/crm-m4-quote-to-order.spec.ts",
+            "web-admin/tests/e2e/crm/crm-m5-pcba.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-currency.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-kanban.spec.ts",
+            "web-admin/tests/e2e/crm/crm-quote-complaint.spec.ts",
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
+            "web-admin/tests/e2e/finance-accounting/fac-ar-ap-payment.spec.ts",
+            "web-admin/tests/e2e/pcba/pcba-main-flow-permissions.spec.ts",
+            "web-admin/tests/e2e/pcba/pcba-main-flow.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/form-and-overlay-golden.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-minimal-create-regression.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/quote-role-sales-golden.spec.ts",
+            "web-admin/tests/e2e/pcba-solution/role-capability-closed-loop.spec.ts",
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
+            "web-admin/tests/e2e/platform/multi-tenant-isolation.spec.ts",
+            "web-admin/tests/e2e/sales/sales-dashboard.spec.ts",
+            "web-admin/tests/e2e/sales/sales-order-lifecycle.spec.ts",
+            "web-admin/tests/e2e/sales/sales-quotation-lifecycle.spec.ts",
+            "web-admin/tests/e2e/sales/sales-shipment-lifecycle.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:create_activity",
+          "action": "crm:create_activity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:create_campaign",
+          "action": "crm:create_campaign",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-campaign-sla.spec.ts",
+            "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:create_contact",
+          "action": "crm:create_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-core-entities.spec.ts",
+            "web-admin/tests/e2e/cs-agent/cs-agent-email-lifecycle.spec.ts",
+            "web-admin/tests/e2e/email/email-crm-timeline.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:create_lead",
+          "action": "crm:create_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-agent-ui-smoke.spec.ts",
+            "web-admin/tests/e2e/crm/crm-batch-ops.spec.ts",
+            "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
+            "web-admin/tests/e2e/crm/crm-dashboard.spec.ts",
+            "web-admin/tests/e2e/crm/crm-inline-edit.spec.ts",
+            "web-admin/tests/e2e/crm/crm-m4-lead-engine.spec.ts",
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
+            "web-admin/tests/e2e/list-ux/ux-loading-states.spec.ts",
+            "web-admin/tests/e2e/list-ux/ux-operation-feedback.spec.ts",
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:create_opportunity",
+          "action": "crm:create_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm/crm-dashboard-enhanced.spec.ts",
+            "web-admin/tests/e2e/crm/crm-dashboard.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-currency.spec.ts",
+            "web-admin/tests/e2e/crm/crm-opportunity-kanban.spec.ts",
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:delete_account",
+          "action": "crm:delete_account",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
+            "web-admin/tests/e2e/finance-accounting/fac-ar-ap-payment.spec.ts",
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts",
+            "web-admin/tests/e2e/platform/multi-tenant-isolation.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:delete_activity",
+          "action": "crm:delete_activity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:delete_campaign",
+          "action": "crm:delete_campaign",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:delete_contact",
+          "action": "crm:delete_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:delete_lead",
+          "action": "crm:delete_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:delete_opportunity",
+          "action": "crm:delete_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_account",
+          "action": "crm:detail_account",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_activity",
+          "action": "crm:detail_activity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_contact",
+          "action": "crm:detail_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_lead",
+          "action": "crm:detail_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:detail_opportunity",
+          "action": "crm:detail_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_accounts",
+          "action": "crm:list_accounts",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_activities",
+          "action": "crm:list_activities",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_campaigns",
+          "action": "crm:list_campaigns",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_contacts",
+          "action": "crm:list_contacts",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_leads",
+          "action": "crm:list_leads",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:list_opportunities",
+          "action": "crm:list_opportunities",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:lose_lead",
+          "action": "crm:lose_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:lose_opportunity",
+          "action": "crm:lose_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:qualify_lead",
+          "action": "crm:qualify_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:qualify_opportunity",
+          "action": "crm:qualify_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/dashboard/dashboard-widget-runtime.spec.ts",
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "crm:update_account",
+          "action": "crm:update_account",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:update_activity",
+          "action": "crm:update_activity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:update_campaign",
+          "action": "crm:update_campaign",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:update_contact",
+          "action": "crm:update_contact",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "crm:update_lead",
+          "action": "crm:update_lead",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:update_opportunity",
+          "action": "crm:update_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "crm:win_opportunity",
+          "action": "crm:win_opportunity",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/platform/command-pipeline.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "id": "golden-path",
+      "title": "golden-path",
+      "rows": [
+        {
+          "id": "gp:approve",
+          "action": "gp:approve",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "gp:archive_task",
+          "action": "gp:archive_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "gp:complete_task",
+          "action": "gp:complete_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "gp:create_task",
+          "action": "gp:create_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/templates/templates-smoke.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "gp:create_task_comment",
+          "action": "gp:create_task_comment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "gp:delete_task",
+          "action": "gp:delete_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "gp:delete_task_comment",
+          "action": "gp:delete_task_comment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "gp:detail_task",
+          "action": "gp:detail_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "gp:list_approvals",
+          "action": "gp:list_approvals",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "gp:list_task_comments",
+          "action": "gp:list_task_comments",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "gp:list_tasks",
+          "action": "gp:list_tasks",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "gp:reject",
+          "action": "gp:reject",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "gp:request_approval",
+          "action": "gp:request_approval",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "gp:start_task",
+          "action": "gp:start_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "gp:update_task",
+          "action": "gp:update_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "gp:update_task_comment",
+          "action": "gp:update_task_comment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        }
+      ]
+    },
+    {
+      "id": "hr-essentials",
+      "title": "hr-essentials",
+      "rows": [
+        {
+          "id": "thr:approve_leave",
+          "action": "thr:approve_leave",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "thr:cancel_leave",
+          "action": "thr:cancel_leave",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "thr:create_attendance",
+          "action": "thr:create_attendance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "thr:create_employee",
+          "action": "thr:create_employee",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/templates/templates-smoke.spec.ts",
+            "web-admin/tests/e2e/templates/thr-leave-request-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "thr:create_leave_request",
+          "action": "thr:create_leave_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/templates/thr-leave-request-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "thr:delete_attendance",
+          "action": "thr:delete_attendance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "thr:delete_employee",
+          "action": "thr:delete_employee",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "thr:delete_leave_request",
+          "action": "thr:delete_leave_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/templates/thr-leave-request-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "thr:detail_attendance",
+          "action": "thr:detail_attendance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "thr:detail_employee",
+          "action": "thr:detail_employee",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "thr:detail_leave_request",
+          "action": "thr:detail_leave_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "thr:list_attendance",
+          "action": "thr:list_attendance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "thr:list_employees",
+          "action": "thr:list_employees",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "thr:list_leave_requests",
+          "action": "thr:list_leave_requests",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "thr:on_leave",
+          "action": "thr:on_leave",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "thr:reject_leave",
+          "action": "thr:reject_leave",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "thr:resign",
+          "action": "thr:resign",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "thr:return_from_leave",
+          "action": "thr:return_from_leave",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "thr:update_attendance",
+          "action": "thr:update_attendance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "thr:update_employee",
+          "action": "thr:update_employee",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "thr:update_leave_request",
+          "action": "thr:update_leave_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        }
+      ]
+    },
+    {
+      "id": "org-management",
+      "title": "org-management",
+      "rows": [
+        {
+          "id": "org:create_department",
+          "action": "org:create_department",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/account-policy-and-employee-open-account.spec.ts",
+            "web-admin/tests/e2e/organization/org-department.spec.ts",
+            "web-admin/tests/e2e/organization/org-employee.spec.ts",
+            "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
+            "web-admin/tests/e2e/organization/org-position.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "org:create_employee",
+          "action": "org:create_employee",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/account-policy-and-employee-open-account.spec.ts",
+            "web-admin/tests/e2e/organization/org-employee.spec.ts",
+            "web-admin/tests/e2e/organization/org-enhanced.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "org:create_position",
+          "action": "org:create_position",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/account-policy-and-employee-open-account.spec.ts",
+            "web-admin/tests/e2e/organization/org-employee.spec.ts",
+            "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
+            "web-admin/tests/e2e/organization/org-position.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "org:create_team",
+          "action": "org:create_team",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "tests/team-dsl-config.test.mjs",
+            "web-admin/tests/e2e/organization/team-management.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "org:delete_department",
+          "action": "org:delete_department",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/org-department.spec.ts",
+            "web-admin/tests/e2e/organization/org-enhanced.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "org:delete_employee",
+          "action": "org:delete_employee",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/org-enhanced.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "org:delete_position",
+          "action": "org:delete_position",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/org-enhanced.spec.ts",
+            "web-admin/tests/e2e/organization/org-position.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "org:delete_team",
+          "action": "org:delete_team",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/team-management.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "org:open_employee_account",
+          "action": "org:open_employee_account",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/menus-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
+          "id": "org:update_department",
+          "action": "org:update_department",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "org:update_employee",
+          "action": "org:update_employee",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/org-employee.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "org:update_position",
+          "action": "org:update_position",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "org:update_team",
+          "action": "org:update_team",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/team-management.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        }
+      ]
+    },
+    {
+      "id": "page-manager",
+      "title": "page-manager",
+      "rows": [
+        {
+          "id": "pgm:archive_page_schema",
+          "action": "pgm:archive_page_schema",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "pgm:create_page_schema",
+          "action": "pgm:create_page_schema",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/page-schema-list.spec.ts",
+            "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
+            "web-admin/tests/e2e/showcase/page-creation-dispatch-e2e.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "pgm:delete_page_schema",
+          "action": "pgm:delete_page_schema",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/page-schema-list.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "pgm:duplicate_page_schema",
+          "action": "pgm:duplicate_page_schema",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "pgm:publish_page_schema",
+          "action": "pgm:publish_page_schema",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/page-schema-list.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "pgm:update_page_schema",
+          "action": "pgm:update_page_schema",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/page-designer/form-buttons-refresh-runtime.spec.ts",
+            "web-admin/tests/e2e/page-designer/layout-tabs-child-block-drop-authoring.spec.ts",
+            "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        }
+      ]
+    },
+    {
+      "id": "platform-admin",
+      "title": "platform-admin",
+      "rows": [
+        {
+          "id": "admin:approve_member",
+          "action": "admin:approve_member",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:create_api_connector",
+          "action": "admin:create_api_connector",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/api-connector-lifecycle.spec.ts",
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:create_bpm_domain_config",
+          "action": "admin:create_bpm_domain_config",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:create_data_permission",
+          "action": "admin:create_data_permission",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:create_member",
+          "action": "admin:create_member",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "admin:create_scheduled_task",
+          "action": "admin:create_scheduled_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/scheduled-task-lifecycle.spec.ts",
+            "web-admin/tests/e2e/platform-admin/scheduled-task-dsl.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:create_sla_config",
+          "action": "admin:create_sla_config",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:create_webhook",
+          "action": "admin:create_webhook",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts",
+            "web-admin/tests/e2e/admin/webhook-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:delete_api_connector",
+          "action": "admin:delete_api_connector",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:delete_bpm_domain_config",
+          "action": "admin:delete_bpm_domain_config",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:delete_data_permission",
+          "action": "admin:delete_data_permission",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:delete_member",
+          "action": "admin:delete_member",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:delete_scheduled_task",
+          "action": "admin:delete_scheduled_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/platform-admin/scheduled-task-dsl.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:delete_sla_config",
+          "action": "admin:delete_sla_config",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:delete_webhook",
+          "action": "admin:delete_webhook",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:leave_member",
+          "action": "admin:leave_member",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:provision_member_from_employee",
+          "action": "admin:provision_member_from_employee",
+          "surface": "contract",
+          "dependencies": "hermetic",
+          "driver": "unit",
+          "evidence": [
+            "tests/menus-config.test.mjs"
+          ],
+          "assertion": "covered below the UI only — no browser evidence",
+          "verdict": "partial"
+        },
+        {
+          "id": "admin:reject_member",
+          "action": "admin:reject_member",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:reset_member_password",
+          "action": "admin:reset_member_password",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:restore_member",
+          "action": "admin:restore_member",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:suspend_member",
+          "action": "admin:suspend_member",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "admin:update_api_connector",
+          "action": "admin:update_api_connector",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/api-connector-lifecycle.spec.ts",
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:update_bpm_domain_config",
+          "action": "admin:update_bpm_domain_config",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:update_data_permission",
+          "action": "admin:update_data_permission",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/data-permissions.spec.ts",
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:update_scheduled_task",
+          "action": "admin:update_scheduled_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/platform-admin/scheduled-task-dsl.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:update_sla_config",
+          "action": "admin:update_sla_config",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "admin:update_webhook",
+          "action": "admin:update_webhook",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/admin/platform-admin-crud.spec.ts",
+            "web-admin/tests/e2e/admin/webhook-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        }
+      ]
+    },
+    {
+      "id": "project-management",
+      "title": "project-management",
+      "rows": [
+        {
+          "id": "tpm:activate_project",
+          "action": "tpm:activate_project",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:cancel_project",
+          "action": "tpm:cancel_project",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:complete_project",
+          "action": "tpm:complete_project",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:complete_task",
+          "action": "tpm:complete_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:create_milestone",
+          "action": "tpm:create_milestone",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:create_project",
+          "action": "tpm:create_project",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/templates/templates-smoke.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "tpm:create_task",
+          "action": "tpm:create_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:delete_milestone",
+          "action": "tpm:delete_milestone",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:delete_project",
+          "action": "tpm:delete_project",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:delete_task",
+          "action": "tpm:delete_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:detail_milestone",
+          "action": "tpm:detail_milestone",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tpm:detail_project",
+          "action": "tpm:detail_project",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tpm:detail_task",
+          "action": "tpm:detail_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tpm:hold_project",
+          "action": "tpm:hold_project",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:list_milestones",
+          "action": "tpm:list_milestones",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tpm:list_projects",
+          "action": "tpm:list_projects",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tpm:list_tasks",
+          "action": "tpm:list_tasks",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tpm:miss_milestone",
+          "action": "tpm:miss_milestone",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:reach_milestone",
+          "action": "tpm:reach_milestone",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:review_task",
+          "action": "tpm:review_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:start_task",
+          "action": "tpm:start_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tpm:update_milestone",
+          "action": "tpm:update_milestone",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tpm:update_project",
+          "action": "tpm:update_project",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tpm:update_task",
+          "action": "tpm:update_task",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        }
+      ]
+    },
+    {
+      "id": "showcase",
+      "title": "showcase",
+      "rows": [
+        {
+          "id": "sc:activate_showcase",
+          "action": "sc:activate_showcase",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "sc:archive_showcase",
+          "action": "sc:archive_showcase",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "sc:create_monthly_metric",
+          "action": "sc:create_monthly_metric",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "sc:create_showcase",
+          "action": "sc:create_showcase",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/platform/form-redirect-regression.spec.ts",
+            "web-admin/tests/e2e/platform/showcase-all-fields-lifecycle.spec.ts",
+            "web-admin/tests/e2e/platform/showcase-form-validation.spec.ts",
+            "web-admin/tests/e2e/platform/showcase-smart-components.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "sc:delete_monthly_metric",
+          "action": "sc:delete_monthly_metric",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "sc:delete_showcase",
+          "action": "sc:delete_showcase",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/bpm/picker-fill-roundtrip.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "sc:detail_showcase",
+          "action": "sc:detail_showcase",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "sc:list_showcase",
+          "action": "sc:list_showcase",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "sc:submit_review_showcase",
+          "action": "sc:submit_review_showcase",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "sc:update_showcase",
+          "action": "sc:update_showcase",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/showcase/page-rebuild-from-designer-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        }
+      ]
+    },
+    {
+      "id": "simple-inventory",
+      "title": "simple-inventory",
+      "rows": [
+        {
+          "id": "tinv:activate_product",
+          "action": "tinv:activate_product",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:activate_warehouse",
+          "action": "tinv:activate_warehouse",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:cancel_stock_in",
+          "action": "tinv:cancel_stock_in",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:cancel_stock_out",
+          "action": "tinv:cancel_stock_out",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:confirm_stock_in",
+          "action": "tinv:confirm_stock_in",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:confirm_stock_out",
+          "action": "tinv:confirm_stock_out",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:create_product",
+          "action": "tinv:create_product",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:create_stock_in",
+          "action": "tinv:create_stock_in",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:create_stock_out",
+          "action": "tinv:create_stock_out",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:create_warehouse",
+          "action": "tinv:create_warehouse",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:deactivate_warehouse",
+          "action": "tinv:deactivate_warehouse",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:delete_product",
+          "action": "tinv:delete_product",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:delete_stock_in",
+          "action": "tinv:delete_stock_in",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:delete_stock_out",
+          "action": "tinv:delete_stock_out",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:delete_warehouse",
+          "action": "tinv:delete_warehouse",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:detail_product",
+          "action": "tinv:detail_product",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tinv:detail_stock_in",
+          "action": "tinv:detail_stock_in",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tinv:detail_stock_out",
+          "action": "tinv:detail_stock_out",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tinv:detail_warehouse",
+          "action": "tinv:detail_warehouse",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tinv:discontinue_product",
+          "action": "tinv:discontinue_product",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "tinv:list_products",
+          "action": "tinv:list_products",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tinv:list_stock_in",
+          "action": "tinv:list_stock_in",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tinv:list_stock_out",
+          "action": "tinv:list_stock_out",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tinv:list_warehouses",
+          "action": "tinv:list_warehouses",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tinv:update_product",
+          "action": "tinv:update_product",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tinv:update_stock_in",
+          "action": "tinv:update_stock_in",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tinv:update_stock_out",
+          "action": "tinv:update_stock_out",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "tinv:update_warehouse",
+          "action": "tinv:update_warehouse",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        }
+      ]
+    },
+    {
+      "id": "test-fixtures",
+      "title": "test-fixtures",
+      "rows": [
+        {
+          "id": "e2et:approve_order",
+          "action": "e2et:approve_order",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:approve_payment",
+          "action": "e2et:approve_payment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:cancel_order",
+          "action": "e2et:cancel_order",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/automation/automation-golden.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "e2et:complete_order",
+          "action": "e2et:complete_order",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:create_customer",
+          "action": "e2et:create_customer",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:create_order",
+          "action": "e2et:create_order",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/designer/report-designer-deep.spec.ts",
+            "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
+            "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "e2et:create_order_item",
+          "action": "e2et:create_order_item",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:create_payment",
+          "action": "e2et:create_payment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:delete_customer",
+          "action": "e2et:delete_customer",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:delete_order",
+          "action": "e2et:delete_order",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts",
+            "web-admin/tests/e2e/plugin-lifecycle/plugin-lifecycle.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "e2et:delete_order_item",
+          "action": "e2et:delete_order_item",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:pay_payment",
+          "action": "e2et:pay_payment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:reject_order",
+          "action": "e2et:reject_order",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:reject_payment",
+          "action": "e2et:reject_payment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:submit_order",
+          "action": "e2et:submit_order",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:submit_payment",
+          "action": "e2et:submit_payment",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:touch_order_noperm",
+          "action": "e2et:touch_order_noperm",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/automation/automation-designer-golden.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "e2et:update_customer",
+          "action": "e2et:update_customer",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2et:update_order",
+          "action": "e2et:update_order",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/automation/automation-designer-golden.spec.ts",
+            "web-admin/tests/e2e/automation/automation-golden.spec.ts",
+            "web-admin/tests/e2e/page-designer/standard-blocks-runtime.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "e2et:update_order_item",
+          "action": "e2et:update_order_item",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "e2eto:create_e2et_order",
+          "action": "e2eto:create_e2et_order",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/automation/automation-designer-golden.spec.ts",
+            "web-admin/tests/e2e/automation/automation-golden.spec.ts",
+            "web-admin/tests/e2e/cross-field-validation.spec.ts",
+            "web-admin/tests/e2e/realtime-data-push.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        }
+      ]
+    },
+    {
+      "id": "workflow-demo",
+      "title": "workflow-demo",
+      "rows": [
+        {
+          "id": "wd:cancel_leave_request",
+          "action": "wd:cancel_leave_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/workflow-demo/wd-leave-detail-tabs.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "wd:create_and_submit_leave_request",
+          "action": "wd:create_and_submit_leave_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested"
+        },
+        {
+          "id": "wd:create_leave_balance",
+          "action": "wd:create_leave_balance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/bpm/designer-servicetask-command.spec.ts",
+            "web-admin/tests/e2e/bpm/designer-servicetask-java.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "wd:create_leave_request",
+          "action": "wd:create_leave_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/workflow-demo/wd-leave-detail-tabs.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "wd:delete_leave_request",
+          "action": "wd:delete_leave_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "wd:submit_leave_request",
+          "action": "wd:submit_leave_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/bpm/workflow-demo-leave-flow.spec.ts",
+            "web-admin/tests/e2e/bpm-designer/designer-node-property-matrix.spec.ts",
+            "web-admin/tests/e2e/bpm-designer/designer-servicetask-command.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-detail-tabs.spec.ts",
+            "web-admin/tests/e2e/workflow-demo/wd-leave-diagram-first-open.spec.ts"
+          ],
+          "assertion": "driven through the UI",
+          "verdict": "pass"
+        },
+        {
+          "id": "wd:update_leave_balance",
+          "action": "wd:update_leave_balance",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "wd:update_leave_request",
+          "action": "wd:update_leave_request",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no test references this command",
+          "verdict": "untested",
+          "note": "no UI entry point: no page/menu DSL references it"
+        }
+      ]
+    }
+  ],
+  "stats": {
+    "commands": 332,
+    "untested": 228
+  }
+}
