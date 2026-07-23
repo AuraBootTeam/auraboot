@@ -205,16 +205,19 @@ function generatePlugin(dir: string, opts: InitOptions): void {
     // models.json
     writeFileSync(join(configDir, 'models.json'), JSON.stringify([{
       code: modelCode,
-      displayName: 'Sample',
+      'displayName:zh-CN': opts.displayName,
+      'displayName:en': opts.displayName,
       modelType: 'entity',
+      modelCategory: 'master',
+      extension: { titleField: 'name', tableName: `mt_${modelCode}`, softDelete: true },
     }], null, 2) + '\n');
     log.success('Created config/models.json (1 sample model)');
 
     // fields.json
     const fields = [
-      { code: 'name', displayName: 'Name', fieldType: 'text' },
-      { code: 'description', displayName: 'Description', fieldType: 'long_text' },
-      { code: 'status', displayName: 'Status', fieldType: 'dict', dictCode: `${ns}_status` },
+      { code: 'name', 'displayName:zh-CN': '名称', 'displayName:en': 'Name', dataType: 'text', constraints: { required: true, maxLength: 200 }, feature: { searchable: true } },
+      { code: 'description', 'displayName:zh-CN': '描述', 'displayName:en': 'Description', dataType: 'text', constraints: { maxLength: 500 } },
+      { code: 'status', 'displayName:zh-CN': '状态', 'displayName:en': 'Status', dataType: 'text', constraints: { maxLength: 50 } },
     ];
     writeFileSync(join(configDir, 'fields.json'), JSON.stringify(fields, null, 2) + '\n');
     log.success(`Created config/fields.json (${fields.length} sample fields)`);
@@ -223,96 +226,53 @@ function generatePlugin(dir: string, opts: InitOptions): void {
     const bindings = fields.map((f, i) => ({
       modelCode: modelCode,
       fieldCode: f.code,
+      sequence: i + 1,
       required: f.code === 'name',
-      orderNo: (i + 1) * 10,
+      visible: true,
+      editable: true,
     }));
     writeFileSync(join(configDir, 'bindings.json'), JSON.stringify(bindings, null, 2) + '\n');
     log.success('Created config/bindings.json');
 
-    // commands.json
-    const commands = [
-      { code: `${ns}:create-${ns}-sample`, modelCode: modelCode, type: 'create', displayName: 'Create' },
-      { code: `${ns}:update-${ns}-sample`, modelCode: modelCode, type: 'update', displayName: 'Update' },
-      { code: `${ns}:delete-${ns}-sample`, modelCode: modelCode, type: 'delete', displayName: 'Delete' },
-    ];
-    writeFileSync(join(configDir, 'commands.json'), JSON.stringify(commands, null, 2) + '\n');
-    log.success(`Created config/commands.json (${commands.length} CRUD commands)`);
-
-    // pages.json
-    const pages = [
-      {
-        pageKey: `${modelCode}_list`,
-        pageName: `${opts.displayName} List`,
-        schemaType: 'list',
-        dslSchema: {
-          kind: 'List',
-          layout: { areas: ['filters', 'toolbar', 'main'] },
-          areas: {
-            filters: { blocks: [{ blockType: 'filter-form', fields: ['name', 'status'] }] },
-            toolbar: { blocks: [{ blockType: 'toolbar', actions: ['create'] }] },
-            main: { blocks: [{ blockType: 'data-table', columns: ['name', 'description', 'status'] }] },
-          },
-        },
-      },
-      {
-        pageKey: `${modelCode}_form`,
-        pageName: `${opts.displayName} Form`,
-        schemaType: 'form',
-        dslSchema: {
-          kind: 'Form',
-          layout: { areas: ['main', 'actions'] },
-          areas: {
-            main: { blocks: [{ blockType: 'form', fields: ['name', 'description', 'status'] }] },
-            actions: { blocks: [{ blockType: 'form-buttons', actions: ['save', 'cancel'] }] },
-          },
-        },
-      },
-    ];
-    writeFileSync(join(configDir, 'pages.json'), JSON.stringify(pages, null, 2) + '\n');
-    log.success(`Created config/pages.json (${pages.length} pages)`);
-
-    // permissions.json
-    const permissions = [
-      { code: `${ns}_sample_view`, name: 'View Sample', resource: `/${ns}/sample`, action: 'read', resourceType: 'page', type: 'menu', module: 'plugin' },
-      { code: `${ns}_sample_manage`, name: 'Manage Sample', resource: `/${ns}/sample`, action: 'manage', resourceType: 'page', type: 'operation', module: 'plugin' },
-    ];
-    writeFileSync(join(configDir, 'permissions.json'), JSON.stringify(permissions, null, 2) + '\n');
-    log.success('Created config/permissions.json');
-
-    // roles.json
-    writeFileSync(join(configDir, 'roles.json'), JSON.stringify([], null, 2) + '\n');
-    log.success('Created config/roles.json');
-
-    // menus.json
-    const menus = [
-      { code: `${ns}_sample_menu`, name: opts.displayName, path: `/dynamic/${modelCode.replace(/_/g, '-')}`, type: 1, permissionCode: `${ns}_sample_view`, orderNo: 100, visible: true },
-    ];
-    writeFileSync(join(configDir, 'menus.json'), JSON.stringify(menus, null, 2) + '\n');
-    log.success('Created config/menus.json');
-
     // dicts.json
     const dicts = [
       {
-        code: `${ns}_status`, name: 'Status', dictType: 'enum',
+        code: `${ns}_status`, name: 'Status', 'name:zh-CN': '状态', dictType: 'static',
         items: [
-          { code: 'draft', label: 'Draft', orderNo: 1 },
-          { code: 'active', label: 'Active', orderNo: 2 },
-          { code: 'archived', label: 'Archived', orderNo: 3 },
+          { value: 'draft', label: 'Draft', 'label:zh-CN': '草稿', sortNo: 10, status: 'enabled' },
+          { value: 'active', label: 'Active', 'label:zh-CN': '启用', sortNo: 20, status: 'enabled' },
+          { value: 'archived', label: 'Archived', 'label:zh-CN': '归档', sortNo: 30, status: 'enabled' },
         ],
       },
     ];
     writeFileSync(join(configDir, 'dicts.json'), JSON.stringify(dicts, null, 2) + '\n');
     log.success('Created config/dicts.json');
 
-    // i18n.json
-    const i18n = [
-      { key: `model.${modelCode}._meta.label`, 'zh-CN': opts.displayName, 'en-US': 'Sample', source: 'import', refType: 'model' },
-      { key: `model.${modelCode}.name.label`, 'zh-CN': '名称', 'en-US': 'Name', source: 'import', refType: 'field' },
-      { key: `model.${modelCode}.description.label`, 'zh-CN': '描述', 'en-US': 'Description', source: 'import', refType: 'field' },
-      { key: `model.${modelCode}.status.label`, 'zh-CN': '状态', 'en-US': 'Status', source: 'import', refType: 'field' },
+    // permissions.json
+    const permissions = [
+      { code: `${ns}.sample.manage`, 'name:zh-CN': `${opts.displayName} 管理`, 'name:en': `${opts.displayName} Manage`, resourceType: 'operation', module: ns },
     ];
-    writeFileSync(join(configDir, 'i18n.json'), JSON.stringify(i18n, null, 2) + '\n');
-    log.success('Created config/i18n.json (zh-CN + en-US)');
+    writeFileSync(join(configDir, 'permissions.json'), JSON.stringify(permissions, null, 2) + '\n');
+    log.success('Created config/permissions.json');
+
+    // menus.json — points at the model's platform-generated default list page (<model>_list)
+    const menus = [
+      { code: `${modelCode}_menu`, parentCode: null, 'name:zh-CN': opts.displayName, 'name:en': opts.displayName, path: `/dynamic/${modelCode.replace(/_/g, '-')}`, pageKey: `${modelCode}_list`, component: null, icon: 'IconList', type: 1, permissionCode: `${ns}.sample.manage`, orderNo: 100, visible: true },
+    ];
+    writeFileSync(join(configDir, 'menus.json'), JSON.stringify(menus, null, 2) + '\n');
+    log.success('Created config/menus.json');
+
+    // roles.json
+    writeFileSync(join(configDir, 'roles.json'), JSON.stringify([], null, 2) + '\n');
+    log.success('Created config/roles.json');
+
+    // pages / commands / i18n — start empty. The platform auto-generates default
+    // list/form/detail pages for the model, and dynamic models get CRUD for free.
+    // Build richer pages with the Page Designer or the `auraboot-ui-builder` skill.
+    for (const empty of ['pages', 'commands', 'i18n']) {
+      writeFileSync(join(configDir, `${empty}.json`), '[]\n');
+    }
+    log.success('Created config/pages.json, commands.json, i18n.json (empty — add via Page Designer / ui-builder)');
   } else {
     // Empty config files
     for (const file of ['models', 'fields', 'bindings', 'commands', 'pages', 'permissions', 'roles', 'menus', 'dicts', 'i18n']) {
