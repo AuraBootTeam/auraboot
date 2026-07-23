@@ -699,7 +699,7 @@ class AgentRuntimeArchitectureTest {
     @DisplayName("durable plan persistence must append workflow checkpoints")
     void durablePlanPersistenceAppendsWorkflowCheckpoints() throws Exception {
         String stepLoop = Files.readString(MAIN_SOURCES.resolve("agent/service/StepLoopService.java"));
-        String schema = Files.readString(Path.of("src/main/resources/database/schema.sql"));
+        String schema = Files.readString(Path.of("src/main/resources/db/snapshots/schema-current.sql"));
 
         assertThat(stepLoop)
                 .as("ACP plan persistence must keep append-only checkpoint history, not only overwrite current_step")
@@ -708,7 +708,7 @@ class AgentRuntimeArchitectureTest {
                         "checkpointStore.recordPlanCheckpoint(");
         assertThat(schema)
                 .as("The checkpoint history table must exist in the reset schema")
-                .contains("CREATE TABLE IF NOT EXISTS ab_agent_run_checkpoint");
+                .contains("CREATE TABLE public.ab_agent_run_checkpoint");
     }
 
     @Test

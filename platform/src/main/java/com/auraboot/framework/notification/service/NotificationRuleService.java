@@ -48,8 +48,9 @@ public class NotificationRuleService {
     // -------------------------------------------------------------------------
     // CRUD
     // -------------------------------------------------------------------------
-    // NOTE: the ab_notification_rule table + indexes are owned by database/schema.sql
-    // (and the reset/init scripts). Startup-time DDL is forbidden by the bootstrap red line
+    // NOTE: the ab_notification_rule table + indexes are owned by the Flyway migrations
+    // (db/migration/core; fresh stacks load the generated db/snapshots/schema-current.sql).
+    // Startup-time DDL is forbidden by the bootstrap red line
     // (no @PostConstruct / ApplicationRunner schema writes), so no initSchema() lives here.
 
     /** List all rules for the current tenant. */

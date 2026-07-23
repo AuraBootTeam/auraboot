@@ -96,7 +96,9 @@ ship(){
   log "ship: prepare $REMOTE_DIR on $HOST"
   run_remote "mkdir -p '$REMOTE_DIR'"
   # config bundle
-  cp "$ROOT/platform/src/main/resources/database/schema.sql" "$SELF_DIR/schema.sql"
+  # OSS community deploy has no Flyway; the DB is built at first-init from the
+  # Flyway-generated snapshot (shipped as schema.sql, mounted into initdb.d).
+  cp "$ROOT/platform/src/main/resources/db/snapshots/schema-current.sql" "$SELF_DIR/schema.sql"
   cp "$ROOT/scripts/quickstart.sh" "$SELF_DIR/quickstart.sh"
   scp -q "$SELF_DIR/docker-compose.remote.yml" "$SELF_DIR/override.$MODE.yml" \
         "$SELF_DIR/gateway.conf" "$SELF_DIR/schema.sql" "$SELF_DIR/quickstart.sh" \

@@ -18,6 +18,8 @@ services:
     volumes:
       - oss_pg_data:/var/lib/postgresql/data
       # OSS schema is applied at first-init of a fresh DB (no Flyway in the community flow).
+      # schema.sql here is the Flyway-generated snapshot (db/snapshots/schema-current.sql),
+      # copied in by deploy.sh — not a hand-maintained file.
       - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-auraboot} -d ${POSTGRES_DB:-aura_boot}"]

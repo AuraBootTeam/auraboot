@@ -1,35 +1,37 @@
 #!/usr/bin/env bash
 #
 # Answer one question about an EXISTING database: does it still match
-# platform/src/main/resources/database/schema.sql?
+# platform/src/main/resources/db/snapshots/schema-current.sql — the Flyway-
+# generated snapshot that golden and fresh stacks load directly?
 #
-# Why this exists: schema.sql is 300+ `CREATE TABLE IF NOT EXISTS` statements, so
-# re-applying it to a database that was created by an older checkout is a silent
-# no-op for every table that already exists — columns added since then are never
-# back-filled. The database then looks fine (psql exits 0) and fails much later,
-# far from the cause: on 2026-07-13 a reused slot-80 database was missing
+# Why this exists: golden-stack reuses a slot database across backend rebuilds to
+# avoid a full plugin re-import. But a database created by an older checkout may be
+# missing columns the current snapshot declares. The snapshot is a pg_dump
+# (plain CREATE TABLE, no IF NOT EXISTS), so it cannot be replayed to back-fill
+# them — reusing such a database looks fine (psql exits 0 elsewhere) and fails much
+# later, far from the cause: on 2026-07-13 a reused slot-80 database was missing
 # ab_named_query.resource_code, and the only symptom was a plugin import dying with
 # `25P02 current transaction is aborted` pointing at an unrelated COUNT(*).
 #
-# Applies schema.sql to a throwaway reference database (same trick as
-# check-schema-sql.sh), then diffs table+column sets against the target.
+# Applies the snapshot to a throwaway reference database, then diffs table+column
+# sets against the target so the caller can decide to reuse (match) or recreate.
 #
 # Usage:
-#   scripts/db/check-db-matches-schema-sql.sh <target-db> [--quiet]
+#   scripts/db/check-db-matches-snapshot.sh <target-db> [--quiet]
 #
 # Connection (same env contract as the rest of scripts/db):
 #   PG_HOST/PG_PORT/PG_USER/PG_PASSWORD, PG_ADMIN_DB=postgres
 #
 # Exit codes:
-#   0 — target matches schema.sql (or target has no app tables yet: nothing to drift)
-#   1 — target is missing tables/columns that schema.sql declares (drift)
-#   2 — environment problem (psql missing, cannot connect, schema.sql absent)
+#   0 — target matches the snapshot (or target has no app tables yet: nothing to drift)
+#   1 — target is missing tables/columns that the snapshot declares (drift)
+#   2 — environment problem (psql missing, cannot connect, snapshot absent)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-SCHEMA_FILE="$PROJECT_ROOT/platform/src/main/resources/database/schema.sql"
+SCHEMA_FILE="$PROJECT_ROOT/platform/src/main/resources/db/snapshots/schema-current.sql"
 
 TARGET_DB="${1:-}"
 QUIET=0
@@ -40,7 +42,7 @@ if [ -z "$TARGET_DB" ]; then
   exit 2
 fi
 if [ ! -f "$SCHEMA_FILE" ]; then
-  echo "[db-drift] schema.sql not found: $SCHEMA_FILE" >&2
+  echo "[db-drift] snapshot not found: $SCHEMA_FILE" >&2
   exit 2
 fi
 command -v psql >/dev/null 2>&1 || { echo "[db-drift] psql not on PATH" >&2; exit 2; }
@@ -84,12 +86,12 @@ if [ "${target_tables:-0}" -eq 0 ]; then
   exit 0
 fi
 
-say "[db-drift] building reference database from schema.sql"
+say "[db-drift] building reference database from the snapshot"
 psql -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$PG_ADMIN_DB" -q \
   -c "CREATE DATABASE $REF_DB" >/dev/null 2>&1 || { echo "[db-drift] cannot create $REF_DB" >&2; exit 2; }
 if ! psql -v ON_ERROR_STOP=1 -h "$PG_HOST" -p "$PG_PORT" -U "$PG_USER" -d "$REF_DB" \
      -q -f "$SCHEMA_FILE" >/tmp/"$REF_DB".apply 2>&1; then
-  echo "[db-drift] schema.sql does not apply cleanly to a fresh database:" >&2
+  echo "[db-drift] snapshot does not apply cleanly to a fresh database:" >&2
   tail -5 /tmp/"$REF_DB".apply >&2
   exit 2
 fi
@@ -99,20 +101,20 @@ inventory "$TARGET_DB" >/tmp/"$REF_DB".target
 
 missing=$(comm -23 /tmp/"$REF_DB".ref /tmp/"$REF_DB".target)
 if [ -z "$missing" ]; then
-  say "[db-drift] '$TARGET_DB' matches schema.sql ($(wc -l < /tmp/"$REF_DB".ref | tr -d ' ') columns)"
+  say "[db-drift] '$TARGET_DB' matches the snapshot ($(wc -l < /tmp/"$REF_DB".ref | tr -d ' ') columns)"
   exit 0
 fi
 
 count=$(printf '%s\n' "$missing" | wc -l | tr -d ' ')
-echo "[db-drift] '$TARGET_DB' is missing $count column(s) that schema.sql declares:" >&2
+echo "[db-drift] '$TARGET_DB' is missing $count column(s) that the snapshot declares:" >&2
 printf '%s\n' "$missing" | sed 's/^/  - /' | head -30 >&2
 [ "$count" -gt 30 ] && echo "  ... and $((count - 30)) more" >&2
 cat >&2 <<EOF
 
-schema.sql is all CREATE TABLE IF NOT EXISTS, so re-applying it cannot repair an
-existing database — those columns will stay missing and surface later as confusing
-runtime errors (a plugin import aborting with 25P02, a mapper selecting a column
-that does not exist).
+The snapshot is a pg_dump (plain CREATE TABLE, no IF NOT EXISTS), so it cannot be
+replayed to back-fill those columns on an existing database — they will stay missing
+and surface later as confusing runtime errors (a plugin import aborting with 25P02,
+a mapper selecting a column that does not exist).
 
 Recreate the database instead of reusing it.
 EOF

@@ -18,10 +18,10 @@
 #   ./scripts/oss-golden-stack.sh up   <name> [--slot N] [--no-frontend] [--no-warm] [--fresh-db] [--ttl 6h] [--plugin-profile P|--plugin X]
 #       --no-warm : keep the frontend but skip the setup/auth/pre-warm step — for goldens
 #                   that self-provision accounts and run with --no-deps (no storageState).
-#       --fresh-db: drop + recreate the slot's database before applying schema.sql. `up`
+#       --fresh-db: drop + recreate the slot's database before applying the snapshot. `up`
 #                   otherwise refuses to run on a database that predates the current
-#                   schema.sql (schema.sql is CREATE TABLE IF NOT EXISTS — it cannot
-#                   back-fill columns into tables that already exist).
+#                   snapshot (db/snapshots/schema-current.sql is a pg_dump — plain CREATE
+#                   TABLE, so it cannot back-fill columns into tables that already exist).
 #   ./scripts/oss-golden-stack.sh import <name> [--plugin-profile P|--plugin X]
 #   ./scripts/oss-golden-stack.sh warm <name>          # re-run setup→auth→pre-warm (up does this)
 #   ./scripts/oss-golden-stack.sh env  <name>          # print the Playwright env exports
@@ -207,11 +207,12 @@ cmd_up() {
 
   log "2/9 apply schema to $pg_db"
   # `dev.sh infra ensure` reuses an existing database for the slot, which may have been
-  # created by an older checkout. schema.sql is all CREATE TABLE IF NOT EXISTS, so applying
-  # it to such a database silently skips every table that already exists and leaves columns
-  # added since then missing — the stack then dies much later with an unrelated-looking
-  # error (2026-07-13: ab_named_query.resource_code missing → plugin import failed with
-  # `25P02 current transaction is aborted` pointing at a COUNT(*) on another table).
+  # created by an older checkout. The bring-up file is db/snapshots/schema-current.sql — the
+  # Flyway-generated snapshot (a pg_dump, plain CREATE TABLE). It can only be loaded onto a
+  # fresh database; it cannot back-fill columns onto an existing one. So a reused database that
+  # predates the current snapshot is missing columns and the stack dies much later with an
+  # unrelated-looking error (2026-07-13: ab_named_query.resource_code missing → plugin import
+  # failed with `25P02 current transaction is aborted` pointing at a COUNT(*) on another table).
   if [ "$fresh_db" = "1" ]; then
     log "    --fresh-db: dropping and recreating $pg_db"
     PGPASSWORD=auraboot psql -h 127.0.0.1 -p 5432 -U auraboot -d postgres -q \
@@ -230,27 +231,25 @@ cmd_up() {
     # This is the path every gate runner takes: `destroy` then `up` is the
     # documented way to guarantee a fresh database, and it lands here every
     # single run.
-    log "    $pg_db has no tables yet — applying schema.sql"
+    log "    $pg_db has no tables yet — applying snapshot"
   elif ! PG_HOST=127.0.0.1 PG_PORT=5432 PG_USER=auraboot PG_PASSWORD=auraboot \
-       "$REPO_ROOT/scripts/db/check-db-matches-schema-sql.sh" "$pg_db" --quiet; then
-    die "database '$pg_db' predates the current schema.sql (see the missing columns above).
-     Re-applying schema.sql cannot repair it. Either:
+       "$REPO_ROOT/scripts/db/check-db-matches-snapshot.sh" "$pg_db" --quiet; then
+    die "database '$pg_db' predates the current snapshot (see the missing columns above).
+     The snapshot is a pg_dump and cannot back-fill an existing database. Either:
        $0 destroy $name          # then 'up' again on a clean database
        $0 up $name --slot $slot --fresh-db   # drop + recreate the database in place"
   else
-    # The drift check just established that this database matches schema.sql, so
-    # replaying it would do no work — and cannot succeed anyway: the file carries
-    # 40 unguarded ALTER TABLE ... ADD CONSTRAINT statements (Postgres has no
-    # ADD CONSTRAINT IF NOT EXISTS), so a second apply always dies on the first
-    # one. That made `up` impossible on any existing database: every backend
-    # rebuild forced --fresh-db and a full plugin re-import.
-    log "    database already matches schema.sql — skipping replay"
+    # The drift check just established that this database matches the snapshot, so
+    # replaying it would do no work — and cannot succeed anyway: the snapshot is a
+    # pg_dump of plain CREATE TABLE statements (no IF NOT EXISTS), so a second apply
+    # always dies on the first table that already exists. Reuse the database as-is.
+    log "    database already matches the snapshot — skipping replay"
     skip_schema=1
   fi
 
   if [ "${skip_schema:-0}" != "1" ]; then
     PGPASSWORD=auraboot psql -v ON_ERROR_STOP=1 -h 127.0.0.1 -p 5432 -U auraboot -d "$pg_db" \
-      -q -f "$REPO_ROOT/platform/src/main/resources/database/schema.sql" >"$sd/schema-apply.log" 2>&1 \
+      -q -f "$REPO_ROOT/platform/src/main/resources/db/snapshots/schema-current.sql" >"$sd/schema-apply.log" 2>&1 \
       || { tail -5 "$sd/schema-apply.log" >&2; die "schema apply failed — see $sd/schema-apply.log"; }
   fi
 
