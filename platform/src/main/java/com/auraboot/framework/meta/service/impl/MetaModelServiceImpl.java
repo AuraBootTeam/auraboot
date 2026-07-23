@@ -404,10 +404,13 @@ public class MetaModelServiceImpl extends BaseMetaService implements MetaModelSe
     }
 
     @Override
-    @CacheEvict(value = "modelDefinitions", key = "#modelCode + '_' + T(com.auraboot.framework.meta.cache.MetaCacheKeyGenerator).getTenantContextSuffix()")
     public void refreshModelCache(String modelCode) {
         // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
         log.info("Refreshing model cache for: {} in tenant: {}", logSafe(modelCode), getCurrentTenantId());
+        // Evict via the separate cache bean so the @CacheEvict interceptor fires even when
+        // this method is reached by self-invocation (evictModelCache / publish paths). A
+        // @CacheEvict annotation placed directly here is silently bypassed on internal calls.
+        metaDefinitionCacheService.evict(modelCode);
     }
 
     @Override
