@@ -1053,7 +1053,8 @@ class CommandSideEffectBatchTest {
             verify(dynamicDataMapper, never()).updateWithJsonb(eq("mt_target_model"), anyMap(), anyMap(), anySet());
 
             assertTrue(sqlCaptor.getValue().contains("UPDATE mt_target_model SET"));
-            assertTrue(sqlCaptor.getValue().matches("(?s).*config = #\\{params\\.set\\d+}::jsonb.*"));
+            assertTrue(sqlCaptor.getValue().matches(
+                    "(?s).*config = #\\{params\\.set\\d+,jdbcType=OTHER,typeHandler=[\\w.]+}::jsonb.*"));
             assertTrue(sqlCaptor.getValue().contains("WHERE pid = #{params.recordId}"));
             assertTrue(sqlCaptor.getValue().contains("tenant_id = #{params.tenantId}"));
             assertTrue(sqlCaptor.getValue().contains("owner_id = 100"));

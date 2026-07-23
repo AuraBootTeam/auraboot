@@ -431,7 +431,7 @@ class EventPolicyControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.data.actionPayload.payload.content").value("SLA ${SLA.recordPid} timeout"))
                 .andExpect(jsonPath("$.data.contextPayload.sla.recordPid").value("sla-record-" + suffix))
                 .andExpect(jsonPath("$.data.errorMessage")
-                        .value("Retry attempts exhausted after 4 attempts: No real SMS sender available"));
+                        .value("Retry attempts exhausted after 4 attempts: SEND_SMS failed: No real SMS sender available"));
     }
 
     @Test

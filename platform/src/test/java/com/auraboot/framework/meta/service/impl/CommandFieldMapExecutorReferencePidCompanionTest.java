@@ -142,7 +142,7 @@ class CommandFieldMapExecutorReferencePidCompanionTest {
 
         assertThat(sqlCaptor.getValue())
                 .contains("UPDATE ab_bpm_domain_config SET")
-                .containsPattern("sort_fields = #\\{params\\.set\\d+}::jsonb")
+                .containsPattern("sort_fields = #\\{params\\.set\\d+,jdbcType=OTHER,typeHandler=[\\w.]+}::jsonb")
                 .contains("WHERE pid = #{params.recordId}")
                 .contains("tenant_id = #{params.tenantId}")
                 .contains("created_by = 20")

@@ -1,5 +1,6 @@
 package com.auraboot.framework.decision;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.auraboot.framework.eventpolicy.model.ConflictStrategy;
 import com.auraboot.framework.eventpolicy.model.DedupStrategy;
@@ -142,8 +143,12 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
         assertThat(result.policy().status().name()).isEqualTo("MATCHED");
         assertThat(result.execution().actions().get(0).status().name()).isEqualTo("SUCCESS");
 
-        // the real record was mutated by the production UpdateRecordActionHandler -> DynamicDataService
-        Map<String, Object> after = dynamicDataService.getById(modelCode, recordPid);
+        // the real record was mutated by the production UpdateRecordActionHandler -> DynamicDataService.
+        // This IT creates its own dynamic tenant/user with no rule-center grant, so the verification
+        // read-back must bypass record-permission enforcement (established pattern, cf. c737b79d3) —
+        // we are asserting the mutation persisted, not asserting a deny.
+        Map<String, Object> after = MetaContext.runWithoutDataPermission(
+                () -> dynamicDataService.getById(modelCode, recordPid));
         assertThat(after.get(statusField)).isEqualTo("ESCALATED");
     }
 
