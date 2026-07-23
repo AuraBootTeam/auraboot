@@ -2,6 +2,7 @@ import Ajv from 'ajv';
 import { readFileSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
 import type { PluginFiles } from '../utils/plugin-loader.js';
+import { ajvHint } from './ajv-hints.js';
 import { type ValidationResult, createResult, addMessage } from './types.js';
 
 const SCHEMA_DIR = resolve(import.meta.dirname, '../../../schemas');
@@ -55,6 +56,7 @@ export function validateStructural(plugin: PluginFiles): ValidationResult {
             severity: 'error',
             message: `plugin.json${err.instancePath}: ${err.message}`,
             path: `plugin.json${err.instancePath}`,
+            ...ajvHint(err),
           });
         }
       }
@@ -115,6 +117,7 @@ export function validateStructural(plugin: PluginFiles): ValidationResult {
             severity: 'error',
             message: `${resourceType}.json${err.instancePath}: ${err.message}`,
             path: `config/${resourceType}.json${err.instancePath}`,
+            ...ajvHint(err),
           });
         }
       }
