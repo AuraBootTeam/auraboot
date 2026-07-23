@@ -957,6 +957,253 @@ class PluginImportServiceImplCoreTest {
         assertThat(danglingMsgs).isEmpty();
     }
 
+    // ---------- two-phase cross-plugin reference validation: menu-parent / role-perm / menu-perm ----------
+
+    /**
+     * Reproduces the pcba-solution ↔ pcba-compliance ↔ pcba-manufacturing cyclic-dependency bug:
+     * pcba-manufacturing declares a menu whose parent directory is owned by pcba-solution, which
+     * imports later in the cycle. Default mode (no deferral) MUST keep the hard error — regression
+     * guard proving the fix did not silently weaken validation for menu->parent-menu refs.
+     */
+    @Test
+    @DisplayName("validateManifest: cross-plugin menu->parent-menu is a HARD error by default")
+    void validateManifest_crossPluginMenuParent_hardErrorByDefault() {
+        PluginManifestExtended m = baseManifest();
+        MenuDefinitionDTO menu = new MenuDefinitionDTO();
+        menu.setCode("pe_manufacturing_dir");
+        menu.setParentCode("pe_planning_dir"); // owned by pcba-solution, not yet imported
+        m.setMenus(List.of(menu));
+
+        when(resourceImporter.checkMenuExists(eq(1L), eq("pe_planning_dir"))).thenReturn(false);
+
+        List<String> errors = service.validateManifest(m);
+
+        assertThat(errors).anyMatch(e -> e.contains("pe_manufacturing_dir") && e.contains("pe_planning_dir")
+                && !e.startsWith("[WARN] "));
+    }
+
+    /** Same cross-plugin menu->parent-menu reference, downgraded to a deferred warning. */
+    @Test
+    @DisplayName("validateManifest: cross-plugin menu->parent-menu is DEFERRED (no error) when deferral on")
+    void validateManifest_crossPluginMenuParent_deferred() {
+        PluginManifestExtended m = baseManifest();
+        MenuDefinitionDTO menu = new MenuDefinitionDTO();
+        menu.setCode("pe_manufacturing_dir");
+        menu.setParentCode("pe_planning_dir");
+        m.setMenus(List.of(menu));
+
+        when(resourceImporter.checkMenuExists(eq(1L), eq("pe_planning_dir"))).thenReturn(false);
+
+        List<String> messages = service.validateManifest(m, true);
+
+        assertThat(messages).noneMatch(e ->
+                e.contains("missing parent menu") && !e.startsWith("[WARN] "));
+        assertThat(messages).anyMatch(e ->
+                e.startsWith("[WARN] ") && e.contains("pe_planning_dir"));
+    }
+
+    /** Cross-plugin menu->permission reference, downgraded to a deferred warning. */
+    @Test
+    @DisplayName("validateManifest: cross-plugin menu->permission is DEFERRED (no error) when deferral on")
+    void validateManifest_crossPluginMenuPermission_deferred() {
+        PluginManifestExtended m = baseManifest();
+        MenuDefinitionDTO menu = new MenuDefinitionDTO();
+        menu.setCode("pe_manufacturing_dir");
+        menu.setPermissionCode("pcba.compliance.view"); // owned by pcba-compliance
+        m.setMenus(List.of(menu));
+
+        when(resourceImporter.checkPermissionExists(eq(1L), eq("pcba.compliance.view"))).thenReturn(false);
+
+        List<String> messages = service.validateManifest(m, true);
+
+        assertThat(messages).noneMatch(e ->
+                e.contains("missing permission") && !e.startsWith("[WARN] "));
+        assertThat(messages).anyMatch(e ->
+                e.startsWith("[WARN] ") && e.contains("pcba.compliance.view"));
+    }
+
+    /** Cross-plugin menu->model reference, downgraded to a deferred warning. */
+    @Test
+    @DisplayName("validateManifest: cross-plugin menu->model is DEFERRED (no error) when deferral on")
+    void validateManifest_crossPluginMenuModel_deferred() {
+        PluginManifestExtended m = baseManifest();
+        MenuDefinitionDTO menu = new MenuDefinitionDTO();
+        menu.setCode("pe_manufacturing_list");
+        menu.setModelCode("pe_manufacturing_order"); // owned by another plugin in the cycle
+        m.setMenus(List.of(menu));
+
+        when(resourceImporter.checkModelExists(eq(1L), eq("pe_manufacturing_order"))).thenReturn(false);
+
+        List<String> messages = service.validateManifest(m, true);
+
+        assertThat(messages).noneMatch(e ->
+                e.contains("missing model") && !e.startsWith("[WARN] "));
+        assertThat(messages).anyMatch(e ->
+                e.startsWith("[WARN] ") && e.contains("pe_manufacturing_order"));
+    }
+
+    /** Cross-plugin role->permission reference, downgraded to a deferred warning. */
+    @Test
+    @DisplayName("validateManifest: cross-plugin role->permission is DEFERRED (no error) when deferral on")
+    void validateManifest_crossPluginRolePermission_deferred() {
+        PluginManifestExtended m = baseManifest();
+        RoleDefinitionDTO role = new RoleDefinitionDTO();
+        role.setCode("pcba.manufacturing.operator");
+        role.setPermissions(List.of("pcba.compliance.view")); // owned by pcba-compliance
+        m.setRoles(List.of(role));
+
+        when(resourceImporter.checkPermissionExists(eq(1L), eq("pcba.compliance.view"))).thenReturn(false);
+
+        List<String> messages = service.validateManifest(m, true);
+
+        assertThat(messages).noneMatch(e ->
+                e.contains("references missing permission") && !e.startsWith("[WARN] "));
+        assertThat(messages).anyMatch(e ->
+                e.startsWith("[WARN] ") && e.contains("pcba.compliance.view"));
+    }
+
+    /** Cross-plugin role->permissionPolicies permission reference, downgraded to a deferred warning. */
+    @Test
+    @DisplayName("validateManifest: cross-plugin role permissionPolicies->permission is DEFERRED when deferral on")
+    void validateManifest_crossPluginRolePermissionPolicy_deferred() {
+        PluginManifestExtended m = baseManifest();
+        RoleDefinitionDTO role = new RoleDefinitionDTO();
+        role.setCode("pcba.manufacturing.operator");
+        role.setPermissions(List.of("pcba.compliance.view"));
+        role.setPermissionPolicies(List.of(RolePermissionPolicyDefinitionDTO.builder()
+                .permissionCode("pcba.compliance.view")
+                .conditions(Map.of("dynamicAbac", Map.of("expectedMatched", true)))
+                .build()));
+        m.setRoles(List.of(role));
+
+        when(resourceImporter.checkPermissionExists(eq(1L), eq("pcba.compliance.view"))).thenReturn(false);
+
+        List<String> messages = service.validateManifest(m, true);
+
+        assertThat(messages).noneMatch(e ->
+                e.contains("permissionPolicies references missing permission") && !e.startsWith("[WARN] "));
+        assertThat(messages).anyMatch(e ->
+                e.startsWith("[WARN] ") && e.contains("permissionPolicies") && e.contains("pcba.compliance.view"));
+    }
+
+    /**
+     * Deferral must NOT mask an intra-manifest inconsistency: a permissionPolicies entry
+     * referencing a permission the role itself never grants is a same-manifest authoring bug,
+     * not a cross-plugin forward reference, so it stays a hard error even with deferral on.
+     */
+    @Test
+    @DisplayName("validateManifest: permissionPolicies referencing an unassigned permission stays a HARD error even when deferral on")
+    void validateManifest_rolePermissionPolicyUnassigned_stillHardErrorWhenDeferred() {
+        PluginManifestExtended m = baseManifest();
+        PermissionDefinitionDTO perm = new PermissionDefinitionDTO();
+        perm.setCode("perm.local");
+        m.setPermissions(List.of(perm));
+
+        RoleDefinitionDTO role = new RoleDefinitionDTO();
+        role.setCode("role.x");
+        role.setPermissions(List.of("perm.other"));
+        role.setPermissionPolicies(List.of(RolePermissionPolicyDefinitionDTO.builder()
+                .permissionCode("perm.local")
+                .conditions(Map.of("dynamicAbac", Map.of("expectedMatched", true)))
+                .build()));
+        m.setRoles(List.of(role));
+
+        List<String> messages = service.validateManifest(m, true);
+
+        assertThat(messages).anyMatch(e -> e.contains("permissionPolicies")
+                && e.contains("permission not assigned to role")
+                && e.contains("perm.local")
+                && !e.startsWith("[WARN] "));
+    }
+
+    // ---------- closing sweep: menu-parent / menu-perm / role-perm dangling refs ----------
+
+    @Test
+    @DisplayName("findDanglingMenuParentRefs flags menu->parent-menu that no menu provides")
+    void closingSweep_flagsDanglingMenuParentRef() {
+        MenuDefinitionDTO ok = new MenuDefinitionDTO();
+        ok.setCode("pe_manufacturing_dir");
+        ok.setParentCode("pe_planning_dir"); // provided after full batch
+
+        MenuDefinitionDTO dangling = new MenuDefinitionDTO();
+        dangling.setCode("pe_typo_dir");
+        dangling.setParentCode("pe_plannign_dir"); // typo — provided by nobody
+
+        List<String> danglingMsgs = service.findDanglingMenuParentRefs(
+                List.of(ok, dangling), java.util.Set.of("pe_planning_dir", "pe_manufacturing_dir"));
+
+        assertThat(danglingMsgs).anyMatch(s -> s.contains("pe_typo_dir") && s.contains("pe_plannign_dir"));
+        assertThat(danglingMsgs).hasSize(1); // the "ok" menu's parent resolves — no message for it
+    }
+
+    @Test
+    @DisplayName("findDanglingMenuParentRefs returns empty when all parent menus resolve")
+    void closingSweep_menuParentEmptyWhenAllResolve() {
+        MenuDefinitionDTO menu = new MenuDefinitionDTO();
+        menu.setCode("pe_manufacturing_dir");
+        menu.setParentCode("pe_planning_dir");
+
+        List<String> danglingMsgs = service.findDanglingMenuParentRefs(
+                List.of(menu), java.util.Set.of("pe_planning_dir"));
+
+        assertThat(danglingMsgs).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findDanglingPermissionRefs flags menu->permission that no plugin provides")
+    void closingSweep_flagsDanglingMenuPermissionRef() {
+        MenuDefinitionDTO dangling = new MenuDefinitionDTO();
+        dangling.setCode("pe_manufacturing_dir");
+        dangling.setPermissionCode("pcba.compliance.typo");
+
+        List<String> danglingMsgs = service.findDanglingPermissionRefs(
+                List.of(dangling), List.of(), java.util.Set.of("pcba.compliance.view"));
+
+        assertThat(danglingMsgs).anyMatch(s -> s.contains("pe_manufacturing_dir") && s.contains("pcba.compliance.typo"));
+    }
+
+    @Test
+    @DisplayName("findDanglingPermissionRefs flags role->permission and role permissionPolicies->permission that no plugin provides")
+    void closingSweep_flagsDanglingRolePermissionRefs() {
+        RoleDefinitionDTO okRole = new RoleDefinitionDTO();
+        okRole.setCode("pcba.manufacturing.operator");
+        okRole.setPermissions(List.of("pcba.compliance.view")); // provided after full batch
+
+        RoleDefinitionDTO danglingRole = new RoleDefinitionDTO();
+        danglingRole.setCode("pcba.manufacturing.typo_role");
+        danglingRole.setPermissions(List.of("pcba.compliance.typo")); // provided by nobody
+        danglingRole.setPermissionPolicies(List.of(RolePermissionPolicyDefinitionDTO.builder()
+                .permissionCode("pcba.compliance.typo")
+                .conditions(Map.of("dynamicAbac", Map.of("expectedMatched", true)))
+                .build()));
+
+        List<String> danglingMsgs = service.findDanglingPermissionRefs(
+                List.of(), List.of(okRole, danglingRole), java.util.Set.of("pcba.compliance.view"));
+
+        assertThat(danglingMsgs).anyMatch(s -> s.contains("pcba.manufacturing.typo_role")
+                && s.contains("pcba.compliance.typo") && s.contains("references missing permission"));
+        assertThat(danglingMsgs).anyMatch(s -> s.contains("pcba.manufacturing.typo_role")
+                && s.contains("pcba.compliance.typo") && s.contains("permissionPolicies"));
+        assertThat(danglingMsgs).noneMatch(s -> s.contains("pcba.manufacturing.operator"));
+    }
+
+    @Test
+    @DisplayName("findDanglingPermissionRefs returns empty when all menu/role permissions resolve")
+    void closingSweep_permissionEmptyWhenAllResolve() {
+        MenuDefinitionDTO menu = new MenuDefinitionDTO();
+        menu.setCode("pe_manufacturing_dir");
+        menu.setPermissionCode("pcba.compliance.view");
+
+        RoleDefinitionDTO role = new RoleDefinitionDTO();
+        role.setCode("pcba.manufacturing.operator");
+        role.setPermissions(List.of("pcba.compliance.view"));
+
+        List<String> danglingMsgs = service.findDanglingPermissionRefs(
+                List.of(menu), List.of(role), java.util.Set.of("pcba.compliance.view"));
+
+        assertThat(danglingMsgs).isEmpty();
+    }
+
     @Test
     @DisplayName("autoPublishAndSyncModels acknowledges rule-center governance during trusted plugin import")
     void autoPublishAndSyncModels_acknowledgesGovernanceForTrustedImport() {

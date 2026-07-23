@@ -193,11 +193,40 @@ class CrossReferenceValidatorTest {
     }
 
     @Test
-    void menuPermissionMissing_emitsWarning() {
+    void menuPermissionMissing_emitsError() {
         PluginManifestExtended manifest = new PluginManifestExtended();
         manifest.setMenus(List.of(menu("m1", "missing_perm")));
         var msgs = validator.validate(ctx(manifest, Set.of(), Set.of(), Set.of()));
-        assertThat(msgs).anyMatch(m -> "S-REF-PERM".equals(m.getCode()) && m.isWarning());
+        assertThat(msgs).anyMatch(m -> "S-REF-MENU-PERMISSION".equals(m.getCode()) && m.isError());
+    }
+
+    /**
+     * Phase-1 of the two-phase cross-plugin reference fix, extended to menu→permission: when an
+     * import declares {@code deferReferenceValidation}, a menu referencing a permission that is
+     * not yet available (it may be supplied by another plugin imported later in the same cyclic
+     * batch — e.g. pcba-solution ↔ pcba-compliance ↔ pcba-manufacturing) must be downgraded from a
+     * hard error to a deferred warning. The truly-dangling case is re-enforced afterwards by the
+     * closing reference-integrity sweep.
+     */
+    @Test
+    void menuPermissionMissing_deferred_emitsWarningNotError() {
+        PluginManifestExtended manifest = new PluginManifestExtended();
+        manifest.setMenus(List.of(menu("m1", "missing_perm")));
+        PluginValidationContext ctx = PluginValidationContext.builder()
+                .pluginId("p")
+                .namespace("ns")
+                .manifest(manifest)
+                .deferReferenceValidation(true)
+                .installedModelCodes(Set.of())
+                .installedFieldCodes(Set.of())
+                .installedPermissionCodes(Set.of())
+                .build();
+
+        var msgs = validator.validate(ctx);
+
+        assertThat(msgs).noneMatch(m -> "S-REF-MENU-PERMISSION".equals(m.getCode()) && m.isError());
+        assertThat(msgs).anyMatch(m -> "S-REF-MENU-PERMISSION".equals(m.getCode()) && m.isWarning()
+                && m.getMessage().contains("missing_perm"));
     }
 
     @Test
@@ -206,7 +235,7 @@ class CrossReferenceValidatorTest {
         manifest.setPermissions(List.of(permission("ns:read")));
         manifest.setMenus(List.of(menu("m1", "ns:read")));
         var msgs = validator.validate(ctx(manifest, Set.of(), Set.of(), Set.of()));
-        assertThat(msgs).noneMatch(m -> "S-REF-PERM".equals(m.getCode()));
+        assertThat(msgs).noneMatch(m -> "S-REF-MENU-PERMISSION".equals(m.getCode()));
     }
 
     @Test

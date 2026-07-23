@@ -18,5 +18,11 @@
   "commands": [
     { "code": "tpc:create", "displayName": "Create C", "modelCode": "tp_c_model", "type": "custom" },
     { "code": "tpc:dangling", "displayName": "Dangling C", "modelCode": "tp_nonexistent_model", "type": "custom" }
+  ],
+  "menus": [
+    { "code": "tpc_dangling_menu", "name": "TPC Dangling Menu", "parentCode": "tp_nonexistent_menu" }
+  ],
+  "roles": [
+    { "code": "tpc_dangling_role", "name": "TPC Dangling Role", "permissions": ["tp_nonexistent_permission"] }
   ]
 }

@@ -3262,7 +3262,8 @@ public class PluginImportServiceImpl implements PluginImportService {
                     if (!manifestPermissionCodes.contains(permissionCode)
                             && !existsInTenant(tenantId, permissionCode, permissionExistsCache,
                             code -> resourceImporter.checkPermissionExists(tenantId, code))) {
-                        errors.add("Role '" + role.getCode() + "' references missing permission: " + permissionCode);
+                        String msg = "Role '" + role.getCode() + "' references missing permission: " + permissionCode;
+                        errors.add(deferReferenceValidation ? "[WARN] " + msg : msg);
                     }
                 }
                 if (role.getPermissionPolicies() != null) {
@@ -3279,8 +3280,9 @@ public class PluginImportServiceImpl implements PluginImportService {
                         if (!manifestPermissionCodes.contains(permissionCode)
                                 && !existsInTenant(tenantId, permissionCode, permissionExistsCache,
                                 code -> resourceImporter.checkPermissionExists(tenantId, code))) {
-                            errors.add("Role '" + role.getCode()
-                                    + "' permissionPolicies references missing permission: " + permissionCode);
+                            String msg = "Role '" + role.getCode()
+                                    + "' permissionPolicies references missing permission: " + permissionCode;
+                            errors.add(deferReferenceValidation ? "[WARN] " + msg : msg);
                         }
                     }
                 }
@@ -3297,21 +3299,24 @@ public class PluginImportServiceImpl implements PluginImportService {
                         && !manifestMenuCodes.contains(menu.getParentCode())
                         && !existsInTenant(tenantId, menu.getParentCode(), menuExistsCache,
                         code -> resourceImporter.checkMenuExists(tenantId, code))) {
-                    errors.add("Menu '" + menu.getCode() + "' references missing parent menu: " + menu.getParentCode());
+                    String msg = "Menu '" + menu.getCode() + "' references missing parent menu: " + menu.getParentCode();
+                    errors.add(deferReferenceValidation ? "[WARN] " + msg : msg);
                 }
 
                 if (!isBlank(menu.getPermissionCode())
                         && !manifestPermissionCodes.contains(menu.getPermissionCode())
                         && !existsInTenant(tenantId, menu.getPermissionCode(), permissionExistsCache,
                         code -> resourceImporter.checkPermissionExists(tenantId, code))) {
-                    errors.add("Menu '" + menu.getCode() + "' references missing permission: " + menu.getPermissionCode());
+                    String msg = "Menu '" + menu.getCode() + "' references missing permission: " + menu.getPermissionCode();
+                    errors.add(deferReferenceValidation ? "[WARN] " + msg : msg);
                 }
 
                 if (!isBlank(menu.getModelCode())
                         && !manifestModelCodes.contains(menu.getModelCode())
                         && !existsInTenant(tenantId, menu.getModelCode(), modelExistsCache,
                         code -> resourceImporter.checkModelExists(tenantId, code))) {
-                    errors.add("Menu '" + menu.getCode() + "' references missing model: " + menu.getModelCode());
+                    String msg = "Menu '" + menu.getCode() + "' references missing model: " + menu.getModelCode();
+                    errors.add(deferReferenceValidation ? "[WARN] " + msg : msg);
                 }
             }
         }
@@ -3379,16 +3384,131 @@ public class PluginImportServiceImpl implements PluginImportService {
     }
 
     /**
+     * Closing sweep counterpart for menu→parent-menu references deferred during a cyclic
+     * cold-reset. Mirrors {@link #findDanglingCommandModelRefs(List, Set)}: a parent menu code
+     * that resolves once the whole batch is imported is fine; one that resolves to nobody is a
+     * genuinely dangling reference (typo / removed menu).
+     *
+     * @param menus         every currently-imported menu's manifest DTO (reconstructed from the
+     *                      plugin-resource import snapshot), null / blank-parentCode entries ignored
+     * @param providedMenus menu codes that currently exist for the tenant
+     * @return messages for menus whose parentCode no menu provides (empty if all resolve)
+     */
+    public List<String> findDanglingMenuParentRefs(List<MenuDefinitionDTO> menus, Set<String> providedMenus) {
+        List<String> dangling = new ArrayList<>();
+        if (menus == null) {
+            return dangling;
+        }
+        Set<String> provided = providedMenus != null ? providedMenus : Set.of();
+        for (MenuDefinitionDTO menu : menus) {
+            if (menu == null || isBlank(menu.getParentCode())) {
+                continue;
+            }
+            if (!provided.contains(menu.getParentCode())) {
+                dangling.add("Menu '" + menu.getCode() + "' references missing parent menu: "
+                        + menu.getParentCode() + " (no plugin provides it)");
+            }
+        }
+        return dangling;
+    }
+
+    /**
+     * Closing sweep counterpart for menu→permission and role→permission references deferred
+     * during a cyclic cold-reset. Mirrors {@link #findDanglingCommandModelRefs(List, Set)}.
+     *
+     * @param menus               every currently-imported menu's manifest DTO, null / blank
+     *                            permissionCode entries ignored
+     * @param roles               every currently-imported role's manifest DTO, null entries ignored
+     * @param providedPermissions permission codes that currently exist for the tenant
+     * @return messages for menus/roles whose permissionCode no plugin provides (empty if all resolve)
+     */
+    public List<String> findDanglingPermissionRefs(List<MenuDefinitionDTO> menus,
+                                                    List<RoleDefinitionDTO> roles,
+                                                    Set<String> providedPermissions) {
+        List<String> dangling = new ArrayList<>();
+        Set<String> provided = providedPermissions != null ? providedPermissions : Set.of();
+        if (menus != null) {
+            for (MenuDefinitionDTO menu : menus) {
+                if (menu == null || isBlank(menu.getPermissionCode())) {
+                    continue;
+                }
+                if (!provided.contains(menu.getPermissionCode())) {
+                    dangling.add("Menu '" + menu.getCode() + "' references missing permission: "
+                            + menu.getPermissionCode() + " (no plugin provides it)");
+                }
+            }
+        }
+        if (roles != null) {
+            for (RoleDefinitionDTO role : roles) {
+                if (role == null) {
+                    continue;
+                }
+                if (role.getPermissions() != null) {
+                    for (String permissionCode : role.getPermissions()) {
+                        if (isBlank(permissionCode)) {
+                            continue;
+                        }
+                        if (!provided.contains(permissionCode)) {
+                            dangling.add("Role '" + role.getCode() + "' references missing permission: "
+                                    + permissionCode + " (no plugin provides it)");
+                        }
+                    }
+                }
+                if (role.getPermissionPolicies() != null) {
+                    for (RolePermissionPolicyDefinitionDTO policy : role.getPermissionPolicies()) {
+                        if (policy == null || isBlank(policy.getPermissionCode())) {
+                            continue;
+                        }
+                        if (!provided.contains(policy.getPermissionCode())) {
+                            dangling.add("Role '" + role.getCode()
+                                    + "' permissionPolicies references missing permission: "
+                                    + policy.getPermissionCode() + " (no plugin provides it)");
+                        }
+                    }
+                }
+            }
+        }
+        return dangling;
+    }
+
+    /**
+     * Reconstruct every currently-imported resource of the given type for a tenant from its
+     * {@code ab_plugin_resource.import_snapshot}, deduplicated by resource code (last import wins).
+     * This is how the closing sweep recovers manifest-only fields (e.g. menu {@code parentCode})
+     * that the persisted entity itself does not retain (only the resolved {@code parentId}, which
+     * a not-yet-resolved cross-plugin reference would otherwise leave permanently unrecoverable).
+     */
+    private <T> List<T> loadImportedResourceSnapshots(Long tenantId, ResourceType resourceType, Class<T> dtoClass) {
+        List<PluginResource> resources = pluginResourceMapper.findByTenantAndType(tenantId, resourceType.code());
+        Map<String, T> byCode = new LinkedHashMap<>();
+        for (PluginResource resource : resources) {
+            if (resource == null || resource.getImportSnapshot() == null || isBlank(resource.getResourceCode())) {
+                continue;
+            }
+            try {
+                T dto = objectMapper.convertValue(resource.getImportSnapshot(), dtoClass);
+                byCode.put(resource.getResourceCode(), dto);
+            } catch (Exception e) {
+                log.warn("Failed to reconstruct {} snapshot for code={}: {}",
+                        resourceType.code(), logSafe(resource.getResourceCode()), logSafe(e.getMessage()));
+            }
+        }
+        return new ArrayList<>(byCode.values());
+    }
+
+    /**
      * Closing reference-integrity sweep over the whole tenant. Run after a batch cold-reset that
      * imported a cyclic plugin set with {@code deferReferenceValidation=true}: by now every plugin
-     * has been imported, so a command whose {@code modelCode} still resolves to no model is a
-     * genuinely dangling reference (typo / removed model) rather than a not-yet-imported one.
+     * has been imported, so a command whose {@code modelCode}, a menu whose {@code parentCode} /
+     * {@code permissionCode}, or a role whose permission reference still resolves to nothing is a
+     * genuinely dangling reference (typo / removed resource) rather than a not-yet-imported one.
      *
      * <p>The per-plugin imports already committed (multi-tx, shell-orchestrated), so this can only
      * <em>report</em> dangling references — the caller (reset/init orchestration) decides to fail.
      *
-     * @return human-readable messages for every command referencing a non-existent model
-     *         (empty when the tenant's command→model references are all intact)
+     * @return human-readable messages for every command→model, menu→parent-menu, menu→permission
+     *         and role→permission reference that resolves to nothing (empty when the tenant's
+     *         deferred cross-plugin references are all intact)
      */
     @Override
     public List<String> verifyImportReferenceIntegrity() {
@@ -3415,7 +3535,51 @@ public class PluginImportServiceImpl implements PluginImportService {
             }
         }
 
-        return findDanglingCommandModelRefs(commandDtos, providedModels);
+        List<String> dangling = new ArrayList<>(findDanglingCommandModelRefs(commandDtos, providedModels));
+
+        List<MenuDefinitionDTO> menuDtos = loadImportedResourceSnapshots(tenantId, ResourceType.MENU, MenuDefinitionDTO.class);
+        List<RoleDefinitionDTO> roleDtos = loadImportedResourceSnapshots(tenantId, ResourceType.ROLE, RoleDefinitionDTO.class);
+
+        Set<String> providedMenus = new HashSet<>();
+        for (MenuDefinitionDTO menu : menuDtos) {
+            if (menu != null && !isBlank(menu.getCode())
+                    && resourceImporter.checkMenuExists(tenantId, menu.getCode())) {
+                providedMenus.add(menu.getCode());
+            }
+        }
+
+        Set<String> permissionCodesToCheck = new HashSet<>();
+        for (MenuDefinitionDTO menu : menuDtos) {
+            if (menu != null && !isBlank(menu.getPermissionCode())) {
+                permissionCodesToCheck.add(menu.getPermissionCode());
+            }
+        }
+        for (RoleDefinitionDTO role : roleDtos) {
+            if (role == null) {
+                continue;
+            }
+            if (role.getPermissions() != null) {
+                permissionCodesToCheck.addAll(role.getPermissions());
+            }
+            if (role.getPermissionPolicies() != null) {
+                for (RolePermissionPolicyDefinitionDTO policy : role.getPermissionPolicies()) {
+                    if (policy != null && !isBlank(policy.getPermissionCode())) {
+                        permissionCodesToCheck.add(policy.getPermissionCode());
+                    }
+                }
+            }
+        }
+        Set<String> providedPermissions = new HashSet<>();
+        for (String code : permissionCodesToCheck) {
+            if (!isBlank(code) && resourceImporter.checkPermissionExists(tenantId, code)) {
+                providedPermissions.add(code);
+            }
+        }
+
+        dangling.addAll(findDanglingMenuParentRefs(menuDtos, providedMenus));
+        dangling.addAll(findDanglingPermissionRefs(menuDtos, roleDtos, providedPermissions));
+
+        return dangling;
     }
 
     /**
