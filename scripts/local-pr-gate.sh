@@ -48,6 +48,7 @@ run_gate oss-boundary bash scripts/check-oss-boundary.sh
 run_gate secret-scan run_gitleaks
 run_gate docs bash scripts/check-docs.sh --strict
 run_gate permission-codes node scripts/validate-permission-codes.mjs --oss-only
+run_gate scripts-index node scripts/check-scripts-index.mjs
 
 printf 'finished_at=%s\nresult=%s\n' "$(date -u +%FT%TZ)" \
   "$([[ $FAILED -eq 0 ]] && echo PASS || echo FAIL)" | tee -a "$SUMMARY"

@@ -6,7 +6,7 @@
 
 | category | count | what it is |
 |---|--:|---|
-| **gate** | 41 | Correctness/quality checks (`check-*` / `validate-*` / `*-audit`). Run before push / in local gate runners. |
+| **gate** | 42 | Correctness/quality checks (`check-*` / `validate-*` / `*-audit`). Run before push / in local gate runners. |
 | **generator** | 4 | Regenerate a tracked artifact (manifests, snapshots). Output is committed; rerun when inputs change. |
 | **entrypoint** | 24 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
 | **pipeline/lib** | 9 | Shared library modules for the aura-pipeline / other scripts. Not run directly. |
@@ -19,7 +19,7 @@
 - **One-off migrations** (`migrate-*`, `*-split`, casing/backfill scripts) are **removed once the migration lands** — git history keeps them (`git log --all --full-history -- scripts/<name>`).
 - Before adding a script, check the tables below for an existing one to extend.
 
-## gate (41)
+## gate (42)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -55,6 +55,7 @@
 | `check-public-record-id-contracts.sh` | 1 | 2026-06-24 |  |
 | `check-public-record-openapi-contract.mjs` | 1 | 2026-06-24 | Validate public-record pid-only naming in a live or captured OpenAPI document. |
 | `check-reset-init-contracts.sh` | 1 | 2026-05-28 |  |
+| `check-scripts-index.mjs` | 2 | — | Falsifiable freshness gate for scripts/README.md (the scripts index). |
 | `check-test-system.sh` | 0 | 2026-07-23 | Umbrella gate for the test system's own integrity. exit code = result. |
 | `check-version-sync.sh` | 1 | 2026-06-18 | Gate: VERSION (release version, single source of truth) must equal |
 | `db/check-db-matches-snapshot.sh` | 1 | 2026-07-23 | Answer one question about an EXISTING database: does it still match |
