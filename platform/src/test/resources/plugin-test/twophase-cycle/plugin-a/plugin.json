@@ -18,5 +18,11 @@
   "commands": [
     { "code": "tpa:create", "displayName": "Create A", "modelCode": "tp_a_model", "type": "custom" },
     { "code": "tpa:use_b", "displayName": "Use B from A", "modelCode": "tp_b_model", "type": "custom" }
+  ],
+  "permissions": [
+    { "code": "tpa:view", "name": "View A" }
+  ],
+  "menus": [
+    { "code": "tpa_child_menu", "name": "TPA Child Menu", "parentCode": "tpb_dir_menu" }
   ]
 }

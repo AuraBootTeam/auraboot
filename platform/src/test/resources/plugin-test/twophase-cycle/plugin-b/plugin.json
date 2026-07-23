@@ -18,5 +18,11 @@
   "commands": [
     { "code": "tpb:create", "displayName": "Create B", "modelCode": "tp_b_model", "type": "custom" },
     { "code": "tpb:use_a", "displayName": "Use A from B", "modelCode": "tp_a_model", "type": "custom" }
+  ],
+  "menus": [
+    { "code": "tpb_dir_menu", "name": "TPB Dir Menu" }
+  ],
+  "roles": [
+    { "code": "tpb_role", "name": "TPB Role", "permissions": ["tpa:view"] }
   ]
 }

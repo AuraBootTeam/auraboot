@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
@@ -26,6 +27,24 @@ public interface PluginResourceMapper extends BaseMapper<PluginResource> {
      */
     @Select("SELECT * FROM ab_plugin_resource WHERE import_id = #{importId} ORDER BY sequence")
     List<PluginResource> findByImportId(@Param("importId") String importId);
+
+    /**
+     * Find all resources of a given type for a tenant, across every plugin/import.
+     *
+     * <p>Used by the closing reference-integrity sweep to reconstruct the manifest DTOs
+     * (via {@code importSnapshot}) of every currently-imported menu/role so cross-plugin
+     * references deferred during a cyclic cold-reset (menu parent / permission) can be
+     * re-checked once the whole batch has landed.
+     *
+     * <p>{@code @ResultMap} is required (not just {@code autoResultMap=true} on the entity):
+     * without it MyBatis silently builds its own generic column→field mapping for this custom
+     * {@code @Select} method instead of reusing BaseMapper's auto-generated resultMap, so the
+     * {@code import_snapshot} JSONB column's custom TypeHandler never runs and every row reads
+     * back with {@code importSnapshot=null} — no exception, no log, just a silently empty value.
+     */
+    @Select("SELECT * FROM ab_plugin_resource WHERE tenant_id = #{tenantId} AND resource_type = #{resourceType} ORDER BY sequence")
+    @ResultMap("mybatis-plus_PluginResource")
+    List<PluginResource> findByTenantAndType(@Param("tenantId") Long tenantId, @Param("resourceType") String resourceType);
 
     /**
      * Find resources by type for a plugin.

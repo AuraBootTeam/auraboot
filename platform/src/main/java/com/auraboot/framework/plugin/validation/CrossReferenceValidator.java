@@ -53,7 +53,7 @@ public class CrossReferenceValidator implements PluginValidator {
 
         checkCommandModelRefs(manifest, availableModels, defer, messages);
         checkBindingRefs(manifest, availableModels, availableFields, defer, messages);
-        checkMenuPermissionRefs(manifest, availablePermissions, messages);
+        checkMenuPermissionRefs(manifest, availablePermissions, defer, messages);
 
         return messages;
     }
@@ -153,7 +153,7 @@ public class CrossReferenceValidator implements PluginValidator {
     }
 
     private void checkMenuPermissionRefs(PluginManifestExtended manifest, Set<String> availablePermissions,
-                                          List<PluginValidationMessage> messages) {
+                                          boolean defer, List<PluginValidationMessage> messages) {
         if (manifest.getMenus() == null) return;
 
         for (int i = 0; i < manifest.getMenus().size(); i++) {
@@ -161,11 +161,16 @@ public class CrossReferenceValidator implements PluginValidator {
             if (menu == null || menu.getPermissionCode() == null) continue;
 
             if (!availablePermissions.contains(menu.getPermissionCode())) {
-                messages.add(warning("S-REF-PERM", category(),
-                        "menus[" + i + "].permissionCode",
-                        "Menu '" + (menu.getCode() != null ? menu.getCode() : menu.getName()) +
-                                "' references permission '" + menu.getPermissionCode() +
-                                "' not found in plugin or system"));
+                String path = "menus[" + i + "].permissionCode";
+                String text = "Menu '" + (menu.getCode() != null ? menu.getCode() : menu.getName()) +
+                        "' references permission '" + menu.getPermissionCode() +
+                        "' not found in plugin or system";
+                // Cross-plugin permission reference: deferred to the closing sweep when a cyclic
+                // batch import is in progress (menu owned by one plugin in a cycle, permission
+                // owned by another not-yet-imported plugin), otherwise a hard error.
+                messages.add(defer
+                        ? warning("S-REF-MENU-PERMISSION", category(), path, text)
+                        : error("S-REF-MENU-PERMISSION", category(), path, text));
             }
         }
     }
