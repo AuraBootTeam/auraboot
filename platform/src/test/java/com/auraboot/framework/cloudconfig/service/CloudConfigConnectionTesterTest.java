@@ -176,6 +176,21 @@ class CloudConfigConnectionTesterTest {
     }
 
     @Test
+    void testConnection_email_privateHost_isRejected() {
+        // SEC-20260723-07: an SMTP host pointing at an internal/private address must be
+        // rejected by the SSRF guard before any connection attempt (blind-SSRF / internal
+        // port probe). Without the guard this would attempt a live connection and return
+        // "SMTP test failed" instead.
+        when(cloudConfigService.getByPidDecrypted("pid-1"))
+                .thenReturn(config("email", "smtp", "{\"host\":\"10.0.0.1\",\"port\":25}"));
+
+        Map<String, Object> result = tester.testConnection("pid-1");
+
+        assertThat(result.get("status")).isEqualTo("error");
+        assertThat((String) result.get("message")).contains("not allowed");
+    }
+
+    @Test
     void testConnection_googleOAuth_missingClientId_returnsError() {
         when(cloudConfigService.getByPidDecrypted("pid-1"))
                 .thenReturn(config("oauth", "google", "{}"));
