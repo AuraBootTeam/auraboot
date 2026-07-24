@@ -34,6 +34,7 @@ cd "$PROJECT_ROOT/platform"
   --tests 'com.auraboot.framework.agent.AgentApprovalGateIntegrationTest' \
   --tests 'com.auraboot.framework.agentchat.handoff.HandoffPermissionPolicyTest' \
   --tests 'com.auraboot.framework.agentchat.reply.AgentReplyTaskChokepointTest' \
+  --tests 'com.auraboot.framework.agentchat.GroupChatMessagePortWiringIT' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpDispatchTest' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplAcpResumeTest' \
   --tests 'com.auraboot.framework.conversation.ConversationTurnServiceImplDispatchTest' \
