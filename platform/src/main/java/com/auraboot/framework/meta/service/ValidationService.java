@@ -113,6 +113,44 @@ public interface ValidationService {
     }
 
     /**
+     * Evaluate field-level domain invariants that depend on the record's CURRENT state
+     * ({@link com.auraboot.framework.meta.dto.FieldDefinition#getImmutableWhen()} /
+     * {@code immutable}).
+     *
+     * <p>Unlike every other check on this interface, this one needs the row as it exists
+     * <em>before</em> the update, because "frozen once approved" is a statement about the
+     * stored state, not about the incoming payload.</p>
+     *
+     * <p>This is an invariant, not a permission: it binds every subject and every write
+     * path, and no role, scope, ACL or inherited command authority can grant an exception.</p>
+     *
+     * @param modelDefinition 模型定义
+     * @param data            incoming change (only the keys actually being written)
+     * @param existingRecord  the row as currently stored; {@code null} means "nothing to
+     *                        compare against" and yields a vacuous pass (e.g. on create)
+     */
+    ValidationResult validateImmutability(ModelDefinition modelDefinition, Map<String, Object> data,
+                                          Map<String, Object> existingRecord);
+
+    /**
+     * {@link #validateImmutability} in throwing form.
+     *
+     * <p>Null-tolerant on purpose: a {@code null} result means the collaborator did not
+     * evaluate anything (test doubles), which must behave as "no invariant violated"
+     * rather than blowing up an unrelated write path.</p>
+     */
+    default void validateImmutabilityAndThrow(ModelDefinition modelDefinition, Map<String, Object> data,
+                                              Map<String, Object> existingRecord) {
+        if (existingRecord == null) {
+            return;
+        }
+        ValidationResult result = validateImmutability(modelDefinition, data, existingRecord);
+        if (result != null && !Boolean.TRUE.equals(result.getValid())) {
+            throw new ValidationException("Validation failed: " + String.join(", ", result.getErrors()));
+        }
+    }
+
+    /**
      * 验证租户隔离
      * @param data 数据
      * @throws ValidationException 租户上下文无效时抛出异常

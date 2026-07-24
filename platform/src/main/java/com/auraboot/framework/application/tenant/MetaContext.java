@@ -21,6 +21,8 @@ public class MetaContext {
     private static final ThreadLocal<Boolean> LOCK_GUARD_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Boolean> DATA_PERMISSION_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<String> COMMAND_AUTHORITY = new ThreadLocal<>();
+    /** Aggregate root (master document) the current command was authorized against. */
+    private static final ThreadLocal<String> COMMAND_AGGREGATE = new ThreadLocal<>();
 
     @Getter
     private final Long tenantId;
@@ -89,6 +91,7 @@ public class MetaContext {
         LOCK_GUARD_BYPASSED.remove();
         DATA_PERMISSION_BYPASSED.remove();
         COMMAND_AUTHORITY.remove();
+        COMMAND_AGGREGATE.remove();
     }
 
     /**
@@ -315,6 +318,50 @@ public class MetaContext {
 
     public static boolean hasCommandAuthority() {
         return COMMAND_AUTHORITY.get() != null;
+    }
+
+    /**
+     * Run {@code action} pinned to the aggregate root the request named — the master document
+     * the entry actually authorized.
+     *
+     * <p>This is the other half of {@link #runWithCommandAuthority}. That one says <em>what</em>
+     * the caller was allowed to do; this one says <em>which document</em> they were allowed to do
+     * it to. Writes to models that declare an aggregate binding are pinned to this id in the SQL,
+     * so a command authorized for Q1001 cannot reach Q2002's rows even though both live in the
+     * same table and the same capability covers them.</p>
+     *
+     * <p>Opening this scope only ever <em>adds</em> a constraint, so it is safe to open on every
+     * command that names a target; models that declare no binding are unaffected.</p>
+     *
+     * <p>Like the other command-scoped state, this deliberately does not ride into worker threads
+     * via {@link Snapshot}: the async path re-establishes it from the persisted task instead.</p>
+     */
+    public static <T> T runWithCommandAggregate(String aggregateId, java.util.function.Supplier<T> action) {
+        if (aggregateId == null || aggregateId.isBlank()) {
+            // Pinning to "nothing" would silently widen every guarded write back to the whole
+            // table while still reading as though a boundary were in force.
+            throw new IllegalArgumentException("A command aggregate scope must name the aggregate it pins to");
+        }
+        String prior = COMMAND_AGGREGATE.get();
+        COMMAND_AGGREGATE.set(aggregateId);
+        try {
+            return action.get();
+        } finally {
+            // Restore, never clear: a nested command must not strip the outer aggregate on exit.
+            COMMAND_AGGREGATE.set(prior);
+        }
+    }
+
+    public static void runWithCommandAggregate(String aggregateId, Runnable action) {
+        runWithCommandAggregate(aggregateId, () -> {
+            action.run();
+            return null;
+        });
+    }
+
+    /** The aggregate root this thread's work was authorized against, or null when unscoped. */
+    public static String getCommandAggregateId() {
+        return COMMAND_AGGREGATE.get();
     }
 
     public static Long getCurrentMemberId() {
