@@ -2354,6 +2354,52 @@ describe('ReviewDrawerBlockRenderer', () => {
     // Falsifiable guard: reverting the fillTemplate valueMap resolution turns this red.
     expect(heading).not.toHaveTextContent('manual_confirm');
   });
+
+  it('resolves reference _display in summary items instead of leaking raw pids', () => {
+    const runtime = makeRuntime({
+      data: {
+        standardLines: [
+          {
+            ...selectedLine,
+            // A reference field + its backend-enriched _display sibling (GAP-124), like FR-22
+            // shift-handover's carried-forward-from pointing at a prior handover.
+            mfg_sho_carried_forward_from_id: '01JZZZULIDRAWPID',
+            mfg_sho_carried_forward_from_id_display: 'SHIFT-2026-07-23-DAY',
+          },
+        ],
+      },
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: { pid: 'task-1' },
+        global: {},
+        state: { selectedBomLine: selectedLine },
+      }),
+    }) as any;
+
+    render(
+      <ReviewDrawerBlockRenderer
+        block={{
+          ...reviewDrawerBlock,
+          contextDataSource: 'standardLines',
+          contextKeyField: 'pid',
+          source: {
+            summary: {
+              items: [
+                { key: 'carried', label: 'Carried From', field: 'mfg_sho_carried_forward_from_id' },
+              ],
+            },
+          },
+        }}
+        runtime={runtime}
+      />,
+    );
+
+    const drawer = screen.getByTestId('review-drawer');
+    expect(drawer).toHaveTextContent('SHIFT-2026-07-23-DAY');
+    // Falsifiable guard: without _display resolution the summary shows the raw pid.
+    expect(drawer).not.toHaveTextContent('01JZZZULIDRAWPID');
+  });
 });
 
 describe('RecordInspectorBlockRenderer', () => {
