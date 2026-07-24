@@ -1,14 +1,16 @@
 /**
- * Full-Page Agent Chat
+ * AgentChatEmbed — custom DSL block for the full-page AI colleague chat.
  *
- * Provides a dedicated full-page chat experience for a specific ACP agent.
- * Reuses the existing AuraBotChat component from the side panel.
- *
- * Route: /ai/colleagues/:agentPid/chat
+ * Ported from pages/ai/colleagues.$agentPid.chat.tsx so the page can be a DSL page
+ * (ai_colleague_chat, kind:detail) rendering { blockType:"custom", component:"AgentChatEmbed" }.
+ * A streaming conversational UI cannot be pure DSL config, so it stays a registered platform
+ * component wrapping the existing AuraBotChat — the §7-sanctioned custom-block escape. The
+ * agent to talk to comes from the ?agentPid= query parameter (the DSL /p/c/ route has no path
+ * param), replacing the old :agentPid route segment.
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate, Link } from 'react-router';
+import { useNavigate, useSearchParams, Link } from 'react-router';
 import {
   ArrowLeftIcon,
   Cog6ToothIcon,
@@ -20,10 +22,6 @@ import { ResultHelper } from '~/utils/type';
 import { useAuraBot, AuraBotChat } from '~/plugins/core-aurabot/components-shell';
 import { useI18n } from '~/contexts/I18nContext';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 interface AgentInfo {
   pid: string;
   agent_code: string;
@@ -34,10 +32,6 @@ interface AgentInfo {
   model: string | null;
   status: string;
 }
-
-// ---------------------------------------------------------------------------
-// Avatar (inline — keeps this page self-contained)
-// ---------------------------------------------------------------------------
 
 function avatarColor(str: string): string {
   const colors = [
@@ -79,12 +73,9 @@ function AgentAvatar({ agent }: { agent: AgentInfo }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
-
-export default function AgentChatPage() {
-  const { agentPid } = useParams<{ agentPid: string }>();
+export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) {
+  const [searchParams] = useSearchParams();
+  const agentPid = searchParams.get('agentPid') || undefined;
   const navigate = useNavigate();
   const { t } = useI18n();
   const { setSelectedAgent, newSession } = useAuraBot();
@@ -93,9 +84,12 @@ export default function AgentChatPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load agent definition
   const loadAgent = useCallback(async () => {
-    if (!agentPid) return;
+    if (!agentPid) {
+      setError(t('ai.chat.error.notFound', undefined, 'Agent not found'));
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -116,7 +110,6 @@ export default function AgentChatPage() {
     loadAgent();
   }, [loadAgent]);
 
-  // Set selected agent in AuraBot context once loaded
   useEffect(() => {
     if (agent?.agent_code) {
       setSelectedAgent(agent.agent_code);
@@ -127,7 +120,6 @@ export default function AgentChatPage() {
     newSession();
   }, [newSession]);
 
-  // Loading state
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -136,12 +128,14 @@ export default function AgentChatPage() {
     );
   }
 
-  // Error state
   if (error || !agent) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4">
         <p className="text-sm text-gray-500">{error || 'Agent not found'}</p>
-        <Link to="/ai/colleagues" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+        <Link
+          to="/p/c/ai_colleagues"
+          className="text-sm font-medium text-blue-600 hover:text-blue-700"
+        >
           {t('ai.chat.backToColleagues', undefined, 'Back to AI Colleagues')}
         </Link>
       </div>
@@ -150,11 +144,10 @@ export default function AgentChatPage() {
 
   return (
     <div className="flex h-full flex-col" data-testid="agent-chat-page">
-      {/* Header */}
       <div className="flex items-center justify-between border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-900">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => navigate('/ai/colleagues')}
+            onClick={() => navigate('/p/c/ai_colleagues')}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             title={t('ai.chat.back', undefined, 'Back')}
             data-testid="agent-chat-back-btn"
@@ -177,7 +170,6 @@ export default function AgentChatPage() {
         </div>
 
         <div className="flex items-center gap-1">
-          {/* New session button */}
           <button
             onClick={handleNewSession}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
@@ -187,7 +179,6 @@ export default function AgentChatPage() {
             <ArrowPathIcon className="h-4 w-4" />
           </button>
 
-          {/* Settings — navigate to agent detail */}
           <button
             onClick={() => navigate(`/ai/colleagues/${agentPid}`)}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
@@ -199,10 +190,11 @@ export default function AgentChatPage() {
         </div>
       </div>
 
-      {/* Chat area — reuse the existing AuraBotChat component */}
       <div className="flex-1 overflow-hidden">
         <AuraBotChat />
       </div>
     </div>
   );
 }
+
+export default AgentChatEmbed;

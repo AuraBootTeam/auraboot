@@ -3879,5 +3879,22 @@
         "component": "AgentColleaguesGrid"
       }
     ]
+  },
+  {
+    "pageKey": "ai_colleague_chat",
+    "name:zh-CN": "AI 同事对话",
+    "name:en": "AI Colleague Chat",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "ai_colleague_chat_embed",
+        "blockType": "custom",
+        "component": "AgentChatEmbed"
+      }
+    ]
   }
 ]
