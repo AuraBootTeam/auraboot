@@ -24,8 +24,8 @@
 | api | OSS-REL-SUSPENDED-TENANT-API | release | real-stack | exact-pin | http | · |
 | contract | OSS-AUTHZ-01 | offline | hermetic | contract | unit | · |
 | contract | OSS-BOUNDARY-01 | offline | hermetic | contract | unit | · |
+| contract | OSS-CAPCODE-01 | offline | hermetic | contract | unit | · |
 | contract | OSS-DATA-01 | offline | hermetic | contract | unit | · |
-| contract | OSS-DEBT-CAPCODE | offline | hermetic | contract | unit | · |
 | contract | OSS-DSL-01 | offline | hermetic | contract | unit | · |
 | contract | OSS-HYGIENE-01 | offline | hermetic | contract | unit | · |
 | contract | OSS-META-01 | offline | hermetic | contract | unit | · |

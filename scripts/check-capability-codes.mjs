@@ -16,7 +16,50 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const MODEL_PERM = /^model\.[a-z0-9_]+\.(read|create|update|delete|manage|export|import)$/i;
+// The seven CRUD-ish actions the platform always generates for a model.
+const CRUD_ACTIONS = /^model\.[a-z0-9_]+\.(read|create|update|delete|manage|export|import)$/i;
+
+// A model permission is `model.<modelCode>.<action>` where <action> comes from a
+// declared command — see TestSeedController: "model." + modelCode + "." + action. The
+// action set is therefore whatever the commands declare, not a fixed seven. Allowing
+// only the seven flagged six legitimate codes (model.tenant_member.approve, .suspend,
+// …) whose commands exist as admin:approve_member and friends.
+function declaredModelActions(roots) {
+  const out = new Set();
+  for (const root of roots) {
+    if (!fs.existsSync(root)) continue;
+    for (const dir of fs.readdirSync(root)) {
+      const f = path.join(root, dir, 'config', 'commands.json');
+      if (!fs.existsSync(f)) continue;
+      let j; try { j = readJson(f); } catch { continue; }
+      for (const c of Array.isArray(j) ? j : (j.commands || [])) {
+        const model = c.modelCode;
+        const code = c.code || c.commandCode || '';
+        const action = code.includes(':') ? code.split(':').pop() : code;
+        if (model && action) out.add(`${model}.${action}`);
+      }
+    }
+  }
+  return out;
+}
+
+// Codes the PLATFORM declares. A plugin capability may legitimately include
+// meta.menu.read or bpm.process.read; requiring them in the plugin's own
+// permissions.json flagged 22 codes that exist and work. Read from the constants class
+// and the tenant bootstrap template rather than re-listing them here, so the gate
+// cannot drift from the platform.
+function platformPermissionCodes(repoRoot) {
+  const out = new Set();
+  const files = [
+    path.join(repoRoot, 'platform/src/main/java/com/auraboot/framework/permission/constants/MetaPermission.java'),
+    path.join(repoRoot, 'platform/src/main/resources/tenant-templates/default-bootstrap.json'),
+  ];
+  for (const f of files) {
+    if (!fs.existsSync(f)) continue;
+    for (const m of fs.readFileSync(f, 'utf8').matchAll(/"([a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+)"/gi)) out.add(m[1]);
+  }
+  return out;
+}
 
 function arg(name, fallback) {
   const i = process.argv.indexOf(name);
@@ -43,6 +86,10 @@ function pluginDirs(root) {
 }
 
 const root = resolveRoot();
+// The repo root is the parent of the plugin root, so platform/ resolves from it.
+const repoRoot = path.resolve(root, '..');
+const platformCodes = platformPermissionCodes(repoRoot);
+const modelActions = declaredModelActions([root]);
 const violations = [];
 const seenCapCodes = new Set();
 let plugins = 0;
@@ -69,8 +116,10 @@ for (const dir of pluginDirs(root)) {
     seenCapCodes.add(cap.code);
 
     for (const code of cap.includes) {
-      if (permCodes.has(code) || MODEL_PERM.test(code)) continue;
-      violations.push(`${name}: capability '${cap.code}' includes ghost permission code '${code}' (not in this plugin's permissions.json, not a model.* permission)`);
+      if (permCodes.has(code) || platformCodes.has(code) || CRUD_ACTIONS.test(code)) continue;
+      const m = /^model\.([a-z0-9_]+)\.([a-z0-9_]+)$/i.exec(code);
+      if (m && modelActions.has(`${m[1]}.${m[2]}`)) continue;
+      violations.push(`${name}: capability '${cap.code}' includes ghost permission code '${code}' — not in this plugin's permissions.json, not declared by the platform, and not model.<model>.<action> for any declared command`);
     }
     for (const f of cap.unmasksFields || []) {
       if (!/^[a-z0-9_]+\.[a-z0-9_]+$/i.test(f)) {

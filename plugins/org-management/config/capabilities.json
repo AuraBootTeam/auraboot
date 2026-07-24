@@ -49,10 +49,10 @@
     "description": "查看、审批、停用、重置租户成员账号",
     "includes": [
       "model.tenant_member.read",
-      "model.tenant_member.approve",
-      "model.tenant_member.reject",
-      "model.tenant_member.suspend",
-      "model.tenant_member.restore",
+      "model.tenant_member.approve_member",
+      "model.tenant_member.reject_member",
+      "model.tenant_member.suspend_member",
+      "model.tenant_member.restore_member",
       "model.tenant_member.reset_member_password",
       "model.tenant_member.provision_member_from_employee"
     ],
