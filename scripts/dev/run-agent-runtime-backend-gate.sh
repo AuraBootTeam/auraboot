@@ -50,6 +50,7 @@ cd "$PROJECT_ROOT/platform"
   `# slow and flaky is one somebody eventually switches off. A gate nobody runs protects nothing. #` \
   --tests 'com.auraboot.framework.agent.AgentApprovalGrantConsumptionIT' \
   --tests 'com.auraboot.framework.agent.AgentWriteCommandPipelineIT' \
+  --tests 'com.auraboot.framework.agent.SkillEngineWiredExecutionIT' \
   --tests 'com.auraboot.framework.agent.AgentLifecycleSuspendIT' \
   --tests 'com.auraboot.framework.agent.MemorySecretWritebackIT' \
   --tests 'com.auraboot.framework.agent.StaleRunRecoveryIT' \

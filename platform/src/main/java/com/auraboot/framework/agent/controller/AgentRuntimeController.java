@@ -22,6 +22,11 @@ import com.auraboot.framework.agent.service.SkillAutoGenerator;
 import com.auraboot.framework.agent.service.CapabilityViewService;
 import com.auraboot.framework.agent.service.PluginScaffoldService;
 import com.auraboot.framework.agent.service.ToolDryRunService;
+import com.auraboot.framework.agent.service.SkillEngine;
+import com.auraboot.framework.agent.dto.SkillInput;
+import com.auraboot.framework.agent.dto.SkillResult;
+import com.auraboot.framework.agent.provider.LlmProvider;
+import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.port.AgentChatPort;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
@@ -54,6 +59,8 @@ public class AgentRuntimeController {
     private final AgentRunService runService;
     private final AgentScheduleService scheduleService;
     private final AgentSkillService skillService;
+    private final SkillEngine skillEngine;
+    private final LlmProviderFactory providerFactory;
     private final CapabilityEvalService evalService;
     private final AgentOnlineEvalService onlineEvalService;
     private final CapabilityViewService capabilityViewService;
@@ -603,17 +610,40 @@ public class AgentRuntimeController {
         return ApiResponse.success(skillService.resolveSkillTools(tenantId, skillCode));
     }
 
-    /** Execute a skill — returns an execution plan */
+    /**
+     * Execute a skill through the {@link SkillEngine} — actually runs its tools per the skill's
+     * execution_mode (template / sequential / orchestration / dsl_dispatch) and returns the real
+     * {@link SkillResult}, not a plan. An LLM provider is resolved (request override → tenant
+     * default) so orchestration-mode skills truly run rather than silently degrading to sequential.
+     *
+     * <p>Body: {@code {"input": {...params}, "userMessage": "...", "provider": "qianwen"}} — all optional.
+     */
     @PostMapping("/skills/{skillCode}/execute")
     @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
     @SuppressWarnings("unchecked")
-    public ApiResponse<Map<String, Object>> executeSkill(
+    public ApiResponse<SkillResult> executeSkill(
             @PathVariable String skillCode,
             @RequestBody(required = false) Map<String, Object> body) {
         Long tenantId = MetaContext.getCurrentTenantId();
         Map<String, Object> input = body != null ? (Map<String, Object>) body.get("input") : null;
-        String agentCode = body != null ? (String) body.get("agentCode") : null;
-        return ApiResponse.success(skillService.executeSkill(tenantId, skillCode, input, agentCode));
+        String userMessage = body != null ? (String) body.get("userMessage") : null;
+        String providerCode = body != null ? (String) body.get("provider") : null;
+
+        SkillInput skillInput = new SkillInput();
+        skillInput.setParameters(input != null ? input : Map.of());
+        skillInput.setUserMessage(userMessage);
+
+        // Resolve a provider so orchestration-mode skills run for real. SkillEngine falls back to
+        // sequential when provider is null — a silent degradation we avoid by resolving the tenant
+        // default here (null only when the tenant has no LLM configured, in which case that fallback
+        // is the honest behaviour).
+        LlmProviderFactory.ProviderResolution resolution = providerFactory.resolveProvider(tenantId, providerCode);
+        LlmProvider provider = resolution != null ? resolution.getProvider() : null;
+        LlmProviderFactory.ProviderConfig config = resolution != null ? resolution.getConfig() : null;
+
+        String runPid = "skill-exec-" + UniqueIdGenerator.generate();
+        SkillResult result = skillEngine.execute(tenantId, runPid, skillCode, skillInput, null, provider, config);
+        return ApiResponse.success(result);
     }
 
     /** Sync auto-generated skills from DSL model definitions */

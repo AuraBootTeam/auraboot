@@ -212,15 +212,16 @@ public class AgentSkillService {
     }
 
     /**
-     * Execute a skill — resolve tools and generate an execution plan.
-     * Returns a structured plan that AgentRunService can execute.
+     * Plan a skill — resolve its tools into an ordered execution plan. This does NOT run the
+     * skill; actual execution is {@link SkillEngine#execute}. Kept for solution-skill flattening
+     * (recursively expands sub-skills into a flat step list) and plan preview.
      *
      * For ATOMIC: returns single-step plan
      * For WORKFLOW: returns multi-step plan based on prompt_template
      * For SOLUTION: recursively resolves sub-skills into a flat plan
      */
-    public Map<String, Object> executeSkill(Long tenantId, String skillCode,
-                                             Map<String, Object> input, String agentCode) {
+    public Map<String, Object> planSkill(Long tenantId, String skillCode,
+                                          Map<String, Object> input, String agentCode) {
         Map<String, Object> skill = loadSkill(tenantId, skillCode);
         if (skill == null) {
             return Map.of("success", false, "error", "Skill not found: " + skillCode);
@@ -326,7 +327,7 @@ public class AgentSkillService {
             if (ref.startsWith("skill:")) {
                 // Recursively resolve sub-skill
                 String subSkillCode = ref.substring(6);
-                Map<String, Object> subResult = executeSkill(tenantId, subSkillCode, input, null);
+                Map<String, Object> subResult = planSkill(tenantId, subSkillCode, input, null);
                 if (Boolean.TRUE.equals(subResult.get("success"))) {
                     List<Map<String, Object>> subSteps = (List<Map<String, Object>>) subResult.get("steps");
                     if (subSteps != null) {
