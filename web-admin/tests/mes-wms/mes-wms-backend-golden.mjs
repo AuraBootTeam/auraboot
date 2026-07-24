@@ -170,9 +170,16 @@ async function frKitting() {
 }
 try { await frKitting(); } catch (e) { R.check('FR-13', 'no exception', false, String(e.message).slice(0, 200)); }
 
-// FR-10 FEFO — real-stack golden requires inventory balance with expiry-dated lots + a warehouse
-// + a pick source seeded (multi-model). Reported honestly as DEFERRED until that seed is built.
-R.deferred('FR-10', 'FEFO allocation golden requires balance + expiry-dated lots + warehouse seed', 'multi-model seed not yet built');
+// FR-10 FEFO — DEFERRED. Probed the seed path live (2026-07-24): warehouse(strategy=fefo via
+// update), warehouse_location, product, and expiry-dated inv:create_lot all seed cleanly, BUT the
+// balance-per-lot seed that FEFO sorts on is genuinely hard to build through the command pipeline:
+//   • inv:add_lot_transaction(inbound) executes (code 0) but does NOT create an inv_balance row;
+//   • the warehouse_in receive flow's line (inv:add_wh_in_line) carries product+qty but NO lot,
+//     so confirming it cannot produce the per-lot balance rows FEFO needs.
+// A faithful FR-10 golden therefore needs the correct lot-aware inbound path (or a documented
+// direct inv_balance seed) + a warehouse_out demand, then create_pick_order → assert near-expiry
+// lot allocated first. The FEFO ordering logic itself shipped in #217; only this seed remains.
+R.deferred('FR-10', 'FEFO golden blocked on lot-aware balance seed (add_lot_transaction ≠ balance; wh_in line has no lot)', 'seed path documented for follow-up');
 
 // ------------------------------------------------------------------ summary
 const s = R.summary();
