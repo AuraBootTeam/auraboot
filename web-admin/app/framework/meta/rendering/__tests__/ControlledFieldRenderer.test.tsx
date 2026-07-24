@@ -811,4 +811,95 @@ describe('ControlledFieldRenderer', () => {
       }),
     ]);
   });
+
+  // helpText used to be forwarded into the control's props, and only the smart *Input*
+  // ever read it — so a dict/enum field rendered as SmartSelect (or any picker, switch,
+  // uploader …) silently dropped its configured help. The wrapper owns it now, exactly
+  // like the label, so it renders for every control type and never renders twice.
+  it('renders configured helpText for every control type instead of leaving it to the component', async () => {
+    vi.resetModules();
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      ComponentLoader: ({
+        componentName,
+        props,
+      }: {
+        componentName: string;
+        props: Record<string, unknown>;
+      }) => {
+        capturedPropsSpy({ componentName, props });
+        return <div data-testid={`component-loader-${componentName}`}>{componentName}</div>;
+      },
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    render(
+      <ControlledFieldRenderer
+        field={
+          {
+            field: 'kind',
+            label: 'Kind',
+            component: 'SmartSelect',
+            dictCode: 'page_kind',
+            props: { helpText: 'Pick the page kind' },
+          } as any
+        }
+        value={undefined}
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('component-loader-SmartSelect')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Pick the page kind')).toBeInTheDocument();
+    // Not forwarded to the control, else SmartInput would render a second copy.
+    const selectProps = capturedPropsSpy.mock.calls[0]?.[0]?.props;
+    expect(selectProps).not.toHaveProperty('helpText');
+  });
+
+  it('renders the field error once when the control also renders its own FieldBase error', async () => {
+    vi.resetModules();
+    const { FieldBase } = await import('~/ui/ui/field-base');
+    vi.doMock('~/framework/meta/rendering/components/ComponentLoader', () => ({
+      // Mirror a real smart control: its own validationRules run over the same value
+      // produces the same message the runtime form context already reported, and it
+      // renders that through its own FieldBase.
+      ComponentLoader: () => (
+        <FieldBase error="Required">
+          <input data-testid="inner-control" />
+        </FieldBase>
+      ),
+    }));
+
+    const { ControlledFieldRenderer } = await import('../ControlledFieldRenderer');
+
+    const { rerender } = render(
+      <ControlledFieldRenderer
+        field={{ field: 'page_key', label: 'Page key', component: 'SmartInput' } as any}
+        value={''}
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+        error="Required"
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('inner-control')).toBeInTheDocument();
+    });
+    expect(screen.getAllByText('Required')).toHaveLength(1);
+
+    // With no wrapper error the control still shows its own validation feedback (e.g.
+    // on-blur rules the wrapper knows nothing about) — suppression is scoped, not global.
+    rerender(
+      <ControlledFieldRenderer
+        field={{ field: 'page_key', label: 'Page key', component: 'SmartInput' } as any}
+        value={''}
+        onChange={vi.fn()}
+        context={{ locale: 'zh-CN', t: (key: string) => key } as any}
+      />,
+    );
+    expect(screen.getAllByText('Required')).toHaveLength(1);
+  });
 });

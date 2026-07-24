@@ -2494,7 +2494,7 @@ function RuntimeField({ block, runtimeServices, pageContext, blockPath }: Runtim
     block.blockType === 'field' && block.field
       ? modelFields.find((candidate) => candidate.code === block.field)
       : undefined;
-  if (previewModelField) {
+  if (previewModelField && !isDesignerRuntimeOnlyComponent(block)) {
     return <RuntimePlatformField block={block} modelField={previewModelField} />;
   }
 
@@ -3144,6 +3144,29 @@ type RuntimeFieldComponent =
   | 'upload'
   | 'picker'
   | 'rich-text';
+
+/**
+ * `field` blocks whose configured component is executed by the *designer runtime* and
+ * therefore cannot be represented by a platform `FieldConfig`, so they stay on the
+ * designer's own renderer even when model metadata is available (true-WYSIWYG path).
+ *
+ * Only `picker` qualifies. The designer's picker is a data-source component: its option
+ * source is authored as `pickerDataSource` (`model` | `named-query`) + `pickerSource` /
+ * `pickerQueryCode` / `valueField` / `displayField` / `pageSize` and executed through
+ * `runtimeServices.loadPickerOptions` → `/api/query-builder/execute`, including
+ * server-side `searchable` filtering. A platform `FieldConfig` can only bind a dict, a
+ * model reference, or a static option list, so routing a picker through the platform
+ * control would silently drop the authored option source (the "shared renderer silently
+ * ignores DSL config" class of bug) — on top of the platform registry having no generic
+ * `picker` at all, which is what produced "Unknown component: picker".
+ *
+ * The edit canvas has no designer runtime to execute that option source, so there
+ * `buildPreviewFieldConfig` still translates `picker` into the closest real platform
+ * picker (`resolvePickerPlatformComponent`) instead of rendering an error box.
+ */
+function isDesignerRuntimeOnlyComponent(block: DslBlockV3): boolean {
+  return normalizeRuntimeFieldComponent(block.props?.component) === 'picker';
+}
 
 function normalizeRuntimeFieldComponent(value: unknown): RuntimeFieldComponent {
   const component = getStringProp(value).toLowerCase();

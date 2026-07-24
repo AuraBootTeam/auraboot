@@ -157,14 +157,17 @@ function runtimePreviewControl(
  * `ControlledFieldRenderer`'s `<FieldError>` (an `ErrorText` `<p>` with the
  * `text-status-red` class), not the legacy `runtime-field-error-<blockId>` node.
  * The label's required asterisk is a `<span class="text-status-red">`, so the `p.`
- * prefix keeps this pinned to the error paragraph. Under WYSIWYG the same message
- * can appear twice (once from the runtime form-context error passed to
- * `<FieldError>`, once from the platform control's own internal validation), so
- * `.first()` keeps the locator single-valued; both carry the same text. Absent
- * when there is no error, so `toBeHidden()` still holds for the no-error case.
+ * prefix keeps this pinned to the error paragraph.
+ *
+ * Deliberately NOT `.first()`: the message must render exactly once. While the wrapper
+ * shows a field error the control suppresses its own copy of it
+ * (`FieldErrorOwnedByWrapperContext`), so a regression that paints the same message
+ * twice (wrapper + the control's identical validationRules run) fails here on a
+ * Playwright strict-mode violation instead of being hidden by `.first()`. Absent when
+ * there is no error, so `toBeHidden()` still holds for the no-error case.
  */
 function runtimePreviewFieldError(page: Page, blockId: string): Locator {
-  return page.getByTestId(`runtime-field-${blockId}`).locator('p.text-status-red').first();
+  return page.getByTestId(`runtime-field-${blockId}`).locator('p.text-status-red');
 }
 
 /**
@@ -2535,21 +2538,18 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // PRODUCT GAP (WYSIWYG picker): after #1204 ("true WYSIWYG form-field preview"),
-  // model-backed `field` blocks render through the real platform control
-  // (ControlledFieldRenderer → ComponentLoader). The designer's `picker` component
-  // has NO platform equivalent — the registry only has specific picker types
-  // (userselect/ownerselect/treeselect/memberpicker/...), so the preview renders
-  // "Failed to load picker: Unknown component: picker (normalized: picker)" instead
-  // of a control. This also breaks relation fields (dragging a relation model field
-  // into a form auto-sets component='picker', see UDW-053). The old
-  // `runtime-picker-*` control (with meta line / dynamic option loading / search
-  // request contract) no longer renders for model fields, so this test's
-  // interactions cannot be retargeted without a product fix. Tracked for a product
-  // PR: map the designer `picker` component to a platform picker (e.g. SmartSelect /
-  // refTarget-driven userselect) in buildPreviewFieldConfig, or register a `picker`
-  // alias. UDW-027 also covers rich-text, which DOES render under WYSIWYG.
-  test.fixme('UDW-027: configures picker and rich text form controls through the inspector', async ({
+  // Two different WYSIWYG outcomes in one test, by design:
+  //  - `picker` stays on the designer's own picker renderer (`runtime-picker-*`). It is a
+  //    data-source component — its options come from `pickerSource` / `pickerDataSource` /
+  //    `options` executed by the designer runtime — and a platform FieldConfig cannot
+  //    express that, so handing it to the platform control would drop the authored source
+  //    (and the platform registry has no generic `picker`; that is what used to render
+  //    "Unknown component: picker"). See isDesignerRuntimeOnlyComponent in
+  //    RecursiveBlockRenderer.
+  //  - `rich-text` DOES resolve to a real platform control (SmartRichTextEditor, a TipTap
+  //    contenteditable), so it is asserted through the platform DOM (`.ProseMirror` +
+  //    `data-placeholder`) rather than the legacy `runtime-rich-text-*` textarea.
+  test('UDW-027: configures picker and rich text form controls through the inspector', async ({
     page,
   }) => {
     expect(pagePid).toBeTruthy();
@@ -2605,15 +2605,21 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     );
     await page.getByTestId('runtime-picker-field_seed_title').selectOption(`bob_${uid}`);
     await expect(page.getByTestId('runtime-picker-field_seed_title')).toHaveValue(`bob_${uid}`);
-    await expect(page.getByTestId('runtime-rich-text-field_seed_secondary')).toBeVisible();
-    await expect(page.getByTestId('runtime-rich-text-field_seed_secondary')).toHaveAttribute(
-      'placeholder',
+
+    // rich-text renders the real platform editor (TipTap): the editable surface is a
+    // `.ProseMirror` contenteditable, and the configured placeholder is exposed as
+    // `data-placeholder` on its empty first paragraph.
+    const richTextEditor = page
+      .getByTestId('runtime-field-field_seed_secondary')
+      .locator('.ProseMirror');
+    await expect(richTextEditor).toBeVisible();
+    await expect(richTextEditor.locator('[data-placeholder]').first()).toHaveAttribute(
+      'data-placeholder',
       componentRichTextPlaceholder,
     );
-    await page.getByTestId('runtime-rich-text-field_seed_secondary').fill(`Formatted notes ${uid}`);
-    await expect(page.getByTestId('runtime-rich-text-field_seed_secondary')).toHaveValue(
-      `Formatted notes ${uid}`,
-    );
+    await richTextEditor.click();
+    await page.keyboard.type(`Formatted notes ${uid}`);
+    await expect(richTextEditor).toContainText(`Formatted notes ${uid}`);
 
     const persisted = await readPage(page, pagePid);
     const pickerField = findBlockById(persisted.blocks ?? [], 'field_seed_title');
@@ -3069,6 +3075,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.getByTestId('runtime-action-action_seed_submit').click();
     await expect(secondaryError).toHaveText('Required');
+    // Rendered once — the control suppresses its own identical validationRules message
+    // while the wrapper is showing the form-context error.
+    await expect(secondaryError).toHaveCount(1);
     expect(commandRequestCount).toBe(0);
 
     await secondaryTextarea.fill('Bad');
@@ -3698,17 +3707,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     expectChildOrder(persisted.blocks ?? [], 'list_toolbar', actionOrder);
   });
 
-  // PRODUCT GAP (WYSIWYG upload): under true-WYSIWYG the model-backed `upload`
-  // field renders the platform SmartUpload (`upload-area-<code>` / hidden
-  // `upload-input-<code>` / `upload-file-<code>` items), which is correct — but the
-  // designer's `maxFiles` prop does NOT map to the platform uploader's file limit:
-  // with maxFiles=2 the control still shows "已上传 1/1" and accepts only the first
-  // file, so the test's constraint check (2 files accepted, 3rd rejected) cannot
-  // hold. `accept`/`multiple` DO map; the legacy `runtime-upload-*` /
-  // `runtime-upload-files-*` feedback nodes are also gone. Tracked for a product PR:
-  // translate designer upload props (maxFiles → the SmartUpload limit prop) in
-  // buildPreviewFieldConfig.
-  test.fixme('UDW-028: configures upload constraints and shows selected file feedback in preview', async ({
+  // Under true-WYSIWYG the model-backed `upload` field renders the platform SmartUpload:
+  // a hidden `upload-input-<fieldCode>` inside the block wrapper, one
+  // `upload-file-<fieldCode>` row per accepted file, and an "已上传 x/y" counter — the
+  // legacy `runtime-upload-*` / `runtime-upload-files-*` nodes are gone.
+  // `buildPreviewFieldConfig` translates the designer's `maxFiles` into the platform
+  // uploader's `maxCount`, so the configured limit is what actually gates the selection
+  // (before the translation the uploader kept its default limit of 1: "已上传 1/1").
+  test('UDW-028: configures upload constraints and shows selected file feedback in preview', async ({
     page,
   }) => {
     expect(pagePid).toBeTruthy();
@@ -3740,26 +3746,26 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
-    const upload = page.getByTestId('runtime-upload-field_seed_title');
-    await expect(upload).toHaveAttribute('accept', componentUploadAccept);
-    await upload.setInputFiles([
+    // `field_seed_title` binds the model field `name`, and SmartUpload keys its testids on
+    // the field code — scope by the block wrapper so the selector stays unambiguous.
+    const uploadBlock = page.getByTestId('runtime-field-field_seed_title');
+    const uploadInput = uploadBlock.locator('[data-testid="upload-input-name"]');
+    await expect(uploadInput).toHaveAttribute('accept', componentUploadAccept);
+    await expect(uploadInput).toHaveJSProperty('multiple', true);
+    // The configured limit (not the default 1) drives the counter.
+    await expect(uploadBlock).toContainText('已上传 0/2');
+    // All three are `.pdf`, so `accept` cannot be what rejects the third one — only the
+    // translated maxFiles → maxCount limit can.
+    await uploadInput.setInputFiles([
       { name: `first-${uid}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('first') },
-      {
-        name: `second-${uid}.docx`,
-        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        buffer: Buffer.from('second'),
-      },
-      { name: `third-${uid}.txt`, mimeType: 'text/plain', buffer: Buffer.from('third') },
+      { name: `second-${uid}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('second') },
+      { name: `third-${uid}.pdf`, mimeType: 'application/pdf', buffer: Buffer.from('third') },
     ]);
-    await expect(page.getByTestId('runtime-upload-files-field_seed_title')).toContainText(
-      `first-${uid}.pdf`,
-    );
-    await expect(page.getByTestId('runtime-upload-files-field_seed_title')).toContainText(
-      `second-${uid}.docx`,
-    );
-    await expect(page.getByTestId('runtime-upload-files-field_seed_title')).not.toContainText(
-      `third-${uid}.txt`,
-    );
+    await expect(uploadBlock.getByTestId('upload-file-name')).toHaveCount(2);
+    await expect(uploadBlock).toContainText(`first-${uid}.pdf`);
+    await expect(uploadBlock).toContainText(`second-${uid}.pdf`);
+    await expect(uploadBlock).not.toContainText(`third-${uid}.pdf`);
+    await expect(uploadBlock).toContainText('已上传 2/2');
 
     const persisted = await readPage(page, pagePid);
     const uploadField = findBlockById(persisted.blocks ?? [], 'field_seed_title');
@@ -3772,6 +3778,30 @@ test.describe.serial('Unified Designer Workbench V3', () => {
         multiple: true,
         maxFiles: 2,
       }),
+    });
+
+    // Restore `field_seed_title` before leaving: this suite is `describe.serial` and the
+    // two seed fields are shared, so `props.multiple: true` would survive into every
+    // later test. It is not inert leftover — a field switched to `select` later still
+    // carries it, and SmartSelect's multiple mode renders a native <select multiple>
+    // (role=listbox) instead of the Radix combobox, which silently breaks any downstream
+    // select interaction (UDW-029). It also cannot be cleaned up downstream: the
+    // `props.multiple` inspector control only exists while the component is `upload`
+    // (uploadFieldFields in InspectorSchemaRegistry), so the checkbox is gone the moment
+    // another test picks a different component. Uncheck it while the control is still
+    // rendered, then put the component back to the seed's `input`.
+    await page.getByTestId('designer-mode-edit').click();
+    await page.getByTestId('outline-item-field_seed_title').click();
+    await setCheckbox(page, 'inspector-field-props.multiple', false);
+    await page.getByTestId('inspector-field-props.component').selectOption('input');
+    await saveDesignerPage(page, pagePid);
+
+    // Assert the restore actually persisted — a silently no-op cleanup would poison the
+    // rest of the chain exactly like no cleanup at all.
+    const restored = await readPage(page, pagePid);
+    expect(findBlockById(restored.blocks ?? [], 'field_seed_title')).toMatchObject({
+      blockType: 'field',
+      props: expect.objectContaining({ component: 'input', multiple: false }),
     });
   });
 
@@ -3850,11 +3880,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // PRODUCT GAP (WYSIWYG picker) — see UDW-027: model-backed form-field `picker`
-  // no longer renders under true-WYSIWYG (platform has no generic `picker`
-  // component), and the old `runtime-picker-*` dynamic-option/search contract is
-  // gone for model fields. Tracked for a product PR.
-  test.fixme('UDW-030: configures a model-backed picker and reloads dynamic options in preview', async ({
+  // `picker` keeps the designer's own renderer under true-WYSIWYG (see UDW-027): the
+  // authored `pickerDataSource: model` option source is executed by the designer runtime
+  // through /api/query-builder/execute, which a platform FieldConfig cannot express.
+  test('UDW-030: configures a model-backed picker and reloads dynamic options in preview', async ({
     page,
   }) => {
     expect(pagePid).toBeTruthy();
@@ -3947,9 +3976,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // PRODUCT GAP (WYSIWYG picker) — see UDW-027: model-backed form-field `picker`
-  // no longer renders under true-WYSIWYG. Tracked for a product PR.
-  test.fixme('UDW-031: configures a named-query picker and reloads dynamic options in preview', async ({
+  // `picker` keeps the designer's own renderer under true-WYSIWYG (see UDW-027); the
+  // authored named-query option source has no platform FieldConfig equivalent.
+  test('UDW-031: configures a named-query picker and reloads dynamic options in preview', async ({
     page,
   }) => {
     expect(pagePid).toBeTruthy();
@@ -4053,10 +4082,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // PRODUCT GAP (WYSIWYG picker) — see UDW-027: model-backed form-field `picker`
-  // no longer renders under true-WYSIWYG; the `runtime-picker-search-*` request
-  // contract is gone for model fields. Tracked for a product PR.
-  test.fixme('UDW-032: configures a searchable model picker and sends preview search filters', async ({
+  // `picker` keeps the designer's own renderer under true-WYSIWYG (see UDW-027), so the
+  // server-side `runtime-picker-search-*` contract stays live for model fields — the
+  // platform's select only filters already-loaded options client-side.
+  test('UDW-032: configures a searchable model picker and sends preview search filters', async ({
     page,
   }) => {
     expect(pagePid).toBeTruthy();
@@ -4184,10 +4213,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
   });
 
-  // PRODUCT GAP (WYSIWYG picker) — see UDW-027: model-backed form-field `picker`
-  // no longer renders under true-WYSIWYG; the `runtime-picker-search-*` where-
-  // condition request contract is gone for model fields. Tracked for a product PR.
-  test.fixme('UDW-033: configures a searchable named-query picker and sends preview where conditions', async ({
+  // `picker` keeps the designer's own renderer under true-WYSIWYG (see UDW-027), so the
+  // named-query where-condition search contract stays live for model fields.
+  test('UDW-033: configures a searchable named-query picker and sends preview where conditions', async ({
     page,
   }) => {
     expect(pagePid).toBeTruthy();
@@ -5541,24 +5569,30 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('designer-mode-preview').click();
     await expect(page.getByTestId('unified-runtime-preview')).toBeVisible();
     // WYSIWYG renders the real platform controls: date → SmartDatePicker (native
-    // <input type="date">), number → SmartNumberInput (a stepper <input
-    // type="text" inputMode="decimal">, not a native number input), switch →
-    // SmartSwitch (<button role="switch">).
-    // date: renders a native <input type="date"> (real, editable control).
-    // PRODUCT BUG (WYSIWYG date): `component: 'date'` does NOT resolve to the
-    // SmartDatePicker (no `date-picker-input-*` testid / today/clear chrome) — it
-    // falls back to a bare date input whose onChange binds a non-string value, so
-    // filling it corrupts the bound value to `[object Object]` and the input reads
-    // back empty. We therefore assert the control renders + is editable, but not the
-    // (broken) string round-trip. number + switch below round-trip correctly.
+    // <input type="date"> carrying the `date-picker-input-<fieldCode>` testid), number →
+    // SmartNumberInput (a stepper <input type="text" inputMode="decimal">, not a native
+    // number input), switch → SmartSwitch (<button role="switch">).
+    // The designer's `date` component id is translated to SmartDatePicker in
+    // buildPreviewFieldConfig; the same-named legacy platform control is a bare date
+    // input that forwards the raw change *event* to onChange, so the bound value became
+    // `[object Object]` and the input read back empty. Assert the string round-trip so a
+    // regression to that control fails here.
     const dateControl = runtimePreviewControl(page, dateFieldId);
     await expect(dateControl).toBeVisible();
     await expect(dateControl).toHaveAttribute('type', 'date');
+    await expect(dateControl).toHaveAttribute('data-testid', 'date-picker-input-created_at');
     await expect(dateControl).toBeEditable();
+    await dateControl.fill('2026-03-18');
+    await expect(dateControl).toHaveValue('2026-03-18');
     const numberControl = runtimePreviewControl(page, numberFieldId);
     await expect(numberControl).toHaveAttribute('inputmode', 'decimal');
     await numberControl.fill('42');
     await expect(numberControl).toHaveValue('42');
+    // helpText is rendered by ControlledFieldRenderer for every control type, not just
+    // the smart Input (SmartNumberInput never forwarded a plain helpText prop).
+    await expect(page.getByTestId(`runtime-field-${numberFieldId}`)).toContainText(
+      `Number help ${uid}`,
+    );
     const switchControl = page.getByTestId(`runtime-field-${switchFieldId}`).locator('[role="switch"]');
     await switchControl.click();
     await expect(switchControl).toBeChecked();
@@ -6203,16 +6237,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId(`runtime-field-${detailFieldBlockId}`)).toContainText(
       detailFieldLabel,
     );
-    // PRODUCT GAP (WYSIWYG helpText): the configured `helpText` is NOT rendered here.
-    // `fieldCode` resolves to a dict-backed enum field (`kind`), which the platform
-    // renders as a SmartSelect; `ControlledFieldRenderer` never emits a `<FieldHelp>`
-    // — help text is left to each smart control, and only the smart *Input* renders
-    // it. So a select/picker-rendered field silently drops its configured helpText
-    // (the "shared renderer silently ignores DSL config" class). The legacy
-    // `runtime-field-help-<blockId>` node is gone with it. helpText *authoring +
-    // persistence* is still asserted above against the saved schema; only the runtime
-    // rendering is unverifiable until the platform renders help for non-input
-    // controls. Tracked for a product PR.
+    // `fieldCode` resolves to a dict-backed enum field (`kind`) that the platform renders
+    // as a SmartSelect. Help text is owned by `ControlledFieldRenderer` (like the label),
+    // so it renders for non-input controls too — it used to be left to each smart control
+    // and only the smart *Input* read it, silently dropping configured help everywhere
+    // else ("shared renderer silently ignores DSL config"). The legacy
+    // `runtime-field-help-<blockId>` node is gone; assert the text inside the block.
+    await expect(page.getByTestId(`runtime-field-${detailFieldBlockId}`)).toContainText(
+      detailFieldHelp,
+    );
     await expect
       .poll(
         async () => {
