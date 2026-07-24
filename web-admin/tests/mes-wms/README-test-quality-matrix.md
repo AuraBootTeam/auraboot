@@ -41,9 +41,17 @@
 - **跨仓 `--profile=pcba-agent` 单次 import(两阶段 defer)**:`mfg 命令 97 个注册`。关键洞察:整 profile 一次导入让 defer 解析依赖网(pcba-industry 的 pe:* handler 从 jar 加载即可、config import 失败不影响命令注册)。3 个失败插件(pcba-solution/pcba-sales/pcba-quote)是 FR 不需要的 quote 侧。
 - runner `scripts/mes-wms-golden-run.sh` 已 codify 全流程(build 16 jar → stage → runtime → schema → backend → bootstrap → import profile → golden → teardown)。
 
+### UI golden(真浏览器)—— 路径跑通 + FR-22 验证
+`tests/mes-wms/ui/mes-wms-ui-golden.mjs`:Playwright 驱动登录表单 → 导航 standalone DSL 页(`/p/c/<key>`)→ 断言 + 截图。**FR-22 handover workbench 5/5 绿**:
+- 页渲染(班次交接工作台)+ metric-strip(待签认)
+- **#228 polish live 验证**:交班/接班班次 = 白班/夜班(dict 解析,非裸 day/night)、状态 = 已签认(非 pending_ack)
+- 截图 `fr22-handover-workbench.png`(亲眼看过:metric-strip + 表格 + 色点 dict 标签)
+- 关键坑:app proxy SSE → `waitForLoadState('networkidle')` 永不触发(禁用);登录邮箱字段是 `input[autocomplete="username"]`
+
 ### 剩余（诚实）
-- **FR-10/FR-13 full golden**:需 BOM/行 + balance/效期 lot + warehouse 多模型 seed(deferred,已在 golden 里明确标注非产品 bug)。
-- **UI golden(全 8 FR)**:需起前端 + per-page Playwright spec(未做)。
+- **FR-10 后端**:FEFO balance-per-lot seed 墙(add_lot_txn≠balance、wh_in line 无 lot;需正确 lot-aware 收货流 + warehouse_out demand)。已探测记录。
+- **UI golden 其余 7 页**:按 FR-22 已验证 pattern 扩(每页 login→navigate→assert→screenshot)。
+- **HTML 报告**:runner 已接线 backend+UI golden;HTML 汇总报告未做(矩阵 SoT 是当前报告)。
 
 ## 证据口径
 - **真栈 IT**：Playwright API spec `mes-wms-commands.spec.ts`，`executeCommandViaApi` → `POST /api/meta/commands/execute/{code}` → `GET /api/dynamic/{model}/list` 反查 DB。凭据 = spec pass + 断言查的是**结果**（DB 行/字段值）非请求次数。
