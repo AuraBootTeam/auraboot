@@ -49,22 +49,30 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# The 8 FRs live in inventory + pcba-manufacturing; both are hybrid. Their dep chain
-# (finance→procurement/sales→pcba-industry→pcba-manufacturing) must all import, so every
-# hybrid dep needs a FRESH jar (stale platform/plugins jars miss handlers → S-EXT-HANDLER).
-HYBRID_JARS=(inventory pcba-manufacturing product-catalog quality finance crm procurement)
-IMPORT_BASE=(core-meta core-bpm platform-admin core-decisionops core-announcement core-aurabot
-  page-manager org-management product-catalog crm inventory quality)
-IMPORT_CHAIN=(finance procurement sales pcba-industry pcba-manufacturing)
+# The 8 FRs live in inventory + pcba-manufacturing, but pcba-manufacturing's transitive
+# dependency web pulls in the FULL pcba-agent plugin set (pcba-industry→pcba-sales→
+# pcba-solution/pcba-crm/quote-core/bom-standardization→…). Every hybrid plugin in that set
+# needs a FRESH jar staged into AURA_PLUGINS_DIR — stale platform/plugins jars miss handlers
+# → S-EXT-HANDLER. Config-only plugins (req, sales, pcba-base, pcba-crm, quote-core,
+# pcba-industry, pcba-quote) and OSS built-ins (core-*, page-manager, org-management,
+# agent-control-plane) need no jar. quote-engine lives in the aura-quote repo.
+HYBRID_JARS=(product-catalog crm inventory finance quality procurement pcba-solution
+  pcba-procurement jiejia-integration bom-standardization pcba-sales pcba-manufacturing
+  pcba-warehouse pcba-finance pcba-compliance)
+QUOTE_HYBRID=(quote-engine)  # built from aura-quote/plugin-aura/<p>/backend
+IMPORT_PROFILE=pcba-agent    # import-plugins.sh resolves the full set + two-phase defer order
 
-log "1/7 build fresh hybrid plugin jars"
+log "1/7 build fresh hybrid plugin jars (full pcba-agent set)"
+build_jar() {  # <plugin> <backend-dir>
+  [ -d "$2" ] || { echo "  WARN no backend: $1" >&2; return; }
+  ( cd "$2" && gradle jar --console=plain -q >/dev/null 2>&1 ) || echo "  WARN build failed: $1" >&2
+  local j; j="$(ls "$2/build/libs/"*.jar 2>/dev/null | head -1)"
+  [ -n "$j" ] && cp "$j" "$STAGE/"
+}
 ( unset MAVEN_OPTS GRADLE_OPTS MAVEN_REPO_LOCAL
-  for p in "${HYBRID_JARS[@]}"; do
-    [ -d "$PLUGINS/$p/backend" ] && ( cd "$PLUGINS/$p/backend" && gradle jar --console=plain -q >/dev/null 2>&1 ) || true
-    j="$(ls "$PLUGINS/$p/backend/build/libs/"*.jar 2>/dev/null | head -1)"
-    [ -n "$j" ] && cp "$j" "$STAGE/"
-  done )
-log "    staged $(ls "$STAGE"/*.jar | wc -l | tr -d ' ') hybrid jars"
+  for p in "${HYBRID_JARS[@]}"; do build_jar "$p" "$PLUGINS/$p/backend"; done
+  for p in "${QUOTE_HYBRID[@]}"; do build_jar "$p" "/Users/ghj/work/auraboot/aura-quote/plugin-aura/$p/backend"; done )
+log "    staged $(ls "$STAGE"/*.jar | wc -l | tr -d ' ') hybrid jars (expect 16)"
 
 log "2/7 allocate runtime (slot $SLOT) + infra + schema"
 ( cd "$REPO" && ./dev.sh runtime allocate auraboot "$NAME" --slot "$SLOT" --purpose "MES/WMS 8FR golden" --ttl 4h >/dev/null 2>&1 || true )
@@ -98,14 +106,16 @@ curl --noproxy '*' -sS -X POST "$BACKEND_URL/api/bootstrap/setup" -H 'Content-Ty
   -d '{"companyName":"MES-WMS Golden","adminEmail":"admin@auraboot.com","adminPassword":"Test2026x","adminDisplayName":"Admin","systemMode":"single","seedDemoData":false}' \
   | grep -q '"code":"0"' || die "bootstrap failed"
 
-log "5/7 import plugin configs (cross-repo: enterprise-plugin-root=sibling plugins repo)"
+log "5/7 import full pcba-agent profile (one call → two-phase defer resolves the dep web)"
+# Importing the whole profile in ONE call is essential: the two-phase import defers
+# cross-plugin refs until every plugin is in, so interdependent plugins (pcba-industry
+# needs pcba-sales' pe:* handler; pcba-manufacturing needs pcba-industry's dict) resolve.
+# Importing one-at-a-time makes each plugin's closing reference-integrity sweep fail.
 IARGS="--edition=enterprise --plugin-root=$REPO/plugins --enterprise-plugin-root=$PLUGINS"
-"$REPO/scripts/import-plugins.sh" $IARGS "${IMPORT_BASE[@]}" >"$SD/import-base.log" 2>&1 || { tail -8 "$SD/import-base.log"; die "base import failed"; }
-for p in "${IMPORT_CHAIN[@]}"; do
-  "$REPO/scripts/import-plugins.sh" $IARGS "$p" >"$SD/import-$p.log" 2>&1 || { tail -8 "$SD/import-$p.log"; die "import $p failed"; }
-done
+"$REPO/scripts/import-plugins.sh" $IARGS --profile="$IMPORT_PROFILE" >"$SD/import.log" 2>&1 \
+  || { grep -iE 'FAIL|unresolved|unregistered|missing' "$SD/import.log" | head -12; die "profile import failed — see $SD/import.log"; }
 MFG_CMDS="$(psql -h 127.0.0.1 -p 5432 -U auraboot -d "$PG_DB" -tAc "select count(*) from ab_command_definition where code like 'mfg%'")"
-[ "${MFG_CMDS:-0}" -gt 0 ] || die "pcba-manufacturing commands not registered (import chain incomplete)"
+[ "${MFG_CMDS:-0}" -gt 0 ] || die "pcba-manufacturing commands not registered (import incomplete)"
 log "    imported — $MFG_CMDS mfg commands registered"
 
 log "6/7 backend command-pipeline golden (real-stack IT)"
