@@ -7950,7 +7950,7 @@ CREATE TABLE public.ab_im_message (
     triage_bucket character varying(30),
     triage_confidence numeric(3,2),
     triage_reason_codes jsonb,
-    CONSTRAINT ab_im_message_triage_bucket_check CHECK (((triage_bucket IS NULL) OR ((triage_bucket)::text = ANY ((ARRAY['light_chat'::character varying, 'contextual_answer'::character varying, 'acp_run'::character varying])::text[])))),
+    CONSTRAINT ab_im_message_triage_bucket_check CHECK (((triage_bucket IS NULL) OR ((triage_bucket)::text = ANY ((ARRAY['light_chat'::character varying, 'contextual_answer'::character varying, 'sync_action'::character varying, 'acp_run'::character varying])::text[])))),
     CONSTRAINT ab_im_message_triage_confidence_check CHECK (((triage_confidence IS NULL) OR ((triage_confidence >= (0)::numeric) AND (triage_confidence <= (1)::numeric))))
 );
 
