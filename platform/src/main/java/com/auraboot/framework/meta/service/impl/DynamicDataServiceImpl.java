@@ -1462,6 +1462,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // 使用验证服务的严格模式进行验证
             // 验证失败会抛出异常并触发事务回滚
             validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
+            // Field-level domain invariants (immutable / immutableWhen). These are decided
+            // against the row as it currently stands, which is why they need existingRecord
+            // and cannot live in the payload-only validation above. They are invariants, not
+            // permissions: admin and system handlers are bound by them, and a command that
+            // inherited an aggregate's authority does not get to waive them.
+            validationService.validateImmutabilityAndThrow(model, data, existingRecord);
             // Validation intentionally works with java.time domain types. Convert
             // them to JDBC-native values only afterwards, matching the CREATE
             // path and preventing MyBatis from binding Instant as an untyped
@@ -1676,6 +1682,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
+        appendAggregateBindingGuard(sql, params, model);
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, "update");
 
         return dynamicDataMapper.updateByQuery(sql.toString(), params);
@@ -1700,9 +1707,40 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 .append(pkColumn)
                 .append(" = #{params.recordId}")
                 .append(" AND tenant_id = #{params.tenantId}");
+        appendAggregateBindingGuard(sql, params, model);
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete");
 
         return dynamicDataMapper.deleteByQuery(sql.toString(), params);
+    }
+
+    /**
+     * Pin a write to the aggregate root the command was authorized against.
+     *
+     * <p>Deliberately NOT gated on {@link MetaContext#isDataPermissionBypassed()}. That flag means
+     * "do not re-run the caller's read projection", which is a statement about re-deciding policy.
+     * This is not a decision — no policy is consulted — it is the execution of a boundary the entry
+     * already fixed. A command authorized for Q1001 must not reach Q2002's rows precisely on the
+     * paths that inherit its authority, so switching it off there would remove the guard exactly
+     * where it is load-bearing.</p>
+     *
+     * <p>Inert unless both an aggregate scope is open and the model declares a binding, so models
+     * opt in one at a time rather than the whole platform changing behaviour at once.</p>
+     */
+    // package-private + static: the safety property (an open aggregate scope pins every guarded
+    // write, including on bypassed paths) is directly tested, and the guard depends on no
+    // instance state.
+    static void appendAggregateBindingGuard(StringBuilder sql, Map<String, Object> params, ModelDefinition model) {
+        String aggregateId = MetaContext.getCommandAggregateId();
+        if (aggregateId == null || model == null) {
+            return;
+        }
+        ModelDefinition.AggregateBinding binding = model.getAggregateBinding();
+        if (binding == null || binding.getLocalField() == null || binding.getLocalField().isBlank()) {
+            return;
+        }
+        String column = SqlSafetyUtils.requireIdentifier(binding.getLocalField(), "aggregate binding column");
+        params.put("authorizedAggregateId", aggregateId);
+        sql.append(" AND ").append(column).append(" = #{params.authorizedAggregateId}");
     }
 
     private void appendScopedWriteGuards(

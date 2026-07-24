@@ -118,4 +118,34 @@ public class ModelDefinition {
      * source-type-specific config (e.g. {@code endpointAdapter}).
      */
     private Map<String, Object> extension;
+
+    /**
+     * Declares that this model's rows belong to an aggregate root (a master document),
+     * and by which local column that ownership is proved.
+     *
+     * <p>A command is authorized against <em>one</em> aggregate — the record named in the
+     * request. Capability reach can only prove "this command may write {@code quote_line}";
+     * it can never prove "this command may write <em>Q1001's</em> {@code quote_line} rather
+     * than Q2002's". This binding is what closes that gap: every write performed under an
+     * open aggregate scope is pinned to the authorized aggregate in the SQL itself.</p>
+     *
+     * <p>Enforcing it is not a second authorization decision — no policy is consulted. It
+     * executes a boundary the entry already decided, which is why it still applies on paths
+     * that inherit a command's authority.</p>
+     *
+     * <p>Absent on a model, nothing changes: the guard only constrains models that opt in.</p>
+     */
+    private AggregateBinding aggregateBinding;
+
+    /**
+     * How a derived model proves which aggregate root its rows belong to.
+     */
+    @Data
+    @Builder
+    public static class AggregateBinding {
+        /** Model code of the aggregate root, e.g. {@code quote}. Informational. */
+        private String aggregateModel;
+        /** Local column holding the aggregate root's id, e.g. {@code quote_pid}. */
+        private String localField;
+    }
 }
