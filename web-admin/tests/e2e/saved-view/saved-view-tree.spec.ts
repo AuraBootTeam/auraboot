@@ -16,6 +16,13 @@ import { E2ET_ORDER_CONFIG } from '../../helpers/configs/e2et-order.config';
 import { navigateToDynamicPage, openSavedViewManagePanel, uniqueId } from '../helpers';
 import { cleanupGeneratedSavedViews, createOrReuseSavedView } from './helpers';
 
+import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+
+// Serialize e2et_order saved-view specs — they share the model's per-user view
+// state (active view / created views) under the shared admin storageState.
+test.beforeAll(async () => { await acquireSavedViewLock('saved-view-tree'); });
+test.afterAll(() => { releaseSavedViewLock('saved-view-tree'); });
+
 const ROUTE_PAGE_KEY = 'e2et_order';
 const CUSTOMER_PAGE_KEY = 'e2et_customer';
 const SCREENSHOT_DIR = 'test-results/saved-view-vnext';

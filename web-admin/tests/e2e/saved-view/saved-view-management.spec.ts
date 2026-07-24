@@ -10,6 +10,13 @@ import { expect, test, type Page } from '@playwright/test';
 import { selectSavedViewByName, uniqueId } from '../helpers';
 import { navigateToOrderViaSidebar } from './helpers';
 
+import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+
+// Serialize e2et_order saved-view specs — they share the model's per-user view
+// state (active view / created views) under the shared admin storageState.
+test.beforeAll(async () => { await acquireSavedViewLock('saved-view-management'); });
+test.afterAll(() => { releaseSavedViewLock('saved-view-management'); });
+
 const MODEL_CODE = 'e2et_order';
 const PAGE_KEY = 'e2et_order_list';
 const SHOTS = 'test-results/saved-view-personal-golden';

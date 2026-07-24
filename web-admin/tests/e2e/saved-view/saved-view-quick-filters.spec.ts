@@ -13,6 +13,13 @@ import {
   navigateToOrderViaSidebar,
 } from './helpers';
 
+import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+
+// Serialize e2et_order saved-view specs — they share the model's per-user view
+// state (active view / created views) under the shared admin storageState.
+test.beforeAll(async () => { await acquireSavedViewLock('saved-view-quick-filters'); });
+test.afterAll(() => { releaseSavedViewLock('saved-view-quick-filters'); });
+
 const MODEL_CODE = 'e2et_order';
 const PAGE_KEY = 'e2et_order_list';
 

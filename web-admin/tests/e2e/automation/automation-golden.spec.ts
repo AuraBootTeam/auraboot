@@ -1466,6 +1466,15 @@ test.describe('Automation Golden — Layer B node-type coverage (Phase 3)', () =
   // so EVERY method fell through to default → "Unsupported HTTP method" and call_api was
   // 100% broken (red line §9 case-consistency). Fixed: switch on method.toLowerCase().
   test('action-call-api: the action makes a real outbound HTTP GET (host.docker.internal /actuator/health → 200) and completes', async ({ page }) => {
+    // host-env: the SSRF guard rejects loopback, so this happy-path outbound call
+    // needs a reachable non-loopback endpoint (the test-allowlisted backend URL in
+    // docker CI-parity). On a single-machine host-first stack goldenBackendUrl is
+    // loopback and the call is blocked ("URL resolves to loopback address"). Runs in
+    // docker or when E2E_CALLAPI_OK_URL points to a reachable host.
+    test.skip(
+      /127\.0\.0\.1|localhost/.test(CALLAPI_OK_URL),
+      'call_api outbound happy-path needs a reachable non-loopback endpoint (SSRF guard blocks loopback on host-first); set E2E_CALLAPI_OK_URL or run in docker CI-parity.',
+    );
     const t = 'trig', a = 'callapi';
     const create = await postAutomation(page, {
       name: `P3-API ${uniqueId()}`,

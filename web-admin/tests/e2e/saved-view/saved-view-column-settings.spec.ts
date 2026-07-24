@@ -26,6 +26,13 @@ import {
 import { BASE_URL } from '../../helpers/environments';
 import { uniqueId } from '../helpers';
 
+import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+
+// Serialize e2et_order saved-view specs — they share the model's per-user view
+// state (active view / created views) under the shared admin storageState.
+test.beforeAll(async () => { await acquireSavedViewLock('saved-view-column-settings'); });
+test.afterAll(() => { releaseSavedViewLock('saved-view-column-settings'); });
+
 const MODEL_CODE = 'e2et_order';
 const SAVED_VIEW_PAGE_KEY = 'e2et_order_list';
 const ADMIN_STORAGE_STATE = process.env.PW_ADMIN_STORAGE_STATE || 'tests/storage/admin.json';
