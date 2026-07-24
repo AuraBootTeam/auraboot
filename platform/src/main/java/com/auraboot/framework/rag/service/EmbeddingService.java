@@ -2,6 +2,8 @@ package com.auraboot.framework.rag.service;
 
 import com.auraboot.framework.cloudconfig.entity.CloudConfig;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
+import com.auraboot.framework.common.util.PinnedHttpRequests;
+import com.auraboot.framework.common.util.SsrfValidator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -116,8 +118,14 @@ public class EmbeddingService {
                 ? config.baseUrl + "v1/embeddings"
                 : config.baseUrl + "/v1/embeddings";
 
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
+        // SSRF guard: baseUrl is tenant-configurable (CloudConfig). Reject private/
+        // loopback/link-local targets and disallowed schemes, and pin the resolved IP
+        // at connect time to close the DNS-rebinding window (SEC-20260723-05).
+        SsrfValidator.ValidatedTarget target = SsrfValidator.validate(url);
+        HttpRequest.Builder requestBuilder = target != null
+                ? PinnedHttpRequests.newPinnedRequestBuilder(target)
+                : HttpRequest.newBuilder().uri(URI.create(url));
+        HttpRequest request = requestBuilder
                 .header("Content-Type", "application/json")
                 .header("Authorization", "Bearer " + config.apiKey)
                 .timeout(Duration.ofSeconds(60))

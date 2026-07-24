@@ -5,6 +5,7 @@ import com.auraboot.framework.agent.dto.AnthropicResponse;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.dto.LlmChunk;
+import com.auraboot.framework.common.util.SsrfValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
@@ -270,6 +271,10 @@ public class AnthropicLlmProvider implements LlmProvider {
         java.util.List<String> warnings = new java.util.ArrayList<>();
         AnthropicRequest anthropicReq = buildAnthropicRequest(request, warnings);
 
+        // SSRF guard (SEC-20260723-05): baseUrl is tenant-configurable — reject
+        // private/loopback/link-local targets and disallowed schemes before the call.
+        SsrfValidator.validate(baseUrl + "/v1/messages");
+
         org.springframework.web.reactive.function.client.WebClient.RequestBodySpec spec = webClient.post()
                 .uri(baseUrl + "/v1/messages")
                 .header("x-api-key", apiKey)
@@ -354,6 +359,9 @@ public class AnthropicLlmProvider implements LlmProvider {
         } catch (Exception e) {
             return Flux.error(e);
         }
+
+        // SSRF guard (SEC-20260723-05): reject private/loopback targets before streaming.
+        SsrfValidator.validate(baseUrl + "/v1/messages");
 
         Flux<ServerSentEvent<String>> sseFlux = webClient.post()
                 .uri(baseUrl + "/v1/messages")

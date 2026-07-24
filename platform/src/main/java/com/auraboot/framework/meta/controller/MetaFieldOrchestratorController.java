@@ -5,6 +5,8 @@ import com.auraboot.framework.meta.dto.AddFieldRequest;
 import com.auraboot.framework.meta.dto.AddFieldResult;
 import com.auraboot.framework.meta.dto.RemoveFieldRequest;
 import com.auraboot.framework.meta.service.MetaFieldService;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -22,9 +24,13 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link MetaFieldService#removeFromModel} (Spec §4).
  *
  * <p>Wire shape only — the controller delegates straight to the service and
- * holds no business logic. Permission gating is handled centrally by the
- * platform's {@code PermissionInterceptor}; we deliberately do not stack
- * controller-level {@code @PreAuthorize} here (Plan §Task 5).
+ * holds no business logic. Both endpoints trigger physical schema DDL
+ * ({@code ADD}/{@code DROP COLUMN}) on a model-level shared table, so each is
+ * explicitly gated with {@link MetaPermission#MODEL_MANAGE} — matching the
+ * sibling {@code ModelFieldBindingController}. Relying on the central
+ * {@code PermissionInterceptor} alone is unsafe: its default
+ * {@code unannotated-mode} is {@code shadow} (fail-open), so an un-annotated
+ * write endpoint is reachable by any authenticated user (SEC-20260723-01).
  *
  * <p><b>Path note (deviation from Spec §4 / Plan §Task 5):</b> the spec calls
  * for {@code /api/meta/models/{modelCode}/fields}, but
@@ -59,6 +65,7 @@ public class MetaFieldOrchestratorController {
      * request body to prevent client-side drift.
      */
     @PostMapping
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     @Operation(summary = "Add a single field to a published model (Spec §4 / §3.1)")
     public ApiResponse<AddFieldResult> addField(@PathVariable("modelCode") String modelCode,
                                                 @RequestBody AddFieldRequest request) {
@@ -78,6 +85,7 @@ public class MetaFieldOrchestratorController {
      *                            row remains; defaults to {@code true}
      */
     @DeleteMapping("/{storageCode}")
+    @RequirePermission(MetaPermission.MODEL_MANAGE)
     @Operation(summary = "Remove a field from a published model (Spec §4 / §3.6)")
     public ApiResponse<Void> removeField(
             @PathVariable("modelCode") String modelCode,

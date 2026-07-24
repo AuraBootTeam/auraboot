@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.provider;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.dto.LlmChunk;
+import com.auraboot.framework.common.util.SsrfValidator;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -88,6 +89,11 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
 
         String normalizedBase = normalizeBaseUrl(baseUrl);
 
+        // SSRF guard: baseUrl is tenant-configurable (CloudConfig) — reject private/
+        // loopback/link-local targets and disallowed schemes before the call
+        // (throws IllegalArgumentException on a blocked target; SEC-20260723-05).
+        SsrfValidator.validate(normalizedBase + "/v1/chat/completions");
+
         String responseBody;
         try {
             responseBody = webClient.post()
@@ -160,6 +166,8 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
         }
 
         String url = normalizeBaseUrl(baseUrl) + "/v1/chat/completions";
+        // SSRF guard (SEC-20260723-05): reject private/loopback targets before streaming.
+        SsrfValidator.validate(url);
         Map<String, String> toolNameReverse = buildToolNameReverseMap(request);
         AtomicLong seq = new AtomicLong(0L);
         OpenAiStreamAggregator agg = new OpenAiStreamAggregator();

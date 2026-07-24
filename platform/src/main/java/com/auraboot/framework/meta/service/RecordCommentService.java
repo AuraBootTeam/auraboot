@@ -21,10 +21,32 @@ import java.util.*;
 public class RecordCommentService {
 
     private final JdbcTemplate jdbcTemplate;
+    private final MetaModelService metaModelService;
+    private final DynamicDataService dynamicDataService;
 
     private static final String TABLE = "ab_record_comment";
 
+    /**
+     * Enforce record-level visibility before exposing / mutating a record's comment thread.
+     *
+     * <p>Comments are keyed by {@code (modelCode, recordPid)}. When {@code modelCode} is a
+     * registered model, delegate to {@link DynamicDataService#getById} which applies the
+     * caller's row-ACL / field-mask and throws {@code Access denied} when the caller cannot
+     * view the record — this closes the intra-tenant bypass where a user without data
+     * permission on a record could still read or append its comments (SEC-20260723-04).
+     * Comments attached to non-model targets (arbitrary {@code modelCode}) are not row-ACL
+     * controlled and are left unchanged.
+     */
+    private void assertRecordVisible(String modelCode, String recordPid) {
+        if (modelCode == null || recordPid == null
+                || metaModelService.getModelDefinition(modelCode).isEmpty()) {
+            return;
+        }
+        dynamicDataService.getById(modelCode, recordPid);
+    }
+
     public List<Map<String, Object>> listComments(String modelCode, String recordPid) {
+        assertRecordVisible(modelCode, recordPid);
         // JdbcTemplate bypasses the MyBatis tenant interceptor, so tenant_id must be scoped
         // explicitly here to keep comments isolated per tenant.
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -44,6 +66,7 @@ public class RecordCommentService {
         if (content == null || content.isBlank()) {
             throw new IllegalArgumentException("Comment content cannot be empty");
         }
+        assertRecordVisible(modelCode, recordPid);
 
         Long tenantId = MetaContext.getCurrentTenantId();
         Long userId = MetaContext.getCurrentUserId();
@@ -113,6 +136,8 @@ public class RecordCommentService {
 
     public List<Map<String, Object>> listActivity(String modelCode, String recordPid) {
         try {
+            // Deny (return empty) when the caller cannot view the underlying record.
+            assertRecordVisible(modelCode, recordPid);
             Long tenantId = MetaContext.getCurrentTenantId();
             return jdbcTemplate.queryForList(
                     "SELECT pid AS \"activityPid\", object_model, object_record, activity_type, subject, actor_name AS \"actorName\", occurred_at "

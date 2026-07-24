@@ -1,6 +1,7 @@
 package com.auraboot.framework.meta.service.impl;
 
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.meta.security.SqlSafetyUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -42,6 +43,15 @@ public class CriticalPathService {
             String projectId,
             String durationField,
             String dependencyField) {
+
+        // These arrive from @RequestParam (ScheduleController) and are used as column
+        // identifiers — projectIdField flows into a WHERE clause, duration/dependency are
+        // row-key lookups. A value quote-escape does NOT protect an identifier position, so
+        // validate against the identifier whitelist before use (rejects boolean/expression
+        // injection such as "1=1 OR pm_wbs_project_id").
+        SqlSafetyUtils.validateIdentifier(projectIdField, "critical-path projectIdField");
+        SqlSafetyUtils.validateIdentifier(durationField, "critical-path durationField");
+        SqlSafetyUtils.validateIdentifier(dependencyField, "critical-path dependencyField");
 
         // 1. Fetch all WBS nodes for the project
         String whereClause = projectId != null && !projectId.isEmpty()
