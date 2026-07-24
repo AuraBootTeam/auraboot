@@ -7,7 +7,7 @@ import { evaluateCondition as evaluateExpressionCondition } from '~/framework/me
 
 import { MetricStripBlockRenderer } from '../MetricStripBlockRenderer';
 import { CandidateListBlockRenderer } from '../CandidateListBlockRenderer';
-import { safeExternalUrl } from '../ReviewDrawerBlockRenderer';
+import { parseLadderRungs, safeExternalUrl } from '../ReviewDrawerBlockRenderer';
 import { RecordInspectorBlockRenderer } from '../RecordInspectorBlockRenderer';
 import { WorkbenchActionBarBlockRenderer } from '../WorkbenchActionBarBlockRenderer';
 import { EvidencePanelBlockRenderer } from '../EvidencePanelBlockRenderer';
@@ -2888,5 +2888,24 @@ describe('safeExternalUrl', () => {
     expect(safeExternalUrl('')).toBeNull();
     expect(safeExternalUrl(null)).toBeNull();
     expect(safeExternalUrl(42)).toBeNull();
+  });
+});
+
+describe('parseLadderRungs', () => {
+  it('accepts the projected array in object or string form and rejects anything else', () => {
+    const rungs = [
+      { qty: '1', price: '0.3705', current: false },
+      { qty: '100', price: '0.3200', current: true },
+    ];
+    expect(parseLadderRungs(rungs)).toEqual(rungs);
+    // jsonb reaches the client as an array or as its string form depending on the driver.
+    expect(parseLadderRungs(JSON.stringify(rungs))).toEqual(rungs);
+
+    expect(parseLadderRungs(null)).toBeNull();
+    expect(parseLadderRungs([])).toBeNull();
+    expect(parseLadderRungs('not json')).toBeNull();
+    // The old projection was a display string; it must not be mistaken for a ladder.
+    expect(parseLadderRungs('1+: 0.3705  100+: 0.3200')).toBeNull();
+    expect(parseLadderRungs([{ qty: '1' }])).toBeNull();
   });
 });

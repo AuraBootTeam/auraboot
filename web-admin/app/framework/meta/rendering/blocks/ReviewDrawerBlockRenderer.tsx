@@ -190,6 +190,27 @@ function isEmptyValue(value: unknown): boolean {
   return value === undefined || value === null || value === '';
 }
 
+/** One rung of a supplier price ladder, as projected by the named query. */
+interface LadderRung {
+  qty: string | number;
+  price: string | number;
+  current?: boolean;
+}
+
+/**
+ * Parses the ladder array off a field value. It arrives as jsonb, so it may already be an array or
+ * still be the string form depending on the driver and the projection.
+ */
+export function parseLadderRungs(value: unknown): LadderRung[] | null {
+  const raw = typeof value === 'string' ? parseJsonValue(value) : value;
+  if (!Array.isArray(raw) || raw.length === 0) return null;
+  const rungs = raw.filter(
+    (item): item is LadderRung =>
+      !!item && typeof item === 'object' && 'qty' in item && 'price' in item,
+  );
+  return rungs.length > 0 ? rungs : null;
+}
+
 /**
  * An http(s) URL safe to put in an href, or null. Evidence snapshots carry supplier detail links
  * copied verbatim from an upstream API, so the scheme is checked rather than assumed — javascript:
@@ -1313,7 +1334,37 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                                     className="text-text min-w-0 whitespace-normal break-words"
                                     title={value}
                                   >
-                                    {field.format === 'link' && safeExternalUrl(rawValue) ? (
+                                    {field.format === 'ladder' && parseLadderRungs(rawValue) ? (
+                                      <table
+                                        className="w-full text-xs"
+                                        data-testid={`review-drawer-candidate-${rowKey}-ladder`}
+                                      >
+                                        <tbody>
+                                          {parseLadderRungs(rawValue)!.map((rung) => (
+                                            <tr
+                                              key={String(rung.qty)}
+                                              data-testid={
+                                                rung.current
+                                                  ? `review-drawer-ladder-current-${rowKey}`
+                                                  : undefined
+                                              }
+                                              className={
+                                                rung.current
+                                                  ? 'text-accent font-semibold'
+                                                  : 'text-text-2'
+                                              }
+                                            >
+                                              <td className="pr-2 whitespace-nowrap">
+                                                {String(rung.qty)}+
+                                              </td>
+                                              <td className="text-right whitespace-nowrap">
+                                                {String(rung.price)}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    ) : field.format === 'link' && safeExternalUrl(rawValue) ? (
                                       <a
                                         href={safeExternalUrl(rawValue) as string}
                                         target="_blank"
