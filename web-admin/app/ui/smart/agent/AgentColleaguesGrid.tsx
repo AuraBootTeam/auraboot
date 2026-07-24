@@ -375,7 +375,7 @@ export function AgentColleaguesGrid(_props?: { block?: unknown; runtime?: unknow
 
   const handleCreate = () => navigate('/ai/colleagues/new');
   const handleEdit = (agent: AgentRecord) => navigate(`/ai/colleagues/${agent.pid}`);
-  const handleChat = (agent: AgentRecord) => navigate(`/ai/colleagues/${agent.pid}/chat`);
+  const handleChat = (agent: AgentRecord) => navigate(`/p/c/ai_colleague_chat?agentPid=${agent.pid}`);
 
   return (
     <div className={workspacePageClassName('contentPadded')} data-testid="agent-colleagues-grid">

@@ -158,6 +158,9 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   agentcolleaguesgrid: runtime('agent', 'AgentColleaguesGrid', {
     aliases: ['AgentColleaguesGrid', 'agent-colleagues-grid', 'agent_colleagues_grid'],
   }),
+  agentchatembed: runtime('agent', 'AgentChatEmbed', {
+    aliases: ['AgentChatEmbed', 'agent-chat-embed', 'agent_chat_embed'],
+  }),
   decisioneventpolicyactions: runtime('decision', 'EventPolicyActionsBlock', {
     aliases: [
       'EventPolicyActionsBlock',

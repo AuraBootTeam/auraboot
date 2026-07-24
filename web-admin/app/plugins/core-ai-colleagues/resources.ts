@@ -29,9 +29,11 @@ export const RESOURCES: PluginResource[] = [
     file: './plugins/core-ai-colleagues/pages/ai/colleagues.$agentPid.tsx',
   },
   {
-    key: 'ai.colleagues.chat', path: '/ai/colleagues/:agentPid/chat',
+    // Converted to a DSL page (ai_colleague_chat) whose AgentChatEmbed custom block wraps
+    // AuraBotChat; the agent comes from ?agentPid=. Kept as a resource for menu parentage,
+    // but fileless (no React route) — callers navigate to /p/c/ai_colleague_chat?agentPid=…
+    key: 'ai.colleagues.chat', path: '/p/c/ai_colleague_chat',
     title: { en: 'Chat', zh: '对话' },
     menu: false, parentKey: 'ai.colleagues',
-    file: './plugins/core-ai-colleagues/pages/ai/colleagues.$agentPid.chat.tsx',
   },
 ]
