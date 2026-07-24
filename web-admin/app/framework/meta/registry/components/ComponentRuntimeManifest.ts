@@ -164,6 +164,9 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   agentcreatewizard: runtime('agent', 'AgentCreateWizard', {
     aliases: ['AgentCreateWizard', 'agent-create-wizard', 'agent_create_wizard'],
   }),
+  agentdetailtabs: runtime('agent', 'AgentDetailTabs', {
+    aliases: ['AgentDetailTabs', 'agent-detail-tabs', 'agent_detail_tabs'],
+  }),
   decisioneventpolicyactions: runtime('decision', 'EventPolicyActionsBlock', {
     aliases: [
       'EventPolicyActionsBlock',

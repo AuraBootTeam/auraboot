@@ -374,7 +374,7 @@ export function AgentColleaguesGrid(_props?: { block?: unknown; runtime?: unknow
   }, [agents]);
 
   const handleCreate = () => navigate('/p/c/ai_colleague_new');
-  const handleEdit = (agent: AgentRecord) => navigate(`/ai/colleagues/${agent.pid}`);
+  const handleEdit = (agent: AgentRecord) => navigate(`/p/c/ai_colleague_detail?agentPid=${agent.pid}`);
   const handleChat = (agent: AgentRecord) => navigate(`/p/c/ai_colleague_chat?agentPid=${agent.pid}`);
 
   return (

@@ -180,7 +180,7 @@ export function AgentChatEmbed(_props?: { block?: unknown; runtime?: unknown }) 
           </button>
 
           <button
-            onClick={() => navigate(`/ai/colleagues/${agentPid}`)}
+            onClick={() => navigate(`/p/c/ai_colleague_detail?agentPid=${agentPid}`)}
             className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
             title={t('ai.chat.settings', undefined, 'Agent Settings')}
             data-testid="agent-chat-settings-btn"
