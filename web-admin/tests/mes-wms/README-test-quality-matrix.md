@@ -31,10 +31,10 @@
 | **FR-16** Hold | 🟢 3/3 | place_hold → active hold 行持久化 |
 | **FR-20** 设备停机 | 🟢 4/4 | breakdown 转 status + **重叠 breakdown 不重复计时=1 open downtime（#219）** |
 | **FR-22** 班次交接 | 🟢 5/5 | create → pending_ack → acknowledge → **acknowledged（双签认）** |
-| FR-13 齐套 | 🟡 前置绿 / full DEFER | work order 建成;compute_kitting 正确拒绝未解析 BOM → **full golden 需真 eng_bom_pcba_mbom + 行 + balance seed** |
-| FR-10 FEFO | ⬜ DEFER | 需 balance + 效期 lot + warehouse 多模型 seed |
+| **FR-13** 齐套 | 🟢 7/7 | product→BOM→line→work order→compute_kitting → 1 kitting_result / **status=short_non_critical rate=0（缺料正确报缺,非静默 kitted=临界件安全）** |
+| FR-10 FEFO | ⬜ 1 DEFER | 唯一未覆盖:需 warehouse(strategy=fefo)+ 2 效期 lot + balance(经 warehouse_in 收货流)+ pick source demand 的多步 seed;FEFO 排序逻辑已在 #217 交付,golden 待此 seed |
 
-**断言全 falsifiable**(DB 守恒值/事件数/明细表行/状态机),真命令管道 + 真 DB round-trip(psql 直查,非 API scope)。
+**7/8 FR 后端真栈 golden 全绿(34/34 checks,0 fail,1 deferred)**。断言全 falsifiable(DB 守恒值/事件数/互锁明细表 7 项/状态机),真命令管道 + 真 DB round-trip(psql 直查,非 API scope)。live 验证交付:**#219(互锁 tooling_life 第7检查 + 停机防重叠)+ #230(note 用 code)**。
 
 ### ✅ Infra 突破（本会话攻克 pcba 依赖网）
 - **16 个 hybrid jar 全 fresh 构建**(15 in `plugins/` + quote-engine in `aura-quote/`)→ `AURA_PLUGINS_DIR` 加载。
