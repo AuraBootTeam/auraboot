@@ -22,7 +22,7 @@
 | Language | TypeScript |
 | Assertion | Playwright's built-in `expect` |
 | Browser | Chromium (primary), Firefox/WebKit (optional) |
-| CI Integration | GitHub Actions |
+| Regression trigger | Self-contained runners on nightly cron + release (no GitHub Actions) — §8.3 |
 
 ---
 
@@ -259,36 +259,6 @@ test('can delete a model', async ({ page, api }) => {
 
 ### 5.1 How It Works
 
----
-
-## 6. Page Designer Commands
-
-Page Designer 回归不要再手写长文件列表，统一使用 `package.json` 中的专用脚本：
-
-```bash
-cd /Users/ghj/work/auraboot/auraboot/web-admin
-
-pnpm test:page-designer
-pnpm test:page-designer:smoke
-pnpm test:page-designer:critical
-pnpm test:page-designer:deep
-```
-
-说明：
-
-1. `test:page-designer` 跑完整 page-designer 回归集。
-2. `test:page-designer:smoke` 覆盖入口、属性面板、组件库基础行为。
-3. `test:page-designer:critical` 覆盖主闭环和权限门禁。
-4. `test:page-designer:deep` 使用 `PW_WORKERS=1` 和更长超时，避免 deep 套件单独运行时出现设计器加载假红。
-
-推荐日常顺序：
-
-```bash
-pnpm test:page-designer:smoke
-pnpm test:page-designer:critical
-pnpm test:page-designer:deep
-```
-
 1. **auth setup project (`tests/auth.setup.ts`)** runs first
 2. Performs real login (API first, UI fallback)
 3. Saves authentication state to `tests/storage/*.json`
@@ -515,45 +485,39 @@ npx playwright test --debug
 npx playwright show-report
 ```
 
-### 8.2 CI Configuration
+### 8.2 Page Designer Commands
 
-```yaml
-# .github/workflows/e2e-tests.yml
-name: E2E Tests
-on: [push, pull_request]
+Page Designer 回归不要再手写长文件列表，统一使用 `package.json` 中的专用脚本：
 
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+```bash
+cd /Users/ghj/work/auraboot/auraboot/web-admin
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install dependencies
-        run: npm ci
-        working-directory: web-admin
-
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-        working-directory: web-admin
-
-      - name: Run E2E tests
-        run: npx playwright test
-        working-directory: web-admin
-        env:
-          CI: true
-
-      - name: Upload test report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: web-admin/test-results/
+pnpm test:page-designer          # 完整 page-designer 回归集
+pnpm test:page-designer:smoke    # 入口、属性面板、组件库基础行为
+pnpm test:page-designer:critical # 主闭环和权限门禁
+pnpm test:page-designer:deep     # PW_WORKERS=1 + 更长超时，避免设计器加载假红
 ```
+
+推荐日常顺序：smoke → critical → deep。
+
+### 8.3 How These Get Triggered
+
+**这个仓库不靠 GitHub Actions 跑 E2E。** 长期回归靠自包含 runner —— 一条命令起栈、导入、
+跑、报 `exit`=结果、拆栈 —— 挂在 nightly crontab 和发版脚本上。写一个 `.yml` 等于写一道
+永远不会跑的门。
+
+| 触发点 | 入口 |
+|---|---|
+| 改动完成判定 | `tools/golden-gate-run.sh --changed`(只跑 `coversPaths` 命中的黄金套件) |
+| nightly / 每次回归 | `tools/golden-gate-run.sh`(所有 onboard 仓的 offline 档) |
+| 发版 | `tools/golden-gate-run.sh --full` |
+| 测试体系自证 | `./scripts/check-test-system.sh`(孤儿 spec / 命令可达 / 矩阵漂移 / 派生列) |
+
+写完一个 spec 之后**它会不会被选中跑**,不由本文件决定,由套件注册决定 ——
+未注册的 spec 在名单制 `testMatch` 下是 `No tests found` + **exit 0**,
+写了却从不运行,看起来却像有。`check-e2e-spec-registration` 就是拦这一条的。
+
+跨仓的执行/报告/债怎么串成一条链,见 workspace 根的 `tools/TEST-SYSTEM.md`。
 
 ---
 
@@ -577,12 +541,18 @@ npx playwright test -g "can create a model"
 npx playwright test --debug tests/e2e/model/model-crud.spec.ts
 ```
 
-### Q: Tests pass locally but fail in CI
+### Q: Tests pass when I run them, but fail in the nightly / release runner
 
-**A:** Common causes:
-1. Timing issues - add proper waits
-2. Network latency - increase timeouts in CI
-3. Missing dependencies - check CI logs
+**A:** 先分清是**环境**还是**产品**。这两类的处理方式相反,搞混会让你去改一个没坏的测试。
+
+1. **档位不同** — `--project=chromium` 跳过 fixtures 导入,大批 spec 变假红。全量 survey
+   必须 `PW_PROFILE=oss --project=oss`。用错档位前既不能说产品 bug 也不能说没事。
+2. **库不是 fresh** — 复用旧 slot 的库会静默 schema 漂移,而且上一轮的残留数据会让本轮
+   "为了错误的原因通过"。runner 走 destroy → up 拿全新库就是为了这个。
+3. **等待写成了固定 sleep** — `waitForTimeout` 把"还没开始"当成"正确地什么都没做",
+   在快机器上绿、在慢机器上红。等真实完成信号。
+4. **真的是环境挂了** — `ECONNREFUSED` / 进程退出 / 端口消失,立即停本轮归
+   `environment-invalid`,别把级联失败当产品失败。
 
 ### Q: How to add a new test?
 
