@@ -107,6 +107,71 @@ describe('RecursiveBlockRenderer', () => {
     expect(screen.queryByTestId('controlled-field-demo_color')).not.toBeInTheDocument();
   });
 
+  it('keeps model-backed picker fields on the designer picker so the authored option source still runs', async () => {
+    // The designer's `picker` is a data-source component: options come from
+    // `pickerDataSource`/`pickerSource` through runtimeServices.loadPickerOptions
+    // (/api/query-builder/execute), including server-side search. A platform FieldConfig
+    // cannot express that, so a picker must not be handed to the platform control — which
+    // would drop the authored source (and the platform registry has no `picker` at all).
+    const loadPickerOptions = vi
+      .fn()
+      .mockResolvedValue([{ label: 'Alice', value: 'alice' }]);
+    const schema: PageSchemaV3 = {
+      schemaVersion: 3,
+      kind: 'form',
+      id: 'wysiwyg_picker_page',
+      modelCode: 'demo_model',
+      blocks: [
+        {
+          id: 'form_root',
+          blockType: 'form',
+          blocks: [
+            {
+              id: 'field_owner',
+              blockType: 'field',
+              field: 'demo_owner',
+              props: {
+                label: 'Owner',
+                component: 'picker',
+                pickerDataSource: 'model',
+                pickerSource: 'user',
+                valueField: 'pid',
+                displayField: 'displayName',
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const modelFields: ModelFieldDefinition[] = [
+      {
+        modelCode: 'demo_model',
+        code: 'demo_owner',
+        label: '负责人',
+        type: 'relation',
+        refTarget: { modelCode: 'user', valueField: 'pid', displayField: 'displayName' },
+      },
+    ];
+
+    render(
+      <RecursiveBlockRenderer
+        schema={schema}
+        modelFields={modelFields}
+        runtimeServices={{ loadPickerOptions } as unknown as RuntimeExecutionServices}
+      />,
+    );
+
+    const picker = await screen.findByTestId('runtime-picker-field_owner');
+    await waitFor(() => expect(picker).toHaveTextContent('Alice'));
+    expect(screen.getByTestId('runtime-picker-meta-field_owner')).toHaveTextContent(
+      'model / user / displayName / pid',
+    );
+    expect(loadPickerOptions).toHaveBeenCalled();
+    // Not routed through the platform control (which has no `picker`).
+    expect(screen.getByTestId('runtime-field-field_owner')).not.toHaveAttribute('data-wysiwyg');
+    expect(screen.queryByTestId('controlled-field-demo_owner')).not.toBeInTheDocument();
+  });
+
   it('renders fields, columns, actions, and dashboard widgets from recursive blocks', () => {
     render(<RecursiveBlockRenderer schema={samplePageSchemaV3} />);
 

@@ -22,7 +22,8 @@ import type { FieldConfig, DataSourceConfig } from '~/framework/meta/schemas/typ
 import type { ExpressionContext } from '~/framework/meta/runtime/expression/context';
 import { evaluateCondition } from '~/framework/meta/runtime/expression/evaluator';
 import { ComponentLoader } from '~/framework/meta/rendering/components/ComponentLoader';
-import { FieldError } from '~/ui/ui/field-meta';
+import { FieldError, FieldHelp } from '~/ui/ui/field-meta';
+import { FieldErrorOwnedByWrapperContext } from '~/ui/ui/field-base';
 import { getLocalizedText } from '~/routes/_shared/dynamic-route-utils';
 import { usePermission } from '~/contexts/AuthContext';
 import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
@@ -198,6 +199,17 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
       }
     }
   }
+
+  // Help text is rendered by this wrapper (like the label), not by the control.
+  // Only the smart *Input* ever forwarded a plain `helpText` prop into its FieldBase, so
+  // every other control (SmartSelect / SmartSwitch / SmartUpload / pickers …) silently
+  // dropped a configured `helpText`. Rendering it here makes help work for every control
+  // and keeps the vertical label→control→error→help rhythm identical across components.
+  const rawHelpText = (field as any).helpText ?? field.props?.helpText;
+  const resolvedHelpText =
+    rawHelpText == null || rawHelpText === ''
+      ? undefined
+      : getLocalizedText(rawHelpText, context.locale || 'zh-CN', t) || undefined;
 
   const componentLower = String(componentName).toLowerCase();
 
@@ -417,6 +429,9 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
     context,
     ...field.props, // 合并字段配置的其他 props
   };
+  // Owned by this wrapper (see resolvedHelpText); keep it out of the control's props so
+  // SmartInput does not render a second copy under its own FieldBase.
+  delete componentProps.helpText;
 
   // 如果有 dictCode 且没有 dataSource，自动生成字典数据源配置（不适用于 tree 组件）
   if (field.dictCode && !isTreeComponent && !field.dataSource) {
@@ -532,10 +547,16 @@ export const ControlledFieldRenderer: React.FC<ControlledFieldRendererProps> = (
           </div>
         ) : (
           <>
-            <ComponentLoader componentName={componentName} props={componentProps} />
+            {/* While this wrapper shows the field error, the control suppresses its own
+                copy of it — otherwise the same message renders twice (form-context error
+                here + the control's identical validationRules run inside its FieldBase). */}
+            <FieldErrorOwnedByWrapperContext.Provider value={Boolean(error)}>
+              <ComponentLoader componentName={componentName} props={componentProps} />
+            </FieldErrorOwnedByWrapperContext.Provider>
             <FieldError message={error} />
           </>
         )}
+        <FieldHelp message={resolvedHelpText} />
       </div>
       {allowCreate && (
         <ReferenceCreateDialog

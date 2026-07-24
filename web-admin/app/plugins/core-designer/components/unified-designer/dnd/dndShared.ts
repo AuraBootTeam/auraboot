@@ -29,6 +29,19 @@ export const ROOT_DROPPABLE_ID = 'drop-root';
 type CollisionIdentifier = string | number;
 type CollisionRect = { width: number; height: number };
 
+/**
+ * Order *containment* hits so the innermost droppable wins.
+ *
+ * `pointerWithin` reports EVERY droppable whose rect contains the pointer, so a
+ * pointer over a nested field also reports the section and the page root. Its
+ * own sort key (mean distance from the pointer to the rect corners) does not
+ * reliably rank the innermost target first, so we rank by rect area ascending:
+ * the smallest rect containing the pointer is the deepest target under it.
+ *
+ * Only ever apply this to droppables that genuinely contain the pointer — a
+ * smallest-area rule over a mixed containment/proximity set lets a block the
+ * pointer is nowhere near win (see `buildDesignerCollisionCandidates`).
+ */
 export function prioritizeNestedDropCollisions<T extends { id: CollisionIdentifier }>(
   collisions: T[],
   droppableRects: { get(id: CollisionIdentifier): CollisionRect | undefined },
@@ -46,19 +59,46 @@ export function prioritizeNestedDropCollisions<T extends { id: CollisionIdentifi
     .map(({ collision }) => collision);
 }
 
+/**
+ * Merge @dnd-kit's `pointerWithin` (containment) and `closestCenter` (proximity)
+ * results into the designer's drop candidate list. `over` is `candidates[0]`.
+ *
+ * The two inputs answer different questions and must NOT be pooled:
+ *  - `pointerWithin` = "which droppables is the pointer actually inside?" — the
+ *    user's aim, and empty whenever the pointer sits in a gap between blocks.
+ *  - `closestCenter` = "which droppable's center is nearest the dragged item's
+ *    center?" — a proximity GUESS over every measured droppable that never
+ *    checks containment, so it always returns something.
+ *
+ * Therefore: containment hits (innermost first) always outrank the proximity
+ * fallback, which is kept only as a trailing last resort and is the sole answer
+ * when the pointer is inside nothing at all.
+ *
+ * Ranking the proximity guess by area alongside the containment hits was the
+ * cause of a silent no-op drop: for a container taller than the viewport
+ * (measured: `form_root` at 1651px) the container's own center is hundreds of
+ * pixels from the pointer, so `closestCenter` always contributed some small
+ * descendant, which then won the area sort — a drop aimed at the container (even
+ * on its own header) resolved to a descendant that rejects the block, and the
+ * gesture did nothing at all.
+ */
 export function buildDesignerCollisionCandidates<T extends { id: CollisionIdentifier }>(
   pointerHits: T[],
   closestHits: T[],
   droppableRects: { get(id: CollisionIdentifier): CollisionRect | undefined },
 ): T[] {
+  // Pointer outside every droppable (dragging over a gap): proximity is all we have.
   if (pointerHits.length === 0) return closestHits;
 
-  const candidates = [...pointerHits];
-  const closest = closestHits[0];
-  if (closest && !candidates.some((candidate) => candidate.id === closest.id)) {
-    candidates.push(closest);
+  const containmentCandidates = prioritizeNestedDropCollisions(pointerHits, droppableRects);
+  const proximityFallback = closestHits[0];
+  if (
+    !proximityFallback ||
+    containmentCandidates.some((candidate) => candidate.id === proximityFallback.id)
+  ) {
+    return containmentCandidates;
   }
-  return prioritizeNestedDropCollisions(candidates, droppableRects);
+  return [...containmentCandidates, proximityFallback];
 }
 
 function getCollisionRectArea(rect: CollisionRect | undefined): number {
