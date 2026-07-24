@@ -145,17 +145,28 @@ try { await frInterlock(); } catch (e) { R.check('FR-05', 'no exception', false,
 async function frKitting() {
   console.log('\n[FR-13] Kitting analysis — compute produces a kitting result per work order');
   const code = uid('KWO');
+  // Seed a real product (compute_kitting FK-checks the BOM line material against prod_product) + BOM + line.
+  const prod = await execCommand(token, 'prod:create_product',
+    { prod_name: `Mat ${code}`, prod_type: 'raw_material', prod_unit: 'pcs' }, undefined, 'create', { allowError: true });
+  if (!R.check('FR-13', 'seed material product', prod.recordId, `prod=${prod.recordId} detail=${JSON.stringify(prod.raw?.context||'').slice(0,80)}`)) return;
+  const bom = await execCommand(token, 'eng_bom_pcba_mbom:create',
+    { eng_bom_name: `BOM ${code}`, eng_bom_product_id: prod.recordId, eng_bom_version: 'A', eng_bom_output_qty: 1 }, undefined, 'create', { allowError: true });
+  if (!R.check('FR-13', 'seed BOM', bom.recordId, `bom=${bom.recordId} detail=${JSON.stringify(bom.raw?.context||'').slice(0,80)}`)) return;
+  const line = await execCommand(token, 'eng_bom_line_pcba_mbom:create',
+    { eng_bom_line_bom_id: bom.recordId, eng_bom_line_material_id: prod.recordId, eng_bom_line_qty: 10, eng_bom_line_unit: 'pcs' }, undefined, 'create', { allowError: true });
+  R.check('FR-13', 'seed BOM line', line.recordId, `line=${line.recordId}`);
   const wo = await execCommand(token, 'mfg_work_order_pcba_execution:create',
-    { mfg_wo_name: `KitWO ${code}`, mfg_wo_product_id: `prod-${code}`, mfg_wo_bom_id: `bom-${code}`, mfg_wo_plan_qty: 50 }, undefined, 'create', { allowError: true });
-  if (!R.check('FR-13', 'create work order', wo.recordId, `id=${wo.recordId}`)) return;
+    { mfg_wo_name: `KitWO ${code}`, mfg_wo_product_id: `prod-${code}`, mfg_wo_bom_id: bom.recordId, mfg_wo_plan_qty: 50 }, undefined, 'create', { allowError: true });
+  if (!R.check('FR-13', 'create work order (real BOM)', wo.recordId, `id=${wo.recordId}`)) return;
   const kit = await execCommand(token, 'inv:compute_kitting', { inv_kr_work_order_id: wo.recordId }, undefined, 'action', { allowError: true });
-  // FR-13's meaningful assertion (full vs critical kitting) needs a real eng_bom_pcba_mbom +
-  // BOM lines + inventory balance seeded. compute_kitting correctly refuses a work order whose
-  // BOM does not resolve ("Record not found") — that IS correct behaviour, but it means this FR's
-  // full golden requires a multi-model seed not yet built. Report honestly as DEFERRED, not green.
-  const needsBomSeed = !kit.ok && /not found|no BOM/i.test(JSON.stringify(kit.raw || ''));
-  R.deferred('FR-13', 'kitting rate/critical golden requires real BOM + lines + balance seed',
-    needsBomSeed ? 'compute_kitting correctly rejects unresolved BOM — seed needed for full golden' : `code=${kit.code}`);
+  R.check('FR-13', 'compute_kitting executes', kit.ok, `code=${kit.code} status=${kit.status} detail=${JSON.stringify(kit.raw?.context||'').slice(0,90)}`);
+  const kr = queryDb(`select inv_kr_status, inv_kr_kitting_rate from mt_inv_kitting_result where inv_kr_work_order_id='${sq(wo.recordId)}'`);
+  R.check('FR-13', 'exactly one kitting_result row per work order', kr.length === 1, `rows=${kr.length} status=${kr[0]?.[0]} rate=${kr[0]?.[1]}`);
+  // Critical-part safety: with the BOM material having no inventory balance it is short → status must
+  // reflect a real shortage state (never null / never silently "kitted").
+  R.check('FR-13', 'shortage → real non-kitted status (critical-part safety)',
+    kr[0] && kr[0][0] != null && kr[0][0] !== '' && kr[0][0] !== 'kitted', `status=${kr[0]?.[0]} rate=${kr[0]?.[1]}`);
+  const shortRows = scalar(`select count(*) from information_schema.tables where table_name like 'mt_inv_kitting%shortage%' or table_name like 'mt_inv_kr%'`);
 }
 try { await frKitting(); } catch (e) { R.check('FR-13', 'no exception', false, String(e.message).slice(0, 200)); }
 
