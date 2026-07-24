@@ -757,6 +757,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     : [];
   const sourceCards = Array.isArray(sourceConfig.cards) ? sourceConfig.cards : [];
   const sourcePolicies = Array.isArray(sourceConfig.policies) ? sourceConfig.policies : [];
+  // Labeled JSON evidence blocks (e.g. handover snapshots). Structured/JSONB data belongs here as a
+  // collapsible, formatted, labeled <pre> — not crammed into scalar summaryBadges where it renders as
+  // raw inline JSON. Additive alongside the singular sourceConfig.jsonField.
+  const sourceJsonFields = Array.isArray(sourceConfig.jsonFields) ? sourceConfig.jsonFields : [];
   const exportFields = Array.isArray(exportConfig.fields) ? exportConfig.fields : [];
   const decisionFields = Array.isArray(candidatesConfig.decisionFields)
     ? candidatesConfig.decisionFields
@@ -766,7 +770,10 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     : [];
   const hasComparePanel = rawFields.length > 0 || canonicalFields.length > 0;
   const hasSourceDetails =
-    sourceCards.length > 0 || sourcePolicies.length > 0 || Boolean(sourceConfig.jsonField);
+    sourceCards.length > 0 ||
+    sourcePolicies.length > 0 ||
+    sourceJsonFields.length > 0 ||
+    Boolean(sourceConfig.jsonField);
   const hasExportDetails = exportFields.length > 0 || exportRows.length > 0;
   const hasLeftRail =
     hasComparePanel || sourceSummaryItems.length > 0 || hasSourceDetails || hasExportDetails;
@@ -1082,6 +1089,23 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                         )}
                       </pre>
                     )}
+                    {sourceJsonFields.map((item: any) => {
+                      const key = String(item.key || item.field || item.label);
+                      return (
+                        <section key={key} data-testid={`review-drawer-source-json-${key}`}>
+                          <div className="text-text-2 mb-1 text-xs font-medium">
+                            {getLocalizedText(item.label || key, locale, t)}
+                          </div>
+                          <pre className="rounded-card border-inverse-border bg-inverse text-inverse-muted max-h-64 overflow-auto border p-3 text-xs">
+                            {JSON.stringify(
+                              parseJsonValue(readPath(sourceRecord, item.field)),
+                              null,
+                              2,
+                            )}
+                          </pre>
+                        </section>
+                      );
+                    })}
                   </div>
                 </details>
               )}

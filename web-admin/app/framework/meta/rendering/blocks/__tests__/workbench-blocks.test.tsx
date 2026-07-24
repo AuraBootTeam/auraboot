@@ -2400,6 +2400,48 @@ describe('ReviewDrawerBlockRenderer', () => {
     // Falsifiable guard: without _display resolution the summary shows the raw pid.
     expect(drawer).not.toHaveTextContent('01JZZZULIDRAWPID');
   });
+
+  it('renders labeled JSON evidence blocks from source.jsonFields', () => {
+    const runtime = makeRuntime({
+      data: {
+        standardLines: [
+          {
+            ...selectedLine,
+            // Structured JSONB snapshot (like FR-22 handover open-items snapshot).
+            mfg_sho_open_items_snapshot: [{ item: 'reflow oven drift', severity: 'high' }],
+          },
+        ],
+      },
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: { pid: 'task-1' },
+        global: {},
+        state: { selectedBomLine: selectedLine },
+      }),
+    }) as any;
+
+    render(
+      <ReviewDrawerBlockRenderer
+        block={{
+          ...reviewDrawerBlock,
+          contextDataSource: 'standardLines',
+          contextKeyField: 'pid',
+          source: {
+            jsonFields: [
+              { key: 'openItems', label: 'Open Items', field: 'mfg_sho_open_items_snapshot' },
+            ],
+          },
+        }}
+        runtime={runtime}
+      />,
+    );
+
+    // JSONB snapshot renders as a labeled, formatted evidence block -- not a raw scalar badge.
+    const section = screen.getByTestId('review-drawer-source-json-openItems');
+    expect(section).toHaveTextContent('Open Items');
+    expect(section).toHaveTextContent('reflow oven drift');
+  });
 });
 
 describe('RecordInspectorBlockRenderer', () => {
