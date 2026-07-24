@@ -1159,6 +1159,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         enrichedData.put("updated_at", java.time.Instant.now());
         enrichedData.put("updated_by", getCurrentUserId());
         enrichedData.put("tenant_id", getCurrentTenantId());
+        // Same reason as the fields above: a derived row created under a command authorized for one
+        // aggregate belongs to that aggregate, not to whichever one the payload names.
+        injectAggregateBinding(model, enrichedData);
         
         // 生成主键（如果需要）
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
@@ -1292,24 +1295,66 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * Stripping (rather than rejecting) keeps clients tolerant while guaranteeing
      * restricted fields never reach the row; each strip is logged for audit.
      */
-    private void stripNonWritableFields(String modelCode, Map<String, Object> data) {
+    /**
+     * Remove fields the caller may not write.
+     *
+     * @return the field codes actually removed, so a caller holding the stored row can tell an
+     *         apologetic full-row round-trip from a real attempt to change a forbidden field.
+     */
+    private Set<String> stripNonWritableFields(String modelCode, Map<String, Object> data) {
         if (data == null || data.isEmpty()) {
-            return;
+            return Collections.emptySet();
         }
         if (MetaContext.isDataPermissionBypassed()) {
-            return;
+            return Collections.emptySet();
         }
         Long tenantId = getCurrentTenantId();
         Long userId = getCurrentUserId();
         Set<String> nonWritable = dataPermissionEngine.getNonWritableFields(tenantId, modelCode, userId);
         if (nonWritable == null || nonWritable.isEmpty()) {
-            return;
+            return Collections.emptySet();
         }
+        Set<String> stripped = new LinkedHashSet<>();
         for (String fieldCode : nonWritable) {
             if (data.remove(fieldCode) != null) {
+                stripped.add(fieldCode);
                 log.warn("Field-write permission: stripped non-writable field '{}' from {} write by user {}",
                         logSafe(fieldCode), logSafe(modelCode), logSafe(userId));
             }
+        }
+        return stripped;
+    }
+
+    /**
+     * Turn a silently-dropped write into a visible refusal when the caller actually tried to
+     * change something they may not change.
+     *
+     * <p>Silently stripping is the friendly behaviour for the common "read a row, edit two
+     * fields, send the whole thing back" client: it submitted the forbidden field, but it
+     * submitted the value that is already stored, so nothing was denied and nothing should be
+     * reported. A submitted value that <em>differs</em> from the stored one is a different
+     * event — the caller asked for a change and did not get it — and letting that pass in
+     * silence is how a permission problem becomes an invisible one.</p>
+     */
+    // package-private + static: the visibility property (a real refusal is never silent, an
+    // unchanged round-trip never complains) is directly tested; no instance state is involved.
+    static void assertNoDeniedFieldWrites(String modelCode, Map<String, Object> submitted,
+                                          Set<String> strippedFields, Map<String, Object> existingRecord) {
+        if (strippedFields == null || strippedFields.isEmpty() || submitted == null || existingRecord == null) {
+            return;
+        }
+        List<String> denied = new ArrayList<>();
+        for (String fieldCode : strippedFields) {
+            if (!submitted.containsKey(fieldCode)) {
+                continue;
+            }
+            if (ValidationServiceImpl.valueChanges(existingRecord.get(fieldCode), submitted.get(fieldCode))) {
+                denied.add(fieldCode);
+            }
+        }
+        if (!denied.isEmpty()) {
+            throw new MetaServiceException("FIELD_WRITE_DENIED: not permitted to change "
+                    + String.join(", ", denied) + " on " + modelCode);
         }
     }
 
@@ -1444,7 +1489,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         Map<String, Object> data = new LinkedHashMap<>(inputData);
         
         // Field-level write permission (gap #1): strip fields the current user may not write
-        stripNonWritableFields(modelCode, data);
+        Set<String> strippedNonWritable = stripNonWritableFields(modelCode, data);
 
         logOperation("update", modelCode, recordId, data.keySet());
         
@@ -1456,12 +1501,24 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             if (existingRecord == null) {
                 throw new MetaServiceException("Record not found with ID: " + recordId);
             }
-            
+
+            // A field the caller may not write was dropped above. Now that the stored row is in
+            // hand we can tell whether that was harmless (they sent back the value already there)
+            // or a real refusal that must not be delivered silently.
+            assertNoDeniedFieldWrites(modelCode, inputData, strippedNonWritable, existingRecord);
+
+
             // Normalize temporal string values to typed objects (LocalDate/Instant) before validation
             payloadTemporalNormalizer.normalize(data, model);
             // 使用验证服务的严格模式进行验证
             // 验证失败会抛出异常并触发事务回滚
             validationService.validateAndThrow(model, data, ValidationContext.UPDATE);
+            // Field-level domain invariants (immutable / immutableWhen). These are decided
+            // against the row as it currently stands, which is why they need existingRecord
+            // and cannot live in the payload-only validation above. They are invariants, not
+            // permissions: admin and system handlers are bound by them, and a command that
+            // inherited an aggregate's authority does not get to waive them.
+            validationService.validateImmutabilityAndThrow(model, data, existingRecord);
             // Validation intentionally works with java.time domain types. Convert
             // them to JDBC-native values only afterwards, matching the CREATE
             // path and preventing MyBatis from binding Instant as an untyped
@@ -1676,6 +1733,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             params.put("expectedVersion", expectedVersion);
             sql.append(" AND row_version = #{params.expectedVersion}");
         }
+        appendAggregateBindingGuard(sql, params, model);
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, "update");
 
         return dynamicDataMapper.updateByQuery(sql.toString(), params);
@@ -1700,9 +1758,79 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 .append(pkColumn)
                 .append(" = #{params.recordId}")
                 .append(" AND tenant_id = #{params.tenantId}");
+        appendAggregateBindingGuard(sql, params, model);
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete");
 
         return dynamicDataMapper.deleteByQuery(sql.toString(), params);
+    }
+
+    /**
+     * Pin a write to the aggregate root the command was authorized against.
+     *
+     * <p>Deliberately NOT gated on {@link MetaContext#isDataPermissionBypassed()}. That flag means
+     * "do not re-run the caller's read projection", which is a statement about re-deciding policy.
+     * This is not a decision — no policy is consulted — it is the execution of a boundary the entry
+     * already fixed. A command authorized for Q1001 must not reach Q2002's rows precisely on the
+     * paths that inherit its authority, so switching it off there would remove the guard exactly
+     * where it is load-bearing.</p>
+     *
+     * <p>Inert unless both an aggregate scope is open and the model declares a binding, so models
+     * opt in one at a time rather than the whole platform changing behaviour at once.</p>
+     */
+    // package-private + static: the safety property (an open aggregate scope pins every guarded
+    // write, including on bypassed paths) is directly tested, and the guard depends on no
+    // instance state.
+    static void appendAggregateBindingGuard(StringBuilder sql, Map<String, Object> params, ModelDefinition model) {
+        String aggregateId = MetaContext.getCommandAggregateId();
+        if (aggregateId == null || model == null) {
+            return;
+        }
+        ModelDefinition.AggregateBinding binding = model.getAggregateBinding();
+        if (binding == null || binding.getLocalField() == null || binding.getLocalField().isBlank()) {
+            return;
+        }
+        String column = resolveBindingColumn(model, binding.getLocalField());
+        params.put("authorizedAggregateId", aggregateId);
+        sql.append(" AND ").append(column).append(" = #{params.authorizedAggregateId}");
+    }
+
+    /**
+     * A binding names a <em>field code</em>; SQL needs the physical column. Falls back to the code
+     * when the model declares no explicit column, which is the common case.
+     */
+    private static String resolveBindingColumn(ModelDefinition model, String fieldCode) {
+        String column = fieldCode;
+        if (model.getFields() != null) {
+            for (FieldDefinition field : model.getFields()) {
+                if (fieldCode.equals(field.getCode()) && field.getColumnName() != null
+                        && !field.getColumnName().isBlank()) {
+                    column = field.getColumnName();
+                    break;
+                }
+            }
+        }
+        return SqlSafetyUtils.requireIdentifier(column, "aggregate binding column");
+    }
+
+    /**
+     * Stamp a newly created row with the aggregate the entry authorized.
+     *
+     * <p>Injected for exactly the reason {@code tenant_id} and {@code created_by} are injected a
+     * few lines above: the client does not get to choose. A derived row created while a command is
+     * authorized for Q1001 belongs to Q1001, whatever the payload claims — otherwise a caller could
+     * plant rows under another document and reach them later through a legitimate scope.</p>
+     */
+    // package-private + static: directly tested, no instance state involved.
+    static void injectAggregateBinding(ModelDefinition model, Map<String, Object> data) {
+        String aggregateId = MetaContext.getCommandAggregateId();
+        if (aggregateId == null || model == null || data == null) {
+            return;
+        }
+        ModelDefinition.AggregateBinding binding = model.getAggregateBinding();
+        if (binding == null || binding.getLocalField() == null || binding.getLocalField().isBlank()) {
+            return;
+        }
+        data.put(binding.getLocalField(), aggregateId);
     }
 
     private void appendScopedWriteGuards(

@@ -184,8 +184,45 @@ public class FieldDefinition {
      * 扩展属性
      */
     private Map<String, Object> extraProps;
-    
+
+    /**
+     * Unconditional field-level invariant: the field may never change once the
+     * record exists, in any state.
+     */
+    private Boolean immutable;
+
+    /**
+     * Conditional field-level invariant: the field may not change while the record
+     * is in one of the locking states.
+     *
+     * <p><b>This is not a permission.</b> It binds every subject and every write path —
+     * admin, system handlers and commands that inherited an aggregate's authority
+     * included — and can never be granted away by a role, scope or ACL. Changing a
+     * locked field requires a legal state transition that moves the record out of the
+     * locking state, not a broader privilege.</p>
+     */
+    private ImmutableWhen immutableWhen;
+
+    /**
+     * Locking condition for {@link FieldDefinition#immutableWhen}: the guarded field is
+     * frozen while {@code field}'s <em>current</em> (pre-update) value is one of {@code in}.
+     */
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class ImmutableWhen {
+        /** Code of the field whose current value decides whether the lock applies. */
+        private String field;
+        /** The guarded field is frozen while {@link #field} currently holds one of these values. */
+        private List<String> in;
+    }
+
     // 便利方法
+    public boolean isImmutable() {
+        return Boolean.TRUE.equals(immutable);
+    }
+
     public boolean isRequired() {
         return Boolean.TRUE.equals(required);
     }
