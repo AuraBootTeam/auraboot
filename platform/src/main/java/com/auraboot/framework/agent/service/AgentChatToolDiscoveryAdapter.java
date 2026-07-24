@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.service;
 
+import com.auraboot.framework.agent.dto.AgentToolDefinition;
 import com.auraboot.framework.agent.dto.BusinessIntentFrame;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
@@ -33,6 +34,16 @@ class AgentChatToolDiscoveryAdapter {
     private final ToolProviderRegistry toolProviderRegistry;
     private final GroundingService groundingService;
     private final ObjectMapper objectMapper;
+    /**
+     * Resolves the governed tools a bound skill contributes (#1440). A named agent
+     * (colleague) declares its skills in the {@code skills} column; without this the
+     * named-agent turn read only the {@code tools} column, so a colleague bound to a
+     * skill but given no explicit tools got NO tool at all — and, unable to read the
+     * system of record, fabricated its answer. The generic AuraBot path already
+     * resolves bound skills via {@code ToolDiscoveryPortImpl}; this brings the
+     * named-agent path to parity.
+     */
+    private final AgentSkillService agentSkillService;
 
     private com.auraboot.framework.agent.runtime.policy.AgentToolScopePolicy toolScopePolicy() {
         // Stateless; constructed on demand so the adapter's constructor signature
@@ -95,7 +106,7 @@ class AgentChatToolDiscoveryAdapter {
 
     private List<ToolDefinition> discoverExplicitAgentTools(Long tenantId, Long userId, String agentCode,
                                                             Map<String, Object> agentDef, BusinessIntentFrame bif) {
-        List<String> explicitCodes = explicitToolCodes(agentDef);
+        List<String> explicitCodes = combinedAgentToolCodes(tenantId, agentDef);
         if (explicitCodes.isEmpty()) {
             return Collections.emptyList();
         }
@@ -279,11 +290,48 @@ class AgentChatToolDiscoveryAdapter {
     }
 
     @SuppressWarnings("unchecked")
+    /**
+     * The tool codes a named-agent turn resolves: its explicit {@code tools} column
+     * PLUS the governed tools each bound skill (in the {@code skills} column)
+     * contributes. Bound-skill tools are resolved via {@link AgentSkillService}, which
+     * already applies the #1440 permission envelope (a bound skill cannot hand a user a
+     * governed tool they could not reach directly); the resulting codes then flow
+     * through the exact same registry resolution as explicit tools, so a skill-supplied
+     * {@code list:crm_account} gets identical metadata (read-only, model hint, gating).
+     */
+    private List<String> combinedAgentToolCodes(Long tenantId, Map<String, Object> agentDef) {
+        Set<String> codes = new LinkedHashSet<>(explicitToolCodes(agentDef));
+        for (String skillCode : parseCodeList(agentDef, "skills")) {
+            List<AgentToolDefinition> skillTools;
+            try {
+                skillTools = agentSkillService.resolveSkillTools(tenantId, skillCode);
+            } catch (Exception e) {
+                log.warn("Failed to resolve bound skill tools: skill={}, error={}",
+                        LogSanitizer.safe(skillCode), safeExceptionMessage(e));
+                continue;
+            }
+            if (skillTools == null) {
+                continue;
+            }
+            for (AgentToolDefinition tool : skillTools) {
+                if (tool != null && tool.getName() != null && !tool.getName().isBlank()) {
+                    codes.add(tool.getName().trim());
+                }
+            }
+        }
+        return new ArrayList<>(codes);
+    }
+
     private List<String> explicitToolCodes(Map<String, Object> agentDef) {
-        if (agentDef == null || agentDef.get("tools") == null) {
+        return parseCodeList(agentDef, "tools");
+    }
+
+    /** Parse a JSON-array / CSV / list-of-maps code column ({@code tools} or {@code skills}). */
+    private List<String> parseCodeList(Map<String, Object> agentDef, String field) {
+        if (agentDef == null || agentDef.get(field) == null) {
             return Collections.emptyList();
         }
-        Object raw = agentDef.get("tools");
+        Object raw = agentDef.get(field);
         List<Object> values = new ArrayList<>();
         if (raw instanceof List<?> list) {
             values.addAll((List<Object>) list);
@@ -296,7 +344,7 @@ class AgentChatToolDiscoveryAdapter {
                 try {
                     values.addAll(objectMapper.readValue(text, List.class));
                 } catch (Exception e) {
-                    log.warn("Failed to parse agent tools JSON: {}", e.getMessage());
+                    log.warn("Failed to parse agent {} JSON: {}", field, e.getMessage());
                     return Collections.emptyList();
                 }
             } else {

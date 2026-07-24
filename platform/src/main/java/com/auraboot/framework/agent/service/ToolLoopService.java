@@ -308,10 +308,20 @@ public class ToolLoopService {
             }
 
             String result;
+            // The LLM sees a sanitized tool name (list_crm_account); the real DSL code
+            // (list:crm_account) is recovered by restoring the prefix ':'. Its sourceCode is only
+            // the bare modelCode (crm_account), so neither the name nor sourceCode can classify it.
+            // Classify and dispatch DSL queries on the restored code — a bare list:/get: model read
+            // must reach the DSL provider (executeList/getById), not named-query execution. Testing
+            // the sanitized name made isGenericModelReadTool() always false (it checks the "list:"/
+            // "get:" prefix), so every list:/get: read was misrouted to namedQueryService.executeQuery
+            // and failed ("list:crm_account" is not a named query) — leaving a bound-skill colleague
+            // with a dead read tool.
+            String dslQueryCode = restoreDslToolCode(toolName);
             if ("dsl_command".equals(toolType)) {
                 result = executeDslCommandWithAction(toolDef.getSourceCode(), input, tenantId, runPid, toolDef);
-            } else if ("dsl_query".equals(toolType) && isGenericModelReadTool(toolName)) {
-                result = executeProviderToolByCode(toolDef, input, tenantId, toolName);
+            } else if ("dsl_query".equals(toolType) && isGenericModelReadTool(dslQueryCode)) {
+                result = executeProviderToolByCode(toolDef, input, tenantId, dslQueryCode);
             } else if ("dsl_query".equals(toolType)) {
                 result = executeDslQueryWithAction(toolDef.getSourceCode(), input, tenantId, runPid, toolDef);
             } else if ("AURABOT_SKILL".equals(toolType)) {
@@ -658,6 +668,31 @@ public class ToolLoopService {
 
     private boolean isGenericModelReadTool(String toolCode) {
         return toolCode != null && (toolCode.startsWith("get:") || toolCode.startsWith("list:"));
+    }
+
+    /** DSL tool codes an LLM function name is sanitized from (prefix ':' becomes '_'). */
+    private static final Set<String> DSL_TOOL_PREFIXES = Set.of("cmd", "nq", "list", "get");
+
+    /**
+     * Restore a DSL tool code from its LLM-safe name: {@code list_crm_account} →
+     * {@code list:crm_account}. Sanitization ({@link AgentChatPortImpl#toLlmSafeToolName})
+     * replaces the prefix ':' with '_', and the model code that follows keeps its own
+     * underscores, so only the FIRST underscore (right after a known DSL prefix) is
+     * restored. Non-DSL names (custom/native tools) pass through unchanged.
+     */
+    private String restoreDslToolCode(String toolName) {
+        if (toolName == null) {
+            return null;
+        }
+        int underscore = toolName.indexOf('_');
+        if (underscore <= 0) {
+            return toolName;
+        }
+        String prefix = toolName.substring(0, underscore);
+        if (DSL_TOOL_PREFIXES.contains(prefix)) {
+            return prefix + ":" + toolName.substring(underscore + 1);
+        }
+        return toolName;
     }
 
     private String executeProviderTool(AgentToolDefinition toolDef, Map<String, Object> input, Long tenantId)
