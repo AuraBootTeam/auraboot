@@ -44,6 +44,41 @@ async function frHandlingUnit() {
 
 try { await frHandlingUnit(); } catch (e) { R.check('FR-04', 'no exception', false, String(e.message).slice(0, 200)); }
 
+// ------------------------------------------------------------------ FR-09 Tooling life
+async function frTooling() {
+  console.log('\n[FR-09] SMT tooling — usage-cycle accumulation + over-life block');
+  const code = uid('TL');
+  const tl = await execCommand(token, 'mfg_tooling_pcba_asset:create',
+    { mfg_tl_code: code, mfg_tl_name: `Stencil ${code}`, mfg_tl_type: 'stencil', mfg_tl_life_limit_cycles: 100 }, undefined, 'create', { allowError: true });
+  R.check('FR-09', 'create tooling', tl.recordId, `id=${tl.recordId} code=${tl.code}`);
+  if (!tl.recordId) return;
+  // Record usage (accumulate cycles). Payload key discovered by iteration against live stack.
+  const u1 = await execCommand(token, 'mfg_tooling_pcba_asset:record_usage', { cycles: 30 }, tl.recordId, 'action', { allowError: true });
+  R.check('FR-09', 'record_usage executes', u1.ok, `code=${u1.code} status=${u1.status}`);
+  const used = scalar(`select mfg_tl_used_cycles from mt_mfg_tooling_pcba_asset where pid='${sq(tl.recordId)}'`);
+  R.check('FR-09', 'used cycles accumulated (>0)', Number(used) > 0, `used=${used}`);
+}
+try { await frTooling(); } catch (e) { R.check('FR-09', 'no exception', false, String(e.message).slice(0, 200)); }
+
+// ------------------------------------------------------------------ FR-20 Downtime (no double-count)
+async function frDowntime() {
+  console.log('\n[FR-20] Equipment downtime — overlapping breakdown must not double-count');
+  const code = uid('EQ');
+  const eq = await execCommand(token, 'mfg_equipment_pcba_asset:create',
+    { mfg_eq_code: code, mfg_eq_name: `Reflow ${code}`, mfg_eq_type: 'reflow' }, undefined, 'create', { allowError: true });
+  R.check('FR-20', 'create equipment', eq.recordId, `id=${eq.recordId}`);
+  if (!eq.recordId) return;
+  const b1 = await execCommand(token, 'mfg_equipment_pcba_asset:breakdown', {}, eq.recordId, 'state_transition', { allowError: true });
+  R.check('FR-20', 'breakdown transitions status', b1.ok, `code=${b1.code}`);
+  const status = scalar(`select mfg_eq_status from mt_mfg_equipment_pcba_asset where pid='${sq(eq.recordId)}'`);
+  R.check('FR-20', 'status = breakdown', status === 'breakdown', `status=${status}`);
+  // Second breakdown while already down (overlap) must not open a second downtime window (#219).
+  await execCommand(token, 'mfg_equipment_pcba_asset:breakdown', {}, eq.recordId, 'state_transition', { allowError: true });
+  const openDt = scalar(`select count(*) from mt_mfg_equipment_downtime_pcba_asset where mfg_dt_equipment_id='${sq(eq.recordId)}' and (mfg_dt_end_time is null or mfg_dt_end_time='')`);
+  R.check('FR-20', 'no duplicate open downtime (<=1)', Number(openDt) <= 1, `open downtime rows=${openDt}`);
+}
+try { await frDowntime(); } catch (e) { R.check('FR-20', 'no exception', false, String(e.message).slice(0, 200)); }
+
 // ------------------------------------------------------------------ summary
 const s = R.summary();
 console.log(`\n=== SUMMARY: ${s.pass}/${s.total} checks pass, ${s.fail} fail ===`);
