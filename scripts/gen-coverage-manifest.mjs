@@ -87,6 +87,56 @@ function buildUiIndex(specRoots) {
   return index;
 }
 
+/**
+ * Every page a plugin declares, so the page-level denominator is generated too.
+ *
+ * Page coverage used to live in hand-written GOLDEN-UI-COVERAGE-MATRIX.md files —
+ * 29 of them across the workspace, no generator, no gate, one still citing a Docker
+ * image retired months ago. A hand-written matrix lists what someone remembered; a
+ * page missing from it reads as "not applicable" rather than as work. Same reasoning
+ * that put commands in this manifest applies to pages.
+ */
+function declaredPages(pluginDir) {
+  const dir = path.join(pluginDir, 'config', 'pages');
+  if (!fs.existsSync(dir)) return [];
+  const pages = [];
+  for (const file of walk(dir, ['.json'])) {
+    let j;
+    try { j = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { continue; }
+    for (const p of Array.isArray(j) ? j : [j]) {
+      if (p && typeof p.pageKey === 'string') {
+        pages.push({ pageKey: p.pageKey, kind: p.kind ?? 'unknown', modelCode: p.modelCode ?? null });
+      }
+    }
+  }
+  return pages.sort((a, b) => a.pageKey.localeCompare(b.pageKey));
+}
+
+/**
+ * Page key → spec files that navigate to or name it.
+ *
+ * A spec reaches a page either by naming its key or by visiting its route. Both forms
+ * are indexed because matching only the key would call every route-driven golden
+ * "untested", and a denominator that under-counts coverage is as misleading as one
+ * that over-counts it.
+ */
+function buildPageIndex(specRoots) {
+  const index = new Map();
+  const add = (key, rel) => {
+    if (!index.has(key)) index.set(key, []);
+    if (!index.get(key).includes(rel)) index.get(key).push(rel);
+  };
+  for (const root of specRoots) {
+    for (const file of walk(root, ['.spec.ts'])) {
+      const text = fs.readFileSync(file, 'utf8');
+      const rel = path.relative(process.cwd(), file);
+      // bare page keys, and the two route shapes: /p/c/<pageKey> and /p/<model>
+      for (const m of text.matchAll(/["'`\/]([a-z][a-z0-9_]{3,})["'`\/]/gi)) add(m[1], rel);
+    }
+  }
+  return index;
+}
+
 function gitCommit(root) {
   try {
     return execFileSync('git', ['-C', root, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
@@ -94,10 +144,14 @@ function gitCommit(root) {
 }
 
 export function buildManifest({ repoRoot, pluginRoot, only, specRoots, runId, target }) {
-  const uiIndex = buildUiIndex(specRoots.map((r) => path.resolve(repoRoot, r)));
+  const absSpecRoots = specRoots.map((r) => path.resolve(repoRoot, r));
+  const uiIndex = buildUiIndex(absSpecRoots);
+  const pageIndex = buildPageIndex(absSpecRoots);
   const groups = [];
   let untested = 0;
   let total = 0;
+  let pageTotal = 0;
+  let pageUntested = 0;
 
   const plugins = fs.readdirSync(pluginRoot).sort()
     .filter((e) => fs.statSync(path.join(pluginRoot, e)).isDirectory())
@@ -106,7 +160,8 @@ export function buildManifest({ repoRoot, pluginRoot, only, specRoots, runId, ta
   for (const plugin of plugins) {
     const pluginDir = path.join(pluginRoot, plugin);
     const commands = declaredCommands(pluginDir);
-    if (commands.length === 0) continue;
+    const pages = declaredPages(pluginDir);
+    if (commands.length === 0 && pages.length === 0) continue;
     const referenced = referencedCommands(pluginDir);
 
     const rows = commands.sort().map((code) => {
@@ -140,14 +195,33 @@ export function buildManifest({ repoRoot, pluginRoot, only, specRoots, runId, ta
       };
     });
 
-    groups.push({ id: plugin, title: plugin, rows });
+    const pageRows = pages.map((p) => {
+      pageTotal += 1;
+      const evidence = pageIndex.get(p.pageKey) ?? [];
+      if (evidence.length === 0) pageUntested += 1;
+      return {
+        id: `page:${p.pageKey}`,
+        action: p.pageKey,
+        surface: 'ui',
+        dependencies: 'real-stack',
+        driver: 'browser',
+        evidence,
+        assertion: evidence.length > 0
+          ? 'a browser spec reaches this page'
+          : 'no browser spec names this page or its route',
+        verdict: evidence.length > 0 ? 'pass' : 'untested',
+        note: `kind=${p.kind}${p.modelCode ? ` model=${p.modelCode}` : ''}`,
+      };
+    });
+
+    groups.push({ id: plugin, title: plugin, rows: [...rows, ...pageRows] });
   }
 
   return {
     run: { id: runId, target, commit: gitCommit(repoRoot),
            generator: 'scripts/gen-coverage-manifest.mjs' },
     groups,
-    stats: { commands: total, untested },
+    stats: { commands: total, untested, pages: pageTotal, pagesUntested: pageUntested },
   };
 }
 
@@ -172,9 +246,11 @@ function main(argv) {
 
   fs.mkdirSync(path.dirname(path.resolve(repoRoot, out)), { recursive: true });
   fs.writeFileSync(path.resolve(repoRoot, out), `${JSON.stringify(manifest, null, 2)}\n`);
-  const { commands, untested } = manifest.stats;
+  const { commands, untested, pages, pagesUntested } = manifest.stats;
+  const pct = (n, d) => `${Math.round((n / Math.max(1, d)) * 100)}%`;
   console.log(`[coverage-manifest] ${out}: ${manifest.groups.length} plugin(s), `
-    + `${commands} command(s), ${untested} untested (${Math.round((untested / Math.max(1, commands)) * 100)}%)`);
+    + `${commands} command(s), ${untested} untested (${pct(untested, commands)}); `
+    + `${pages} page(s), ${pagesUntested} untested (${pct(pagesUntested, pages)})`);
   console.log('Untested rows are in the file, not omitted — they are the denominator.');
   return 0;
 }

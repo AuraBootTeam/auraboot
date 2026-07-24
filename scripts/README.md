@@ -46,6 +46,7 @@
 | `check-e2e-spec-registration.mjs` | 3 | 2026-07-23 | Gate: no E2E spec may exist without being selectable by some project. |
 | `check-e2e-spec-registration.sh` | 0 | 2026-07-23 | Pre-push gate: no E2E spec may exist without being selectable by some project. |
 | `check-form-back-link.mjs` | 1 | 2026-07-23 | Targets that point outside the scanned page set — each needs a reason. |
+| `check-hand-written-page-matrix.mjs` | 0 | 2026-07-24 | Gate: no new hand-written page-coverage matrices — the denominator is generated. |
 | `check-i18n-hardcoded.mjs` | 0 | 2026-06-20 | check-i18n-hardcoded.mjs — i18n hardcoded-Chinese gate (ratchet). |
 | `check-jsonb-typehandler.sh` | 3 | 2026-06-11 | check-jsonb-typehandler.sh — guard against the recurring "varchar→jsonb on insert/update" bug. |
 | `check-no-secret-echo.mjs` | 1 | 2026-07-14 | check-no-secret-echo — refuse shell scripts that print a secret to stdout/stderr. |

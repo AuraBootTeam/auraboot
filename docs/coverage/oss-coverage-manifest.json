@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "abdd85fee",
+    "commit": "778c9f9ba",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -931,6 +931,105 @@
           "assertion": "no test references this command",
           "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "page:tasset_asset_detail",
+          "action": "tasset_asset_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tasset_asset"
+        },
+        {
+          "id": "page:tasset_asset_form",
+          "action": "tasset_asset_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tasset_asset"
+        },
+        {
+          "id": "page:tasset_asset_list",
+          "action": "tasset_asset_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tasset_asset"
+        },
+        {
+          "id": "page:tasset_category_detail",
+          "action": "tasset_category_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tasset_category"
+        },
+        {
+          "id": "page:tasset_category_form",
+          "action": "tasset_category_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tasset_category"
+        },
+        {
+          "id": "page:tasset_category_list",
+          "action": "tasset_category_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tasset_category"
+        },
+        {
+          "id": "page:tasset_maintenance_detail",
+          "action": "tasset_maintenance_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tasset_maintenance"
+        },
+        {
+          "id": "page:tasset_maintenance_form",
+          "action": "tasset_maintenance_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tasset_maintenance"
+        },
+        {
+          "id": "page:tasset_maintenance_list",
+          "action": "tasset_maintenance_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tasset_maintenance"
         }
       ]
     },
@@ -1067,6 +1166,69 @@
           "evidence": [],
           "assertion": "no test references this command",
           "verdict": "untested"
+        },
+        {
+          "id": "page:faq_candidate_detail",
+          "action": "faq_candidate_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=faq_candidate"
+        },
+        {
+          "id": "page:faq_candidate_form",
+          "action": "faq_candidate_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=faq_candidate"
+        },
+        {
+          "id": "page:faq_candidate_list",
+          "action": "faq_candidate_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=faq_candidate"
+        },
+        {
+          "id": "page:faq_candidate_workbench",
+          "action": "faq_candidate_workbench",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/faq-loop-conversation-queue.spec.ts",
+            "web-admin/tests/e2e/faq-loop-review-workbench.spec.ts",
+            "web-admin/tests/e2e/faq-loop-unpublish.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=faq_candidate"
+        },
+        {
+          "id": "page:faq_conversation_queue",
+          "action": "faq_conversation_queue",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/faq-loop-conversation-queue.spec.ts",
+            "web-admin/tests/e2e/faq-loop-pages-and-menu.spec.ts",
+            "web-admin/tests/e2e/faq-loop-unpublish.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=faq_source_conversation"
         }
       ]
     },
@@ -1094,6 +1256,39 @@
           "evidence": [],
           "assertion": "no test references this command",
           "verdict": "untested"
+        },
+        {
+          "id": "page:behavior_site_key_detail",
+          "action": "behavior_site_key_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=behavior_site_key"
+        },
+        {
+          "id": "page:behavior_site_key_form",
+          "action": "behavior_site_key_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=behavior_site_key"
+        },
+        {
+          "id": "page:behavior_site_key_list",
+          "action": "behavior_site_key_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=behavior_site_key"
         }
       ]
     },
@@ -1384,6 +1579,138 @@
           "evidence": [],
           "assertion": "no test references this command",
           "verdict": "untested"
+        },
+        {
+          "id": "page:tcrm_account_detail",
+          "action": "tcrm_account_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tcrm_account"
+        },
+        {
+          "id": "page:tcrm_account_form",
+          "action": "tcrm_account_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tcrm_account"
+        },
+        {
+          "id": "page:tcrm_account_list",
+          "action": "tcrm_account_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tcrm_account"
+        },
+        {
+          "id": "page:tcrm_contact_detail",
+          "action": "tcrm_contact_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tcrm_contact"
+        },
+        {
+          "id": "page:tcrm_contact_form",
+          "action": "tcrm_contact_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tcrm_contact"
+        },
+        {
+          "id": "page:tcrm_contact_list",
+          "action": "tcrm_contact_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tcrm_contact"
+        },
+        {
+          "id": "page:tcrm_lead_detail",
+          "action": "tcrm_lead_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tcrm_lead"
+        },
+        {
+          "id": "page:tcrm_lead_form",
+          "action": "tcrm_lead_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tcrm_lead"
+        },
+        {
+          "id": "page:tcrm_lead_list",
+          "action": "tcrm_lead_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tcrm_lead"
+        },
+        {
+          "id": "page:tcrm_opportunity_detail",
+          "action": "tcrm_opportunity_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tcrm_opportunity"
+        },
+        {
+          "id": "page:tcrm_opportunity_form",
+          "action": "tcrm_opportunity_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tcrm_opportunity"
+        },
+        {
+          "id": "page:tcrm_opportunity_list",
+          "action": "tcrm_opportunity_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tcrm_opportunity"
         }
       ]
     },
@@ -1915,6 +2242,217 @@
           ],
           "assertion": "driven through the UI",
           "verdict": "pass"
+        },
+        {
+          "id": "page:crm_account_detail",
+          "action": "crm_account_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_account"
+        },
+        {
+          "id": "page:crm_account_form",
+          "action": "crm_account_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_account"
+        },
+        {
+          "id": "page:crm_account_list",
+          "action": "crm_account_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_account"
+        },
+        {
+          "id": "page:crm_activity_detail",
+          "action": "crm_activity_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_activity"
+        },
+        {
+          "id": "page:crm_activity_form",
+          "action": "crm_activity_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_activity"
+        },
+        {
+          "id": "page:crm_activity_list",
+          "action": "crm_activity_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_activity"
+        },
+        {
+          "id": "page:crm_campaign_detail",
+          "action": "crm_campaign_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_campaign"
+        },
+        {
+          "id": "page:crm_campaign_form",
+          "action": "crm_campaign_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_campaign"
+        },
+        {
+          "id": "page:crm_campaign_list",
+          "action": "crm_campaign_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_campaign"
+        },
+        {
+          "id": "page:crm_contact_detail",
+          "action": "crm_contact_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_contact"
+        },
+        {
+          "id": "page:crm_contact_form",
+          "action": "crm_contact_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_contact"
+        },
+        {
+          "id": "page:crm_contact_list",
+          "action": "crm_contact_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_contact"
+        },
+        {
+          "id": "page:crm_lead_detail",
+          "action": "crm_lead_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_lead"
+        },
+        {
+          "id": "page:crm_lead_form",
+          "action": "crm_lead_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_lead"
+        },
+        {
+          "id": "page:crm_lead_list",
+          "action": "crm_lead_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_lead"
+        },
+        {
+          "id": "page:crm_lead_workbench",
+          "action": "crm_lead_workbench",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/crm-starter-lead-workbench.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=crm_lead"
+        },
+        {
+          "id": "page:crm_opportunity_detail",
+          "action": "crm_opportunity_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=crm_opportunity"
+        },
+        {
+          "id": "page:crm_opportunity_form",
+          "action": "crm_opportunity_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=crm_opportunity"
+        },
+        {
+          "id": "page:crm_opportunity_list",
+          "action": "crm_opportunity_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=crm_opportunity"
         }
       ]
     },
@@ -2092,6 +2630,61 @@
           "assertion": "no test references this command",
           "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "page:gp_task_comment_form",
+          "action": "gp_task_comment_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=gp_task_comment"
+        },
+        {
+          "id": "page:gp_task_comment_list",
+          "action": "gp_task_comment_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=gp_task_comment"
+        },
+        {
+          "id": "page:gp_task_detail",
+          "action": "gp_task_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=gp_task"
+        },
+        {
+          "id": "page:gp_task_form",
+          "action": "gp_task_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=gp_task"
+        },
+        {
+          "id": "page:gp_task_list",
+          "action": "gp_task_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=gp_task"
         }
       ]
     },
@@ -2324,6 +2917,107 @@
           "assertion": "no test references this command",
           "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "page:thr_attendance_detail",
+          "action": "thr_attendance_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=thr_attendance"
+        },
+        {
+          "id": "page:thr_attendance_form",
+          "action": "thr_attendance_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=thr_attendance"
+        },
+        {
+          "id": "page:thr_attendance_list",
+          "action": "thr_attendance_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=thr_attendance"
+        },
+        {
+          "id": "page:thr_employee_detail",
+          "action": "thr_employee_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=thr_employee"
+        },
+        {
+          "id": "page:thr_employee_form",
+          "action": "thr_employee_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=thr_employee"
+        },
+        {
+          "id": "page:thr_employee_list",
+          "action": "thr_employee_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=thr_employee"
+        },
+        {
+          "id": "page:thr_leave_request_detail",
+          "action": "thr_leave_request_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=thr_leave_request"
+        },
+        {
+          "id": "page:thr_leave_request_form",
+          "action": "thr_leave_request_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/bpm/bpm-form-integration.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=form model=thr_leave_request"
+        },
+        {
+          "id": "page:thr_leave_request_list",
+          "action": "thr_leave_request_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=thr_leave_request"
         }
       ]
     },
@@ -2506,6 +3200,144 @@
           "assertion": "driven through the UI",
           "verdict": "pass",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "page:ab_team_detail",
+          "action": "ab_team_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/team-management.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=ab_team"
+        },
+        {
+          "id": "page:ab_team_form",
+          "action": "ab_team_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/team-management.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=form model=ab_team"
+        },
+        {
+          "id": "page:ab_team_list",
+          "action": "ab_team_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/organization/team-management.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=ab_team"
+        },
+        {
+          "id": "page:org_department_detail",
+          "action": "org_department_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=org_department"
+        },
+        {
+          "id": "page:org_department_form",
+          "action": "org_department_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=org_department"
+        },
+        {
+          "id": "page:org_department_list",
+          "action": "org_department_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=org_department"
+        },
+        {
+          "id": "page:org_employee_detail",
+          "action": "org_employee_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=org_employee"
+        },
+        {
+          "id": "page:org_employee_form",
+          "action": "org_employee_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=org_employee"
+        },
+        {
+          "id": "page:org_employee_list",
+          "action": "org_employee_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=org_employee"
+        },
+        {
+          "id": "page:org_position_detail",
+          "action": "org_position_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=org_position"
+        },
+        {
+          "id": "page:org_position_form",
+          "action": "org_position_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=org_position"
+        },
+        {
+          "id": "page:org_position_list",
+          "action": "org_position_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=org_position"
         }
       ]
     },
@@ -3153,6 +3985,105 @@
           "assertion": "no test references this command",
           "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "page:tpm_milestone_detail",
+          "action": "tpm_milestone_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tpm_milestone"
+        },
+        {
+          "id": "page:tpm_milestone_form",
+          "action": "tpm_milestone_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tpm_milestone"
+        },
+        {
+          "id": "page:tpm_milestone_list",
+          "action": "tpm_milestone_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tpm_milestone"
+        },
+        {
+          "id": "page:tpm_project_detail",
+          "action": "tpm_project_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tpm_project"
+        },
+        {
+          "id": "page:tpm_project_form",
+          "action": "tpm_project_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tpm_project"
+        },
+        {
+          "id": "page:tpm_project_list",
+          "action": "tpm_project_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tpm_project"
+        },
+        {
+          "id": "page:tpm_task_detail",
+          "action": "tpm_task_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tpm_task"
+        },
+        {
+          "id": "page:tpm_task_form",
+          "action": "tpm_task_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tpm_task"
+        },
+        {
+          "id": "page:tpm_task_list",
+          "action": "tpm_task_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tpm_task"
         }
       ]
     },
@@ -3277,6 +4208,47 @@
           "assertion": "driven through the UI",
           "verdict": "pass",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "page:showcase_all_fields_detail",
+          "action": "showcase_all_fields_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=showcase_all_fields"
+        },
+        {
+          "id": "page:showcase_all_fields_form",
+          "action": "showcase_all_fields_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=showcase_all_fields"
+        },
+        {
+          "id": "page:showcase_all_fields_list",
+          "action": "showcase_all_fields_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/platform/showcase-all-fields-lifecycle.spec.ts",
+            "web-admin/tests/e2e/showcase/list-ux-features.spec.ts",
+            "web-admin/tests/e2e/showcase/runtime-rendering-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-all-fields-form-audit.spec.ts",
+            "web-admin/tests/e2e/showcase/showcase-ux-regression.spec.ts",
+            "web-admin/tests/e2e/showcase/subtable-modes-e2e.spec.ts",
+            "web-admin/tests/e2e/showcase/validation-e2e.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=list model=showcase_all_fields"
         }
       ]
     },
@@ -3575,6 +4547,138 @@
           "assertion": "no test references this command",
           "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "page:tinv_product_detail",
+          "action": "tinv_product_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tinv_product"
+        },
+        {
+          "id": "page:tinv_product_form",
+          "action": "tinv_product_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tinv_product"
+        },
+        {
+          "id": "page:tinv_product_list",
+          "action": "tinv_product_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tinv_product"
+        },
+        {
+          "id": "page:tinv_stock_in_detail",
+          "action": "tinv_stock_in_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tinv_stock_in"
+        },
+        {
+          "id": "page:tinv_stock_in_form",
+          "action": "tinv_stock_in_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tinv_stock_in"
+        },
+        {
+          "id": "page:tinv_stock_in_list",
+          "action": "tinv_stock_in_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tinv_stock_in"
+        },
+        {
+          "id": "page:tinv_stock_out_detail",
+          "action": "tinv_stock_out_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tinv_stock_out"
+        },
+        {
+          "id": "page:tinv_stock_out_form",
+          "action": "tinv_stock_out_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tinv_stock_out"
+        },
+        {
+          "id": "page:tinv_stock_out_list",
+          "action": "tinv_stock_out_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tinv_stock_out"
+        },
+        {
+          "id": "page:tinv_warehouse_detail",
+          "action": "tinv_warehouse_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=tinv_warehouse"
+        },
+        {
+          "id": "page:tinv_warehouse_form",
+          "action": "tinv_warehouse_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=form model=tinv_warehouse"
+        },
+        {
+          "id": "page:tinv_warehouse_list",
+          "action": "tinv_warehouse_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=tinv_warehouse"
         }
       ]
     },
@@ -3918,12 +5022,64 @@
           "assertion": "no test references this command",
           "verdict": "untested",
           "note": "no UI entry point: no page/menu DSL references it"
+        },
+        {
+          "id": "page:wd_leave_balance_list",
+          "action": "wd_leave_balance_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=wd_leave_balance"
+        },
+        {
+          "id": "page:wd_leave_request_detail",
+          "action": "wd_leave_request_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/bpm/ui-full-stack-lifecycle.spec.ts",
+            "web-admin/tests/e2e/bpm-designer/designer-usertask-form.spec.ts",
+            "web-admin/tests/e2e/bpm-smoke/wf-end-to-end-smoke.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail model=wd_leave_request"
+        },
+        {
+          "id": "page:wd_leave_request_form",
+          "action": "wd_leave_request_form",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/bpm/designer-usertask-form.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=form model=wd_leave_request"
+        },
+        {
+          "id": "page:wd_leave_request_list",
+          "action": "wd_leave_request_list",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=list model=wd_leave_request"
         }
       ]
     }
   ],
   "stats": {
     "commands": 332,
-    "untested": 228
+    "untested": 228,
+    "pages": 102,
+    "pagesUntested": 92
   }
 }
