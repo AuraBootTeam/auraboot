@@ -65,8 +65,12 @@ const listed = new Set(
   [...readme.matchAll(/^\|\s*`([^`]+\.(?:mjs|sh|cjs|js))`\s*\|/gm)].map((m) => m[1]),
 );
 
-const missing = [...actual].filter((p) => !listed.has(p)).sort();
-const stale = [...listed].filter((p) => !actual.has(p)).sort();
+// Dual-base: a README may list paths relative to scripts/ (auraboot/ENT/iot) or
+// relative to the repo root (whole-repo indexes like aura-quote). Accept either.
+const missing = [...actual].filter((p) => !listed.has(p) && !listed.has(`scripts/${p}`)).sort();
+const stale = [...listed]
+  .filter((L) => !fs.existsSync(path.join(REPO, L)) && !fs.existsSync(path.join(SCRIPTS_DIR, L)))
+  .sort();
 
 if (missing.length || stale.length) {
   console.error(`[scripts-index] FAIL: scripts/README.md is out of sync with scripts/.`);
@@ -82,4 +86,4 @@ if (missing.length || stale.length) {
   process.exit(1);
 }
 
-console.log(`[scripts-index] OK: ${actual.size} non-test scripts, all indexed in scripts/README.md.`);
+console.log(`[scripts-index] OK ${path.basename(REPO)}: ${actual.size} script(s) under scripts/ all indexed; ${listed.size} row(s) in scripts/README.md all point at existing files.`);
