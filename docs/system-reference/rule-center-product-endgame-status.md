@@ -10,7 +10,8 @@ status: active
 > - 本文各轮测试报告与「当前验证命令」引用的 **前端 spec / 组件测试路径（本文 45 条）与后端测试 FQCN（本文 63 条）经逐条 `ls` / 路径映射复核，除下面一条外全部存在**；引用的 14 条 `tests/e2e/**.spec.ts`、`playwright.gt5.config.ts`、19 个 `ab_*` 表名与全部 `/api/decision/*` 端点亦实测存在。
 > - 已修：`com.auraboot.framework.permission.AutoPermissionHierarchyIntegrationTest` → 真实包名是 `com.auraboot.framework.integration.AutoPermissionHierarchyIntegrationTest`（`platform/src/test/java/com/auraboot/framework/integration/AutoPermissionHierarchyIntegrationTest.java`）。按旧写法跑 `--tests` 会得到 “No tests found”。
 > - `scripts/check-schema-sql.sh` 在 2026-07-19 那轮是真实存在的命令，但**已于 2026-07-23 随手写 `schema.sql` 镜像一起退役**（OSS commit `6f9a3410a`）。下文所有引用它的行按历史记录保留；**今天要复跑等价检查请用** `scripts/db/flyway-migrate.sh` + `scripts/db/flyway-validate.sh` + `scripts/db/check-schema-drift.sh` + `scripts/db/check-db-matches-snapshot.sh`。`scripts/check-jsonb-typehandler.sh`、`scripts/oss-golden-stack.sh`、`web-admin/scripts/run-auth-regression.mjs` 均仍存在。
-> - **截图证据可用性**：本文引用 `docs/system-reference/assets/` 下 126 个截图，其中 **104 个从未提交进仓库**（`git log --all -- <path>` 无记录，`assets/` 目录当前只有 54 个文件）。这些行只能当作「当时确实看过截图」的叙述，**不能当作可回看的证据**；后续要把某行推进为 `DONE` 必须重新产出并提交截图。
+> - **截图证据可用性**：本文引用 `docs/system-reference/assets/` 下 **132** 个截图（含行内反引号写法，比上一轮只数 markdown 链接的口径多），其中 **110 个在仓库里不存在**（`assets/` 目录当前只有 54 个文件）。这些行只能当作「当时确实看过截图」的叙述，**不能当作可回看的证据**；后续要把某行推进为 `DONE` 必须重新产出并提交截图。
+>   **根因不是谁忘了提交,是 `.gitignore` 的 `*.png` 把它们静默吞了**：`git add` 不报错、不提示，引用就此悬空。证据是本文与 `rule-center-lowcode-model-integration-gap.md` 合计 147 个悬空引用**全部是 `.png`、一个 `.jpg` 都没有**——因为 `.jpg` 从来不在忽略规则里；能进仓的 42 个 `.png` 是有人记得 `git add -f`。已于 2026-07-24 加 `!docs/**/assets/*.png` 反忽略修掉（`git check-ignore` 验证：docs assets 下 `.png` 放行，仓根与 build 产物仍拦）；此后新截图正常入库，历史丢失的无法找回。
 > - 平台 SmartEngine 依赖版本当前为 **4.0.2**（`platform/build.gradle:317,321`）。
 
 ## 目标
