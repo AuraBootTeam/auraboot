@@ -316,10 +316,38 @@ function findRelatedRecord(runtime: SchemaRuntime, config: any, selectedRecord: 
   return rows.find((row: any) => String(readPath(row, matchField)) === String(expected)) || {};
 }
 
-function fillTemplate(template: string, runtime: SchemaRuntime, record: any): string {
+// Collects the block's own field configs (summaryBadges + source.summary.items) keyed by their
+// field/valueField path, so titleTemplate substitutions can resolve dict/valueMap labels instead of
+// leaking raw enum codes. Purely additive: paths without a configured valueMap fall back to the raw
+// value, matching the pre-existing behaviour.
+function buildTemplateFieldConfigs(block: any): Map<string, any> {
+  const map = new Map<string, any>();
+  const add = (field: unknown, config: any) => {
+    if (typeof field === 'string' && field && !map.has(field)) map.set(field, config);
+  };
+  const badges = Array.isArray(block?.summaryBadges) ? block.summaryBadges : [];
+  for (const badge of badges) add(badge?.valueField, badge);
+  const items = Array.isArray(block?.source?.summary?.items) ? block.source.summary.items : [];
+  for (const item of items) add(item?.field, item);
+  return map;
+}
+
+function fillTemplate(
+  template: string,
+  runtime: SchemaRuntime,
+  record: any,
+  fieldConfigs: Map<string, any>,
+  locale: string,
+  t: (key: string) => string,
+): string {
   return template.replace(/\$\{([^}]+)\}/g, (_match, expression: string) => {
     const path = String(expression).trim();
-    if (path.startsWith('record.')) return formatValue(readPath(record, path.slice(7)), '');
+    if (path.startsWith('record.')) {
+      const fieldPath = path.slice(7);
+      const value = readPath(record, fieldPath);
+      const config = fieldConfigs.get(fieldPath);
+      return config ? formatConfiguredValue(value, config, locale, t) : formatValue(value, '');
+    }
     return formatValue(readPath(runtime.getContext(), path), '');
   });
 }
@@ -692,7 +720,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
 
   const titleTemplate = (block as any).titleTemplate;
   const title = titleTemplate
-    ? fillTemplate(String(titleTemplate), runtime, record)
+    ? fillTemplate(String(titleTemplate), runtime, record, buildTemplateFieldConfigs(block), locale, t)
     : getLocalizedText(block.title || 'Review', locale, t);
   const rawRecord = findRelatedRecord(runtime, rawRecordConfig, record);
   const canonicalRecord = findRelatedRecord(runtime, canonicalRecordConfig, record);

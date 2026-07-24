@@ -2312,6 +2312,48 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getAllByText('D790000099999').length).toBeGreaterThan(0);
     expect(screen.getByTestId('review-drawer')).toHaveTextContent('manual_confirm');
   });
+
+  it('resolves dict valueMap labels in the title template instead of leaking raw enum codes', () => {
+    const runtime = makeRuntime({
+      data: {
+        standardLines: [{ ...selectedLine, bom_std_reason_code: 'manual_confirm' }],
+      },
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        form: { pid: 'task-1' },
+        global: {},
+        state: { selectedBomLine: selectedLine },
+      }),
+    }) as any;
+
+    render(
+      <ReviewDrawerBlockRenderer
+        block={{
+          ...reviewDrawerBlock,
+          contextDataSource: 'standardLines',
+          contextKeyField: 'pid',
+          titleTemplate: 'Reason: ${record.bom_std_reason_code}',
+          // Title field carries a dict valueMap (like FR-22 handover status/shift): the h2 must show
+          // the label, never the raw enum code.
+          summaryBadges: [
+            {
+              key: 'reason',
+              label: 'Reason',
+              valueField: 'bom_std_reason_code',
+              valueMap: { manual_confirm: { 'zh-CN': '人工确认', en: 'Manual Confirm' } },
+            },
+          ],
+        }}
+        runtime={runtime}
+      />,
+    );
+
+    const heading = screen.getByTestId('review-drawer').querySelector('h2');
+    expect(heading).toHaveTextContent('Reason: 人工确认');
+    // Falsifiable guard: reverting the fillTemplate valueMap resolution turns this red.
+    expect(heading).not.toHaveTextContent('manual_confirm');
+  });
 });
 
 describe('RecordInspectorBlockRenderer', () => {
