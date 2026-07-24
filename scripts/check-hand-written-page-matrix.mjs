@@ -25,6 +25,7 @@
  *   node scripts/check-hand-written-page-matrix.mjs [--update-baseline]
  */
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveRepoRoot } from './lib/repo-root.mjs';
@@ -46,10 +47,29 @@ function walk(dir, out = []) {
   return out;
 }
 
+/**
+ * Only git-tracked files count.
+ *
+ * enterprise keeps copied plugin trees under deploy/<x>/.stage/ — build output, not
+ * source, and untracked. Counting them made the gate red on five files the repo does
+ * not carry, and would have made the number swing with whatever happened to be staged
+ * locally. "What this repo has" means what it has committed.
+ */
+function trackedSet(repoRoot) {
+  try {
+    return new Set(
+      execFileSync('git', ['-C', repoRoot, 'ls-files'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+        .split('\n').filter(Boolean),
+    );
+  } catch { return null; }
+}
+
 export function audit({ repoRoot, roots, baseline }) {
+  const tracked = trackedSet(repoRoot);
   const found = roots
     .flatMap((r) => walk(path.join(repoRoot, r)))
     .map((f) => path.relative(repoRoot, f))
+    .filter((f) => !tracked || tracked.has(f))
     .sort();
   const known = new Set(baseline);
   return {
