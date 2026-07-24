@@ -42,6 +42,23 @@ public class PayloadTemporalNormalizer {
         "datetime", "timestamp", "localdatetime"
     );
 
+    /**
+     * Server-managed audit timestamp columns. Their value is always set by the write layer
+     * ({@code DynamicDataServiceImpl} overwrites {@code updated_at} and drops {@code created_at}
+     * on update; both are stamped on create), so any client-supplied value is discarded before
+     * it ever reaches SQL.
+     *
+     * <p>A form button that re-submits the whole loaded record carries these back as offset-less
+     * local datetimes produced by the read path (e.g. {@code 2026-07-23T23:02:08.896}). Parsing
+     * them here would reject the offset-less value and 400 the entire command — over a field that
+     * is about to be overwritten. Skipping them keeps the strict "explicit offset required" contract
+     * for genuine user-editable datetime fields (no timezone is ever assumed) while letting the
+     * read→write round-trip of a server-managed column succeed.
+     */
+    private static final Set<String> SERVER_MANAGED_TEMPORAL_FIELDS = Set.of(
+        "created_at", "updated_at"
+    );
+
     /** Guard against runaway recursion in deeply-nested payloads. */
     static final int MAX_DEPTH = 10;
 
@@ -83,6 +100,10 @@ public class PayloadTemporalNormalizer {
             for (FieldDefinition field : model.getFields()) {
                 String fieldCode = field.getCode();
                 if (!payload.containsKey(fieldCode)) continue;
+
+                // Server-managed audit timestamps are overwritten/dropped by the write layer;
+                // never coerce (or reject) a client-supplied value for them (see field docs above).
+                if (SERVER_MANAGED_TEMPORAL_FIELDS.contains(fieldCode)) continue;
 
                 Object value = payload.get(fieldCode);
                 if (value == null) continue;

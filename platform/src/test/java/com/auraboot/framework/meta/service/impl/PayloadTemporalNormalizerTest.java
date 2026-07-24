@@ -69,13 +69,33 @@ class PayloadTemporalNormalizerTest extends BaseIntegrationTest {
 
     @Test
     void datetimeString_withoutOffset_throws400() {
-        var model = modelWithFields(datetimeField("created_at"));
+        // A genuine user-editable datetime field still requires an explicit offset — the strict
+        // contract that avoids assuming a timezone stays intact (created_at/updated_at are a
+        // separate, server-managed case covered below).
+        var model = modelWithFields(datetimeField("event_time"));
         Map<String, Object> payload = new HashMap<>();
-        payload.put("created_at", "2026-03-18T10:30:00");  // no offset
+        payload.put("event_time", "2026-03-18T10:30:00");  // no offset
 
         assertThatThrownBy(() -> normalizer.normalize(payload, model))
             .isInstanceOf(TemporalParseException.class)
-            .hasMessageContaining("created_at");
+            .hasMessageContaining("event_time");
+    }
+
+    @Test
+    void serverManagedAuditFields_offsetLessValue_notRejected() {
+        // A form button that re-submits the whole loaded record carries created_at/updated_at
+        // back as offset-less local datetimes from the read path. These are server-managed and
+        // overwritten by the write layer, so the normalizer must skip them instead of 400ing the
+        // whole command.
+        var model = modelWithFields(datetimeField("created_at"), datetimeField("updated_at"));
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("created_at", "2026-07-23T23:02:08.896");  // offset-less, from read path
+        payload.put("updated_at", "2026-07-23T23:02:08.896");
+
+        assertThatCode(() -> normalizer.normalize(payload, model)).doesNotThrowAnyException();
+        // Left untouched — the write layer sets/drops these itself.
+        assertThat(payload.get("created_at")).isEqualTo("2026-07-23T23:02:08.896");
+        assertThat(payload.get("updated_at")).isEqualTo("2026-07-23T23:02:08.896");
     }
 
     @Test

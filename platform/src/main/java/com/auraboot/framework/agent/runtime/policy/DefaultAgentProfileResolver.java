@@ -33,7 +33,7 @@ public enum DefaultAgentProfileResolver implements AgentProfileResolver {
         return new AgentProfile(
                 stringValue(agentDefinition.get("agent_code")),
                 permissions,
-                contextPolicy(guardrails, agentDefinition),
+                contextPolicy(objectMapper, guardrails, agentDefinition),
                 guardrails != null && Boolean.TRUE.equals(guardrails.get("evidenceFirst")));
     }
 
@@ -52,20 +52,75 @@ public enum DefaultAgentProfileResolver implements AgentProfileResolver {
      * alone: it reads as "not configured", not as "forbidden from everything", and treating it as
      * the latter would silently mute every agent whose row predates this field.
      */
-    private ToolCapabilityCeiling ceilingFromAllowedOperations(Map<String, Object> agentDefinition) {
-        Set<String> operations = stringSet(agentDefinition.get("allowed_operations"));
+    private ToolCapabilityCeiling ceilingFromAllowedOperations(ObjectMapper objectMapper,
+                                                               Map<String, Object> agentDefinition) {
+        // allowed_operations is persisted as a JSONB column, so the resolver receives it as a raw
+        // JSON-array STRING (e.g. `["query","create","update","delete","transition"]`), not a parsed
+        // List. The old stringSet() comma-split left the brackets/quotes attached to each token
+        // (`["query`, `"create"`, ...), so NONE matched the clean write verbs and every agent whose
+        // operations were stored that way was misread as READ_ONLY — denying its own write tools with
+        // capability_ceiling_exceeded even though it was explicitly granted create/update/delete.
+        // Parse it the same way AgentToolScopePolicy does so the derived ceiling agrees with the
+        // tool-list filter that already reads the column correctly.
+        Set<String> operations = operationSet(objectMapper, agentDefinition.get("allowed_operations"));
         if (operations.isEmpty()) {
             return null;
         }
         boolean writes = operations.stream()
                 .map(op -> op.trim().toLowerCase(Locale.ROOT))
-                .anyMatch(op -> WRITE_OPERATIONS.contains(op));
+                .anyMatch(WRITE_OPERATIONS::contains);
         return writes ? ToolCapabilityCeiling.WRITE_CAPABLE : ToolCapabilityCeiling.READ_ONLY;
     }
 
+    /**
+     * Robustly parse the {@code allowed_operations} guardrail into a set of operation verbs. The
+     * value can arrive as a real {@code Collection}, a JSON-array {@code String}, or — the form the
+     * JSONB column actually deserializes to on the runtime read path — a {@code PGobject} (or any
+     * other type) whose {@code toString()} is the JSON array text. Reducing every non-collection
+     * value to its text form before parsing is what makes {@code ["query","create",...]} yield the
+     * five verbs instead of one bracket-and-quote-laden token. A blank value or {@code "*"} means
+     * "not configured" → empty set.
+     */
+    private Set<String> operationSet(ObjectMapper objectMapper, Object raw) {
+        if (raw == null) {
+            return Set.of();
+        }
+        if (raw instanceof Collection<?> collection) {
+            LinkedHashSet<String> values = new LinkedHashSet<>();
+            for (Object value : collection) {
+                add(values, value);
+            }
+            return Set.copyOf(values);
+        }
+        String text = String.valueOf(raw).trim();
+        if (text.isEmpty() || "*".equals(text) || "null".equals(text)) {
+            return Set.of();
+        }
+        if (text.startsWith("[") && objectMapper != null) {
+            try {
+                java.util.List<String> parsed = objectMapper.readValue(
+                        text, new com.fasterxml.jackson.core.type.TypeReference<java.util.List<String>>() {});
+                LinkedHashSet<String> values = new LinkedHashSet<>();
+                for (String value : parsed) {
+                    add(values, value);
+                }
+                return Set.copyOf(values);
+            } catch (Exception ignored) {
+                // Fall through to comma-splitting for a non-JSON string.
+            }
+        }
+        LinkedHashSet<String> values = new LinkedHashSet<>();
+        for (String value : text.split(",")) {
+            add(values, value);
+        }
+        return Set.copyOf(values);
+    }
+
     @SuppressWarnings("unchecked")
-    private AgentContextPolicy contextPolicy(Map<String, Object> guardrails, Map<String, Object> agentDefinition) {
-        ToolCapabilityCeiling operationCeiling = ceilingFromAllowedOperations(agentDefinition);
+    private AgentContextPolicy contextPolicy(ObjectMapper objectMapper,
+                                             Map<String, Object> guardrails,
+                                             Map<String, Object> agentDefinition) {
+        ToolCapabilityCeiling operationCeiling = ceilingFromAllowedOperations(objectMapper, agentDefinition);
         if (guardrails == null || guardrails.isEmpty()) {
             return operationCeiling == null
                     ? AgentContextPolicy.defaults()
