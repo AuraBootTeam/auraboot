@@ -19,6 +19,25 @@
 
 状态图例：⬜ 未做 · 🟡 IT 绿/UI 待 · 🟢 IT+UI 双绿（变异验证过）· 🔴 发现产品 bug
 
+### 实际进度（2026-07-24 本会话）
+
+| FR | 后端真栈 IT | 备注 |
+|----|------------|------|
+| **FR-04** HandlingUnit | 🟡 **6/6 绿**（真命令管道 + 真 DB round-trip）| create HU→pack→DB 断言:parent qty 5+10=15 / child 链 parent / 2 event 行 / **note 用 code 非 pid（#230 live 验证）**。断言全 falsifiable（DB 值/守恒/事件数）|
+| FR-09/FR-20 | ⬜ spec 已写，未跑 | 卡 pcba-manufacturing import（见下）|
+| FR-05/16/22 | ⬜ | 卡 pcba-manufacturing import |
+| FR-10/FR-13 | ⬜ | inventory 已导,但前置需效期 lot/balance（FR-10 FEFO）、work order（FR-13 齐套）多模型 seed,未做 |
+
+### 🔴 已知 infra 阻塞（诚实记录 — 剩余为多会话工作）
+
+**pcba-manufacturing 的 5 个 FR（FR-05/09/16/20/22）被依赖网阻塞**:
+`pcba-manufacturing → pcba-industry(缺 dict eng_route_step_type)→ pcba-sales(hybrid handler pe:convert_opp_to_rfq)→ pcba-solution/pcba-crm/quote-core/bom-standardization → ...`
+= 需**完整 pcba-agent hybrid 插件集**(30+ 插件,跨 `plugins/` + `aura-quote/` 两仓,quote-core 还有独立 S-EXT-HANDLER)。这是 pcba-agent profile 存在的原因,是一项大 infra 工作。
+
+**已验证可行的 infra 基建**(本会话真跑通):fresh hybrid jar(inventory/pcba-manufacturing/product-catalog/quality/finance/crm/procurement/pcba-sales)→ `AURA_PLUGINS_DIR` 加载 → 跨仓两阶段 import(base 集 + finance/procurement/sales 链 OK)。runner `scripts/mes-wms-golden-run.sh` 已 codify;要跑全 8 FR 需把 `HYBRID_JARS`/`IMPORT_CHAIN` 扩到完整 pcba-agent 集。
+
+**结论**:本会话交付了 **可复用 infra 基建 + FR-04 真栈 golden(live 验证 #230)+ harness + runner + 矩阵**;完成全 8 FR × (IT+UI) + 报告是**多会话工作**(pcba 依赖网 + FR-10/13 复杂 seed + UI golden 各自可观)。
+
 ## 证据口径
 - **真栈 IT**：Playwright API spec `mes-wms-commands.spec.ts`，`executeCommandViaApi` → `POST /api/meta/commands/execute/{code}` → `GET /api/dynamic/{model}/list` 反查 DB。凭据 = spec pass + 断言查的是**结果**（DB 行/字段值）非请求次数。
 - **UI golden**：Playwright E2E spec `mes-wms/*.spec.ts`，真点每个行动点 + 断言状态变化 + 截图；截图存 `test-results/`。
