@@ -74,10 +74,51 @@ async function frDowntime() {
   R.check('FR-20', 'status = breakdown', status === 'breakdown', `status=${status}`);
   // Second breakdown while already down (overlap) must not open a second downtime window (#219).
   await execCommand(token, 'mfg_equipment_pcba_asset:breakdown', {}, eq.recordId, 'state_transition', { allowError: true });
-  const openDt = scalar(`select count(*) from mt_mfg_equipment_downtime_pcba_asset where mfg_dt_equipment_id='${sq(eq.recordId)}' and (mfg_dt_end_time is null or mfg_dt_end_time='')`);
-  R.check('FR-20', 'no duplicate open downtime (<=1)', Number(openDt) <= 1, `open downtime rows=${openDt}`);
+  const openDt = scalar(`select count(*) from mt_mfg_equipment_downtime_pcba_asset where mfg_dt_equipment_id='${sq(eq.recordId)}' and mfg_dt_end_time is null`);
+  R.check('FR-20', 'overlapping breakdown: still exactly 1 open downtime (no double-count)', Number(openDt) === 1, `open downtime rows=${openDt}`);
 }
 try { await frDowntime(); } catch (e) { R.check('FR-20', 'no exception', false, String(e.message).slice(0, 200)); }
+
+// ------------------------------------------------------------------ FR-22 Shift Handover
+async function frHandover() {
+  console.log('\n[FR-22] Shift handover — create + snapshot + acknowledge (dual sign-off)');
+  const wsCode = uid('WS');
+  const ws = await execCommand(token, 'mfg_workstation_pcba_execution:create',
+    { mfg_ws_code: wsCode, mfg_ws_name: `SMT-${wsCode}`, mfg_ws_operation_type: 'smt', mfg_ws_capacity_per_hour: 100 }, undefined, 'create', { allowError: true });
+  R.check('FR-22', 'create workstation', ws.recordId, `id=${ws.recordId} code=${ws.code}`);
+  if (!ws.recordId) return;
+  const ho = await execCommand(token, 'mfg_shift_handover:create_handover',
+    { mfg_sho_workstation_id: ws.recordId, mfg_sho_outgoing_shift: 'day', mfg_sho_incoming_shift: 'night',
+      mfg_sho_outgoing_person: 'Alice', mfg_sho_notes: 'reflow oven monitored' }, undefined, 'action', { allowError: true });
+  R.check('FR-22', 'create_handover executes', ho.ok, `code=${ho.code} status=${ho.status}`);
+  // create_handover is an action command; resolve the created row from the DB by workstation.
+  const hoRow = queryDb(`select pid, mfg_sho_status, mfg_sho_workstation_id from mt_mfg_shift_handover where mfg_sho_workstation_id='${sq(ws.recordId)}' order by created_at desc limit 1`);
+  const hoPid = hoRow[0] ? hoRow[0][0] : '';
+  R.check('FR-22', 'handover persisted (pending_ack, workstation linked)', hoRow[0] && hoRow[0][1] === 'pending_ack' && hoRow[0][2] === ws.recordId, `row=${JSON.stringify(hoRow[0])}`);
+  if (!hoPid) return;
+  const ack = await execCommand(token, 'mfg_shift_handover:acknowledge_handover',
+    { mfg_sho_incoming_person: 'Bob' }, hoPid, 'action', { allowError: true });
+  R.check('FR-22', 'acknowledge_handover executes', ack.ok, `code=${ack.code} detail=${JSON.stringify(ack.raw?.context||'').slice(0,80)}`);
+  const status = scalar(`select mfg_sho_status from mt_mfg_shift_handover where pid='${sq(hoPid)}'`);
+  R.check('FR-22', 'status → acknowledged (dual sign-off)', status === 'acknowledged', `status=${status}`);
+}
+try { await frHandover(); } catch (e) { R.check('FR-22', 'no exception', false, String(e.message).slice(0, 200)); }
+
+// ------------------------------------------------------------------ FR-16 Hold
+async function frHold() {
+  console.log('\n[FR-16] Hold — place hold on a target + persisted');
+  const code = uid('EQH');
+  const eq = await execCommand(token, 'mfg_equipment_pcba_asset:create',
+    { mfg_eq_code: code, mfg_eq_name: `Held ${code}`, mfg_eq_type: 'reflow' }, undefined, 'create', { allowError: true });
+  if (!R.check('FR-16', 'create hold target (equipment)', eq.recordId, `id=${eq.recordId}`)) return;
+  const hold = await execCommand(token, 'mfg_hold:place_hold',
+    { mfg_hold_target_type: 'equipment', mfg_hold_target_pid: eq.recordId, mfg_hold_scope: 'full',
+      mfg_hold_reason: 'calibration drift', mfg_hold_responsible: 'QA' }, undefined, 'action', { allowError: true });
+  R.check('FR-16', 'place_hold executes', hold.ok, `code=${hold.code} status=${hold.status} detail=${JSON.stringify(hold.raw?.context||'').slice(0,80)}`);
+  const held = scalar(`select count(*) from mt_mfg_hold where mfg_hold_target_pid='${sq(eq.recordId)}' and mfg_hold_status='active'`);
+  R.check('FR-16', 'active hold row persisted', Number(held) >= 1, `active holds=${held}`);
+}
+try { await frHold(); } catch (e) { R.check('FR-16', 'no exception', false, String(e.message).slice(0, 200)); }
 
 // ------------------------------------------------------------------ summary
 const s = R.summary();
