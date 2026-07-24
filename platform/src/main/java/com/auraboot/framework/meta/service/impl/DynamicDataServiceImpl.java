@@ -1292,24 +1292,66 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * Stripping (rather than rejecting) keeps clients tolerant while guaranteeing
      * restricted fields never reach the row; each strip is logged for audit.
      */
-    private void stripNonWritableFields(String modelCode, Map<String, Object> data) {
+    /**
+     * Remove fields the caller may not write.
+     *
+     * @return the field codes actually removed, so a caller holding the stored row can tell an
+     *         apologetic full-row round-trip from a real attempt to change a forbidden field.
+     */
+    private Set<String> stripNonWritableFields(String modelCode, Map<String, Object> data) {
         if (data == null || data.isEmpty()) {
-            return;
+            return Collections.emptySet();
         }
         if (MetaContext.isDataPermissionBypassed()) {
-            return;
+            return Collections.emptySet();
         }
         Long tenantId = getCurrentTenantId();
         Long userId = getCurrentUserId();
         Set<String> nonWritable = dataPermissionEngine.getNonWritableFields(tenantId, modelCode, userId);
         if (nonWritable == null || nonWritable.isEmpty()) {
-            return;
+            return Collections.emptySet();
         }
+        Set<String> stripped = new LinkedHashSet<>();
         for (String fieldCode : nonWritable) {
             if (data.remove(fieldCode) != null) {
+                stripped.add(fieldCode);
                 log.warn("Field-write permission: stripped non-writable field '{}' from {} write by user {}",
                         logSafe(fieldCode), logSafe(modelCode), logSafe(userId));
             }
+        }
+        return stripped;
+    }
+
+    /**
+     * Turn a silently-dropped write into a visible refusal when the caller actually tried to
+     * change something they may not change.
+     *
+     * <p>Silently stripping is the friendly behaviour for the common "read a row, edit two
+     * fields, send the whole thing back" client: it submitted the forbidden field, but it
+     * submitted the value that is already stored, so nothing was denied and nothing should be
+     * reported. A submitted value that <em>differs</em> from the stored one is a different
+     * event — the caller asked for a change and did not get it — and letting that pass in
+     * silence is how a permission problem becomes an invisible one.</p>
+     */
+    // package-private + static: the visibility property (a real refusal is never silent, an
+    // unchanged round-trip never complains) is directly tested; no instance state is involved.
+    static void assertNoDeniedFieldWrites(String modelCode, Map<String, Object> submitted,
+                                          Set<String> strippedFields, Map<String, Object> existingRecord) {
+        if (strippedFields == null || strippedFields.isEmpty() || submitted == null || existingRecord == null) {
+            return;
+        }
+        List<String> denied = new ArrayList<>();
+        for (String fieldCode : strippedFields) {
+            if (!submitted.containsKey(fieldCode)) {
+                continue;
+            }
+            if (ValidationServiceImpl.valueChanges(existingRecord.get(fieldCode), submitted.get(fieldCode))) {
+                denied.add(fieldCode);
+            }
+        }
+        if (!denied.isEmpty()) {
+            throw new MetaServiceException("FIELD_WRITE_DENIED: not permitted to change "
+                    + String.join(", ", denied) + " on " + modelCode);
         }
     }
 
@@ -1444,7 +1486,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         Map<String, Object> data = new LinkedHashMap<>(inputData);
         
         // Field-level write permission (gap #1): strip fields the current user may not write
-        stripNonWritableFields(modelCode, data);
+        Set<String> strippedNonWritable = stripNonWritableFields(modelCode, data);
 
         logOperation("update", modelCode, recordId, data.keySet());
         
@@ -1456,7 +1498,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             if (existingRecord == null) {
                 throw new MetaServiceException("Record not found with ID: " + recordId);
             }
-            
+
+            // A field the caller may not write was dropped above. Now that the stored row is in
+            // hand we can tell whether that was harmless (they sent back the value already there)
+            // or a real refusal that must not be delivered silently.
+            assertNoDeniedFieldWrites(modelCode, inputData, strippedNonWritable, existingRecord);
+
+
             // Normalize temporal string values to typed objects (LocalDate/Instant) before validation
             payloadTemporalNormalizer.normalize(data, model);
             // 使用验证服务的严格模式进行验证

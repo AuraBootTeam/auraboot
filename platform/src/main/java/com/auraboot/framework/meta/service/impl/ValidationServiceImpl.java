@@ -389,7 +389,7 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
      * rendered form before declaring a change keeps an unchanged round-trip from tripping
      * a lock it never touched.</p>
      */
-    private boolean valueChanges(Object current, Object incoming) {
+    static boolean valueChanges(Object current, Object incoming) {
         if (current == null && incoming == null) {
             return false;
         }
