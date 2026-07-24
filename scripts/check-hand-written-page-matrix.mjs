@@ -36,7 +36,9 @@ function walk(dir, out = []) {
   let entries;
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
   for (const e of entries) {
-    if (e.name === 'node_modules' || e.name === '.git' || e.name === 'build' || e.name === 'dist') continue;
+    // .worktrees holds linked checkouts of this same repo; counting their copies would
+    // multiply the debt by however many branches happen to be checked out today.
+    if (['node_modules', '.git', '.worktrees', 'build', 'dist', 'target'].includes(e.name)) continue;
     const abs = path.join(dir, e.name);
     if (e.isDirectory()) walk(abs, out);
     else if (e.name === NAME) out.push(abs);
@@ -57,18 +59,35 @@ export function audit({ repoRoot, roots, baseline }) {
   };
 }
 
+export const DEFAULT_CONFIG = 'scripts/page-matrix.json';
+export const DEFAULT_BASELINE = 'scripts/check-hand-written-page-matrix.baseline.json';
+
 function main(argv) {
   const repoRoot = resolveRepoRoot(argv, path.resolve(HERE, '..'));
-  const baselineFile = path.join(HERE, 'check-hand-written-page-matrix.baseline.json');
+
+  // Baseline and roots live in the TARGET repo, not next to this script. The first
+  // version read one baseline beside the engine and compared it against whatever repo
+  // was passed with --repo, so running it across the workspace declared every other
+  // repo's pre-existing files "new" and every OSS file "no longer exists". A shared
+  // baseline for per-repo debt is the same category of mistake as a shared denominator.
+  const baselineFile = path.join(repoRoot, DEFAULT_BASELINE);
   const baseline = fs.existsSync(baselineFile)
     ? JSON.parse(fs.readFileSync(baselineFile, 'utf8'))
     : [];
-  const roots = ['plugins', 'web-admin'];
+  const cfgPath = path.join(repoRoot, DEFAULT_CONFIG);
+  // Scan the repo root by default. The first version listed likely directory names —
+  // plugins/, web-admin/ — and every repo that puts them somewhere else reported a
+  // baseline of zero, which reads as "no debt here" rather than "I looked in the wrong
+  // place". Guessing a layout is how a gate misses the thing it exists to find:
+  // enterprise showed 1 of 6, plugins 0 of 17.
+  const roots = fs.existsSync(cfgPath)
+    ? JSON.parse(fs.readFileSync(cfgPath, 'utf8')).roots
+    : ['.'];
   const { found, fresh, stale } = audit({ repoRoot, roots, baseline });
 
   if (argv.includes('--update-baseline')) {
     fs.writeFileSync(baselineFile, `${JSON.stringify(found, null, 2)}\n`);
-    console.log(`[page-matrix] baseline updated: ${found.length} file(s) recorded as debt`);
+    console.log(`[page-matrix] baseline updated at ${path.relative(repoRoot, baselineFile)}: ${found.length} file(s) recorded as debt`);
     return 0;
   }
 
