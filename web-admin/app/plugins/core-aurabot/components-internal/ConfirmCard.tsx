@@ -77,7 +77,7 @@ export function ConfirmCard({
   const visibleParams = Object.entries(input).filter(([key]) => !EXCLUDED_KEYS.has(key));
 
   return (
-    <div className="mb-3 flex justify-start">
+    <div className="mb-3 flex justify-start" data-testid="aurabot-confirm-card">
       <div className="w-full max-w-[95%] overflow-hidden rounded-xl border border-amber-200 bg-amber-50 shadow-sm dark:border-amber-700 dark:bg-amber-900/20">
         {/* Header */}
         <div className="flex items-center gap-2 border-b border-amber-100 px-3 py-2 dark:border-amber-800/50">
@@ -114,6 +114,7 @@ export function ConfirmCard({
           <button
             onClick={() => onCancel(toolId)}
             disabled={disabled}
+            data-testid="aurabot-confirm-cancel"
             className="rounded-lg border border-gray-300 bg-white px-3 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
           >
             Cancel
@@ -121,6 +122,7 @@ export function ConfirmCard({
           <button
             onClick={() => onConfirm(toolId)}
             disabled={disabled}
+            data-testid="aurabot-confirm-approve"
             className="rounded-lg bg-amber-500 px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Confirm
