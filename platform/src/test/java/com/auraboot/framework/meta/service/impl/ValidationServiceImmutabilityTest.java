@@ -187,6 +187,22 @@ class ValidationServiceImmutabilityTest {
         assertTrue(r.getValid(), "same value in a different wire type is not a change: " + r.getErrors());
     }
 
+    /**
+     * An invariant that fails to engage because the declaration says "APPROVED" while the column
+     * holds "approved" reads as configured but protects nothing — the inert-guard failure mode.
+     * Fail closed instead.
+     */
+    @Test
+    @DisplayName("the locking state matches regardless of case")
+    void lockMatchesRegardlessOfCase() {
+        Map<String, Object> stored = storedApprovedQuote();
+        stored.put("status", "APPROVED");   // declaration says "approved"
+
+        ValidationResult r = validation.validateImmutability(quoteModel(), change("price", 200), stored);
+
+        assertFalse(r.getValid(), "a case mismatch must not silently disarm the lock");
+    }
+
     @Test
     @DisplayName("a field with no immutability metadata is never locked")
     void unannotatedFieldNeverLocks() {

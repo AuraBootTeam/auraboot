@@ -365,7 +365,11 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 continue;
             }
             String rendered = String.valueOf(currentState);
-            boolean locked = when.getIn().stream().anyMatch(v -> v != null && v.equals(rendered));
+            // Case-insensitive on purpose. An invariant that silently fails to engage because the
+            // declaration says "APPROVED" and the column holds "approved" is worse than one that
+            // engages slightly too eagerly: it reads as configured while protecting nothing. Two
+            // states of the same model differing only in case would be a modelling error anyway.
+            boolean locked = when.getIn().stream().anyMatch(v -> v != null && v.equalsIgnoreCase(rendered));
             if (locked) {
                 errors.add("Field '" + label + "' cannot be changed while "
                         + when.getField() + " is '" + rendered + "'");

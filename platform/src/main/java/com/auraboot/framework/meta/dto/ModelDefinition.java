@@ -140,6 +140,9 @@ public class ModelDefinition {
     /**
      * How a derived model proves which aggregate root its rows belong to.
      */
+    // @Builder alone would leave only a package-private all-args constructor, which Jackson
+    // cannot use — a binding declared in a plugin's models.json would fail to deserialize and
+    // the guard would silently never engage. Same annotation set as FieldDefinition.ImmutableWhen.
     @Data
     @Builder
     public static class AggregateBinding {
