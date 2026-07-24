@@ -145,7 +145,10 @@ public class ModelDefinition {
     public static class AggregateBinding {
         /** Model code of the aggregate root, e.g. {@code quote}. Informational. */
         private String aggregateModel;
-        /** Local column holding the aggregate root's id, e.g. {@code quote_pid}. */
+        /**
+         * Local <em>field code</em> holding the aggregate root's id, e.g. {@code quote_pid}.
+         * Resolved to its physical column when a guard is compiled into SQL.
+         */
         private String localField;
     }
 }

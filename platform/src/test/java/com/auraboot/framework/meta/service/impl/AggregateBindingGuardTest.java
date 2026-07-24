@@ -148,6 +148,77 @@ class AggregateBindingGuardTest {
 
     // ---------- scope semantics ----------
 
+    // ---------- create-time injection ----------
+
+    @Test
+    @DisplayName("a row created under an aggregate scope is stamped with the authorized aggregate")
+    void createStampsAuthorizedAggregate() {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("amount", 10);
+
+        MetaContext.runWithCommandAggregate("Q1001", () -> {
+            DynamicDataServiceImpl.injectAggregateBinding(boundModel(), row);
+            return null;
+        });
+
+        assertEquals("Q1001", row.get(QUOTE_LINE_BINDING_COLUMN));
+    }
+
+    /**
+     * The client does not get to choose which document its row lands under. Without this, a caller
+     * could plant rows beneath another aggregate and reach them later through a legitimate scope.
+     */
+    @Test
+    @DisplayName("a payload cannot choose its own aggregate: the authorized one overwrites it")
+    void createOverwritesClaimedAggregate() {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put(QUOTE_LINE_BINDING_COLUMN, "Q2002");
+
+        MetaContext.runWithCommandAggregate("Q1001", () -> {
+            DynamicDataServiceImpl.injectAggregateBinding(boundModel(), row);
+            return null;
+        });
+
+        assertEquals("Q1001", row.get(QUOTE_LINE_BINDING_COLUMN),
+                "the aggregate the entry authorized must win over the one the payload claimed");
+    }
+
+    @Test
+    @DisplayName("create injection is inert without a scope or a binding")
+    void createInjectionInertWhenNotApplicable() {
+        Map<String, Object> noScope = new LinkedHashMap<>();
+        DynamicDataServiceImpl.injectAggregateBinding(boundModel(), noScope);
+        assertFalse(noScope.containsKey(QUOTE_LINE_BINDING_COLUMN));
+
+        Map<String, Object> unbound = new LinkedHashMap<>();
+        MetaContext.runWithCommandAggregate("Q1001", () -> {
+            DynamicDataServiceImpl.injectAggregateBinding(unboundModel(), unbound);
+            return null;
+        });
+        assertTrue(unbound.isEmpty());
+    }
+
+    @Test
+    @DisplayName("a binding field code resolves to its physical column in SQL")
+    void bindingResolvesFieldCodeToColumn() {
+        ModelDefinition model = ModelDefinition.builder()
+                .code("quote_line")
+                .fields(java.util.List.of(com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                        .code("quotePid").columnName("quote_pid").build()))
+                .aggregateBinding(ModelDefinition.AggregateBinding.builder()
+                        .localField("quotePid").build())
+                .build();
+        StringBuilder sql = freshSql();
+
+        MetaContext.runWithCommandAggregate("Q1001", () ->
+                DynamicDataServiceImpl.appendAggregateBindingGuard(sql, new LinkedHashMap<>(), model));
+
+        assertTrue(sql.toString().contains("AND quote_pid = "),
+                "SQL must use the physical column, not the field code, got: " + sql);
+    }
+
+    // ---------- scope semantics ----------
+
     @Test
     @DisplayName("an aggregate scope must name the aggregate it pins to")
     void blankAggregateRejected() {
