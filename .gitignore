@@ -93,6 +93,13 @@ DerivedData/
 *.png
 !web-admin/public/*.png
 !docs/assets/screenshots/*.png
+# Documentation evidence screenshots. Without these negations `*.png` above
+# swallows them silently: `git add` reports nothing and the reference in the
+# doc dangles. That is not hypothetical — 147 referenced .png files under
+# docs/system-reference/assets/ were lost this way, while every referenced
+# .jpg survived, because .jpg was never ignored.
+!docs/**/assets/*.png
+!docs/**/assets/**/*.png
 *.hprof
 
 report.json

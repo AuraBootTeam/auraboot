@@ -12,6 +12,8 @@ status: active
 > - `FactCatalogAdapter` 仓内没有同名 class，真源是模块 `web-admin/app/shared/decision/ui/factCatalogAdapter.ts`（导出 `factCatalogToFieldOptions` 等函数）；已在 §「前端规则绑定字段 picker」定义处标注，本文其余处沿用旧称。
 > - `ab_bpm_execution_log.node_failure` 写法会被误读成列名；`node_failure` 实际是 `event_type` 列的取值（`BpmExecutionLogMapper` `.eq("event_type","node_failure")`），已就地更正。
 > - `scripts/check-schema-sql.sh` 在 2026-07-19 那轮真实存在，但**已于 2026-07-23 随手写 `schema.sql` 镜像一起退役**（OSS commit `6f9a3410a`）。历史行保留；今天复跑等价检查请用 `scripts/db/flyway-migrate.sh` / `flyway-validate.sh` / `check-schema-drift.sh` / `check-db-matches-snapshot.sh`。
+> - **截图证据可用性**：本文引用 `assets/` 下 **93** 个截图，其中 **67 个在仓库里不存在**（全部是 `.png`）。这些行只能当作「当时确实看过截图」的叙述，**不能当作可回看的证据**；要把某行推进为 `DONE` 必须重新产出并提交截图。
+>   **根因不是谁忘了提交，是 `.gitignore` 的 `*.png` 把它们静默吞了**：`git add` 不报错、不提示，引用就此悬空。证据是两篇合计 147 个悬空引用**全部是 `.png`、一个 `.jpg` 都没有**——因为 `.jpg` 从来不在忽略规则里。已于 2026-07-24 加 `!docs/**/assets/*.png` 反忽略修掉；此后新截图正常入库，历史丢失的无法找回。
 > - **截图证据可用性**：本文引用 `docs/system-reference/assets/` 下 93 个截图，其中 **67 个从未提交进仓库**（`git log --all -- <path>` 无记录，目录当前只有 54 个文件）；`live-scan-20260707/**` 同样从未入库。这些行只能当作「当时看过」的叙述，**不是可回看的证据**；要把对应 gap 行推进为 `DONE`，必须重新产出并提交截图。
 > - 平台 SmartEngine 依赖当前为 **4.0.2**（`platform/build.gradle:317,321`）。
 > - 本文 Gap 1-15 全部处于 `PARTIAL` / `PARTIAL+`，本轮逐条抽查未发现「标为缺口但其实已实现」的条目；`/api/decision/facts/catalog` 返回的 `dictCode / allowedValues / reference / sourceType / sourceRef / operators / visible / editable / masked / permission` 字段集与 Gap 1 描述一致（`DecisionFactDTO` / `DecisionFactEntityDTO`）。
