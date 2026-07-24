@@ -120,6 +120,27 @@ async function frHold() {
 }
 try { await frHold(); } catch (e) { R.check('FR-16', 'no exception', false, String(e.message).slice(0, 200)); }
 
+// ------------------------------------------------------------------ FR-05 Interlock (7 checks)
+async function frInterlock() {
+  console.log('\n[FR-05] Start interlock — 7-check evaluator returns structured result');
+  const code = uid('WOP');
+  // Precondition chain: work order → operation (references aren't FK-enforced, so dummy ids suffice).
+  const wo = await execCommand(token, 'mfg_work_order_pcba_execution:create',
+    { mfg_wo_name: `WO ${code}`, mfg_wo_product_id: `prod-${code}`, mfg_wo_bom_id: `bom-${code}`, mfg_wo_plan_qty: 100 }, undefined, 'create', { allowError: true });
+  if (!R.check('FR-05', 'create work order', wo.recordId, `id=${wo.recordId} detail=${JSON.stringify(wo.raw?.context||'').slice(0,90)}`)) return;
+  const op = await execCommand(token, 'mfg_work_order_operation_pcba_execution:create',
+    { mfg_wop_work_order_id: wo.recordId, mfg_wop_seq: 10, mfg_wop_name: `SMT op ${code}`, mfg_wop_planned_qty: 100, mfg_wop_operator: 'Alice' }, undefined, 'create', { allowError: true });
+  if (!R.check('FR-05', 'create work-order operation', op.recordId, `id=${op.recordId} code=${op.code} detail=${JSON.stringify(op.raw?.context||'').slice(0,90)}`)) return;
+  const chk = await execCommand(token, 'mfg_work_order_operation_pcba_execution:check_interlock', {}, op.recordId, 'action', { allowError: true });
+  R.check('FR-05', 'check_interlock executes', chk.ok, `code=${chk.code} status=${chk.status}`);
+  // The evaluator persists one row per check into mt_mfg_interlock_check_pcba_execution.
+  R.check('FR-05', 'evaluator ran 7 checks (6→7 per #219)', Number(chk.data?.checkedItems) === 7, `checkedItems=${chk.data?.checkedItems} failed=${chk.data?.failedItems} passed=${chk.data?.passed}`);
+  const codes = queryDb(`select distinct mfg_ic_item_code from mt_mfg_interlock_check_pcba_execution where mfg_ic_work_order_op_id='${sq(op.recordId)}'`).map((r) => r[0]);
+  R.check('FR-05', '7 distinct check items persisted', codes.length === 7, `codes=${codes.join(',')}`);
+  R.check('FR-05', 'tooling_life check present (#219 7th check)', codes.includes('tooling_life'), `has tooling_life=${codes.includes('tooling_life')}`);
+}
+try { await frInterlock(); } catch (e) { R.check('FR-05', 'no exception', false, String(e.message).slice(0, 200)); }
+
 // ------------------------------------------------------------------ summary
 const s = R.summary();
 console.log(`\n=== SUMMARY: ${s.pass}/${s.total} checks pass, ${s.fail} fail ===`);
