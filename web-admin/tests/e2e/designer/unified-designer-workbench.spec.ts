@@ -49,6 +49,9 @@ async function dndDragTo(
     // a held button or a stuck @dnd-kit drag would make this gesture a no-op.
     // mouse.move uses viewport coordinates, so both ends must be on-screen first;
     // a tall canvas (filters + toolbar + table) can push the drop target below the fold.
+    // Note that this pins an oversized container's TOP to the pane top, which is
+    // where @dnd-kit's auto-scroll can slide it out from under a stationary
+    // pointer — see `containerDropPosition` for the drop point that avoids it.
     await target.scrollIntoViewIfNeeded();
     await source.scrollIntoViewIfNeeded();
     const src = await source.boundingBox();
@@ -75,6 +78,30 @@ async function dndDragTo(
     await performGesture();
     expect(await canvasBlocks.count()).toBeGreaterThan(before);
   }).toPass({ timeout: 20000 });
+}
+
+/**
+ * Drop position for "drop this palette block INTO that container".
+ *
+ * Aims at the container's own left body gutter (blocks inset their children by
+ * ~13px), so the pointer is inside the container and inside NO descendant.
+ *
+ * Two measured constraints decide the numbers:
+ *  - x must stay in the gutter: children start at parent.x + 13.
+ *  - y must stay clear of the canvas pane's edges. @dnd-kit auto-scrolls while
+ *    the pointer sits within ~25% of the scrollable pane (measured: pane height
+ *    583px, so ~146px), and scrolling slides the container out from under a
+ *    stationary pointer: aiming 16px below the top of a 1695px-tall `form_root`
+ *    scrolled the pane from scrollTop 136 -> 58 mid-gesture, moving the container
+ *    to y=209 while the pointer stayed at y=145 — over nothing, drop discarded.
+ *    `scrollIntoViewIfNeeded` pins an oversized container's top to the pane top,
+ *    so 200px down is both inside it and clear of the band; a container shorter
+ *    than the pane is centred instead, so half its height is equally safe.
+ */
+async function containerDropPosition(target: Locator): Promise<{ x: number; y: number }> {
+  const box = await target.boundingBox();
+  if (!box) throw new Error('containerDropPosition: target has no bounding box');
+  return { x: 6, y: Math.min(200, Math.max(24, box.height / 2)) };
 }
 
 /**
@@ -2124,7 +2151,21 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     );
     await page.getByTestId('runtime-action-action_seed_submit').click();
     const commandResp = await commandRespPromise;
-    expect([200, 400, 403, 404, 422, 500]).toContain(commandResp.status());
+    // This action is deliberately wired to a command code that does not exist
+    // (`missing.form.command.<uid>`), so the run has exactly ONE coherent outcome:
+    // the request goes to that code and the platform rejects it (live backend
+    // answers 400 `Command not found`). The old expectation also accepted 200
+    // while still requiring an inline error below — self-contradictory, and it
+    // reported the interesting case (the runtime executed something else, or the
+    // inspector edit never committed) as a confusing "error box never appeared".
+    // Pinning the target and the failure makes both halves falsifiable: a runtime
+    // that sent the stale/seeded command, or a backend that started accepting
+    // unknown codes, now fails here with a message that says which happened.
+    expect(commandResp.url()).toContain(`/api/meta/commands/execute/${liveFormCommandCode}`);
+    expect(
+      commandResp.status(),
+      'a command code that does not exist must not execute successfully',
+    ).toBeGreaterThanOrEqual(400);
     const commandRequestBody = commandResp.request().postDataJSON() as {
       payload?: Record<string, unknown>;
       auditContext?: Record<string, unknown>;
@@ -2147,12 +2188,17 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       blockPath: ['form_root', 'form_actions', 'action_seed_submit'],
     });
 
+    // The rejection must reach the user inline, and must NOT be reported as a
+    // success: the runtime renders EITHER the status line (resolved) or the error
+    // box (rejected), so asserting the status line is absent is what catches a
+    // runtime that swallows a failed execution and tells the user it worked.
     const commandError = page.getByTestId('runtime-action-error-action_seed_submit');
     await expect(commandError).toBeVisible();
     await expect(commandError).toHaveAttribute(
       'data-error-kind',
       /not-found|validation|permission|server/,
     );
+    await expect(page.getByTestId('runtime-action-status-action_seed_submit')).toHaveCount(0);
 
     const persisted = await readPage(page, pagePid);
     const persistedCommand = findBlockById(persisted.blocks ?? [], 'action_seed_submit');
@@ -4876,20 +4922,23 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(tabsPaletteItem).toBeVisible();
     await expect(tabsPaletteItem).toBeEnabled();
     await expect(tabsPaletteItem).toHaveAttribute('aria-roledescription', 'draggable');
-    // Add the tabs container via the palette's click-to-add affordance (it targets
-    // the current selection — form_root, selected above) rather than a drag.
+    // Real drag onto a container TALLER THAN THE VIEWPORT: by this point in the
+    // serial suite `form_root` measures 1695px. This replaces the palette's
+    // click-to-add shortcut, which was adopted when this drop looked like a silent
+    // no-op; the drop lands (and stays landed) now that it is aimed at form_root's
+    // own gutter — see `containerDropPosition` for why the aim, not the ranking,
+    // was what the earlier attempt got wrong.
     //
-    // By this point in the serial suite `form_root` is ~1650px tall. The designer
-    // resolves a drop by taking `pointerWithin` hits PLUS the top `closestCenter`
-    // candidate and then picking the SMALLEST-area droppable
-    // (prioritizeNestedDropCollisions). For a container that large, closestCenter
-    // always contributes some small descendant, which then wins on area — so a drop
-    // aimed at form_root (even on its own header) resolves to a descendant that
-    // rejects a `tabs` block and the gesture is a silent no-op. See the audit notes:
-    // this silent no-op drop onto a tall container is a real UX weakness, tracked
-    // separately. Drag coverage for palette→canvas is retained by UDW-006 and by the
-    // tab / form-section drags below (small, freshly-created containers).
-    await tabsPaletteItem.click();
+    // Honest scope: this drag exercises the palette -> tall-container drop path
+    // end to end in a browser, but it does NOT by itself discriminate the #1479
+    // ranking fix — mutation-verified, the whole file stays green with the pre-fix
+    // pooled ranking restored, because the proximity guess elected here is a direct
+    // child, which accepts a sibling insert. The ranking rule itself is pinned by
+    // the dndShared unit tests.
+    const formRoot = page.getByTestId('canvas-block-form_root');
+    await dndDragTo(page, tabsPaletteItem, formRoot, {
+      targetPosition: await containerDropPosition(formRoot),
+    });
     await expect(page.getByTestId(`canvas-block-${tabsId}`)).toBeVisible();
     await expect(page.getByTestId('inspector-selected-id')).toContainText(tabsId);
     await page.getByTestId('inspector-field-title').fill(tabsTitle);
@@ -5012,13 +5061,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await switchResourceTab(page, 'blocks');
     const widgetPaletteItem = page.getByTestId('palette-add-widget');
     await expect(widgetPaletteItem).toBeEnabled();
-    // Click-to-add against the current selection (detail_root, selected above) —
-    // by this point detail_root also holds the action-bar added above and a
-    // WYSIWYG-rendered summary section, so a drop aimed at it resolves to a smaller
-    // descendant that rejects a `widget` (see the UDW-040 note on
-    // prioritizeNestedDropCollisions) and the gesture is a silent no-op. The
-    // action-bar / action drags above still exercise the drag path in this test.
-    await widgetPaletteItem.click();
+    // Real drag onto detail_root, which by now also holds the action-bar added
+    // above plus a WYSIWYG-rendered summary section — replacing the click-to-add
+    // shortcut this test used while the drop looked like a no-op (see the UDW-040
+    // note). Aimed at detail_root's own gutter, so the pointer is inside it and
+    // inside no descendant.
+    const detailRoot = page.getByTestId('canvas-block-detail_root');
+    await dndDragTo(page, widgetPaletteItem, detailRoot, {
+      targetPosition: await containerDropPosition(detailRoot),
+    });
     await expect(page.getByTestId(`canvas-block-${widgetId}`)).toBeVisible();
     await page.getByTestId('inspector-field-widgetType').selectOption('number-card');
     await page.getByTestId('inspector-field-props.title').fill(detailWidgetTitle);
@@ -5342,12 +5393,14 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await switchResourceTab(page, 'outline');
     await page.getByTestId(`outline-item-${tabId}`).click();
     await switchResourceTab(page, 'blocks');
-    // Click-to-add against the current selection (the tab, selected above). The tab
-    // now holds a filter-bar plus a table with a column, so a drop aimed at it
-    // resolves to a smaller descendant that rejects an `action-bar` (see the UDW-040
-    // note on prioritizeNestedDropCollisions) and the gesture is a silent no-op.
-    // The action drag below still exercises the drag path.
-    await page.getByTestId('palette-add-action-bar').click();
+    // Real drag onto the tab, which now holds a filter-bar plus a table with a
+    // column — replacing the click-to-add shortcut this test used while the drop
+    // looked like a no-op (see the UDW-040 note). Aimed at the tab's own gutter,
+    // so the pointer is inside the tab and inside no descendant.
+    const listTab = page.getByTestId(`canvas-block-${tabId}`);
+    await dndDragTo(page, page.getByTestId('palette-add-action-bar'), listTab, {
+      targetPosition: await containerDropPosition(listTab),
+    });
     const actionBarId =
       (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
     expect(actionBarId).toMatch(/^action_bar_new_action_bar(_\d+)?$/);
@@ -5780,11 +5833,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       await page.getByTestId(`outline-item-${tabId}`).click();
       await switchResourceTab(page, 'blocks');
       await expect(page.getByTestId(helper.paletteId)).toBeEnabled();
-      // Click-to-add against the current selection (the tab, re-selected each
-      // iteration). The tab grows with every helper appended, so a drop aimed at it
-      // resolves to a smaller descendant that rejects the helper block (see the
-      // UDW-040 note on prioritizeNestedDropCollisions) and silently adds nothing.
-      await page.getByTestId(helper.paletteId).click();
+      // Real drag onto the tab, re-selected each iteration. The tab grows with
+      // every helper appended, so the last iterations drop onto a container much
+      // taller than the drop point — four consecutive drags into a container that
+      // is a different size every time (see the UDW-040 note). Aimed at the tab's
+      // own gutter, so the pointer is inside the tab and inside no descendant.
+      const detailTab = page.getByTestId(`canvas-block-${tabId}`);
+      await dndDragTo(page, page.getByTestId(helper.paletteId), detailTab, {
+        targetPosition: await containerDropPosition(detailTab),
+      });
       const helperId =
         (await page.getByTestId('inspector-selected-id').textContent())?.trim() ?? '';
       expect(helperId).toContain(helper.blockType.replaceAll('-', '_'));
