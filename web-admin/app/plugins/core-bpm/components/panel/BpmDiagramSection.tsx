@@ -83,6 +83,18 @@ const nodeTypes: NodeTypes = {
   callActivity: BpmDiagramNode,
 };
 
+/**
+ * A {@link BpmDiagramNode} is `min-w-24` (96px) wide. `fitView` shrinks the
+ * diagram to fit its whole bounds, so a wide multi-branch process — or a fit
+ * that runs against a not-yet-measured / 0×0 container the first time the tab
+ * becomes visible — can drop the zoom to ReactFlow's `minZoom` and leave nodes
+ * unreadably small. Clamp every fit to a readable floor (96px × 0.6 ≈ 58px) so
+ * nodes stay legible; the canvas is still pan/zoom-able for anything that
+ * overflows at this floor (`panOnDrag` / `zoomOnScroll` are enabled below).
+ */
+const MIN_READABLE_ZOOM = 0.6;
+const FIT_VIEW_OPTIONS = { padding: 0.24, minZoom: MIN_READABLE_ZOOM } as const;
+
 function DiagramViewportSync({
   nodeCount,
   containerRef,
@@ -96,7 +108,7 @@ function DiagramViewportSync({
   useEffect(() => {
     if (!nodesInitialized || nodeCount === 0) return;
     const frame = window.requestAnimationFrame(() => {
-      void fitView({ padding: 0.24, duration: 0 });
+      void fitView({ ...FIT_VIEW_OPTIONS, duration: 0 });
     });
     return () => window.cancelAnimationFrame(frame);
   }, [fitView, nodeCount, nodesInitialized]);
@@ -111,7 +123,7 @@ function DiagramViewportSync({
       if (width <= 0 || height <= 0) return;
 
       window.requestAnimationFrame(() => {
-        void fitView({ padding: 0.24, duration: 0 });
+        void fitView({ ...FIT_VIEW_OPTIONS, duration: 0 });
       });
     });
 
@@ -233,7 +245,7 @@ export function BpmDiagramSection({ instance, t }: BpmDiagramSectionProps) {
         minZoom={0.2}
         maxZoom={1.5}
         fitView
-        fitViewOptions={{ padding: 0.24 }}
+        fitViewOptions={FIT_VIEW_OPTIONS}
       >
         <DiagramViewportSync
           nodeCount={annotatedNodes.length}

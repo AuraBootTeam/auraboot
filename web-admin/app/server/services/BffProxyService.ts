@@ -45,7 +45,13 @@ function hasNonEmptyBody(body: unknown): boolean {
   if (body === undefined || body === null) return false;
   if (Buffer.isBuffer(body)) return body.length > 0;
   if (typeof body === 'string') return body.length > 0;
-  if (Array.isArray(body)) return body.length > 0;
+  // An array is ALWAYS a deliberate client body — express.json() defaults a body-less
+  // request to `{}` (empty object), never to `[]`. Dropping an empty array here made a
+  // legitimate `PUT [] ` (e.g. clearing the last automation-debug breakpoint) reach the
+  // backend with no body, which 400s as "Required request body is missing". Forward it.
+  // (Content-Length is re-derived downstream — REQUEST_FRAMING_HEADERS are stripped — so
+  // this does not reintroduce the empty-`{}` framing desync that guards the object case.)
+  if (Array.isArray(body)) return true;
   if (typeof body === 'object') return Object.keys(body as Record<string, unknown>).length > 0;
   return true;
 }

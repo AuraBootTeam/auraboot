@@ -279,7 +279,18 @@ function camelToSnake(value: string): string {
   return value.replace(/[A-Z]/g, (char) => `_${char.toLowerCase()}`);
 }
 
-export function getListFieldValueWithAlias(record: Record<string, any>, fieldCode: string): unknown {
+export function getListFieldValueWithAlias(
+  record: Record<string, any>,
+  fieldCode: string | undefined,
+): unknown {
+  // A bare-string column shorthand (e.g. `columns: ['name', 'pageKey']`) reaches the
+  // legacy list runtime without a resolved `field`, so `column.field` can be undefined.
+  // Guard the alias lookup here so such a column renders empty instead of throwing
+  // `Cannot read properties of undefined (reading 'includes')`, which would blank the
+  // whole page behind the render error boundary ("Oops!").
+  if (!record || typeof fieldCode !== 'string' || fieldCode.length === 0) {
+    return undefined;
+  }
   if (Object.prototype.hasOwnProperty.call(record, fieldCode)) {
     return record[fieldCode];
   }

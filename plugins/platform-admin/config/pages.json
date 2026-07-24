@@ -2528,7 +2528,7 @@
               "en-US": "Save"
             },
             "action": {
-              "type": "state_transition",
+              "type": "command",
               "command": "admin:update_scheduled_task"
             }
           },
