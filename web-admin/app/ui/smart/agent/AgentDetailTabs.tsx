@@ -6,7 +6,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useSearchParams, useNavigate } from 'react-router';
 import {
   ArrowLeftIcon,
   UserCircleIcon,
@@ -1789,9 +1789,10 @@ function RemoveFromOrgDialog({
 // Main Page
 // ---------------------------------------------------------------------------
 
-export default function AIColleagueDetailPage() {
+export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown }) {
   const { t } = useI18n();
-  const { agentPid } = useParams<{ agentPid: string }>();
+  const [searchParams] = useSearchParams();
+  const agentPid = searchParams.get('agentPid') || undefined;
   const navigate = useNavigate();
   const toast = useToastContext();
   const tabs = useTabs(t);
@@ -1866,7 +1867,7 @@ export default function AIColleagueDetailPage() {
         setAgent(res.data);
       } else {
         toast.showErrorToast(t('ai.colleagues.error.notFound', undefined, 'Agent not found'));
-        navigate('/ai/colleagues');
+        navigate('/p/c/ai_colleagues');
       }
     } catch {
       toast.showErrorToast(t('ai.colleagues.error.loadFailed', undefined, 'Failed to load agent'));
@@ -1943,7 +1944,7 @@ export default function AIColleagueDetailPage() {
       {/* Back + Title */}
       <div className="mb-6 flex items-center gap-3">
         <button
-          onClick={() => navigate('/ai/colleagues')}
+          onClick={() => navigate('/p/c/ai_colleagues')}
           className="rounded-lg p-2 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
           data-testid="back-to-colleagues"
         >
@@ -2079,3 +2080,5 @@ export default function AIColleagueDetailPage() {
     </div>
   );
 }
+
+export default AgentDetailTabs;

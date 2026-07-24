@@ -25,10 +25,12 @@ export const RESOURCES: PluginResource[] = [
     menu: false, parentKey: 'ai.colleagues',
   },
   {
-    key: 'ai.colleagues.detail', path: '/ai/colleagues/:agentPid',
+    // Converted to a DSL page (ai_colleague_detail) whose AgentDetailTabs custom block is the
+    // 5-tab agent configuration surface. Fileless (no React route); the agent comes from
+    // ?agentPid=. Callers (grid/chat/wizard) navigate to /p/c/ai_colleague_detail?agentPid=…
+    key: 'ai.colleagues.detail', path: '/p/c/ai_colleague_detail',
     title: { en: 'AI Agent', zh: 'AI 同事详情' },
     menu: false, parentKey: 'ai.colleagues',
-    file: './plugins/core-ai-colleagues/pages/ai/colleagues.$agentPid.tsx',
   },
   {
     // Converted to a DSL page (ai_colleague_chat) whose AgentChatEmbed custom block wraps

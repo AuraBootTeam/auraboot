@@ -3913,5 +3913,22 @@
         "component": "AgentCreateWizard"
       }
     ]
+  },
+  {
+    "pageKey": "ai_colleague_detail",
+    "name:zh-CN": "AI 同事详情",
+    "name:en": "AI Colleague Detail",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "ai_colleague_detail_tabs",
+        "blockType": "custom",
+        "component": "AgentDetailTabs"
+      }
+    ]
   }
 ]

@@ -921,7 +921,7 @@ export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown 
         toast.showSuccessToast(
           t('ai.wizard.success', undefined, 'AI Colleague created successfully'),
         );
-        navigate(`/ai/colleagues/${res.data.pid}`);
+        navigate(`/p/c/ai_colleague_detail?agentPid=${res.data.pid}`);
       } else {
         toast.showErrorToast(
           t('ai.wizard.error.createFailed', undefined, 'Failed to create AI Colleague'),
