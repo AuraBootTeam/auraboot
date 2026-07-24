@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +34,14 @@ import java.util.Set;
  * Enterprise SPI implementation of GroupChatMessagePort.
  * Bridges the core agent-chat module with the enterprise IM module.
  */
+// @Primary: the consumers resolve the port via ObjectProvider.getIfAvailable(NoOp::new), which
+// throws NoUniqueBeanDefinitionException when both this real IM-backed adapter and the
+// @ConditionalOnMissingBean NoOp fallback exist. @ConditionalOnMissingBean on a @Component is
+// scan-order dependent (unreliable) — @Primary makes this adapter win deterministically whenever
+// the IM module is on the classpath, so a group-chat turn always reaches real persistence, never
+// the silent NoOp. The NoOp still serves a core-only build where this adapter is absent.
 @Component
+@Primary
 @RequiredArgsConstructor
 public class GroupChatMessageAdapter implements GroupChatMessagePort {
 
