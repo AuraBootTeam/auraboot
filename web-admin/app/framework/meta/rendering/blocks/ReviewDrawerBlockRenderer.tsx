@@ -190,6 +190,23 @@ function isEmptyValue(value: unknown): boolean {
   return value === undefined || value === null || value === '';
 }
 
+/**
+ * An http(s) URL safe to put in an href, or null. Evidence snapshots carry supplier detail links
+ * copied verbatim from an upstream API, so the scheme is checked rather than assumed — javascript:
+ * and data: never reach the DOM.
+ */
+export function safeExternalUrl(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 function readFieldValue(record: any, config: any, fallbackRecord?: any): unknown {
   if (Object.prototype.hasOwnProperty.call(config, 'value')) return config.value;
   const source = config.sourceField ? readPath(record, config.sourceField) : record;
@@ -1296,7 +1313,23 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                                     className="text-text min-w-0 whitespace-normal break-words"
                                     title={value}
                                   >
-                                    {value}
+                                    {field.format === 'link' && safeExternalUrl(rawValue) ? (
+                                      <a
+                                        href={safeExternalUrl(rawValue) as string}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-accent underline underline-offset-2"
+                                        data-testid={`review-drawer-candidate-${rowKey}-link-${key}`}
+                                      >
+                                        {getLocalizedText(
+                                          field.linkLabel || { 'zh-CN': '查看', en: 'Open' },
+                                          locale,
+                                          t,
+                                        )}
+                                      </a>
+                                    ) : (
+                                      value
+                                    )}
                                   </dd>
                                 </div>
                               );
@@ -1403,40 +1436,49 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                   )}
                 </section>
                 )}
-              {(candidatesConfig.actions || []).length > 0 && (
-                <div className="mt-4 flex flex-wrap justify-end gap-2">
-                  {candidatesConfig.actions.filter(isActionVisible).map((actionConfig: any) => {
-                    const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
-                    const requiresSelection =
-                      actionConfig.requiresSelection !== false &&
-                      actionConfig.code !== 'undo_decision';
-                    const disabled = Boolean(
-                      (requiresSelection && !selectedCandidate) ||
-                      isActionDisabledByCondition(actionConfig) ||
-                      runningAction,
-                    );
-                    return (
-                      <button
-                        key={code}
-                        type="button"
-                        data-testid={`review-drawer-candidate-action-${code}`}
-                        disabled={disabled}
-                        onClick={() => {
-                          void runAction(actionConfig, 'candidate');
-                        }}
-                        className={`rounded-control px-3 py-2 text-sm font-medium ${
-                          buttonClass[actionConfig.variant || 'primary'] || buttonClass.primary
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
-                      >
-                        {runningAction === `candidate:${code}`
-                          ? t('common.loading')
-                          : getLocalizedText(actionConfig.label || code, locale, t)}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
             </section>
+            {/*
+              The actions live outside the decision panel on purpose. Inside it they were the last
+              child of a max-h-[48%] overflow-auto section, so "确认此报价" scrolled out of sight
+              behind the evidence it was meant to confirm. As a shrink-0 sibling in the aside's flex
+              column they stay on screen however long the candidate detail runs.
+            */}
+            {(candidatesConfig.actions || []).length > 0 && (
+              <footer
+                data-testid="review-drawer-actions"
+                className="border-border bg-panel flex shrink-0 flex-wrap justify-end gap-2 border-t px-2.5 py-2"
+              >
+                {candidatesConfig.actions.filter(isActionVisible).map((actionConfig: any) => {
+                  const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
+                  const requiresSelection =
+                    actionConfig.requiresSelection !== false &&
+                    actionConfig.code !== 'undo_decision';
+                  const disabled = Boolean(
+                    (requiresSelection && !selectedCandidate) ||
+                    isActionDisabledByCondition(actionConfig) ||
+                    runningAction,
+                  );
+                  return (
+                    <button
+                      key={code}
+                      type="button"
+                      data-testid={`review-drawer-candidate-action-${code}`}
+                      disabled={disabled}
+                      onClick={() => {
+                        void runAction(actionConfig, 'candidate');
+                      }}
+                      className={`rounded-control px-3 py-2 text-sm font-medium ${
+                        buttonClass[actionConfig.variant || 'primary'] || buttonClass.primary
+                      } disabled:cursor-not-allowed disabled:opacity-50`}
+                    >
+                      {runningAction === `candidate:${code}`
+                        ? t('common.loading')
+                        : getLocalizedText(actionConfig.label || code, locale, t)}
+                    </button>
+                  );
+                })}
+              </footer>
+            )}
           </aside>
           )}
         </div>
