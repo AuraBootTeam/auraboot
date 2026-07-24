@@ -1,0 +1,395 @@
+{
+  "catalogId": "oss-platform-regression",
+  "goldenGate": {
+    "release": "golden/release.sh"
+  },
+  "suites": [
+    {
+      "id": "OSS-META-01",
+      "domain": "oss",
+      "name": "Catalog schema + generated matrix freshness (methodology gate)",
+      "command": "bash golden/run-meta-gates.sh",
+      "tier": "offline",
+      "coversPaths": [
+        "golden/test-catalog.json",
+        "golden/GENERATED-test-matrix.md",
+        "golden/run-meta-gates.sh"
+      ],
+      "axes": {
+        "surface": "contract",
+        "dependencies": "hermetic",
+        "verdict": "contract",
+        "driver": "unit"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-SYS-01",
+      "domain": "oss",
+      "name": "Test-system integrity: spec registration, command reachability, coverage-manifest freshness, derived-field writers",
+      "command": "./scripts/check-test-system.sh",
+      "tier": "offline",
+      "coversPaths": [
+        "web-admin/tests/e2e/**",
+        "web-admin/playwright*.config.ts",
+        "plugins/**/config/commands.json",
+        "plugins/**/config/pages/**",
+        "docs/coverage/**",
+        "scripts/check-test-system.sh",
+        "scripts/check-e2e-spec-registration.mjs",
+        "scripts/check-command-reachability.mjs",
+        "scripts/check-coverage-manifest-freshness.mjs",
+        "scripts/check-derived-field-writers.mjs"
+      ],
+      "axes": {
+        "surface": "contract",
+        "dependencies": "hermetic",
+        "verdict": "contract",
+        "driver": "unit"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-DSL-01",
+      "domain": "oss",
+      "name": "DSL legality: actions, render types, command convention, form back links",
+      "command": "node scripts/check-dsl-actions.mjs && node scripts/check-dsl-render-types.mjs && node scripts/check-dsl-command-convention.mjs && node scripts/check-form-back-link.mjs",
+      "tier": "offline",
+      "coversPaths": [
+        "plugins/**/config/pages/**",
+        "plugins/**/config/commands.json",
+        "web-admin/app/framework/meta/**",
+        "scripts/check-dsl-actions.mjs",
+        "scripts/check-dsl-render-types.mjs",
+        "scripts/check-dsl-command-convention.mjs",
+        "scripts/check-form-back-link.mjs"
+      ],
+      "axes": {
+        "surface": "contract",
+        "dependencies": "hermetic",
+        "verdict": "contract",
+        "driver": "unit"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-AUTHZ-01",
+      "domain": "oss",
+      "name": "Authorization surface: controller authz, command permissions, agent/rag boundary",
+      "command": "node scripts/check-controller-authz.mjs && node scripts/check-command-permissions.mjs && node scripts/check-agent-eval-boundary.mjs",
+      "tier": "offline",
+      "coversPaths": [
+        "platform/src/main/java/**/*Controller.java",
+        "platform/src/main/java/com/auraboot/framework/permission/**",
+        "plugins/**/config/commands.json",
+        "plugins/**/config/roles.json",
+        "scripts/check-controller-authz.mjs",
+        "scripts/check-command-permissions.mjs",
+        "scripts/check-agent-eval-boundary.mjs"
+      ],
+      "axes": {
+        "surface": "contract",
+        "dependencies": "hermetic",
+        "verdict": "contract",
+        "driver": "unit"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-DATA-01",
+      "domain": "oss",
+      "name": "Data contracts: cache eviction, JSONB type handlers, public record dual id",
+      "command": "node scripts/check-cache-eviction.mjs && ./scripts/check-jsonb-typehandler.sh && ./scripts/check-public-record-id-contracts.sh",
+      "tier": "offline",
+      "coversPaths": [
+        "platform/src/main/java/**/*Service*.java",
+        "platform/src/main/java/**/*Mapper*.java",
+        "platform/src/main/java/**/entity/**",
+        "scripts/check-cache-eviction.mjs",
+        "scripts/check-jsonb-typehandler.sh",
+        "scripts/check-public-record-id-contracts.sh"
+      ],
+      "axes": {
+        "surface": "contract",
+        "dependencies": "hermetic",
+        "verdict": "contract",
+        "driver": "unit"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-BOUNDARY-01",
+      "domain": "oss",
+      "name": "Boundaries: OSS must not reference enterprise, designer kernel, no internal docs",
+      "command": "./scripts/check-oss-boundary.sh && node scripts/check-designer-boundary.mjs && ./scripts/check-oss-no-internal-docs.sh",
+      "tier": "offline",
+      "coversPaths": [
+        "platform/src/main/java/**",
+        "web-admin/app/**",
+        "packages/**",
+        "docs/**",
+        "scripts/check-oss-boundary.sh",
+        "scripts/check-designer-boundary.mjs",
+        "scripts/check-oss-no-internal-docs.sh"
+      ],
+      "axes": {
+        "surface": "contract",
+        "dependencies": "hermetic",
+        "verdict": "contract",
+        "driver": "unit"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-HYGIENE-01",
+      "domain": "oss",
+      "name": "Hygiene: falsifiable e2e assertions, i18n, secret echo, scripts index, version sync, widget bundle, reset/init contracts",
+      "command": "node scripts/check-e2e-assertions.mjs && node scripts/check-i18n-hardcoded.mjs && ./scripts/check-no-secret-echo.sh && node scripts/check-scripts-index.mjs && ./scripts/check-version-sync.sh && node scripts/check-cs-widget-bundle.mjs && ./scripts/check-reset-init-contracts.sh",
+      "tier": "offline",
+      "coversPaths": [
+        "web-admin/tests/e2e/**",
+        "web-admin/app/**",
+        "scripts/**",
+        "VERSION",
+        "plugins/**/config/i18n.json"
+      ],
+      "axes": {
+        "surface": "contract",
+        "dependencies": "hermetic",
+        "verdict": "contract",
+        "driver": "unit"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-DEBT-CAPCODE",
+      "domain": "oss",
+      "name": "Capability codes (RECORDED — red on main: platform-admin capability includes a ghost permission)",
+      "command": "node scripts/check-capability-codes.mjs",
+      "tier": "offline",
+      "coversPaths": [
+        "plugins/**/config/capabilities.json",
+        "plugins/**/config/roles.json",
+        "scripts/check-capability-codes.mjs"
+      ],
+      "axes": {
+        "surface": "contract",
+        "dependencies": "hermetic",
+        "verdict": "contract",
+        "driver": "unit"
+      },
+      "goldenSet": false,
+      "blocking": false,
+      "reason": "red on origin/main as of 2026-07-24 — sys.cap.member_base lists a ghost permission. Runs and is reported so the debt stays visible; flip blocking:true when fixed."
+    },
+    {
+      "id": "OSS-DEBT-DICTCOLOR",
+      "domain": "oss",
+      "name": "DSL status colours vs design system (RECORDED — red on main)",
+      "command": "node scripts/check-dsl-status-colors.mjs",
+      "tier": "offline",
+      "coversPaths": [
+        "plugins/**/config/dicts.json",
+        "plugins/**/config/dict/**",
+        "scripts/check-dsl-status-colors.mjs"
+      ],
+      "axes": {
+        "surface": "ui",
+        "dependencies": "hermetic",
+        "verdict": "contract",
+        "driver": "unit"
+      },
+      "goldenSet": false,
+      "blocking": false,
+      "reason": "red on origin/main as of 2026-07-24 — business dict colours violate ux-design-system.md §1.3. Runs and is reported so the debt stays visible; flip blocking:true when fixed."
+    },
+
+    {
+      "id": "OSS-REL-RBAC",
+      "domain": "oss",
+      "name": "RBAC platform-baseline browser golden (per-role, real stack)",
+      "command": "./scripts/rbac-golden-run.sh",
+      "tier": "release",
+      "coversPaths": [
+        "platform/src/main/java/com/auraboot/framework/permission/**",
+        "web-admin/tests/e2e/rbac/**",
+        "scripts/rbac-golden-run.sh"
+      ],
+      "axes": {
+        "surface": "journey",
+        "dependencies": "real-stack",
+        "verdict": "exact-pin",
+        "driver": "browser"
+      },
+      "goldenSet": false,
+      "blocking": true,
+      "reason": "mutation evidence not yet recorded — see TEST-SYSTEM.md gap on goldenSet promotion"
+    },
+    {
+      "id": "OSS-REL-AURABOT",
+      "domain": "oss",
+      "name": "AuraBot scenario matrix golden (routing + seam, real-stack DB read-back)",
+      "command": "./scripts/aurabot-scenario-golden-run.sh",
+      "tier": "release",
+      "coversPaths": [
+        "platform/src/main/java/com/auraboot/framework/aurabot/**",
+        "platform/src/main/java/com/auraboot/framework/agent/**",
+        "platform/src/main/java/com/auraboot/framework/conversation/**",
+        "scripts/aurabot-scenario-golden-run.sh"
+      ],
+      "axes": {
+        "surface": "service",
+        "dependencies": "real-stack",
+        "verdict": "exact-pin",
+        "driver": "it"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-REL-DIGITAL-EMPLOYEE",
+      "domain": "oss",
+      "name": "Digital employee (AI colleague) journey browser golden",
+      "command": "./scripts/digital-employee-golden-run.sh",
+      "tier": "release",
+      "coversPaths": [
+        "web-admin/tests/e2e/agent-control-plane/**",
+        "platform/src/main/java/com/auraboot/framework/agent/**",
+        "scripts/digital-employee-golden-run.sh"
+      ],
+      "axes": {
+        "surface": "journey",
+        "dependencies": "real-stack",
+        "verdict": "exact-pin",
+        "driver": "browser"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-REL-FAQ-LOOP",
+      "domain": "oss",
+      "name": "Conversation to FAQ loop golden (distil, review, approve, publish, retrieve)",
+      "command": "./scripts/faq-loop-golden-run.sh",
+      "tier": "release",
+      "coversPaths": [
+        "plugins/core-faq-loop/**",
+        "web-admin/tests/e2e/faq-loop-*.spec.ts",
+        "scripts/faq-loop-golden-run.sh"
+      ],
+      "axes": {
+        "surface": "journey",
+        "dependencies": "real-stack",
+        "verdict": "exact-pin",
+        "driver": "browser"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-REL-KB-INGESTION",
+      "domain": "oss",
+      "name": "Knowledge-base ingestion golden",
+      "command": "./scripts/kb-ingestion-golden-run.sh",
+      "tier": "release",
+      "coversPaths": [
+        "web-admin/tests/e2e/ai/**",
+        "scripts/kb-ingestion-golden-run.sh"
+      ],
+      "axes": {
+        "surface": "journey",
+        "dependencies": "real-stack",
+        "verdict": "exact-pin",
+        "driver": "browser"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-REL-QUICK-FILTER",
+      "domain": "oss",
+      "name": "Quick-filter view chip browser golden",
+      "command": "./scripts/quick-filter-chip-golden-run.sh",
+      "tier": "release",
+      "coversPaths": [
+        "web-admin/app/framework/meta/rendering/pages/list/quickFilter*.ts",
+        "web-admin/tests/e2e/saved-view/**",
+        "scripts/quick-filter-chip-golden-run.sh"
+      ],
+      "axes": {
+        "surface": "ui",
+        "dependencies": "real-stack",
+        "verdict": "exact-pin",
+        "driver": "browser"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-REL-SUSPENDED-TENANT-API",
+      "domain": "oss",
+      "name": "Suspended organization cannot log in — API contract, both directions, reversible",
+      "command": "./scripts/suspended-tenant-login-golden.sh",
+      "tier": "release",
+      "coversPaths": [
+        "platform/src/main/java/com/auraboot/framework/auth/**",
+        "scripts/suspended-tenant-login-golden.sh"
+      ],
+      "axes": {
+        "surface": "api",
+        "dependencies": "real-stack",
+        "verdict": "exact-pin",
+        "driver": "http"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-REL-SUSPENDED-TENANT-UI",
+      "domain": "oss",
+      "name": "Suspended organization at the glass — localized message, not a raw code",
+      "command": "./scripts/suspended-tenant-login-ui-golden.sh",
+      "tier": "release",
+      "coversPaths": [
+        "platform/src/main/java/com/auraboot/framework/auth/**",
+        "web-admin/tests/golden/suspended-tenant-login-ui.mjs",
+        "scripts/suspended-tenant-login-ui-golden.sh"
+      ],
+      "axes": {
+        "surface": "ui",
+        "dependencies": "real-stack",
+        "verdict": "exact-pin",
+        "driver": "browser"
+      },
+      "goldenSet": false,
+      "blocking": true
+    },
+    {
+      "id": "OSS-REL-OEE-DASHBOARD",
+      "domain": "oss",
+      "name": "PCBA OEE dashboard golden (requires an already-running host stack)",
+      "command": "./scripts/host-oee-dashboard-golden.sh",
+      "tier": "release",
+      "coversPaths": [
+        "web-admin/tests/e2e/pcba/**",
+        "scripts/host-oee-dashboard-golden.sh"
+      ],
+      "axes": {
+        "surface": "ui",
+        "dependencies": "real-stack",
+        "verdict": "exact-pin",
+        "driver": "browser"
+      },
+      "goldenSet": false,
+      "blocking": false,
+      "reason": "not self-contained — it deliberately does not start or reset services, so it needs a host stack brought up outside the runner. RECORDED until it is either wrapped or documented as on-demand."
+    }
+  ]
+}
