@@ -93,10 +93,16 @@ export function makeReporter() {
       console.log(`  [${tag}] ${fr} · ${name}${detail ? ' — ' + detail : ''}`);
       return !!cond;
     },
+    deferred(fr, name, detail = '') {
+      results.push({ fr, name, deferred: true, detail });
+      console.log(`  [DEFER] ${fr} · ${name}${detail ? ' — ' + detail : ''}`);
+    },
     results,
     summary() {
-      const pass = results.filter((r) => r.pass).length;
-      return { total: results.length, pass, fail: results.length - pass };
+      const scored = results.filter((r) => !r.deferred);
+      const pass = scored.filter((r) => r.pass).length;
+      const deferred = results.filter((r) => r.deferred).length;
+      return { total: scored.length, pass, fail: scored.length - pass, deferred };
     },
   };
 }

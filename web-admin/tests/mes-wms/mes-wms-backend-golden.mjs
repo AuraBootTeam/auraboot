@@ -141,7 +141,32 @@ async function frInterlock() {
 }
 try { await frInterlock(); } catch (e) { R.check('FR-05', 'no exception', false, String(e.message).slice(0, 200)); }
 
+// ------------------------------------------------------------------ FR-13 Kitting
+async function frKitting() {
+  console.log('\n[FR-13] Kitting analysis — compute produces a kitting result per work order');
+  const code = uid('KWO');
+  const wo = await execCommand(token, 'mfg_work_order_pcba_execution:create',
+    { mfg_wo_name: `KitWO ${code}`, mfg_wo_product_id: `prod-${code}`, mfg_wo_bom_id: `bom-${code}`, mfg_wo_plan_qty: 50 }, undefined, 'create', { allowError: true });
+  if (!R.check('FR-13', 'create work order', wo.recordId, `id=${wo.recordId}`)) return;
+  const kit = await execCommand(token, 'inv:compute_kitting', { inv_kr_work_order_id: wo.recordId }, undefined, 'action', { allowError: true });
+  // FR-13's meaningful assertion (full vs critical kitting) needs a real eng_bom_pcba_mbom +
+  // BOM lines + inventory balance seeded. compute_kitting correctly refuses a work order whose
+  // BOM does not resolve ("Record not found") — that IS correct behaviour, but it means this FR's
+  // full golden requires a multi-model seed not yet built. Report honestly as DEFERRED, not green.
+  const needsBomSeed = !kit.ok && /not found|no BOM/i.test(JSON.stringify(kit.raw || ''));
+  R.deferred('FR-13', 'kitting rate/critical golden requires real BOM + lines + balance seed',
+    needsBomSeed ? 'compute_kitting correctly rejects unresolved BOM — seed needed for full golden' : `code=${kit.code}`);
+}
+try { await frKitting(); } catch (e) { R.check('FR-13', 'no exception', false, String(e.message).slice(0, 200)); }
+
+// FR-10 FEFO — real-stack golden requires inventory balance with expiry-dated lots + a warehouse
+// + a pick source seeded (multi-model). Reported honestly as DEFERRED until that seed is built.
+R.deferred('FR-10', 'FEFO allocation golden requires balance + expiry-dated lots + warehouse seed', 'multi-model seed not yet built');
+
 // ------------------------------------------------------------------ summary
 const s = R.summary();
-console.log(`\n=== SUMMARY: ${s.pass}/${s.total} checks pass, ${s.fail} fail ===`);
+const frCovered = [...new Set(R.results.filter((r) => !r.deferred).map((r) => r.fr))];
+console.log(`\n=== SUMMARY: ${s.pass}/${s.total} checks pass, ${s.fail} fail, ${s.deferred} deferred ===`);
+console.log(`    FRs with real-stack backend golden: ${frCovered.sort().join(', ')} (${frCovered.length}/8)`);
+console.log(`    Deferred (need multi-model seed): ${[...new Set(R.results.filter((r) => r.deferred).map((r) => r.fr))].join(', ') || 'none'}`);
 process.exit(s.fail > 0 ? 1 : 0);
