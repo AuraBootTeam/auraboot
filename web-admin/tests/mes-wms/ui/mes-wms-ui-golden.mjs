@@ -15,9 +15,10 @@ try {
   // NEVER fires — never gate on it. Go straight to the selector (this is what works).
   const emailSel = 'input[type="email"], input[name="email"], input[autocomplete="username"]';
   let seen = false;
-  for (let attempt = 0; attempt < 3 && !seen; attempt++) {
-    await p.goto(`${BASE}/`, { waitUntil: 'domcontentloaded', timeout: 25000 }).catch(() => {});
-    seen = await p.waitForSelector(emailSel, { timeout: 12000 }).then(() => true).catch(() => false);
+  for (let attempt = 0; attempt < 5 && !seen; attempt++) {
+    await p.goto(`${BASE}/`, { waitUntil: "load", timeout: 25000 }).catch(() => {});
+    await p.waitForTimeout(2000);
+    seen = await p.waitForSelector(emailSel, { state: "visible", timeout: 8000 }).then(() => true).catch(() => false);
   }
   if (!seen) throw new Error('login form did not appear after 3 attempts');
   await p.fill(emailSel, 'admin@auraboot.com');
