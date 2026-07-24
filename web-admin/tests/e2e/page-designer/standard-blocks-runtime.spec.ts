@@ -2,6 +2,13 @@ import type { Page } from '@playwright/test';
 import { test, expect } from '../../fixtures';
 import { executeCommandViaApi, uniqueId } from '../helpers';
 
+// The bulk-action toolbar renders i18n labels (编辑/删除/清除 under the default zh-CN);
+// the BulkEditModal heading is hardcoded English. These tests assert the English UI,
+// so force the en-US locale cookie for a consistent English render (SSR reads it).
+test.beforeEach(async ({ context }) => {
+  await context.addCookies([{ name: 'locale', value: 'en-US', domain: '127.0.0.1', path: '/' }]);
+});
+
 const STANDARD_LIST_BLOCK_TYPES = [
   'filters',
   'toolbar',
