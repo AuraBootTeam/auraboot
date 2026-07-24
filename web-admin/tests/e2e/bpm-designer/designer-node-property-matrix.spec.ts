@@ -26,6 +26,12 @@ import {
 import { loginAs } from '../../helpers/wd-fixtures';
 import { BACKEND_URL } from '../../helpers/environments';
 
+// Flow/BPMN designer uses a compact layout below 1600px (palette/inspector collapse
+// behind toggles + a drawer backdrop intercepts canvas clicks). These specs assert the
+// palette/canvas/nodes directly, so run them at the wide layout the designer targets.
+// See FlowDesigner.tsx COMPACT_FLOW_DESIGNER_QUERY '(max-width: 1599px)'.
+test.use({ viewport: { width: 1680, height: 1050 } });
+
 const BACKEND = BACKEND_URL;
 
 function authHeader(token: string): Record<string, string> {

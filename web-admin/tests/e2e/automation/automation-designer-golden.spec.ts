@@ -957,6 +957,12 @@ test.describe('Automation Designer — Layer A real drag-drop golden', () => {
   test('N-CALL-API: drag trigger-record-create→action-call-api, configure url+method via panel, save, enable, fire → node completes (real outbound GET) @golden', async ({
     page,
   }) => {
+    // host-env: SSRF guard blocks loopback; this real-outbound happy path needs a
+    // reachable non-loopback endpoint (docker CI-parity / E2E_CALLAPI_OK_URL).
+    test.skip(
+      /127\.0\.0\.1|localhost/.test(CALLAPI_OK_URL),
+      'call_api outbound happy-path needs a reachable non-loopback endpoint (SSRF guard blocks loopback on host-first); set E2E_CALLAPI_OK_URL or run in docker CI-parity.',
+    );
     await openNewDesigner(page);
     await setAutomationName(page, `N-CALL-API ${uniqueId()}`);
 

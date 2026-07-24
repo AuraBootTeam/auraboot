@@ -7,6 +7,13 @@
 import { test, expect, type Page } from '@playwright/test';
 import { navigateToDynamicPage, uniqueId } from '../helpers';
 
+import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+
+// Serialize e2et_order saved-view specs — they share the model's per-user view
+// state (active view / created views) under the shared admin storageState.
+test.beforeAll(async () => { await acquireSavedViewLock('saved-view-form-view'); });
+test.afterAll(() => { releaseSavedViewLock('saved-view-form-view'); });
+
 const MODEL_CODE = 'e2et_order';
 const PAGE_KEY = 'e2et_order_list';
 const FORM_VIEW_PREFIX = 'FV_';

@@ -9,6 +9,13 @@ import { test, expect, type Page } from '@playwright/test';
 import { uniqueId } from '../helpers';
 import { cleanupGeneratedSavedViews, createOrReuseSavedView } from './helpers';
 
+import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+
+// Serialize e2et_order saved-view specs — they share the model's per-user view
+// state (active view / created views) under the shared admin storageState.
+test.beforeAll(async () => { await acquireSavedViewLock('saved-view-kanban-grouping'); });
+test.afterAll(() => { releaseSavedViewLock('saved-view-kanban-grouping'); });
+
 async function createKanbanViewViaApi(
   page: Page,
   modelCode: string,

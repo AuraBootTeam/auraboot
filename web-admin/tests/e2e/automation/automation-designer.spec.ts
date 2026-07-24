@@ -22,6 +22,12 @@ import { test, expect } from '../../fixtures';
 import { uniqueId } from '../helpers';
 import { ErrorCodes } from '~/shared/services/http-client/types';
 
+// The flow designer switches to a compact layout below 1600px (palette/inspector
+// collapse behind toggles). These specs assert the palette/canvas directly, so run
+// them in the wide layout the designer is built for. See FlowDesigner.tsx
+// COMPACT_FLOW_DESIGNER_QUERY '(max-width: 1599px)'.
+test.use({ viewport: { width: 1680, height: 1050 } });
+
 // ---------------------------------------------------------------------------
 // Locator helpers — handle both Chinese (zh-CN) and English (en-US) i18n
 // ---------------------------------------------------------------------------

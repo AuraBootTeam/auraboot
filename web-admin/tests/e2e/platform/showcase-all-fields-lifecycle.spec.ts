@@ -847,7 +847,13 @@ test.describe('Showcase All Fields — Full Lifecycle', () => {
     const cmdCode = (commandBody as any)?.code;
     const cmdMessage = (commandBody as any)?.message;
     const resultData = (commandBody as any)?.data?.data ?? {};
-    uiCreatedPid = String(resultData?.recordId ?? resultData?.pid ?? '');
+    uiCreatedPid = String(
+      resultData?.recordId ??
+        resultData?.recordPid ??
+        resultData?.publicRecordId ??
+        resultData?.pid ??
+        '',
+    );
     uiCreatedCode = String(resultData?.sc_code ?? '');
     console.log(`[SC-006] Command response: code=${cmdCode}, message=${cmdMessage}, pid=${uiCreatedPid}`);
     expect(uiCreatedPid, `Create should return a valid record ID. Response code=${cmdCode}, message=${cmdMessage}`).toBeTruthy();

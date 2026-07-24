@@ -23,6 +23,13 @@ import {
 } from '../helpers';
 import { cleanupGeneratedSavedViews } from './helpers';
 
+import { acquireSavedViewLock, releaseSavedViewLock } from './_saved-view-lock';
+
+// Serialize e2et_order saved-view specs — they share the model's per-user view
+// state (active view / created views) under the shared admin storageState.
+test.beforeAll(async () => { await acquireSavedViewLock('saved-view-ux-optimization'); });
+test.afterAll(() => { releaseSavedViewLock('saved-view-ux-optimization'); });
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

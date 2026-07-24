@@ -16,6 +16,12 @@
 import { test, expect } from '@playwright/test';
 import { uniqueId } from '../helpers';
 
+// App defaults to zh-CN (localStorage 'locale' / cookie); these KB specs assert the
+// English UI. Force the en-US locale cookie so SSR renders English strings.
+test.beforeEach(async ({ context }) => {
+  await context.addCookies([{ name: 'locale', value: 'en-US', domain: '127.0.0.1', path: '/' }]);
+});
+
 const KB_NAME = `S2 Chart ${uniqueId('KB')}`;
 const CHART_FILE = 'east-china-quarterly-revenue.png';
 
