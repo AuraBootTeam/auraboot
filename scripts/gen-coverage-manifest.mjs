@@ -103,10 +103,20 @@ function buildUiIndex(specRoots) {
  * that put commands in this manifest applies to pages.
  */
 function declaredPages(pluginDir) {
+  // Two shapes are in use and both are legal: config/pages/ as a directory of one file
+  // per page, and config/pages.json as a single array. 26 plugins use the second form
+  // and 50 the first; reading only the directory made those 26 contribute zero rows,
+  // which reads as "this plugin has no pages" rather than "this plugin was not counted".
+  // A denominator with a silent hole in it is the exact failure this file exists to stop.
   const dir = path.join(pluginDir, 'config', 'pages');
-  if (!fs.existsSync(dir)) return [];
+  const single = path.join(pluginDir, 'config', 'pages.json');
+  const files = [
+    ...(fs.existsSync(dir) && fs.statSync(dir).isDirectory() ? walk(dir, ['.json']) : []),
+    ...(fs.existsSync(single) ? [single] : []),
+  ];
+  if (files.length === 0) return [];
   const pages = [];
-  for (const file of walk(dir, ['.json'])) {
+  for (const file of files) {
     let j;
     try { j = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { continue; }
     for (const p of Array.isArray(j) ? j : [j]) {
