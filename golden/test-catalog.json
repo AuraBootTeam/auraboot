@@ -190,9 +190,9 @@
       "reason": "red on origin/main as of 2026-07-24 — sys.cap.member_base lists a ghost permission. Runs and is reported so the debt stays visible; flip blocking:true when fixed."
     },
     {
-      "id": "OSS-DEBT-DICTCOLOR",
+      "id": "OSS-DICTCOLOR-01",
       "domain": "oss",
-      "name": "DSL status colours vs design system (RECORDED — red on main)",
+      "name": "DSL status colours are canonical tones (an unknown name renders gray)",
       "command": "node scripts/check-dsl-status-colors.mjs",
       "tier": "offline",
       "coversPaths": [
@@ -207,10 +207,8 @@
         "driver": "unit"
       },
       "goldenSet": false,
-      "blocking": false,
-      "reason": "red on origin/main as of 2026-07-24 — business dict colours violate ux-design-system.md §1.3. Runs and is reported so the debt stays visible; flip blocking:true when fixed."
+      "blocking": true
     },
-
     {
       "id": "OSS-REL-RBAC",
       "domain": "oss",
