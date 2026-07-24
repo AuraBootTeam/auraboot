@@ -3896,5 +3896,22 @@
         "component": "AgentChatEmbed"
       }
     ]
+  },
+  {
+    "pageKey": "ai_colleague_new",
+    "name:zh-CN": "创建 AI 同事",
+    "name:en": "New AI Colleague",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "ai_colleague_new_wizard",
+        "blockType": "custom",
+        "component": "AgentCreateWizard"
+      }
+    ]
   }
 ]
