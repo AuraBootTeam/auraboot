@@ -345,8 +345,17 @@
         "verdict": "exact-pin",
         "driver": "http"
       },
-      "goldenSet": false,
-      "blocking": true
+      "goldenSet": true,
+      "blocking": true,
+      "evidence": "scripts/suspended-tenant-login-golden.sh — 4 assertions: baseline login, suspended refusal with a named message, and reversibility",
+      "seenRed": {
+        "date": "2026-07-24",
+        "how": "mutation",
+        "mutation": "LoginCompletionHelper: disabled the tenant-suspension gate (`if (false && tenant != null && SUSPENDED...)`) and rebuilt",
+        "result": "RED — \"SUSPENDED TENANT STILL LOGGED IN (JWT issued) — the block did not fire\", with the JWT it should never have received; 4/4 green before and after restore",
+        "harness": "green -> disable the guarded behaviour -> rebuild -> require red -> restore -> rebuild -> require green",
+        "caveat": "the runner reuses an existing bootJar unless --rebuild is passed, so the first mutation attempt stayed green against a stale artifact. A mutation of backend source is only valid with --rebuild."
+      }
     },
     {
       "id": "OSS-REL-SUSPENDED-TENANT-UI",

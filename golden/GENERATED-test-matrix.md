@@ -12,16 +12,17 @@
 | frozen-dump | · | · | · | · | 0 |
 | live-external | · | · | · | · | 0 |
 
-## 2. 固定黄金集(见过红,0 个)
+## 2. 固定黄金集(见过红,1 个)
 
 | suite | 被测面 | 驱动入口 | evidence |
 |---|---|---|---|
+| OSS-REL-SUSPENDED-TENANT-API | api | http | `scripts/suspended-tenant-login-golden.sh — 4 assertions: baseline login, suspended refusal with a named message, and reversibility` |
 
 ## 3. 按被测面全量套件
 
 | 被测面 | suite | tier | 依赖 | 裁决权 | 驱动 | 黄金 |
 |---|---|---|---|---|---|---|
-| api | OSS-REL-SUSPENDED-TENANT-API | release | real-stack | exact-pin | http | · |
+| api | OSS-REL-SUSPENDED-TENANT-API | release | real-stack | exact-pin | http | ✅ |
 | contract | OSS-AUTHZ-01 | offline | hermetic | contract | unit | · |
 | contract | OSS-BOUNDARY-01 | offline | hermetic | contract | unit | · |
 | contract | OSS-CAPCODE-01 | offline | hermetic | contract | unit | · |
