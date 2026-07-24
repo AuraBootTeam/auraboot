@@ -25,6 +25,24 @@ export function resolvePageTargetPath(
     return '';
   }
 
+  // A target that begins with a {placeholder} carries its whole route in a record
+  // field — e.g. a card-grid row with to: "{target}" where record.target =
+  // "/ai/providers". Resolve the placeholder(s) from the record first; if the result
+  // is a concrete absolute path, use it. This lets one card-grid cardAction navigate
+  // each card to its own distinct path (the action is shared across cards, the target
+  // is per-row). Purely additive: no existing target begins with "{" — they start with
+  // "/", a known "prefix:" scheme, or a "modelCode_pageType" pageKey.
+  if (record && target.startsWith('{')) {
+    const resolved = target.replace(/\{(\w+)\}/g, (_, key) => {
+      if (key in record) return String(record[key] ?? '');
+      if (key === 'pid' || key === 'id') return String(recordPid ?? '');
+      return '';
+    });
+    if (resolved.startsWith('/')) {
+      return resolved;
+    }
+  }
+
   // Absolute path with template variables — OCP compliant
   // DSL can write navigateTo: "/dashboard-designer/{pid}" or "/bpmn-designer?pid={pid}"
   if (target.startsWith('/')) {
