@@ -1159,6 +1159,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         enrichedData.put("updated_at", java.time.Instant.now());
         enrichedData.put("updated_by", getCurrentUserId());
         enrichedData.put("tenant_id", getCurrentTenantId());
+        // Same reason as the fields above: a derived row created under a command authorized for one
+        // aggregate belongs to that aggregate, not to whichever one the payload names.
+        injectAggregateBinding(model, enrichedData);
         
         // 生成主键（如果需要）
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
@@ -1786,9 +1789,48 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (binding == null || binding.getLocalField() == null || binding.getLocalField().isBlank()) {
             return;
         }
-        String column = SqlSafetyUtils.requireIdentifier(binding.getLocalField(), "aggregate binding column");
+        String column = resolveBindingColumn(model, binding.getLocalField());
         params.put("authorizedAggregateId", aggregateId);
         sql.append(" AND ").append(column).append(" = #{params.authorizedAggregateId}");
+    }
+
+    /**
+     * A binding names a <em>field code</em>; SQL needs the physical column. Falls back to the code
+     * when the model declares no explicit column, which is the common case.
+     */
+    private static String resolveBindingColumn(ModelDefinition model, String fieldCode) {
+        String column = fieldCode;
+        if (model.getFields() != null) {
+            for (FieldDefinition field : model.getFields()) {
+                if (fieldCode.equals(field.getCode()) && field.getColumnName() != null
+                        && !field.getColumnName().isBlank()) {
+                    column = field.getColumnName();
+                    break;
+                }
+            }
+        }
+        return SqlSafetyUtils.requireIdentifier(column, "aggregate binding column");
+    }
+
+    /**
+     * Stamp a newly created row with the aggregate the entry authorized.
+     *
+     * <p>Injected for exactly the reason {@code tenant_id} and {@code created_by} are injected a
+     * few lines above: the client does not get to choose. A derived row created while a command is
+     * authorized for Q1001 belongs to Q1001, whatever the payload claims — otherwise a caller could
+     * plant rows under another document and reach them later through a legitimate scope.</p>
+     */
+    // package-private + static: directly tested, no instance state involved.
+    static void injectAggregateBinding(ModelDefinition model, Map<String, Object> data) {
+        String aggregateId = MetaContext.getCommandAggregateId();
+        if (aggregateId == null || model == null || data == null) {
+            return;
+        }
+        ModelDefinition.AggregateBinding binding = model.getAggregateBinding();
+        if (binding == null || binding.getLocalField() == null || binding.getLocalField().isBlank()) {
+            return;
+        }
+        data.put(binding.getLocalField(), aggregateId);
     }
 
     private void appendScopedWriteGuards(
