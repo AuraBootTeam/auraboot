@@ -5,6 +5,17 @@ status: active
 
 # Rule Center 与低码元模型打通现状和 Gap
 
+> **2026-07-24 对照代码校准（只改可证伪的事实错误，不改历史结论、gap 状态与设计意图）**
+>
+> 本轮把本文引用的**类名 / 组件名 / 测试 FQCN / 前端路径 / API 路径 / `ab_*` 表名与列名**逐条与 OSS `platform`、`web-admin`、`plugins` 及 Flyway snapshot 对照，结论是**绝大多数仍然成立**（两篇合计 136 个类/组件名、本文 42 条前端路径、本文 54 个后端测试 FQCN、19 个 `ab_*` 表名、全部 `/api/decision/*` 端点均实测存在）。已修正的事实错误与仍需注意的点：
+>
+> - `FactCatalogAdapter` 仓内没有同名 class，真源是模块 `web-admin/app/shared/decision/ui/factCatalogAdapter.ts`（导出 `factCatalogToFieldOptions` 等函数）；已在 §「前端规则绑定字段 picker」定义处标注，本文其余处沿用旧称。
+> - `ab_bpm_execution_log.node_failure` 写法会被误读成列名；`node_failure` 实际是 `event_type` 列的取值（`BpmExecutionLogMapper` `.eq("event_type","node_failure")`），已就地更正。
+> - `scripts/check-schema-sql.sh` 在 2026-07-19 那轮真实存在，但**已于 2026-07-23 随手写 `schema.sql` 镜像一起退役**（OSS commit `6f9a3410a`）。历史行保留；今天复跑等价检查请用 `scripts/db/flyway-migrate.sh` / `flyway-validate.sh` / `check-schema-drift.sh` / `check-db-matches-snapshot.sh`。
+> - **截图证据可用性**：本文引用 `docs/system-reference/assets/` 下 93 个截图，其中 **67 个从未提交进仓库**（`git log --all -- <path>` 无记录，目录当前只有 54 个文件）；`live-scan-20260707/**` 同样从未入库。这些行只能当作「当时看过」的叙述，**不是可回看的证据**；要把对应 gap 行推进为 `DONE`，必须重新产出并提交截图。
+> - 平台 SmartEngine 依赖当前为 **4.0.2**（`platform/build.gradle:317,321`）。
+> - 本文 Gap 1-15 全部处于 `PARTIAL` / `PARTIAL+`，本轮逐条抽查未发现「标为缺口但其实已实现」的条目；`/api/decision/facts/catalog` 返回的 `dictCode / allowedValues / reference / sourceType / sourceRef / operators / visible / editable / masked / permission` 字段集与 Gap 1 描述一致（`DecisionFactDTO` / `DecisionFactEntityDTO`）。
+
 ## 文档定位
 
 这份文档是规则中心后续开发的单一 gap tracker，覆盖本会话连续暴露的所有问题：中文环境下页面不像产品、菜单和入口混乱、旧 mockup 与当前实现脱节、规则条件配置入口不清楚、条件片段复用不明显、SLA / BPM / Automation / EventPolicy / Permission 与规则中心联动不完整、动作类型扩展后体验仍不统一，以及低码元模型 `model / field / dict / virtual model` 与规则运行时的事实目录尚未完全闭环。
@@ -453,7 +464,7 @@ platform && ./gradlew :test --tests com.auraboot.framework.bpm.chain.DecisionAct
 
 #### 2026-07-17 BPM ServiceTask action ProcessStatus failure snapshot focused 补充
 
-本轮继续关闭上一条后端切片暴露的真实 UX gap：同步 serviceTask provider failure 会写入 `ab_bpm_execution_log.node_failure`，但 SmartEngine `se_process_instance` 没有对应 businessKey 行，导致 `/api/bpm/process-instances/by-business-key/status` 返回空，流程状态页无法打开。修复后 `PluginActionServiceTaskDelegate` 在 node_failure `inputData` 中写入 `processKey / businessKey / startUserId / tenantId`，`ProcessEngineService` 仅在 SmartEngine 实例查不到时从 execution log 回构只读失败快照；不手写 `se_process_instance`，避免绕过引擎状态机。
+本轮继续关闭上一条后端切片暴露的真实 UX gap：同步 serviceTask provider failure 会写入 `ab_bpm_execution_log`（`event_type=node_failure` 行，`node_failure` 是 event_type 取值不是列名），但 SmartEngine `se_process_instance` 没有对应 businessKey 行，导致 `/api/bpm/process-instances/by-business-key/status` 返回空，流程状态页无法打开。修复后 `PluginActionServiceTaskDelegate` 在 node_failure `inputData` 中写入 `processKey / businessKey / startUserId / tenantId`，`ProcessEngineService` 仅在 SmartEngine 实例查不到时从 execution log 回构只读失败快照；不手写 `se_process_instance`，避免绕过引擎状态机。
 
 产品行为：失败快照返回 `status=terminated`、`currentNodes[0].status=failed`、`instanceId=<executionId>`、`processDefinitionId=<processKey>`，前端监控态新增 `failed`。ServiceTask 节点显示红色描边和 `!` 角标，底部 `BpmRuleTraceSection` 继续按 executionId 读取真实 timeline，展示“发送短信 / 动作失败 / 流程已失败关闭 / 通道=短信 / 目标手机号=+8613800138000 / 发送数量=0”，并断言页面不泄漏 `provider_unavailable`、`No real SMS sender available`、`bpm.action.action_failed`。截图：`docs/system-reference/assets/bpm-service-task-action-provider-failure-process-status-20260717.png`。
 
@@ -1193,7 +1204,7 @@ flowchart LR
 - `GET /api/decision/facts/catalog` 返回全局规则事实目录。
 - `GET /api/decision/facts/catalog?modelCode=<code>` 返回指定模型及共享上下文。
 - 后端返回 `operators / allowedValues / reference / permission / masked / sourceType / sourceRef`，前端不得丢弃这些元数据。
-- 前端 `FactCatalogAdapter` 统一把后端 facts 转成 `FieldOption`、分组、值域、操作符和权限状态。
+- 前端 fact catalog adapter（真源 `web-admin/app/shared/decision/ui/factCatalogAdapter.ts`，导出 `factCatalogToFieldOptions` / `modelFieldToFieldOption` / `modelFieldsToFieldOptions` / `mergeFieldOptions`；本文其余处写作 `FactCatalogAdapter` 是同一模块的旧称，仓内没有同名 class）统一把后端 facts 转成 `FieldOption`、分组、值域、操作符和权限状态。
 - `/api/decision/model/fields` 只能作为兼容索引，不再作为新规则配置主源。
 
 ### 低码模型与规则条件专项闭环（2026-07-07 补充）
