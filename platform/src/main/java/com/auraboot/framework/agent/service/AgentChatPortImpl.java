@@ -199,7 +199,8 @@ public class AgentChatPortImpl implements AgentChatPort {
                 dynamicDataMapper,
                 toolProviderRegistry,
                 groundingService,
-                objectMapper);
+                objectMapper,
+                skillService);
         this.contextAdapter = contextAdapter != null
                 ? contextAdapter
                 : fallbackContextAdapter(objectMapper);
