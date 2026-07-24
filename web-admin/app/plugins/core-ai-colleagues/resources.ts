@@ -10,10 +10,11 @@ export const RESOURCES: PluginResource[] = [
     menu: { order: 10, group: 'ai' },
   },
   {
-    key: 'ai.colleagues', path: '/ai/colleagues',
+    // Converted to a DSL page (ai_colleagues, kind:detail) whose single custom block,
+    // AgentColleaguesGrid, ports the agent card grid. Menu-only entry linking to the DSL route.
+    key: 'ai.colleagues', path: '/p/c/ai_colleagues',
     title: { en: 'AI Colleagues', zh: 'AI 同事' }, icon: 'users',
     menu: { order: 20, group: 'ai' },
-    file: './plugins/core-ai-colleagues/pages/ai/colleagues.tsx',
   },
   {
     key: 'ai.colleagues.new', path: '/ai/colleagues/new',

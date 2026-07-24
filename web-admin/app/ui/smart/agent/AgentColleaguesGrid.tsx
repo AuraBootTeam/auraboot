@@ -1,8 +1,16 @@
 /**
- * AI Colleagues — Card Grid Page
+ * AgentColleaguesGrid — custom DSL block for the AI Colleagues card grid.
  *
- * Displays all AI agents as cards. AuraBot appears first as a read-only
- * "official" agent. Other agents can be edited / chatted with.
+ * Ported from the hand-written pages/ai/colleagues.tsx so the page can be a DSL page
+ * (ai_colleagues, kind:detail) that renders `{ blockType: "custom", component:
+ * "AgentColleaguesGrid" }`. The rich, agent-specific presentation the generic card-grid
+ * cannot express — AuraBot pinned first as a read-only "official" card, per-card conditional
+ * actions (chat everywhere, edit only for non-AuraBot), computed visibility badges — lives
+ * here as a registered platform component (the §7-sanctioned custom-block escape), not a
+ * bespoke file route.
+ *
+ * Self-contained: fetches agent-definition rows and navigates to the (still-React) detail /
+ * chat / new routes; those convert in later slices.
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
@@ -25,10 +33,6 @@ import { useToastContext } from '~/contexts/ToastContext';
 import { useI18n } from '~/contexts/I18nContext';
 import { workspacePageClassName } from '~/shared/layout/WorkspacePageLayout';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 interface AgentRecord {
   pid: string;
   agent_code: string;
@@ -45,10 +49,6 @@ interface AgentRecord {
   created_at: string;
 }
 
-// ---------------------------------------------------------------------------
-// Constants
-// ---------------------------------------------------------------------------
-
 const AURABOT_CODE = 'aurabot';
 
 const TYPE_COLORS: Record<string, string> = {
@@ -64,20 +64,13 @@ const STATUS_STYLES: Record<string, { dot: string; text: string }> = {
   draft: { dot: 'bg-yellow-500', text: 'text-yellow-700 dark:text-yellow-400' },
 };
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/** Extract initials (first letter) from agent name */
 function getInitial(name: string): string {
   if (!name) return '?';
-  // For CJK characters, just return the first character
   const first = name.charAt(0);
-  if (/[\u4e00-\u9fff\u3400-\u4dbf]/.test(first)) return first;
+  if (/[一-鿿㐀-䶿]/.test(first)) return first;
   return first.toUpperCase();
 }
 
-/** Deterministic color for avatar background based on string hash */
 function avatarColor(str: string): string {
   const colors = [
     'bg-blue-500',
@@ -97,10 +90,6 @@ function avatarColor(str: string): string {
   }
   return colors[Math.abs(hash) % colors.length];
 }
-
-// ---------------------------------------------------------------------------
-// Sub-components
-// ---------------------------------------------------------------------------
 
 function AgentAvatar({ agent, size = 'md' }: { agent: AgentRecord; size?: 'sm' | 'md' | 'lg' }) {
   const sizeMap = { sm: 'h-8 w-8 text-sm', md: 'h-12 w-12 text-lg', lg: 'h-16 w-16 text-2xl' };
@@ -174,7 +163,6 @@ function VisibilityBadge({ visibility }: { visibility: 'private' | 'team' | 'ten
       </span>
     );
   }
-  // tenant
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-medium text-blue-600 dark:bg-blue-900/30 dark:text-blue-300"
@@ -186,10 +174,6 @@ function VisibilityBadge({ visibility }: { visibility: 'private' | 'team' | 'ten
   );
 }
 
-// ---------------------------------------------------------------------------
-// AuraBot Card (special)
-// ---------------------------------------------------------------------------
-
 function AuraBotCard({ agent, onChat }: { agent: AgentRecord; onChat: () => void }) {
   const { t } = useI18n();
   return (
@@ -197,7 +181,6 @@ function AuraBotCard({ agent, onChat }: { agent: AgentRecord; onChat: () => void
       className="relative overflow-hidden rounded-xl border-2 border-blue-200 bg-gradient-to-br from-blue-50 via-white to-violet-50 p-5 shadow-sm transition-all duration-200 hover:shadow-md dark:border-blue-800 dark:from-blue-950/40 dark:via-gray-900 dark:to-violet-950/30"
       data-testid="aurabot-card"
     >
-      {/* Official badge ribbon */}
       <div className="absolute top-3 right-3 flex items-center gap-1.5">
         <span className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-2 py-0.5 text-[11px] font-semibold text-white">
           {t('ai.colleagues.badge.official', undefined, 'Official')}
@@ -216,11 +199,7 @@ function AuraBotCard({ agent, onChat }: { agent: AgentRecord; onChat: () => void
           </h3>
           <p className="mt-1 line-clamp-2 text-sm text-gray-500 dark:text-gray-400">
             {agent.description ||
-              t(
-                'ai.colleagues.aurabot.desc',
-                undefined,
-                'Built-in AI assistant with full data access',
-              )}
+              t('ai.colleagues.aurabot.desc', undefined, 'Built-in AI assistant with full data access')}
           </p>
         </div>
       </div>
@@ -243,10 +222,6 @@ function AuraBotCard({ agent, onChat }: { agent: AgentRecord; onChat: () => void
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Regular Agent Card
-// ---------------------------------------------------------------------------
 
 function AgentCard({
   agent,
@@ -308,10 +283,6 @@ function AgentCard({
   );
 }
 
-// ---------------------------------------------------------------------------
-// Empty State
-// ---------------------------------------------------------------------------
-
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   const { t } = useI18n();
   return (
@@ -338,10 +309,6 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Loading Skeleton
-// ---------------------------------------------------------------------------
-
 function CardSkeleton() {
   return (
     <div className="animate-pulse rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-900">
@@ -364,11 +331,11 @@ function CardSkeleton() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Main Page
-// ---------------------------------------------------------------------------
-
-export default function AIColleaguesPage() {
+/**
+ * The custom block itself. Receives the standard block/runtime props from the DSL renderer
+ * but is self-contained (fetches its own data and navigates directly), so they are unused.
+ */
+export function AgentColleaguesGrid(_props?: { block?: unknown; runtime?: unknown }) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const toast = useToastContext();
@@ -397,7 +364,6 @@ export default function AIColleaguesPage() {
     fetchAgents();
   }, [fetchAgents]);
 
-  // Sort: AuraBot first, then active before disabled, then by name
   const sortedAgents = useMemo(() => {
     return [...agents].sort((a, b) => {
       if (a.agent_code === AURABOT_CODE) return -1;
@@ -407,22 +373,12 @@ export default function AIColleaguesPage() {
     });
   }, [agents]);
 
-  const handleCreate = () => {
-    navigate('/ai/colleagues/new');
-  };
-
-  const handleEdit = (agent: AgentRecord) => {
-    navigate(`/ai/colleagues/${agent.pid}`);
-  };
-
-  const handleChat = (agent: AgentRecord) => {
-    // Navigate to full-page chat for all agents (including AuraBot)
-    navigate(`/ai/colleagues/${agent.pid}/chat`);
-  };
+  const handleCreate = () => navigate('/ai/colleagues/new');
+  const handleEdit = (agent: AgentRecord) => navigate(`/ai/colleagues/${agent.pid}`);
+  const handleChat = (agent: AgentRecord) => navigate(`/ai/colleagues/${agent.pid}/chat`);
 
   return (
-    <div className={workspacePageClassName('contentPadded')}>
-      {/* Header */}
+    <div className={workspacePageClassName('contentPadded')} data-testid="agent-colleagues-grid">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
@@ -442,7 +398,6 @@ export default function AIColleaguesPage() {
         </button>
       </div>
 
-      {/* Card Grid */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {loading ? (
           <>
@@ -473,3 +428,5 @@ export default function AIColleaguesPage() {
     </div>
   );
 }
+
+export default AgentColleaguesGrid;

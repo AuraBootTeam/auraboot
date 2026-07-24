@@ -3862,5 +3862,22 @@
         ]
       }
     ]
+  },
+  {
+    "pageKey": "ai_colleagues",
+    "name:zh-CN": "AI 同事",
+    "name:en": "AI Colleagues",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "blocks": [
+      {
+        "id": "ai_colleagues_grid",
+        "blockType": "custom",
+        "component": "AgentColleaguesGrid"
+      }
+    ]
   }
 ]
