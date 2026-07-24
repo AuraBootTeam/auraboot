@@ -71,11 +71,17 @@ function coverageFor(pluginDir, code, uiIndex) {
   return hits;
 }
 
+// A browser golden is not always a .spec.ts. aura-quote drives Playwright from Python
+// (browser-automation-runner-selection.md sanctions both), and iot/crawler ship .mjs
+// goldens. Indexing only TypeScript reported every quote page as untested — a gap
+// overstated by construction, which gets ignored exactly as fast as one understated.
+const SPEC_EXTS = ['.spec.ts', '.py', '.mjs'];
+
 /** Command code → E2E spec files mentioning it. Built once; the spec tree is big. */
 function buildUiIndex(specRoots) {
   const index = new Map();
   for (const root of specRoots) {
-    for (const file of walk(root, ['.spec.ts'])) {
+    for (const file of walk(root, SPEC_EXTS)) {
       const text = fs.readFileSync(file, 'utf8');
       for (const m of text.matchAll(/["'`]([a-z0-9_-]+:[a-z0-9_]+)["'`]/gi)) {
         const rel = path.relative(process.cwd(), file);
@@ -127,7 +133,7 @@ function buildPageIndex(specRoots) {
     if (!index.get(key).includes(rel)) index.get(key).push(rel);
   };
   for (const root of specRoots) {
-    for (const file of walk(root, ['.spec.ts'])) {
+    for (const file of walk(root, SPEC_EXTS)) {
       const text = fs.readFileSync(file, 'utf8');
       const rel = path.relative(process.cwd(), file);
       // bare page keys, and the two route shapes: /p/c/<pageKey> and /p/<model>
