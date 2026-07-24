@@ -35,7 +35,7 @@
 | journey | OSS-REL-KB-INGESTION | release | real-stack | exact-pin | browser | · |
 | journey | OSS-REL-RBAC | release | real-stack | exact-pin | browser | · |
 | service | OSS-REL-AURABOT | release | real-stack | exact-pin | it | · |
-| ui | OSS-DEBT-DICTCOLOR | offline | hermetic | contract | unit | · |
+| ui | OSS-DICTCOLOR-01 | offline | hermetic | contract | unit | · |
 | ui | OSS-REL-OEE-DASHBOARD | release | real-stack | exact-pin | browser | · |
 | ui | OSS-REL-QUICK-FILTER | release | real-stack | exact-pin | browser | · |
 | ui | OSS-REL-SUSPENDED-TENANT-UI | release | real-stack | exact-pin | browser | · |
