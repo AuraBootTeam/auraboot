@@ -124,7 +124,7 @@ RC=0
 ( cd "$GOLDEN_DIR" && node mes-wms-backend-golden.mjs ) || RC=1
 
 if [ "$RUN_UI" = "1" ]; then
-  log "7/7 UI golden — (requires frontend; see mes-wms/*.spec.ts) [not yet wired]"
+  ( cd "/web-admin" && BASE="http://127.0.0.1:20 20 12 61 79 80 81 98 33 100 204 250 395 398 399 400(5100+SLOT))" node tests/mes-wms/ui/mes-wms-ui-golden.mjs ) || RC=1
 fi
 
 [ "$RC" = 0 ] && log "GOLDEN PASSED ✓" || log "GOLDEN FAILED ✗"
