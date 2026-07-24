@@ -293,30 +293,49 @@ test.describe('List Page UX Features', () => {
     // Even if ViewSelector specific text isn't found, the page header should exist
   });
 
-  test('Sort URL persists across reload', async ({ page }) => {
+  test('Sort persists across reload once saved to the view', async ({ page }) => {
     test.setTimeout(60_000);
     await gotoShowcaseList(page);
 
-    // Apply sort — poll until the URL reflects the sort param.
+    // Apply sort — while a sort is live, ListPageContent reflects `activeSorts`
+    // into the URL as a `sort=` param (the "sync to URL" effect).
     await clearActiveSorts(page);
     await page.getByTestId('table-header-sort-sc_code').click();
     await expect.poll(() => page.url(), { timeout: 5_000 }).toMatch(/sort=/);
-
-    // Verify URL has sort param
     expect(page.url()).toContain('sort=');
-    const urlBefore = page.url();
 
-    // Reload
+    // Persistence of the sort is carried on the SavedView, not the URL alone.
+    // This spec's beforeAll creates an explicit personal *default* view, so the
+    // list runs in `personal-persist` mode: a sort is staged as a local draft
+    // (see `pendingViewConfig` / the amber "personal-view-draft-banner") and is
+    // NOT written to the backend until the user explicitly saves the view — so a
+    // reload BEFORE saving discards the sort (the original assertion here failed
+    // exactly because it reloaded without saving). The staging is itself
+    // debounced 2s inside useAutoSaveView, so the draft banner appears shortly
+    // after the sort. Save the draft so the sort is persisted.
+    const draftSaved = page.waitForResponse(
+      (r) =>
+        /\/api\/views\/[^/]+$/.test(r.url()) && r.request().method() === 'PUT' && r.ok(),
+      { timeout: 15_000 },
+    );
+    await page.getByTestId('personal-view-save-current').click({ timeout: 10_000 });
+    await draftSaved;
+
+    // Reload. The default view is re-applied WITH the persisted sort, so
+    // `activeSorts` is restored from the SavedView config; the sync-to-URL effect
+    // then re-derives `sort=` from the restored sort. Both the URL param and the
+    // header indicator therefore survive the reload.
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page
       .locator('[data-testid="dynamic-list"] table tbody tr')
       .first()
       .waitFor({ state: 'visible', timeout: 20_000 });
 
-    // Sort param still in URL
-    expect(page.url()).toContain('sort=');
+    // Sort restored → URL re-derives the sort param from the SavedView.
+    await expect.poll(() => page.url(), { timeout: 5_000 }).toMatch(/sort=sc_code/);
 
-    // Sort indicator still visible
+    // The sort itself persisted: the sc_code header still shows the active
+    // (accent-coloured) sort indicator restored from the SavedView.
     const bluePath = page.getByTestId('table-header-sc_code').locator('svg path[fill="var(--color-accent)"]');
     await expect(bluePath.first()).toBeVisible({ timeout: 5_000 });
   });
