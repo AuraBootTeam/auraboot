@@ -1493,7 +1493,13 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId('inspector-selected-id')).toContainText('action_seed_export');
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(runtimeCommandLabel);
-    await page.getByTestId('inspector-field-props.command').fill('mission.archive');
+    // props.command is a `command-select` inspector field (#800 D2 rich selectors):
+    // it renders a <select> over the live /api/meta/commands registry PLUS a
+    // manual-entry <input> (testid `<field>-manual`) for arbitrary/preview codes
+    // not in the registry. `mission.archive` (and the other codes below) are
+    // preview/synthetic commands, so drive the manual input rather than the
+    // <select> — `.fill()` on the <select> throws "not an <input>".
+    await page.getByTestId('inspector-field-props.command-manual').fill('mission.archive');
     await setCheckbox(page, 'inspector-field-props.confirm', true);
     await page.getByTestId('inspector-field-props.feedback').fill(runtimeCommandFeedback);
 
@@ -1590,7 +1596,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-widget_pipeline').click();
     await page.getByTestId('inspector-field-widgetType').selectOption('table');
     await page.getByTestId('inspector-field-props.title').fill(liveWidgetTitle);
-    await page.getByTestId('inspector-field-dataSource.model').fill(modelCode);
+    await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
     await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-dataSource.query').fill(JSON.stringify(query));
     await applyJsonField(page, 'inspector-json-field-apply-dataSource.query');
@@ -1654,7 +1660,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_export').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(liveCommandLabel);
-    await page.getByTestId('inspector-field-props.command').fill(liveCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(liveCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(
       JSON.stringify({
@@ -1909,7 +1915,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('inspector-field-props.title').fill(liveNamedQueryTitle);
     await page.getByTestId('inspector-field-dataSource.type').selectOption('namedQuery');
     await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-dataSource.queryCode').fill(liveNamedQueryCode);
+    await page.getByTestId('inspector-field-dataSource.queryCode-manual').fill(liveNamedQueryCode);
     await page.getByTestId('inspector-field-dataSource.parameters').fill(JSON.stringify({}));
     await applyJsonField(page, 'inspector-json-field-apply-dataSource.parameters');
     await page.getByTestId('inspector-field-dataSource.page').fill('1');
@@ -2011,7 +2017,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_submit').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(liveFormCommandLabel);
-    await page.getByTestId('inspector-field-props.command').fill(liveFormCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(liveFormCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
@@ -2109,7 +2115,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_bulk').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(liveBulkCommandLabel);
-    await page.getByTestId('inspector-field-props.command').fill(liveBulkCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(liveBulkCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
@@ -2211,7 +2217,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_row_open').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(liveRowCommandLabel);
-    await page.getByTestId('inspector-field-props.command').fill(liveRowCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(liveRowCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
@@ -2326,7 +2332,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId(`canvas-block-${paletteRowActionBlockId}`)).toBeVisible();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(paletteRowActionLabel);
-    await page.getByTestId('inspector-field-props.command').fill(paletteRowCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(paletteRowCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
@@ -2719,15 +2725,15 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.getByTestId('outline-item-field_customer_phone').click();
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
-    await page.getByTestId('inspector-field-props.permissionCode').fill(missingPermissionCode);
+    await page.getByTestId('inspector-field-props.permissionCode-manual').fill(missingPermissionCode);
 
     await page.getByTestId('outline-item-filter_status').click();
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
-    await page.getByTestId('inspector-field-props.permissionCode').fill(missingPermissionCode);
+    await page.getByTestId('inspector-field-props.permissionCode-manual').fill(missingPermissionCode);
 
     await page.getByTestId('outline-item-column_status').click();
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
-    await page.getByTestId('inspector-field-props.permissionCode').fill(missingPermissionCode);
+    await page.getByTestId('inspector-field-props.permissionCode-manual').fill(missingPermissionCode);
 
     await page.getByTestId('outline-item-table_customers').click();
     await page
@@ -2943,7 +2949,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_submit').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(validationCommandLabel);
-    await page.getByTestId('inspector-field-props.command').fill(validationCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(validationCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(payload));
     await applyJsonField(page, 'inspector-json-field-apply-props.payload');
@@ -3181,7 +3187,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       'sub_table_new_sub_table',
     );
     await page.getByTestId('inspector-field-title').fill(subTableTitle);
-    await page.getByTestId('inspector-field-dataSource.model').fill(modelCode);
+    await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
     await page.getByTestId('inspector-field-dataSource.parentField').fill(subTableParentField);
     await page.getByTestId('inspector-field-dataSource.childField').fill(subTableChildField);
     await page.getByTestId('inspector-field-props.rows').fill(JSON.stringify(subTableRows));
@@ -4217,10 +4223,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_export').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(permissionActionLabel);
-    await page.getByTestId('inspector-field-props.command').fill(liveCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(liveCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
-    await page.getByTestId('inspector-field-props.permissionCode').fill(missingPermissionCode);
+    await page.getByTestId('inspector-field-props.permissionCode-manual').fill(missingPermissionCode);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
@@ -4272,9 +4278,9 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_export').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(permissionActionLabel);
-    await page.getByTestId('inspector-field-props.command').fill(liveCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(liveCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
-    await page.getByTestId('inspector-field-props.permissionCode').fill(allowedPermissionCode);
+    await page.getByTestId('inspector-field-props.permissionCode-manual').fill(allowedPermissionCode);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await saveDesignerPage(page, listPagePid);
@@ -4348,10 +4354,10 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_export').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(permissionActionLabel);
-    await page.getByTestId('inspector-field-props.command').fill(liveCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(liveCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await page
-      .getByTestId('inspector-field-props.permissionCode')
+      .getByTestId('inspector-field-props.permissionCode-manual')
       .fill(ROLE_MATRIX_PERMISSION_CODE);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
     await saveDesignerPage(page, listPagePid);
@@ -4505,7 +4511,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_submit').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(`Submit repeater ${uid}`);
-    await page.getByTestId('inspector-field-props.command').fill(repeaterCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(repeaterCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     await setCheckbox(page, 'inspector-field-props.validateForm', false);
     await page.getByTestId('inspector-field-props.payload').fill(JSON.stringify(repeaterPayload));
@@ -4628,7 +4634,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await page.getByTestId('outline-item-action_seed_submit').click();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(`Submit subform ${uid}`);
-    await page.getByTestId('inspector-field-props.command').fill(subformCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(subformCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
     const validateFormInput = page.getByTestId('inspector-field-props.validateForm');
     if (await validateFormInput.isChecked()) {
@@ -4840,7 +4846,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await expect(page.getByTestId(`canvas-block-${actionId}`)).toBeVisible();
     await page.getByTestId('inspector-field-actionType').selectOption('command');
     await page.getByTestId('inspector-field-props.label').fill(detailActionLabel);
-    await page.getByTestId('inspector-field-props.command').fill(detailCommandCode);
+    await page.getByTestId('inspector-field-props.command-manual').fill(detailCommandCode);
     await page.getByTestId('inspector-field-props.executionMode').selectOption('live');
 
     await switchResourceTab(page, 'outline');
@@ -4865,7 +4871,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     await dndDragTo(page, subTablePaletteItem, page.getByTestId('canvas-block-detail_section_summary'));
     await expect(page.getByTestId(`canvas-block-${subTableId}`)).toBeVisible();
     await page.getByTestId('inspector-field-title').fill(detailSubTableTitle);
-    await page.getByTestId('inspector-field-dataSource.model').fill(modelCode);
+    await page.getByTestId('inspector-field-dataSource.model-manual').fill(modelCode);
     await page
       .getByTestId('inspector-field-props.rows')
       .fill(JSON.stringify([{ [fieldCode]: subTablePreviewValue }]));
@@ -5600,7 +5606,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
       await page.getByTestId('inspector-field-dataSource.type').selectOption('namedQuery');
       await page.getByTestId('inspector-field-dataSource.executionMode').selectOption('preview');
       await page
-        .getByTestId('inspector-field-dataSource.queryCode')
+        .getByTestId('inspector-field-dataSource.queryCode-manual')
         .fill(`udw_${helper.blockType.replaceAll('-', '_')}_${uid}`);
       await page
         .getByTestId('inspector-field-dataSource.parameters')
@@ -6286,7 +6292,7 @@ test.describe.serial('Unified Designer Workbench V3', () => {
 
     await page.getByTestId('outline-item-ai_permission_denied_helper').click();
     await expect(page.getByTestId('inspector-field-props.permissionCode')).toBeVisible();
-    await page.getByTestId('inspector-field-props.permissionCode').fill(missingPermissionCode);
+    await page.getByTestId('inspector-field-props.permissionCode-manual').fill(missingPermissionCode);
     await expect(page.getByTestId('designer-dirty-state')).toHaveText('未保存');
 
     await page.getByTestId('outline-item-ai_permission_allowed_helper').click();
