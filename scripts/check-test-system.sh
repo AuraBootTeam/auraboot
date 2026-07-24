@@ -5,6 +5,8 @@
 #   1. Does every spec actually run, or can one exist and never be selected?
 #   2. Does every declared command have a UI entry point, or is its coverage
 #      unreachable by construction?
+#   3. Is the denominator still generated, or has someone started hand-keeping it
+#      again in a markdown table that only ever drifts in the flattering direction?
 #
 # Both fail open by default in the underlying tooling, which is why they need a
 # gate rather than a convention. Pre-existing violations are recorded in each
@@ -16,7 +18,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 status=0
-for gate in check-e2e-spec-registration check-command-reachability check-coverage-manifest-freshness check-derived-field-writers check-scripts-index; do
+for gate in check-e2e-spec-registration check-command-reachability check-coverage-manifest-freshness check-derived-field-writers check-hand-written-page-matrix check-scripts-index; do
   echo "───── $gate"
   if ! node "scripts/$gate.mjs" "$@"; then
     status=1
