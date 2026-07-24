@@ -2,10 +2,12 @@ import type { PluginResource } from '../_shared/types.js'
 
 export const RESOURCES: PluginResource[] = [
   {
-    key: 'ai.settings', path: '/ai/settings',
+    // Converted to a DSL page (ai_settings_hub, a card-grid over a static dataSource) served at
+    // /p/c/ai_settings_hub. No `file`: this is now a menu-only entry linking to the DSL route
+    // (toRouteEntries skips fileless resources), replacing the hand-written settings.tsx.
+    key: 'ai.settings', path: '/p/c/ai_settings_hub',
     title: { en: 'AI Settings', zh: 'AI 设置' }, icon: 'settings',
     menu: { order: 10, group: 'ai' },
-    file: './plugins/core-ai-colleagues/pages/ai/settings.tsx',
   },
   {
     key: 'ai.colleagues', path: '/ai/colleagues',

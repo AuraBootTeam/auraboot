@@ -3749,5 +3749,118 @@
         ]
       }
     ]
+  },
+  {
+    "pageKey": "ai_settings_hub",
+    "name:zh-CN": "AI 设置",
+    "name:en": "AI Settings",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "stack"
+    },
+    "dataSources": {
+      "settingsItems": {
+        "type": "static",
+        "data": [
+          {
+            "title": {
+              "zh-CN": "大模型服务商",
+              "en-US": "LLM Providers"
+            },
+            "description": {
+              "zh-CN": "配置 AI 模型服务商与 API Key",
+              "en-US": "Configure AI model providers and API keys"
+            },
+            "icon": "key",
+            "target": "/aurabot/providers"
+          },
+          {
+            "title": {
+              "zh-CN": "MCP 服务器",
+              "en-US": "MCP Servers"
+            },
+            "description": {
+              "zh-CN": "通过 MCP 协议连接外部工具服务器",
+              "en-US": "Connect external tool servers via MCP protocol"
+            },
+            "icon": "server",
+            "target": "/p/mcp-server"
+          },
+          {
+            "title": {
+              "zh-CN": "提示词模板",
+              "en-US": "Prompt Templates"
+            },
+            "description": {
+              "zh-CN": "管理可复用的提示词模板",
+              "en-US": "Manage reusable prompt templates"
+            },
+            "icon": "file-text",
+            "target": "/aurabot/prompts"
+          },
+          {
+            "title": {
+              "zh-CN": "对象别名",
+              "en-US": "Object Aliases"
+            },
+            "description": {
+              "zh-CN": "为数据模型配置自然语言别名",
+              "en-US": "Configure natural language aliases for data models"
+            },
+            "icon": "tag",
+            "target": "/p/object-alias"
+          },
+          {
+            "title": {
+              "zh-CN": "语义术语",
+              "en-US": "Semantic Terms"
+            },
+            "description": {
+              "zh-CN": "定义领域专有词汇",
+              "en-US": "Define domain-specific vocabulary"
+            },
+            "icon": "book-open",
+            "target": "/p/semantic-term"
+          },
+          {
+            "title": {
+              "zh-CN": "治理策略",
+              "en-US": "Governance Policies"
+            },
+            "description": {
+              "zh-CN": "设置 Agent 动作的审批规则",
+              "en-US": "Set approval rules for agent actions"
+            },
+            "icon": "shield-check",
+            "target": "/p/approval-policy"
+          }
+        ]
+      }
+    },
+    "blocks": [
+      {
+        "id": "ai_settings_grid",
+        "blockType": "card-grid",
+        "dataSource": "settingsItems",
+        "titleField": "title",
+        "descriptionField": "description",
+        "iconField": "icon",
+        "cardActions": [
+          {
+            "code": "open",
+            "label": {
+              "zh-CN": "打开",
+              "en-US": "Open"
+            },
+            "variant": "primary",
+            "action": {
+              "type": "navigate",
+              "to": "{target}"
+            }
+          }
+        ]
+      }
+    ]
   }
 ]
