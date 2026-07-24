@@ -201,6 +201,27 @@ function readFieldValue(record: any, config: any, fallbackRecord?: any): unknown
   return readPath(parseJsonValue(fallbackSource), config.fallbackField);
 }
 
+// Reference/lookup fields carry a resolved `<field>_display` sibling on the record (the backend's
+// generic GAP-124 reference enrichment, applied on both list and getById reads). When a detail field
+// has no explicit valueMap and is read directly (no sourceField), prefer that display name so the
+// drawer shows names instead of raw pids/ULIDs. Purely additive: falls back to the configured value
+// when no `_display` sibling exists, so non-reference fields are unchanged.
+function resolveDisplayValue(
+  record: any,
+  config: any,
+  locale: string,
+  t: (key: string) => string,
+): string {
+  const field = config?.field || config?.valueField;
+  if (field && !config?.valueMap && !config?.sourceField && record && typeof record === 'object') {
+    const display = record[`${field}_display`];
+    if (display !== undefined && display !== null && display !== '') {
+      return formatValue(display, config?.emptyText);
+    }
+  }
+  return formatConfiguredValue(readFieldValue(record, config), config, locale, t);
+}
+
 function isComparisonRecord(value: unknown): value is Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   return (
@@ -947,12 +968,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                     {sourceSummaryItems.map((item: any) => {
                       const key = String(item.key || item.field || item.label);
                       const label = getLocalizedText(item.label || key, locale, t);
-                      const value = formatConfiguredValue(
-                        readFieldValue(sourceRecord, item),
-                        item,
-                        locale,
-                        t,
-                      );
+                      const value = resolveDisplayValue(sourceRecord, item, locale, t);
                       return (
                         <span
                           key={key}
