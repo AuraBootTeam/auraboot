@@ -161,6 +161,9 @@ export const COMPONENT_RUNTIME_MANIFEST: Record<string, ComponentRuntimeConfig> 
   agentchatembed: runtime('agent', 'AgentChatEmbed', {
     aliases: ['AgentChatEmbed', 'agent-chat-embed', 'agent_chat_embed'],
   }),
+  agentcreatewizard: runtime('agent', 'AgentCreateWizard', {
+    aliases: ['AgentCreateWizard', 'agent-create-wizard', 'agent_create_wizard'],
+  }),
   decisioneventpolicyactions: runtime('decision', 'EventPolicyActionsBlock', {
     aliases: [
       'EventPolicyActionsBlock',

@@ -774,7 +774,7 @@ function ReviewRow({
 // Main Wizard
 // ---------------------------------------------------------------------------
 
-export default function AIColleagueNewPage() {
+export function AgentCreateWizard(_props?: { block?: unknown; runtime?: unknown }) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const toast = useToastContext();
@@ -941,7 +941,7 @@ export default function AIColleagueNewPage() {
       <div className="w-full max-w-2xl">
         {/* Back to list */}
         <button
-          onClick={() => navigate('/ai/colleagues')}
+          onClick={() => navigate('/p/c/ai_colleagues')}
           className="mb-6 inline-flex items-center gap-1.5 text-sm text-gray-500 transition-colors hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
           data-testid="wizard-back-to-list"
         >
@@ -1032,3 +1032,5 @@ export default function AIColleagueNewPage() {
     </div>
   );
 }
+
+export default AgentCreateWizard;

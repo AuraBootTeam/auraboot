@@ -17,10 +17,12 @@ export const RESOURCES: PluginResource[] = [
     menu: { order: 20, group: 'ai' },
   },
   {
-    key: 'ai.colleagues.new', path: '/ai/colleagues/new',
+    // Converted to a DSL page (ai_colleague_new) whose AgentCreateWizard custom block is the
+    // template-picker + 3-step creation flow. Fileless (no React route); the colleagues grid's
+    // create action navigates to /p/c/ai_colleague_new.
+    key: 'ai.colleagues.new', path: '/p/c/ai_colleague_new',
     title: { en: 'New Agent', zh: '创建 AI 同事' },
     menu: false, parentKey: 'ai.colleagues',
-    file: './plugins/core-ai-colleagues/pages/ai/colleagues.new.tsx',
   },
   {
     key: 'ai.colleagues.detail', path: '/ai/colleagues/:agentPid',

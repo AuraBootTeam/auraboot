@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 import { I18nProvider } from '~/contexts/I18nContext';
-import CreateColleaguePage, { deriveAgentCode } from '../pages/ai/colleagues.new';
+import CreateColleaguePage, { deriveAgentCode } from '~/ui/smart/agent/AgentCreateWizard';
 
 const postMock = vi.fn();
 
