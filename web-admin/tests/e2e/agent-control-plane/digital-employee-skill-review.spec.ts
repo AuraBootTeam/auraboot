@@ -68,6 +68,14 @@ async function ensureOpsColleague(request: APIRequestContext): Promise<void> {
 }
 
 test.describe('Digital employee — bound skill drives a real customer review', () => {
+  // A grounded read needs a live model — a stub cannot produce the real customer facts this
+  // asserts on. So it belongs to the live tier (digital-employee-golden-run.sh --live) and
+  // self-skips under the runner's default stub mode rather than failing there: a check that can
+  // only ever be red buries every real failure after it. Mirrors digital-employee-write-approval.
+  test.skip(
+    process.env.AGENT_LLM_STUB_MODE === 'true',
+    'needs a live model to produce grounded customer facts; run the golden with --live',
+  );
   // A live model is slow and its latency is not ours to control.
   test.setTimeout(240_000);
 
