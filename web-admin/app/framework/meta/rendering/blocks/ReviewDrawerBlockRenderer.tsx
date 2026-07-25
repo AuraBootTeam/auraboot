@@ -561,6 +561,150 @@ function FieldGroups({
   );
 }
 
+/**
+ * An optional inline edit form at the top of the drawer.
+ *
+ * This table opens the drawer on a single row click, so double-click-to-edit in the grid fights it
+ * — a dblclick is two clicks, each of which opens the drawer first. Editing lives here instead,
+ * beside the line's own context, which is also where a reviewer who spotted a wrong value is
+ * already looking. Fields are declared on the block; submitting runs a command with the collected
+ * values, so a corrected part number or per-set usage re-prices without leaving the panel.
+ */
+function DrawerEditForm({
+  config,
+  record,
+  runtime,
+  locale,
+  t,
+}: {
+  config: any;
+  record: any;
+  runtime: SchemaRuntime;
+  locale: string;
+  t: (key: string) => string;
+}) {
+  const fields: any[] = Array.isArray(config?.fields) ? config.fields : [];
+  const [open, setOpen] = useState(false);
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (fields.length === 0 || !config?.command) return null;
+  const recordPid = record ? String(record.pid ?? '') : '';
+  const disabled = !recordPid;
+
+  function begin() {
+    const seed: Record<string, string> = {};
+    for (const f of fields) {
+      const raw = readPath(record, f.valueField || f.field);
+      seed[f.field] = raw === undefined || raw === null ? '' : String(raw);
+    }
+    setValues(seed);
+    setError(null);
+    setOpen(true);
+  }
+
+  async function submit() {
+    setSaving(true);
+    setError(null);
+    // Only send fields the user actually filled: the handler leaves a blank field alone, so an
+    // empty box means "keep the current value" rather than "clear it".
+    const payload: Record<string, string> = {};
+    for (const f of fields) {
+      const v = (values[f.field] ?? '').trim();
+      if (v !== '') payload[f.field] = v;
+    }
+    try {
+      await executeSimpleWorkbenchAction(runtime, {
+        action: 'command.execute',
+        args: {
+          command: config.command,
+          targetRecordPid: recordPid,
+          payload,
+          reload: Array.isArray(config.reload) ? config.reload : [],
+        },
+      });
+      setOpen(false);
+    } catch (e: any) {
+      setError(e?.message || String(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      data-testid="review-drawer-edit-form"
+      className="border-border bg-panel border-b px-4 py-2"
+    >
+      {!open ? (
+        <button
+          type="button"
+          data-testid="review-drawer-edit-open"
+          disabled={disabled}
+          onClick={begin}
+          className="rounded-control border-border bg-panel text-text hover:bg-hover border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {getLocalizedText(config.openLabel || { 'zh-CN': '编辑此行并重新查价', en: 'Edit this row' }, locale, t)}
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex flex-wrap gap-3">
+            {fields.map((f: any) => {
+              const key = String(f.field);
+              return (
+                <label
+                  key={key}
+                  data-testid={`review-drawer-edit-field-${key}`}
+                  className="text-text-2 flex min-w-[160px] flex-1 flex-col gap-1 text-xs"
+                >
+                  <span>{getLocalizedText(f.label || key, locale, t)}</span>
+                  <input
+                    className="rounded-control border-border bg-panel text-text border px-2 py-1 text-sm"
+                    value={values[key] ?? ''}
+                    inputMode={f.type === 'number' ? 'numeric' : undefined}
+                    placeholder={
+                      f.placeholder ? getLocalizedText(f.placeholder, locale, t) : undefined
+                    }
+                    onChange={(e) =>
+                      setValues((prev) => ({ ...prev, [key]: e.target.value }))
+                    }
+                  />
+                </label>
+              );
+            })}
+          </div>
+          {error && (
+            <div data-testid="review-drawer-edit-error" className="text-status-red text-xs">
+              {error}
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-control border-border bg-panel text-text hover:bg-hover border px-3 py-1.5 text-sm"
+            >
+              {t('common.cancel') || '取消'}
+            </button>
+            <button
+              type="button"
+              data-testid="review-drawer-edit-submit"
+              disabled={saving}
+              onClick={() => void submit()}
+              className="rounded-control bg-accent px-3 py-1.5 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {saving
+                ? t('common.loading')
+                : getLocalizedText(config.submitLabel || { 'zh-CN': '保存并重新查价', en: 'Save and re-price' }, locale, t)}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps> = ({
   block,
   runtime,
@@ -930,6 +1074,16 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
           />
         ))}
       </div>
+
+      {(block as any).editForm && (
+        <DrawerEditForm
+          config={(block as any).editForm}
+          record={record}
+          runtime={runtime}
+          locale={locale}
+          t={t}
+        />
+      )}
 
       <div className="bg-subtle min-h-0 max-w-full overflow-hidden p-4">
         <div
