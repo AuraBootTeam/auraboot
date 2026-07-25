@@ -116,6 +116,9 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     const b = block();
     delete (b as any).editForm;
     render(<ReviewDrawerBlockRenderer block={b} runtime={makeRuntime(LINE)} />);
+    // The slot stays in the DOM (a zero-height grid cell) so the drawer's row count is constant,
+    // but nothing interactive renders.
     expect(screen.queryByTestId('review-drawer-edit-open')).toBeNull();
+    expect(screen.getByTestId('review-drawer-edit-form-empty')).toBeInTheDocument();
   });
 });

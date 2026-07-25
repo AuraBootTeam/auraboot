@@ -589,7 +589,7 @@ function DrawerEditForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (fields.length === 0 || !config?.command) return null;
+  if (fields.length === 0 || !config?.command) return <div data-testid="review-drawer-edit-form-empty" />;
   const recordPid = record ? String(record.pid ?? '') : '';
   const disabled = !recordPid;
 
@@ -1009,7 +1009,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     <section
       data-testid="review-drawer"
       style={drawerStyle}
-      className="rounded-card bg-panel shadow-pop fixed z-50 grid min-h-[500px] max-w-[calc(100vw-24px)] grid-rows-[auto_auto_minmax(0,1fr)] overflow-hidden border border-border"
+      className="rounded-card bg-panel shadow-pop fixed z-50 grid min-h-[500px] max-w-[calc(100vw-24px)] grid-rows-[auto_auto_auto_minmax(0,1fr)] overflow-hidden border border-border"
     >
       <div
         className="bg-accent flex min-h-12 cursor-move items-center justify-between gap-3 overflow-hidden px-4 text-white"
@@ -1075,15 +1075,13 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
         ))}
       </div>
 
-      {(block as any).editForm && (
-        <DrawerEditForm
-          config={(block as any).editForm}
-          record={record}
-          runtime={runtime}
-          locale={locale}
-          t={t}
-        />
-      )}
+      <DrawerEditForm
+        config={(block as any).editForm}
+        record={record}
+        runtime={runtime}
+        locale={locale}
+        t={t}
+      />
 
       <div className="bg-subtle min-h-0 max-w-full overflow-hidden p-4">
         <div
