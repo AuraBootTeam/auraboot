@@ -1,14 +1,21 @@
 package com.auraboot.framework.plugin.service.impl;
 
+import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
+import com.auraboot.framework.plugin.dto.PluginResourceOwner;
 import com.auraboot.framework.plugin.dto.imports.OwnershipType;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
-import com.auraboot.framework.plugin.dto.uninstall.*;
+import com.auraboot.framework.plugin.dto.uninstall.ResourceDiff;
+import com.auraboot.framework.plugin.dto.uninstall.ResourceUninstallInfo;
+import com.auraboot.framework.plugin.dto.uninstall.UninstallDecision;
+import com.auraboot.framework.plugin.dto.uninstall.UninstallPreviewResult;
+import com.auraboot.framework.plugin.dto.uninstall.UninstallRequest;
+import com.auraboot.framework.plugin.dto.uninstall.UninstallResult;
 import com.auraboot.framework.plugin.entity.PluginRecord;
 import com.auraboot.framework.plugin.entity.PluginResource;
 import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
 import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.plugin.service.PluginResourceService;
-import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -18,8 +25,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 /**
  * Implementation of plugin resource service for ownership and lifecycle management.
@@ -55,6 +71,51 @@ public class PluginResourceServiceImpl implements PluginResourceService {
     @Override
     public PluginResource findByTypeAndCode(Long tenantId, ResourceType type, String code) {
         return resourceMapper.findByTypeAndCode(tenantId, type.code(), code);
+    }
+
+    @Override
+    public PluginResourceOwner findResourceOwner(Long tenantId, ResourceType type, String code) {
+        PluginResource resource = findByTypeAndCode(tenantId, type, code);
+        if (resource == null || !resource.isManagedByPlugin()) {
+            return null;
+        }
+
+        PluginRecord plugin = pluginRecordMapper.findByPid(resource.getPluginPid());
+        return new PluginResourceOwner(
+                plugin != null ? plugin.getPluginId() : null,
+                plugin != null ? plugin.getDisplayName() : null,
+                plugin != null ? plugin.getVersion() : null,
+                resource.getOwnershipType(),
+                Boolean.TRUE.equals(resource.getUserModified()),
+                resource.getUserModifiedAt(),
+                resource.getCreatedAt()
+        );
+    }
+
+    @Override
+    public Map<String, List<Map<String, Object>>> exportPluginConfig(String pluginId) {
+        PluginRecord record = pluginRecordMapper.findByTenantAndPluginId(pluginId);
+        if (record == null || record.getPid() == null) {
+            return new LinkedHashMap<>();
+        }
+
+        // BaseMapper.selectList applies the entity's autoResultMap, so the JSONB
+        // importSnapshot deserializes via its TypeHandler.
+        List<PluginResource> resources = resourceMapper.selectList(
+                Wrappers.<PluginResource>lambdaQuery()
+                        .eq(PluginResource::getPluginPid, record.getPid())
+                        .orderByAsc(PluginResource::getSequence));
+
+        Map<String, List<Map<String, Object>>> byType = new LinkedHashMap<>();
+        for (PluginResource resource : resources) {
+            Map<String, Object> snapshot = resource.getImportSnapshot();
+            if (snapshot == null || snapshot.isEmpty()) {
+                continue;
+            }
+            byType.computeIfAbsent(resource.getResourceType(), ignored -> new ArrayList<>())
+                    .add(snapshot);
+        }
+        return byType;
     }
 
     @Override
@@ -158,7 +219,9 @@ public class PluginResourceServiceImpl implements PluginResourceService {
                             Object value = rs.getObject(i);
                             if (value instanceof org.postgresql.util.PGobject pgObj) {
                                 try {
-                                    value = objectMapper.readValue(pgObj.getValue(), new TypeReference<Map<String, Object>>() {});
+                                    value = objectMapper.readValue(
+                                            pgObj.getValue(),
+                                            new TypeReference<Map<String, Object>>() {});
                                 } catch (Exception e) {
                                     value = pgObj.getValue();
                                 }
@@ -311,7 +374,9 @@ public class PluginResourceServiceImpl implements PluginResourceService {
                         : request.getDecisions().get(info.getCode());
 
                 PluginResource resource = findByTypeAndCode(tenantId, info.getType(), info.getCode());
-                if (resource == null) continue;
+                if (resource == null) {
+                    continue;
+                }
 
                 switch (decision) {
                     case DELETE -> {
@@ -479,7 +544,9 @@ public class PluginResourceServiceImpl implements PluginResourceService {
     }
 
     private String truncate(String str, int maxLen) {
-        if (str.length() <= maxLen) return str;
+        if (str.length() <= maxLen) {
+            return str;
+        }
         return str.substring(0, maxLen - 3) + "...";
     }
 

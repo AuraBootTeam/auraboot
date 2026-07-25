@@ -4,20 +4,23 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.plugin.dto.PluginResourceOwner;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
-import com.auraboot.framework.plugin.entity.PluginRecord;
-import com.auraboot.framework.plugin.entity.PluginResource;
-import com.auraboot.framework.plugin.mapper.PluginRecordMapper;
-import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.plugin.service.PluginResourceService;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * REST API for querying plugin resource ownership information.
@@ -30,8 +33,6 @@ import java.util.*;
 public class PluginResourceController {
 
     private final PluginResourceService pluginResourceService;
-    private final PluginResourceMapper pluginResourceMapper;
-    private final PluginRecordMapper pluginRecordMapper;
 
     /**
      * Query the owner of a single resource.
@@ -55,12 +56,12 @@ public class PluginResourceController {
             return ApiResponse.error("Invalid resource type: " + resourceType);
         }
 
-        PluginResource resource = pluginResourceService.findByTypeAndCode(tenantId, type, resourceCode);
-        if (resource == null || !resource.isManagedByPlugin()) {
+        PluginResourceOwner owner = pluginResourceService.findResourceOwner(tenantId, type, resourceCode);
+        if (owner == null) {
             return ApiResponse.success(ResourceOwnerDTO.unmanaged());
         }
 
-        return ApiResponse.success(toOwnerDTO(resource));
+        return ApiResponse.success(toOwnerDTO(owner));
     }
 
     /**
@@ -83,9 +84,9 @@ public class PluginResourceController {
             String key = ref.type + ":" + ref.code;
             try {
                 ResourceType type = ResourceType.fromCode(ref.type);
-                PluginResource resource = pluginResourceService.findByTypeAndCode(tenantId, type, ref.code);
-                if (resource != null && resource.isManagedByPlugin()) {
-                    results.put(key, toOwnerDTO(resource));
+                PluginResourceOwner owner = pluginResourceService.findResourceOwner(tenantId, type, ref.code);
+                if (owner != null) {
+                    results.put(key, toOwnerDTO(owner));
                 } else {
                     results.put(key, ResourceOwnerDTO.unmanaged());
                 }
@@ -102,54 +103,30 @@ public class PluginResourceController {
      * reconciler's `aura dsl pull`. Returns each resource's importSnapshot — the
      * manifest DTO captured at import time — which is re-importable and lets the
      * CLI adopt a running instance's config as a local baseline.
-     */
+    */
     @GetMapping("/export")
-    @Operation(summary = "Export a plugin's imported config", description = "Resource importSnapshots grouped by type, for `aura dsl pull`")
+    @Operation(
+            summary = "Export a plugin's imported config",
+            description = "Resource importSnapshots grouped by type, for `aura dsl pull`")
     @RequirePermission(MetaPermission.PLUGIN_READ)
     public ApiResponse<Map<String, List<Map<String, Object>>>> exportPluginConfig(
             @RequestParam String pluginId) {
 
-        PluginRecord record = pluginRecordMapper.findByTenantAndPluginId(pluginId);
-        if (record == null || record.getPid() == null) {
-            return ApiResponse.success(new LinkedHashMap<>());
-        }
-
-        // BaseMapper.selectList applies the entity's autoResultMap, so the JSONB
-        // importSnapshot deserializes via its TypeHandler; the custom @Select
-        // findByPluginPid uses plain auto-mapping and would leave it null.
-        List<PluginResource> resources = pluginResourceMapper.selectList(
-                Wrappers.<PluginResource>lambdaQuery()
-                        .eq(PluginResource::getPluginPid, record.getPid())
-                        .orderByAsc(PluginResource::getSequence));
-
-        Map<String, List<Map<String, Object>>> byType = new LinkedHashMap<>();
-        for (PluginResource r : resources) {
-            Map<String, Object> snapshot = r.getImportSnapshot();
-            if (snapshot == null || snapshot.isEmpty()) {
-                continue;
-            }
-            byType.computeIfAbsent(r.getResourceType(), k -> new ArrayList<>()).add(snapshot);
-        }
-        return ApiResponse.success(byType);
+        return ApiResponse.success(pluginResourceService.exportPluginConfig(pluginId));
     }
 
-    private ResourceOwnerDTO toOwnerDTO(PluginResource resource) {
-        PluginRecord plugin = pluginRecordMapper.findByPid(resource.getPluginPid());
-        String pluginName = plugin != null ? plugin.getDisplayName() : null;
-        String pluginVersion = plugin != null ? plugin.getVersion() : null;
-        String pluginId = plugin != null ? plugin.getPluginId() : null;
-
+    private ResourceOwnerDTO toOwnerDTO(PluginResourceOwner owner) {
         return new ResourceOwnerDTO(
                 true,
-                pluginId,
-                pluginName,
-                pluginVersion,
-                resource.getOwnershipType(),
-                Boolean.TRUE.equals(resource.getUserModified()),
-                resource.getUserModifiedAt(),
-                resource.getCreatedAt(),
-                resource.getOwnershipType() != null
-                        ? ("user_claimed".equals(resource.getOwnershipType()) ? 0 : 1)
+                owner.pluginId(),
+                owner.pluginName(),
+                owner.pluginVersion(),
+                owner.ownershipType(),
+                owner.userModified(),
+                owner.userModifiedAt(),
+                owner.importedAt(),
+                owner.ownershipType() != null
+                        ? ("user_claimed".equals(owner.ownershipType()) ? 0 : 1)
                         : 1
         );
     }

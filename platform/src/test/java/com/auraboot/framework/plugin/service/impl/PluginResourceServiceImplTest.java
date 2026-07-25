@@ -3,6 +3,7 @@ package com.auraboot.framework.plugin.service.impl;
 import com.auraboot.framework.meta.mapper.MetaModelFieldBindingMapper;
 import com.auraboot.framework.plugin.dto.imports.OwnershipType;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
+import com.auraboot.framework.plugin.dto.PluginResourceOwner;
 import com.auraboot.framework.plugin.dto.uninstall.ResourceDiff;
 import com.auraboot.framework.plugin.dto.uninstall.UninstallPreviewResult;
 import com.auraboot.framework.plugin.dto.uninstall.UninstallRequest;
@@ -18,9 +19,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.postgresql.util.PGobject;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.core.RowMapper;
 
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -30,6 +36,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -68,6 +75,73 @@ class PluginResourceServiceImplTest {
         when(resourceMapper.findByPluginPid("PLG-1")).thenReturn(List.of(r));
 
         assertThat(service.findByPluginPid("PLG-1")).containsExactly(r);
+    }
+
+    @Test
+    @DisplayName("findResourceOwner resolves plugin metadata for a managed resource")
+    void findResourceOwnerResolvesPluginMetadata() {
+        PluginResource resource = buildResource(ResourceType.MODEL, "m1", OwnershipType.SHARED);
+        resource.setUserModified(true);
+        when(resourceMapper.findByTypeAndCode(1L, ResourceType.MODEL.code(), "m1"))
+                .thenReturn(resource);
+        when(pluginRecordMapper.findByPid("PLG-1")).thenReturn(PluginRecord.builder()
+                .pluginId("com.example.plugin")
+                .displayName("Example")
+                .version("1.2.3")
+                .build());
+
+        PluginResourceOwner owner = service.findResourceOwner(1L, ResourceType.MODEL, "m1");
+
+        assertThat(owner.pluginId()).isEqualTo("com.example.plugin");
+        assertThat(owner.pluginName()).isEqualTo("Example");
+        assertThat(owner.pluginVersion()).isEqualTo("1.2.3");
+        assertThat(owner.ownershipType()).isEqualTo("shared");
+        assertThat(owner.userModified()).isTrue();
+    }
+
+    @Test
+    @DisplayName("findResourceOwner returns null for a user-managed resource")
+    void findResourceOwnerSkipsUserManagedResource() {
+        PluginResource resource = buildResource(ResourceType.MODEL, "m1", OwnershipType.USER_CLAIMED);
+        when(resourceMapper.findByTypeAndCode(1L, ResourceType.MODEL.code(), "m1"))
+                .thenReturn(resource);
+
+        assertThat(service.findResourceOwner(1L, ResourceType.MODEL, "m1")).isNull();
+        verify(pluginRecordMapper, never()).findByPid(anyString());
+    }
+
+    @Test
+    @DisplayName("exportPluginConfig groups non-empty snapshots in mapper order")
+    void exportPluginConfigGroupsSnapshots() {
+        when(pluginRecordMapper.findByTenantAndPluginId("com.example.plugin"))
+                .thenReturn(PluginRecord.builder().pid("PLG-1").build());
+
+        PluginResource first = buildResource(ResourceType.MODEL, "m1", OwnershipType.PLUGIN_OWNED);
+        first.setImportSnapshot(new LinkedHashMap<>(Map.of("code", "m1")));
+        PluginResource empty = buildResource(ResourceType.MODEL, "m2", OwnershipType.PLUGIN_OWNED);
+        empty.setImportSnapshot(Map.of());
+        PluginResource second = buildResource(ResourceType.PAGE, "p1", OwnershipType.PLUGIN_OWNED);
+        second.setImportSnapshot(new LinkedHashMap<>(Map.of("pageKey", "p1")));
+        when(resourceMapper.selectList(any())).thenReturn(List.of(first, empty, second));
+
+        Map<String, List<Map<String, Object>>> exported =
+                service.exportPluginConfig("com.example.plugin");
+
+        assertThat(exported).containsOnlyKeys("model", "page");
+        assertThat(exported.get("model")).containsExactly(Map.of("code", "m1"));
+        assertThat(exported.get("page")).containsExactly(Map.of("pageKey", "p1"));
+    }
+
+    @Test
+    @DisplayName("exportPluginConfig returns an ordered empty map for an unknown plugin")
+    void exportPluginConfigUnknownPlugin() {
+        when(pluginRecordMapper.findByTenantAndPluginId("missing")).thenReturn(null);
+
+        Map<String, List<Map<String, Object>>> exported = service.exportPluginConfig("missing");
+
+        assertThat(exported).isEmpty();
+        assertThat(exported).isInstanceOf(LinkedHashMap.class);
+        verify(resourceMapper, never()).selectList(any());
     }
 
     @Test
@@ -129,6 +203,31 @@ class PluginResourceServiceImplTest {
     void updateOwnershipTypeNoop() {
         when(resourceMapper.findByTypeAndCode(eq(1L), anyString(), anyString())).thenReturn(null);
         service.updateOwnershipType(1L, ResourceType.MODEL, "x", OwnershipType.USER_CLAIMED);
+        verify(resourceMapper, never()).updateById(any(PluginResource.class));
+    }
+
+    @Test
+    @DisplayName("claimByUser transfers ownership and persists when resource exists")
+    void claimByUserUpdatesResource() {
+        PluginResource resource = buildResource(ResourceType.MODEL, "m1", OwnershipType.SHARED);
+        when(resourceMapper.findByTypeAndCode(1L, ResourceType.MODEL.code(), "m1"))
+                .thenReturn(resource);
+
+        service.claimByUser(1L, ResourceType.MODEL, "m1");
+
+        assertThat(resource.getOwnershipTypeEnum()).isEqualTo(OwnershipType.USER_CLAIMED);
+        assertThat(resource.getUserModified()).isTrue();
+        verify(resourceMapper).updateById(resource);
+    }
+
+    @Test
+    @DisplayName("claimByUser is a no-op for a missing resource")
+    void claimByUserMissingResource() {
+        when(resourceMapper.findByTypeAndCode(1L, ResourceType.MODEL.code(), "missing"))
+                .thenReturn(null);
+
+        service.claimByUser(1L, ResourceType.MODEL, "missing");
+
         verify(resourceMapper, never()).updateById(any(PluginResource.class));
     }
 
@@ -231,6 +330,76 @@ class PluginResourceServiceImplTest {
         when(resourceMapper.findByTypeAndCode(eq(1L), eq(ResourceType.MODEL.code()), eq("absent")))
                 .thenReturn(null);
         assertThat(service.detectModifications(1L, ResourceType.MODEL, "absent")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getCurrentDatabaseState maps scalar and JSONB columns")
+    @SuppressWarnings("unchecked")
+    void getCurrentDatabaseStateMapsResultSet() throws Exception {
+        ResultSet resultSet = org.mockito.Mockito.mock(ResultSet.class);
+        ResultSetMetaData metadata = org.mockito.Mockito.mock(ResultSetMetaData.class);
+        PGobject jsonb = new PGobject();
+        jsonb.setType("jsonb");
+        jsonb.setValue("{\"source\":\"plugin\"}");
+
+        when(resultSet.getMetaData()).thenReturn(metadata);
+        when(metadata.getColumnCount()).thenReturn(2);
+        when(metadata.getColumnName(1)).thenReturn("code");
+        when(metadata.getColumnName(2)).thenReturn("settings");
+        when(resultSet.getObject(1)).thenReturn("m1");
+        when(resultSet.getObject(2)).thenReturn(jsonb);
+        when(objectMapper.readValue(eq(jsonb.getValue()), any(com.fasterxml.jackson.core.type.TypeReference.class)))
+                .thenReturn(Map.of("source", "plugin"));
+        when(jdbcTemplate.queryForObject(
+                anyString(),
+                any(RowMapper.class),
+                any(Object[].class)))
+                .thenAnswer(invocation -> {
+                    RowMapper<Map<String, Object>> mapper = invocation.getArgument(1);
+                    return mapper.mapRow(resultSet, 0);
+                });
+
+        Map<String, Object> state =
+                service.getCurrentDatabaseState(1L, ResourceType.MODEL, "m1");
+
+        assertThat(state)
+                .containsEntry("code", "m1")
+                .containsEntry("settings", Map.of("source", "plugin"));
+    }
+
+    @Test
+    @DisplayName("getCurrentDatabaseState covers type-specific code columns and active predicates")
+    @SuppressWarnings("unchecked")
+    void getCurrentDatabaseStateUsesTypeSpecificSql() {
+        when(jdbcTemplate.queryForObject(
+                anyString(),
+                any(RowMapper.class),
+                any(Object[].class)))
+                .thenReturn(Map.of("ok", true));
+
+        assertThat(service.getCurrentDatabaseState(1L, ResourceType.MENU, "menu")).containsEntry("ok", true);
+        assertThat(service.getCurrentDatabaseState(1L, ResourceType.PAGE, "page")).containsEntry("ok", true);
+        assertThat(service.getCurrentDatabaseState(1L, ResourceType.PROCESS, "process")).containsEntry("ok", true);
+        assertThat(service.getCurrentDatabaseState(
+                1L, ResourceType.AGENT_DEFINITION, "agent")).containsEntry("ok", true);
+        assertThat(service.getCurrentDatabaseState(1L, ResourceType.NAMED_QUERY, "query")).containsEntry("ok", true);
+        verify(jdbcTemplate, times(5)).queryForObject(
+                anyString(),
+                any(RowMapper.class),
+                any(Object[].class));
+    }
+
+    @Test
+    @DisplayName("getCurrentDatabaseState returns empty state when the query fails")
+    @SuppressWarnings("unchecked")
+    void getCurrentDatabaseStateQueryFailure() {
+        when(jdbcTemplate.queryForObject(
+                anyString(),
+                any(RowMapper.class),
+                any(Object[].class)))
+                .thenThrow(new IllegalStateException("database unavailable"));
+
+        assertThat(service.getCurrentDatabaseState(1L, ResourceType.MODEL, "m1")).isEmpty();
     }
 
     @Test
