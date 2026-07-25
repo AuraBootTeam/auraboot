@@ -5,6 +5,7 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
@@ -53,6 +54,9 @@ public class CommandTargetScopePhase implements CommandPhase {
     static final String MODE_OBSERVE = "observe";
     /** Enforce: deny at the boundary. Flipped together with removing the deep projection. */
     static final String MODE_ENFORCE = "enforce";
+
+    /** The caller cannot read the record they named — a BOLA refusal. */
+    static final String REASON_TARGET_NOT_READABLE = "target_record_not_readable";
     /** Off: skip entirely. Diagnostic escape hatch — costs one read per targeted command. */
     static final String MODE_OFF = "off";
 
@@ -101,13 +105,21 @@ public class CommandTargetScopePhase implements CommandPhase {
         }
 
         if (readable == null) {
+            // No subject, or the named record does not exist — no authorization decision to make.
+            ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.abstain(name()));
             return;
         }
         ctx.setTargetRecordReadable(readable);
         if (readable) {
+            ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.permit(name()));
             return;
         }
 
+        // The caller cannot see the record they named. Record the refusal for the permit plan
+        // regardless of this phase's own observe/enforce mode — the plan captures what was DECIDED,
+        // not whether this phase happened to enforce it (shadow; nothing consumes the plan yet).
+        ctx.recordPhaseDecision(
+                CommandPermitPlan.PhaseDecision.deny(REASON_TARGET_NOT_READABLE, name()));
         log.info("Boundary target-scope check would deny: command={} model={} record={} mode={}",
                 ctx.getCommandCode(), ctx.getCommand().getModelCode(),
                 ctx.getRequest().getTargetRecordId(), mode);

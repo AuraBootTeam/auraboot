@@ -5,6 +5,7 @@ import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.service.DynamicDataService;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.permission.engine.model.PermissionResult;
 import com.auraboot.framework.permission.service.PermissionFacade;
@@ -162,6 +163,64 @@ class CommandTargetScopePhaseTest {
         phase.execute(ctx);
 
         assertThat(ctx.getTargetRecordReadable()).isNull();
+    }
+
+    // ---------- permit-plan accumulator (phase-1 §11.15 step 2, shadow) ----------
+
+    @Test
+    void recordsADenyPhaseDecisionWhenTheCallerCannotSeeTheTarget() {
+        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+        givenRecordIsReadable(false);
+        CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getPhaseDecisions()).singleElement().satisfies(d -> {
+            assertThat(d.decision()).isEqualTo(CommandPermitPlan.Decision.DENY);
+            assertThat(d.reasonCode()).isEqualTo(CommandTargetScopePhase.REASON_TARGET_NOT_READABLE);
+            assertThat(d.phaseName()).isEqualTo("target_scope");
+        });
+    }
+
+    /** The decision is recorded even while enforcing, before the throw aborts the pipeline. */
+    @Test
+    void recordsTheDenyPhaseDecisionBeforeThrowingInEnforceMode() {
+        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_ENFORCE);
+        givenRecordIsReadable(false);
+        CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
+
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
+
+        assertThat(ctx.getPhaseDecisions()).singleElement()
+                .extracting(CommandPermitPlan.PhaseDecision::decision)
+                .isEqualTo(CommandPermitPlan.Decision.DENY);
+    }
+
+    @Test
+    void recordsAPermitPhaseDecisionWhenTheCallerCanSeeTheTarget() {
+        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
+        givenRecordIsReadable(true);
+        CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getPhaseDecisions()).singleElement()
+                .extracting(CommandPermitPlan.PhaseDecision::decision)
+                .isEqualTo(CommandPermitPlan.Decision.PERMIT);
+    }
+
+    @Test
+    void recordsAnAbstainPhaseDecisionWhenTheTargetDoesNotExist() {
+        CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_ENFORCE);
+        when(dynamicDataService.getById(anyString(), anyString())).thenReturn(null);
+        givenMember();
+        CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getPhaseDecisions()).singleElement()
+                .extracting(CommandPermitPlan.PhaseDecision::decision)
+                .isEqualTo(CommandPermitPlan.Decision.ABSTAIN);
     }
 
     private CommandTargetScopePhase phase(String mode) {
