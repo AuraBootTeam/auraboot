@@ -119,6 +119,28 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void tokenForDeletedUser_returns401_notA500() throws Exception {
+        // A correctly signed, unexpired token whose user row is gone (deactivated,
+        // deleted, or a database that has since been reset). loadUserByUsername throws
+        // UsernameNotFoundException; that used to escape this filter uncaught and Spring
+        // rendered a raw 500 "Internal Server Error" page — a credential that no longer
+        // identifies anyone was being reported as a platform fault.
+        MockHttpServletRequest req = req();
+        req.addHeader("Authorization", "Bearer valid.but.orphaned");
+        when(jwtUtil.extractIdentifier("valid.but.orphaned")).thenReturn("01ORPHANEDUSERPID000000000");
+        when(userDetailsService.loadUserByUsername("01ORPHANEDUSERPID000000000"))
+                .thenThrow(new org.springframework.security.core.userdetails.UsernameNotFoundException(
+                        "Invalid identifier: 01ORPHANEDUSERPID000000000"));
+        MockHttpServletResponse resp = new MockHttpServletResponse();
+
+        filter.doFilter(req, resp, chain);
+
+        assertEquals(401, resp.getStatus(), "an orphaned credential is an auth failure, not a server error");
+        assertNotEquals(500, resp.getStatus());
+        verify(chain, never()).doFilter(req, resp);
+    }
+
+    @Test
     void validToken_setsAuthentication_andChainsForward() throws Exception {
         MockHttpServletRequest req = req();
         req.addHeader("Authorization", "Bearer valid.token");

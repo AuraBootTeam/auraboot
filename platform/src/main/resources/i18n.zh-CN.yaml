@@ -990,8 +990,93 @@ workbench:
     view: 查看
     empty: 暂无待办事项
     justNow: 刚刚
+    minutesAgo: "{minutes}分钟前"
+    priorityUrgent: 紧急
+    priorityHigh: 高
+    priorityMedium: 中
+    priorityNormal: 普通
+    priorityLow: 低
+    stateActed: 已处理
+    stateDismissed: 已忽略
+    stateClosed: 已关闭
+    stateExpired: 已过期
     hoursAgo: "{hours}小时前"
     daysAgo: "{days}天前"
+    mention: 提及
+    assignment: 指派
+    refresh: 刷新
+    markAllRead: 全部标为已读
+    itemsNeedAttention: "{count} 项待处理"
+    results: "{count} 条结果"
+    unread: 未读
+    approvals: 待审批
+    dismiss: 忽略
+    open: 打开
+    review: 审阅
+    record: 记录
+    loadFailed: 待办事项加载失败
+    colTitle: 标题
+    colType: 类型
+    colStatus: 状态
+    colTime: 时间
+    colSource: 来源 / 记录
+    colAction: 操作
+    statusPending: 待处理
+    statusAll: 全部
+    statusActed: 已处理
+    statusClosed: 已关闭
+    statusPendingDesc: 仅显示仍需处理的事项。
+    statusAllDesc: 当前队列中的全部事项。
+    statusActedDesc: 你已经处理过的事项。
+    statusClosedDesc: 不再需要关注的事项。
+    copyAllTitle: 全部待办
+    copyAllDesc: 在一处查看所有审批、提醒与指派。
+    copyApprovalTitle: 审批队列
+    copyApprovalDesc: 等待你决策的流程审批。
+    copyAlertTitle: 提醒队列
+    copyAlertDesc: 需要跟进的告警或问题。
+    copyAssignmentTitle: 指派队列
+    copyAssignmentDesc: 关联业务记录的委派工作项。
+    copyTaskTitle: 任务队列
+    copyTaskDesc: 指派给你、仍需处理的工作项。
+    copyMentionTitle: 提及
+    copyMentionDesc: 同事在消息中 @ 你的内容。
+  notificationCenter:
+    title: 通知中心
+    unreadCount: "{count} 条未读通知"
+    allRead: 所有通知已读
+    preferences: 偏好设置
+    preferencesTitle: 通知偏好设置
+    catAll: 全部
+    catSystem: 系统
+    catApproval: 审批
+    catBusiness: 业务
+    catAlert: 告警
+    filterAll: 全部
+    filterUnread: 未读
+    filterRead: 已读
+    selectAll: 全选
+    selectedCount: "已选 {count} 项"
+    deleteSelected: 删除选中
+    markAllRead: 全部已读
+    markRead: 标为已读
+    read: 已读
+    readAt: 已读于
+    viewDetail: 查看详情
+    priorityHigh: 高
+    priorityNormal: 普通
+    priorityLow: 低
+    justNow: 刚刚
+    minutesAgo: "{minutes}分钟前"
+    hoursAgo: "{hours}小时前"
+    yesterday: 昨天
+    daysAgo: "{days}天前"
+    emptyTitle: "暂无{filter}通知"
+    emptyHint: 当有新的通知时,它们将显示在这里。
+    allDoneHint: 所有通知已处理完毕,做得很棒!
+    prevPage: 上一页
+    nextPage: 下一页
+    pageInfo: "第 {page} 页,共 {total} 条"
   shortcuts:
     title: 快捷操作
     edit: 编辑

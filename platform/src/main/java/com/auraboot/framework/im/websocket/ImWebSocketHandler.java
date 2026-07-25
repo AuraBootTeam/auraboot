@@ -151,23 +151,40 @@ public class ImWebSocketHandler extends TextWebSocketHandler {
         }
 
         // Trigger AI response if @AI is mentioned
-        try {
-            var aiService = applicationContext.getBean(
-                    com.auraboot.framework.im.service.ImAiService.class);
-            if (aiService.hasMention(saved)) {
-                aiService.generateResponse(saved, tenantId);
+        com.auraboot.framework.im.service.ImAiService aiService =
+                applicationContext.getBeanProvider(
+                        com.auraboot.framework.im.service.ImAiService.class).getIfAvailable();
+        if (aiService != null) {
+            try {
+                if (aiService.hasMention(saved)) {
+                    aiService.generateResponse(saved, tenantId);
+                }
+            } catch (RuntimeException e) {
+                // Same rule as the inbox hook: the message stands, the failure is visible.
+                log.warn("@AI handling failed for message {}: {}", saved.getId(), e.toString(), e);
             }
-        } catch (Exception e) {
-            log.debug("ImAiService not available, skipping @AI check", e);
         }
 
-        // Create MENTION inbox items for @mentioned users
-        try {
-            var inboxImListener = applicationContext.getBean(
-                    com.auraboot.framework.inbox.listener.InboxImListener.class);
-            inboxImListener.onMessageSent(saved, userId, tenantId);
-        } catch (Exception e) {
-            log.debug("InboxImListener not available, skipping mention inbox", e);
+        // Create MENTION inbox items for @mentioned users.
+        //
+        // Two different situations used to be collapsed into one silent catch: the
+        // listener bean being absent (a legitimate deployment shape) and the listener
+        // itself failing (a defect). Both were logged at debug, so a mention that never
+        // reached anyone's Inbox left no trace anyone would look at. Absence is now
+        // expressed by asking for the bean; a real failure is logged as a warning.
+        //
+        // The message is already persisted and broadcast at this point, so a failure
+        // here must not fail the send — but it must be visible.
+        com.auraboot.framework.inbox.listener.InboxImListener inboxImListener =
+                applicationContext.getBeanProvider(
+                        com.auraboot.framework.inbox.listener.InboxImListener.class).getIfAvailable();
+        if (inboxImListener != null) {
+            try {
+                inboxImListener.onMessageSent(saved, userId, tenantId);
+            } catch (RuntimeException e) {
+                log.warn("Failed to materialize MENTION inbox items for message {}: {}",
+                        saved.getId(), e.toString(), e);
+            }
         }
 
         // Publish ImMessageSentEvent so GroupChatAgentRouter can route to

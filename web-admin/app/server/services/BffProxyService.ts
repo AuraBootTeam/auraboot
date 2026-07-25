@@ -56,6 +56,19 @@ function hasNonEmptyBody(body: unknown): boolean {
   return true;
 }
 
+/**
+ * The exact bytes the client sent, when express.json() preserved them.
+ *
+ * Rebuilding the body from the parsed `req.body` re-serialises it, and JSON.parse has
+ * already rounded any integer past 2^53 by then — an 18-19 digit snowflake id arrives
+ * at the backend as a neighbouring, usually non-existent, id. Nothing errors: the
+ * request succeeds against the wrong record. Forwarding the original buffer also keeps
+ * the body's length identical to what the client declared.
+ */
+export function rawRequestBody(req: { rawBody?: Buffer }): Buffer | undefined {
+  return Buffer.isBuffer(req.rawBody) && req.rawBody.length > 0 ? req.rawBody : undefined;
+}
+
 export function shouldForwardRequestBody(method: string, body?: unknown): boolean {
   const normalized = method.toUpperCase();
   return normalized !== 'GET' && normalized !== 'HEAD' && hasNonEmptyBody(body);
@@ -248,7 +261,9 @@ export class BffProxyService {
         proxy: false as const, // Disable axios built-in proxy detection
       };
       if (shouldForwardRequestBody(req.method, req.body)) {
-        axiosConfig.data = req.body;
+        // Prefer the untouched bytes; fall back to the parsed body when a route
+        // consumed the stream without keeping them.
+        axiosConfig.data = rawRequestBody(req as never) ?? req.body;
       }
 
       // 发送请求到后端
@@ -329,12 +344,14 @@ export class BffProxyService {
         signal: controller.signal,
       };
       if (shouldForwardRequestBody(req.method, req.body)) {
-        requestInit.body =
-          typeof req.body === 'string'
+        const raw = rawRequestBody(req as never);
+        requestInit.body = raw
+          ? new Uint8Array(raw)
+          : typeof req.body === 'string'
             ? req.body
             : Buffer.isBuffer(req.body)
               ? new Uint8Array(req.body)
-            : JSON.stringify(req.body ?? {});
+              : JSON.stringify(req.body ?? {});
       }
 
       let response: globalThis.Response;

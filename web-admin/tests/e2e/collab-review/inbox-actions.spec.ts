@@ -29,7 +29,9 @@ test.describe('inbox actions', () => {
     }
 
     await page.goto('/inbox', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible({ timeout: 10000 });
+    // Wait on the page's testid, not its title: the heading is localised, so asserting
+    // on English text made these break the moment the page learned to speak Chinese.
+    await expect(page.locator('[data-testid="unified-inbox-page"]')).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(1500);
 
     // Source of truth: the same endpoint the page reads.
@@ -71,7 +73,9 @@ test.describe('inbox actions', () => {
 
   test('IB-2: dismiss removes the item from the list and from the backend', async ({ page }) => {
     await page.goto('/inbox', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible({ timeout: 10000 });
+    // Wait on the page's testid, not its title: the heading is localised, so asserting
+    // on English text made these break the moment the page learned to speak Chinese.
+    await expect(page.locator('[data-testid="unified-inbox-page"]')).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(1500);
 
     const before = await page.locator('[data-testid^="inbox-item-"]').count();
@@ -88,7 +92,9 @@ test.describe('inbox actions', () => {
 
   test('IB-3: mark all read drives the unread count to zero', async ({ page }) => {
     await page.goto('/inbox', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible({ timeout: 10000 });
+    // Wait on the page's testid, not its title: the heading is localised, so asserting
+    // on English text made these break the moment the page learned to speak Chinese.
+    await expect(page.locator('[data-testid="unified-inbox-page"]')).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(1500);
 
     await page.locator('[data-testid="inbox-mark-all-read"]').click();
@@ -107,7 +113,9 @@ test.describe('inbox actions', () => {
 
   test('IB-4: type tab filters the list to that type only', async ({ page }) => {
     await page.goto('/inbox', { waitUntil: 'domcontentloaded' });
-    await expect(page.getByRole('heading', { name: 'Inbox' })).toBeVisible({ timeout: 10000 });
+    // Wait on the page's testid, not its title: the heading is localised, so asserting
+    // on English text made these break the moment the page learned to speak Chinese.
+    await expect(page.locator('[data-testid="unified-inbox-page"]')).toBeVisible({ timeout: 15000 });
     await page.waitForTimeout(1500);
 
     await page.locator('[data-testid="inbox-tab-alert"]').click();

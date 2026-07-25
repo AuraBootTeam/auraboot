@@ -703,8 +703,93 @@ workbench:
     view: View
     empty: No pending tasks
     justNow: Just now
+    minutesAgo: "{minutes}m ago"
+    priorityUrgent: Urgent
+    priorityHigh: High
+    priorityMedium: Medium
+    priorityNormal: Normal
+    priorityLow: Low
+    stateActed: Acted
+    stateDismissed: Dismissed
+    stateClosed: Closed
+    stateExpired: Expired
     hoursAgo: "{hours}h ago"
     daysAgo: "{days}d ago"
+    mention: Mention
+    assignment: Assignment
+    refresh: Refresh
+    markAllRead: Mark all read
+    itemsNeedAttention: "{count} items need attention"
+    results: "{count} results"
+    unread: Unread
+    approvals: Approvals
+    dismiss: Dismiss
+    open: Open
+    review: Review
+    record: Record
+    loadFailed: Inbox failed to load
+    colTitle: Title
+    colType: Type
+    colStatus: Status
+    colTime: Time
+    colSource: Source / Record
+    colAction: Action
+    statusPending: Pending
+    statusAll: All
+    statusActed: Acted
+    statusClosed: Closed
+    statusPendingDesc: Only items that still need action.
+    statusAllDesc: Everything in the selected queue.
+    statusActedDesc: Items you already handled.
+    statusClosedDesc: Items that no longer require attention.
+    copyAllTitle: All inbox items
+    copyAllDesc: Review every approval, alert, and assignment from one place.
+    copyApprovalTitle: Approval queue
+    copyApprovalDesc: Inline workflow approvals that still need a decision.
+    copyAlertTitle: Alert queue
+    copyAlertDesc: Warnings or issues that need follow-up.
+    copyAssignmentTitle: Assignment queue
+    copyAssignmentDesc: Delegated work items linked to business records.
+    copyTaskTitle: Task queue
+    copyTaskDesc: Work items assigned to you that still need action.
+    copyMentionTitle: Mentions
+    copyMentionDesc: Messages where a teammate @mentioned you.
+  notificationCenter:
+    title: Notifications
+    unreadCount: "{count} unread"
+    allRead: All caught up
+    preferences: Preferences
+    preferencesTitle: Notification preferences
+    catAll: All
+    catSystem: System
+    catApproval: Approvals
+    catBusiness: Business
+    catAlert: Alerts
+    filterAll: All
+    filterUnread: Unread
+    filterRead: Read
+    selectAll: Select all
+    selectedCount: "{count} selected"
+    deleteSelected: Delete selected
+    markAllRead: Mark all read
+    markRead: Mark as read
+    read: Read
+    readAt: Read
+    viewDetail: View details
+    priorityHigh: High
+    priorityNormal: Normal
+    priorityLow: Low
+    justNow: Just now
+    minutesAgo: "{minutes}m ago"
+    hoursAgo: "{hours}h ago"
+    yesterday: Yesterday
+    daysAgo: "{days}d ago"
+    emptyTitle: "No {filter}notifications"
+    emptyHint: New notifications will appear here.
+    allDoneHint: Everything is handled — nice work!
+    prevPage: Previous
+    nextPage: Next
+    pageInfo: "Page {page} of {total} items"
   shortcuts:
     title: Quick Actions
     edit: Edit

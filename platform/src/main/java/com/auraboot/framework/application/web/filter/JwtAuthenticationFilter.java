@@ -21,6 +21,7 @@ import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -97,7 +98,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         if (userPid != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            CustomUserDetails userDetails = (CustomUserDetails) this.userDetailsService.loadUserByUsername(userPid);
+            CustomUserDetails userDetails;
+            try {
+                userDetails = (CustomUserDetails) this.userDetailsService.loadUserByUsername(userPid);
+            } catch (UsernameNotFoundException e) {
+                // A correctly signed, unexpired token whose user no longer exists —
+                // deactivated, deleted, or issued against a database that has since been
+                // reset. UsernameNotFoundException used to escape this filter uncaught and
+                // surface as a raw Spring 500 error page ("Internal Server Error"), which
+                // reads as a platform fault instead of what it is: a credential that no
+                // longer identifies anyone. Same answer as an expired token — 401, so the
+                // client re-authenticates.
+                log.debug("Token references a user that no longer exists: {}, url: {}", userPid,
+                        request.getRequestURI());
+                ApiResponse<?> apiResponse = ApiResponse.errorWithContext(
+                        ResponseCode.UserNotLoginInOrAccessTokenInvalid, request.getRequestURI());
+                reject(request, response, apiResponse);
+                return;
+            }
 
             if (jwtUtil.validateToken(jwt, userDetails)) {
                 // Verify security version — invalidate token if password changed

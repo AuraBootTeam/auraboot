@@ -3,6 +3,8 @@ package com.auraboot.framework.auth.service.impl;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.auth.dto.UserInfoResponse;
 import com.auraboot.framework.auth.service.UserInfoService;
+import com.auraboot.framework.common.constant.ResponseCode;
+import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.permission.entity.Permission;
 import com.auraboot.framework.permission.mapper.PermissionMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -39,6 +41,16 @@ public class UserInfoServiceImpl implements UserInfoService {
     public UserInfoResponse buildCurrentUserInfo(Long userId, String userPid, Long tenantId) {
         // 1. User profile
         User user = userService.findByUserId(userId);
+        if (user == null) {
+            // A signed, unexpired token whose user row is gone — deactivated, deleted, or
+            // pointing at a database that has since been reset. Authentication already
+            // passed (the signature is valid), so this used to reach buildUserDTO and NPE
+            // on user.getId(), escaping as a raw Spring 500 error page. The honest answer
+            // is that the credential no longer identifies anyone: 401, so the client
+            // re-authenticates instead of showing the user a crash.
+            throw new BusinessException(ResponseCode.UserNotLoginInOrAccessTokenInvalid,
+                    "The account for this session no longer exists");
+        }
         UserInfoResponse.UserDTO userDTO = buildUserDTO(user, tenantId);
 
         // 2. Roles and permissions
