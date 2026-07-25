@@ -14,10 +14,10 @@ import { useI18n } from '~/contexts/I18nContext';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface CommandAuditLogDTO {
-  id: number;
+  id: string;
   commandCode: string;
   commandPid?: string;
-  userId?: number;
+  userId?: string;
   requestPayload?: string;
   executionResult?: string;
   success: boolean;
@@ -149,7 +149,7 @@ export default function CommandAuditLogsPage() {
   const [logs, setLogs] = useState<CommandAuditLogDTO[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   // Filters
   const [commandCode, setCommandCode] = useState('');

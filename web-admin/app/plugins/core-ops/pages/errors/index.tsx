@@ -17,7 +17,9 @@ import { useI18n } from '~/contexts/I18nContext';
 type Tab = 'command' | 'client';
 
 interface CommandAuditLog {
-  id: number;
+  // Serialized as a string by the backend: a 19-digit snowflake sent as a JSON number
+  // loses precision past 2^53 in JS.
+  id: string;
   commandCode: string;
   success: boolean;
   errorMessage: string | null;

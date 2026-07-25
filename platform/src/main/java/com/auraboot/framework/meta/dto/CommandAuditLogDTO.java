@@ -3,6 +3,8 @@ package com.auraboot.framework.meta.dto;
 import lombok.Data;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -20,9 +22,18 @@ public class CommandAuditLogDTO {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+    /**
+     * Internal row id. Serialized as a string: this and {@code userId} are the only two
+     * internal ids on a DTO that crosses the browser boundary, and both are Long. A 19-digit
+     * snowflake sent as a JSON number silently loses precision past 2^53 in any JS consumer,
+     * so per the public-record id contract an internal id that must cross the boundary
+     * travels as string digits.
+     */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
     private String commandCode;
     private String commandPid;
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
     private String requestPayload;
     private String executionResult;

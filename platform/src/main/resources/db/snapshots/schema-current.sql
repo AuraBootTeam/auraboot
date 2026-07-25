@@ -2244,7 +2244,7 @@ ALTER SEQUENCE public.ab_agent_user_soul_profile_id_seq OWNED BY public.ab_agent
 CREATE TABLE public.ab_ai_action_audit_log (
     id bigint NOT NULL,
     tenant_id bigint NOT NULL,
-    user_id bigint NOT NULL,
+    user_id bigint,
     conversation_id character varying(64),
     message_id character varying(64),
     action_type character varying(50) NOT NULL,
@@ -2257,8 +2257,47 @@ CREATE TABLE public.ab_ai_action_audit_log (
     reasoning text,
     payload jsonb,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    record_pid character varying(64)
+    record_pid character varying(64),
+    actor_type character varying(20),
+    agent_code character varying(200),
+    run_pid character varying(64),
+    trace_id character varying(36)
 );
+
+
+--
+-- Name: COLUMN ab_ai_action_audit_log.user_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_ai_action_audit_log.user_id IS 'Human who confirmed/cancelled the action; NULL for an autonomous agent action with no human actor';
+
+
+--
+-- Name: COLUMN ab_ai_action_audit_log.actor_type; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_ai_action_audit_log.actor_type IS 'Who took the action: user | agent';
+
+
+--
+-- Name: COLUMN ab_ai_action_audit_log.agent_code; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_ai_action_audit_log.agent_code IS 'Agent that attempted the action when actor_type = agent';
+
+
+--
+-- Name: COLUMN ab_ai_action_audit_log.run_pid; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_ai_action_audit_log.run_pid IS 'Agent run this action belonged to, for joining back to the run timeline';
+
+
+--
+-- Name: COLUMN ab_ai_action_audit_log.trace_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_ai_action_audit_log.trace_id IS 'OTel W3C traceId (32-hex) of the request, so a refused action is reachable from the eagle-eye console';
 
 
 --
@@ -21590,6 +21629,13 @@ CREATE INDEX idx_agent_tool_tenant ON public.ab_agent_tool USING btree (tenant_i
 
 
 --
+-- Name: idx_ai_audit_decision; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_audit_decision ON public.ab_ai_action_audit_log USING btree (tenant_id, user_decision, created_at DESC);
+
+
+--
 -- Name: idx_ai_audit_risk; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -21601,6 +21647,13 @@ CREATE INDEX idx_ai_audit_risk ON public.ab_ai_action_audit_log USING btree (ten
 --
 
 CREATE INDEX idx_ai_audit_tenant_time ON public.ab_ai_action_audit_log USING btree (tenant_id, created_at DESC);
+
+
+--
+-- Name: idx_ai_audit_trace_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ai_audit_trace_id ON public.ab_ai_action_audit_log USING btree (trace_id) WHERE (trace_id IS NOT NULL);
 
 
 --

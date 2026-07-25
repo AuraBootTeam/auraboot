@@ -19,7 +19,9 @@ import { useI18n } from '~/contexts/I18nContext';
 // ---------------------------------------------------------------------------
 
 interface CommandAudit {
-  id: number;
+  // String on the wire — see CommandAuditLogDTO: internal ids that cross the browser
+  // boundary travel as string digits so snowflake precision survives.
+  id: string;
   commandCode: string;
   success: boolean;
   errorMessage: string | null;
@@ -33,6 +35,7 @@ interface CommandAudit {
 
 interface LlmUsage {
   provider: string | null;
+  pricingVersion: string | null;
   requestModel: string | null;
   responseModel: string | null;
   inputTokens: number | null;
@@ -88,10 +91,26 @@ function fmtTime(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
 
-function fmtCost(n: number | null, currency: string | null): string {
+/**
+ * Costs are DECIMAL(10,6). Rendering them at 4 decimal places turned any call under
+ * $0.00005 into "0.0000", which reads as free — and a row the price table could not price
+ * is also stored as 0. Those are different facts and the console has to say which is which:
+ * the backend now stamps pricing_version 'unpriced' when no rate matched.
+ */
+function fmtCost(
+  n: number | null,
+  currency: string | null,
+  pricingVersion: string | null,
+  l: (zh: string, en: string) => string,
+): string {
+  if (pricingVersion === 'unpriced') {
+    return l('未定价', 'unpriced');
+  }
   if (n == null) return '—';
   const cur = currency || 'USD';
-  return `${n < 1 ? n.toFixed(4) : n.toFixed(2)} ${cur}`;
+  // Keep all six stored decimals for small amounts so a real cost never renders as zero.
+  const text = n === 0 ? '0' : n < 0.01 ? n.toFixed(6) : n < 1 ? n.toFixed(4) : n.toFixed(2);
+  return `${text} ${cur}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +359,9 @@ export default function TroubleshootingPage() {
                           <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
                             {(u.inputTokens ?? 0)} / {(u.outputTokens ?? 0)}
                           </td>
-                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{fmtCost(u.amount, u.currency)}</td>
+                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300" data-testid="llm-cost">
+                            {fmtCost(u.amount, u.currency, u.pricingVersion, l)}
+                          </td>
                           <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400">{fmtTime(u.createdAt)}</td>
                         </tr>
                       ))}
