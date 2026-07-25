@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent.eval;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -16,13 +17,34 @@ import java.util.Objects;
  */
 public interface AgentTurnQualityJudge {
 
-    /** A run's observations folded into the signals a judge grades on. */
+    /**
+     * A run's observations folded into the signals a judge grades on.
+     *
+     * <p>{@code narrative} carries the turn's human-readable trace (each observation's
+     * title + detail, most recent first, truncated). The counters above it answer "did
+     * this turn break"; only the narrative can answer "was the answer any good", which is
+     * what an LLM judge grades. It is empty for callers that build signals from counters
+     * alone, and a judge must treat empty as "no evidence of quality" rather than as good.
+     */
     record TurnSignals(String runPid, String agentId, int eventCount,
-                       boolean completed, boolean failed, int errorEvents, boolean costFlagged) {
+                       boolean completed, boolean failed, int errorEvents, boolean costFlagged,
+                       List<String> narrative) {
+
+        /** Back-compat for callers that grade on counters only. */
+        public TurnSignals(String runPid, String agentId, int eventCount,
+                           boolean completed, boolean failed, int errorEvents, boolean costFlagged) {
+            this(runPid, agentId, eventCount, completed, failed, errorEvents, costFlagged, List.of());
+        }
+
+        /** Cap on narrative lines handed to a judge, so one noisy run cannot blow up a prompt. */
+        private static final int MAX_NARRATIVE_LINES = 40;
+        /** Cap on each line, for the same reason. */
+        private static final int MAX_LINE_CHARS = 400;
 
         /**
          * Build signals from the {@code ab_agent_observation} rows of one run.
-         * Pure: each row is a map with {@code observation_type} + {@code severity}.
+         * Pure: each row is a map with {@code observation_type} + {@code severity}, and
+         * optionally {@code obs_title} / {@code detail} which become the narrative.
          * Failure signals: a {@code *_failed} type, an {@code alert_*} type, or
          * {@code severity=error}. Cost signals: {@code cost_warning} / {@code cost_}.
          */
@@ -31,6 +53,7 @@ public interface AgentTurnQualityJudge {
             boolean completed = false;
             boolean failed = false;
             boolean cost = false;
+            List<String> narrative = new ArrayList<>();
             for (Map<String, Object> row : rows) {
                 String type = String.valueOf(row.getOrDefault("observation_type", "")).toLowerCase();
                 String severity = String.valueOf(row.getOrDefault("severity", "info")).toLowerCase();
@@ -46,8 +69,32 @@ public interface AgentTurnQualityJudge {
                 if (type.startsWith("cost_") || type.equals("cost_warning")) {
                     cost = true;
                 }
+                if (narrative.size() < MAX_NARRATIVE_LINES) {
+                    String line = narrativeLine(type, row);
+                    if (line != null) {
+                        narrative.add(line);
+                    }
+                }
             }
-            return new TurnSignals(runPid, agentId, rows.size(), completed, failed, errors, cost);
+            return new TurnSignals(runPid, agentId, rows.size(), completed, failed, errors, cost,
+                    List.copyOf(narrative));
+        }
+
+        private static String narrativeLine(String type, Map<String, Object> row) {
+            String title = text(row.get("obs_title"));
+            String detail = text(row.get("detail"));
+            if (title.isEmpty() && detail.isEmpty()) {
+                return null;
+            }
+            String body = (title.isEmpty() ? detail : (detail.isEmpty() ? title : title + " — " + detail));
+            if (body.length() > MAX_LINE_CHARS) {
+                body = body.substring(0, MAX_LINE_CHARS) + "…";
+            }
+            return "[" + type + "] " + body;
+        }
+
+        private static String text(Object v) {
+            return v == null ? "" : String.valueOf(v).trim();
         }
     }
 
