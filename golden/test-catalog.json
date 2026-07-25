@@ -414,6 +414,8 @@
         "web-admin/app/hooks/useNotificationList.ts",
         "web-admin/app/plugins/core-ops/pages/notifications/**",
         "web-admin/tests/e2e/collab-review/**",
+        "platform/src/main/resources/i18n.zh-CN.yaml",
+        "platform/src/main/resources/i18n.en-US.yaml",
         "scripts/collab-trio-golden-run.sh"
       ],
       "axes": {
