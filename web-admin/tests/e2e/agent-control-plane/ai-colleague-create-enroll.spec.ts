@@ -40,7 +40,7 @@ async function openWizardForm(page: Page) {
     (r) => r.url().includes('/agent/providers/configured'),
     { timeout: 30_000 },
   );
-  await page.goto('/ai/colleagues/new', { waitUntil: 'domcontentloaded' });
+  await page.goto('/p/c/ai_colleague_new', { waitUntil: 'domcontentloaded' });
   await hydrated;
   const skip = page.locator('[data-testid="wizard-template-skip"]');
   await expect(skip).toBeVisible({ timeout: 15_000 });
@@ -161,7 +161,7 @@ test.describe('Digital employee — create and enrol', () => {
     expect(createResponse.status(), 'create must not 4xx').toBeLessThan(400);
 
     // The wizard navigates to the new colleague's detail page on success.
-    await expect(page).toHaveURL(/\/ai\/colleagues\/[^/]+$/, { timeout: 20_000 });
+    await expect(page).toHaveURL(/\/p\/c\/ai_colleague_detail\?agentPid=/, { timeout: 20_000 });
     await expect(page.getByText(COLLEAGUE_NAME).first()).toBeVisible({ timeout: 15_000 });
 
     // ---------------------------------------------------------------------

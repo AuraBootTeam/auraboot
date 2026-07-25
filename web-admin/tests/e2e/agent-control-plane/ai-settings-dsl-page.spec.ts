@@ -23,8 +23,19 @@ test.describe('AI settings hub — DSL card-grid page', () => {
     const cards = page.locator('[data-testid="card-grid-card"]');
     await expect(cards, 'all six settings items render as cards').toHaveCount(6);
 
-    // Localized title proves the static dataSource rows and titleField resolve.
-    await expect(grid).toContainText(/LLM Providers|大模型服务商/);
+    // All six settings areas render with their titles (locale-agnostic) — preserves the
+    // coverage of the former hand-written settings.tsx tests, now that it is a DSL card-grid.
+    const settingTitles = [
+      /LLM Providers|大模型服务商/,
+      /MCP Servers|MCP 服务器/,
+      /Prompt Templates|提示词模板/,
+      /Object Aliases|对象别名/,
+      /Semantic Terms|语义术语/,
+      /Governance Policies|治理策略/,
+    ];
+    for (const title of settingTitles) {
+      await expect(grid, `settings card "${title}" renders`).toContainText(title);
+    }
 
     // The first card ("LLM Providers") targets /aurabot/providers — clicking its action must
     // navigate there, proving per-row {target} resolution (not a single shared static path).
