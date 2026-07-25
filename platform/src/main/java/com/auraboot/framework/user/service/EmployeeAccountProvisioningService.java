@@ -14,11 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -55,8 +52,7 @@ public class EmployeeAccountProvisioningService {
             throw new BusinessException("randomDigitCount must be between 1 and 12");
         }
 
-        Map<String, List<String>> roleMapping = buildRoleMapping(request.getRoleMapping());
-        List<PreparedEmployee> employees = prepareEmployees(request.getEmployees(), roleMapping);
+        List<PreparedEmployee> employees = prepareEmployees(request.getEmployees());
 
         validateNoExistingUsers(employees);
         validateRolesExist(employees, tenantId);
@@ -91,8 +87,7 @@ public class EmployeeAccountProvisioningService {
                 .build();
     }
 
-    private List<PreparedEmployee> prepareEmployees(List<EmployeeAccountRow> rows,
-                                                    Map<String, List<String>> roleMapping) {
+    private List<PreparedEmployee> prepareEmployees(List<EmployeeAccountRow> rows) {
         List<PreparedEmployee> employees = new ArrayList<>();
         Set<String> seenNames = new LinkedHashSet<>();
         for (EmployeeAccountRow row : rows) {
@@ -104,22 +99,23 @@ public class EmployeeAccountProvisioningService {
             if (name == null) {
                 throw new BusinessException("Employee name is required");
             }
-            if (type == null) {
-                throw new BusinessException("Employee type is required for " + name);
-            }
             if (!seenNames.add(name)) {
                 throw new BusinessException("Duplicate employee name: " + name);
             }
 
-            List<String> roleCodes = roleMapping.get(normalizeKey(type));
-            if (roleCodes == null || roleCodes.isEmpty()) {
-                throw new BusinessException("No role mapping configured for employee type: " + type);
-            }
+            // Roles are taken verbatim from the row. An employee with no roles is
+            // provisioned as a bare account; validateRolesExist rejects any code
+            // that does not exist in the tenant.
+            List<String> roleCodes = row.getRoles() == null ? List.of() : row.getRoles().stream()
+                    .map(this::normalizeOrNull)
+                    .filter(value -> value != null)
+                    .distinct()
+                    .toList();
             employees.add(new PreparedEmployee(
                     name,
                     type,
                     normalizeOrNull(row.getEmail()),
-                    List.copyOf(roleCodes)
+                    roleCodes
             ));
         }
         return employees;
@@ -152,31 +148,6 @@ public class EmployeeAccountProvisioningService {
         }
     }
 
-    private Map<String, List<String>> buildRoleMapping(Map<String, List<String>> override) {
-        Map<String, List<String>> mapping = new LinkedHashMap<>();
-        putMapping(mapping, List.of("管理员", "admin", "administrator"), List.of("tenant_admin"));
-        putMapping(mapping, List.of("销售", "sales"), List.of("bom_operator", "qo_quoter"));
-        putMapping(mapping, List.of("采购", "procurement", "purchasing"), List.of("bom_operator", "qo_quoter"));
-        putMapping(mapping, List.of("工程", "engineering", "engineer"), List.of("bom_operator"));
-
-        if (override != null) {
-            override.forEach((type, roles) -> {
-                String key = normalizeKey(type);
-                List<String> normalizedRoles = roles == null ? List.of() : roles.stream()
-                        .map(this::normalizeOrNull)
-                        .filter(value -> value != null)
-                        .distinct()
-                        .toList();
-                mapping.put(key, normalizedRoles);
-            });
-        }
-        return mapping;
-    }
-
-    private void putMapping(Map<String, List<String>> mapping, List<String> aliases, List<String> roleCodes) {
-        aliases.forEach(alias -> mapping.put(normalizeKey(alias), roleCodes));
-    }
-
     private String generatePassword(String prefix, int digits) {
         StringBuilder value = new StringBuilder(prefix);
         for (int i = 0; i < digits; i++) {
@@ -195,11 +166,6 @@ public class EmployeeAccountProvisioningService {
             return null;
         }
         return value.trim();
-    }
-
-    private String normalizeKey(String value) {
-        String normalized = normalizeOrNull(value);
-        return normalized == null ? "" : normalized.toLowerCase(Locale.ROOT);
     }
 
     private record PreparedEmployee(String name, String type, String email, List<String> roleCodes) {

@@ -32,7 +32,8 @@ public class EmployeeAccountWorkbookParser {
             }
             Map<String, Integer> columns = readColumns(sheet.get(0));
             int nameColumn = requiredColumn(columns, "name", "姓名/name");
-            int typeColumn = requiredColumn(columns, "type", "类型/type");
+            Integer typeColumn = columns.get("type");
+            Integer rolesColumn = columns.get("roles");
             Integer mobileColumn = columns.get("mobile");
             Integer emailColumn = columns.get("email");
 
@@ -40,13 +41,14 @@ public class EmployeeAccountWorkbookParser {
             for (int i = 1; i < sheet.size(); i++) {
                 List<String> row = sheet.get(i);
                 String name = readCell(row, nameColumn);
-                String type = readCell(row, typeColumn);
+                String type = typeColumn == null ? null : readCell(row, typeColumn);
                 if (isBlank(name) && isBlank(type)) {
                     continue;
                 }
                 EmployeeAccountRow accountRow = new EmployeeAccountRow();
                 accountRow.setName(name);
                 accountRow.setType(type);
+                accountRow.setRoles(rolesColumn == null ? null : parseRoles(readCell(row, rolesColumn)));
                 accountRow.setMobile(mobileColumn == null ? null : readCell(row, mobileColumn));
                 accountRow.setEmail(emailColumn == null ? null : readCell(row, emailColumn));
                 rows.add(accountRow);
@@ -89,10 +91,28 @@ public class EmployeeAccountWorkbookParser {
         return switch (normalized) {
             case "姓名", "name", "employee name" -> "name";
             case "类型", "type", "employee type" -> "type";
+            case "角色", "roles", "role", "role codes" -> "roles";
             case "手机", "手机号", "mobile", "phone", "phone number" -> "mobile";
             case "邮箱", "email", "email address" -> "email";
             default -> null;
         };
+    }
+
+    // A roles cell holds zero or more role codes separated by comma, Chinese
+    // comma, or semicolon. Blank cells and blank entries are dropped, so an
+    // empty cell yields no roles (a bare account).
+    private List<String> parseRoles(String value) {
+        if (isBlank(value)) {
+            return null;
+        }
+        List<String> roles = new ArrayList<>();
+        for (String part : value.split("[,，;；]")) {
+            String trimmed = part.trim();
+            if (!trimmed.isEmpty()) {
+                roles.add(trimmed);
+            }
+        }
+        return roles.isEmpty() ? null : roles;
     }
 
     private String readCell(List<String> row, int column) {
