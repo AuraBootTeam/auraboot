@@ -94,9 +94,10 @@ public class HandlerPhase implements CommandPhase {
     @Override
     public void execute(CommandPipelineContext ctx) {
         var handlerRules = ctx.getRulesByType().getOrDefault("handler", Collections.emptyList());
-        Map<String, Object> handlerResults = withCommandAuthority(ctx, () -> executeHandlerPhase(
-                handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
-                ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig()));
+        Map<String, Object> handlerResults = withCommandAggregate(ctx, () ->
+                withCommandAuthority(ctx, () -> executeHandlerPhase(
+                        handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
+                        ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig())));
         ctx.setHandlerResults(handlerResults);
         persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
                 handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
@@ -412,6 +413,24 @@ public class HandlerPhase implements CommandPhase {
      * whether any command would newly reach a target its caller cannot read.
      */
     // package-private: the safety property (only AUTHORIZED opens a scope) is directly tested.
+    /**
+     * Pin the handler stage to the aggregate root the request named, when it named one.
+     *
+     * <p>Independent of {@link #commandDataAuthorityEnabled} on purpose: opening this scope only
+     * ever <em>adds</em> a constraint (writes get pinned to the authorized document), so it is safe
+     * on every path, whereas the flag gates whether authority is <em>inherited</em>. Models that
+     * declare no aggregate binding are unaffected, so this changes no behaviour until a model opts
+     * in.</p>
+     */
+    <T> T withCommandAggregate(CommandPipelineContext ctx, java.util.function.Supplier<T> body) {
+        CommandExecuteRequest request = ctx.getRequest();
+        String aggregateId = request == null ? null : request.getTargetRecordId();
+        if (!StringUtils.hasText(aggregateId)) {
+            return body.get();
+        }
+        return MetaContext.runWithCommandAggregate(aggregateId, body);
+    }
+
     <T> T withCommandAuthority(CommandPipelineContext ctx, java.util.function.Supplier<T> body) {
         if (!commandDataAuthorityEnabled) {
             return body.get();

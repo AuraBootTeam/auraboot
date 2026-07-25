@@ -319,8 +319,118 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
                 .build();
     }
 
+    @Override
+    public ValidationResult validateImmutability(ModelDefinition modelDefinition, Map<String, Object> data,
+                                                 Map<String, Object> existingRecord) {
+        List<String> errors = new ArrayList<>();
+
+        if (modelDefinition == null || modelDefinition.getFields() == null
+                || data == null || data.isEmpty() || existingRecord == null) {
+            return ValidationResult.builder()
+                    .valid(true)
+                    .errors(errors)
+                    .warnings(new ArrayList<>())
+                    .validFields(Collections.emptyList())
+                    .build();
+        }
+
+        for (FieldDefinition field : modelDefinition.getFields()) {
+            String code = field.getCode();
+            // Only fields actually being written can violate an immutability lock.
+            if (code == null || !data.containsKey(code)) {
+                continue;
+            }
+            // Re-submitting the same value is not a change. This matters because the
+            // "read a row, change a few fields, write the whole thing back" shape is
+            // common; without it, every full-row write would trip every lock.
+            if (!valueChanges(existingRecord.get(code), data.get(code))) {
+                continue;
+            }
+
+            String label = field.getName() != null ? field.getName() : code;
+
+            if (field.isImmutable()) {
+                errors.add("Field '" + label + "' is immutable and cannot be changed");
+                continue;
+            }
+
+            FieldDefinition.ImmutableWhen when = field.getImmutableWhen();
+            if (when == null || when.getField() == null || when.getIn() == null || when.getIn().isEmpty()) {
+                continue;
+            }
+            // A lock whose state field does not exist on the model can never engage — the
+            // classic silently-disarmed invariant, and exactly the failure this line of work
+            // exists to remove. Distinguish it from a state field that exists but holds null
+            // (a legitimate "no lock"): a reference to an undeclared field is a typo, and for
+            // an invariant the safe direction is closed — refuse the guarded write rather than
+            // let a possibly-illegal change through because the guard was misconfigured.
+            if (!modelHasField(modelDefinition, when.getField())) {
+                errors.add("Field '" + label + "' declares immutableWhen on unknown field '"
+                        + when.getField() + "'");
+                continue;
+            }
+            // The lock is decided by the record's CURRENT state, not by whatever the
+            // caller is trying to set the state to in this same payload.
+            Object currentState = existingRecord.get(when.getField());
+            if (currentState == null) {
+                continue;
+            }
+            String rendered = String.valueOf(currentState);
+            // Case-insensitive on purpose. An invariant that silently fails to engage because the
+            // declaration says "APPROVED" and the column holds "approved" is worse than one that
+            // engages slightly too eagerly: it reads as configured while protecting nothing. Two
+            // states of the same model differing only in case would be a modelling error anyway.
+            boolean locked = when.getIn().stream().anyMatch(v -> v != null && v.equalsIgnoreCase(rendered));
+            if (locked) {
+                errors.add("Field '" + label + "' cannot be changed while "
+                        + when.getField() + " is '" + rendered + "'");
+            }
+        }
+
+        return ValidationResult.builder()
+                .valid(errors.isEmpty())
+                .errors(errors)
+                .warnings(new ArrayList<>())
+                .validFields(Collections.emptyList())
+                .build();
+    }
+
+    /**
+     * Whether {@code incoming} actually differs from what is stored.
+     *
+     * <p>Types routinely differ across the JDBC boundary — a DATE column reads back as
+     * {@code java.sql.Date} while the payload carries {@code "2026-07-24"}, an integer
+     * column reads back as {@code Integer} while JSON supplies {@code Long}. Comparing the
+     * rendered form before declaring a change keeps an unchanged round-trip from tripping
+     * a lock it never touched.</p>
+     */
+    private static boolean modelHasField(ModelDefinition model, String code) {
+        if (model.getFields() == null) {
+            return false;
+        }
+        for (FieldDefinition f : model.getFields()) {
+            if (code.equals(f.getCode())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static boolean valueChanges(Object current, Object incoming) {
+        if (current == null && incoming == null) {
+            return false;
+        }
+        if (current == null || incoming == null) {
+            return true;
+        }
+        if (current.equals(incoming)) {
+            return false;
+        }
+        return !String.valueOf(current).equals(String.valueOf(incoming));
+    }
+
     // 私有辅助方法
-    private void validateRequiredFields(ModelDefinition modelDefinition, Map<String, Object> data, 
+    private void validateRequiredFields(ModelDefinition modelDefinition, Map<String, Object> data,
                                       ValidationContext context, List<String> errors) {
         if (modelDefinition.getFields() == null) {
             return;
