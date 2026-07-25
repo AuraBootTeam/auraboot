@@ -542,7 +542,21 @@ tasks.register('instrumentMainOffline') {
 
 // 配置测试任务使用JUnit Platform
 test {
-    useJUnitPlatform()
+    useJUnitPlatform {
+        // Real-LLM evals (@Tag("agent-eval-live")) call DeepSeek for real. They are
+        // non-deterministic by construction and cost money on every run, so they must not
+        // ride along with the ordinary suite: back-to-back runs of identical code produced
+        // 32 and then 44 failures purely because these classes answered differently the
+        // second time. They stay opt-in:
+        //
+        //     ./gradlew :test -PincludeLiveEvals
+        //
+        // Without a DEEPSEEK_API_KEY they already self-skip via Assumptions; the problem is
+        // the machine that HAS a key, where they turn a regression signal into noise.
+        if (!project.hasProperty('includeLiveEvals')) {
+            excludeTags 'agent-eval-live'
+        }
+    }
     jvmArgs "-Djavax.xml.parsers.SAXParserFactory=com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl"
     jvmArgs '-Duser.timezone=UTC'
     jvmArgs '-Xmx6g', '-Xms2g', '-XX:+UseG1GC'
