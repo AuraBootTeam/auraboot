@@ -49,6 +49,35 @@ class EmployeeAccountWorkbookParserTest {
     }
 
     @Test
+    void parse_readsRolesColumnSplittingOnCommaAndSemicolon() throws Exception {
+        XSSFWorkbook workbook = new XSSFWorkbook();
+        Sheet sheet = workbook.createSheet("在职人员信息");
+        Row header = sheet.createRow(0);
+        header.createCell(0).setCellValue("姓名");
+        header.createCell(1).setCellValue("角色");
+        Row withRoles = sheet.createRow(1);
+        withRoles.createCell(0).setCellValue("袁称磊");
+        withRoles.createCell(1).setCellValue("qo_sales，crm_account; sys_member");
+        Row withoutRoles = sheet.createRow(2);
+        withoutRoles.createCell(0).setCellValue("访客小陈");
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        workbook.write(out);
+        workbook.close();
+
+        List<EmployeeAccountRow> rows = parser.parse(new ByteArrayInputStream(out.toByteArray()));
+
+        assertThat(rows).hasSize(2);
+        // roles split on comma / Chinese comma / semicolon, trimmed
+        assertThat(rows.get(0).getName()).isEqualTo("袁称磊");
+        assertThat(rows.get(0).getRoles()).containsExactly("qo_sales", "crm_account", "sys_member");
+        // no type column at all, and an empty roles cell yields no roles (bare account)
+        assertThat(rows.get(1).getName()).isEqualTo("访客小陈");
+        assertThat(rows.get(1).getType()).isNull();
+        assertThat(rows.get(1).getRoles()).isNull();
+    }
+
+    @Test
     void parse_skipsRowsWithoutNameAndType() throws Exception {
         XSSFWorkbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Sheet1");

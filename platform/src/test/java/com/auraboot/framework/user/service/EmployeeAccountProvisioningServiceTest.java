@@ -16,7 +16,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -40,20 +39,21 @@ class EmployeeAccountProvisioningServiceTest {
     private EmployeeAccountProvisioningService service;
 
     @Test
-    void provision_mapsEmployeeTypesAndGeneratesCustomerPasswords() {
+    void provision_assignsTheRolesEachRowCarriesAndGeneratesCustomerPasswords() {
         when(roleService.findByTenantId(7L)).thenReturn(List.of(
                 role(1L, "tenant_admin"),
-                role(2L, "bom_operator"),
-                role(3L, "qo_quoter")
+                role(2L, "qo_sales"),
+                role(3L, "qo_procurement"),
+                role(4L, "bom_engineering")
         ));
         when(userProvisioningService.provision(any(), eq(7L), eq(100L)))
                 .thenAnswer(invocation -> response(invocation.getArgument(0)));
 
         EmployeeAccountProvisionResponse result = service.provision(request(List.of(
-                row("吴书生", "管理员"),
-                row("袁称磊", "销售"),
-                row("刘星梅", "采购"),
-                row("邓康铭", "工程")
+                row("吴书生", "管理员", "tenant_admin"),
+                row("袁称磊", "销售", "qo_sales"),
+                row("刘星梅", "采购", "qo_procurement"),
+                row("邓康铭", "工程", "bom_engineering")
         )), 7L, 100L);
 
         assertThat(result.getAccounts()).hasSize(4);
@@ -73,42 +73,72 @@ class EmployeeAccountProvisioningServiceTest {
                 .extracting(UserProvisionRequest::getRoleCodes)
                 .containsExactly(
                         List.of("tenant_admin"),
-                        List.of("bom_operator", "qo_quoter"),
-                        List.of("bom_operator", "qo_quoter"),
-                        List.of("bom_operator")
+                        List.of("qo_sales"),
+                        List.of("qo_procurement"),
+                        List.of("bom_engineering")
                 );
     }
 
     @Test
-    void provision_missingMappedRoleFailsBeforeCreatingUsers() {
+    void provision_multipleRolesPerRowAreAllAssigned() {
+        when(roleService.findByTenantId(7L)).thenReturn(List.of(
+                role(2L, "qo_sales"),
+                role(5L, "crm_account")
+        ));
+        when(userProvisioningService.provision(any(), eq(7L), eq(100L)))
+                .thenAnswer(invocation -> response(invocation.getArgument(0)));
+
+        service.provision(request(List.of(row("袁称磊", "销售", "qo_sales", "crm_account"))), 7L, 100L);
+
+        ArgumentCaptor<UserProvisionRequest> captor = ArgumentCaptor.forClass(UserProvisionRequest.class);
+        verify(userProvisioningService).provision(captor.capture(), eq(7L), eq(100L));
+        assertThat(captor.getValue().getRoleCodes()).containsExactly("qo_sales", "crm_account");
+    }
+
+    @Test
+    void provision_employeeWithNoRolesIsCreatedAsBareAccount() {
+        when(roleService.findByTenantId(7L)).thenReturn(List.of());
+        when(userProvisioningService.provision(any(), eq(7L), eq(100L)))
+                .thenAnswer(invocation -> response(invocation.getArgument(0)));
+
+        service.provision(request(List.of(row("访客小陈", null))), 7L, 100L);
+
+        ArgumentCaptor<UserProvisionRequest> captor = ArgumentCaptor.forClass(UserProvisionRequest.class);
+        verify(userProvisioningService).provision(captor.capture(), eq(7L), eq(100L));
+        assertThat(captor.getValue().getRoleCodes()).isEmpty();
+    }
+
+    @Test
+    void provision_roleNotInTenantFailsBeforeCreatingUsers() {
         when(roleService.findByTenantId(7L)).thenReturn(List.of(role(1L, "qo_quoter")));
 
-        assertThatThrownBy(() -> service.provision(request(List.of(row("袁称磊", "销售"))), 7L, 100L))
+        assertThatThrownBy(() -> service.provision(request(List.of(row("袁称磊", "销售", "qo_sales"))), 7L, 100L))
                 .isInstanceOf(BusinessException.class)
-                .hasMessageContaining("bom_operator");
+                .hasMessageContaining("Missing tenant roles")
+                .hasMessageContaining("qo_sales");
         verify(userProvisioningService, never()).provision(any(), any(), any());
     }
 
     @Test
-    void provision_customRoleMappingOverridesDefaultTypeRoles() {
-        when(roleService.findByTenantId(7L)).thenReturn(List.of(role(9L, "custom_sales")));
+    void provision_typeIsOptionalMetadataAndDoesNotDeriveRoles() {
+        when(roleService.findByTenantId(7L)).thenReturn(List.of(role(2L, "qo_sales")));
         when(userProvisioningService.provision(any(), eq(7L), eq(100L)))
                 .thenAnswer(invocation -> response(invocation.getArgument(0)));
-        EmployeeAccountProvisionRequest request = request(List.of(row("袁称磊", "销售")));
-        request.setRoleMapping(Map.of("销售", List.of("custom_sales")));
 
-        service.provision(request, 7L, 100L);
+        // No type at all, roles given explicitly — provisioning proceeds and the
+        // type never influences the assigned roles.
+        service.provision(request(List.of(row("袁称磊", null, "qo_sales"))), 7L, 100L);
 
         ArgumentCaptor<UserProvisionRequest> captor = ArgumentCaptor.forClass(UserProvisionRequest.class);
         verify(userProvisioningService).provision(captor.capture(), eq(7L), eq(100L));
-        assertThat(captor.getValue().getRoleCodes()).containsExactly("custom_sales");
+        assertThat(captor.getValue().getRoleCodes()).containsExactly("qo_sales");
     }
 
     @Test
     void provision_duplicateNamesInSameBatchAreRejected() {
         assertThatThrownBy(() -> service.provision(request(List.of(
-                row("吴书生", "管理员"),
-                row(" 吴书生 ", "管理员")
+                row("吴书生", "管理员", "tenant_admin"),
+                row(" 吴书生 ", "管理员", "tenant_admin")
         )), 7L, 100L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("Duplicate employee name");
@@ -119,7 +149,7 @@ class EmployeeAccountProvisioningServiceTest {
     void provision_existingUserNameIsRejectedBeforeCreatingUsers() {
         when(userService.findByUserName("吴书生")).thenReturn(new com.auraboot.framework.user.dao.entity.User());
 
-        assertThatThrownBy(() -> service.provision(request(List.of(row("吴书生", "管理员"))), 7L, 100L))
+        assertThatThrownBy(() -> service.provision(request(List.of(row("吴书生", "管理员", "tenant_admin"))), 7L, 100L))
                 .isInstanceOf(BusinessException.class)
                 .hasMessageContaining("User already exists");
         verify(userProvisioningService, never()).provision(any(), any(), any());
@@ -127,7 +157,7 @@ class EmployeeAccountProvisioningServiceTest {
 
     @Test
     void provision_rejectsTooLongPasswordPrefixBeforeCreatingUsers() {
-        EmployeeAccountProvisionRequest request = request(List.of(row("吴书生", "管理员")));
+        EmployeeAccountProvisionRequest request = request(List.of(row("吴书生", "管理员", "tenant_admin")));
         request.setPasswordPrefix("x".repeat(33));
 
         assertThatThrownBy(() -> service.provision(request, 7L, 100L))
@@ -142,10 +172,11 @@ class EmployeeAccountProvisioningServiceTest {
         return request;
     }
 
-    private EmployeeAccountRow row(String name, String type) {
+    private EmployeeAccountRow row(String name, String type, String... roles) {
         EmployeeAccountRow row = new EmployeeAccountRow();
         row.setName(name);
         row.setType(type);
+        row.setRoles(roles.length == 0 ? null : List.of(roles));
         return row;
     }
 

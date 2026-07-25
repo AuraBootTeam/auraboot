@@ -8,10 +8,14 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Admin request for provisioning a customer employee account batch.
+ *
+ * <p>Each employee carries its own role codes ({@link EmployeeAccountRow#getRoles()}).
+ * There is no type→role mapping table: this platform-generic service does not
+ * know any vertical's business roles. Callers that need type→role translation
+ * (e.g. the Quote/BOM deployment) resolve it on their side before calling.
  */
 @Data
 public class EmployeeAccountProvisionRequest {
@@ -26,10 +30,4 @@ public class EmployeeAccountProvisionRequest {
     @Min(1)
     @Max(12)
     private Integer randomDigitCount = 4;
-
-    /**
-     * Optional override by employee type, e.g. {"销售":["qo_sales"]}.
-     * Defaults cover 管理员/销售/采购/工程 and common English aliases.
-     */
-    private Map<String, List<String>> roleMapping;
 }
