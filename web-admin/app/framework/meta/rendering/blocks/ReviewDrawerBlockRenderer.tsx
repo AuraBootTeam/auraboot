@@ -1495,7 +1495,12 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                                   data-testid={`review-drawer-candidate-${rowKey}-field-${key}`}
                                   className={`min-w-0 ${
                                     field.span === 2 ? 'sm:col-span-2' : ''
-                                  } grid grid-cols-[72px_minmax(0,1fr)] items-baseline gap-2`}
+                                  } grid grid-cols-[72px_minmax(0,1fr)] gap-2 ${
+                                    // A ladder is a multi-row card, so align its label to the top of
+                                    // the card and give the card room below it instead of letting the
+                                    // next field sit tight against it.
+                                    field.format === 'ladder' ? 'items-start pb-1' : 'items-baseline'
+                                  }`}
                                 >
                                   <dt className="text-text-2 min-w-0 break-words" title={label}>
                                     {label}
