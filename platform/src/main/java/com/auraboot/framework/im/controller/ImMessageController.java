@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@lombok.extern.slf4j.Slf4j
 @RestController
 @RequestMapping("/api/im")
 @AuthenticatedAccess("message operations require conversation membership (isMember + userId/tenantId)")
@@ -167,7 +168,17 @@ public class ImMessageController {
         if (listener == null) {
             return;
         }
-        listener.onMessageSent(saved, senderId, tenantId);
+        try {
+            listener.onMessageSent(saved, senderId, tenantId);
+        } catch (RuntimeException e) {
+            // The message is already persisted; failing the send because a derived
+            // inbox row could not be written would lose the user's message over a
+            // secondary concern. Logged at warn (not debug) so a mention that never
+            // reaches anyone's Inbox leaves a trace someone actually reads — the same
+            // rule ImWebSocketHandler follows.
+            log.warn("Failed to materialize MENTION inbox items for message {}: {}",
+                    saved.getId(), e.toString(), e);
+        }
     }
 
     /**
