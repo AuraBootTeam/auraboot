@@ -97,9 +97,12 @@ test.describe('List Page UX Features', () => {
     const sortTarget = page.getByTestId('table-header-sort-sc_code');
     await expect(targetHeader).toBeVisible();
 
-    // First click — ascending. The blue SVG indicator becoming visible is the
-    // ground truth that the sort was applied; toBeVisible auto-polls.
+    // First click — ascending. Gate each transition on the URL (the sort param is a
+    // live reflection of activeSorts — see the "Sort persists" test) BEFORE asserting
+    // the SVG indicator, so the three rapid clicks can't race: without the ground-truth
+    // wait the final `.not.toBeVisible` on the SVG was timing-flaky (~1/15).
     await sortTarget.click();
+    await expect.poll(() => page.url(), { timeout: 10_000 }).toContain('sort=');
 
     // SVG sort indicator has blue fill
     const bluePath = targetHeader.locator('svg path[fill="var(--color-accent)"]');
@@ -107,11 +110,13 @@ test.describe('List Page UX Features', () => {
 
     // Second click — descending. The blue indicator stays visible (now desc).
     await sortTarget.click();
+    await expect.poll(() => page.url(), { timeout: 10_000 }).toMatch(/sort=[^&]*desc/i);
     await expect(bluePath.first()).toBeVisible({ timeout: 5_000 });
 
-    // Third click — clear sort. The same locator should become invisible
-    // (auto-polling) once the sort indicator is removed from the DOM.
+    // Third click — clear sort. Wait for the sort to actually clear from the URL (the
+    // ground truth) before asserting the accent indicator is gone.
     await sortTarget.click();
+    await expect.poll(() => page.url(), { timeout: 10_000 }).not.toContain('sort=');
     await expect(bluePath.first()).not.toBeVisible({ timeout: 5_000 });
   });
 
