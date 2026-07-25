@@ -95,7 +95,7 @@ const inputSchema = z.object({
   dryRun: z
     .boolean()
     .optional()
-    .default(false)
+    .default(true)
     .describe('When true, validate the input only — DO NOT persist. Returns { valid, wouldCreate }.'),
 });
 
@@ -118,7 +118,7 @@ export function createPageSchemaTool(client: ApiClient): Tool<Params> {
     name: 'create_page_schema',
     title: 'Create AuraBoot Page Schema (V2 flat)',
     description:
-      'Create a V2 page (kind=list|form|detail) in the current tenant. CALL query_existing_models to confirm modelCode, query_page_schemas to avoid pageKey collisions, and query_dsl_capabilities to pick valid blockType / widgetType. NEVER use removed concepts (pageType, dslSchema, kind=dashboard, kind=composite).',
+      'Create a V2 page (kind=list|form|detail) in the current tenant. CALL query_existing_models to confirm modelCode, query_page_schemas to avoid pageKey collisions, and query_dsl_capabilities to pick valid blockType / widgetType. dryRun defaults to true; pass false only after validating the preview. NEVER use removed concepts (pageType, dslSchema, kind=dashboard, kind=composite).',
     inputSchema,
     annotations: { destructiveHint: true, idempotentHint: false, openWorldHint: false },
     handler: async (params) => {

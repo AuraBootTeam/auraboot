@@ -87,7 +87,7 @@ const inputSchema = z.object({
   dryRun: z
     .boolean()
     .optional()
-    .default(false)
+    .default(true)
     .describe('When true, validate the input only — DO NOT persist. Returns { valid, wouldCreate }.'),
 });
 
@@ -114,7 +114,7 @@ export function createModelTool(client: ApiClient): Tool<Params> {
     name: 'create_model',
     title: 'Create AuraBoot Model',
     description:
-      'Create a new model (entity / view / aggregate) in the current tenant. The code MUST be unique. CALL query_existing_models FIRST to avoid collisions, and query_dsl_capabilities to pick valid dataTypes. Use dryRun=true to validate without persisting.',
+      'Create a new model (entity / view / aggregate) in the current tenant. The code MUST be unique. CALL query_existing_models FIRST to avoid collisions, and query_dsl_capabilities to pick valid dataTypes. dryRun defaults to true; pass false only after validating the preview.',
     inputSchema,
     annotations: { destructiveHint: true, idempotentHint: false, openWorldHint: false },
     handler: async (params) => {

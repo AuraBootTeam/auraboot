@@ -66,7 +66,7 @@ const inputSchema = z.object({
   dryRun: z
     .boolean()
     .optional()
-    .default(false)
+    .default(true)
     .describe('When true, validate the input only — DO NOT persist. Returns { valid, wouldCreate }.'),
 });
 
@@ -96,7 +96,7 @@ export function createCommandTool(client: ApiClient): Tool<Params> {
     name: 'create_command',
     title: 'Create AuraBoot Command',
     description:
-      'Create a Command (write operation that runs through the 20+4 stage Command Pipeline). Optionally attach BindingRules in one orchestrated call. CALL describe_command_pipeline first to know which phases run automatically — do not duplicate validation/audit/change-tracking logic in your handler. CALL query_existing_models to confirm modelCode exists.',
+      'Create a Command (write operation that runs through the 20+4 stage Command Pipeline). Optionally attach BindingRules in one orchestrated call. dryRun defaults to true; pass false only after validating the preview. CALL describe_command_pipeline first to know which phases run automatically — do not duplicate validation/audit/change-tracking logic in your handler. CALL query_existing_models to confirm modelCode exists.',
     inputSchema,
     annotations: { destructiveHint: true, idempotentHint: false, openWorldHint: false },
     handler: async (params) => {
