@@ -38,7 +38,7 @@
     "name": "AI 同事",
     "name:zh-CN": "AI 同事",
     "name:en": "AI Colleagues",
-    "path": "/ai/colleagues",
+    "path": "/p/c/ai_colleagues",
     "component": null,
     "icon": "IconUsers",
     "type": 1,
