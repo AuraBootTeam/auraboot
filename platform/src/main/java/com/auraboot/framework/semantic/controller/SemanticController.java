@@ -4,6 +4,7 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.annotation.RequirePermission;
 import com.auraboot.framework.permission.constants.MetaPermission;
+import com.auraboot.framework.semantic.compiler.MetricCompileException;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
 import com.auraboot.framework.semantic.compiler.UserContext;
 import com.auraboot.framework.semantic.dto.SemanticLineageResponse;
@@ -87,7 +88,21 @@ public class SemanticController {
     @PostMapping(value = "/validate", consumes = {"application/yaml", "text/yaml", "text/plain"})
     @RequirePermission(MetaPermission.META_SEMANTIC_USE)
     public ApiResponse<Map<String, Object>> validate(@RequestBody byte[] yamlBytes) {
-        String yaml = new String(yamlBytes, StandardCharsets.UTF_8);
+        return ApiResponse.success(doValidate(new String(yamlBytes, StandardCharsets.UTF_8)));
+    }
+
+    /**
+     * JSON variant of {@code /validate} for the web client: the BFF proxy only
+     * forwards JSON request bodies (a raw {@code text/plain} body is dropped),
+     * so the console posts {@code {"yaml": "..."}} instead of a raw YAML body.
+     */
+    @PostMapping(value = "/validate", consumes = "application/json")
+    @RequirePermission(MetaPermission.META_SEMANTIC_USE)
+    public ApiResponse<Map<String, Object>> validateJson(@RequestBody YamlBody body) {
+        return ApiResponse.success(doValidate(body == null ? "" : body.yaml()));
+    }
+
+    private Map<String, Object> doValidate(String yaml) {
         SemanticModelDTO dto = parser.parse(yaml);
         validator.validate(dto);
         Map<String, Object> out = new HashMap<>();
@@ -99,7 +114,7 @@ public class SemanticController {
         out.put("entityCount", dto.getEntities().size());
         out.put("accessPolicyCount",
                 dto.getAccessPolicies() == null ? 0 : dto.getAccessPolicies().size());
-        return ApiResponse.success(out);
+        return out;
     }
 
     /**
@@ -111,11 +126,35 @@ public class SemanticController {
     @RequirePermission(MetaPermission.META_SEMANTIC_PUBLISH)
     public ApiResponse<Map<String, Object>> publish(@RequestBody byte[] yamlBytes,
                                         @RequestParam(name = "pluginCode") String pluginCode) {
-        UserContext user = currentUser();
-        String pid = publishService.publishFromYaml(yamlBytes, pluginCode,
-                user.tenantId(), user.userId());
-        return ApiResponse.success(Map.of("ok", true, "pid", pid));
+        return ApiResponse.success(doPublish(new String(yamlBytes, StandardCharsets.UTF_8), pluginCode));
     }
+
+    /**
+     * JSON variant of {@code /publish} for the web client (see {@link #validateJson}).
+     * Posts {@code {"yaml": "...", "pluginCode": "..."}}.
+     */
+    @PostMapping(value = "/publish", consumes = "application/json")
+    @RequirePermission(MetaPermission.META_SEMANTIC_PUBLISH)
+    public ApiResponse<Map<String, Object>> publishJson(@RequestBody PublishBody body) {
+        if (body == null || body.pluginCode() == null || body.pluginCode().isBlank()) {
+            throw new MetricCompileException("BAD_PARAM", "pluginCode is required");
+        }
+        return ApiResponse.success(doPublish(body.yaml(), body.pluginCode()));
+    }
+
+    private Map<String, Object> doPublish(String yaml, String pluginCode) {
+        UserContext user = currentUser();
+        String pid = publishService.publishFromYaml(
+                yaml.getBytes(StandardCharsets.UTF_8), pluginCode,
+                user.tenantId(), user.userId());
+        return Map.of("ok", true, "pid", pid);
+    }
+
+    /** JSON request body carrying a raw semantic YAML source. */
+    public record YamlBody(String yaml) {}
+
+    /** JSON request body for publish: YAML source + owning namespace. */
+    public record PublishBody(String yaml, String pluginCode) {}
 
     @GetMapping("/meta")
     @RequirePermission(MetaPermission.META_SEMANTIC_USE)
