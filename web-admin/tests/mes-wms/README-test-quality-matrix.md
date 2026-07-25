@@ -1,5 +1,7 @@
 # MES/WMS 交付 FR — 测试质量矩阵(单一权威）
 
+> ⚠️ **诚实纠正(2026-07-25)**:本仓 `mes-wms-acceptance-report.html`(#1508 生成)曾报「🟢21 全绿」,但它把 UI 行的**「页面渲染了」当成「功能可用了」**——高估了 UI 层。真去驱动行动点后发现:workbench 上 **5 个操作按钮点了就 400**(命令要 inputFields 但页配置没声明 → 空 payload)。已全部修复(plugins #246)+ 行动驱动 golden 验证(auraboot #1517/#1520)。**真实的三层大图见 [`FEATURE-BIGPICTURE-REPORT.md`](./FEATURE-BIGPICTURE-REPORT.md)**(后端命令层 / UI 渲染层 / UI 行动点层,各层证据强度不同)。旧 HTML 报告仅作历史留存,勿当"端到端可用"依据。
+
 > 覆盖金轮交付的 8 个 FR 的**真栈 IT**(命令管道 API + DB round-trip）+ **注册 UI golden**（真浏览器驱动行动点）。
 > 由自包含 runner `scripts/mes-wms-golden-run.sh` 一键跑（起栈→import→seed→backend IT→UI golden→报告→拆栈）。
 > 层次定义见 `auraboot-enterprise/docs/standards/core/testing-layering.md`：**IT = 真栈 + 真 DB**；golden = 固定集 + 见过红 + 注册可复跑。
