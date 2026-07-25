@@ -58,13 +58,17 @@ class PayloadTemporalNormalizerTest extends BaseIntegrationTest {
 
     @Test
     void datetimeString_withOffset_convertedToInstant() {
-        var model = modelWithFields(datetimeField("created_at"));
+        // Must be a user-editable datetime field: created_at/updated_at are server-managed and
+        // deliberately left uncoerced (see SERVER_MANAGED_TEMPORAL_FIELDS), so using one here
+        // asserted the opposite of the intended contract. event_time is the user-editable case,
+        // matching datetimeString_withoutOffset_throws400 below.
+        var model = modelWithFields(datetimeField("event_time"));
         Map<String, Object> payload = new HashMap<>();
-        payload.put("created_at", "2026-03-18T10:30:00+08:00");
+        payload.put("event_time", "2026-03-18T10:30:00+08:00");
 
         normalizer.normalize(payload, model);
 
-        assertThat(payload.get("created_at")).isInstanceOf(Instant.class);
+        assertThat(payload.get("event_time")).isInstanceOf(Instant.class);
     }
 
     @Test
