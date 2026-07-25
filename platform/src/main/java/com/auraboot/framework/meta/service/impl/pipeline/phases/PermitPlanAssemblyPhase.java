@@ -1,10 +1,15 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -22,17 +27,39 @@ import org.springframework.util.StringUtils;
  * it. The two invariant phases (state 600, pre-invariant 800) are axis B and deliberately do not feed
  * this plan (§11.15.1).</p>
  *
- * <p><strong>Phase-1 Shadow.</strong> The plan is assembled and stashed on the context, but nothing
- * enforces it yet — the data layer still runs its own {@code isDataPermissionBypassed} decision. The
- * next slice makes the data layer read this plan's scope predicate and version instead of deciding
- * again. Assembling it here changes no behaviour; it only makes the decision available. Row scope
- * (D3) and the optimistic version (D5) are not resolved yet — they join the plan in the following
- * slice — so both are carried as {@code null} for now.</p>
+ * <p>The plan carries the row-scope grade (D3), resolved here from the existing row-scope engine's
+ * own verdict so it can never drift from what that engine filters. The optimistic version (D5) is
+ * captured later, at enforcement.</p>
+ *
+ * <p><strong>Phase-1 Shadow + observe (§11.10 stage 1).</strong> The plan is assembled and stashed
+ * on the context, but nothing enforces it yet — the data layer still runs its own
+ * {@code isDataPermissionBypassed} decision, so assembling the plan changes no behaviour. Because any
+ * denying gate has already thrown before this phase, a command that reaches here was allowed by the
+ * legacy path; so the assembled decision <em>vs</em> that legacy allow is exactly the migration
+ * divergence §11.10 stage 1 asks to record. We meter it by decision: an {@code ABSTAIN} here is a
+ * command the legacy path allows but the plan does not authorize (an undeclared-permission command) —
+ * the surface that must gain a declaration before enforcement can flip on.</p>
  */
 @Slf4j
 @Component
 @Order(550)
 public class PermitPlanAssemblyPhase implements CommandPhase {
+
+    /**
+     * The existing row-scope engine — the same one the data layer calls at each of its ~40 sites
+     * today. We call it once here, at the boundary, so the plan carries the scope grade instead of
+     * each site re-deciding it (the whole point of §11.15). Optional so a minimal context without the
+     * engine still assembles a plan (scope simply stays unresolved).
+     */
+    @Autowired(required = false)
+    private DataPermissionEngine dataPermissionEngine;
+
+    /** Optional so a minimal context still assembles; when present, records the shadow divergence. */
+    @Autowired(required = false)
+    private MeterRegistry meterRegistry;
+
+    /** Meter of assembled plan decisions — the §11.10 stage-1 divergence surface (see class doc). */
+    static final String SHADOW_DECISION_METRIC = "command.permit_plan.shadow.decision";
 
     @Override
     public String name() {
@@ -52,13 +79,69 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
         CommandPermitPlan plan = CommandPermitPlan.fromPhaseDecisions(
                 ctx.getPhaseDecisions(),
                 aggregateId,
-                null,   // row scope (D3) — resolved in the next slice
-                null);  // expected version (D5) — captured in the next slice
+                resolveScope(ctx),
+                null);  // expected version (D5) — captured at enforcement (step 4)
         ctx.setPermitPlan(plan);
+        observe(ctx, plan);
+    }
 
-        if (log.isDebugEnabled()) {
-            log.debug("Permit plan assembled for {}: decision={} deniedByPhase={} aggregateId={}",
-                    ctx.getCommandCode(), plan.decision(), plan.deniedByPhase(), aggregateId);
+    /**
+     * Record the shadow divergence (§11.10 stage 1): meter the assembled decision, and surface an
+     * {@code ABSTAIN} — a command the legacy path let through here but the plan does not authorize —
+     * so the undeclared-permission surface is visible before enforcement flips on. Observation only;
+     * it changes nothing.
+     */
+    private void observe(CommandPipelineContext ctx, CommandPermitPlan plan) {
+        if (meterRegistry != null) {
+            meterRegistry.counter(SHADOW_DECISION_METRIC, "decision", plan.decision().name()).increment();
+        }
+        if (plan.decision() == CommandPermitPlan.Decision.ABSTAIN) {
+            log.info("Permit-plan shadow: command {} reached the boundary (legacy allow) but declares no "
+                    + "authorization (plan=ABSTAIN); it would need a permission declaration before enforcement",
+                    ctx.getCommandCode());
+        } else if (log.isDebugEnabled()) {
+            log.debug("Permit plan assembled for {}: decision={} deniedByPhase={} aggregateId={} scope={}",
+                    ctx.getCommandCode(), plan.decision(), plan.deniedByPhase(),
+                    plan.aggregateId(), plan.scope());
+        }
+    }
+
+    /**
+     * Resolve the row-scope grade (D3) the whole command runs under, from the existing row-scope
+     * engine's own verdict — so the plan's grade can never drift from what the engine actually
+     * filters. {@code buildRowFilter} returns a blank fragment exactly when the caller has ALL access
+     * (or no row policy at all — the unrestricted default), and a non-blank fragment when it is
+     * restricted (SELF, and — folded to SELF for phase-1, per §11.13 — DEPARTMENT / CUSTOM). Multiple
+     * roles are already combined most-permissive-wins inside the engine, so a caller with any ALL
+     * grant comes back blank → {@link ScopeGrade#ALL}.
+     *
+     * <p>Returns {@code null} (unresolved) when the inputs to decide a grade are absent, or when the
+     * engine is unavailable or errors. This is deliberate <strong>shadow safety</strong>: nothing
+     * enforces the grade yet, so resolving it here must not add a failure the command would not
+     * otherwise hit — the data layer's own fail-secure evaluation is still the one in force. Step 4
+     * makes this boundary resolution authoritative and fail-secure, retiring the per-site calls.</p>
+     */
+    private ScopeGrade resolveScope(CommandPipelineContext ctx) {
+        if (dataPermissionEngine == null) {
+            return null;
+        }
+        CommandDefinition command = ctx.getCommand();
+        String modelCode = command == null ? null : command.getModelCode();
+        Long tenantId = ctx.getTenantId();
+        Long userId = ctx.getUserId();
+        if (modelCode == null || tenantId == null || userId == null) {
+            return null;
+        }
+        try {
+            String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
+            return StringUtils.hasText(rowFilter) ? ScopeGrade.SELF : ScopeGrade.ALL;
+        } catch (RuntimeException e) {
+            // Shadow safety only: the grade is not consumed yet, so a resolution failure here must
+            // not break a command the data layer would have run. The data layer keeps its own
+            // fail-secure evaluation until step 4 moves enforcement onto this plan.
+            log.warn("Shadow scope resolution failed for {} (model {}); leaving scope unresolved",
+                    ctx.getCommandCode(), modelCode, e);
+            return null;
         }
     }
 }
