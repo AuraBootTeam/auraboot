@@ -83,3 +83,25 @@
 **发现并修复的美观性问题(1)**:FR-23 车间看板 dashboard 的 `smart-table-chart` widget `h=1` 导致表体压缩到 ~1 行高、12 行不可见 → h=1→4/3(参照 pe_oee_dashboard h=3)。plugins #240 merged。
 
 **结论**:🟡 存量 FR 里有用户页的 6 个（FR-01/03/07/15/21/23)全部真栈 UI golden 通过 + 截图美观性复核优秀,1 个 dashboard 布局 bug 已修;FR-08/12/14 无独立 UI 页(sub-feature）。
+
+---
+
+## 🟡 FR 行动点驱动 golden(真点按钮 + 断言状态变化)+ 发现修复 2 个 UX bug
+
+不止「页面渲染」——真点行动点断言状态变化(§2.2 门禁绿≠功能可用)。
+
+### FR-07 工位执行 · start 行动点(`fr07-action-golden.mjs`,5/5)
+真点某工序的 **start** 按钮 → 观察到 **FR-05 开工互锁正确拦截**(该工序无激活生产版本):
+- DB 断言:工序**未非法转 in_progress**(拦截生效)
+- 拦截原因**以 toast 呈现**给操作员(product_version 检查失败 + 指向 Interlock Card + override 命令)
+- **FR-05/FR-07 seam 真栈 UI 端到端验证**(互锁门控 start)
+
+### 🔧 发现并修复的 UX bug(2 个,都在美观性 /goal 范围)
+| # | bug | 修复 | 验证 |
+|---|-----|------|------|
+| 1 | FR-23 车间看板 dashboard table widget `h=1` → 表体塌陷、12 行不可见 | h=1→4/3 | plugins #240,截图变异 |
+| 2 | **被拦截的 list 行动点 → 整页崩「加载失败」+ 重试**(action 错误被误设成 page-level error;应只 toast) | ListPageContent `onError` 不再设 page error → action 失败只 toast、列表保持 | OSS #1501,截图变异(改前整页崩/改后列表保留+干净 toast),FR-07 golden 5/5 |
+
+**bug #2 是共享渲染器修复,改善所有 list 页**:任何行动点被业务规则拒绝(互锁/权限/校验)不再整页崩,操作员保留列表 + 看清 toast 原因。
+
+**结论**:🟡 FR 不止验证渲染,还行动点驱动验证状态变化(FR-05/FR-07 互锁 seam),并发现+修复 2 个真 UX/美观性 bug(dashboard 表塌陷 + 行动点错误整页崩)。
