@@ -63,3 +63,23 @@
 - 6 hybrid jar（inventory/pcba-manufacturing fresh 构建 + product-catalog/quality/crm/procurement）staged 到 AURA_PLUGINS_DIR。
 - host-first 隔离栈（dev.sh runtime slot 63，零 docker）；backend `java -jar bootJar` + AURA_PLUGINS_DIR；跨仓 import（`--enterprise-plugin-root=/Users/ghj/work/auraboot/plugins`）。
 - 验证：backend UP + `HandlingUnitHandler commandType=inv:pack` 等 FR handler 真加载。
+
+---
+
+## 🟡 存量 MES FR — 真栈 UI golden + 美观性截图验证（2026-07-25）
+
+`tests/mes-wms/ui/mes-wms-yellow-fr-golden.mjs`:真浏览器导航每个 🟡 FR 用户页 + 截图 + 断言（渲染/无404/内容匹配/无裸码/无 console error）。**33/33 pass**;截图逐张 agent-vision 复核美观性。
+
+| FR | 页面 | 真栈 UI | 美观性（截图复核） |
+|----|------|---------|-------------------|
+| **FR-01** 工单接入/冻结 | 生产管理列表 | 🟢 有数据 | 优秀:工单/KitWO 行、BOM 列蓝链接（reference 解析）、计划产量、查看链接 |
+| **FR-03** 派工/工位分配 | 工位派工列表 | 🟢 渲染 | 干净列表 |
+| **FR-07** 工序执行 | 工位执行列表 | 🟢 有数据 | 优秀:工单/工序行、状态待开始(dict)、Alice、start 操作链 |
+| **FR-15** 异常/Andon | Andon 工作台 | 🟢 渲染 | 优秀:6卡 metric-strip + filters + 分段tab + 表 + 证据面板,空态整洁 |
+| **FR-21** 产出/结案 | 报工记录列表 | 🟢 有数据(seed 3条) | 优秀:工序蓝链接、班次白班(dict)、完成80/不良2/工时45、编辑链接 |
+| **FR-23** 生产控制塔 | 车间看板 dashboard | 🟢 **修复后** | **发现+修复美观性 bug**:工位状态表 widget `h=1` 塌陷→`h=4`,12 工位行完整显示(SMT贴片/可用/产能100);未解决异常表 `h=3`。plugins #240,截图变异验证 |
+| FR-08/12/14 | 材料验证/序列化/测试维修 | — | **无独立 UI 页**(backend/handler 或 field 级 sub-feature,非 standalone 页,不做 UI golden) |
+
+**发现并修复的美观性问题(1)**:FR-23 车间看板 dashboard 的 `smart-table-chart` widget `h=1` 导致表体压缩到 ~1 行高、12 行不可见 → h=1→4/3(参照 pe_oee_dashboard h=3)。plugins #240 merged。
+
+**结论**:🟡 存量 FR 里有用户页的 6 个（FR-01/03/07/15/21/23)全部真栈 UI golden 通过 + 截图美观性复核优秀,1 个 dashboard 布局 bug 已修;FR-08/12/14 无独立 UI 页(sub-feature）。
