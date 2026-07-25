@@ -23,7 +23,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-auraboot_dev}
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./platform/src/main/resources/database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./platform/src/main/resources/db/snapshots/schema-current.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-auraboot} -d ${POSTGRES_DB:-aura_boot}"]
       interval: 5s
