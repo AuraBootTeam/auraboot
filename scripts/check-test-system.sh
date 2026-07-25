@@ -18,6 +18,18 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 status=0
+
+# The generator that produces the denominator is itself part of what has to be
+# believed: if its page index quietly stops matching a route shape, covered pages
+# report untested (noise) — and if it starts matching prose, untested pages report
+# covered, which is the failure this whole gate exists to prevent. Both directions
+# are pinned in the unit test, so run it before the gates that read its output.
+echo "───── gen-coverage-manifest (unit)"
+if ! node --test scripts/gen-coverage-manifest.test.mjs; then
+  status=1
+fi
+echo
+
 for gate in check-e2e-spec-registration check-command-reachability check-coverage-manifest-freshness check-derived-field-writers check-hand-written-page-matrix check-scripts-index; do
   echo "───── $gate"
   if ! node "scripts/$gate.mjs" "$@"; then

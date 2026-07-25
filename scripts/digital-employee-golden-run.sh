@@ -72,10 +72,15 @@ LIVE=0
 # makes it structurally unable to pass here, and a check that can only ever be
 # red is worse than no check — it buries every real failure after it.
 #
-# So it runs in the live tier instead, and the exclusion is printed rather than
-# quietly applied: a suite that silently skips something reads exactly like a
-# suite that covered it.
-STUB_EXCLUDED_SPEC="ai-colleague-can-talk.spec.ts"
+# So it runs in the live tier instead. The spec now declares that itself, with
+# test.skip(AGENT_LLM_STUB_MODE), the same way its two siblings do — excluding it
+# from here by name kept this runner green but left the spec born-red under every
+# other way of running it, and a check that is red for unrelated reasons hides the
+# next real failure.
+#
+# What stays here is the reporting: a suite that silently skips something reads
+# exactly like a suite that covered it, so the gap is printed at the end.
+STUB_SELF_SKIPPING_SPEC="ai-colleague-can-talk.spec.ts"
 
 die() { echo "[de-golden] ERROR: $*" >&2; exit 2; }
 
@@ -124,7 +129,7 @@ else
   # created, enrolled, suspended and hold a turn at all. Whether the model
   # answers *well* is a different question and a different budget.
   export AGENT_LLM_STUB_MODE=true
-  echo "[de-golden] mode: STUB — excluding $STUB_EXCLUDED_SPEC (needs a real model; run --live for it)"
+  echo "[de-golden] mode: STUB — $STUB_SELF_SKIPPING_SPEC will self-skip (needs a real model; run --live for it)"
 fi
 
 echo "[de-golden] 1/4 fresh stack (destroy prior + up + import)"
@@ -146,7 +151,8 @@ rm -rf test-results/digital-employee
 set +e
 PW_ARGS=(tests/e2e/agent-control-plane/ --project=contract
          --repeat-each="$REPEAT" --reporter=line)
-[[ "$LIVE" == 1 ]] || PW_ARGS+=(--grep-invert "conversation")
+# No --grep-invert: the spec self-skips under stub mode, and a reported skip is
+# better evidence than a test that was never selected.
 NO_PROXY=localhost,127.0.0.1 PW_PROFILE=contract \
   pnpm exec playwright test "${PW_ARGS[@]}" 2>&1 | tee /tmp/de-golden-run.$$.log
 GOLDEN_RC=${PIPESTATUS[0]}
@@ -157,7 +163,7 @@ SHOTS=$(find test-results/digital-employee -name '*.png' 2>/dev/null | wc -l | t
 if [[ "$GOLDEN_RC" == 0 ]]; then
   echo "[de-golden] ============================================"
   echo "[de-golden]   DIGITAL EMPLOYEE GOLDEN: PASS  (name=$NAME slot=$SLOT, mode=$([[ "$LIVE" == 1 ]] && echo LIVE || echo STUB))"
-  [[ "$LIVE" == 1 ]] || echo "[de-golden]   NOT COVERED HERE: $STUB_EXCLUDED_SPEC — a stub answers, so it cannot fail the way a mute colleague does"
+  [[ "$LIVE" == 1 ]] || echo "[de-golden]   NOT COVERED HERE: $STUB_SELF_SKIPPING_SPEC — a stub answers, so it cannot fail the way a mute colleague does"
   # Skips are printed because a pass that quietly swallowed them reads exactly
   # like a pass that ran everything. Some of this suite's skips fire when the
   # row under test cannot be found — which declares success for the case where

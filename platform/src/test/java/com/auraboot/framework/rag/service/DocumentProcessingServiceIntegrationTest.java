@@ -97,7 +97,11 @@ class DocumentProcessingServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(chunks.get(0).getContent()).isNotBlank();
         assertThat(chunks.get(0).getCharCount()).isGreaterThan(0);
 
-        verify(embeddingService).embedBatch(eq(getTestTenant().getId()), anyList(), eq("openai"));
+        // The knowledge base's embedding provider is now resolved from what the deployment has
+        // enabled, not hardcoded to "openai" (creating on a disabled provider produced a base
+        // where every chunk failed to embed). These stubs must therefore not pin the provider —
+        // pinning it made them assert the old default rather than the behaviour under test.
+        verify(embeddingService).embedBatch(eq(getTestTenant().getId()), anyList(), anyString());
         Files.deleteIfExists(tmpFile);
     }
 

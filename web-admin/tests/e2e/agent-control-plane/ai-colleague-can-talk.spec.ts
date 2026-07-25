@@ -27,6 +27,25 @@ const COLLEAGUE_NAME = `E2E Talker ${UNIQUE}`;
 const SHOTS = 'test-results/digital-employee';
 
 test.describe('Digital employee — conversation', () => {
+  // Belongs to the live tier: a stub answers, and answering is what a mute
+  // colleague fails to do — so under stub mode this can only ever be red.
+  //
+  // The runner used to exclude this file by name instead. That kept the golden
+  // green but left the spec born-red for every other way of running it (an IDE,
+  // a plain `playwright test`, a future runner) — and a check that is red for
+  // reasons unrelated to the code hides the next real failure. Self-skipping
+  // puts the decision next to the assertion it guards and matches the two
+  // sibling specs (digital-employee-skill-review, digital-employee-write-approval).
+  //
+  // The inverse risk — env says stub while the backend is live, so this skips
+  // and live coverage silently disappears — is covered by the assertion below
+  // that the reply must not be '[stub response]': running the live tier against
+  // a stub backend goes red rather than green.
+  test.skip(
+    process.env.AGENT_LLM_STUB_MODE === 'true',
+    'needs a real model: a stub always answers, so it cannot fail the way a mute colleague does. Run the golden with --live.',
+  );
+
   // A live model is slow and its latency is not ours to control.
   test.setTimeout(240_000);
 

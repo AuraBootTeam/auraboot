@@ -61,6 +61,9 @@
 | `check-version-sync.sh` | 1 | 2026-06-18 | Gate: VERSION (release version, single source of truth) must equal |
 | `db/check-db-matches-snapshot.sh` | 1 | 2026-07-23 | Answer one question about an EXISTING database: does it still match |
 | `db/check-schema-drift.sh` | 1 | 2026-06-22 | Regenerate the schema snapshot from Flyway and diff it against the committed |
+| `digital-employee-capability-eval-run.sh` | 0 | 2026-07-25 | Self-contained capability-eval runner for the digital-employee agent line. |
+| `mes-wms-golden-run.sh` | 0 | 2026-07-24 | mes-wms-golden-run.sh — self-contained golden gate runner for the 8 delivered MES/WMS FRs. |
+| `oss-e2e-gate-run.sh` | 0 | 2026-07-24 | oss-e2e-gate-run.sh — self-contained, one-command OSS E2E regression gate. |
 | `validate-permission-codes.mjs` | 2 | 2026-05-08 | Cross-source permission-code validator. |
 | `validate-plugin-dashboards.mjs` | 1 | 2026-05-11 | Validates every plugins/<plugin>/config/dashboards/*.json against the Plan #8 |
 | `validate-plugin-i18n.mjs` | 1 | 2026-04-14 | Validates every plugins/<plugin>/config/i18n.json against the plugin i18n contract. |

@@ -335,6 +335,7 @@ function DocumentsTab({ kbPid, onUpdate }: { kbPid: string; onUpdate: () => void
           <CloudArrowUpIcon className="h-5 w-5" />
           {uploading ? t('ai.knowledge.detail.uploading', undefined, 'Uploading...') : t('ai.knowledge.detail.uploadFiles', undefined, 'Upload Files')}
           <input
+            data-testid="kb-upload-input"
             ref={fileInputRef}
             type="file"
             multiple
@@ -676,6 +677,7 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
     <div>
       <div className="mb-6 flex gap-3">
         <input
+          data-testid="kb-retrieval-query"
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -684,6 +686,7 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
           className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-gray-900 focus:border-transparent focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
         />
         <button
+          data-testid="kb-retrieval-search"
           onClick={handleSearch}
           disabled={searching || !query.trim()}
           className="flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -702,6 +705,10 @@ function RetrievalTestTab({ kbPid }: { kbPid: string }) {
             {path && (
               <span
                 data-testid="retrieval-path"
+                /* The raw path, so a check can assert the semantics rather than the
+                   localized label — the badge text is translated and a test pinned to
+                   English wording goes red under any other locale. */
+                data-path={path}
                 title={
                   path === 'hybrid'
                     ? t('ai.knowledge.detail.pathHybridTitle', undefined, 'Vector similarity combined with keyword matching')

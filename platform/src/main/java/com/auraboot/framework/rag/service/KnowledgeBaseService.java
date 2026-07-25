@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashMap;
+import com.auraboot.framework.exception.BusinessException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -35,6 +36,8 @@ public class KnowledgeBaseService {
     private final KbDocumentMapper docMapper;
     private final KbChunkMapper chunkMapper;
     private final JdbcTemplate jdbcTemplate;
+    private final com.auraboot.framework.cloudconfig.service.CloudConfigService cloudConfigService;
+    private final com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     // =========================================================================
     // Knowledge Base CRUD
@@ -54,14 +57,15 @@ public class KnowledgeBaseService {
     }
 
     public KnowledgeBaseDTO createKnowledgeBase(Long tenantId, Long userId, CreateKnowledgeBaseRequest req) {
+        ResolvedEmbeddingProvider resolved = resolveEmbeddingProvider(tenantId, req.getEmbeddingProvider());
         KnowledgeBase kb = KnowledgeBase.builder()
                 .pid(UniqueIdGenerator.generate())
                 .tenantId(tenantId)
                 .name(req.getName())
                 .description(req.getDescription())
                 .status("active")
-                .embeddingProvider(req.getEmbeddingProvider() != null ? req.getEmbeddingProvider() : "openai")
-                .embeddingModel(req.getEmbeddingModel() != null ? req.getEmbeddingModel() : "text-embedding-3-small")
+                .embeddingProvider(resolved.provider())
+                .embeddingModel(req.getEmbeddingModel() != null ? req.getEmbeddingModel() : resolved.model())
                 .embeddingDimension(req.getEmbeddingDimension() != null ? req.getEmbeddingDimension() : 1536)
                 .chunkStrategy("fixed_size")
                 .chunkSize(req.getChunkSize() != null ? req.getChunkSize() : 500)
@@ -74,6 +78,78 @@ public class KnowledgeBaseService {
         kbMapper.insert(kb);
         log.info("Created knowledge base: pid={}, name={}", kb.getPid(), kb.getName());
         return toDTO(kb);
+    }
+
+    /** Which embedding provider a new knowledge base will actually run on, and its model. */
+    record ResolvedEmbeddingProvider(String provider, String model) {}
+
+    /**
+     * Decide the embedding provider at creation time, and refuse one this deployment
+     * cannot use.
+     *
+     * <p>The old default was the literal {@code "openai"}. EmbeddingService already
+     * auto-resolves the first enabled provider — but only when the code is blank
+     * (#1390 F3), and the create dialog always sent a non-blank 'openai'. So the
+     * fallback never ran, the lookup went to a provider with no credentials, and every
+     * chunk failed to embed. The failure was reported honestly downstream (a red
+     * {@code 0/N} badge, {@code path=keyword}), which made it survivable but no less
+     * of a dead end: the user was walked into it by the default.
+     *
+     * <p>So: blank means auto-resolve, and an explicitly named provider that is not
+     * enabled is refused up front rather than baked into a knowledge base that can
+     * never embed. Failing at creation costs one error message; failing later costs a
+     * knowledge base that looks fine and answers nothing (§8 — configuration errors
+     * report, they do not self-heal).
+     */
+    ResolvedEmbeddingProvider resolveEmbeddingProvider(Long tenantId, String requested) {
+        List<com.auraboot.framework.cloudconfig.entity.CloudConfig> enabled =
+                cloudConfigService.getEnabledProviders(tenantId, "embedding");
+        List<String> codes = enabled == null ? List.of()
+                : enabled.stream().map(com.auraboot.framework.cloudconfig.entity.CloudConfig::getProviderCode)
+                        .filter(c -> c != null && !c.isBlank()).toList();
+
+        if (requested != null && !requested.isBlank()) {
+            if (!codes.contains(requested)) {
+                throw new BusinessException(
+                        "Embedding provider '" + requested + "' is not enabled for this deployment"
+                                + (codes.isEmpty()
+                                        ? " and no embedding provider is configured at all."
+                                        : ". Available: " + String.join(", ", codes) + "."));
+            }
+            return new ResolvedEmbeddingProvider(requested, defaultModelOf(enabled, requested));
+        }
+
+        // Blank: take the first enabled provider, the same order EmbeddingService uses.
+        if (codes.isEmpty()) {
+            throw new BusinessException(
+                    "No embedding provider is configured for this deployment; a knowledge base "
+                            + "created now could not embed anything.");
+        }
+        return new ResolvedEmbeddingProvider(codes.get(0), defaultModelOf(enabled, codes.get(0)));
+    }
+
+    /**
+     * The provider's own default model. Carrying the previous provider's model across
+     * yields a "model not found" at the first embed, long after creation — the same trap
+     * the create dialog handles for its dropdown.
+     */
+    private String defaultModelOf(List<com.auraboot.framework.cloudconfig.entity.CloudConfig> enabled,
+                                  String providerCode) {
+        if (enabled != null) {
+            for (com.auraboot.framework.cloudconfig.entity.CloudConfig cc : enabled) {
+                if (!providerCode.equals(cc.getProviderCode()) || cc.getConfig() == null) continue;
+                try {
+                    com.fasterxml.jackson.databind.JsonNode node = objectMapper.readTree(cc.getConfig());
+                    String model = node.path("defaultModel").asText(null);
+                    if (model != null && !model.isBlank()) return model;
+                } catch (Exception e) {
+                    // A malformed config blob is not a reason to refuse the create; fall
+                    // through to the generic default and let the embed report the truth.
+                    log.debug("Could not read defaultModel for {}: {}", providerCode, e.getMessage());
+                }
+            }
+        }
+        return "text-embedding-3-small";
     }
 
     public KnowledgeBaseDTO updateKnowledgeBase(Long tenantId, Long userId, String kbPid,
