@@ -776,14 +776,17 @@ public class NlModelingService {
         List<Map<String, Object>> fields = lowercaseStringKey(res.getFields(), "dataType");
         downgradeOrphanEnumFields(fields, res.getDicts());
         conformFieldLabels(fields);
-        manifest.put("models", conformModels(res.getModels()));
+        List<Map<String, Object>> models = conformModels(res.getModels());
+        manifest.put("models", models);
         manifest.put("fields", fields);
-        manifest.put("modelFieldBindings", synthesizeBindings(res.getModels(), fields, res.getBindings()));
+        List<Map<String, Object>> bindings = synthesizeBindings(models, fields, res.getBindings());
+        manifest.put("modelFieldBindings", bindings);
         List<Map<String, Object>> commands =
-                synthesizeCrudCommands(pluginCode, res.getModels(), fields, res.getCommands());
+                synthesizeCrudCommands(pluginCode, models, fields, res.getCommands());
         manifest.put("commands", lowercaseStringKey(commands, "type"));
         List<Map<String, Object>> pages =
-                synthesizePages(pluginCode, res.getModels(), fields, res.getPages());
+                synthesizePages(pluginCode, models, fields, res.getPages());
+        conformPageModelContracts(pages, fields, bindings);
         List<Map<String, Object>> i18nResources = mutableI18nResources(res.getI18n());
         conformPageTextToI18n(pages, fields, i18nResources);
         // Config-as-product provenance (FR-E4): tag every generated block source=ai /
@@ -793,9 +796,9 @@ public class NlModelingService {
         }
         manifest.put("pages", pages);
         manifest.put("menus", deriveDynamicMenuPageKeys(
-                synthesizeMenus(res.getModels(), res.getMenus())));
+                synthesizeMenus(models, res.getMenus())));
         manifest.put("i18nResources", i18nResources);
-        manifest.put("permissions", synthesizePermissions(res.getModels(), res.getPermissions()));
+        manifest.put("permissions", synthesizePermissions(models, res.getPermissions()));
         manifest.put("dicts", res.getDicts() != null ? res.getDicts() : List.of());
 
         return objectMapper.writeValueAsString(manifest);
@@ -1507,6 +1510,289 @@ public class NlModelingService {
             }
         }
         return out;
+    }
+
+    private static final Set<String> PAGE_SYSTEM_FIELD_CODES = Set.of(
+            "pid", "id", "tenant_id", "created_at", "updated_at", "created_by", "updated_by",
+            "createdAt", "updatedAt", "createdBy", "updatedBy");
+    private static final List<String> PAGE_FIELD_PROJECTION_SUFFIXES = List.of(
+            "_name", "_label", "_display", "_text");
+
+    /**
+     * Projects model contracts into LLM-authored v4 pages before the strict import
+     * validator runs. The operation is deliberately bounded to facts already declared
+     * by the manifest:
+     * <ul>
+     *   <li>an invalid page field reference is rewritten only when it has exactly one
+     *       bound-field match (exact normalized label/code, or a conventional
+     *       {@code _name}/{@code _label}/{@code _display}/{@code _text} projection);</li>
+     *   <li>required model fields used by editable form controls get
+     *       {@code required=true};</li>
+     *   <li>dictionary-backed table fields inherit the field's dictCode when the
+     *       column omitted it.</li>
+     * </ul>
+     *
+     * <p>Unknown or ambiguous references are left untouched so the import gate still
+     * rejects them. This is conformance, not best-effort guessing.
+     */
+    @SuppressWarnings("unchecked")
+    static void conformPageModelContracts(List<Map<String, Object>> pages,
+                                          List<Map<String, Object>> fields,
+                                          List<Map<String, Object>> bindings) {
+        if (pages == null || pages.isEmpty() || bindings == null || bindings.isEmpty()) {
+            return;
+        }
+
+        Map<String, Map<String, Object>> fieldsByCode = new LinkedHashMap<>();
+        if (fields != null) {
+            for (Map<String, Object> field : fields) {
+                if (field != null && field.get("code") instanceof String code && !code.isBlank()) {
+                    fieldsByCode.put(code, field);
+                }
+            }
+        }
+
+        Map<String, LinkedHashSet<String>> boundFieldsByModel = new LinkedHashMap<>();
+        Map<String, LinkedHashSet<String>> requiredFieldsByModel = new LinkedHashMap<>();
+        for (Map<String, Object> binding : bindings) {
+            if (binding == null
+                    || !(binding.get("modelCode") instanceof String modelCode)
+                    || modelCode.isBlank()
+                    || !(binding.get("fieldCode") instanceof String fieldCode)
+                    || fieldCode.isBlank()) {
+                continue;
+            }
+            boundFieldsByModel.computeIfAbsent(modelCode, ignored -> new LinkedHashSet<>())
+                    .add(fieldCode);
+            Map<String, Object> field = fieldsByCode.get(fieldCode);
+            boolean globallyRequired = field != null
+                    && field.get("constraints") instanceof Map<?, ?> constraints
+                    && Boolean.TRUE.equals(constraints.get("required"));
+            if (Boolean.TRUE.equals(binding.get("required")) || globallyRequired) {
+                requiredFieldsByModel.computeIfAbsent(modelCode, ignored -> new LinkedHashSet<>())
+                        .add(fieldCode);
+            }
+        }
+
+        Map<String, Map<String, Set<String>>> aliasesByModel = new LinkedHashMap<>();
+        for (Map.Entry<String, LinkedHashSet<String>> entry : boundFieldsByModel.entrySet()) {
+            Map<String, Set<String>> aliases = new LinkedHashMap<>();
+            for (String fieldCode : entry.getValue()) {
+                addPageFieldAlias(aliases, fieldCode, fieldCode);
+                Map<String, Object> field = fieldsByCode.get(fieldCode);
+                if (field == null) {
+                    continue;
+                }
+                for (String labelKey : List.of(
+                        "displayName", "displayName:en", "displayName:en-US",
+                        "displayName:zh-CN")) {
+                    if (field.get(labelKey) instanceof String label && !label.isBlank()) {
+                        addPageFieldAlias(aliases, label, fieldCode);
+                    }
+                }
+            }
+            aliasesByModel.put(entry.getKey(), aliases);
+        }
+
+        for (Map<String, Object> page : pages) {
+            if (page == null || !(page.get("blocks") instanceof List<?> blocks)) {
+                continue;
+            }
+            String pageModel = page.get("modelCode") instanceof String code ? code : null;
+            String pageKind = page.get("kind") instanceof String kind ? kind : null;
+            for (Object blockObject : blocks) {
+                if (!(blockObject instanceof Map<?, ?> rawBlock)) {
+                    continue;
+                }
+                Map<String, Object> block = (Map<String, Object>) rawBlock;
+                String blockModel = firstNonBlankPageValue(
+                        block.get("modelCode"), block.get("childModel"), pageModel);
+                String blockType = block.get("blockType") instanceof String type ? type : "";
+                switch (blockType) {
+                    case "table", "embedded-list" ->
+                            conformTableContract(block, blockModel, fieldsByCode,
+                                    boundFieldsByModel, aliasesByModel);
+                    case "sub-table" -> {
+                        Object subTableObject = block.get("subTable");
+                        if (subTableObject instanceof Map<?, ?> rawSubTable) {
+                            Map<String, Object> subTable = (Map<String, Object>) rawSubTable;
+                            String subTableModel = firstNonBlankPageValue(
+                                    subTable.get("modelCode"), subTable.get("childModel"), blockModel);
+                            conformTableContract(subTable, subTableModel, fieldsByCode,
+                                    boundFieldsByModel, aliasesByModel);
+                        } else {
+                            conformTableContract(block, blockModel, fieldsByCode,
+                                    boundFieldsByModel, aliasesByModel);
+                        }
+                    }
+                    case "form-section" -> conformFormContract(
+                            block, blockModel, pageKind, requiredFieldsByModel,
+                            boundFieldsByModel, aliasesByModel);
+                    default -> {
+                        // Other block contracts do not carry validator-enforced model fields.
+                    }
+                }
+            }
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void conformTableContract(Map<String, Object> block,
+                                             String modelCode,
+                                             Map<String, Map<String, Object>> fieldsByCode,
+                                             Map<String, LinkedHashSet<String>> boundFieldsByModel,
+                                             Map<String, Map<String, Set<String>>> aliasesByModel) {
+        if (usesExternalPageDataSource(block)) {
+            return;
+        }
+        Map<String, Object> table = block;
+        if (!(block.get("columns") instanceof List<?>)
+                && block.get("table") instanceof Map<?, ?> rawTable) {
+            table = (Map<String, Object>) rawTable;
+        }
+        if (usesExternalPageDataSource(table) || !(table.get("columns") instanceof List<?> columns)) {
+            return;
+        }
+        for (Object columnObject : columns) {
+            if (!(columnObject instanceof Map<?, ?> rawColumn)) {
+                continue;
+            }
+            Map<String, Object> column = (Map<String, Object>) rawColumn;
+            String rawField = column.get("field") instanceof String code ? code : null;
+            if (rawField == null || PAGE_SYSTEM_FIELD_CODES.contains(rawField)
+                    || "actions".equals(rawField) || "_actions".equals(rawField)
+                    || Boolean.TRUE.equals(column.get("isActionColumn"))) {
+                continue;
+            }
+            String fieldCode = resolvePageField(
+                    modelCode, rawField, boundFieldsByModel, aliasesByModel);
+            if (!Objects.equals(rawField, fieldCode)) {
+                column.put("field", fieldCode);
+            }
+            Map<String, Object> field = fieldsByCode.get(fieldCode);
+            if (field != null && field.get("dictCode") instanceof String dictCode
+                    && !dictCode.isBlank()
+                    && (!(column.get("dictCode") instanceof String existing) || existing.isBlank())) {
+                column.put("dictCode", dictCode);
+            }
+        }
+    }
+
+    private static void conformFormContract(Map<String, Object> block,
+                                            String modelCode,
+                                            String pageKind,
+                                            Map<String, LinkedHashSet<String>> requiredFieldsByModel,
+                                            Map<String, LinkedHashSet<String>> boundFieldsByModel,
+                                            Map<String, Map<String, Set<String>>> aliasesByModel) {
+        if (!(block.get("fields") instanceof List<?> formFields)) {
+            return;
+        }
+        Set<String> required = requiredFieldsByModel.getOrDefault(
+                modelCode, new LinkedHashSet<>());
+        for (Object fieldObject : formFields) {
+            if (!(fieldObject instanceof Map<?, ?> rawFieldMap)) {
+                continue;
+            }
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldMap = (Map<String, Object>) rawFieldMap;
+            String rawField = fieldMap.get("field") instanceof String code ? code : null;
+            if (rawField == null) {
+                continue;
+            }
+            String fieldCode = resolvePageField(
+                    modelCode, rawField, boundFieldsByModel, aliasesByModel);
+            if (!Objects.equals(rawField, fieldCode)) {
+                fieldMap.put("field", fieldCode);
+            }
+            if ("form".equals(pageKind) && required.contains(fieldCode)
+                    && !Boolean.TRUE.equals(fieldMap.get("readOnly"))
+                    && !Boolean.TRUE.equals(fieldMap.get("hidden"))) {
+                fieldMap.put("required", true);
+            }
+        }
+    }
+
+    private static String resolvePageField(
+            String modelCode,
+            String rawField,
+            Map<String, LinkedHashSet<String>> boundFieldsByModel,
+            Map<String, Map<String, Set<String>>> aliasesByModel) {
+        Set<String> boundFields = boundFieldsByModel.get(modelCode);
+        if (boundFields == null || boundFields.contains(rawField)) {
+            return rawField;
+        }
+
+        Map<String, Set<String>> aliases = aliasesByModel.getOrDefault(modelCode, Map.of());
+        Set<String> directMatches = aliases.getOrDefault(pageFieldAliasKey(rawField), Set.of());
+        if (directMatches.size() == 1) {
+            return directMatches.iterator().next();
+        }
+
+        String lower = rawField.toLowerCase(Locale.ROOT);
+        for (String suffix : PAGE_FIELD_PROJECTION_SUFFIXES) {
+            if (!lower.endsWith(suffix) || lower.length() <= suffix.length()) {
+                continue;
+            }
+            String base = rawField.substring(0, rawField.length() - suffix.length());
+            if (boundFields.contains(base)) {
+                return base;
+            }
+            Set<String> baseMatches = aliases.getOrDefault(pageFieldAliasKey(base), Set.of());
+            if (baseMatches.size() == 1) {
+                return baseMatches.iterator().next();
+            }
+        }
+        return rawField;
+    }
+
+    private static void addPageFieldAlias(Map<String, Set<String>> aliases,
+                                          String alias,
+                                          String fieldCode) {
+        String key = pageFieldAliasKey(alias);
+        if (!key.isBlank()) {
+            aliases.computeIfAbsent(key, ignored -> new LinkedHashSet<>()).add(fieldCode);
+        }
+    }
+
+    private static String pageFieldAliasKey(String value) {
+        if (value == null) {
+            return "";
+        }
+        StringBuilder key = new StringBuilder(value.length());
+        value.toLowerCase(Locale.ROOT).codePoints()
+                .filter(Character::isLetterOrDigit)
+                .forEach(key::appendCodePoint);
+        return key.toString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static boolean usesExternalPageDataSource(Map<String, Object> owner) {
+        Object dataSource = owner.get("dataSource");
+        if (dataSource instanceof String sourceId) {
+            return !sourceId.isBlank();
+        }
+        if (!(dataSource instanceof Map<?, ?> rawDataSource)) {
+            return false;
+        }
+        Map<String, Object> dataSourceMap = (Map<String, Object>) rawDataSource;
+        Object type = dataSourceMap.get("type");
+        if ("api".equals(type) || "namedQuery".equals(type)) {
+            return true;
+        }
+        if (dataSourceMap.get("params") instanceof Map<?, ?> params
+                && params.get("datasourceId") instanceof String dataSourceId) {
+            return dataSourceId.startsWith("nq:");
+        }
+        return false;
+    }
+
+    private static String firstNonBlankPageValue(Object... values) {
+        for (Object value : values) {
+            if (value instanceof String text && !text.isBlank()) {
+                return text;
+            }
+        }
+        return null;
     }
 
     static List<Map<String, Object>> synthesizePages(String pluginCode, List<Map<String, Object>> models,

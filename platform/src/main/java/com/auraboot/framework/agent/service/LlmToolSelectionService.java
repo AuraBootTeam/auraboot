@@ -88,7 +88,13 @@ public class LlmToolSelectionService {
                         .role("user")
                         .content(taskDescription)
                         .build()))
-                .maxTokens(512)
+                // Some OpenAI-compatible reasoning models account hidden reasoning
+                // against max_tokens. A 512-token cap intermittently ended with
+                // finish_reason=length and no visible JSON even though this reply is
+                // tiny. Keep enough headroom and ask compatible providers to enforce
+                // the JSON object contract on the wire.
+                .maxTokens(2048)
+                .responseFormat("json_object")
                 .build();
 
         LlmChatResponse response = provider.chat(request, config.getApiKey(), config.getBaseUrl());
@@ -156,8 +162,12 @@ public class LlmToolSelectionService {
         sb.append("{\"tools\": [\"tool_code\", ...], \"params\": [\"argument_name\", ...]} — ");
         sb.append("up to ").append(maxTools).append(" codes, most relevant first, ");
         sb.append("chosen strictly from the catalog below. Never invent codes.\n");
-        sb.append("In \"params\", list the argument names you would fill for this task, ");
-        sb.append("taken only from what the task actually states. Omit anything the task does not say.\n\n");
+        sb.append("For a multi-step task, include every required tool in execution order, ");
+        sb.append("not only the first step. If no catalog tool can perform the task, return an empty tools array.\n");
+        sb.append("In \"params\", use only argument names declared by the selected tools. ");
+        sb.append("Include an argument when the task explicitly supplies its value or states it semantically ");
+        sb.append("(for example, a requested response language maps to a language argument). ");
+        sb.append("Omit values the task does not provide.\n\n");
         sb.append("Tool catalog:\n");
         int count = 0;
         for (ToolDefinition tool : candidates) {
@@ -169,13 +179,39 @@ public class LlmToolSelectionService {
             if (tool.getRiskLevel() != null) {
                 sb.append(" [risk ").append(tool.getRiskLevel()).append("]");
             }
+            String parameters = parameterSummary(tool.getParameterSchema());
+            if (!parameters.isBlank()) {
+                sb.append(" [parameters: ").append(parameters).append("]");
+            }
             sb.append('\n');
         }
         sb.append("\nSafety rules:\n");
         sb.append("- If the task asks to query, diagnose, gather context, or explicitly says not to act, ");
         sb.append("prefer read-only/low-risk tools and do not include write/control/approval tools.\n");
         sb.append("- Only include mutating tools when the task explicitly asks to create, update, approve, close, release, or execute an action.\n");
+        sb.append("- Do not delegate an unsupported task merely to avoid abstaining; delegation does not create missing capabilities.\n");
         return sb.toString();
+    }
+
+    private String parameterSummary(Map<String, Object> schema) {
+        if (schema == null || !(schema.get("properties") instanceof Map<?, ?> properties)) {
+            return "";
+        }
+        Set<String> required = new HashSet<>();
+        if (schema.get("required") instanceof List<?> requiredList) {
+            for (Object item : requiredList) {
+                if (item instanceof String name) {
+                    required.add(name);
+                }
+            }
+        }
+        List<String> names = properties.keySet().stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .sorted()
+                .map(name -> required.contains(name) ? name + " (required)" : name + " (optional)")
+                .toList();
+        return String.join(", ", names);
     }
 
     private List<String> enforceReadOnlyIntent(List<String> selected,
@@ -242,9 +278,13 @@ public class LlmToolSelectionService {
         String risk = tool.getRiskLevel();
         if (risk != null) {
             String normalized = risk.trim().toUpperCase();
-            if ("L2".equals(normalized) || "L3".equals(normalized) || "L4".equals(normalized)) {
-                return true;
+            if (Set.of("L0", "L1", "L2", "L3", "L4").contains(normalized)) {
+                return "L2".equals(normalized) || "L3".equals(normalized) || "L4".equals(normalized);
             }
+        }
+        String operationKind = safeLower(tool.getOperationKind());
+        if (!operationKind.isBlank()) {
+            return !Set.of("query", "read", "list", "get", "search").contains(operationKind);
         }
         if (tool.isRequiresApproval() || tool.isRequiresConfirmation()) return true;
         String haystack = (safeLower(tool.getToolCode()) + " "

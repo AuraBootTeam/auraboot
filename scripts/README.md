@@ -8,10 +8,10 @@
 |---|--:|---|
 | **gate** | 42 | Correctness/quality checks (`check-*` / `validate-*` / `*-audit`). Run before push / in local gate runners. |
 | **generator** | 4 | Regenerate a tracked artifact (manifests, snapshots). Output is committed; rerun when inputs change. |
-| **entrypoint** | 24 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
-| **pipeline/lib** | 9 | Shared library modules for the aura-pipeline / other scripts. Not run directly. |
-| **tooling** | 65 | Reusable dev/ops helpers referenced by other scripts, package.json, or docs. |
-| **test** | 19 | Co-located `*.test.mjs` unit tests for the scripts above. |
+| **entrypoint** | 25 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
+| **pipeline/lib** | 10 | Shared library modules for the aura-pipeline / other scripts. Not run directly. |
+| **tooling** | 66 | Reusable dev/ops helpers referenced by other scripts, package.json, or docs. |
+| **test** | 20 | Co-located `*.test.mjs` unit tests for the scripts above. |
 
 ## Conventions
 
@@ -79,7 +79,7 @@
 | `gen-coverage-manifest.mjs` | 2 | 2026-07-23 | Generate a coverage manifest from the DSL and the test tree. |
 | `generate-plugin-routes.mjs` | 5 | 2026-04-26 | scripts/generate-plugin-routes.mjs |
 
-## entrypoint (24)
+## entrypoint (25)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
@@ -106,13 +106,15 @@
 | `p1-verify-in-docker.sh` | 0 | 2026-05-08 | P1' ACP platformization — docker isolated stack verification. |
 | `quick-filter-chip-golden-run.sh` | 0 | 2026-07-17 | quick-filter-chip-golden-run.sh — self-contained quick-filter view-chip browser golden runner. |
 | `rbac-golden-run.sh` | 0 | 2026-07-04 | rbac-golden-run.sh — self-contained RBAC platform-baseline browser golden runner. |
+| `release/tag-release.sh` | 2 | 2026-07-25 | Gated OSS release tag entrypoint; runs capability and test-system gates on the exact release commit. |
 | `suspended-tenant-login-ui-golden.sh` | 0 | 2026-07-17 | suspended-tenant-login-ui-golden.sh — E5, at the glass: what a user sees when their org is |
 | `test-acp-runtime.sh` | 0 | 2026-05-09 |  |
 
-## pipeline/lib (9)
+## pipeline/lib (10)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
+| `lib/capability-eval-junit.mjs` | 1 | 2026-07-25 | Fail-closed JUnit receipt for the explicit digital-employee capability suite inventory. |
 | `dev/lib/env-loader.sh` | 7 | 2026-05-22 | env-loader.sh — shell counterpart to web-admin/tests/helpers/environments.ts. |
 | `dev/lib/env-registry.mjs` | 4 | 2026-05-22 |  |
 | `dev/lib/health.sh` | 3 | 2026-05-22 | Sourceable health helpers for per-worktree dev stacks. |
@@ -123,13 +125,14 @@
 | `lib/reset-init-common.sh` | 7 | 2026-05-17 | Shared reset/init primitives. This file is sourced by lifecycle scripts; keep |
 | `lib/test-multi-worktree-guard.sh` | 1 | 2026-05-22 | Sanity tests for scripts/lib/multi-worktree-guard.sh |
 
-## tooling (65)
+## tooling (66)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
 | `agent-git-guard.mjs` | 4 | 2026-06-24 |  |
 | `agent-write-guard.mjs` | 2 | 2026-06-24 |  |
 | `aps-fixtures/compare-strategies.sh` | 1 | 2026-05-28 | Compare APS V2 scheduling strategies on the fixture data set. |
+| `db/cleanup-scheduler-residue.sh` | 0 | 2026-07-26 | Read-only-by-default cleanup for three exact retired system scheduler definitions. |
 | `behavior-keyed-load-test.mjs` | 0 | 2026-06-23 |  |
 | `db/deploy-migrate.sh` | 1 | 2026-06-18 | Deploy-time schema step: migrate the target DB, validate, and record the |
 | `db/flyway-common.sh` | 5 | 2026-06-18 | Shared Flyway environment + invocation for AuraBoot PostgreSQL schema governance. |
@@ -193,7 +196,6 @@
 | `sync-marketplace-catalog.sh` | 4 | 2026-05-18 | Synchronize the plugin marketplace catalog from plugin manifests. |
 | `sync-platform-plugins.sh` | 5 | 2026-03-26 | Sync SSR platform plugin frontend/ dirs into web-admin/app/plugins/ |
 
-## test (19)
+## test (20)
 
 Co-located `*.test.mjs`; run via the repo test task. Not listed individually.
-

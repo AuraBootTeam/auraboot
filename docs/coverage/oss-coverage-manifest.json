@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "2ce74a97b",
+    "commit": "d012c3fe1",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -442,8 +442,7 @@
           "driver": "browser",
           "evidence": [],
           "assertion": "no test references this command",
-          "verdict": "untested",
-          "note": "no UI entry point: no page/menu DSL references it"
+          "verdict": "untested"
         },
         {
           "id": "acp:delete_mission",
@@ -1033,6 +1032,17 @@
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
           "note": "kind=list model=approval_policy"
+        },
+        {
+          "id": "page:mcp_server_detail",
+          "action": "mcp_server_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [],
+          "assertion": "no browser spec names this page or its route",
+          "verdict": "untested",
+          "note": "kind=detail model=mcp_server"
         },
         {
           "id": "page:mcp_server_form",
@@ -6441,7 +6451,6 @@
             "web-admin/tests/e2e/ai/knowledge-provider-select-golden.spec.ts",
             "web-admin/tests/e2e/ai/knowledge-url-ingestion-golden.spec.ts",
             "web-admin/tests/e2e/ai/knowledge-vector-retrieval-golden.spec.ts",
-            "web-admin/tests/e2e/aurabot/knowledge-base-lifecycle.spec.ts",
             "web-admin/tests/e2e/search/command-palette-docs.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",
@@ -7045,6 +7054,8 @@
           "dependencies": "real-stack",
           "driver": "browser",
           "evidence": [
+            "web-admin/tests/e2e/dataplane-review/dataplane-ui-audit.spec.ts",
+            "web-admin/tests/e2e/dataplane-review/query-builder-e2e-golden.spec.ts",
             "web-admin/tests/e2e/query-builder/query-builder-basic.spec.ts"
           ],
           "assertion": "a browser spec navigates to this route",
@@ -7059,6 +7070,7 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/_golden-stack-warm.spec.ts",
+            "web-admin/tests/e2e/dataplane-review/dataplane-ui-audit.spec.ts",
             "web-admin/tests/e2e/designer/designer-lifecycle.spec.ts",
             "web-admin/tests/e2e/designer/designer-unified-architecture.spec.ts",
             "web-admin/tests/e2e/designer/report-designer-deep.spec.ts",
@@ -7425,9 +7437,11 @@
           "surface": "platform-page",
           "dependencies": "real-stack",
           "driver": "browser",
-          "evidence": [],
-          "assertion": "no browser spec navigates to this route",
-          "verdict": "untested",
+          "evidence": [
+            "web-admin/tests/e2e/dataplane-review/dataplane-ui-audit.spec.ts"
+          ],
+          "assertion": "a browser spec navigates to this route",
+          "verdict": "pass",
           "note": "plugin=core-meta file=./plugins/core-meta/pages/meta/named-queries/new.tsx"
         },
         {
@@ -7489,6 +7503,8 @@
           "driver": "browser",
           "evidence": [
             "web-admin/tests/e2e/approval/approval-workflow.spec.ts",
+            "web-admin/tests/e2e/collab-review/notification-actions.spec.ts",
+            "web-admin/tests/e2e/collab-review/notification-i18n.spec.ts",
             "web-admin/tests/e2e/header/header-features.spec.ts",
             "web-admin/tests/e2e/notification/notification-system.spec.ts"
           ],
@@ -7708,6 +7724,19 @@
           "note": "plugin=core-platform file=./plugins/core-platform/pages/plugins/index.tsx"
         },
         {
+          "id": "platform-page:semantic.chatbi",
+          "action": "/semantic/ask",
+          "surface": "platform-page",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/semantic/chatbi-console-golden.spec.ts"
+          ],
+          "assertion": "a browser spec navigates to this route",
+          "verdict": "pass",
+          "note": "plugin=core-semantic file=./routes/chatbi/index.tsx"
+        },
+        {
           "id": "platform-page:semantic.lineage",
           "action": "/semantic/lineage",
           "surface": "platform-page",
@@ -7717,6 +7746,19 @@
           "assertion": "no browser spec navigates to this route",
           "verdict": "untested",
           "note": "plugin=core-semantic file=./routes/semantic-lineage/index.tsx"
+        },
+        {
+          "id": "platform-page:semantic.models",
+          "action": "/semantic/models",
+          "surface": "platform-page",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/semantic/semantic-console-golden.spec.ts"
+          ],
+          "assertion": "a browser spec navigates to this route",
+          "verdict": "pass",
+          "note": "plugin=core-semantic file=./routes/semantic-models/index.tsx"
         },
         {
           "id": "platform-page:settings.api-docs",
@@ -7853,9 +7895,9 @@
   "stats": {
     "commands": 332,
     "untested": 228,
-    "pages": 200,
-    "pagesUntested": 174,
-    "platformPages": 97,
-    "platformPagesUntested": 42
+    "pages": 201,
+    "pagesUntested": 175,
+    "platformPages": 99,
+    "platformPagesUntested": 41
   }
 }

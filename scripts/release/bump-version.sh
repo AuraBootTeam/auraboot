@@ -58,5 +58,5 @@ PY
 fi
 
 echo "[bump] VERSION $cur -> $new$SYNCED"
-echo "[bump] next: commit on a branch -> PR -> merge, then:"
-echo "       git tag -a v$new -m \"release v$new\" && git push origin v$new"
+echo "[bump] next: commit on a branch -> PR -> merge, then run the gated release entrypoint:"
+echo "       scripts/release/tag-release.sh $new --push"

@@ -58,12 +58,13 @@ public interface AgentTurnQualityJudge {
                 String type = String.valueOf(row.getOrDefault("observation_type", "")).toLowerCase();
                 String severity = String.valueOf(row.getOrDefault("severity", "info")).toLowerCase();
                 boolean isError = "error".equals(severity)
-                        || type.endsWith("_failed") || type.startsWith("alert_") || type.equals("schedule_failed");
+                        || type.endsWith("_failed") || type.startsWith("alert_")
+                        || type.equals("schedule_failed") || type.equals("turn_interrupted");
                 if (isError) {
                     errors++;
                     failed = true;
                 }
-                if (type.equals("run_completed")) {
+                if (type.equals("run_completed") || type.equals("turn_completed")) {
                     completed = true;
                 }
                 if (type.startsWith("cost_") || type.equals("cost_warning")) {

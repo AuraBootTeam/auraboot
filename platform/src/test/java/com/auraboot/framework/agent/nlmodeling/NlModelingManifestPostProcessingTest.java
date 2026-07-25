@@ -404,6 +404,97 @@ class NlModelingManifestPostProcessingTest {
     }
 
     @Test
+    void buildManifest_conformsPageFieldAliasRequiredAndDictionaryProjection() throws Exception {
+        // Two live providers exposed different halves of the same deterministic gap:
+        // qwen emitted inspector_name for the bound inspector field, while deepseek
+        // omitted required=true from an editable required form field. The manifest
+        // builder must project the declared model contract into both pages.
+        NlModelingResponse.Resources res = NlModelingResponse.Resources.builder()
+                .models(List.of(mutable("code", "equipment_inspection", "modelType", "entity")))
+                .fields(List.of(
+                        mutable("code", "inspector", "dataType", "reference",
+                                "displayName:en", "Inspector", "constraints", mutable("required", true)),
+                        mutable("code", "status", "dataType", "enum", "dictCode", "inspection_status",
+                                "displayName:en", "Status")))
+                .bindings(List.of(
+                        mutable("modelCode", "equipment_inspection", "fieldCode", "inspector",
+                                "required", true, "visible", true, "editable", true),
+                        mutable("modelCode", "equipment_inspection", "fieldCode", "status",
+                                "required", false, "visible", true, "editable", true)))
+                .dicts(List.of(mutable("code", "inspection_status", "items", List.of())))
+                .pages(List.of(
+                        mutable("pageKey", "equipment_inspection_list", "kind", "list",
+                                "modelCode", "equipment_inspection",
+                                "layout", mutable("type", "stack"),
+                                "blocks", List.of(mutable(
+                                        "id", "table", "blockType", "table",
+                                        "columns", List.of(
+                                                mutable("field", "inspector_name"),
+                                                mutable("field", "status"))))),
+                        mutable("pageKey", "equipment_inspection_form", "kind", "form",
+                                "modelCode", "equipment_inspection",
+                                "layout", mutable("type", "stack"),
+                                "blocks", List.of(mutable(
+                                        "id", "form", "blockType", "form-section",
+                                        "fields", List.of(
+                                                mutable("field", "inspector"),
+                                                mutable("field", "status")))))))
+                .build();
+
+        JsonNode manifest = mapper.readTree(service.buildPluginManifestJson("inspection", res));
+        JsonNode columns = manifest.get("pages").get(0).get("blocks").get(0).get("columns");
+        assertEquals("inspector", columns.get(0).get("field").asText(),
+                "an unambiguous _name projection must resolve to the bound field");
+        assertEquals("inspection_status", columns.get(1).get("dictCode").asText(),
+                "a dictionary-backed column must inherit the field dictionary");
+
+        JsonNode formFields = manifest.get("pages").get(1).get("blocks").get(0).get("fields");
+        assertTrue(formFields.get(0).get("required").asBoolean(),
+                "editable required model fields must project required=true to the page");
+        assertFalse(formFields.get(1).has("required"),
+                "optional fields must not be upgraded to required");
+    }
+
+    @Test
+    void conformPageModelContracts_leavesUnknownReferenceForValidator() {
+        Map<String, Object> column = mutable("field", "not_a_real_field");
+        List<Map<String, Object>> pages = List.of(mutable(
+                "pageKey", "equipment_list", "kind", "list", "modelCode", "equipment",
+                "blocks", List.of(mutable(
+                        "id", "table", "blockType", "table", "columns", List.of(column)))));
+        List<Map<String, Object>> fields = List.of(
+                mutable("code", "name", "dataType", "string", "displayName:en", "Name"));
+        List<Map<String, Object>> bindings = List.of(
+                mutable("modelCode", "equipment", "fieldCode", "name"));
+
+        NlModelingService.conformPageModelContracts(pages, fields, bindings);
+
+        assertEquals("not_a_real_field", column.get("field"),
+                "unknown references must remain invalid instead of being guessed or dropped");
+    }
+
+    @Test
+    void conformPageModelContracts_doesNotRequireHiddenOrReadOnlyControls() {
+        Map<String, Object> hidden = mutable("field", "name", "hidden", true);
+        Map<String, Object> readOnly = mutable("field", "name", "readOnly", true);
+        List<Map<String, Object>> pages = List.of(mutable(
+                "pageKey", "equipment_form", "kind", "form", "modelCode", "equipment",
+                "blocks", List.of(mutable(
+                        "id", "form", "blockType", "form-section",
+                        "fields", List.of(hidden, readOnly)))));
+        List<Map<String, Object>> fields = List.of(
+                mutable("code", "name", "dataType", "string",
+                        "constraints", mutable("required", true)));
+        List<Map<String, Object>> bindings = List.of(
+                mutable("modelCode", "equipment", "fieldCode", "name", "required", true));
+
+        NlModelingService.conformPageModelContracts(pages, fields, bindings);
+
+        assertFalse(hidden.containsKey("required"));
+        assertFalse(readOnly.containsKey("required"));
+    }
+
+    @Test
     void conformPageTextToI18n_sanitizesRepeatedHyphenCodesWithoutRegexBacktracking() {
         List<Map<String, Object>> blocks = List.of(mutable(
                 "code", "section-----客户-----summary",

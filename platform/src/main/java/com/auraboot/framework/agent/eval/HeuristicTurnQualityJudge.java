@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent.eval;
 
 import org.springframework.stereotype.Component;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 /**
  * Deterministic, no-LLM turn-quality judge (test-strategy doc item ④). Grades a turn
@@ -17,6 +18,10 @@ import org.springframework.stereotype.Component;
  * (it would implement the same {@link AgentTurnQualityJudge} interface).
  */
 @Component
+@ConditionalOnProperty(
+        name = "aura.agent.online-eval.judge",
+        havingValue = "heuristic",
+        matchIfMissing = true)
 public class HeuristicTurnQualityJudge implements AgentTurnQualityJudge {
 
     private static final double COST_FLAG_PENALTY = 0.1;

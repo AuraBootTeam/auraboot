@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -122,16 +123,49 @@ class LlmToolSelectionServiceTest {
     void promptListsCatalogAndForbidsInvention() throws Exception {
         stubProvider("{\"tools\": []}");
 
-        service.selectTools(1L, "create order", catalog, 5);
+        ToolDefinition parameterized = tool("platform.execute_sql", "Run a read-only SQL query", "L1");
+        parameterized.setOperationKind("query");
+        parameterized.setParameterSchema(Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        "sql", Map.of("type", "string"),
+                        "chartType", Map.of("type", "string")),
+                "required", List.of("sql")));
+
+        service.selectTools(1L, "create order", List.of(parameterized), 5);
 
         ArgumentCaptor<LlmChatRequest> captor = ArgumentCaptor.forClass(LlmChatRequest.class);
         org.mockito.Mockito.verify(provider).chat(captor.capture(), anyString(), any());
         String prompt = captor.getValue().getSystemPrompt();
         assertThat(prompt)
-                .contains("cmd_order_create")
-                .contains("nq_order_list")
+                .contains("platform.execute_sql")
+                .contains("sql (required)")
+                .contains("chartType (optional)")
                 .contains("Never invent codes")
+                .contains("include every required tool in execution order")
+                .contains("return an empty tools array")
                 .contains("query, diagnose, gather context");
+        assertThat(captor.getValue().getMaxTokens()).isEqualTo(2048);
+        assertThat(captor.getValue().getResponseFormat()).isEqualTo("json_object");
+    }
+
+    @Test
+    void explicitLowRiskMetadataPreventsExecuteQueryFromBeingFilteredAsMutation() throws Exception {
+        ToolDefinition query = tool(
+                "platform.execute_sql",
+                "Execute a read-only SQL SELECT query",
+                "L1");
+        query.setOperationKind("query");
+        stubProvider("{\"tools\": [\"platform.execute_sql\"], \"params\": [\"sql\"]}");
+
+        LlmToolSelectionService.Selection selection = service.selectTools(
+                1L,
+                "Run this read-only query: SELECT id FROM orders",
+                List.of(query),
+                5);
+
+        assertThat(selection.selected()).containsExactly("platform.execute_sql");
+        assertThat(selection.params()).containsExactly("sql");
     }
 
     @Test
