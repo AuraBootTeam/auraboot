@@ -424,7 +424,7 @@
       },
       "goldenSet": true,
       "blocking": true,
-      "evidence": "docs/evidence/2026-07-25-collab-trio-golden-mutation.md",
+      "evidence": "golden/evidence/2026-07-25-collab-trio-golden-mutation.md",
       "seenRed": {
         "how": "mutation",
         "mutation": "reverted the unread-total fix to Object.values(summary).reduce(...); separately forced the category-filter condition to false",

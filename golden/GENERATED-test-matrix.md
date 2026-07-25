@@ -16,7 +16,7 @@
 
 | suite | 被测面 | 驱动入口 | evidence |
 |---|---|---|---|
-| OSS-REL-COLLAB-TRIO | ui | browser | `docs/evidence/2026-07-25-collab-trio-golden-mutation.md` |
+| OSS-REL-COLLAB-TRIO | ui | browser | `golden/evidence/2026-07-25-collab-trio-golden-mutation.md` |
 | OSS-REL-SUSPENDED-TENANT-API | api | http | `scripts/suspended-tenant-login-golden.sh — 4 assertions: baseline login, suspended refusal with a named message, and reversibility` |
 
 ## 3. 按被测面全量套件

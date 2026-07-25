@@ -1,10 +1,3 @@
----
-type: evidence
-status: active
-created: 2026-07-25
-title: Collaboration trio golden — mutation evidence (seen red)
----
-
 # Collaboration trio golden — mutation evidence
 
 Suite: `OSS-REL-COLLAB-TRIO` (`scripts/collab-trio-golden-run.sh`)
