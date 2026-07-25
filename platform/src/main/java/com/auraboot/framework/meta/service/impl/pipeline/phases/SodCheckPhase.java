@@ -1,7 +1,9 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.exception.SodViolationException;
 import com.auraboot.framework.meta.service.impl.SodService;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +22,9 @@ public class SodCheckPhase implements CommandPhase {
 
     @Autowired(required = false)
     private SodService sodService;
+
+    /** A hard separation-of-duties conflict blocks the command. */
+    static final String REASON_SOD_VIOLATION = "sod_violation";
 
     @Override
     public String name() {
@@ -45,6 +50,16 @@ public class SodCheckPhase implements CommandPhase {
             }
         }
         String actorName = MetaContext.exists() ? MetaContext.getCurrentUsername() : null;
-        sodService.checkSod(ctx.getCommandCode(), ctx.getUserId(), actorName, entityType, entityId, entityPid);
+        try {
+            sodService.checkSod(ctx.getCommandCode(), ctx.getUserId(), actorName, entityType, entityId, entityPid);
+            // No hard conflict — a gate with no objection, not a grant.
+            ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.abstain(name()));
+        } catch (SodViolationException e) {
+            // Record the refusal for the permit plan before rethrowing (shadow; nothing consumes it
+            // yet). Only the SoD violation is caught — an infra failure is not a SoD denial and must
+            // propagate unlabelled rather than be recorded as one.
+            ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.deny(REASON_SOD_VIOLATION, name()));
+            throw e;
+        }
     }
 }
