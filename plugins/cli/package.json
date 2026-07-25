@@ -1,10 +1,13 @@
 {
   "name": "@auraboot/cli",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "AuraBoot CLI — the agent-native console: skills, MCP, DSL authoring, plugins, and runtime ops",
   "type": "module",
   "bin": {
     "aura": "./dist/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist",
@@ -14,6 +17,7 @@
   ],
   "scripts": {
     "build": "tsc",
+    "prepublishOnly": "npm run build",
     "dev": "tsx src/index.ts",
     "lint": "tsc --noEmit",
     "test": "vitest run",
