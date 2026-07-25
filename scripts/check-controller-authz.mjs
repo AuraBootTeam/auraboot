@@ -39,13 +39,30 @@ const GUARD = /@RequirePermission|@AuthenticatedAccess/;
 // are never registered in a production context, so they carry no fail-open risk.
 const TEST_PROFILE = /@Profile\(\s*\{?\s*['"]test['"]/;
 const ADMIN_PATH = /["(]\s*"?\/api\/admin\//;
-// High-sensitivity READ surfaces: AI observability (/api/ai/**) and IM (/api/im/**).
-// A GET-only controller here that shadow-allows any logged-in user can leak other
-// users' data (raw prompts, agent activity, tenant spend). Read endpoints used to be
+// High-sensitivity READ surfaces. A GET-only controller here that shadow-allows any
+// logged-in user can leak other users' or other tenants' data (raw prompts, agent
+// activity, tenant spend, process-wide infrastructure state). Read endpoints used to be
 // out of scope entirely (SEC-002); they now also need an explicit @RequirePermission
 // or @AuthenticatedAccess decision.
+//
+//   /api/ai/**            — raw prompts, agent activity, tenant spend
+//   /api/im/**            — other users' conversations
+//   /api/observability/** — JVM/heap/uptime, HTTP latency across every path, and
+//                           platform-wide counters. NOT tenant-scoped: this is
+//                           process and infrastructure state, so "any authenticated
+//                           tenant user" is never the right audience. Added after
+//                           ObservabilityController#getMetricsSnapshot shipped
+//                           ungated and this gate could not see it — the endpoint was
+//                           a GET outside /api/ai|/api/im, so it was neither flagged
+//                           nor baselined. A blind spot in a gate is worse than a
+//                           known-bad entry in its baseline, because nothing reports it.
+//
+// The segment may be followed by '/' (a deeper path) OR by the closing quote — a
+// class-level @RequestMapping("/api/observability") has no trailing slash, and an
+// earlier version of this pattern required one, which made the whole addition a
+// silent no-op: the gate reported the same 42 with the annotation deleted.
 const READ_MAPPING = /@GetMapping/;
-const SENSITIVE_READ_PATH = /["'`]\/api\/(ai|im)\//;
+const SENSITIVE_READ_PATH = /["'`]\/api\/(ai|im|observability)(?:\/|["'`])/;
 
 // Strip block + line comments so a javadoc that merely MENTIONS an annotation
 // ({@link RequirePermission}, "// gated by @AuthenticatedAccess") can never satisfy the
@@ -107,7 +124,7 @@ if (removed.length) {
   removed.forEach((f) => console.log(`   - ${f}`));
 }
 if (added.length) {
-  console.error(`\n❌ ${added.length} NEW unguarded write or sensitive-read (/api/ai|/api/im) controller(s) — add @RequirePermission/@AuthenticatedAccess, move under /api/admin, or (if intentionally accepted) --write-baseline with justification:`);
+  console.error(`\n❌ ${added.length} NEW unguarded write or sensitive-read (/api/ai|/api/im|/api/observability) controller(s) — add @RequirePermission/@AuthenticatedAccess, move under /api/admin, or (if intentionally accepted) --write-baseline with justification:`);
   added.forEach((f) => console.error(`   + ${f}`));
   process.exit(1);
 }

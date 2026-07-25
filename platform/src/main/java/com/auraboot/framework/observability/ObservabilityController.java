@@ -1,6 +1,8 @@
 package com.auraboot.framework.observability;
 
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.search.Search;
@@ -18,6 +20,19 @@ import java.util.concurrent.TimeUnit;
 /**
  * REST endpoint that provides a snapshot of key observability metrics
  * for the frontend Infrastructure page.
+ *
+ * <p>Gated by {@link MetaPermission#COMMAND_READ} — the same permission the
+ * sibling {@code CorrelationController} and the error board already require, and
+ * the same troubleshooting-console cluster this snapshot feeds ({@code /ops/runtime}).
+ * It was previously ungated, so any authenticated tenant user could read
+ * process-wide JVM heap/uptime, HTTP latency percentiles across every path, and
+ * platform-wide command/plugin/LLM counters — none of which is tenant-scoped data.
+ *
+ * <p>COMMAND_READ is a pragmatic fit rather than a precise one; the precise answer
+ * is a dedicated {@code system.observability.read} code, which needs bootstrap
+ * registration and role grants before it can be enforced without 403-ing the
+ * existing page. Tracked as follow-up — reusing the code the same page cluster
+ * already demands closes the hole today without a migration.
  */
 @RestController
 @RequestMapping("/api/observability")
@@ -32,6 +47,7 @@ public class ObservabilityController {
     }
 
     @GetMapping("/snapshot")
+    @RequirePermission(MetaPermission.COMMAND_READ)
     public ApiResponse<Map<String, Object>> getMetricsSnapshot() {
         Map<String, Object> snapshot = new LinkedHashMap<>();
 
