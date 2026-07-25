@@ -24,6 +24,7 @@ public class CommandPipelineConfiguration {
             EntitlementPhase entitlementPhase,
             // Guarded phases (Order 500-1400)
             SodCheckPhase sodCheckPhase,
+            PermitPlanAssemblyPhase permitPlanAssemblyPhase,
             StateCheckPhase stateCheckPhase,
             AssertPhase assertPhase,
             PreActionsPhase preActionsPhase,
@@ -46,6 +47,9 @@ public class CommandPipelineConfiguration {
 
         List<CommandPhase> guardedPhases = List.of(
                 sodCheckPhase,
+                // Assemble the permit plan right after the last authorization gate (SoD) and before
+                // any invariant/mutation phase — the boundary's whole decision is known here (§11.15).
+                permitPlanAssemblyPhase,
                 stateCheckPhase,
                 assertPhase,
                 preActionsPhase,
