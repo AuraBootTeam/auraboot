@@ -4,6 +4,19 @@
 > 由自包含 runner `scripts/mes-wms-golden-run.sh` 一键跑（起栈→import→seed→backend IT→UI golden→报告→拆栈）。
 > 层次定义见 `auraboot-enterprise/docs/standards/core/testing-layering.md`：**IT = 真栈 + 真 DB**；golden = 固定集 + 见过红 + 注册可复跑。
 
+## 2026-07-25 完成轮（报告 untested 清零 + FR-22 美观 + 3 个真 bug 修复）
+
+HTML 报告 `mes-wms-acceptance-report.html`:**🟢21 🟡1 🔴0 ⬜0 / 22**(#1501 唯一 🟡,诚实定论)。本轮把之前报告里 4 个 ⬜ untested 全部补齐为真栈 golden,沿途真栈 golden 抓到并修复 **3 个 shipped 产品 bug**(Mockito 单测全看不见,只真命令管道抓到):
+
+| 项 | golden | 结果 | 修的 bug |
+|----|--------|------|----------|
+| **FR-10 FEFO 拣货** | `fr10-fefo-golden.mjs` | 🟢 10/10 变异验证过 | **inventory available_qty 初始化**:入库 create 分支设 inv_bal_qty 不设 inv_bal_available_qty → 新入库 lot available=0 → GeneratePickOrder 跳过 → FEFO 排序不可达。修 `updateInventoryWithDimensions`/`adjustInventoryForStockCheck` 首写初始化(#244)|
+| **FR-08 材料验证 + FR-12 序列化** | `fr08-12-14-golden.mjs` | 🟢 22/22 | (无 bug;错料阻断+消耗+SN 谱系真栈验证)|
+| **FR-14 测试维修联动** | `fr08-12-14-golden.mjs` | 🟢 22/22 | **2 个 bug**:① `RecordTestResultHandler` `qc_tr_raw_data instanceof Map` 门控建 defect,但 JSONB 读回 String → 永假 → 0 defect(修:coerce String→Map);② `CreateReworkOrderHandler` 自持久化缺 `dslPersistence:false` + `qc_rw_code` 未生成 → rework 建不出(修:命令加 dslPersistence:false + handler 自生成 code)(#244)|
+| **FR-22 美观**(owner 点名「太丑」)| `mes-wms-ui-golden.mjs` 7/7 | 🟢 | (无 bug;交接时间裸 ISO→datetime、筛选器加标签、状态列不折行,#243)|
+
+**深层 spec gap 诚实标 DEFER 未覆盖**(golden 里显式列):FR-08 批次/近效期阻断、FR-12 SN unique 约束、FR-14 retest→原失败闭环。证的是 shipped happy-path + 关键阻断/链路,不是全 spec。三条 falsifiable(改被测行为→变红)。
+
 ## 覆盖矩阵
 
 | FR | 能力 | 主命令 | 后端真栈 IT（API+DB） | UI golden | 状态 |
