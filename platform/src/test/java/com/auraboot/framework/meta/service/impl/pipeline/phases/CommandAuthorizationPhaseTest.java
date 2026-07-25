@@ -4,8 +4,10 @@ import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -145,6 +147,52 @@ class CommandAuthorizationPhaseTest {
         verify(userPermissionService).hasPermission(42L, "dashboard.manage");
         verify(userPermissionService, never()).hasPermission(42L, "");
         verify(userPermissionService, never()).hasPermission(42L, "  ");
+    }
+
+    // ---------- permit-plan accumulator (phase-1 §11.15 step 2, shadow) ----------
+
+    @Test
+    @DisplayName("authorizing records a PERMIT phase-decision onto the plan accumulator")
+    void recordsAPermitDecisionForThePlan() {
+        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(true);
+        CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), 42L);
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getPhaseDecisions()).singleElement().satisfies(d -> {
+            assertThat(d.decision()).isEqualTo(CommandPermitPlan.Decision.PERMIT);
+            assertThat(d.phaseName()).isEqualTo("authorization");
+        });
+    }
+
+    @Test
+    @DisplayName("denying records a DENY phase-decision (with reason) onto the plan accumulator before throwing")
+    void recordsADenyDecisionForThePlan() {
+        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(false);
+        CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), 42L);
+
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
+
+        assertThat(ctx.getPhaseDecisions()).singleElement().satisfies(d -> {
+            assertThat(d.decision()).isEqualTo(CommandPermitPlan.Decision.DENY);
+            assertThat(d.reasonCode()).isEqualTo(CommandAuthorizationVerdict.REASON_PERMISSION_DENIED);
+            assertThat(d.phaseName()).isEqualTo("authorization");
+        });
+    }
+
+    @Test
+    @DisplayName("an undeclared command records an ABSTAIN phase-decision, never a permit")
+    void recordsAnAbstainDecisionWhenNothingIsDeclared() {
+        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        CommandPipelineContext ctx = contextWithPermissions(null, 42L);
+
+        phase.execute(ctx);
+
+        assertThat(ctx.getPhaseDecisions()).singleElement()
+                .extracting(CommandPermitPlan.PhaseDecision::decision)
+                .isEqualTo(CommandPermitPlan.Decision.ABSTAIN);
     }
 
     private CommandPipelineContext contextWithPermissions(Object permissions, Long userId) {

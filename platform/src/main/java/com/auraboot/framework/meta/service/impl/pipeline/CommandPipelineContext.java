@@ -7,6 +7,7 @@ import com.auraboot.framework.meta.entity.CommandDefinition;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -61,6 +62,22 @@ public class CommandPipelineContext {
      * Never null once that phase has run.
      */
     private CommandAuthorizationVerdict authorizationVerdict;
+
+    /**
+     * Each phase's authorization finding, accumulated as the pipeline runs, for the forthcoming
+     * {@link CommandPermitPlan} (deny-overrides combination, authorization architecture §11.15).
+     * Shadow: filled but not yet consumed — a phase records here <em>in addition to</em> whatever it
+     * already does, so the plan can later be assembled without changing any phase's behaviour.
+     */
+    @Builder.Default
+    private List<CommandPermitPlan.PhaseDecision> phaseDecisions = new ArrayList<>();
+
+    /** Record a phase's authorization finding for the permit plan. Null is ignored. */
+    public void recordPhaseDecision(CommandPermitPlan.PhaseDecision decision) {
+        if (decision != null) {
+            phaseDecisions.add(decision);
+        }
+    }
 
     /**
      * Whether the caller may read the record they named in the request — evaluated at the boundary
