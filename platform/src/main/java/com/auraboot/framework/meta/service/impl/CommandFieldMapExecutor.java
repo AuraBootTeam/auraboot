@@ -362,12 +362,16 @@ public class CommandFieldMapExecutor {
         CommandExecutorUtils.validateSqlIdentifier(tableName, "FIELD_MAP update table");
         CommandExecutorUtils.validateSqlIdentifier(idEntry.getKey(), "FIELD_MAP update id column");
 
+        Map<String, Object> updateData = new LinkedHashMap<>(data);
+        updateData.remove("row_version");
+        Long expectedVersion = MetaContext.getCommandExpectedVersion(
+                modelCode, String.valueOf(idEntry.getValue()));
         Map<String, Object> params = new LinkedHashMap<>();
         StringBuilder sql = new StringBuilder("UPDATE ")
                 .append(tableName)
                 .append(" SET ");
         int index = 0;
-        for (Map.Entry<String, Object> entry : data.entrySet()) {
+        for (Map.Entry<String, Object> entry : updateData.entrySet()) {
             CommandExecutorUtils.validateSqlIdentifier(entry.getKey(), "FIELD_MAP update column");
             if (index > 0) {
                 sql.append(", ");
@@ -387,6 +391,9 @@ public class CommandFieldMapExecutor {
             params.put(paramName, parameterValue);
             index++;
         }
+        if (expectedVersion != null) {
+            sql.append(", row_version = row_version + 1");
+        }
 
         params.put("recordId", idEntry.getValue());
         params.put("tenantId", tenantId);
@@ -394,9 +401,21 @@ public class CommandFieldMapExecutor {
                 .append(idEntry.getKey())
                 .append(" = #{params.recordId}")
                 .append(" AND tenant_id = #{params.tenantId}");
+        if (expectedVersion != null) {
+            params.put("expectedVersion", expectedVersion);
+            sql.append(" AND row_version = #{params.expectedVersion}");
+        }
         appendScopedWriteGuards(sql, tenantId, modelCode, "update");
 
-        return dynamicDataMapper.updateByQuery(sql.toString(), params);
+        int updated = dynamicDataMapper.updateByQuery(sql.toString(), params);
+        if (updated == 0 && expectedVersion != null) {
+            throw new com.auraboot.framework.exception.ConflictException(
+                    "FIELD_MAP update refused: target changed after command authorization");
+        }
+        if (updated > 0 && expectedVersion != null) {
+            MetaContext.advanceCommandExpectedVersion(modelCode, String.valueOf(idEntry.getValue()));
+        }
+        return updated;
     }
 
     private int executeScopedDelete(
@@ -416,16 +435,32 @@ public class CommandFieldMapExecutor {
                 .append(idEntry.getKey())
                 .append(" = #{params.recordId}")
                 .append(" AND tenant_id = #{params.tenantId}");
+        Long expectedVersion = MetaContext.getCommandExpectedVersion(
+                modelCode, String.valueOf(idEntry.getValue()));
+        if (expectedVersion != null) {
+            params.put("expectedVersion", expectedVersion);
+            sql.append(" AND row_version = #{params.expectedVersion}");
+        }
         appendScopedWriteGuards(sql, tenantId, modelCode, "delete");
 
-        return dynamicDataMapper.deleteByQuery(sql.toString(), params);
+        int deleted = dynamicDataMapper.deleteByQuery(sql.toString(), params);
+        if (deleted == 0 && expectedVersion != null) {
+            throw new com.auraboot.framework.exception.ConflictException(
+                    "FIELD_MAP delete refused: target changed after command authorization");
+        }
+        return deleted;
     }
 
     private void appendScopedWriteGuards(StringBuilder sql, Long tenantId, String modelCode, String operation) {
-        if (MetaContext.isDataPermissionBypassed() || !MetaContext.exists()) {
+        if (!MetaContext.exists()) {
             return;
         }
         Long userId = MetaContext.getCurrentUserId();
+        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        if (permitFilter != null) {
+            appendScopedFilter(sql, permitFilter);
+            return;
+        }
         if (userId == null) {
             return;
         }

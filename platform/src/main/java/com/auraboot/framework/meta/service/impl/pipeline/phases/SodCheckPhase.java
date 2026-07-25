@@ -55,8 +55,8 @@ public class SodCheckPhase implements CommandPhase {
             // No hard conflict — a gate with no objection, not a grant.
             ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.abstain(name()));
         } catch (SodViolationException e) {
-            // Record the refusal for the permit plan before rethrowing (shadow; nothing consumes it
-            // yet). Only the SoD violation is caught — an infra failure is not a SoD denial and must
+            // Record the refusal for the permit plan before rethrowing. Only the SoD violation is
+            // caught — an infra failure is not a SoD denial and must
             // propagate unlabelled rather than be recorded as one.
             ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.deny(REASON_SOD_VIOLATION, name()));
             throw e;

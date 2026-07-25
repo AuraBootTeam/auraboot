@@ -2,6 +2,7 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.AsyncTaskDTO;
+import com.auraboot.framework.meta.dto.AsyncTaskSubmitRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
@@ -248,6 +249,8 @@ class HandlerPhaseTest {
         AsyncTaskDTO dto = new AsyncTaskDTO();
         dto.setTaskCode("TASK-ASYNC-1");
         when(asyncTaskService.submitTask(any(), eq(1L), eq(2L))).thenReturn(dto);
+        when(objectMapper.valueToTree(any())).thenAnswer(invocation ->
+                new ObjectMapper().valueToTree(invocation.getArgument(0)));
 
         CommandPipelineContext ctx = buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of(
                 "type", "custom",
@@ -255,7 +258,8 @@ class HandlerPhaseTest {
                 "handlerParams", Map.of("async", true)
         ));
 
-        phase.execute(ctx);
+        MetaContext.runWithCommandPermitPlan(
+                "SELF", 6L, "pr_purchase_order", "po-1", () -> phase.execute(ctx));
 
         // Handler must NOT run inline on the request thread.
         assertThat(handler.capturedContext.get()).isNull();
@@ -267,7 +271,12 @@ class HandlerPhaseTest {
                 // submits a model-bound async command can redirect to the new
                 // record's detail page instead of falling back to the list route.
                 .containsEntry("recordPid", "po-1");
-        verify(asyncTaskService).submitTask(any(), eq(1L), eq(2L));
+        ArgumentCaptor<AsyncTaskSubmitRequest> taskCaptor =
+                ArgumentCaptor.forClass(AsyncTaskSubmitRequest.class);
+        verify(asyncTaskService).submitTask(taskCaptor.capture(), eq(1L), eq(2L));
+        com.fasterxml.jackson.databind.JsonNode taskInput = taskCaptor.getValue().getInputParams();
+        assertThat(taskInput.path("commandPermitScope").asText()).isEqualTo("SELF");
+        assertThat(taskInput.path("commandExpectedVersion").asLong()).isEqualTo(6L);
     }
 
     @Test
@@ -383,6 +392,52 @@ class HandlerPhaseTest {
                 .containsEntry("recordId", 42L)
                 .containsEntry("tenantId", 1L)
                 .containsValue("[\"https://example.com/\"]");
+    }
+
+    @Test
+    void persistHandlerResults_rejectsStaleServerVersionWithoutReconsultingDataScope() throws Exception {
+        MetaContext.setContext(1L, 2L, "user-pid", "tester");
+        RecordingFullRowHandler handler = new RecordingFullRowHandler(BUSINESS_COMMAND_CODE);
+        when(extensionRegistry.getCommandHandler(BUSINESS_COMMAND_CODE)).thenReturn(Optional.of(handler));
+
+        String modelCode = "cr_crawl_job";
+        String tableName = "mt_cr_crawl_job";
+        com.auraboot.framework.meta.dto.ModelDefinition model =
+                com.auraboot.framework.meta.dto.ModelDefinition.builder()
+                        .code(modelCode)
+                        .tableName(tableName)
+                        .fields(java.util.List.of(
+                                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                                        .code("cr_cj_status").columnName("cr_cj_status")
+                                        .dataType("string").build(),
+                                com.auraboot.framework.meta.dto.FieldDefinition.builder()
+                                        .code("cr_cj_seed_urls").columnName("cr_cj_seed_urls")
+                                        .dataType("array").build()))
+                        .build();
+
+        when(metaModelService.getModelDefinition(modelCode)).thenReturn(Optional.of(model));
+        when(metaModelService.getTableName(modelCode)).thenReturn(tableName);
+        when(dynamicDataMapper.findJsonbColumns(tableName)).thenReturn(java.util.Set.of());
+        when(dynamicDataMapper.selectByQuery(any(), any()))
+                .thenReturn(java.util.List.of(Map.of("id", 42L)));
+        when(dynamicDataMapper.updateByQuery(any(), any())).thenReturn(0);
+
+        CommandPipelineContext ctx = buildContext(
+                BUSINESS_COMMAND_CODE, modelCode, Map.of("type", "custom"));
+
+        assertThatThrownBy(() -> MetaContext.runWithCommandPermitPlan(
+                "SELF", 4L, modelCode, "po-1", () -> phase.execute(ctx)))
+                .isInstanceOf(com.auraboot.framework.exception.ConflictException.class)
+                .hasMessageContaining("target changed");
+
+        ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+        verify(dynamicDataMapper).updateByQuery(sqlCaptor.capture(), any());
+        assertThat(sqlCaptor.getValue())
+                .contains("row_version = row_version + 1")
+                .contains("row_version = #{params.expectedVersion}")
+                .contains("created_by = 2");
+        verify(dataPermissionEngine, never()).buildRowFilter(any(), any(), any());
+        verify(dataDomainService, never()).buildDomainFilter(any(), any());
     }
 
     private CommandPipelineContext buildContext(String commandCode, String modelCode, Map<String, Object> execConfig) {

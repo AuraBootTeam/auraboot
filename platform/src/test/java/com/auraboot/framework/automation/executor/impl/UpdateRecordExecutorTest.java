@@ -57,7 +57,7 @@ class UpdateRecordExecutorTest {
     @SuppressWarnings("unchecked")
     void execute_withExplicitRecordPid_updatesCorrectRecord() {
         when(dynamicDataService.update(any(), any(), any())).thenAnswer(inv -> {
-            assertThat(MetaContext.isDataPermissionBypassed()).isTrue();
+            assertThat(MetaContext.getCommandPermitScope()).isEqualTo("ALL");
             return Map.of();
         });
 
@@ -77,7 +77,7 @@ class UpdateRecordExecutorTest {
         assertThat(updatedFields).contains("status");
         verify(dynamicDataService).update(eq("crm_lead"), eq("lead-123"), argThat(f ->
                 "qualified".equals(f.get("status"))));
-        assertThat(MetaContext.isDataPermissionBypassed()).isFalse();
+        assertThat(MetaContext.getCommandPermitScope()).isNull();
     }
 
     @Test

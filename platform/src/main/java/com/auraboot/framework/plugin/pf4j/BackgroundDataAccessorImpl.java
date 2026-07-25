@@ -126,7 +126,7 @@ public class BackgroundDataAccessorImpl implements BackgroundDataAccessor {
         MetaContext.setMemberId(null);
         MetaContext.setEnvironmentId(priorEnv);
         try {
-            return MetaContext.runWithoutDataPermission(work);
+            return MetaContext.runWithCommandPermitScope("ALL", work);
         } finally {
             if (hadPriorContext) {
                 MetaContext.setContext(priorTenant, priorUser, priorUserPid, priorUsername, priorRoles);

@@ -83,41 +83,18 @@ public class HandlerPhase implements CommandPhase {
     @Autowired(required = false)
     private StorageProvider storageProvider;
 
-    /**
-     * Whether a handler inherits the authority its command boundary granted (DDR-2026-07-22 step 3).
-     * Off until observe mode shows no command would newly reach a target its caller cannot read.
-     */
-    @org.springframework.beans.factory.annotation.Value("${aura.command.data-authority.enabled:false}")
-    private boolean commandDataAuthorityEnabled;
-
     @Override public String name() { return "handler"; }
 
     @Override
     public void execute(CommandPipelineContext ctx) {
-        withPermitScope(ctx, () -> {
-            var handlerRules = ctx.getRulesByType().getOrDefault("handler", Collections.emptyList());
-            Map<String, Object> handlerResults = withCommandAggregate(ctx, () ->
-                    withCommandAuthority(ctx, () -> executeHandlerPhase(
-                            handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
-                            ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig())));
-            ctx.setHandlerResults(handlerResults);
-            persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
-                    handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
-            return null;
-        });
-    }
-
-    /**
-     * Publish the permit plan's row-scope grade (D3) for the data layer, so its guarded writes honour
-     * the one scope the boundary resolved rather than re-resolving it per site. Like
-     * {@link #withCommandAggregate}, this only ever carries a decision already made; a plan with no
-     * resolved scope is a no-op (the data layer keeps its own evaluation). Wraps both the handler and
-     * the DSL-persistence path, since both reach the data layer.
-     */
-    <T> T withPermitScope(CommandPipelineContext ctx, java.util.function.Supplier<T> body) {
-        CommandPermitPlan plan = ctx.getPermitPlan();
-        String grade = plan != null && plan.scope() != null ? plan.scope().name() : null;
-        return MetaContext.runWithCommandPermitScope(grade, body);
+        var handlerRules = ctx.getRulesByType().getOrDefault("handler", Collections.emptyList());
+        Map<String, Object> handlerResults = withCommandAggregate(ctx, () ->
+                withCommandAuthority(ctx, () -> executeHandlerPhase(
+                        handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
+                        ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig())));
+        ctx.setHandlerResults(handlerResults);
+        persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
+                handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
     }
 
     // ==================== Inlined delegate methods ====================
@@ -283,7 +260,8 @@ public class HandlerPhase implements CommandPhase {
         // CommandSideEffectExecutor UPDATE_RECORD + partial-CRUD paths.)
         Set<String> jsonbColumns = resolveJsonbColumns(modelDef, tableName);
         if (shouldUseScopedWrite()) {
-            executeScopedUpdate(tableName, modelCode, idEntry, persistable, tenantId, jsonbColumns);
+            executeScopedUpdate(
+                    tableName, modelCode, recordIdStr, idEntry, persistable, tenantId, jsonbColumns);
         } else if (jsonbColumns.isEmpty()) {
             dynamicDataMapper.update(tableName, persistable, conditions);
         } else {
@@ -319,6 +297,7 @@ public class HandlerPhase implements CommandPhase {
     private void executeScopedUpdate(
             String tableName,
             String modelCode,
+            String permitTargetRecordId,
             Map.Entry<String, Object> idEntry,
             Map<String, Object> data,
             Long tenantId,
@@ -326,12 +305,16 @@ public class HandlerPhase implements CommandPhase {
         CommandExecutorUtils.validateSqlIdentifier(tableName, "handler field tableName");
         CommandExecutorUtils.validateSqlIdentifier(idEntry.getKey(), "handler field id column");
 
+        Map<String, Object> updateData = new LinkedHashMap<>(data);
+        updateData.remove("row_version");
+        Long expectedVersion =
+                MetaContext.getCommandExpectedVersion(modelCode, permitTargetRecordId);
         Map<String, Object> params = new LinkedHashMap<>();
         StringBuilder sql = new StringBuilder("UPDATE ")
                 .append(tableName)
                 .append(" SET ");
         int index = 0;
-        for (Map.Entry<String, Object> entry : data.entrySet()) {
+        for (Map.Entry<String, Object> entry : updateData.entrySet()) {
             CommandExecutorUtils.validateSqlIdentifier(entry.getKey(), "handler field column");
             if (index > 0) {
                 sql.append(", ");
@@ -351,6 +334,9 @@ public class HandlerPhase implements CommandPhase {
             params.put(paramName, parameterValue);
             index++;
         }
+        if (expectedVersion != null) {
+            sql.append(", row_version = row_version + 1");
+        }
 
         params.put("recordId", idEntry.getValue());
         params.put("tenantId", tenantId);
@@ -358,21 +344,39 @@ public class HandlerPhase implements CommandPhase {
                 .append(idEntry.getKey())
                 .append(" = #{params.recordId}")
                 .append(" AND tenant_id = #{params.tenantId}");
+        if (expectedVersion != null) {
+            params.put("expectedVersion", expectedVersion);
+            sql.append(" AND row_version = #{params.expectedVersion}");
+        }
         appendScopedWriteGuards(sql, tenantId, modelCode);
 
-        dynamicDataMapper.updateByQuery(sql.toString(), params);
+        int updated = dynamicDataMapper.updateByQuery(sql.toString(), params);
+        if (updated <= 0 && expectedVersion != null) {
+            throw new com.auraboot.framework.exception.ConflictException(
+                    "Handler result write failed: target changed after command authorization");
+        }
+        if (updated > 0 && expectedVersion != null) {
+            MetaContext.advanceCommandExpectedVersion(modelCode, permitTargetRecordId);
+        }
     }
 
     private boolean shouldUseScopedWrite() {
+        if (MetaContext.hasCommandPermitScope()) {
+            return true;
+        }
         return dataPermissionEngine != null
                 && dataDomainService != null
                 && MetaContext.exists()
-                && !MetaContext.isDataPermissionBypassed()
                 && MetaContext.getCurrentUserId() != null;
     }
 
     private void appendScopedWriteGuards(StringBuilder sql, Long tenantId, String modelCode) {
         Long userId = MetaContext.getCurrentUserId();
+        String permitFilter = com.auraboot.framework.meta.service.impl.CommandPermitDataAccess.rowFilter(userId);
+        if (permitFilter != null) {
+            appendScopedFilter(sql, permitFilter);
+            return;
+        }
         try {
             String rowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
                     () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
@@ -424,20 +428,14 @@ public class HandlerPhase implements CommandPhase {
     /**
      * Open the command's authority for the handler stage when the boundary actually granted one
      * (DDR-2026-07-22). Only an AUTHORIZED verdict qualifies: a command that declared no
-     * permissions granted nothing, and NOT_APPLICABLE must keep today's behaviour exactly.
-     *
-     * <p>Disabled by default. The flip is gated on what observe mode reports from a real workload —
-     * whether any command would newly reach a target its caller cannot read.
+     * permissions granted nothing, and NOT_APPLICABLE keeps the legacy path.
      */
     // package-private: the safety property (only AUTHORIZED opens a scope) is directly tested.
     /**
      * Pin the handler stage to the aggregate root the request named, when it named one.
      *
-     * <p>Independent of {@link #commandDataAuthorityEnabled} on purpose: opening this scope only
-     * ever <em>adds</em> a constraint (writes get pinned to the authorized document), so it is safe
-     * on every path, whereas the flag gates whether authority is <em>inherited</em>. Models that
-     * declare no aggregate binding are unaffected, so this changes no behaviour until a model opts
-     * in.</p>
+     * <p>Opening this scope only ever <em>adds</em> a constraint (writes get pinned to the
+     * authorized document). Models that declare no aggregate binding are unaffected.</p>
      */
     <T> T withCommandAggregate(CommandPipelineContext ctx, java.util.function.Supplier<T> body) {
         CommandExecuteRequest request = ctx.getRequest();
@@ -449,7 +447,8 @@ public class HandlerPhase implements CommandPhase {
     }
 
     <T> T withCommandAuthority(CommandPipelineContext ctx, java.util.function.Supplier<T> body) {
-        if (!commandDataAuthorityEnabled) {
+        CommandPermitPlan plan = ctx.getPermitPlan();
+        if (plan == null || !plan.isPermitted()) {
             return body.get();
         }
         CommandAuthorizationVerdict verdict = ctx.getAuthorizationVerdict();
@@ -646,6 +645,14 @@ public class HandlerPhase implements CommandPhase {
         String commandAuthority = MetaContext.getCommandAuthority();
         if (commandAuthority != null) {
             input.put("commandAuthority", commandAuthority);
+        }
+        String commandPermitScope = MetaContext.getCommandPermitScope();
+        if (commandPermitScope != null) {
+            input.put("commandPermitScope", commandPermitScope);
+            Long expectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordPid);
+            if (expectedVersion != null) {
+                input.put("commandExpectedVersion", expectedVersion);
+            }
         }
 
         AsyncTaskSubmitRequest taskRequest = new AsyncTaskSubmitRequest();

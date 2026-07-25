@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl.pipeline;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.CommandExecuteResult;
 import io.micrometer.observation.annotation.Observed;
 import lombok.extern.slf4j.Slf4j;
@@ -61,14 +62,55 @@ public class CommandPipeline {
      */
     @Observed(name = "command.pipeline.guarded", contextualName = "command-pipeline-guarded")
     public CommandExecuteResult executeGuardedPhases(CommandPipelineContext ctx) {
-        for (CommandPhase phase : guardedPhases) {
+        CommandPermitPlan existingPlan = authoritativePlan(ctx);
+        if (existingPlan != null) {
+            return executeUnderPermitPlan(ctx, existingPlan, 0);
+        }
+
+        for (int index = 0; index < guardedPhases.size(); index++) {
+            CommandPhase phase = guardedPhases.get(index);
             executePhase(phase, ctx);
             if (ctx.isShortCircuited()) {
                 return ctx.getShortCircuitResult();
             }
+            CommandPermitPlan assembledPlan = authoritativePlan(ctx);
+            if (assembledPlan != null) {
+                return executeUnderPermitPlan(ctx, assembledPlan, index + 1);
+            }
         }
 
-        // Build final result
+        return buildFinalResult(ctx);
+    }
+
+    private CommandExecuteResult executeUnderPermitPlan(
+            CommandPipelineContext ctx, CommandPermitPlan plan, int startIndex) {
+        String targetModel = ctx.getCommand() == null ? null : ctx.getCommand().getModelCode();
+        String targetRecordId = ctx.getRequest() == null ? null : ctx.getRequest().getTargetRecordId();
+        return MetaContext.runWithCommandPermitPlan(
+                plan.scope().name(),
+                plan.expectedVersion(),
+                targetModel,
+                targetRecordId,
+                () -> executeRemainingGuardedPhases(ctx, startIndex));
+    }
+
+    private CommandExecuteResult executeRemainingGuardedPhases(
+            CommandPipelineContext ctx, int startIndex) {
+        for (int index = startIndex; index < guardedPhases.size(); index++) {
+            executePhase(guardedPhases.get(index), ctx);
+            if (ctx.isShortCircuited()) {
+                return ctx.getShortCircuitResult();
+            }
+        }
+        return buildFinalResult(ctx);
+    }
+
+    private CommandPermitPlan authoritativePlan(CommandPipelineContext ctx) {
+        CommandPermitPlan plan = ctx.getPermitPlan();
+        return plan != null && plan.isPermitted() && plan.scope() != null ? plan : null;
+    }
+
+    private CommandExecuteResult buildFinalResult(CommandPipelineContext ctx) {
         ctx.transitionTo("completed");
         var resultData = new java.util.HashMap<>(ctx.getFieldMapResults());
         resultData.putAll(ctx.getHandlerResults());

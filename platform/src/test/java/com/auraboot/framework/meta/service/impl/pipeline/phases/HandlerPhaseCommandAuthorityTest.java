@@ -3,11 +3,11 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -32,7 +32,7 @@ class HandlerPhaseCommandAuthorityTest {
     @Test
     @DisplayName("an AUTHORIZED verdict opens a scope carrying the granting permission")
     void authorizedOpensTheScope() {
-        HandlerPhase phase = phaseWithAuthorityEnabled(true);
+        HandlerPhase phase = phase();
         CommandPipelineContext ctx = context(CommandAuthorizationVerdict.authorized("qo.price.manage"));
 
         assertThat(authorityDuring(phase, ctx)).isEqualTo("qo.price.manage");
@@ -41,7 +41,7 @@ class HandlerPhaseCommandAuthorityTest {
     @Test
     @DisplayName("a command that declared nothing opens no scope")
     void undeclaredOpensNothing() {
-        HandlerPhase phase = phaseWithAuthorityEnabled(true);
+        HandlerPhase phase = phase();
         CommandPipelineContext ctx = context(CommandAuthorizationVerdict
                 .notApplicable(CommandAuthorizationVerdict.REASON_NO_DECLARED_PERMISSIONS));
 
@@ -51,7 +51,7 @@ class HandlerPhaseCommandAuthorityTest {
     @Test
     @DisplayName("a command with no user in context opens no scope")
     void noUserContextOpensNothing() {
-        HandlerPhase phase = phaseWithAuthorityEnabled(true);
+        HandlerPhase phase = phase();
         CommandPipelineContext ctx = context(CommandAuthorizationVerdict
                 .notApplicable(CommandAuthorizationVerdict.REASON_NO_USER_CONTEXT));
 
@@ -62,17 +62,19 @@ class HandlerPhaseCommandAuthorityTest {
     @Test
     @DisplayName("a missing verdict opens no scope")
     void missingVerdictOpensNothing() {
-        HandlerPhase phase = phaseWithAuthorityEnabled(true);
+        HandlerPhase phase = phase();
 
         assertThat(authorityDuring(phase, context(null))).isNull();
     }
 
-    /** The rollout switch: until observe mode clears it, nothing inherits anything. */
     @Test
-    @DisplayName("with the feature disabled, even an AUTHORIZED verdict opens no scope")
-    void disabledOpensNothingEvenWhenAuthorized() {
-        HandlerPhase phase = phaseWithAuthorityEnabled(false);
+    @DisplayName("a non-permitting plan opens no scope even with an AUTHORIZED phase verdict")
+    void nonPermitPlanOpensNothingEvenWhenAuthorized() {
+        HandlerPhase phase = phase();
         CommandPipelineContext ctx = context(CommandAuthorizationVerdict.authorized("qo.price.manage"));
+        ctx.setPermitPlan(new CommandPermitPlan(
+                CommandPermitPlan.Decision.DENY, "target_denied", "target_scope", null,
+                CommandPermitPlan.ScopeGrade.ALL, null));
 
         assertThat(authorityDuring(phase, ctx)).isNull();
     }
@@ -80,7 +82,7 @@ class HandlerPhaseCommandAuthorityTest {
     @Test
     @DisplayName("the scope closes when the handler stage returns")
     void theScopeClosesAfterTheStage() {
-        HandlerPhase phase = phaseWithAuthorityEnabled(true);
+        HandlerPhase phase = phase();
         CommandPipelineContext ctx = context(CommandAuthorizationVerdict.authorized("qo.price.manage"));
 
         authorityDuring(phase, ctx);
@@ -102,11 +104,9 @@ class HandlerPhaseCommandAuthorityTest {
      * {@code withCommandAuthority} touches none of them. Constructing the real bean graph here would
      * test Spring wiring, not the property this class is about.
      */
-    private HandlerPhase phaseWithAuthorityEnabled(boolean enabled) {
-        HandlerPhase phase = new HandlerPhase(
+    private HandlerPhase phase() {
+        return new HandlerPhase(
                 null, null, null, null, null, null, null, null, null);
-        ReflectionTestUtils.setField(phase, "commandDataAuthorityEnabled", enabled);
-        return phase;
     }
 
     private CommandPipelineContext context(CommandAuthorizationVerdict verdict) {
@@ -118,6 +118,9 @@ class HandlerPhaseCommandAuthorityTest {
                 .startTime(System.currentTimeMillis())
                 .build();
         ctx.setAuthorizationVerdict(verdict);
+        ctx.setPermitPlan(new CommandPermitPlan(
+                CommandPermitPlan.Decision.PERMIT, null, null, null,
+                CommandPermitPlan.ScopeGrade.ALL, null));
         return ctx;
     }
 }

@@ -52,7 +52,7 @@ class CreateRecordExecutorTest {
     void execute_basicFields_createsRecord() {
         Map<String, Object> createdRecord = Map.of("id", 100L, "name", "John", "status", "new");
         when(dynamicDataService.create(eq("crm_lead"), any())).thenAnswer(inv -> {
-            assertThat(MetaContext.isDataPermissionBypassed()).isTrue();
+            assertThat(MetaContext.getCommandPermitScope()).isEqualTo("ALL");
             return createdRecord;
         });
 
@@ -69,7 +69,7 @@ class CreateRecordExecutorTest {
         assertThat(result.get("record")).isEqualTo(createdRecord);
         verify(dynamicDataService).create(eq("crm_lead"), argThat(fields ->
                 fields.get("name").equals("John") && fields.get("status").equals("new")));
-        assertThat(MetaContext.isDataPermissionBypassed()).isFalse();
+        assertThat(MetaContext.getCommandPermitScope()).isNull();
     }
 
     @Test

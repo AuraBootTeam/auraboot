@@ -46,7 +46,7 @@ public class CreateRecordExecutor implements ActionExecutor {
 
         log.info("Creating record: modelCode={}, fields={}", modelCode, processedFields.keySet());
 
-        Map<String, Object> created = MetaContext.runWithoutDataPermission(
+        Map<String, Object> created = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.create(modelCode, processedFields));
 
         return Map.of(

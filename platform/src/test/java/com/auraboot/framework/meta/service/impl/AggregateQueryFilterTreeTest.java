@@ -119,7 +119,7 @@ class AggregateQueryFilterTreeTest {
     @SuppressWarnings("unchecked")
     private Captured runAggregate(AggregateQueryRequest req) {
         // Bypass data-permission projection so the WHERE clause is just the filters (cleaner assert).
-        MetaContext.runWithoutDataPermission(() -> service.execute(req));
+        MetaContext.runWithCommandPermitScope("ALL", () -> service.execute(req));
         ArgumentCaptor<String> sqlCap = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Map> pCap = ArgumentCaptor.forClass(Map.class);
         verify(dynamicDataMapper).selectByQuery(sqlCap.capture(), pCap.capture());
@@ -308,7 +308,7 @@ class AggregateQueryFilterTreeTest {
         AggregateQueryRequest req = aggregate(List.of(
                 leaf("status; DROP TABLE x", "eq", "x")));
 
-        assertThatThrownBy(() -> MetaContext.runWithoutDataPermission(() -> service.execute(req)))
+        assertThatThrownBy(() -> MetaContext.runWithCommandPermitScope("ALL", () -> service.execute(req)))
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("Invalid filter field");
     }
@@ -319,7 +319,7 @@ class AggregateQueryFilterTreeTest {
         AggregateQueryRequest req = aggregate(List.of(
                 leaf("created_at", "relative", "today'; DROP TABLE x; --")));
 
-        assertThatThrownBy(() -> MetaContext.runWithoutDataPermission(() -> service.execute(req)))
+        assertThatThrownBy(() -> MetaContext.runWithCommandPermitScope("ALL", () -> service.execute(req)))
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("Unsupported relative time token");
     }
@@ -333,7 +333,7 @@ class AggregateQueryFilterTreeTest {
         bad.setField("status"); // now ambiguous: has both field and children
 
         AggregateQueryRequest req = aggregate(List.of(bad));
-        assertThatThrownBy(() -> MetaContext.runWithoutDataPermission(() -> service.execute(req)))
+        assertThatThrownBy(() -> MetaContext.runWithCommandPermitScope("ALL", () -> service.execute(req)))
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("cannot be both a leaf");
     }
@@ -343,7 +343,7 @@ class AggregateQueryFilterTreeTest {
     void invalidGroupLogicRejected() {
         AggregateQueryRequest req = aggregate(List.of(
                 group("xor", leaf("a", "eq", 1), leaf("b", "eq", 2))));
-        assertThatThrownBy(() -> MetaContext.runWithoutDataPermission(() -> service.execute(req)))
+        assertThatThrownBy(() -> MetaContext.runWithCommandPermitScope("ALL", () -> service.execute(req)))
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("Invalid filter group logic");
     }
@@ -356,7 +356,7 @@ class AggregateQueryFilterTreeTest {
             node = group("and", node);
         }
         FilterConfig finalNode = node;
-        assertThatThrownBy(() -> MetaContext.runWithoutDataPermission(
+        assertThatThrownBy(() -> MetaContext.runWithCommandPermitScope("ALL",
                 () -> service.execute(aggregate(List.of(finalNode)))))
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("nesting exceeds max depth");
@@ -386,7 +386,7 @@ class AggregateQueryFilterTreeTest {
                         leaf("status", "eq", "PAID"),
                         leaf("region", "eq", "East"))));
 
-        MetaContext.runWithoutDataPermission(() -> service.execute(req));
+        MetaContext.runWithCommandPermitScope("ALL", () -> service.execute(req));
 
         ArgumentCaptor<String> sqlCap = ArgumentCaptor.forClass(String.class);
         @SuppressWarnings("rawtypes")
@@ -422,7 +422,7 @@ class AggregateQueryFilterTreeTest {
                         leaf("secret_column", "eq", "x")))); // not in whitelist
 
         Throwable t = catchThrowable(() ->
-                MetaContext.runWithoutDataPermission(() -> service.execute(req)));
+                MetaContext.runWithCommandPermitScope("ALL", () -> service.execute(req)));
         assertThat(t).isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("not in whitelist");
     }
@@ -436,7 +436,7 @@ class AggregateQueryFilterTreeTest {
     @SuppressWarnings("unchecked")
     private Captured runAggregateFresh(AggregateQueryRequest req) {
         org.mockito.Mockito.clearInvocations(dynamicDataMapper);
-        MetaContext.runWithoutDataPermission(() -> service.execute(req));
+        MetaContext.runWithCommandPermitScope("ALL", () -> service.execute(req));
         ArgumentCaptor<String> sqlCap = ArgumentCaptor.forClass(String.class);
         ArgumentCaptor<Map> pCap = ArgumentCaptor.forClass(Map.class);
         verify(dynamicDataMapper).selectByQuery(sqlCap.capture(), pCap.capture());

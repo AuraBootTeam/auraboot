@@ -130,7 +130,7 @@ class RecordLevelSlaActivationIT extends BaseIntegrationTest {
     @Order(1)
     @DisplayName("creating a record of the SLA-bound model activates an ab_sla_record with deadline")
     void recordCreate_activatesRecordLevelSla() {
-        Map<String, Object> rec = MetaContext.runWithoutDataPermission(() ->
+        Map<String, Object> rec = MetaContext.runWithCommandPermitScope("ALL", () ->
                 dynamicDataService.create(complaintModel, Map.of(
                         subjectField, "device black screen", priorityField, "high")));
         String recordPid = String.valueOf(rec.get("pid"));

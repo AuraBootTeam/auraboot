@@ -29,11 +29,11 @@ import org.springframework.util.StringUtils;
  *
  * <p>The plan carries the row-scope grade (D3), resolved here from the existing row-scope engine's
  * own verdict so it can never drift from what that engine filters. The optimistic version (D5) is
- * captured later, at enforcement.</p>
+ * captured by the target boundary read and copied into the plan here.</p>
  *
- * <p><strong>Phase-1 Shadow + observe (§11.10 stage 1).</strong> The plan is assembled and stashed
- * on the context, but nothing enforces it yet — the data layer still runs its own
- * {@code isDataPermissionBypassed} decision, so assembling the plan changes no behaviour. Because any
+ * <p>The stage-1 decision telemetry remains active while enforcement advances. The plan is
+ * assembled and stashed on the context; the pipeline publishes only a permitting plan with a
+ * resolved scope to the data layer. Because any
  * denying gate has already thrown before this phase, a command that reaches here was allowed by the
  * legacy path; so the assembled decision <em>vs</em> that legacy allow is exactly the migration
  * divergence §11.10 stage 1 asks to record. We meter it by decision: an {@code ABSTAIN} here is a
@@ -46,10 +46,10 @@ import org.springframework.util.StringUtils;
 public class PermitPlanAssemblyPhase implements CommandPhase {
 
     /**
-     * The existing row-scope engine — the same one the data layer calls at each of its ~40 sites
-     * today. We call it once here, at the boundary, so the plan carries the scope grade instead of
-     * each site re-deciding it (the whole point of §11.15). Optional so a minimal context without the
-     * engine still assembles a plan (scope simply stays unresolved).
+     * The existing row-scope engine. We call it once here, at the boundary, so the plan carries the
+     * scope grade instead of each execution site re-deciding it (the whole point of §11.15).
+     * Optional so a minimal context without the engine still assembles a plan; an unresolved scope
+     * is never published as authoritative.
      */
     @Autowired(required = false)
     private DataPermissionEngine dataPermissionEngine;
@@ -80,7 +80,7 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
                 ctx.getPhaseDecisions(),
                 aggregateId,
                 resolveScope(ctx),
-                null);  // expected version (D5) — captured at enforcement (step 4)
+                ctx.getTargetRecordVersion());
         ctx.setPermitPlan(plan);
         observe(ctx, plan);
     }
@@ -116,10 +116,9 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
      * grant comes back blank → {@link ScopeGrade#ALL}.
      *
      * <p>Returns {@code null} (unresolved) when the inputs to decide a grade are absent, or when the
-     * engine is unavailable or errors. This is deliberate <strong>shadow safety</strong>: nothing
-     * enforces the grade yet, so resolving it here must not add a failure the command would not
-     * otherwise hit — the data layer's own fail-secure evaluation is still the one in force. Step 4
-     * makes this boundary resolution authoritative and fail-secure, retiring the per-site calls.</p>
+     * engine is unavailable or errors. The pipeline never publishes an unresolved plan, so the
+     * existing data-layer path remains the fail-secure fallback rather than manufacturing
+     * authority.</p>
      */
     private ScopeGrade resolveScope(CommandPipelineContext ctx) {
         if (dataPermissionEngine == null) {
@@ -136,10 +135,9 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
             String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
             return StringUtils.hasText(rowFilter) ? ScopeGrade.SELF : ScopeGrade.ALL;
         } catch (RuntimeException e) {
-            // Shadow safety only: the grade is not consumed yet, so a resolution failure here must
-            // not break a command the data layer would have run. The data layer keeps its own
-            // fail-secure evaluation until step 4 moves enforcement onto this plan.
-            log.warn("Shadow scope resolution failed for {} (model {}); leaving scope unresolved",
+            // An unresolved scope is never published. The legacy data-layer path therefore remains
+            // in force and fails closed according to its existing contract.
+            log.warn("Permit-plan scope resolution failed for {} (model {}); leaving scope unresolved",
                     ctx.getCommandCode(), modelCode, e);
             return null;
         }

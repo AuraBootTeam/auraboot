@@ -405,15 +405,22 @@ public class CommandSideEffectExecutor {
     }
 
     private boolean shouldUseScopedWrite() {
+        if (MetaContext.hasCommandPermitScope()) {
+            return true;
+        }
         return dataPermissionEngine != null
                 && dataDomainService != null
                 && MetaContext.exists()
-                && !MetaContext.isDataPermissionBypassed()
                 && MetaContext.getCurrentUserId() != null;
     }
 
     private void appendScopedWriteGuards(StringBuilder sql, Long tenantId, String modelCode, String operation) {
         Long userId = MetaContext.getCurrentUserId();
+        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        if (permitFilter != null) {
+            appendScopedFilter(sql, permitFilter);
+            return;
+        }
         try {
             String rowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
                     () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));

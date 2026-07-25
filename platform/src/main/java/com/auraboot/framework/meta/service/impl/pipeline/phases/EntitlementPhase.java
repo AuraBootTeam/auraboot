@@ -51,7 +51,7 @@ public class EntitlementPhase implements CommandPhase {
 
         if (!entitlementChecker.isPluginActive(namespace)) {
             // A gate: entitlement can refuse, but never grants. Record the refusal for the permit
-            // plan before throwing (shadow; nothing consumes it yet).
+            // plan before throwing so the boundary decision remains auditable.
             ctx.recordPhaseDecision(
                     CommandPermitPlan.PhaseDecision.deny(REASON_PLUGIN_ENTITLEMENT_REQUIRED, name()));
             throw new BusinessException(ResponseCode.FORBIDDEN,

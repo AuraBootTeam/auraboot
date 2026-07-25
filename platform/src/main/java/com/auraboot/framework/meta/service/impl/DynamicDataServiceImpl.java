@@ -201,12 +201,19 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         Long tenantId = getCurrentTenantId();
         queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
 
+        Long userId = getCurrentUserId();
+        String permitRowFilter = CommandPermitDataAccess.rowFilter(userId);
+        boolean commandPermitInForce = permitRowFilter != null;
         String scopedRowFilter = null;
         String scopedDomainFilter = null;
-        if (!MetaContext.isDataPermissionBypassed()) {
+        if (commandPermitInForce) {
+            scopedRowFilter = permitRowFilter;
+            if (!scopedRowFilter.isBlank()) {
+                queryBuilder.addRawCondition(scopedRowFilter);
+            }
+        } else {
             // 添加数据权限行级过滤 — fail-secure: exception = deny all
             try {
-                Long userId = getCurrentUserId();
                 scopedRowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
                         () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
                 if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
@@ -219,10 +226,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
 
-        if (!MetaContext.isDataPermissionBypassed()) {
+        if (!commandPermitInForce) {
             // Apply data domain isolation filter (D5) — fail-secure
             try {
-                Long userId = getCurrentUserId();
                 scopedDomainFilter = DynamicDataQueryScope.domainFilter(tenantId, modelCode, userId,
                         () -> dataDomainService.buildDomainFilter(modelCode, userId));
                 if (scopedDomainFilter != null && !scopedDomainFilter.isBlank()) {
@@ -256,17 +262,17 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             );
             queryBuilder = queryBuilderService.buildPaginationQuery(queryBuilder, pageRequest);
         }
-        
+
         // 验证查询安全性
         QueryValidationResult validation = queryBuilderService.validateQuery(queryBuilder);
         if (!validation.isValid()) {
             throw new MetaServiceException("Query validation failed: " + validation.getErrorMessage());
         }
-        
+
         // 手动添加租户ID条件到SQL和参数中
         String sql = queryBuilder.getSql();
         Map<String, Object> paramMap = queryBuilder.getParameterMap();
-        
+
         // 执行查询
         List<Map<String, Object>> records = dynamicDataMapper.selectByQuery(sql, paramMap);
 
@@ -278,20 +284,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 model, request.getConditions());
         countBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
 
-        if (!MetaContext.isDataPermissionBypassed()) {
-            // Reuse the exact row-level filter from the data query so count cannot drift and
-            // the same request does not re-run permission lookup for the count builder.
-            if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
-                countBuilder.addRawCondition(scopedRowFilter);
-            }
+        // Reuse the exact row-level filter from the data query so count cannot drift and
+        // the same request does not re-run permission lookup for the count builder.
+        if (scopedRowFilter != null && !scopedRowFilter.isBlank()) {
+            countBuilder.addRawCondition(scopedRowFilter);
         }
 
-        if (!MetaContext.isDataPermissionBypassed()) {
-            // Reuse the exact domain filter from the data query for count consistency and to
-            // avoid duplicate domain metadata lookup in one list request.
-            if (scopedDomainFilter != null && !scopedDomainFilter.isBlank()) {
-                countBuilder.addRawCondition(scopedDomainFilter);
-            }
+        // Reuse the exact domain filter from the data query for count consistency and to
+        // avoid duplicate domain metadata lookup in one list request.
+        if (scopedDomainFilter != null && !scopedDomainFilter.isBlank()) {
+            countBuilder.addRawCondition(scopedDomainFilter);
         }
 
         // Apply the same keyword search to count query for consistency
@@ -305,10 +307,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         Long total = dynamicDataMapper.countByQuery(countSql, countParamMap);
 
-        if (!MetaContext.isDataPermissionBypassed()) {
+        if (!commandPermitInForce) {
             // 应用列级字段脱敏 (policy-based) — fail-secure: masking failure = deny access
             try {
-                Long userId = getCurrentUserId();
                 List<FieldMaskRule> maskRules = dataPermissionEngine.getFieldMaskRules(tenantId, modelCode, userId);
                 if (maskRules != null && !maskRules.isEmpty()) {
                     records = dataPermissionEngine.applyFieldMasking(records, maskRules);
@@ -320,10 +321,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
 
-        if (!MetaContext.isDataPermissionBypassed()) {
+        if (!commandPermitInForce) {
             // Apply configurable field masking (A9) — fail-secure
             try {
-                Long userId = getCurrentUserId();
                 records = fieldMaskService.applyMaskingForList(modelCode, records, userId);
             } catch (Exception e) {
                 // codeql[java/log-injection] Model codes are validated metadata identifiers and are logged as structured parameters only.
@@ -332,7 +332,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
 
-        if (!MetaContext.isDataPermissionBypassed()) {
+        if (!commandPermitInForce) {
             // Apply field-level permission filtering — remove hidden fields from results
             records = applyFieldPermissionFilter(modelCode, records);
         }
@@ -957,7 +957,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (recordId == null || recordId.trim().isEmpty()) {
             throw new MetaServiceException("Record ID cannot be null or empty");
         }
-        
+
         logOperation("getById", modelCode, recordId);
 
         ModelDefinition model = getModelDefinition(modelCode);
@@ -975,7 +975,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
         Long tenantId = getCurrentTenantId();
-        
+
         // 构建查询条件
         List<QueryCondition> conditions = new ArrayList<>();
         conditions.add(QueryCondition.builder()
@@ -988,13 +988,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 .operator(QueryCondition.Operator.EQ)
                 .value(tenantId)
                 .build());
-        
+
         QueryBuilderService.QueryBuilder queryBuilder = queryBuilderService.buildConditionQuery(model, conditions);
 
         String sql = queryBuilder.getSql();
         Map<String, Object> paramMap = queryBuilder.getParameterMap();
         List<Map<String, Object>> records = dynamicDataMapper.selectByQuery(sql, paramMap);
-        
+
         if (records.isEmpty()) {
             throw new MetaServiceException("Record not found: " + recordId + " in model: " + modelCode);
         }
@@ -1004,7 +1004,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
         JsonbFieldHelper.normalizeJsonReadValues(model, record);
 
-        if (!MetaContext.isDataPermissionBypassed()) {
+        boolean commandPermitInForce = MetaContext.hasCommandPermitScope();
+        if (commandPermitInForce
+                && !CommandPermitDataAccess.permitsRecord(record, getCurrentUserId())) {
+            throw new MetaServiceException("Access denied: command permit scope does not include this record");
+        }
+
+        if (!commandPermitInForce) {
             // Apply the Rule Center-backed permission pipeline before the
             // legacy row-level gate. A Rule Center DENY is responsible for
             // producing the permission audit/trace row; if the legacy row ACL
@@ -1023,7 +1029,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
 
-        if (!MetaContext.isDataPermissionBypassed()) {
+        if (!commandPermitInForce) {
             // Apply row-level access check for single record — fail-secure: any
             // non-MetaServiceException must surface as a 5xx, not be swallowed.
             // Mirrors the list() pattern at lines 173 and 185. This remains an
@@ -1044,7 +1050,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
 
-        if (!MetaContext.isDataPermissionBypassed()) {
+        if (!commandPermitInForce) {
             // Apply column-level field masking (policy-based) — fail-secure.
             // Returning the unmasked record on internal error would leak the
             // very fields the policy is configured to hide.
@@ -1065,7 +1071,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
 
-        if (!MetaContext.isDataPermissionBypassed()) {
+        if (!commandPermitInForce) {
             // Apply configurable field masking for detail view (A9) — fail-secure.
             try {
                 Long userId = getCurrentUserId();
@@ -1078,7 +1084,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
         }
 
-        if (!MetaContext.isDataPermissionBypassed()) {
+        if (!commandPermitInForce) {
             // Apply field-level permission filtering — remove hidden fields
             record = applyFieldPermissionFilterSingle(modelCode, record);
         }
@@ -1142,16 +1148,16 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         logOperation("create", modelCode, data.keySet());
 
         ModelDefinition model = getModelDefinition(modelCode);
-        
+
         // 检查表是否存在，如果不存在则自动创建
         ensureTableExists(modelCode);
-        
+
         // Normalize temporal string values to typed objects (LocalDate/Instant) before validation
         payloadTemporalNormalizer.normalize(data, model);
         // 使用验证服务的严格模式进行验证
         // 验证失败会抛出异常并触发事务回滚
         validationService.validateAndThrow(model, data, ValidationContext.CREATE);
-        
+
         // 设置系统字段
         Map<String, Object> enrichedData = new HashMap<>(data);
         enrichedData.put("created_at", java.time.Instant.now());
@@ -1162,17 +1168,17 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Same reason as the fields above: a derived row created under a command authorized for one
         // aggregate belongs to that aggregate, not to whichever one the payload names.
         injectAggregateBinding(model, enrichedData);
-        
+
         // 生成主键（如果需要）
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
         if (!enrichedData.containsKey(primaryKey.getCode())) {
             // 使用TypeSystemManager根据字段类型生成主键
             Object generatedPk = typeSystemManager.generatePrimaryKey(primaryKey);
             enrichedData.put(primaryKey.getCode(), generatedPk);
-            log.debug("Generated primary key for model {}: {} = {}", 
+            log.debug("Generated primary key for model {}: {} = {}",
                      logSafe(modelCode), logSafe(primaryKey.getCode()), logSafe(generatedPk));
         }
-        
+
         // 数据类型转换
         enrichedData = convertDataTypes(model, enrichedData);
 
@@ -1207,7 +1213,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // (b) hand automations and SLA a field-masked, incomplete record.
         // The create itself is already authorized by the caller-facing layer.
         Map<String, Object> createdRecord =
-                MetaContext.runWithoutDataPermission(() -> getById(modelCode, recordIdValue));
+                MetaContext.runWithCommandPermitScope("ALL", () -> getById(modelCode, recordIdValue));
         try {
             List<FieldChange> changes = changeTracker.diff(null, createdRecord, modelCode);
             changeTracker.recordChange(ChangeRecord.builder()
@@ -1247,7 +1253,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      */
     private Map<String, Object> convertDataTypes(ModelDefinition model, Map<String, Object> data) {
         Map<String, Object> convertedData = new HashMap<>(data);
-        
+
         for (FieldDefinition field : model.getFields()) {
             // Skip JSONB virtual fields — they are merged and serialized separately
             if (field.isJsonbVirtual()) continue;
@@ -1268,7 +1274,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 // 保持原值，让数据库处理类型转换
             }
         }
-        
+
         return convertedData;
     }
 
@@ -1305,7 +1311,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (data == null || data.isEmpty()) {
             return Collections.emptySet();
         }
-        if (MetaContext.isDataPermissionBypassed()) {
+        if (MetaContext.hasCommandPermitScope()) {
             return Collections.emptySet();
         }
         Long tenantId = getCurrentTenantId();
@@ -1365,12 +1371,12 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (value == null) {
             return null;
         }
-        
+
         String dataType = field.getDataType();
         if (dataType == null) {
             return value;
         }
-        
+
         switch (dataType.toUpperCase()) {
             case "DATE":
                 if (value instanceof String) {
@@ -1434,13 +1440,13 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     }
                 }
                 return value;
-                
+
             case "BOOLEAN":
                 if (value instanceof String) {
                     return Boolean.valueOf((String) value);
                 }
                 return value;
-                
+
             default:
                 return value;
         }
@@ -1453,18 +1459,18 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
             ModelDefinition model = getModelDefinition(modelCode);
             String tableName = model.getTableName();
-            
+
             // 检查表是否存在
             if (!tableMetadataService.tableExists(tableName)) {
                 log.info("Table {} does not exist, creating it automatically for model: {}",
                         logSafe(tableName), logSafe(modelCode));
-                
+
                 // 使用SchemaManagementService创建表
                 SchemaOperationResult result = schemaManagementService.createTableByModel(modelCode);
                 if (!result.isSuccess()) {
                     throw new MetaServiceException("Failed to create table for model " + modelCode + ": " + result.getMessage());
                 }
-                
+
                 log.info("Successfully created table {} for model: {}", logSafe(tableName), logSafe(modelCode));
             }
 
@@ -1487,15 +1493,15 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // inside, and only when the payload happens to carry a date/time field. Copying also
         // means we no longer mutate a caller's map behind its back.
         Map<String, Object> data = new LinkedHashMap<>(inputData);
-        
+
         // Field-level write permission (gap #1): strip fields the current user may not write
         Set<String> strippedNonWritable = stripNonWritableFields(modelCode, data);
 
         logOperation("update", modelCode, recordId, data.keySet());
-        
+
         try {
             ModelDefinition model = getModelDefinition(modelCode);
-            
+
             // Check if record exists
             Map<String, Object> existingRecord = getById(modelCode, recordId);
             if (existingRecord == null) {
@@ -1524,7 +1530,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // path and preventing MyBatis from binding Instant as an untyped
             // Object for dynamic timestamp columns.
             data = convertDataTypes(model, data);
-            
+
             // Set system fields
             Map<String, Object> enrichedData = new HashMap<>(data);
             enrichedData.put("updated_at", java.sql.Timestamp.from(java.time.Instant.now()));
@@ -1532,7 +1538,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             enrichedData.remove("tenant_id");
             enrichedData.remove("created_at");
             enrichedData.remove("created_by");
-            
+
             // Remove primary key field (not allowed to update)
             try {
                 FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
@@ -1546,13 +1552,18 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 enrichedData.remove(modelCode + "_id");
                 enrichedData.remove("device_id"); // For device model specifically
             }
-            
+
             // Filter out non-writable virtual fields (COMPUTED_READONLY, TRANSIENT)
             List<String> changedFields = new ArrayList<>(enrichedData.keySet());
             filterVirtualFields(model, enrichedData);
 
-            // Optimistic locking: extract expectedVersion if present
-            Object expectedVersion = enrichedData.remove("_expectedVersion");
+            // D5: a command write compares against the version the server loaded at the
+            // authorization boundary. Direct non-command callers retain the legacy payload
+            // contract for compatibility.
+            Object clientExpectedVersion = enrichedData.remove("_expectedVersion");
+            Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
+            Object expectedVersion =
+                    planExpectedVersion != null ? planExpectedVersion : clientExpectedVersion;
 
             // Use JSONB-merge-aware toColumnData for UPDATE to preserve unmodified JSONB keys
             Map<String, Object> columnData = toColumnDataForUpdate(model, enrichedData, existingRecord);
@@ -1576,6 +1587,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 }
                 throw new MetaServiceException("Failed to update record");
             }
+            if (planExpectedVersion != null) {
+                MetaContext.advanceCommandExpectedVersion(modelCode, recordId);
+            }
 
             // Materialize computed fields after update
             virtualFieldEngine.materialize(modelCode, recordId, changedFields);
@@ -1585,7 +1599,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             // The pre-update read of existingRecord above deliberately keeps the
             // permission projection — you may not modify a record you cannot see.
             Map<String, Object> updatedRecord =
-                    MetaContext.runWithoutDataPermission(() -> getById(modelCode, recordId));
+                    MetaContext.runWithCommandPermitScope("ALL", () -> getById(modelCode, recordId));
             try {
                 List<FieldChange> changes = changeTracker.diff(existingRecord, updatedRecord, modelCode);
                 if (!changes.isEmpty()) {
@@ -1613,7 +1627,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             }
 
             return updatedRecord;
-            
+
         } catch (Exception e) {
             log.error("Update operation failed for model {} with ID {}: {}",
                     logSafe(modelCode), logSafe(recordId), logSafe(e.getMessage()), e);
@@ -1636,6 +1650,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
 
         // Get record before deletion for change tracking
         Map<String, Object> existingRecord = getById(modelCode, recordId);
+        Long planExpectedVersion = MetaContext.getCommandExpectedVersion(modelCode, recordId);
 
         // 构建删除条件
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
@@ -1650,12 +1665,18 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             updateData.put("deleted_flag", true);
             updateData.put("updated_at", java.time.Instant.now());
             updateData.put("updated_by", getCurrentUserId());
-            result = executeScopedUpdate(model, modelCode, primaryKeyColumn, recordId, updateData, Set.of(), null);
+            result = executeScopedUpdate(
+                    model, modelCode, primaryKeyColumn, recordId, updateData, Set.of(), planExpectedVersion);
         } else {
             // Hard delete: DELETE FROM (default behavior)
-            result = executeScopedDelete(model, modelCode, primaryKeyColumn, recordId);
+            result = executeScopedDelete(
+                    model, modelCode, primaryKeyColumn, recordId, planExpectedVersion);
         }
         if (result <= 0) {
+            if (planExpectedVersion != null) {
+                throw new com.auraboot.framework.exception.ConflictException(
+                        "Delete refused: target changed after command authorization");
+            }
             throw new MetaServiceException("Failed to delete record");
         }
 
@@ -1743,7 +1764,8 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             ModelDefinition model,
             String modelCode,
             String primaryKeyColumn,
-            String recordId) {
+            String recordId,
+            Long expectedVersion) {
         String tableName = SqlSafetyUtils.requireIdentifier(model.getTableName(), "table name");
         String pkColumn = SqlSafetyUtils.requireIdentifier(primaryKeyColumn, "primary key column");
         Long tenantId = getCurrentTenantId();
@@ -1758,6 +1780,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 .append(pkColumn)
                 .append(" = #{params.recordId}")
                 .append(" AND tenant_id = #{params.tenantId}");
+        if (expectedVersion != null) {
+            params.put("expectedVersion", expectedVersion);
+            sql.append(" AND row_version = #{params.expectedVersion}");
+        }
         appendAggregateBindingGuard(sql, params, model);
         appendScopedWriteGuards(sql, tenantId, modelCode, userId, "delete");
 
@@ -1767,18 +1793,15 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     /**
      * Pin a write to the aggregate root the command was authorized against.
      *
-     * <p>Deliberately NOT gated on {@link MetaContext#isDataPermissionBypassed()}. That flag means
-     * "do not re-run the caller's read projection", which is a statement about re-deciding policy.
-     * This is not a decision — no policy is consulted — it is the execution of a boundary the entry
-     * already fixed. A command authorized for Q1001 must not reach Q2002's rows precisely on the
-     * paths that inherit its authority, so switching it off there would remove the guard exactly
-     * where it is load-bearing.</p>
+     * <p>This is not a policy decision: it executes the aggregate boundary the entry already fixed.
+     * A command authorized for Q1001 must not reach Q2002's rows precisely on the paths that inherit
+     * its permit plan.</p>
      *
      * <p>Inert unless both an aggregate scope is open and the model declares a binding, so models
      * opt in one at a time rather than the whole platform changing behaviour at once.</p>
      */
     // package-private + static: the safety property (an open aggregate scope pins every guarded
-    // write, including on bypassed paths) is directly tested, and the guard depends on no
+    // write, including under an authoritative command plan) is directly tested, and the guard depends on no
     // instance state.
     static void appendAggregateBindingGuard(StringBuilder sql, Map<String, Object> params, ModelDefinition model) {
         String aggregateId = MetaContext.getCommandAggregateId();
@@ -1839,7 +1862,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             String modelCode,
             Long userId,
             String operation) {
-        if (MetaContext.isDataPermissionBypassed()) {
+        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        if (permitFilter != null) {
+            appendScopedBulkFilter(sql, permitFilter);
             return;
         }
 
@@ -1864,33 +1889,17 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     /**
-     * The row filter for a guarded write. When the permit plan resolved that the caller has
-     * <strong>ALL</strong> access, honour that one boundary decision and skip the per-site policy
-     * lookup — the grade was derived from this same engine, so ALL means the engine would return a
-     * blank filter anyway; the result is identical, with one fewer decision (§11.10, the boundary
-     * becomes authoritative for the unrestricted case).
-     *
-     * <p>For any restricted grade, or no plan in force, defer to the engine's exact policy filter
-     * (SELF / DEPARTMENT / CUSTOM) unchanged. Folding those onto the plan's binary grade would change
-     * behaviour for DEPARTMENT/CUSTOM tenants, so it is left for a step that can prove it with a
-     * caller that holds view-but-self-write (§11.10 stage 3) — not smuggled in here.</p>
+     * The row filter for a guarded write. A command plan executes its authoritative grade directly:
+     * ALL contributes no predicate and SELF contributes the owner predicate. Without a command plan,
+     * direct callers retain the existing engine path.
      */
     private String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId) {
-        if (planGrantsUnrestrictedWrite(MetaContext.getCommandPermitScope())) {
-            return "";
+        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        if (permitFilter != null) {
+            return permitFilter;
         }
         return DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
                 () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
-    }
-
-    /**
-     * Whether the permit plan resolved the caller has unrestricted (ALL) write access. Only an
-     * explicit {@code ALL} grade qualifies — {@code null} (no plan), {@code SELF}, or any other grade
-     * defers to the engine, the fail-closed direction so a missing or unexpected grade never skips a
-     * filter. Package-private + static: pure, tested directly with no wiring.
-     */
-    static boolean planGrantsUnrestrictedWrite(String planScope) {
-        return "ALL".equals(planScope);
     }
 
     @Override
@@ -2046,17 +2055,17 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
 
         logOperation("batchUpdate", modelCode, dataList.size());
-        
+
         ModelDefinition model = getModelDefinition(modelCode);
         FieldDefinition primaryKey = metadataService.getPrimaryKeyField(modelCode);
-        
+
         DynamicBatchResponse response = new DynamicBatchResponse();
         response.setTotal(dataList.size());
-        
+
         int successCount = 0;
         int failedCount = 0;
         List<String> errors = new ArrayList<>();
-        
+
         for (int i = 0; i < dataList.size(); i++) {
             try {
                 Map<String, Object> data = dataList.get(i);
@@ -2064,7 +2073,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 if (recordId == null) {
                     throw new MetaServiceException("Primary key is required for update");
                 }
-                
+
                 update(modelCode, recordId.toString(), data);
                 successCount++;
             } catch (Exception e) {
@@ -2073,11 +2082,11 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                 log.warn("Batch update failed for row {}: {}", i + 1, logSafe(e.getMessage()), e);
             }
         }
-        
+
         response.setSuccess(successCount);
         response.setFailed(failedCount);
         response.setErrors(errors);
-        
+
         return response;
     }
 
@@ -2123,7 +2132,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
         sql.append(")");
 
-        if (!MetaContext.isDataPermissionBypassed()) {
+        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        if (permitFilter != null) {
+            appendScopedBulkFilter(sql, permitFilter);
+        } else {
             try {
                 String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
                 appendScopedBulkFilter(sql, rowFilter);
@@ -3074,7 +3086,10 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     Map<String, Object> params = new HashMap<>();
                     params.put("tenantId", tenantId);
 
-                    if (!MetaContext.isDataPermissionBypassed()) {
+                    String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+                    if (permitFilter != null) {
+                        appendScopedBulkFilter(sql, permitFilter);
+                    } else {
                         String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
                         if (rowFilter != null && !rowFilter.isBlank()) {
                             sql.append(" ").append(rowFilter);

@@ -145,15 +145,27 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             // hand-off, so what background work carries is a decision that can be named, not an
             // inherited bypass.
             String commandAuthority = text(inputParams, "commandAuthority");
-            Object result = commandAuthority == null
-                    ? handler.execute(pluginContext)
-                    : MetaContext.runWithCommandAuthority(commandAuthority, () -> {
-                        try {
-                            return handler.execute(pluginContext);
-                        } catch (Exception ex) {
-                            throw new CommandHandlerInvocationException(ex);
-                        }
-                    });
+            java.util.function.Supplier<Object> invocation = () -> {
+                try {
+                    return handler.execute(pluginContext);
+                } catch (Exception ex) {
+                    throw new CommandHandlerInvocationException(ex);
+                }
+            };
+            if (commandAuthority != null) {
+                java.util.function.Supplier<Object> delegate = invocation;
+                invocation = () -> MetaContext.runWithCommandAuthority(commandAuthority, delegate);
+            }
+            String commandPermitScope = text(inputParams, "commandPermitScope");
+            Long commandExpectedVersion = longValue(inputParams, "commandExpectedVersion");
+            Object result = commandPermitScope == null
+                    ? invocation.get()
+                    : MetaContext.runWithCommandPermitPlan(
+                            commandPermitScope,
+                            commandExpectedVersion,
+                            modelCode,
+                            recordPid,
+                            invocation);
             callback.report(100, "Completed");
 
             JsonNode data = result == null

@@ -12,8 +12,6 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -21,9 +19,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
 /**
- * The accessor's half of DDR-2026-07-22: a handler's data access stops being re-projected through
- * the caller's record-level read permission, but ONLY while the command boundary's authority is
- * open, and never a microsecond longer.
+ * The accessor consumes the permit-plan context installed by the command boundary and never
+ * manufactures data authority from the informational permission-code scope alone.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -40,17 +37,21 @@ class DynamicDataAccessorCommandAuthorityTest {
     @Test
     @DisplayName("inside the scope, a handler's write is not re-projected through the caller")
     void insideTheScopeTheProjectionIsLifted() {
-        AtomicBoolean bypassedDuringCall = new AtomicBoolean(false);
+        java.util.concurrent.atomic.AtomicReference<String> scopeDuringCall =
+                new java.util.concurrent.atomic.AtomicReference<>();
         when(dynamicDataService.update(anyString(), anyString(), any())).thenAnswer(i -> {
-            bypassedDuringCall.set(MetaContext.isDataPermissionBypassed());
+            scopeDuringCall.set(MetaContext.getCommandPermitScope());
             return Map.of("pid", "REC-1");
         });
         DynamicDataAccessorImpl accessor = new DynamicDataAccessorImpl(dynamicDataService);
 
-        MetaContext.runWithCommandAuthority("qo.price.manage",
-                () -> accessor.update("qo_price_evidence_common", "REC-1", Map.of("qo_pe_status", "captured")));
+        MetaContext.runWithCommandPermitPlan(
+                "SELF", 4L, "qo_price_evidence_common", "REC-1",
+                () -> MetaContext.runWithCommandAuthority("qo.price.manage",
+                        () -> accessor.update("qo_price_evidence_common", "REC-1",
+                                Map.of("qo_pe_status", "captured"))));
 
-        assertThat(bypassedDuringCall).isTrue();
+        assertThat(scopeDuringCall).hasValue("SELF");
     }
 
     /**
@@ -60,16 +61,17 @@ class DynamicDataAccessorCommandAuthorityTest {
     @Test
     @DisplayName("with no authority open, the caller's projection still applies")
     void withoutAuthorityNothingChanges() {
-        AtomicBoolean bypassedDuringCall = new AtomicBoolean(true);
+        java.util.concurrent.atomic.AtomicReference<String> scopeDuringCall =
+                new java.util.concurrent.atomic.AtomicReference<>("sentinel");
         when(dynamicDataService.update(anyString(), anyString(), any())).thenAnswer(i -> {
-            bypassedDuringCall.set(MetaContext.isDataPermissionBypassed());
+            scopeDuringCall.set(MetaContext.getCommandPermitScope());
             return Map.of("pid", "REC-1");
         });
         DynamicDataAccessorImpl accessor = new DynamicDataAccessorImpl(dynamicDataService);
 
         accessor.update("qo_price_evidence_common", "REC-1", Map.of("qo_pe_status", "captured"));
 
-        assertThat(bypassedDuringCall).isFalse();
+        assertThat(scopeDuringCall.get()).isNull();
     }
 
     /**
@@ -80,10 +82,11 @@ class DynamicDataAccessorCommandAuthorityTest {
     @Test
     @DisplayName("the scope does not outlive the command, so the next task on this thread is unaffected")
     void theScopeDoesNotLeakToTheNextTaskOnTheSameThread() {
-        AtomicBoolean bypassedInSecondTask = new AtomicBoolean(true);
+        java.util.concurrent.atomic.AtomicReference<String> scopeInSecondTask =
+                new java.util.concurrent.atomic.AtomicReference<>("sentinel");
         when(dynamicDataService.update(anyString(), anyString(), any())).thenReturn(Map.of("pid", "REC-1"));
         when(dynamicDataService.getById(anyString(), anyString())).thenAnswer(i -> {
-            bypassedInSecondTask.set(MetaContext.isDataPermissionBypassed());
+            scopeInSecondTask.set(MetaContext.getCommandPermitScope());
             return Map.of("pid", "REC-2");
         });
         DynamicDataAccessorImpl accessor = new DynamicDataAccessorImpl(dynamicDataService);
@@ -94,9 +97,9 @@ class DynamicDataAccessorCommandAuthorityTest {
         accessor.getById("qo_quote_common", "REC-2");
 
         assertThat(MetaContext.hasCommandAuthority()).isFalse();
-        assertThat(bypassedInSecondTask)
+        assertThat(scopeInSecondTask.get())
                 .as("an unrelated task must not inherit a previous command's authority")
-                .isFalse();
+                .isNull();
     }
 
     @Test
@@ -107,7 +110,7 @@ class DynamicDataAccessorCommandAuthorityTest {
         })).isInstanceOf(IllegalStateException.class);
 
         assertThat(MetaContext.hasCommandAuthority()).isFalse();
-        assertThat(MetaContext.isDataPermissionBypassed()).isFalse();
+        assertThat(MetaContext.hasCommandPermitScope()).isFalse();
     }
 
     /** A nested command must restore the outer authority, not clear it. */

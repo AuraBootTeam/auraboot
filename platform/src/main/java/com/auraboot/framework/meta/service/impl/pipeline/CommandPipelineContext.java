@@ -64,10 +64,10 @@ public class CommandPipelineContext {
     private CommandAuthorizationVerdict authorizationVerdict;
 
     /**
-     * Each phase's authorization finding, accumulated as the pipeline runs, for the forthcoming
+     * Each phase's authorization finding, accumulated as the pipeline runs, for the
      * {@link CommandPermitPlan} (deny-overrides combination, authorization architecture §11.15).
-     * Shadow: filled but not yet consumed — a phase records here <em>in addition to</em> whatever it
-     * already does, so the plan can later be assembled without changing any phase's behaviour.
+     * A phase records here in addition to its own immediate denial behaviour; the assembly phase
+     * folds the complete authorization axis once.
      */
     @Builder.Default
     private List<CommandPermitPlan.PhaseDecision> phaseDecisions = new ArrayList<>();
@@ -84,9 +84,8 @@ public class CommandPipelineContext {
      * authorization phases have run (assembled by {@code PermitPlanAssemblyPhase}, order 550 — after
      * the last authorization gate, before the data layer).
      *
-     * <p><strong>Phase-1 Shadow.</strong> Assembled but not yet enforced: the data layer still
-     * decides for itself. The next slice makes the data layer read this plan's scope/version instead
-     * of re-deciding. Null until the assembly phase runs (or if it was skipped).</p>
+     * <p>A permitting plan with a resolved scope is enforced by the remaining guarded phases and
+     * data layer. Null until the assembly phase runs (or if it was skipped).</p>
      */
     private CommandPermitPlan permitPlan;
 
@@ -99,6 +98,12 @@ public class CommandPipelineContext {
      * check once that deep projection stops applying to a handler's own bookkeeping writes.</p>
      */
     private Boolean targetRecordReadable;
+
+    /**
+     * Server-loaded optimistic version of the user-named command target. Captured by the boundary
+     * read that already resolves the target, then copied into the permit plan (D5).
+     */
+    private Long targetRecordVersion;
 
     /** Target state resolved by STATE_CHECK phase */
     private String targetState;

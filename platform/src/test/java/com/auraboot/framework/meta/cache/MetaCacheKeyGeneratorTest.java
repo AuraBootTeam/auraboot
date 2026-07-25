@@ -29,15 +29,19 @@ class MetaCacheKeyGeneratorTest {
     }
 
     @Test
-    void dataAccessContextSuffixSeparatesBypassState() {
+    void dataAccessContextSuffixSeparatesPermitGrades() {
         MetaContext.setContext(10L, 20L, "user-a", "user-a");
         MetaContext.setMemberId(30L);
         String scoped = MetaCacheKeyGenerator.getDataAccessContextSuffix();
 
-        String bypassed = MetaContext.runWithoutDataPermission(
+        String all = MetaContext.runWithCommandPermitScope("ALL",
+                MetaCacheKeyGenerator::getDataAccessContextSuffix);
+        String self = MetaContext.runWithCommandPermitScope("SELF",
                 MetaCacheKeyGenerator::getDataAccessContextSuffix);
 
         assertThat(scoped).isEqualTo("10:20:30:scoped");
-        assertThat(bypassed).isEqualTo("10:20:30:bypass");
+        assertThat(all).isEqualTo("10:20:30:permit-ALL");
+        assertThat(self).isEqualTo("10:20:30:permit-SELF");
+        assertThat(all).isNotEqualTo(self);
     }
 }

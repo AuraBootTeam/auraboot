@@ -36,7 +36,8 @@ import static org.mockito.Mockito.when;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class CommandTargetScopePhaseTest {
 
-    private static final Map<String, Object> RECORD = Map.of("pid", "REC-1", "owner_id", 7L);
+    private static final Map<String, Object> RECORD =
+            Map.of("pid", "REC-1", "owner_id", 7L, "row_version", 13L);
 
     @Mock private DynamicDataService dynamicDataService;
     @Mock private ApplicationContext applicationContext;
@@ -63,6 +64,9 @@ class CommandTargetScopePhaseTest {
         phase.execute(ctx);
 
         assertThat(ctx.getTargetRecordReadable()).isTrue();
+        assertThat(ctx.getTargetRecordVersion())
+                .as("D5 uses the server-loaded target version, not the client's payload")
+                .isEqualTo(13L);
     }
 
     @Test
@@ -83,19 +87,19 @@ class CommandTargetScopePhaseTest {
     @Test
     void readsTheTargetOutsideTheCallersOwnProjection() {
         CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
-        AtomicBoolean bypassedDuringRead = new AtomicBoolean(false);
+        AtomicBoolean allPermitDuringRead = new AtomicBoolean(false);
         when(dynamicDataService.getById(anyString(), anyString())).thenAnswer(invocation -> {
-            bypassedDuringRead.set(MetaContext.isDataPermissionBypassed());
+            allPermitDuringRead.set("ALL".equals(MetaContext.getCommandPermitScope()));
             return RECORD;
         });
         givenPermission(true);
 
         phase.execute(context("qo_quote_common", "REC-1"));
 
-        assertThat(bypassedDuringRead).isTrue();
-        assertThat(MetaContext.isDataPermissionBypassed())
-                .as("the bypass must not outlive the read")
-                .isFalse();
+        assertThat(allPermitDuringRead).isTrue();
+        assertThat(MetaContext.getCommandPermitScope())
+                .as("the explicit ALL plan must not outlive the boundary read")
+                .isNull();
     }
 
     @Test

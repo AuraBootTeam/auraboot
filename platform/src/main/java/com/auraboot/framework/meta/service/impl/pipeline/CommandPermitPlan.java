@@ -18,9 +18,9 @@ import java.util.List;
  * plan's scope and asserts the plan's version, and that is all. See the authorization architecture
  * §11.15 (owner-settled decisions D1–D6) and §11.10 (shadow → enforce migration).</p>
  *
- * <p><strong>Phase-1 Shadow.</strong> Nothing constructs or consumes a full plan yet — this is the
- * carrier and the combination algebra, unit-proven, that the phase wiring (next slice) and the data
- * layer (the slice after) build on. Introducing it changes no behaviour.</p>
+ * <p>A permitting plan with a resolved scope is published after assembly and remains authoritative
+ * for every downstream guarded phase. DENY, ABSTAIN, and unresolved scopes publish nothing, so
+ * legacy direct-call enforcement remains the fail-secure fallback.</p>
  */
 public record CommandPermitPlan(
         Decision decision,

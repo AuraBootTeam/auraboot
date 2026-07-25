@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * 5. Pagination
  *
  * Uses real database, no mocking.
- * 
+ *
  * Note: This test class does NOT use @Transactional because:
  * 1. Physical table creation (DDL) requires committed transactions
  * 2. Tests need to share the same model/table across test methods
@@ -90,7 +90,7 @@ class DynamicDataServiceIntegrationTest {
     private Model testModel;
     private final List<String> createdRecordPids = Collections.synchronizedList(new ArrayList<>());
     private boolean modelInitialized = false;
-    
+
     // Test context data
     private User testUser;
     private Tenant testTenant;
@@ -116,7 +116,7 @@ class DynamicDataServiceIntegrationTest {
             try {
                 // Clean up any existing test model with same code (from previous failed runs)
                 cleanupExistingTestModel();
-                
+
                 // Create fresh model and fields for this test run
                 createTestModel();
                 createTestFields();
@@ -128,7 +128,7 @@ class DynamicDataServiceIntegrationTest {
             }
         }
     }
-    
+
     /**
      * Clean up any existing test model with the same code from previous test runs
      */
@@ -140,26 +140,26 @@ class DynamicDataServiceIntegrationTest {
                 "(SELECT id FROM ab_meta_model WHERE code = ? AND tenant_id = ?)",
                 testModelCode, testTenant.getId()
             );
-            
+
             // Delete fields created for this model (by code pattern)
             jdbcTemplate.update(
                 "DELETE FROM ab_meta_field WHERE code IN ('name', 'status', 'pid') AND tenant_id = ?"
                 , testTenant.getId()
             );
-            
+
             // Delete the model
             jdbcTemplate.update(
                 "DELETE FROM ab_meta_model WHERE code = ? AND tenant_id = ?",
                 testModelCode, testTenant.getId()
             );
-            
+
             // Drop the physical table if it exists
             try {
                 jdbcTemplate.execute("DROP TABLE IF EXISTS " + testTableName);
             } catch (Exception e) {
                 log.debug("Table {} does not exist or could not be dropped", testTableName);
             }
-            
+
             log.info("Cleaned up existing test model: {}", testModelCode);
         } catch (Exception e) {
             log.debug("No existing test model to clean up: {}", e.getMessage());
@@ -179,7 +179,7 @@ class DynamicDataServiceIntegrationTest {
         if (testTenant != null && testUser != null) {
             MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
         }
-        
+
         // Clean up records created in this test using pid
         for (String pid : new ArrayList<>(createdRecordPids)) {
             try {
@@ -232,7 +232,7 @@ class DynamicDataServiceIntegrationTest {
 
             // Set MetaContext
             MetaContext.setContext(testTenant.getId(), testUser.getId(), testUser.getPid(), testUser.getUserName());
-            
+
         } catch (Exception e) {
             throw new RuntimeException("Failed to setup tenant context", e);
         }
@@ -257,12 +257,12 @@ class DynamicDataServiceIntegrationTest {
         // Then
         assertNotNull(result, "Create result should not be null");
         assertNotNull(result.get("pid"), "pid should be generated");
-        
+
         String pid = result.get("pid").toString();
         createdRecordPids.add(pid);
 
         // Verify record can be queried
-        Map<String, Object> queried = MetaContext.runWithoutDataPermission(
+        Map<String, Object> queried = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(testModelCode, pid));
         assertNotNull(queried);
         assertEquals(pid, queried.get("pid"));
@@ -331,7 +331,7 @@ class DynamicDataServiceIntegrationTest {
         String latestUpdatedPid = pids.get(0);
         Map<String, Object> updateData = new HashMap<>();
         updateData.put("status", "published");
-        MetaContext.runWithoutDataPermission(
+        MetaContext.runWithCommandPermitScope("ALL",
                 () -> { dynamicDataService.update(testModelCode, latestUpdatedPid, updateData); });
 
         DynamicQueryRequest request = DynamicQueryRequest.builder()
@@ -365,7 +365,7 @@ class DynamicDataServiceIntegrationTest {
         createdRecordPids.add(pid);
 
         // When
-        Map<String, Object> result = MetaContext.runWithoutDataPermission(
+        Map<String, Object> result = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(testModelCode, pid));
 
         // Then
@@ -398,13 +398,13 @@ class DynamicDataServiceIntegrationTest {
         updateData.put("name", "更新后");
         updateData.put("status", "published");
 
-        Map<String, Object> result = MetaContext.runWithoutDataPermission(
+        Map<String, Object> result = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.update(testModelCode, pid, updateData));
 
         // Then
         assertNotNull(result);
 
-        Map<String, Object> updated = MetaContext.runWithoutDataPermission(
+        Map<String, Object> updated = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(testModelCode, pid));
         assertEquals("更新后", updated.get("name"));
         assertEquals("published", updated.get("status"));
@@ -429,11 +429,11 @@ class DynamicDataServiceIntegrationTest {
         String pid = created.get("pid").toString();
 
         // When
-        MetaContext.runWithoutDataPermission(() -> { dynamicDataService.delete(testModelCode, pid); });
+        MetaContext.runWithCommandPermitScope("ALL", () -> { dynamicDataService.delete(testModelCode, pid); });
 
         // Then
         assertThrows(Exception.class, () -> {
-            MetaContext.runWithoutDataPermission(() -> { dynamicDataService.getById(testModelCode, pid); });
+            MetaContext.runWithCommandPermitScope("ALL", () -> { dynamicDataService.getById(testModelCode, pid); });
         }, "Query after delete should throw exception");
 
         log.info("✓ Delete successful: {}", pid);
@@ -464,7 +464,7 @@ class DynamicDataServiceIntegrationTest {
         assertNotNull(result);
         assertEquals(5, result.getTotal());
         assertTrue(result.getSuccess() >= 4, "At least 4 should succeed");
-        
+
         // Track created records for cleanup
         if (result.getSuccessItems() != null) {
             for (Map<String, Object> r : result.getSuccessItems()) {
@@ -495,10 +495,10 @@ class DynamicDataServiceIntegrationTest {
             assertThrows(com.auraboot.framework.meta.exception.ValidationException.class, () -> {
             dynamicDataService.create(testModelCode, invalidData);
         }, "Creating record without required field 'name' should throw exception");
-        
+
         log.info("✓ Required field validation passed - exception thrown: {}", exception.getMessage());
         assertTrue(
-            exception.getMessage().contains("name") || 
+            exception.getMessage().contains("name") ||
             exception.getMessage().contains("required"),
             "Exception should indicate missing required field"
         );
