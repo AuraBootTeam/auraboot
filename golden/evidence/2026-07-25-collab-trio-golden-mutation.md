@@ -49,3 +49,20 @@ Verified against the real stack rather than mocks, before and after the fix:
 | header notification bell | absent (component had zero imports) | rendered, badge + dropdown open |
 | REST `@mention` → recipient Inbox | 0 items | 1 MENTION item with deep link |
 | structured `mentionTargets` → agent reply | no reply | agent reply persisted |
+
+## 4. What proving the gate green caught
+
+Running `scripts/collab-trio-golden-run.sh` for the first time — before trusting it —
+failed 2 of 26 (`IB-1`, `NC-6`); the immediate re-run passed 26/26. A gate that is red
+on a cold stack and green on the next run is worse than no gate: people learn to
+re-run it instead of reading it.
+
+Cause: `oss-golden-stack.sh up` pre-warms only `/report-designer` and `/dashboard`, so
+`/inbox` and `/notifications` are compiled by Vite on first navigation and the first
+render can outrun the assertion timeouts. The stack script documents exactly this
+fallback ("curl the route once before running"), so the runner now pre-warms both
+routes between stack bring-up and the test run.
+
+Recorded here rather than quietly fixed: the flakiness was real, and the fix is a
+mitigation for cold-start compile latency, not a proof that no timing sensitivity
+remains.

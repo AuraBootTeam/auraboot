@@ -29,7 +29,7 @@
 #
 # Usage:
 #   scripts/collab-trio-golden-run.sh [--slot N] [--name NAME] [--keep] [--repeat K]
-#     --slot N     isolated-stack slot (default: 86). Pick one not used by other runtimes.
+#     --slot N     isolated-stack slot (default: 88). Pick one not used by other runtimes.
 #     --name NAME  runtime name        (default: collab-trio-golden)
 #     --keep       leave the stack up after the run (for debugging a failure)
 #     --repeat K   run each golden K times (flakiness check; default: 1)
@@ -44,7 +44,7 @@ REPO_ROOT="$(dirname "$SCRIPT_DIR")"
 GS="$REPO_ROOT/scripts/oss-golden-stack.sh"
 
 NAME="collab-trio-golden"
-SLOT="86"
+SLOT="88"
 KEEP=0
 REPEAT=1
 
@@ -94,6 +94,19 @@ echo "[collab-golden] 1/3 fresh stack (destroy prior + up --fresh-db)"
 echo "[collab-golden] 2/3 resolve stack env"
 eval "$("$GS" env "$NAME")" || die "could not resolve stack env"
 echo "[collab-golden]     base=$PLAYWRIGHT_BASE_URL backend=$BACKEND_URL"
+
+# 2b. Pre-warm the two routes these goldens drive. `up`'s warm step only touches
+#     /report-designer and /dashboard, so /inbox and /notifications are cold on the
+#     first run: Vite compiles them on demand and the first navigation can outrun the
+#     assertion timeouts. That made this gate flaky — 2 failures on a cold stack,
+#     green on the next run once the Vite cache was populated. A gate that fails for
+#     that reason teaches people to ignore it, so warm the routes explicitly.
+echo "[collab-golden] 2b/3 pre-warm /inbox + /notifications (cold Vite compile)"
+for route in /inbox /notifications; do
+  curl --noproxy '*' -s -o /dev/null -m 120 "$PLAYWRIGHT_BASE_URL$route" \
+    && echo "[collab-golden]     warmed $route" \
+    || echo "[collab-golden]     WARN could not pre-warm $route (continuing)"
+done
 
 # 3. Run the goldens single-worker: the specs assert on list contents for the
 #    signed-in user, so two workers mutating that user's notifications concurrently
