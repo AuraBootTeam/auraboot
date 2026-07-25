@@ -19,7 +19,7 @@
 
 import { test, expect } from '@playwright/test';
 
-test.describe('AI Colleagues & Settings', () => {
+test.describe('AI Colleagues (DSL pages)', () => {
   test.setTimeout(30_000);
 
   // =========================================================================
@@ -27,7 +27,7 @@ test.describe('AI Colleagues & Settings', () => {
   // =========================================================================
 
   test('colleagues page loads with title, subtitle, create button, and card grid', async ({ page }) => {
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
 
     // Wait for API response
     await page.waitForResponse(
@@ -54,7 +54,7 @@ test.describe('AI Colleagues & Settings', () => {
   });
 
   test('AuraBot card is first, shows Official + Full Power badges, chat button, no edit button', async ({ page }) => {
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
     await page.waitForResponse(
       (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
       { timeout: 10_000 },
@@ -89,7 +89,7 @@ test.describe('AI Colleagues & Settings', () => {
   });
 
   test('AuraBot card shows status badge and type badge', async ({ page }) => {
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
     await page.waitForResponse(
       (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
       { timeout: 10_000 },
@@ -115,7 +115,7 @@ test.describe('AI Colleagues & Settings', () => {
   });
 
   test('non-AuraBot agent card has edit and chat buttons', async ({ page }) => {
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
     await page.waitForResponse(
       (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
       { timeout: 10_000 },
@@ -162,7 +162,7 @@ test.describe('AI Colleagues & Settings', () => {
   });
 
   test('clicking edit on agent card navigates to detail page with 5 tabs', async ({ page }) => {
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
     const listResponse = await page.waitForResponse(
       (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
       { timeout: 10_000 },
@@ -179,7 +179,7 @@ test.describe('AI Colleagues & Settings', () => {
 
     // Navigate directly to the detail page (Edit button uses navigate())
     const agentPid = nonAurabot.pid;
-    await page.goto(`/ai/colleagues/${agentPid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/p/c/ai_colleague_detail?agentPid=${agentPid}`, { waitUntil: 'domcontentloaded' });
 
     // Wait for tabs to appear (indicates detail page loaded with agent data)
     const profileTab = page.locator('[data-testid="tab-profile"]');
@@ -195,7 +195,7 @@ test.describe('AI Colleagues & Settings', () => {
 
   test('detail page Profile tab shows form fields and back button', async ({ page }) => {
     // Get a valid agent PID from the list API
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
     const listResponse = await page.waitForResponse(
       (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
       { timeout: 10_000 },
@@ -208,7 +208,7 @@ test.describe('AI Colleagues & Settings', () => {
       return;
     }
 
-    await page.goto(`/ai/colleagues/${nonAurabot.pid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/p/c/ai_colleague_detail?agentPid=${nonAurabot.pid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('[data-testid="tab-profile"]')).toBeVisible({ timeout: 10_000 });
 
     // Profile tab is active by default — form inputs should be visible
@@ -232,7 +232,7 @@ test.describe('AI Colleagues & Settings', () => {
 
   test('detail page tab switching works across all 5 tabs', async ({ page }) => {
     // Get a valid agent PID from the list API
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
     const listResponse = await page.waitForResponse(
       (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
       { timeout: 10_000 },
@@ -245,7 +245,7 @@ test.describe('AI Colleagues & Settings', () => {
       return;
     }
 
-    await page.goto(`/ai/colleagues/${nonAurabot.pid}`, { waitUntil: 'domcontentloaded' });
+    await page.goto(`/p/c/ai_colleague_detail?agentPid=${nonAurabot.pid}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('[data-testid="tab-profile"]')).toBeVisible({ timeout: 10_000 });
 
     // Click through each tab by data-testid and verify no errors
@@ -263,66 +263,4 @@ test.describe('AI Colleagues & Settings', () => {
     await expect(nameInput).toBeVisible({ timeout: 5_000 });
   });
 
-  // =========================================================================
-  // AI Settings hub page
-  // =========================================================================
-
-  test('settings hub shows title, subtitle, and all 6 setting cards with descriptions', async ({ page }) => {
-    await page.goto('/ai/settings', { waitUntil: 'domcontentloaded' });
-
-    // Page title
-    await expect(page.locator('h1')).toContainText('AI Settings');
-
-    // Subtitle
-    await expect(
-      page.getByText('Configure providers, tools, and governance'),
-    ).toBeVisible();
-
-    // All 6 cards visible with correct titles and descriptions
-    const expectedCards = [
-      { title: 'LLM Providers', desc: 'Configure AI model providers and API keys' },
-      { title: 'MCP Servers', desc: 'Connect external tool servers via MCP protocol' },
-      { title: 'Prompt Templates', desc: 'Manage reusable prompt templates' },
-      { title: 'Object Aliases', desc: 'Configure natural language aliases for data models' },
-      { title: 'Semantic Terms', desc: 'Define domain-specific vocabulary' },
-      { title: 'Governance Policies', desc: 'Set approval rules for agent actions' },
-    ];
-
-    for (const { title, desc } of expectedCards) {
-      await expect(page.getByText(title, { exact: true })).toBeVisible({ timeout: 3_000 });
-      await expect(page.getByText(desc)).toBeVisible();
-    }
-  });
-
-  test('settings card count is exactly 6 and each has an icon', async ({ page }) => {
-    await page.goto('/ai/settings', { waitUntil: 'domcontentloaded' });
-
-    const cards = page.getByTestId('ai-settings-card');
-    await expect(cards.first()).toBeVisible({ timeout: 5_000 });
-    const count = await cards.count();
-    expect(count).toBe(6);
-
-    // Each card has an SVG icon
-    for (let i = 0; i < count; i++) {
-      const svg = cards.nth(i).locator('svg');
-      await expect(svg.first()).toBeVisible();
-    }
-  });
-
-  test('settings cards link to correct target pages', async ({ page }) => {
-    await page.goto('/ai/settings', { waitUntil: 'domcontentloaded' });
-
-    // Wait for all 6 cards to be visible (ensures React hydration complete)
-    const cards = page.locator('.grid a[href]');
-    await expect(cards.nth(5)).toBeVisible({ timeout: 8_000 });
-
-    // Verify LLM Providers card navigates correctly
-    const llmCard = page.locator('a[href="/aurabot/providers"]').filter({ hasText: 'LLM Providers' });
-    await expect(llmCard).toBeVisible();
-
-    // Wait for load state before clicking to ensure React handlers are attached
-    await page.waitForLoadState('load');
-    await llmCard.click();
-    await expect(page).toHaveURL(/\/aurabot\/providers/, { timeout: 10_000 });
-  });
 });

@@ -31,7 +31,7 @@ async function createColleague(page: Page) {
     (r) => r.url().includes('/agent/providers/configured'),
     { timeout: 30_000 },
   );
-  await page.goto('/ai/colleagues/new', { waitUntil: 'domcontentloaded' });
+  await page.goto('/p/c/ai_colleague_new', { waitUntil: 'domcontentloaded' });
   await hydrated;
   await page.locator('[data-testid="wizard-template-skip"]').click();
   await page.locator('[data-testid="wizard-input-name"]').fill(COLLEAGUE_NAME);
@@ -44,7 +44,7 @@ async function createColleague(page: Page) {
     page.locator('[data-testid="wizard-btn-create"]').click(),
   ]);
   // /new matches "one segment under colleagues" as well as a pid does.
-  await expect(page).toHaveURL(/\/ai\/colleagues\/(?!new$)[^/]+$/, { timeout: 20_000 });
+  await expect(page).toHaveURL(/\/p\/c\/ai_colleague_detail\?agentPid=/, { timeout: 20_000 });
 }
 
 test.describe('Digital employee — allowed operations', () => {
@@ -114,7 +114,7 @@ test.describe('Digital employee — allowed operations', () => {
     await page.screenshot({ path: `${SHOTS}/30-delete-unchecked.png` });
 
     // --- now ask it to delete ---------------------------------------------
-    await page.goto('/ai/colleagues', { waitUntil: 'domcontentloaded' });
+    await page.goto('/p/c/ai_colleagues', { waitUntil: 'domcontentloaded' });
     await page.waitForResponse(
       (r) => r.url().includes('/agent-definition/list') && r.status() === 200,
       { timeout: 20_000 },
