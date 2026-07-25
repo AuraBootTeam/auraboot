@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.entitlement.spi.EntitlementChecker;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +22,11 @@ public class EntitlementPhase implements CommandPhase {
 
     private final EntitlementChecker entitlementChecker;
 
+    /** The plugin owning the command's namespace is not active for this tenant. */
+    static final String REASON_PLUGIN_ENTITLEMENT_REQUIRED = "plugin_entitlement_required";
+    /** The command's required feature is not entitled for this tenant. */
+    static final String REASON_FEATURE_ENTITLEMENT_REQUIRED = "feature_entitlement_required";
+
     @Override
     public String name() {
         return "entitlement_check";
@@ -34,13 +40,20 @@ public class EntitlementPhase implements CommandPhase {
     @Override
     public void execute(CommandPipelineContext ctx) {
         String modelCode = ctx.getCommand().getModelCode();
-        if (modelCode == null) return;
+        if (modelCode == null) {
+            ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.abstain(name()));
+            return;
+        }
 
         String namespace = modelCode.contains("_")
                 ? modelCode.substring(0, modelCode.indexOf('_'))
                 : modelCode;
 
         if (!entitlementChecker.isPluginActive(namespace)) {
+            // A gate: entitlement can refuse, but never grants. Record the refusal for the permit
+            // plan before throwing (shadow; nothing consumes it yet).
+            ctx.recordPhaseDecision(
+                    CommandPermitPlan.PhaseDecision.deny(REASON_PLUGIN_ENTITLEMENT_REQUIRED, name()));
             throw new BusinessException(ResponseCode.FORBIDDEN,
                     "Plugin entitlement required for command: " + ctx.getCommandCode());
         }
@@ -48,9 +61,14 @@ public class EntitlementPhase implements CommandPhase {
         String requiredFeature = ctx.getCommand().getRequiredFeature();
         if (requiredFeature != null && !requiredFeature.isEmpty()) {
             if (!entitlementChecker.hasFeature(namespace, requiredFeature)) {
+                ctx.recordPhaseDecision(
+                        CommandPermitPlan.PhaseDecision.deny(REASON_FEATURE_ENTITLEMENT_REQUIRED, name()));
                 throw new BusinessException(ResponseCode.FORBIDDEN,
                         "Feature entitlement required: " + requiredFeature);
             }
         }
+
+        // Entitlement satisfied — the gate has no objection, but it does not grant.
+        ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.abstain(name()));
     }
 }
