@@ -37,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipeline;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 
 import java.util.*;
@@ -198,9 +200,11 @@ public class CommandExecutorImpl implements CommandExecutor {
                 if (ctx.getCurrentPhase() != null) {
                     phaseTimings.put(ctx.getCurrentPhase(), System.currentTimeMillis() - ctx.getCurrentPhaseStart());
                 }
+                String denyReason = denialAuditReason(ctx);
+                String auditError = denyReason != null ? denyReason + " | " + e.getMessage() : e.getMessage();
                 effectExecutor.saveAuditLog(tenantId, commandCode, null, userId,
                         CommandAuditPayloads.withAuditContext(request.getPayload(), request.getAuditContext()),
-                        null, false, e.getMessage(), executionTimeMs, phaseReached, phaseTimings);
+                        null, false, auditError, executionTimeMs, phaseReached, phaseTimings);
             }
 
             if (e instanceof BusinessException || e instanceof ValidationException
@@ -209,6 +213,34 @@ public class CommandExecutorImpl implements CommandExecutor {
             }
             throw new BusinessException(ResponseCode.BadParam, "Command execution failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * The structured reason a command was refused at the boundary, folded into the failure audit so a
+     * denial is machine-readable in {@code ab_command_audit_log} rather than only a generic exception
+     * string (authz §11.15 — closing the silent-failure gap, net gap ④/⑤). Prefers the assembled
+     * permit plan's reason; falls back to the authorization verdict, because a granter/gate denial
+     * throws before the plan is assembled, leaving only the verdict the granter recorded. Returns
+     * {@code null} when the failure was not a boundary denial, so ordinary errors audit unchanged.
+     *
+     * <p>Package-private + static: pure, so the audited reason is tested directly with no execution
+     * wiring.</p>
+     */
+    static String denialAuditReason(CommandPipelineContext ctx) {
+        if (ctx == null) {
+            return null;
+        }
+        CommandPermitPlan plan = ctx.getPermitPlan();
+        if (plan != null && plan.isDenied()) {
+            return "boundary_denied[" + plan.deniedByPhase() + ":" + plan.reasonCode() + "]";
+        }
+        CommandAuthorizationVerdict verdict = ctx.getAuthorizationVerdict();
+        if (verdict != null && verdict.isDenied()) {
+            String required = verdict.requiredPermissions() == null || verdict.requiredPermissions().isEmpty()
+                    ? "" : " requires=" + String.join(",", verdict.requiredPermissions());
+            return "boundary_denied[authorization:" + verdict.reason() + required + "]";
+        }
+        return null;
     }
 
     // ==================== ExecutionConfig Parsing ====================
