@@ -1,0 +1,204 @@
+{
+  "run": {
+    "id": "mes-wms-2026-07-25",
+    "target": "AMOS MES/WMS 交付 FR — 真栈验收证据索引",
+    "sot": "web-admin/tests/mes-wms/README-test-quality-matrix.md",
+    "runtime": "host-first slot 63 (backend 6463 + Vite 5163 + BFF 6163, DB auraboot_63, 零 docker)",
+    "commit": "204574943 (test/mes-wms-golden-suite)",
+    "fix_rounds": 2
+  },
+  "groups": [
+    {
+      "id": "A",
+      "title": "后端真栈 golden — 真命令管道 + 真 DB round-trip (mes-wms-backend-golden.mjs, 34/34 checks)",
+      "requirement_ref": "AMOS_MES_WMS 终局 v1.1 · FR-04/05/09/13/16/20/22/10",
+      "rows": [
+        {
+          "id": "fr04",
+          "action": "FR-04 HandlingUnit pack/split/merge",
+          "surface": "api", "dependencies": "real-stack", "driver": "it",
+          "evidence": ["exit:mes-wms-backend-golden", "backend-golden.log"],
+          "assertion": "inv:pack → mt_inv_handling_unit 数量守恒 5+10=15 + child 链 + 2 event 行;note 用 inv_hu_code 非 pid (#230)",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr05",
+          "action": "FR-05 开工互锁 (7 检查评估器)",
+          "surface": "api", "dependencies": "real-stack", "driver": "it",
+          "evidence": ["exit:mes-wms-backend-golden", "backend-golden.log"],
+          "assertion": "check_interlock → checkedItems=7 + 明细 7 项 codes 含 tooling_life (#219 第7检查),blocked=failed 1",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr09",
+          "action": "FR-09 SMT 工装寿命累计",
+          "surface": "api", "dependencies": "real-stack", "driver": "it",
+          "evidence": ["exit:mes-wms-backend-golden", "backend-golden.log"],
+          "assertion": "create tooling → record_usage → used_cycles 累加 (>0)",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr13",
+          "action": "FR-13 齐套分析",
+          "surface": "api", "dependencies": "real-stack", "driver": "it",
+          "evidence": ["exit:mes-wms-backend-golden", "backend-golden.log"],
+          "assertion": "product→BOM→line→work order→compute_kitting → 1 kitting_result / status=short_non_critical rate=0 (缺料正确报缺,临界件安全)",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr16",
+          "action": "FR-16 Hold 放置与持久化",
+          "surface": "api", "dependencies": "real-stack", "driver": "it",
+          "evidence": ["exit:mes-wms-backend-golden", "backend-golden.log"],
+          "assertion": "place_hold → active hold 行持久化 (active holds=1)",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr20",
+          "action": "FR-20 设备停机 (防重叠重复计时)",
+          "surface": "api", "dependencies": "real-stack", "driver": "it",
+          "evidence": ["exit:mes-wms-backend-golden", "backend-golden.log"],
+          "assertion": "breakdown 转 status;重叠 breakdown 仍恰好 1 open downtime (不重复计时, #219)",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr22-be",
+          "action": "FR-22 班次交接 + 双签认 (后端)",
+          "surface": "api", "dependencies": "real-stack", "driver": "it",
+          "evidence": ["exit:mes-wms-backend-golden", "backend-golden.log"],
+          "assertion": "create_handover → pending_ack + workstation linked;acknowledge_handover → status=acknowledged (双签认)",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr10",
+          "action": "FR-10 FEFO/FIFO 拣货分配 (DEFERRED)",
+          "surface": "api", "dependencies": "real-stack", "driver": "it",
+          "evidence": [],
+          "assertion": "FEFO 排序逻辑已在 #217 交付;golden 未跑 — 需 warehouse(strategy=fefo)+2 效期 lot + balance(经 warehouse_in 收货流)+ pick demand 的多步 seed(add_lot_transaction≠balance、wh_in line 无 lot)。诚实标 untested。",
+          "verdict": "untested", "verdict_by": null
+        }
+      ]
+    },
+    {
+      "id": "B",
+      "title": "🟡 存量 FR — 真浏览器 UI golden + 美观性截图 (mes-wms-yellow-fr-golden.mjs 33/33 + mes-wms-ui-golden.mjs FR-22 5/5)",
+      "requirement_ref": "AMOS_MES_WMS 终局 v1.1 · FR-01/03/07/15/21/23/22 · FR-08/12/14",
+      "rows": [
+        {
+          "id": "fr01-ui",
+          "action": "FR-01 工单接入/冻结 — 生产管理列表页",
+          "surface": "ui", "dependencies": "real-stack", "driver": "browser",
+          "evidence": ["fr01-work-order.png", "exit:mes-wms-yellow-fr-golden"],
+          "assertion": "真浏览器渲染:工单/KitWO 行、BOM 列蓝链接(reference 解析)、计划产量、查看链接;无 404 / 无裸码 / 无 console error(golden 断言)+ 美观性截图复核优秀",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr03-ui",
+          "action": "FR-03 派工/工位分配 — 工位派工列表",
+          "surface": "ui", "dependencies": "real-stack", "driver": "browser",
+          "evidence": ["fr03-assignment.png", "exit:mes-wms-yellow-fr-golden"],
+          "assertion": "真浏览器渲染:干净分配列表;无 404/裸码/console error(golden 断言)",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr07-ui",
+          "action": "FR-07 工序执行 — 工位执行列表 + 工序列表",
+          "surface": "ui", "dependencies": "real-stack", "driver": "browser",
+          "evidence": ["fr07-station-exec.png", "fr07-operation-list.png", "exit:mes-wms-yellow-fr-golden"],
+          "assertion": "真浏览器渲染:工单/工序行、状态待开始(dict)、操作员 Alice、start 操作链;无 404/裸码/console error",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr15-ui",
+          "action": "FR-15 异常/Andon 工作台",
+          "surface": "ui", "dependencies": "real-stack", "driver": "browser",
+          "evidence": ["fr15-andon.png", "fr15-op-exception.png", "exit:mes-wms-yellow-fr-golden"],
+          "assertion": "真浏览器渲染:6 卡 metric-strip + filters + 分段 tab + 表 + 证据面板,空态整洁;无 404/裸码/console error",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr21-ui",
+          "action": "FR-21 产出/损耗/结案 — 报工记录列表",
+          "surface": "ui", "dependencies": "real-stack", "driver": "browser",
+          "evidence": ["fr21-work-report.png", "fr21-work-report-data.png", "exit:mes-wms-yellow-fr-golden"],
+          "assertion": "真浏览器渲染(seed 3 条):工序蓝链接、班次白班(dict)、完成80/不良2/工时45、编辑链接;无 404/裸码/console error",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr23-ui",
+          "action": "FR-23 生产控制塔 — 车间看板 dashboard",
+          "surface": "ui", "dependencies": "real-stack", "driver": "browser",
+          "evidence": ["fr23-shop-floor-fixed.png", "exit:mes-wms-yellow-fr-golden"],
+          "assertion": "真浏览器渲染(修复后):工位状态表 12 行完整、未解决异常表;修复 widget h=1 塌陷 bug (#240) 后截图复核优秀",
+          "verdict": "pass", "verdict_by": "agent-vision",
+          "vision_check": "fr23-shop-floor-fixed.png:工位状态表 12 行(SMT贴片/可用/产能100)完整显示,h=1→4 已解决表体塌陷"
+        },
+        {
+          "id": "fr22-ui",
+          "action": "FR-22 班次交接工作台 (UI)",
+          "surface": "ui", "dependencies": "real-stack", "driver": "browser",
+          "evidence": ["fr22-handover-workbench.png", "exit:mes-wms-ui-golden"],
+          "assertion": "真浏览器 5/5:页渲染 + metric-strip(待签认)+ #228 polish(班次白班/夜班 dict、状态已签认非 pending_ack)",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "fr08",
+          "action": "FR-08 材料验证 (backend sub-feature, 无独立 UI 页)",
+          "surface": "ui", "dependencies": "real-stack", "driver": "browser",
+          "evidence": [],
+          "assertion": "backend/handler 或 field 级 sub-feature,非 standalone 页;本轮未做 UI golden。诚实标 untested。",
+          "verdict": "untested", "verdict_by": null
+        },
+        {
+          "id": "fr12",
+          "action": "FR-12 序列化 (backend sub-feature, 无独立 UI 页)",
+          "surface": "ui", "dependencies": "real-stack", "driver": "browser",
+          "evidence": [],
+          "assertion": "field/handler 级 sub-feature,非 standalone 页;本轮未做 UI golden。诚实标 untested。",
+          "verdict": "untested", "verdict_by": null
+        },
+        {
+          "id": "fr14",
+          "action": "FR-14 测试维修 (backend sub-feature, 无独立 UI 页)",
+          "surface": "ui", "dependencies": "real-stack", "driver": "browser",
+          "evidence": [],
+          "assertion": "handler 级 sub-feature,非 standalone 页;本轮未做 UI golden。诚实标 untested。",
+          "verdict": "untested", "verdict_by": null
+        }
+      ]
+    },
+    {
+      "id": "C",
+      "title": "行动点驱动 + UX 修复 — seam 验证 + 2 个真 bug",
+      "requirement_ref": "FR-05/FR-07 互锁 seam · UX bug #240 / #1501",
+      "rows": [
+        {
+          "id": "seam-05-07",
+          "action": "FR-05/FR-07 互锁 seam — 真点 start → 互锁拦截",
+          "surface": "journey", "dependencies": "real-stack", "driver": "browser",
+          "evidence": ["fr07-before-start.png", "fr07-after-start.png", "exit:fr07-action-golden"],
+          "assertion": "真点某工序 start → FR-05 开工互锁拦截(无激活生产版本)→ DB 断言工序未非法转 in_progress + 拦截原因 toast 呈现 + 列表保留 (fr07-action-golden 5/5)",
+          "verdict": "pass", "verdict_by": "exit-signal"
+        },
+        {
+          "id": "ux-240",
+          "action": "UX bug #240 — FR-23 车间看板 table widget h=1 塌陷",
+          "surface": "ui", "dependencies": "real-stack", "driver": "browser",
+          "evidence": ["fr23-shop-floor.png", "fr23-shop-floor-fixed.png"],
+          "assertion": "smart-table-chart widget h=1 → 表体压缩 ~1 行高、12 行不可见 → h=1→4/3(参照 pe_oee_dashboard)。plugins #240 merged,截图变异复核",
+          "verdict": "pass", "verdict_by": "agent-vision",
+          "vision_check": "对比 fr23-shop-floor(修前塌陷)vs fr23-shop-floor-fixed(修后 12 行完整),h 修复生效"
+        },
+        {
+          "id": "ux-1501",
+          "action": "UX bug #1501 — list 行动点被拒不再整页崩「加载失败」",
+          "surface": "ui", "dependencies": "deployed", "driver": "browser",
+          "evidence": ["fr07-after-start.png"],
+          "assertion": "ListPageContent onError 不再设 page-level error → 行动点失败只 toast、列表保留。OSS #1501 merged+review;修复态在部署码上 live 验证(拒绝的行动点→列表完整保留、无整页崩)。",
+          "verdict": "partial", "verdict_by": "agent-vision",
+          "vision_check": "⚠️ 诚实口径:仅修复态正向证据(fr07-after-start.png 列表完整)。未取得独立未修复 RED 基线(栈已含 #1501,mutation 不可做——10+ 并发会话共享同一 canonical main checkout 的 Vite);故非变异分辨门。真正 RED→GREEN 需隔离的未修复前端(deferred, 低 ROI)。"
+        }
+      ]
+    }
+  ]
+}
