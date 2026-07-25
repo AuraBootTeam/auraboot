@@ -6,6 +6,7 @@ import com.auraboot.framework.permission.engine.model.PermissionExplanation;
 import com.auraboot.framework.permission.entity.PermissionAuditLog;
 import com.auraboot.framework.permission.mapper.PermissionAuditLogMapper;
 import com.auraboot.framework.permission.service.PermissionAuditService;
+import com.auraboot.framework.observability.TraceCorrelation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,6 +36,37 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
 
     private final PermissionAuditLogMapper auditLogMapper;
     private final ObjectMapper objectMapper;
+
+    /** Absent when tracing is disabled (the dev profile turns it off), hence ObjectProvider. */
+    private final org.springframework.beans.factory.ObjectProvider<io.micrometer.tracing.Tracer> tracerProvider;
+
+    /**
+     * Anchor the denial to the request's distributed trace so it is reachable from the
+     * eagle-eye console.
+     *
+     * <p>Both callers are {@code @Async}, so there is no span on this thread —
+     * {@link TraceCorrelation} falls back to the {@code MetaContext} snapshot that the
+     * {@code taskExecutor}'s {@code TenantAwareTaskDecorator} carried across the hop.
+     * Reading {@code tracer.currentSpan()} directly here would have written NULL forever,
+     * which is exactly what happened to {@code ab_query_audit_log}.
+     *
+     * <p>Isolated in its own try/catch on purpose. Stamping a trace id is a convenience;
+     * persisting the denial is the point. Because the callers wrap everything in a
+     * best-effort catch, anything that throws while resolving the tracer would silently
+     * skip the insert — trading the row we need for the annotation we would like. Same
+     * reasoning as {@code ToolLoopService.noteGoalDrift}: observability must never be the
+     * reason the real work fails.
+     */
+    private void stampTrace(PermissionAuditLog entry) {
+        try {
+            io.micrometer.tracing.Tracer tracer =
+                    tracerProvider == null ? null : tracerProvider.getIfAvailable();
+            entry.setTraceId(TraceCorrelation.traceId(tracer));
+            entry.setSpanId(TraceCorrelation.spanId(tracer));
+        } catch (Exception e) {
+            log.debug("Could not resolve a trace id for the permission audit row: {}", e.getMessage());
+        }
+    }
 
     @Override
     @Async
@@ -68,6 +100,8 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
                     explanation.steps(),
                     objectMapper.getTypeFactory().constructCollectionType(List.class, Object.class));
             entry.setEvaluationTrace(trace);
+
+            stampTrace(entry);
 
             entry.setCreatedAt(Instant.now());
             auditLogMapper.insertAuditLog(entry);
@@ -137,6 +171,8 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
                     List.of(step),
                     objectMapper.getTypeFactory().constructCollectionType(List.class, Object.class));
             entry.setEvaluationTrace(trace);
+            stampTrace(entry);
+
             entry.setCreatedAt(Instant.now());
             auditLogMapper.insertAuditLog(entry);
         } catch (Exception e) {

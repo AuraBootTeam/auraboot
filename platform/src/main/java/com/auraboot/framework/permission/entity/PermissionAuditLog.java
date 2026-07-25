@@ -61,5 +61,14 @@ public class PermissionAuditLog {
             jdbcType = JdbcType.OTHER)
     private List<Object> evaluationTrace;
 
+    /**
+     * OTel W3C traceId of the request that produced this decision. Distinct from the Rule
+     * Center {@code ruleTraceId} that may appear inside {@link #evaluationTrace}.
+     */
+    private String traceId;
+
+    /** OTel spanId; null when written on an @Async thread, where only the trace id survives. */
+    private String spanId;
+
     private Instant createdAt;
 }

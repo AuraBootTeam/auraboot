@@ -6,6 +6,7 @@ import com.auraboot.framework.permission.engine.model.PermissionExplanation;
 import com.auraboot.framework.permission.entity.PermissionAuditLog;
 import com.auraboot.framework.permission.mapper.PermissionAuditLogMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -38,6 +39,9 @@ class PermissionAuditServiceImplTest {
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
+
+    @Mock
+    private org.springframework.beans.factory.ObjectProvider<io.micrometer.tracing.Tracer> tracerProvider;
 
     @InjectMocks
     private PermissionAuditServiceImpl service;
@@ -260,5 +264,32 @@ class PermissionAuditServiceImplTest {
                 .thenReturn(List.of(new PermissionAuditLog()));
 
         assertThat(service.getLogsByTraceId(100L, "trace-permission-001", 10)).hasSize(1);
+    }
+
+    /**
+     * Trace stamping is a convenience; persisting the denial is the point.
+     *
+     * <p>This is the regression for a defect introduced while adding the trace column: the
+     * stamp ran inline inside the method's best-effort catch, so anything that threw while
+     * resolving the tracer skipped the insert entirely — trading the audit row we need for
+     * the annotation we would like. It presented as five tests reporting
+     * "auditLogMapper.insertAuditLog wanted but not invoked" with no visible error, because
+     * the catch swallowed it. Same class of failure as an @Async writer silently writing
+     * NULL: nothing breaks loudly, the row just is not there.
+     */
+    @Test
+    @DisplayName("a failure resolving the tracer does not stop the denial being recorded")
+    void traceStampFailureDoesNotPreventTheAuditRow() {
+        when(tracerProvider.getIfAvailable()).thenThrow(new RuntimeException("tracer bean broken"));
+        EvaluationStep deny = new EvaluationStep("DataScope", EvaluationVerdict.DENY, "out of scope");
+        PermissionExplanation explanation = new PermissionExplanation(
+                1L, "model.user", "read", 10L, "USER-PID-10", false, List.of(deny));
+
+        service.logEvaluation(100L, explanation);
+
+        ArgumentCaptor<PermissionAuditLog> captor = ArgumentCaptor.forClass(PermissionAuditLog.class);
+        verify(auditLogMapper).insertAuditLog(captor.capture());
+        assertThat(captor.getValue().getReason()).isEqualTo("out of scope");
+        assertThat(captor.getValue().getTraceId()).isNull();
     }
 }

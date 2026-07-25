@@ -10706,8 +10706,24 @@ CREATE TABLE public.ab_permission_audit_log (
     result boolean NOT NULL,
     reason text,
     evaluation_trace jsonb,
-    created_at timestamp without time zone DEFAULT now()
+    created_at timestamp without time zone DEFAULT now(),
+    trace_id character varying(36),
+    span_id character varying(36)
 );
+
+
+--
+-- Name: COLUMN ab_permission_audit_log.trace_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_permission_audit_log.trace_id IS 'OTel W3C traceId (32-hex) of the request; correlates a DENY to the distributed trace. Distinct from the Rule Center ruleTraceId inside evaluation_trace.';
+
+
+--
+-- Name: COLUMN ab_permission_audit_log.span_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_permission_audit_log.span_id IS 'OTel spanId of the request; NULL when the row was written on an @Async thread, where only the trace id survives the hop.';
 
 
 --
@@ -20912,6 +20928,13 @@ CREATE INDEX idx_ab_perm_audit_resource ON public.ab_permission_audit_log USING 
 --
 
 CREATE INDEX idx_ab_perm_audit_resource_record_pid ON public.ab_permission_audit_log USING btree (tenant_id, resource_code, record_pid, created_at) WHERE (record_pid IS NOT NULL);
+
+
+--
+-- Name: idx_ab_permission_audit_log_trace_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_permission_audit_log_trace_id ON public.ab_permission_audit_log USING btree (trace_id) WHERE (trace_id IS NOT NULL);
 
 
 --

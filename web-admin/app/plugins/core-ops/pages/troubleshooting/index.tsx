@@ -63,12 +63,22 @@ interface AuditEvent {
   createdAt: string | null;
 }
 
+interface PermissionDenial {
+  resourceCode: string | null;
+  actionCode: string | null;
+  reason: string | null;
+  recordPid: string | null;
+  memberId: string | null;
+  createdAt: string | null;
+}
+
 interface CorrelationView {
   traceId: string;
   commandAudits: CommandAudit[];
   llmUsage: LlmUsage[];
   behaviorEvents: BehaviorEvent[];
   auditEvents: AuditEvent[];
+  permissionDenials: PermissionDenial[];
 }
 
 // ---------------------------------------------------------------------------
@@ -147,6 +157,7 @@ export default function TroubleshootingPage() {
         llmUsage: data.llmUsage ?? [],
         behaviorEvents: data.behaviorEvents ?? [],
         auditEvents: data.auditEvents ?? [],
+        permissionDenials: data.permissionDenials ?? [],
       });
       setQueried(true);
     } catch (e) {
@@ -179,7 +190,8 @@ export default function TroubleshootingPage() {
     (view?.commandAudits.length ?? 0) +
     (view?.llmUsage.length ?? 0) +
     (view?.behaviorEvents.length ?? 0) +
-    (view?.auditEvents.length ?? 0);
+    (view?.auditEvents.length ?? 0) +
+    (view?.permissionDenials.length ?? 0);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900" data-testid="troubleshooting-page">
@@ -237,8 +249,8 @@ export default function TroubleshootingPage() {
             className="rounded-md border border-gray-200 bg-white px-6 py-10 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
           >
             {l(
-              '该 traceId 没有关联到任何命令、LLM、行为或审计记录。',
-              'No command, LLM, behavior or audit records correlate to this traceId.',
+              '该 traceId 没有关联到任何权限拒绝、命令、LLM、行为或审计记录。',
+              'No permission denial, command, LLM, behavior or audit record correlates to this traceId.',
             )}
           </div>
         )}
@@ -262,6 +274,44 @@ export default function TroubleshootingPage() {
                 {l('查看 AI Span 树 →', 'View AI span tree →')}
               </button>
             </div>
+
+            {/* Permission denials — the most common reason a request 'did nothing' */}
+            <Section
+              title={l('权限拒绝', 'Permission Denials')}
+              count={view.permissionDenials.length}
+              testid="section-permission-denials"
+            >
+              {view.permissionDenials.length === 0 ? (
+                <EmptyRow text={l('无权限拒绝记录', 'No permission denials')} />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                        <th className="px-3 py-2">{l('资源', 'Resource')}</th>
+                        <th className="px-3 py-2">{l('动作', 'Action')}</th>
+                        <th className="px-3 py-2">{l('原因', 'Reason')}</th>
+                        <th className="px-3 py-2">{l('记录', 'Record')}</th>
+                        <th className="px-3 py-2">{l('时间', 'Time')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {view.permissionDenials.map((d, i) => (
+                        <tr key={i} className="border-b border-gray-100 dark:border-gray-700/50" data-testid="permission-denial-row">
+                          <td className="px-3 py-2 font-mono text-gray-900 dark:text-gray-100">{d.resourceCode || '—'}</td>
+                          <td className="px-3 py-2 font-mono text-gray-600 dark:text-gray-300">{d.actionCode || '—'}</td>
+                          <td className="px-3 py-2 text-red-600 dark:text-red-400" data-testid="permission-denial-reason">
+                            {d.reason || '—'}
+                          </td>
+                          <td className="px-3 py-2 font-mono text-xs text-gray-500 dark:text-gray-400">{d.recordPid || '—'}</td>
+                          <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400">{fmtTime(d.createdAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Section>
 
             {/* Command audits */}
             <Section

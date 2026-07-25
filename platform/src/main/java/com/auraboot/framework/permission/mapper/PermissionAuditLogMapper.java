@@ -30,11 +30,12 @@ public interface PermissionAuditLogMapper extends BaseMapper<PermissionAuditLog>
      */
     @Insert("""
             INSERT INTO ab_permission_audit_log
-                (tenant_id, member_id, resource_code, action_code, record_id, record_pid, result, reason, evaluation_trace, created_at)
+                (tenant_id, member_id, resource_code, action_code, record_id, record_pid, result, reason, evaluation_trace, trace_id, span_id, created_at)
             VALUES
                 (#{entry.tenantId}, #{entry.memberId}, #{entry.resourceCode}, #{entry.actionCode},
                  #{entry.recordId}, #{entry.recordPid}, #{entry.result}, #{entry.reason},
                  #{entry.evaluationTrace, typeHandler=com.auraboot.framework.application.database.mybatis.JsonbObjectListTypeHandler}::jsonb,
+                 #{entry.traceId}, #{entry.spanId},
                  #{entry.createdAt})
             """)
     void insertAuditLog(@Param("entry") PermissionAuditLog entry);
@@ -83,6 +84,27 @@ public interface PermissionAuditLogMapper extends BaseMapper<PermissionAuditLog>
     List<PermissionAuditLog> findByResource(
             @Param("tenantId") Long tenantId,
             @Param("resourceCode") String resourceCode,
+            @Param("limit") int limit);
+
+    /**
+     * Get denials correlated to an OTel W3C trace id, for the eagle-eye console.
+     *
+     * <p>Deliberately NOT named {@code findByTraceId}: that name is taken below by a lookup
+     * over the Rule Center {@code ruleTraceId} embedded in {@code evaluation_trace}, which is
+     * a different identifier entirely. Two lookups, two ids, two names — swapping them would
+     * silently return nothing rather than fail.
+     */
+    @Select("""
+            SELECT * FROM ab_permission_audit_log
+            WHERE tenant_id = #{tenantId}
+              AND trace_id = #{otelTraceId}
+            ORDER BY created_at DESC
+            LIMIT #{limit}
+            """)
+    @ResultMap("mybatis-plus_PermissionAuditLog")
+    List<PermissionAuditLog> findByOtelTraceId(
+            @Param("tenantId") Long tenantId,
+            @Param("otelTraceId") String otelTraceId,
             @Param("limit") int limit);
 
     /**

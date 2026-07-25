@@ -10,6 +10,8 @@ import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
 import com.auraboot.framework.meta.entity.CommandAuditLog;
 import com.auraboot.framework.meta.mapper.CommandAuditLogMapper;
 import com.auraboot.framework.observability.dto.CorrelationView;
+import com.auraboot.framework.permission.entity.PermissionAuditLog;
+import com.auraboot.framework.permission.mapper.PermissionAuditLogMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +25,10 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -40,6 +46,8 @@ class CorrelationQueryServiceTest {
     private BehaviorEventMapper behaviorEventMapper;
     @Mock
     private AdminEventLogMapper adminEventLogMapper;
+    @Mock
+    private PermissionAuditLogMapper permissionAuditLogMapper;
 
     @InjectMocks
     private CorrelationQueryService service;
@@ -54,8 +62,18 @@ class CorrelationQueryServiceTest {
         MetaContext.clear();
     }
 
+    private static PermissionAuditLog denial(String resource, String action, String reason) {
+        PermissionAuditLog row = new PermissionAuditLog();
+        row.setResourceCode(resource);
+        row.setActionCode(action);
+        row.setReason(reason);
+        row.setRecordPid("REC-PID-9");
+        row.setMemberId(4242L);
+        return row;
+    }
+
     @Test
-    @DisplayName("byTrace assembles all four domains for the given trace id")
+    @DisplayName("byTrace assembles all five domains for the given trace id")
     void byTraceAssemblesAllDomains() {
         CommandAuditLog cmd = new CommandAuditLog();
         cmd.setCommandCode("demo.create");
@@ -64,6 +82,8 @@ class CorrelationQueryServiceTest {
         when(genAiUsageMapper.selectList(any())).thenReturn(List.of(new GenAiUsageRecord()));
         when(behaviorEventMapper.selectList(any())).thenReturn(List.of(new BehaviorEvent()));
         when(adminEventLogMapper.selectList(any())).thenReturn(List.of(new AdminEventLog()));
+        when(permissionAuditLogMapper.findByOtelTraceId(eq(7L), eq("trace-abc"), anyInt()))
+                .thenReturn(List.of(denial("crm_account", "delete", "denied by policy")));
 
         CorrelationView view = service.byTrace("trace-abc");
 
@@ -74,5 +94,52 @@ class CorrelationQueryServiceTest {
         assertThat(view.getLlmUsage()).hasSize(1);
         assertThat(view.getBehaviorEvents()).hasSize(1);
         assertThat(view.getAuditEvents()).hasSize(1);
+        assertThat(view.getPermissionDenials()).hasSize(1);
+    }
+
+    /**
+     * ab_permission_audit_log is the busiest audit table in the product and was the last
+     * domain with no trace anchor, so "why was this refused" could not be answered from a
+     * trace id at all. This is the assertion that the console can now answer it.
+     */
+    @Test
+    @DisplayName("byTrace surfaces permission denials for the trace")
+    void byTraceSurfacesPermissionDenials() {
+        when(commandAuditLogMapper.findByTraceId(any(), any())).thenReturn(List.of());
+        when(genAiUsageMapper.selectList(any())).thenReturn(List.of());
+        when(behaviorEventMapper.selectList(any())).thenReturn(List.of());
+        when(adminEventLogMapper.selectList(any())).thenReturn(List.of());
+        when(permissionAuditLogMapper.findByOtelTraceId(eq(7L), eq("t-1"), anyInt()))
+                .thenReturn(List.of(denial("crm_account", "delete", "denied by policy")));
+
+        CorrelationView view = service.byTrace("t-1");
+
+        assertThat(view.getPermissionDenials()).hasSize(1);
+        assertThat(view.getPermissionDenials().get(0).resourceCode()).isEqualTo("crm_account");
+        assertThat(view.getPermissionDenials().get(0).reason()).isEqualTo("denied by policy");
+        assertThat(view.getPermissionDenials().get(0).recordPid()).isEqualTo("REC-PID-9");
+        // memberId crosses the browser boundary, so it travels as string digits, not a
+        // JSON number that would lose precision past 2^53.
+        assertThat(view.getPermissionDenials().get(0).memberId()).isEqualTo("4242");
+    }
+
+    /**
+     * The mapper has two same-shaped lookups: findByTraceId searches the Rule Center
+     * ruleTraceId inside evaluation_trace, findByOtelTraceId matches the OTel column. Using
+     * the wrong one returns nothing rather than failing, so pin which one this service calls.
+     */
+    @Test
+    @DisplayName("byTrace uses the OTel lookup, not the Rule Center ruleTraceId lookup")
+    void byTraceUsesTheOtelLookup() {
+        when(commandAuditLogMapper.findByTraceId(any(), any())).thenReturn(List.of());
+        when(genAiUsageMapper.selectList(any())).thenReturn(List.of());
+        when(behaviorEventMapper.selectList(any())).thenReturn(List.of());
+        when(adminEventLogMapper.selectList(any())).thenReturn(List.of());
+        when(permissionAuditLogMapper.findByOtelTraceId(any(), any(), anyInt())).thenReturn(List.of());
+
+        service.byTrace("t-2");
+
+        verify(permissionAuditLogMapper).findByOtelTraceId(eq(7L), eq("t-2"), anyInt());
+        verify(permissionAuditLogMapper, never()).findByTraceId(any(), any(), anyInt());
     }
 }

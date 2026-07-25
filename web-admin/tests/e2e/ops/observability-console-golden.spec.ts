@@ -113,6 +113,31 @@ test.describe('observability console', () => {
   });
 
   /**
+   * The permission-denial domain is the one the console was missing, and the one people
+   * actually arrive with ("it just did nothing"). ab_permission_audit_log is the busiest
+   * audit table in the product; until it had a trace_id column there was nothing to join.
+   *
+   * Asserted through the API rather than by manufacturing a denial in the browser: the
+   * point being pinned is that the endpoint returns the domain at all. If
+   * `permissionDenials` is absent from the payload the panel silently renders nothing,
+   * which is indistinguishable from "no denials" — the exact ambiguity this domain was
+   * added to remove.
+   */
+  test('the correlation endpoint returns the permission-denial domain', async ({ page }) => {
+    await page.goto('/ops/troubleshooting');
+    const res = await page.request.get(`/api/observability/correlation/${'0'.repeat(31)}1`);
+    expect(res.status()).toBe(200);
+
+    const body = await res.json();
+    const payload = body?.data ?? body;
+    expect(
+      Object.prototype.hasOwnProperty.call(payload, 'permissionDenials'),
+      `permissionDenials missing from the correlation payload. Keys: ${Object.keys(payload).join(', ')}`,
+    ).toBe(true);
+    expect(Array.isArray(payload.permissionDenials)).toBe(true);
+  });
+
+  /**
    * The trace id from a real response has to be usable in the console — that is the entire
    * documented workflow ("grab it from the X-Trace-Id header, paste it in"). A GET writes no
    * command-audit row, so the honest outcome is the empty state; what is being proven is
