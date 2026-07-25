@@ -78,3 +78,98 @@ test('the index records which file the evidence came from', () => {
     assert.ok(files[0].endsWith('g.spec.ts'), `expected g.spec.ts, got ${files[0]}`);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Platform-native pages. The reason this dimension exists is that 97 hand-written
+// React routes produced no row at all, and an absent row reads as "not applicable"
+// rather than as work. So both of ITS failure directions get pinned too.
+
+import { declaredPlatformPages, buildRouteIndex } from './gen-coverage-manifest.mjs';
+
+function withPlugin(files, fn) {
+  const dir = mkdtempSync(path.join(tmpdir(), 'platpage-'));
+  try {
+    for (const [rel, text] of Object.entries(files)) {
+      const abs = path.join(dir, rel);
+      mkdirSync(path.dirname(abs), { recursive: true });
+      writeFileSync(abs, text);
+    }
+    return fn(dir);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+const RESOURCES = `
+export const RESOURCES = [
+  {
+    key: 'demo.real', path: '/demo/real',
+    title: { en: 'Real', zh: '真' },
+    file: './plugins/demo/pages/real.tsx',
+  },
+  {
+    key: 'demo.dsl-pointer', path: '/p/c/demo_hub',
+    title: { en: 'Hub', zh: '中心' },
+    menu: { order: 10 },
+  },
+]
+`;
+
+test('a resources entry with a file is a platform page', () => {
+  withPlugin({ 'app/plugins/demo/resources.ts': RESOURCES }, (root) => {
+    const pages = declaredPlatformPages(root);
+    assert.deepEqual(pages.map((p) => p.key), ['demo.real']);
+    assert.equal(pages[0].route, '/demo/real');
+  });
+});
+
+test('a fileless entry is NOT a platform page — it points at a DSL route', () => {
+  // Counting it would double-count: the DSL page rows already cover that surface.
+  // This is how the AI colleague pages were converted, so the case is live.
+  withPlugin({ 'app/plugins/demo/resources.ts': RESOURCES }, (root) => {
+    assert.equal(declaredPlatformPages(root).some((p) => p.key === 'demo.dsl-pointer'), false);
+  });
+});
+
+test('visiting a detail path does NOT count as covering the parent route', () => {
+  // This is what the right-hand boundary is for. A spec that opens
+  // /aurabot/knowledge/kb-123 has exercised the detail page, not the list page — and
+  // without the boundary the substring match would credit the list route too, quietly
+  // marking an untested page green.
+  //
+  // (An earlier version of this test asserted the reverse — parent spec, child query —
+  // which no substring match could ever satisfy, so it held whether the boundary was
+  // there or not. It survived the mutation run and taught nothing.)
+  const dir = mkdtempSync(path.join(tmpdir(), 'routeidx-'));
+  try {
+    mkdirSync(path.join(dir, 'tests'), { recursive: true });
+    writeFileSync(
+      path.join(dir, 'tests', 'a.spec.ts'),
+      `await page.goto('/aurabot/knowledge/kb-123');`,
+    );
+    const hits = buildRouteIndex([path.join(dir, 'tests')]);
+    assert.equal(hits('/aurabot/knowledge/kb-123').length, 1, 'the visited route is covered');
+    assert.equal(
+      hits('/aurabot/knowledge').length,
+      0,
+      'the list route must not inherit the detail route evidence',
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a parameterised route is credited when a spec interpolates it', () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'routeidx2-'));
+  try {
+    mkdirSync(path.join(dir, 'tests'), { recursive: true });
+    writeFileSync(
+      path.join(dir, 'tests', 'b.spec.ts'),
+      'await page.goto(`/aurabot/knowledge/${kbPid}`);',
+    );
+    const hits = buildRouteIndex([path.join(dir, 'tests')]);
+    assert.equal(hits('/aurabot/knowledge').length, 1, 'the prefix is genuinely present here');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
