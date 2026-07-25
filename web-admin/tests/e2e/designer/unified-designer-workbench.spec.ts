@@ -3827,28 +3827,34 @@ test.describe.serial('Unified Designer Workbench V3', () => {
     });
 
     // Restore `field_seed_title` before leaving: this suite is `describe.serial` and the
-    // two seed fields are shared, so `props.multiple: true` would survive into every
-    // later test. It is not inert leftover — a field switched to `select` later still
-    // carries it, and SmartSelect's multiple mode renders a native <select multiple>
-    // (role=listbox) instead of the Radix combobox, which silently breaks any downstream
-    // select interaction (UDW-029). It also cannot be cleaned up downstream: the
-    // `props.multiple` inspector control only exists while the component is `upload`
-    // (uploadFieldFields in InspectorSchemaRegistry), so the checkbox is gone the moment
-    // another test picks a different component. Uncheck it while the control is still
-    // rendered, then put the component back to the seed's `input`.
+    // two seed fields are shared, so a leftover `props.multiple: true` would survive into
+    // every later test. It is not inert leftover — a field switched to `select` later
+    // would still carry it, and SmartSelect's multiple mode renders a native
+    // <select multiple> (role=listbox) instead of the Radix combobox, which silently
+    // breaks any downstream select interaction (UDW-029).
+    //
+    // Switching the component back to the seed's `input` is now all that is needed: the
+    // designer reconciles props on a component change (pruneStaleFieldComponentProps),
+    // dropping the upload-specific accept/multiple/maxFiles that `input` does not use.
+    // (This makes the former manual `multiple`-uncheck step — which existed only because
+    // that control disappears the moment another component is picked — unnecessary.)
     await page.getByTestId('designer-mode-edit').click();
     await page.getByTestId('outline-item-field_seed_title').click();
-    await setCheckbox(page, 'inspector-field-props.multiple', false);
     await page.getByTestId('inspector-field-props.component').selectOption('input');
     await saveDesignerPage(page, pagePid);
 
-    // Assert the restore actually persisted — a silently no-op cleanup would poison the
-    // rest of the chain exactly like no cleanup at all.
+    // Assert the restore persisted AND the stale upload props were pruned — a silently
+    // no-op cleanup (or a prune regression) would poison the rest of the chain exactly
+    // like no cleanup at all.
     const restored = await readPage(page, pagePid);
-    expect(findBlockById(restored.blocks ?? [], 'field_seed_title')).toMatchObject({
+    const restoredField = findBlockById(restored.blocks ?? [], 'field_seed_title');
+    expect(restoredField).toMatchObject({
       blockType: 'field',
-      props: expect.objectContaining({ component: 'input', multiple: false }),
+      props: expect.objectContaining({ component: 'input' }),
     });
+    expect(restoredField?.props).not.toHaveProperty('multiple');
+    expect(restoredField?.props).not.toHaveProperty('accept');
+    expect(restoredField?.props).not.toHaveProperty('maxFiles');
   });
 
   test('UDW-029: applies field visibleWhen rules from runtime form values', async ({ page }) => {
