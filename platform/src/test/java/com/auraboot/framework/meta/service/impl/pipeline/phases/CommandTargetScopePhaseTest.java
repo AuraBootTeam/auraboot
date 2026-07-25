@@ -196,8 +196,14 @@ class CommandTargetScopePhaseTest {
                 .isEqualTo(CommandPermitPlan.Decision.DENY);
     }
 
+    /**
+     * A readable target makes this phase abstain, not permit: it is a gate, not a granter. Only the
+     * RBAC capability phase grants. If a readable target permitted here, an undeclared command on any
+     * record the caller can see would combine to an authorized plan — conflating "can see" with "may
+     * act", the projection the 2026-07-22 incident came from.
+     */
     @Test
-    void recordsAPermitPhaseDecisionWhenTheCallerCanSeeTheTarget() {
+    void abstainsRatherThanPermitsWhenTheCallerCanSeeTheTarget() {
         CommandTargetScopePhase phase = phase(CommandTargetScopePhase.MODE_OBSERVE);
         givenRecordIsReadable(true);
         CommandPipelineContext ctx = context("qo_quote_common", "REC-1");
@@ -206,7 +212,7 @@ class CommandTargetScopePhaseTest {
 
         assertThat(ctx.getPhaseDecisions()).singleElement()
                 .extracting(CommandPermitPlan.PhaseDecision::decision)
-                .isEqualTo(CommandPermitPlan.Decision.PERMIT);
+                .isEqualTo(CommandPermitPlan.Decision.ABSTAIN);
     }
 
     @Test
