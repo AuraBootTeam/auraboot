@@ -1844,9 +1844,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
 
         try {
-            String rowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
-                    () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
-            observePermitScopeAgainstEngine(modelCode, operation, rowFilter);
+            String rowFilter = resolveWriteRowFilter(tenantId, modelCode, userId);
             appendScopedBulkFilter(sql, rowFilter);
         } catch (Exception e) {
             log.error("Failed to apply row-level data permission for {} on model {} — denying access",
@@ -1866,28 +1864,33 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
     }
 
     /**
-     * §11.10 stage-1 observe: does the permit plan's row-scope grade agree with what the engine
-     * actually filters on this write? The plan carries one grade the boundary resolved (from this
-     * same engine), so on the paths that publish it they must agree — a divergence means enforcing
-     * the plan here would change behaviour and must be understood before the flip. Log-only; the
-     * engine's filter is still the one applied. A {@code null} grade means no plan is in force (not a
-     * command-driven write), so there is nothing to compare.
+     * The row filter for a guarded write. When the permit plan resolved that the caller has
+     * <strong>ALL</strong> access, honour that one boundary decision and skip the per-site policy
+     * lookup — the grade was derived from this same engine, so ALL means the engine would return a
+     * blank filter anyway; the result is identical, with one fewer decision (§11.10, the boundary
+     * becomes authoritative for the unrestricted case).
+     *
+     * <p>For any restricted grade, or no plan in force, defer to the engine's exact policy filter
+     * (SELF / DEPARTMENT / CUSTOM) unchanged. Folding those onto the plan's binary grade would change
+     * behaviour for DEPARTMENT/CUSTOM tenants, so it is left for a step that can prove it with a
+     * caller that holds view-but-self-write (§11.10 stage 3) — not smuggled in here.</p>
      */
-    private void observePermitScopeAgainstEngine(String modelCode, String operation, String engineRowFilter) {
-        String planScope = MetaContext.getCommandPermitScope();
-        if (planScope == null) {
-            return;
+    private String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId) {
+        if (planGrantsUnrestrictedWrite(MetaContext.getCommandPermitScope())) {
+            return "";
         }
-        boolean engineRestricts = engineRowFilter != null && !engineRowFilter.isBlank();
-        boolean planRestricts = "SELF".equals(planScope);
-        if (planRestricts != engineRestricts) {
-            log.warn("Permit-plan shadow divergence on {} of model {}: plan scope={} but engine {} the rows "
-                    + "— enforcing the plan here would change behaviour", operation, logSafe(modelCode),
-                    planScope, engineRestricts ? "restricts" : "does not restrict");
-        } else if (log.isDebugEnabled()) {
-            log.debug("Permit-plan scope agrees with engine on {} of model {}: scope={}",
-                    operation, logSafe(modelCode), planScope);
-        }
+        return DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
+                () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+    }
+
+    /**
+     * Whether the permit plan resolved the caller has unrestricted (ALL) write access. Only an
+     * explicit {@code ALL} grade qualifies — {@code null} (no plan), {@code SELF}, or any other grade
+     * defers to the engine, the fail-closed direction so a missing or unexpected grade never skips a
+     * filter. Package-private + static: pure, tested directly with no wiring.
+     */
+    static boolean planGrantsUnrestrictedWrite(String planScope) {
+        return "ALL".equals(planScope);
     }
 
     @Override
