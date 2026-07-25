@@ -86,11 +86,15 @@ class PermitPlanAssemblyPhaseTest {
     @DisplayName("the plan pins the aggregate root the request named (D4)")
     void carriesTheAggregateRootTheRequestNamed() {
         CommandPipelineContext ctx = ctx("pur_01KPID");
+        ctx.setTargetRecordVersion(17L);
         ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));
 
         phase.execute(ctx);
 
         assertThat(ctx.getPermitPlan().aggregateId()).isEqualTo("pur_01KPID");
+        assertThat(ctx.getPermitPlan().expectedVersion())
+                .as("the plan must carry the server-captured target version")
+                .isEqualTo(17L);
     }
 
     @Test
@@ -162,9 +166,8 @@ class PermitPlanAssemblyPhaseTest {
     }
 
     /**
-     * Shadow safety: the grade is not enforced yet, so a scope-resolution failure must not break a
-     * command the data layer would otherwise run. The phase leaves scope unresolved and does not
-     * throw — the data layer keeps its own fail-secure evaluation until step 4.
+     * An unresolved grade is never published as an authoritative plan. The phase may therefore
+     * leave it unresolved without widening access; the legacy data-layer path remains in force.
      */
     @Test
     @DisplayName("a scope-resolution failure leaves scope unresolved and does not break the command")
@@ -181,9 +184,9 @@ class PermitPlanAssemblyPhaseTest {
         assertThat(ctx.getPermitPlan().scope()).isNull();
     }
 
-    /** Version (D5) is captured at enforcement (step 4), not here. */
+    /** A command with no captured target version remains unversioned. */
     @Test
-    @DisplayName("version is left unresolved for the enforcement step")
+    @DisplayName("version remains unresolved when the target boundary captured none")
     void leavesVersionUnresolved() {
         CommandPipelineContext ctx = ctx("pur_01KPID");
         ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));

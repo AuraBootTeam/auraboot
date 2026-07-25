@@ -31,8 +31,8 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * Tests advanced CRUD operations: list, create, update, delete, batch operations.
  * Uses a shared model across all tests to avoid field uniqueness constraint issues.
- * 
- * Note: Uses NOT_SUPPORTED propagation because DDL operations (CREATE TABLE) 
+ *
+ * Note: Uses NOT_SUPPORTED propagation because DDL operations (CREATE TABLE)
  * cannot be rolled back in PostgreSQL within a transaction.
  */
 @Slf4j
@@ -76,7 +76,7 @@ class DynamicDataAdvancedIntegrationTest extends BaseIntegrationTest {
     @BeforeEach
     void ensureModelExists() {
         setupTenantContext();
-        
+
         if (!modelInitialized) {
             try {
                 cleanupExistingModel();
@@ -116,26 +116,26 @@ class DynamicDataAdvancedIntegrationTest extends BaseIntegrationTest {
     private void cleanupExistingModel() {
         try {
             Long tenantId = getTestTenant().getId();
-            
+
             // Delete bindings
             jdbcTemplate.update(
                 "DELETE FROM ab_meta_model_field_binding WHERE model_id IN " +
                 "(SELECT id FROM ab_meta_model WHERE code = ? AND tenant_id = ?)",
                 modelCode, tenantId
             );
-            
+
             // Delete fields
             jdbcTemplate.update(
                 "DELETE FROM ab_meta_field WHERE code IN ('pid', 'name', 'status', 'price', 'quantity', 'category') AND tenant_id = ?",
                 tenantId
             );
-            
+
             // Delete model
             jdbcTemplate.update(
                 "DELETE FROM ab_meta_model WHERE code = ? AND tenant_id = ?",
                 modelCode, tenantId
             );
-            
+
             // Drop table
             String tableName = "mt_" + modelCode.toLowerCase();
             try {
@@ -261,14 +261,14 @@ class DynamicDataAdvancedIntegrationTest extends BaseIntegrationTest {
         data.put("category", "electronics");
 
         Map<String, Object> created = dynamicDataService.create(modelCode, data);
-        
+
         assertNotNull(created, "Created record should not be null");
         assertNotNull(created.get("pid"), "Created record should have pid");
-        
+
         String pid = created.get("pid").toString();
         createdRecordPids.add(pid);
-        
-        Map<String, Object> retrieved = MetaContext.runWithoutDataPermission(
+
+        Map<String, Object> retrieved = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(modelCode, pid));
 
         assertNotNull(retrieved, "Retrieved record should not be null");
@@ -307,7 +307,7 @@ class DynamicDataAdvancedIntegrationTest extends BaseIntegrationTest {
         updateData.put("name", "Updated Name");
         updateData.put("status", "updated");
 
-        Map<String, Object> updated = MetaContext.runWithoutDataPermission(
+        Map<String, Object> updated = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.update(modelCode, pid, updateData));
 
         assertNotNull(updated, "Updated record should not be null");
@@ -323,7 +323,7 @@ class DynamicDataAdvancedIntegrationTest extends BaseIntegrationTest {
         String pid = pids.get(0);
         createdRecordPids.remove(pid);  // Remove from cleanup list since we're deleting it
 
-        assertDoesNotThrow(() -> MetaContext.runWithoutDataPermission(
+        assertDoesNotThrow(() -> MetaContext.runWithCommandPermitScope("ALL",
                 () -> { dynamicDataService.delete(modelCode, pid); }));
         log.info("Deleted record with pid: {}", pid);
     }

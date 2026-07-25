@@ -1,6 +1,5 @@
 package com.auraboot.framework.plugin.pf4j;
 
-import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.DynamicQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 import com.auraboot.framework.meta.dto.QueryCondition;
@@ -20,12 +19,9 @@ import java.util.Optional;
  * Implementation of DataAccessor that delegates to DynamicDataService.
  * Provides plugin command handlers with controlled access to dynamic entity data.
  *
- * <p>Every operation runs under {@link #withCommandAuthority}: when the command boundary has
- * already authorized this caller for this command (DDR-2026-07-22), the handler's data access is
- * NOT re-projected through the caller's record-level read permission. Re-deciding authorization
- * here, on a different axis and without knowing what the boundary ruled, is what let a caller
- * authorized to RUN price sourcing have the sourcing's own bookkeeping write refused, silently
- * duplicating the row it failed to update (2026-07-22).
+ * <p>Every operation consumes the permit-plan context already opened by the command pipeline (or
+ * reconstructed at the async task boundary). Re-deciding authorization here, on a different axis
+ * and without knowing what the boundary ruled, is what caused the 2026-07-22 production incident.
  *
  * <p>Absent that authority — no scope open — behaviour is exactly what it was: the caller's
  * projection applies. Commands that declare no permissions never open a scope, so they gain
@@ -158,18 +154,8 @@ public class DynamicDataAccessorImpl implements DataAccessor {
                 modelCode, recordId, counterCode, delta, capCode));
     }
 
-    /**
-     * Execute {@code operation} under the command boundary's authority when one is open.
-     *
-     * <p>The scope carries the permission the caller was already checked against, so the platform
-     * reading and writing on that command's behalf is not the caller reading data — it is the
-     * command doing what it was authorized to do. Tenant scoping and the recorded actor are
-     * untouched; only the caller's record-level read projection stops being re-applied.
-     */
+    /** The authoritative permit context is installed outside this adapter. */
     private <T> T withCommandAuthority(java.util.function.Supplier<T> operation) {
-        if (!MetaContext.hasCommandAuthority()) {
-            return operation.get();
-        }
-        return MetaContext.runWithoutDataPermission(operation);
+        return operation.get();
     }
 }

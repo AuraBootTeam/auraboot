@@ -19,16 +19,29 @@ public class MetaContext {
     private static final ThreadLocal<String> OTEL_TRACE_ID = new ThreadLocal<>();
     private static final ThreadLocal<Boolean> ENV_FILTER_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Boolean> LOCK_GUARD_BYPASSED = ThreadLocal.withInitial(() -> false);
-    private static final ThreadLocal<Boolean> DATA_PERMISSION_BYPASSED = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<String> COMMAND_AUTHORITY = new ThreadLocal<>();
     /** Aggregate root (master document) the current command was authorized against. */
     private static final ThreadLocal<String> COMMAND_AGGREGATE = new ThreadLocal<>();
     /**
-     * Row-scope grade ("SELF" / "ALL") the current command was authorized under, published by the
-     * permit plan so the data layer can honour one boundary decision instead of re-deciding at each
-     * site. Carried as a String to keep this low-level context decoupled from the pipeline's types.
+     * The data-layer execution part of an authoritative command permit plan. Kept as low-level
+     * strings so this tenant-context package does not depend on pipeline types.
      */
-    private static final ThreadLocal<String> COMMAND_PERMIT_SCOPE = new ThreadLocal<>();
+    private static final ThreadLocal<CommandPermitExecution> COMMAND_PERMIT = new ThreadLocal<>();
+
+    private static final class CommandPermitExecution {
+        private final String scopeGrade;
+        private final String targetModel;
+        private final String targetRecordId;
+        private Long expectedVersion;
+
+        private CommandPermitExecution(
+                String scopeGrade, Long expectedVersion, String targetModel, String targetRecordId) {
+            this.scopeGrade = scopeGrade;
+            this.expectedVersion = expectedVersion;
+            this.targetModel = targetModel;
+            this.targetRecordId = targetRecordId;
+        }
+    }
 
     @Getter
     private final Long tenantId;
@@ -95,22 +108,18 @@ public class MetaContext {
         OTEL_TRACE_ID.remove();
         ENV_FILTER_BYPASSED.remove();
         LOCK_GUARD_BYPASSED.remove();
-        DATA_PERMISSION_BYPASSED.remove();
         COMMAND_AUTHORITY.remove();
         COMMAND_AGGREGATE.remove();
-        COMMAND_PERMIT_SCOPE.remove();
+        COMMAND_PERMIT.remove();
     }
 
     /**
      * Immutable capture of the identity + correlation ThreadLocals for propagation
      * across an async boundary (e.g. {@code TenantAwareTaskDecorator}, IM {@code @Async}).
      *
-     * <p>Deliberately EXCLUDES the {@code *_BYPASSED} guard flags. Those are
-     * request-scoped relaxations installed by {@link #runWithoutEnvFilter} /
-     * {@link #runWithoutLockGuard} / {@link #runWithoutDataPermission} around a
-     * specific block; propagating them into a worker thread would let background
-     * work silently run with a foreground request's guard disabled — a security
-     * regression. A snapshot carries only who/where the work runs as.
+     * <p>Deliberately EXCLUDES guard relaxations and command permit state. Propagating either into
+     * a worker thread would let background work silently inherit a foreground request's authority.
+     * An async command must reconstruct its persisted permit plan explicitly.
      */
     public record Snapshot(Long tenantId, Long userId, String userPid, String username,
                            Set<Long> roleIds, Long memberId, Long envId, String otelTraceId) {}
@@ -234,46 +243,6 @@ public class MetaContext {
     }
 
     /**
-     * @return true when platform-managed background work is reading/writing
-     *         tenant-scoped dynamic data and must not be projected through a
-     *         foreground user's row, domain, mask, or field permissions.
-     */
-    public static boolean isDataPermissionBypassed() {
-        return Boolean.TRUE.equals(DATA_PERMISSION_BYPASSED.get());
-    }
-
-    /**
-     * Run a block without dynamic-data permission projection. Intended for
-     * internal background components that already receive an explicit tenant
-     * id, for example plugin workers and scheduled jobs.
-     *
-     * <p>Also legitimate on a request thread for a platform-internal read-back:
-     * reading back the row the platform itself just wrote, to build a
-     * change-log snapshot or an automation/SLA event payload. That read is the
-     * platform reading its own write, not the caller reading data, and the
-     * write was already authorized by the caller-facing layer.
-     *
-     * <p>Request handlers must NOT use this path to serve data the caller
-     * asked for — that would bypass the caller's read permissions.
-     */
-    public static <T> T runWithoutDataPermission(java.util.function.Supplier<T> action) {
-        Boolean prior = DATA_PERMISSION_BYPASSED.get();
-        DATA_PERMISSION_BYPASSED.set(true);
-        try {
-            return action.get();
-        } finally {
-            DATA_PERMISSION_BYPASSED.set(prior);
-        }
-    }
-
-    public static void runWithoutDataPermission(Runnable action) {
-        runWithoutDataPermission(() -> {
-            action.run();
-            return null;
-        });
-    }
-
-    /**
      * Run {@code action} under the authority a command boundary already granted — the permission
      * the caller was checked against before the handler was allowed to run at all
      * (DDR-2026-07-22, command-scoped data authority).
@@ -380,16 +349,43 @@ public class MetaContext {
      * keeps its own evaluation).
      */
     public static <T> T runWithCommandPermitScope(String scopeGrade, java.util.function.Supplier<T> action) {
+        return runWithCommandPermitPlan(scopeGrade, null, null, null, action);
+    }
+
+    /**
+     * Run the data-layer portion of a permitted command under the boundary's resolved row scope and
+     * server-captured target version. The version belongs only to {@code targetModel/targetRecordId};
+     * derived aggregate writes must not accidentally compare their row version with the root's.
+     */
+    public static <T> T runWithCommandPermitPlan(
+            String scopeGrade,
+            Long expectedVersion,
+            String targetModel,
+            String targetRecordId,
+            java.util.function.Supplier<T> action) {
         if (scopeGrade == null || scopeGrade.isBlank()) {
             return action.get();
         }
-        String prior = COMMAND_PERMIT_SCOPE.get();
-        COMMAND_PERMIT_SCOPE.set(scopeGrade);
+        CommandPermitExecution prior = COMMAND_PERMIT.get();
+        COMMAND_PERMIT.set(new CommandPermitExecution(
+                scopeGrade, expectedVersion, targetModel, targetRecordId));
         try {
             return action.get();
         } finally {
-            COMMAND_PERMIT_SCOPE.set(prior);
+            COMMAND_PERMIT.set(prior);
         }
+    }
+
+    public static void runWithCommandPermitPlan(
+            String scopeGrade,
+            Long expectedVersion,
+            String targetModel,
+            String targetRecordId,
+            Runnable action) {
+        runWithCommandPermitPlan(scopeGrade, expectedVersion, targetModel, targetRecordId, () -> {
+            action.run();
+            return null;
+        });
     }
 
     public static void runWithCommandPermitScope(String scopeGrade, Runnable action) {
@@ -401,7 +397,43 @@ public class MetaContext {
 
     /** The row-scope grade the current command was authorized under ("SELF"/"ALL"), or null. */
     public static String getCommandPermitScope() {
-        return COMMAND_PERMIT_SCOPE.get();
+        CommandPermitExecution permit = COMMAND_PERMIT.get();
+        return permit == null ? null : permit.scopeGrade;
+    }
+
+    /** Whether a resolved command permit plan is currently authoritative for data access. */
+    public static boolean hasCommandPermitScope() {
+        return COMMAND_PERMIT.get() != null;
+    }
+
+    /**
+     * The optimistic version captured for this exact command target, or null for a derived row,
+     * an unversioned target, or a direct non-command call.
+     */
+    public static Long getCommandExpectedVersion(String modelCode, String recordId) {
+        CommandPermitExecution permit = COMMAND_PERMIT.get();
+        if (permit == null
+                || permit.expectedVersion == null
+                || !java.util.Objects.equals(permit.targetModel, modelCode)
+                || !java.util.Objects.equals(permit.targetRecordId, recordId)) {
+            return null;
+        }
+        return permit.expectedVersion;
+    }
+
+    /**
+     * Advance the in-flight target version after a successful guarded write. A command may have
+     * both FIELD_MAP and handler-result persistence; the second write must compare with the version
+     * produced by the first, not with the stale boundary snapshot.
+     */
+    public static void advanceCommandExpectedVersion(String modelCode, String recordId) {
+        CommandPermitExecution permit = COMMAND_PERMIT.get();
+        if (permit != null
+                && permit.expectedVersion != null
+                && java.util.Objects.equals(permit.targetModel, modelCode)
+                && java.util.Objects.equals(permit.targetRecordId, recordId)) {
+            permit.expectedVersion = permit.expectedVersion + 1;
+        }
     }
 
     public static Long getCurrentMemberId() {

@@ -80,22 +80,21 @@ class TenantAwareTaskDecoratorTest {
     }
 
     @Test
-    void decorate_doesNotPropagateRequestScopedBypassFlag() throws Exception {
+    void decorate_doesNotPropagateCommandPermitPlan() throws Exception {
         MetaContext.setContext(7L, 42L, "p", "u");
-        AtomicBoolean workerSawBypass = new AtomicBoolean(true);
+        AtomicBoolean workerSawPermit = new AtomicBoolean(true);
 
-        // Snapshot is taken inside a data-permission-bypass block. The bypass is a
-        // request-scoped relaxation and must NOT leak into the async worker.
-        Runnable decorated = MetaContext.runWithoutDataPermission(() ->
+        // Snapshot is taken inside a command permit. Authority must NOT leak into the worker.
+        Runnable decorated = MetaContext.runWithCommandPermitScope("ALL", () ->
                 new TenantAwareTaskDecorator().decorate(() ->
-                        workerSawBypass.set(MetaContext.isDataPermissionBypassed())));
+                        workerSawPermit.set(MetaContext.hasCommandPermitScope())));
 
         Thread worker = new Thread(decorated);
         worker.start();
         worker.join();
 
-        assertThat(workerSawBypass.get())
-                .as("data-permission bypass must not leak into async worker")
+        assertThat(workerSawPermit.get())
+                .as("command permit must not leak into async worker")
                 .isFalse();
     }
 

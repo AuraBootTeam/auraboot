@@ -410,12 +410,12 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
         saveBusinessReferenceModels(supplierModel, supplierNameField, ticketModel, supplierRefField);
 
         String supplierName = "华东审批供应商 " + suffix;
-        Map<String, Object> supplier = MetaContext.runWithoutDataPermission(() ->
+        Map<String, Object> supplier = MetaContext.runWithCommandPermitScope("ALL", () ->
                 dynamicDataService.create(supplierModel, Map.of(supplierNameField, supplierName)));
         String supplierPid = String.valueOf(supplier.get("pid"));
         assertThat(supplierPid).isNotBlank();
 
-        List<FieldOption> options = MetaContext.runWithoutDataPermission(() ->
+        List<FieldOption> options = MetaContext.runWithCommandPermitScope("ALL", () ->
                 dynamicDataService.getFieldOptions(
                         ticketModel,
                         supplierRefField,
@@ -425,10 +425,10 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
             assertThat(option.getLabel()).isEqualTo(supplierName);
         });
 
-        Map<String, Object> ticket = MetaContext.runWithoutDataPermission(() ->
+        Map<String, Object> ticket = MetaContext.runWithCommandPermitScope("ALL", () ->
                 dynamicDataService.create(ticketModel, Map.of(supplierRefField, supplierPid)));
         String ticketPid = String.valueOf(ticket.get("pid"));
-        Map<String, Object> reloadedTicket = MetaContext.runWithoutDataPermission(() ->
+        Map<String, Object> reloadedTicket = MetaContext.runWithCommandPermitScope("ALL", () ->
                 dynamicDataService.getById(ticketModel, ticketPid));
         assertThat(reloadedTicket.get(supplierRefField)).isEqualTo(supplierPid);
         assertThat(reloadedTicket.get(supplierRefField + "_display")).isEqualTo(supplierName);
@@ -439,7 +439,7 @@ class DecisionRuntimeIntegrationTest extends BaseIntegrationTest {
                 businessReferenceEqAst(supplierRefField, supplierPid),
                 "record.data." + supplierRefField);
 
-        DecisionResult matched = MetaContext.runWithoutDataPermission(() ->
+        DecisionResult matched = MetaContext.runWithCommandPermitScope("ALL", () ->
                 evaluationService.evaluate(referenceEvalReq(code, ticketModel, supplierRefField, supplierPid)));
         assertThat(matched.status()).isEqualTo(DecisionStatus.MATCHED);
         assertThat(matched.matched()).isTrue();

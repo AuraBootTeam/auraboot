@@ -869,13 +869,14 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     }
 
     private List<String> buildDataAccessClauses(String modelCode) {
-        if (MetaContext.isDataPermissionBypassed()) {
-            return Collections.emptyList();
-        }
-
         Long tenantId = getCurrentTenantId();
         Long userId = getCurrentUserId();
         List<String> clauses = new ArrayList<>();
+        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        if (permitFilter != null) {
+            appendAccessClause(clauses, permitFilter);
+            return clauses;
+        }
 
         try {
             appendAccessClause(clauses, dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
@@ -897,8 +898,11 @@ public class AggregateQueryServiceImpl extends BaseMetaService implements Aggreg
     }
 
     private List<String> buildNamedQueryDataAccessClauses(NamedQuery query, Long tenantId, Long userId) {
-        if (MetaContext.isDataPermissionBypassed()) {
-            return Collections.emptyList();
+        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        if (permitFilter != null) {
+            List<String> clauses = new ArrayList<>();
+            appendAccessClause(clauses, permitFilter);
+            return clauses;
         }
 
         String resourceCode = trimToNull(query.getResourceCode());

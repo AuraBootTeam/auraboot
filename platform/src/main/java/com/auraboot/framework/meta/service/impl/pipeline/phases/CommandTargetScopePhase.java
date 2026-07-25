@@ -122,7 +122,7 @@ public class CommandTargetScopePhase implements CommandPhase {
 
         // The caller cannot see the record they named. Record the refusal for the permit plan
         // regardless of this phase's own observe/enforce mode — the plan captures what was DECIDED,
-        // not whether this phase happened to enforce it (shadow; nothing consumes the plan yet).
+        // not whether this phase happened to throw immediately.
         ctx.recordPhaseDecision(
                 CommandPermitPlan.PhaseDecision.deny(REASON_TARGET_NOT_READABLE, name()));
         log.info("Boundary target-scope check would deny: command={} model={} record={} mode={}",
@@ -139,21 +139,23 @@ public class CommandTargetScopePhase implements CommandPhase {
      *         (no subject in context, or the target does not resolve).
      */
     private Boolean evaluateReadable(CommandPipelineContext ctx) {
-        Long memberId = resolveMemberId(ctx);
-        if (memberId == null) {
-            // No subject to evaluate (system/scheduled invocation).
-            return null;
-        }
-
         String modelCode = ctx.getCommand().getModelCode();
         String recordId = ctx.getRequest().getTargetRecordId();
 
         // Read the record itself out of the caller's projection: the boundary has to SEE the row to
         // judge it, and reading it through the very gate we are evaluating would be circular.
-        Map<String, Object> record = MetaContext.runWithoutDataPermission(
+        Map<String, Object> record = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(modelCode, recordId));
         if (record == null) {
             // A missing record is not an authorization answer — later phases surface "not found".
+            return null;
+        }
+        ctx.setTargetRecordVersion(resolveRecordVersion(record));
+
+        Long memberId = resolveMemberId(ctx);
+        if (memberId == null) {
+            // No subject to evaluate (system/scheduled invocation), but D5 still retains the
+            // server-loaded target version for the write that follows.
             return null;
         }
 
@@ -163,6 +165,21 @@ public class CommandTargetScopePhase implements CommandPhase {
             log.debug("target-scope deny reason: command={} reason={}", ctx.getCommandCode(), result.reason());
         }
         return result.granted();
+    }
+
+    private Long resolveRecordVersion(Map<String, Object> record) {
+        Object version = record.get("row_version");
+        if (version instanceof Number number) {
+            return number.longValue();
+        }
+        if (version instanceof String text && StringUtils.hasText(text)) {
+            try {
+                return Long.parseLong(text);
+            } catch (NumberFormatException ignored) {
+                // Unversioned/malformed rows keep D5 unresolved; normal validation owns bad fields.
+            }
+        }
+        return null;
     }
 
     private Long resolveMemberId(CommandPipelineContext ctx) {

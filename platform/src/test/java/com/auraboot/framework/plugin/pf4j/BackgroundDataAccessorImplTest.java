@@ -138,7 +138,7 @@ class BackgroundDataAccessorImplTest {
             assertThat(MetaContext.getCurrentTenantId()).isEqualTo(42L);
             assertThat(MetaContext.getCurrentUserId()).isEqualTo(0L);
             assertThat(MetaContext.getCurrentMemberId()).isNull();
-            assertThat(MetaContext.isDataPermissionBypassed()).isTrue();
+            assertThat(MetaContext.getCommandPermitScope()).isEqualTo("ALL");
             return page;
         });
 
@@ -149,7 +149,7 @@ class BackgroundDataAccessorImplTest {
         assertThat(MetaContext.getCurrentTenantId()).isEqualTo(7L);
         assertThat(MetaContext.getCurrentUserId()).isEqualTo(99L);
         assertThat(MetaContext.getCurrentMemberId()).isEqualTo(123L);
-        assertThat(MetaContext.isDataPermissionBypassed()).isFalse();
+        assertThat(MetaContext.getCommandPermitScope()).isNull();
         assertThat(MetaContext.getCurrentRoleIds()).containsExactly(11L);
     }
 

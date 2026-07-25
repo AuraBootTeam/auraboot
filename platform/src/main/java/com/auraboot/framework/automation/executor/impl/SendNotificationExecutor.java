@@ -306,8 +306,9 @@ public class SendNotificationExecutor implements ActionExecutor {
         // Resolving a reference hop to build the notification recipient is an internal system read
         // (automations run subject-less on @Async threads — AutomationProcessRuntime sets tenant but no
         // user). getById enforces per-subject record permission, which with no subject throws
-        // "Permission context missing". Bypass it here, like other internal read-backs (cf. #1405).
-        Map<String, Object> refRow = MetaContext.runWithoutDataPermission(
+        // "Permission context missing". Execute this system read under explicit ALL authority, like
+        // other internal read-backs (cf. #1405).
+        Map<String, Object> refRow = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(refModel, String.valueOf(refId)));
         if (refRow == null) {
             return null;

@@ -31,8 +31,9 @@ import static org.mockito.Mockito.when;
  * exactly the path production broke on (2026-07-22, {@code async-task-3}): the boundary said yes,
  * then the row the run had just created could not be updated by the run itself.
  *
- * <p>So the verdict travels WITH the task and is rebuilt here. These tests pin that it is rebuilt
- * when present, absent when not, and never left behind on a pooled thread.
+ * <p>So the authorization verdict plus permit grade/version travel WITH the task and are rebuilt
+ * here. These tests pin that they are rebuilt when present, absent when not, and never left behind
+ * on a pooled thread.
  */
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -45,6 +46,8 @@ class CommandHandlerAsyncTaskExecutorAuthorityTest {
     @Mock private DynamicDataService dynamicDataService;
 
     private final AtomicReference<String> authoritySeenByHandler = new AtomicReference<>();
+    private final AtomicReference<String> permitScopeSeenByHandler = new AtomicReference<>();
+    private final AtomicReference<Long> expectedVersionSeenByHandler = new AtomicReference<>();
 
     @AfterEach
     void clearContext() {
@@ -60,6 +63,20 @@ class CommandHandlerAsyncTaskExecutorAuthorityTest {
 
         assertThat(result.isSuccess()).isTrue();
         assertThat(authoritySeenByHandler.get()).isEqualTo("qo.price.manage");
+    }
+
+    @Test
+    @DisplayName("the persisted permit grade and server version are rebuilt for the handler")
+    void persistedPermitPlanIsRebuilt() {
+        CommandHandlerAsyncTaskExecutor executor = executorWithRecordingHandler();
+
+        AsyncTaskResult result = executor.execute(
+                inputWithPermit("qo.price.manage", "SELF", 7L), noopCallback());
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(permitScopeSeenByHandler).hasValue("SELF");
+        assertThat(expectedVersionSeenByHandler).hasValue(7L);
+        assertThat(MetaContext.hasCommandPermitScope()).isFalse();
     }
 
     /**
@@ -115,6 +132,9 @@ class CommandHandlerAsyncTaskExecutorAuthorityTest {
             @Override public String getCommandType() { return "qo_quote_common:batch_source_prices"; }
             @Override public Object execute(CommandContext context) {
                 authoritySeenByHandler.set(MetaContext.getCommandAuthority());
+                permitScopeSeenByHandler.set(MetaContext.getCommandPermitScope());
+                expectedVersionSeenByHandler.set(MetaContext.getCommandExpectedVersion(
+                        "qo_quote_common", "Q1"));
                 return Map.of("ok", true);
             }
         };
@@ -136,6 +156,14 @@ class CommandHandlerAsyncTaskExecutorAuthorityTest {
         if (commandAuthority != null) {
             input.put("commandAuthority", commandAuthority);
         }
+        return input;
+    }
+
+    private ObjectNode inputWithPermit(
+            String commandAuthority, String commandPermitScope, Long commandExpectedVersion) {
+        ObjectNode input = input(commandAuthority);
+        input.put("commandPermitScope", commandPermitScope);
+        input.put("commandExpectedVersion", commandExpectedVersion);
         return input;
     }
 

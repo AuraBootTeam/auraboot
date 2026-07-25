@@ -144,7 +144,7 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
         pool.shutdown();
 
         MetaContext.setContext(tenantId, 0L, null, "system");
-        Map<String, Object> reloaded = MetaContext.runWithoutDataPermission(
+        Map<String, Object> reloaded = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(modelCode, pid));
         long finalCounter = ((Number) reloaded.get("counter")).longValue();
         log.info("[atomic-it] incrementWithinCap: finalCounter={}, granted={}", finalCounter, granted.get());
@@ -196,7 +196,7 @@ class AtomicIncrementConcurrencyIT extends BaseIntegrationTest {
         pool.shutdown();
 
         MetaContext.setContext(tenantId, 0L, null, "system");
-        long finalCounter = ((Number) MetaContext.runWithoutDataPermission(
+        long finalCounter = ((Number) MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(modelCode, pid)).get("counter")).longValue();
         log.info("[atomic-it] increment: finalCounter={}", finalCounter);
 

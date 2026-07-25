@@ -68,19 +68,19 @@ class AggregateBindingGuardTest {
     }
 
     /**
-     * The load-bearing one. {@code runWithoutDataPermission} means "do not re-run the caller's
-     * read projection" — a statement about re-deciding policy. This guard is not a decision, so it
+     * The load-bearing one. An explicit ALL execution scope means "do not re-run the caller's
+     * read projection". This guard is not a decision, so it
      * must survive there; the inherited path is exactly where a cross-aggregate write would
      * otherwise slip through.
      */
     @Test
-    @DisplayName("the guard still applies while data permission is bypassed")
-    void guardSurvivesDataPermissionBypass() {
+    @DisplayName("the guard still applies under an explicit ALL execution scope")
+    void guardSurvivesExplicitAllExecutionScope() {
         StringBuilder sql = freshSql();
         Map<String, Object> params = new LinkedHashMap<>();
 
         MetaContext.runWithCommandAggregate("Q1001", () ->
-                MetaContext.runWithoutDataPermission(() -> {
+                MetaContext.runWithCommandPermitScope("ALL", () -> {
                     DynamicDataServiceImpl.appendAggregateBindingGuard(sql, params, boundModel());
                     return null;
                 }));

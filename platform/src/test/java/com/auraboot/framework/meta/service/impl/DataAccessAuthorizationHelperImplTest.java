@@ -17,6 +17,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -109,5 +110,34 @@ class DataAccessAuthorizationHelperImplTest {
         assertThatThrownBy(() -> helper.authorizeRecordId(RESOURCE_CODE, "read", "missing", id -> null))
                 .isInstanceOf(MetaServiceException.class)
                 .hasMessageContaining("Access denied");
+    }
+
+    @Test
+    @DisplayName("an authoritative SELF plan supplies list and record scope without consulting the engine")
+    void authoritativeSelfPlanExecutesWithoutEngineRedecision() {
+        MetaContext.runWithCommandPermitScope("SELF", () -> {
+            DataAccessAuthorizationContext context = helper.authorizeList(RESOURCE_CODE, "read");
+            assertThat(context.filterClause()).isEqualTo("created_by = 20");
+            assertThat(helper.authorizeRecord(
+                    RESOURCE_CODE, "delete", Map.of("created_by", USER_ID))).isTrue();
+            assertThatThrownBy(() -> helper.authorizeRecord(
+                    RESOURCE_CODE, "delete", Map.of("created_by", 999L)))
+                    .isInstanceOf(MetaServiceException.class)
+                    .hasMessageContaining("Access denied");
+        });
+
+        verifyNoInteractions(dataPermissionEngine);
+    }
+
+    @Test
+    @DisplayName("an authoritative ALL plan supplies an empty list filter and permits any record")
+    void authoritativeAllPlanExecutesWithoutEngineRedecision() {
+        MetaContext.runWithCommandPermitScope("ALL", () -> {
+            assertThat(helper.authorizeList(RESOURCE_CODE, "read").filterClause()).isEmpty();
+            assertThat(helper.authorizeRecord(
+                    RESOURCE_CODE, "delete", Map.of("created_by", 999L))).isTrue();
+        });
+
+        verifyNoInteractions(dataPermissionEngine);
     }
 }

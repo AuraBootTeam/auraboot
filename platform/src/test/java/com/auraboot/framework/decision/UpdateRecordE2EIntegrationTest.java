@@ -147,7 +147,7 @@ class UpdateRecordE2EIntegrationTest extends BaseIntegrationTest {
         // This IT creates its own dynamic tenant/user with no rule-center grant, so the verification
         // read-back must bypass record-permission enforcement (established pattern, cf. c737b79d3) —
         // we are asserting the mutation persisted, not asserting a deny.
-        Map<String, Object> after = MetaContext.runWithoutDataPermission(
+        Map<String, Object> after = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(modelCode, recordPid));
         assertThat(after.get(statusField)).isEqualTo("ESCALATED");
     }

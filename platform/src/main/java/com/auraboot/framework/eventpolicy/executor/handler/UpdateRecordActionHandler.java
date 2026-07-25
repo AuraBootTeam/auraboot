@@ -74,10 +74,10 @@ public class UpdateRecordActionHandler implements ActionHandler {
         try {
             // System-triggered policy action: the event runtime already selected this record
             // (recordPid comes from the decision context), and AFTER_COMMIT policies run without
-            // a caller's data-permission projection. Bypass data permission so the platform's
-            // internal pre-update read-back (a visibility gate meant for interactive callers)
-            // does not deny a write the policy engine is authorized to make.
-            MetaContext.runWithoutDataPermission(() -> {
+            // a caller's data-permission projection. Explicit ALL execution authority keeps the
+            // platform's internal pre-update read-back (a visibility gate meant for interactive
+            // callers) from denying a write the policy engine is authorized to make.
+            MetaContext.runWithCommandPermitScope("ALL", () -> {
                 dynamicDataService.update(modelCode, recordPid, fieldMap);
             });
         } catch (RuntimeException e) {

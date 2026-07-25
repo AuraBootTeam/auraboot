@@ -90,7 +90,7 @@ public class EventPolicyActionRetryService {
         MetaContextSnapshot snapshot = MetaContextSnapshot.capture();
         try {
             MetaContext.setSystemTenantContext(row.getTenantId());
-            MetaContext.runWithoutDataPermission(() -> {
+            MetaContext.runWithCommandPermitScope("ALL", () -> {
                 ResolvedActionPlan plan = actionPlan(row);
                 DecisionContext context = decisionContext(row.getContextPayload());
                 EventPolicyResult policyResult = new EventPolicyResult(

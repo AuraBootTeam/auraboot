@@ -138,10 +138,10 @@ class DynamicDataJsonReadShapeIT extends BaseIntegrationTest {
         // Shape isolation: this test pins the read SHAPE, not permissions. The
         // legacy single-record row gate currently denies the shared IT identity
         // on main (pre-existing red, tracked by fix/create-readback-permission-
-        // regression); bypassing data permission keeps the shape contract
+        // regression); an explicit ALL execution plan keeps the shape contract
         // testable independently of that regression.
         Map<String, Object> row = com.auraboot.framework.application.tenant.MetaContext
-                .runWithoutDataPermission(() -> dynamicDataService.getById(modelCode, pid));
+                .runWithCommandPermitScope("ALL", () -> dynamicDataService.getById(modelCode, pid));
         assertThat(row).isNotNull();
         assertParsedArray("getById", row.get(jsonArrayField));
         assertParsedObject("getById", row.get(jsonbObjectField));

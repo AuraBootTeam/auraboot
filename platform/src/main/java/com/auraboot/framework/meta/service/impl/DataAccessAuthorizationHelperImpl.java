@@ -1,5 +1,6 @@
 package com.auraboot.framework.meta.service.impl;
 
+import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.util.LogSanitizer;
 import com.auraboot.framework.meta.exception.MetaServiceException;
 import com.auraboot.framework.meta.service.DataAccessAuthorizationContext;
@@ -26,6 +27,11 @@ public class DataAccessAuthorizationHelperImpl extends BaseMetaService implement
         String resolvedAction = resolveAction(actionCode);
         Long tenantId = getCurrentTenantId();
         Long userId = getCurrentUserId();
+        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        if (permitFilter != null) {
+            return new DataAccessAuthorizationContext(
+                    tenantId, userId, resourceCode, resolvedAction, normalizeFilterClause(permitFilter));
+        }
 
         try {
             String rawFilter = dataPermissionEngine.buildRowFilter(tenantId, resourceCode, resolvedAction, userId);
@@ -44,6 +50,12 @@ public class DataAccessAuthorizationHelperImpl extends BaseMetaService implement
         String resolvedAction = resolveAction(actionCode);
         Long tenantId = getCurrentTenantId();
         Long userId = getCurrentUserId();
+        if (MetaContext.hasCommandPermitScope()) {
+            if (!CommandPermitDataAccess.permitsRecord(record, userId)) {
+                throw new MetaServiceException("Access denied for resource: " + resourceCode);
+            }
+            return true;
+        }
 
         try {
             if (!dataPermissionEngine.canAccessRecord(tenantId, resourceCode, resolvedAction, userId, record)) {

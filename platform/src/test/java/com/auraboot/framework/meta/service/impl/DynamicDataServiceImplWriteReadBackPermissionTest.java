@@ -53,7 +53,7 @@ import static org.mockito.Mockito.*;
  * even though the write itself had already succeeded and been authorized.
  *
  * <p>Falsifiability: both tests stub the permission facade to DENY reads. If the
- * read-back stops bypassing data permissions, the deny propagates out of
+ * read-back stops using an explicit ALL execution plan, the deny propagates out of
  * create/update and these tests fail.
  */
 @ExtendWith(MockitoExtension.class)
@@ -200,7 +200,7 @@ class DynamicDataServiceImplWriteReadBackPermissionTest {
         assertThatCode(() -> service.update(MODEL_CODE, RECORD_ID, data)).doesNotThrowAnyException();
 
         // Exactly one permission evaluation — the pre-update read. If the post-write
-        // read-back stops bypassing data permissions it adds a second one and this fails.
+        // read-back stops using explicit ALL it adds a second one and this fails.
         verify(permissionFacade, times(1)).canOperate(anyLong(), eq(MODEL_CODE), eq("read"), anyMap());
     }
 }

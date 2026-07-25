@@ -60,7 +60,7 @@ public class UpdateRecordExecutor implements ActionExecutor {
                 modelCode, recordPid, processedUpdates.keySet());
 
         String targetRecordPid = recordPid;
-        MetaContext.runWithoutDataPermission(
+        MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.update(modelCode, targetRecordPid, processedUpdates));
 
         return Map.of(

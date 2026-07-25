@@ -226,7 +226,7 @@ class DynamicDataServiceImplCoverageIT {
     @DisplayName("getById round-trips an existing record and throws for missing/blank ids")
     void getByIdBranches() {
         String pid = seedOne("lookup", "active");
-        Map<String, Object> got = MetaContext.runWithoutDataPermission(
+        Map<String, Object> got = MetaContext.runWithCommandPermitScope("ALL",
                 () -> dynamicDataService.getById(modelCode, pid));
         assertNotNull(got);
         assertTrue(pid.equals(String.valueOf(got.get("pid"))));
