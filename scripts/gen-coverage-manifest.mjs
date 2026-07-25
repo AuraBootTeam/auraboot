@@ -136,7 +136,7 @@ function declaredPages(pluginDir) {
  * "untested", and a denominator that under-counts coverage is as misleading as one
  * that over-counts it.
  */
-function buildPageIndex(specRoots) {
+export function buildPageIndex(specRoots) {
   const index = new Map();
   const add = (key, rel) => {
     if (!index.has(key)) index.set(key, []);
@@ -146,8 +146,19 @@ function buildPageIndex(specRoots) {
     for (const file of walk(root, SPEC_EXTS)) {
       const text = fs.readFileSync(file, 'utf8');
       const rel = path.relative(process.cwd(), file);
-      // bare page keys, and the two route shapes: /p/c/<pageKey> and /p/<model>
-      for (const m of text.matchAll(/["'`\/]([a-z][a-z0-9_]{3,})["'`\/]/gi)) add(m[1], rel);
+      // bare page keys, and the two route shapes: /p/c/<pageKey> and /p/<model>.
+      //
+      // The closing class must accept ? and # : a page reached with parameters
+      // appears as `/p/c/ai_colleague_detail?agentPid=${pid}`, and requiring a
+      // quote or slash on the right reported both parameterised colleague pages
+      // as untested while their specs sat right there. An understated denominator
+      // gets ignored as fast as an overstated one.
+      //
+      // The opening class stays strict on purpose. Widening it to any boundary
+      // would match prose — these very specs say "a DSL page (ai_colleague_chat)"
+      // in their header comment — and a mention in a comment is not evidence.
+      // False coverage is the worse failure of the two.
+      for (const m of text.matchAll(/["'`\/]([a-z][a-z0-9_]{3,})["'`\/?#]/gi)) add(m[1], rel);
     }
   }
   return index;

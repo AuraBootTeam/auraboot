@@ -2,7 +2,7 @@
   "run": {
     "id": "coverage-plugins",
     "target": "plugins",
-    "commit": "5c2edcb51",
+    "commit": "857f24c26",
     "generator": "scripts/gen-coverage-manifest.mjs"
   },
   "groups": [
@@ -938,6 +938,79 @@
           "assertion": "no browser spec names this page or its route",
           "verdict": "untested",
           "note": "kind=list model=agent_tool"
+        },
+        {
+          "id": "page:ai_colleague_chat",
+          "action": "ai_colleague_chat",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/ai-colleague-chat-dsl-page.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail"
+        },
+        {
+          "id": "page:ai_colleague_detail",
+          "action": "ai_colleague_detail",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/ai-colleague-detail-dsl-page.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/ai-colleagues.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail"
+        },
+        {
+          "id": "page:ai_colleague_new",
+          "action": "ai_colleague_new",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/ai-colleague-create-enroll.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/ai-colleague-new-dsl-page.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/ai-colleague-operation-scope.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/ai-colleague-suspend.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail"
+        },
+        {
+          "id": "page:ai_colleagues",
+          "action": "ai_colleagues",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/ai-center-menu-reachability.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/ai-colleague-operation-scope.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/ai-colleague-suspend.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/ai-colleagues-dsl-page.spec.ts",
+            "web-admin/tests/e2e/agent-control-plane/ai-colleagues.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail"
+        },
+        {
+          "id": "page:ai_settings_hub",
+          "action": "ai_settings_hub",
+          "surface": "ui",
+          "dependencies": "real-stack",
+          "driver": "browser",
+          "evidence": [
+            "web-admin/tests/e2e/agent-control-plane/ai-settings-dsl-page.spec.ts"
+          ],
+          "assertion": "a browser spec reaches this page",
+          "verdict": "pass",
+          "note": "kind=detail"
         },
         {
           "id": "page:approval_policy_form",
@@ -6169,7 +6242,7 @@
   "stats": {
     "commands": 332,
     "untested": 228,
-    "pages": 195,
+    "pages": 200,
     "pagesUntested": 174
   }
 }
