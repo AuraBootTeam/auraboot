@@ -26,7 +26,7 @@ type TabKey = 'upload' | 'marketplace';
 
 interface UploadResult {
   success: boolean;
-  importId?: string;
+  pluginPid?: string;
   pluginId?: string;
   pluginName?: string;
   version?: string;
@@ -56,27 +56,30 @@ function PluginUploadTab() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch('/api/plugins/upload-package', {
+      // The BFF exposes /api/plugins/packages/install (upload + install in one
+      // multipart POST) and forwards the backend's PackageInstallResult through
+      // unchanged. There is no /api/plugins/upload-package and no {code,data}
+      // envelope — success is the top-level `success` flag.
+      const res = await fetch('/api/plugins/packages/install', {
         method: 'POST',
         body: formData,
       });
       const json = await res.json();
 
-      if (res.ok && json.code === '0') {
-        const data = json.data ?? {};
+      if (res.ok && json.success) {
         const uploadResult: UploadResult = {
           success: true,
-          importId: data.importId,
-          pluginId: data.pluginId,
-          pluginName: data.pluginName ?? data.displayName ?? data.pluginId,
-          version: data.version,
+          pluginPid: json.pluginPid,
+          pluginId: json.pluginId,
+          pluginName: json.pluginId,
+          version: json.version,
         };
         setResult(uploadResult);
         showSuccessToast(
-          `Plugin "${uploadResult.pluginName}" (v${uploadResult.version ?? '?'}) uploaded successfully`,
+          `Plugin "${uploadResult.pluginName ?? uploadResult.pluginId ?? 'package'}" (v${uploadResult.version ?? '?'}) installed successfully`,
         );
       } else {
-        const errorMsg = json.desc || json.message || 'Upload failed';
+        const errorMsg = json.error || json.message || 'Install failed';
         setResult({ success: false, error: errorMsg });
         showErrorToast(errorMsg);
       }
@@ -174,9 +177,9 @@ function PluginUploadTab() {
                   <div className="mt-1 space-y-0.5 text-sm text-green-700">
                     <p>Name: {result.pluginName}</p>
                     {result.version && <p>Version: {result.version}</p>}
-                    {result.importId && (
+                    {result.pluginPid && (
                       <p className="font-mono text-xs text-green-600">
-                        Import ID: {result.importId}
+                        Plugin ID: {result.pluginPid}
                       </p>
                     )}
                   </div>
