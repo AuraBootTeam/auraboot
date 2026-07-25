@@ -1,6 +1,6 @@
 package com.auraboot.framework.agent;
 
-import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
+import com.auraboot.framework.agent.util.LiveLlmSeeder;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.faq.ConversationFaqExtractionService;
 import com.auraboot.framework.faq.ExtractedFaq;
@@ -50,20 +50,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * {@code LlmProviderFactory} short-circuits to {@code StubLlmProvider} and this test passes
  * without a single packet leaving the machine.
  *
- * <p><strong>Opt-in</strong> — gated on {@code DEEPSEEK_API_KEY}; without it the test skips.
+ * <p><strong>Opt-in</strong> — gated on a live credential resolved from the environment by
+ * {@link LiveLlmSeeder} (qwen preferred, DeepSeek fallback); without one the test skips.
  *
  * <pre>{@code
- * cd platform && DEEPSEEK_API_KEY=sk-... \
+ * cd platform && DASHSCOPE_API_KEY=sk-... \
  *   LOGGING_LEVEL_REACTOR_NETTY_HTTP_CLIENT=DEBUG \
  *   ./gradlew :testAgent --tests '*ConversationFaqExtractionLiveIT*'
  * }</pre>
- * <p><strong>After running</strong>: redact {@code $DEEPSEEK_API_KEY} from build/reports +
+ * <p><strong>After running</strong>: redact the live API key from build/reports +
  * build/test-results (the seed INSERT lands in MyBatis DEBUG SQL logs). Redact — do not delete:
  * the request lines and token counts are the wire evidence.
  */
 @Slf4j
 @Tag("agent-eval-live")
-@DisplayName("Live quality: conversation → FAQ extraction vs a real LLM (DeepSeek)")
+@DisplayName("Live quality: conversation → FAQ extraction vs a real LLM (live provider)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
@@ -72,10 +73,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 class ConversationFaqExtractionLiveIT extends BaseIntegrationTest {
 
-    private static final String PROVIDER = "deepseek";
-    private static final String DELETE_SEED =
-            "DELETE FROM ab_cloud_config WHERE service_type='llm' AND provider_code='" + PROVIDER
-                    + "' AND config_level='tenant' AND tenant_id=?";
+    /**
+     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
+     * model name in every live IT is what silently broke this whole layer when
+     * DeepSeek retired {@code deepseek-chat}.
+     */
+    private LiveLlmSeeder.LiveProvider liveProvider;
 
     @Autowired private ConversationFaqExtractionService extractionService;
     @Autowired private CloudConfigService cloudConfigService;
@@ -152,36 +156,18 @@ class ConversationFaqExtractionLiveIT extends BaseIntegrationTest {
     }
 
     @BeforeEach
-    void seedDeepSeek() {
-        String apiKey = System.getenv("DEEPSEEK_API_KEY");
-        Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
-                "DEEPSEEK_API_KEY not set — skipping live conversation→FAQ extraction quality measurement");
+    void seedLiveProvider() {
+        liveProvider = LiveLlmSeeder.resolve();
+        Assumptions.assumeTrue(liveProvider != null, LiveLlmSeeder.skipReason());
 
         tenantId = getTestTenant().getId();
-        jdbcTemplate.update(DELETE_SEED, tenantId);
-
-        String configJson = "{"
-                + "\"apiKey\":\"" + apiKey + "\","
-                + "\"baseUrl\":\"https://api.deepseek.com\","
-                + "\"defaultModel\":\"deepseek-chat\","
-                + "\"apiFormat\":\"chat_completions\","
-                + "\"models\":[\"deepseek-chat\"],"
-                + "\"displayName\":\"DeepSeek (conversation FAQ extraction live)\""
-                + "}";
-        CloudConfigSaveRequest req = new CloudConfigSaveRequest();
-        req.setConfigLevel("tenant");
-        req.setServiceType("llm");
-        req.setProviderCode(PROVIDER);
-        req.setConfig(configJson);
-        req.setEnabled(true);
-        req.setPriority(0);
-        cloudConfigService.saveConfig(req);
+        LiveLlmSeeder.seed(liveProvider, tenantId, cloudConfigService, jdbcTemplate);
     }
 
     @AfterAll
     void cleanup() {
-        if (tenantId != null) {
-            jdbcTemplate.update(DELETE_SEED, tenantId);
+        if (tenantId != null && liveProvider != null) {
+            LiveLlmSeeder.clear(liveProvider, tenantId, jdbcTemplate);
         }
     }
 
@@ -236,7 +222,8 @@ class ConversationFaqExtractionLiveIT extends BaseIntegrationTest {
         }
 
         StringBuilder report = new StringBuilder();
-        report.append("\n========== CONVERSATION → FAQ EXTRACTION (DeepSeek deepseek-chat, single sample) ==========\n");
+        report.append("\n========== CONVERSATION → FAQ EXTRACTION (" + liveProvider.providerCode()
+                + " " + liveProvider.model() + ", single sample) ==========\n");
         report.append(rows);
         report.append("  ------------------------------------------------------------------------------------------\n");
         report.append(String.format("  POSITIVE n=%d  metMinPairs=%d/%d  groundedAnswer=%d/%d%n",

@@ -4,7 +4,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
-import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
+import com.auraboot.framework.agent.util.LiveLlmSeeder;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
@@ -48,11 +48,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code StepLoopService.executeAgentLoop} exactly (assistant {@code tool_use} echo + user
  * {@code tool_result} blocks, terminate on a non-{@code tool_use} stop reason).
  *
- * <p><strong>Opt-in.</strong> Gated by {@code DEEPSEEK_API_KEY} and tagged {@code agent-eval-live};
+ * <p><strong>Opt-in.</strong> Gated on a live credential resolved from the environment by
+ * {@link LiveLlmSeeder} (qwen preferred, DeepSeek fallback) and tagged {@code agent-eval-live};
  * a plain {@code ./gradlew :testAgent} skips it via {@link Assumptions}.
  *
  * <pre>{@code
- * cd platform && DEEPSEEK_API_KEY=sk-... \
+ * cd platform && DASHSCOPE_API_KEY=sk-... \
  *   ./gradlew :testAgent --tests '*AgentMultiStepConvergenceLiveIT*'
  * }</pre>
  */
@@ -67,10 +68,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 })
 class AgentMultiStepConvergenceLiveIT extends BaseIntegrationTest {
 
-    private static final String PROVIDER = "deepseek";
-    private static final String DELETE_SEED =
-            "DELETE FROM ab_cloud_config WHERE service_type='llm' AND provider_code='" + PROVIDER
-                    + "' AND config_level='tenant' AND tenant_id=?";
+    /**
+     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
+     * model name in every live IT is what silently broke this whole layer when
+     * DeepSeek retired {@code deepseek-chat}.
+     */
+    private LiveLlmSeeder.LiveProvider liveProvider;
 
     /** Hard cap mirroring the runtime's loop guard — the model must converge BELOW this. */
     private static final int MAX_LOOPS = 6;
@@ -82,49 +86,32 @@ class AgentMultiStepConvergenceLiveIT extends BaseIntegrationTest {
     private Long tenantId;
 
     @BeforeEach
-    void seedDeepSeek() {
-        String apiKey = System.getenv("DEEPSEEK_API_KEY");
-        Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
-                "DEEPSEEK_API_KEY not set — skipping live multi-step convergence measurement");
+    void seedLiveProvider() {
+        liveProvider = LiveLlmSeeder.resolve();
+        Assumptions.assumeTrue(liveProvider != null, LiveLlmSeeder.skipReason());
 
         tenantId = getTestTenant().getId();
-        jdbcTemplate.update(DELETE_SEED, tenantId);
-
-        String configJson = "{"
-                + "\"apiKey\":\"" + apiKey + "\","
-                + "\"baseUrl\":\"https://api.deepseek.com\","
-                + "\"defaultModel\":\"deepseek-chat\","
-                + "\"apiFormat\":\"chat_completions\","
-                + "\"models\":[\"deepseek-chat\"],"
-                + "\"displayName\":\"DeepSeek (multi-step convergence live)\""
-                + "}";
-        CloudConfigSaveRequest req = new CloudConfigSaveRequest();
-        req.setConfigLevel("tenant");
-        req.setServiceType("llm");
-        req.setProviderCode(PROVIDER);
-        req.setConfig(configJson);
-        req.setEnabled(true);
-        req.setPriority(0);
-        cloudConfigService.saveConfig(req);
+        LiveLlmSeeder.seed(liveProvider, tenantId, cloudConfigService, jdbcTemplate);
     }
 
     @AfterAll
     void cleanup() {
-        if (tenantId != null) {
-            jdbcTemplate.update(DELETE_SEED, tenantId);
+        if (tenantId != null && liveProvider != null) {
+            LiveLlmSeeder.clear(liveProvider, tenantId, jdbcTemplate);
         }
     }
 
     @Test
     @Timeout(value = 6, unit = TimeUnit.MINUTES)
-    @DisplayName("real DeepSeek looks up → decides → escalates → stops within the loop cap")
+    @DisplayName("the real model looks up → decides → escalates → stops within the loop cap")
     void multiStepToolUseLoopConverges() throws Exception {
-        LlmProviderFactory.ProviderResolution resolution = providerFactory.resolveProvider(tenantId, PROVIDER);
-        assertThat(resolution).as("deepseek provider must resolve from the seeded tenant config").isNotNull();
+        LlmProviderFactory.ProviderResolution resolution =
+                providerFactory.resolveProvider(tenantId, liveProvider.providerCode());
+        assertThat(resolution).as("the live provider must resolve from the seeded tenant config").isNotNull();
         LlmProvider provider = resolution.getProvider();
         LlmProviderFactory.ProviderConfig config = resolution.getConfig();
         String model = config.getDefaultModel() != null && !config.getDefaultModel().isBlank()
-                ? config.getDefaultModel() : "deepseek-chat";
+                ? config.getDefaultModel() : liveProvider.model();
 
         List<LlmChatRequest.Tool> tools = List.of(
                 LlmChatRequest.Tool.builder()
@@ -212,12 +199,12 @@ class AgentMultiStepConvergenceLiveIT extends BaseIntegrationTest {
         }
 
         String report = String.format(
-                "%n===== MULTI-STEP CONVERGENCE (DeepSeek %s) =====%n"
+                "%n===== MULTI-STEP CONVERGENCE (%s %s) =====%n"
                 + "  loopsUsed=%d/%d  toolCalls=%d  converged=%s%n"
                 + "  toolSequence=%s%n"
                 + "  finalSummary=%s%n"
                 + "================================================%n",
-                model, loopsUsed, MAX_LOOPS, toolCalls, converged, toolSequence,
+                liveProvider.providerCode(), model, loopsUsed, MAX_LOOPS, toolCalls, converged, toolSequence,
                 finalText.length() > 240 ? finalText.substring(0, 240) + "…" : finalText);
         System.out.print(report);
         log.warn(report);

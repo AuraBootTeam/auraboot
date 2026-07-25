@@ -4,7 +4,7 @@ import com.auraboot.framework.agent.nlmodeling.NlModelingService;
 import com.auraboot.framework.agent.nlmodeling.dto.NlApplyRequest;
 import com.auraboot.framework.agent.nlmodeling.dto.NlModelingRequest;
 import com.auraboot.framework.agent.nlmodeling.dto.NlModelingResponse;
-import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
+import com.auraboot.framework.agent.util.LiveLlmSeeder;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.plugin.dto.imports.ImportExecuteResult;
@@ -48,7 +48,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * actually make an LLM page production-importable.
  *
  * <p>Opt-in (decoupled from every-commit CI — L3 live eval): {@code @Tag("agent-eval-live")} +
- * {@code DEEPSEEK_API_KEY}. Without the key the test self-skips (no faked pass).
+ * a live LLM credential resolved by {@link LiveLlmSeeder}. Without a key the test
+ * self-skips (no faked pass).
  */
 @Slf4j
 @Tag("agent-eval-live")
@@ -61,11 +62,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 class NlModelingApplyV4LiveIT extends BaseIntegrationTest {
 
-    private static final String PROVIDER = "deepseek";
     private static final String PLUGIN_CODE = "nl_live_v4_inspection";
-    private static final String DELETE_SEED =
-            "DELETE FROM ab_cloud_config WHERE service_type='llm' AND provider_code='" + PROVIDER
-                    + "' AND config_level='tenant' AND tenant_id=?";
+
+    /**
+     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
+     * model name in every live IT is what silently broke this whole layer when
+     * DeepSeek retired {@code deepseek-chat}.
+     */
+    private LiveLlmSeeder.LiveProvider liveProvider;
 
     @Autowired private NlModelingService nlModelingService;
     @Autowired private CloudConfigService cloudConfigService;
@@ -74,35 +79,19 @@ class NlModelingApplyV4LiveIT extends BaseIntegrationTest {
     private Long tenantId;
 
     @BeforeEach
-    void seedDeepSeek() {
-        String apiKey = System.getenv("DEEPSEEK_API_KEY");
-        Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
-                "DEEPSEEK_API_KEY not set — skipping live Prompt-to-App apply verification");
+    void seedLiveProvider() {
+        liveProvider = LiveLlmSeeder.resolve();
+        Assumptions.assumeTrue(liveProvider != null, LiveLlmSeeder.skipReason());
+
         tenantId = getTestTenant().getId();
-        jdbcTemplate.update(DELETE_SEED, tenantId);
-        String configJson = "{"
-                + "\"apiKey\":\"" + apiKey + "\","
-                + "\"baseUrl\":\"https://api.deepseek.com\","
-                + "\"defaultModel\":\"deepseek-chat\","
-                + "\"apiFormat\":\"chat_completions\","
-                + "\"models\":[\"deepseek-chat\"],"
-                + "\"displayName\":\"DeepSeek (prompt-to-app apply live)\""
-                + "}";
-        CloudConfigSaveRequest req = new CloudConfigSaveRequest();
-        req.setConfigLevel("tenant");
-        req.setServiceType("llm");
-        req.setProviderCode(PROVIDER);
-        req.setConfig(configJson);
-        req.setEnabled(true);
-        req.setPriority(0);
-        cloudConfigService.saveConfig(req);
+        LiveLlmSeeder.seed(liveProvider, tenantId, cloudConfigService, jdbcTemplate);
     }
 
     @AfterAll
     void cleanup() {
         // Scrub the key-bearing cloud_config row (per "rotate/scrub after live" discipline).
-        if (tenantId != null) {
-            jdbcTemplate.update(DELETE_SEED, tenantId);
+        if (tenantId != null && liveProvider != null) {
+            LiveLlmSeeder.clear(liveProvider, tenantId, jdbcTemplate);
         }
     }
 
@@ -119,7 +108,7 @@ class NlModelingApplyV4LiveIT extends BaseIntegrationTest {
                 .options(NlModelingRequest.Options.builder().build())
                 .build();
 
-        // 1. Live generate (real DeepSeek).
+        // 1. Live generate (real LLM — whichever provider the environment resolved).
         NlModelingResponse resp = nlModelingService.generate(request);
         assertNotNull(resp, "generate() must return a response");
         NlModelingResponse.Resources res = resp.getResources();

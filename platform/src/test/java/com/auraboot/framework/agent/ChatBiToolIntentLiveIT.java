@@ -4,7 +4,7 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
-import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
+import com.auraboot.framework.agent.util.LiveLlmSeeder;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
@@ -41,11 +41,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * dimensions / metrics} correctly and grounded in the schema (no hallucinated fields)? This pins
  * the same property at the new layer, so deleting the v1 parser does not drop coverage.
  *
- * <p>Opt-in: {@code @Tag("agent-eval-live")} + {@code DEEPSEEK_API_KEY} (skips without it).
+ * <p>Opt-in: {@code @Tag("agent-eval-live")} + a live credential resolved from the environment by
+ * {@link LiveLlmSeeder} (qwen preferred, DeepSeek fallback); skips without one.
  */
 @Slf4j
 @Tag("agent-eval-live")
-@DisplayName("Live quality: chat_bi tool NL→params (group-by/metric, grounded) vs a real LLM (DeepSeek)")
+@DisplayName("Live quality: chat_bi tool NL→params (group-by/metric, grounded) vs a real LLM (live provider)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
@@ -54,10 +55,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 class ChatBiToolIntentLiveIT extends BaseIntegrationTest {
 
-    private static final String PROVIDER = "deepseek";
-    private static final String DELETE_SEED =
-            "DELETE FROM ab_cloud_config WHERE service_type='llm' AND provider_code='" + PROVIDER
-                    + "' AND config_level='tenant' AND tenant_id=?";
+    /**
+     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
+     * model name in every live IT is what silently broke this whole layer when
+     * DeepSeek retired {@code deepseek-chat}.
+     */
+    private LiveLlmSeeder.LiveProvider liveProvider;
 
     private static final String MODEL_CODE = "sales_order";
     private static final Set<String> FIELDS =
@@ -105,47 +109,32 @@ class ChatBiToolIntentLiveIT extends BaseIntegrationTest {
     private Long tenantId;
 
     @BeforeEach
-    void seedDeepSeek() {
-        String apiKey = System.getenv("DEEPSEEK_API_KEY");
-        Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
-                "DEEPSEEK_API_KEY not set — skipping chat_bi tool intent live measurement");
+    void seedLiveProvider() {
+        liveProvider = LiveLlmSeeder.resolve();
+        Assumptions.assumeTrue(liveProvider != null, LiveLlmSeeder.skipReason());
+
         tenantId = getTestTenant().getId();
-        jdbcTemplate.update(DELETE_SEED, tenantId);
-        String configJson = "{"
-                + "\"apiKey\":\"" + apiKey + "\","
-                + "\"baseUrl\":\"https://api.deepseek.com\","
-                + "\"defaultModel\":\"deepseek-chat\","
-                + "\"apiFormat\":\"chat_completions\","
-                + "\"models\":[\"deepseek-chat\"],"
-                + "\"displayName\":\"DeepSeek (chat_bi tool intent live)\""
-                + "}";
-        CloudConfigSaveRequest req = new CloudConfigSaveRequest();
-        req.setConfigLevel("tenant");
-        req.setServiceType("llm");
-        req.setProviderCode(PROVIDER);
-        req.setConfig(configJson);
-        req.setEnabled(true);
-        req.setPriority(0);
-        cloudConfigService.saveConfig(req);
+        LiveLlmSeeder.seed(liveProvider, tenantId, cloudConfigService, jdbcTemplate);
     }
 
     @AfterAll
     void cleanup() {
-        if (tenantId != null) {
-            jdbcTemplate.update(DELETE_SEED, tenantId);
+        if (tenantId != null && liveProvider != null) {
+            LiveLlmSeeder.clear(liveProvider, tenantId, jdbcTemplate);
         }
     }
 
     @Test
     @Timeout(value = 6, unit = TimeUnit.MINUTES)
-    @DisplayName("real DeepSeek fills chat_bi modelCode/dimensions/metrics, grounded in the schema")
+    @DisplayName("the real model fills chat_bi modelCode/dimensions/metrics, grounded in the schema")
     void chatBiToolParamsQuality() throws Exception {
-        LlmProviderFactory.ProviderResolution resolution = providerFactory.resolveProvider(tenantId, PROVIDER);
-        org.junit.jupiter.api.Assertions.assertNotNull(resolution, "deepseek provider must resolve");
+        LlmProviderFactory.ProviderResolution resolution =
+                providerFactory.resolveProvider(tenantId, liveProvider.providerCode());
+        org.junit.jupiter.api.Assertions.assertNotNull(resolution, "the live provider must resolve");
         LlmProvider provider = resolution.getProvider();
         LlmProviderFactory.ProviderConfig config = resolution.getConfig();
         String model = config.getDefaultModel() != null && !config.getDefaultModel().isBlank()
-                ? config.getDefaultModel() : "deepseek-chat";
+                ? config.getDefaultModel() : liveProvider.model();
 
         int total = 0, called = 0, modelOk = 0, dimOk = 0, aggOk = 0, grounded = 0, pass = 0;
         StringBuilder rows = new StringBuilder();
@@ -192,7 +181,8 @@ class ChatBiToolIntentLiveIT extends BaseIntegrationTest {
                     dims, c.expectDimension(), agg, yn(isGrounded)));
         }
 
-        String report = "\n===== chat_bi TOOL INTENT LIVE (DeepSeek " + model + ", single sample) =====\n"
+        String report = "\n===== chat_bi TOOL INTENT LIVE (" + liveProvider.providerCode() + " "
+                + model + ", single sample) =====\n"
                 + rows
                 + String.format("  OVERALL n=%d called=%d model=%d dim=%d agg=%d grounded=%d pass=%d%n",
                         total, called, modelOk, dimOk, aggOk, grounded, pass)

@@ -3,7 +3,7 @@ package com.auraboot.framework.agent;
 import com.auraboot.framework.agent.nlmodeling.NlModelingService;
 import com.auraboot.framework.agent.nlmodeling.dto.NlModelingRequest;
 import com.auraboot.framework.agent.nlmodeling.dto.NlModelingResponse;
-import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
+import com.auraboot.framework.agent.util.LiveLlmSeeder;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +40,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * baseline the schema-constrained rewrite must beat; any invalid {@code dataType}, missing
  * ENUM {@code dictCode}, or non-empty {@code validationErrors} is the free-form weakness.
  *
- * <p>Opt-in: {@code @Tag("agent-eval-live")} + {@code DEEPSEEK_API_KEY}.
+ * <p>Opt-in: {@code @Tag("agent-eval-live")} + a live LLM credential resolved by
+ * {@link LiveLlmSeeder}.
  */
 @Slf4j
 @Tag("agent-eval-live")
@@ -53,10 +54,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 class NlModelingLiveQualityIT extends BaseIntegrationTest {
 
-    private static final String PROVIDER = "deepseek";
-    private static final String DELETE_SEED =
-            "DELETE FROM ab_cloud_config WHERE service_type='llm' AND provider_code='" + PROVIDER
-                    + "' AND config_level='tenant' AND tenant_id=?";
+    /**
+     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
+     * model name in every live IT is what silently broke this whole layer when
+     * DeepSeek retired {@code deepseek-chat}.
+     */
+    private LiveLlmSeeder.LiveProvider liveProvider;
 
     /** The dataType enum the system prompt tells the model to use. */
     private static final Set<String> VALID_TYPES = Set.of(
@@ -74,34 +78,18 @@ class NlModelingLiveQualityIT extends BaseIntegrationTest {
     }
 
     @BeforeEach
-    void seedDeepSeek() {
-        String apiKey = System.getenv("DEEPSEEK_API_KEY");
-        Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
-                "DEEPSEEK_API_KEY not set — skipping NL-modeling baseline measurement");
+    void seedLiveProvider() {
+        liveProvider = LiveLlmSeeder.resolve();
+        Assumptions.assumeTrue(liveProvider != null, LiveLlmSeeder.skipReason());
+
         tenantId = getTestTenant().getId();
-        jdbcTemplate.update(DELETE_SEED, tenantId);
-        String configJson = "{"
-                + "\"apiKey\":\"" + apiKey + "\","
-                + "\"baseUrl\":\"https://api.deepseek.com\","
-                + "\"defaultModel\":\"deepseek-chat\","
-                + "\"apiFormat\":\"chat_completions\","
-                + "\"models\":[\"deepseek-chat\"],"
-                + "\"displayName\":\"DeepSeek (nl-modeling baseline)\""
-                + "}";
-        CloudConfigSaveRequest req = new CloudConfigSaveRequest();
-        req.setConfigLevel("tenant");
-        req.setServiceType("llm");
-        req.setProviderCode(PROVIDER);
-        req.setConfig(configJson);
-        req.setEnabled(true);
-        req.setPriority(0);
-        cloudConfigService.saveConfig(req);
+        LiveLlmSeeder.seed(liveProvider, tenantId, cloudConfigService, jdbcTemplate);
     }
 
     @AfterAll
     void cleanup() {
-        if (tenantId != null) {
-            jdbcTemplate.update(DELETE_SEED, tenantId);
+        if (tenantId != null && liveProvider != null) {
+            LiveLlmSeeder.clear(liveProvider, tenantId, jdbcTemplate);
         }
     }
 
@@ -190,7 +178,8 @@ class NlModelingLiveQualityIT extends BaseIntegrationTest {
                 .filter(d -> d != null && !VALID_TYPES.contains(d.toUpperCase())).count();
 
         StringBuilder report = new StringBuilder();
-        report.append(String.format("%n========== NL→MODEL/DSL FREE-FORM BASELINE [%s] (DeepSeek, single sample) ==========%n", label));
+        report.append(String.format("%n========== NL→MODEL/DSL FREE-FORM BASELINE [%s] (%s %s, single sample) ==========%n",
+                label, liveProvider.providerCode(), liveProvider.model()));
         report.append(rows);
         report.append("  ------------------------------------------------------------------------------------------\n");
         report.append(String.format("  fieldsGenerated=%d  typeCorrect=%d/%d  enumDictOk=%d/%d  invalidDataTypes=%d%n",

@@ -7,7 +7,7 @@ import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.service.CapabilityEvalService;
 import com.auraboot.framework.agent.service.LlmToolSelectionService;
-import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
+import com.auraboot.framework.agent.util.LiveLlmSeeder;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -39,10 +39,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Live-LLM golden for the <strong>PCBA quality agent</strong>
- * (pcba_quality archetype), driven against a real
- * OpenAI-compatible model (DeepSeek). Restores live eval coverage lost when M2
- * deleted {@code AgentArchetypeLiveQualityIT}. Mirrors {@link DeviceAgentLiveEvalIT}'s
- * harness and proves the PCBA quality agent contract:
+ * (pcba_quality archetype), driven against a real OpenAI-compatible model
+ * (whichever live provider the environment supplies). Restores live eval coverage
+ * lost when M2 deleted {@code AgentArchetypeLiveQualityIT}. Mirrors
+ * {@link DeviceAgentLiveEvalIT}'s harness and proves the PCBA quality agent contract:
  *
  * <ol>
  *   <li><b>routing</b> — CAPA creation tasks route to {@code qc:create_capa};
@@ -57,22 +57,22 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *       {@code eval_mode=llm} (not degraded to keyword).</li>
  * </ol>
  *
- * <p><strong>Opt-in.</strong> Gated by {@code DEEPSEEK_API_KEY}
- * ({@link Assumptions#assumeTrue}) and tagged {@code agent-eval-live}, so a plain
- * {@code ./gradlew :test} skips it.
+ * <p><strong>Opt-in.</strong> Gated by the presence of a live LLM credential
+ * ({@link LiveLlmSeeder#resolve()} → {@link Assumptions#assumeTrue}) and tagged
+ * {@code agent-eval-live}, so a plain {@code ./gradlew :test} skips it.
  *
  * <pre>{@code
- * cd platform && DEEPSEEK_API_KEY=sk-... \
+ * cd platform && DASHSCOPE_API_KEY=sk-... \
  *   ./gradlew :test --tests '*PcbaQualityAgentLiveEvalIT*'
  * }</pre>
  *
- * <p>Blank {@code agent.anthropic.api-key} so the seeded tenant-level DeepSeek
+ * <p>Blank {@code agent.anthropic.api-key} so the seeded tenant-level live-provider
  * config becomes the first resolved provider (same rationale as
  * {@link DeviceAgentLiveEvalIT}). The seeded {@code ab_cloud_config} row is
  * tenant-scoped and removed in {@link #cleanup()} so a real API key never lingers.
  */
 @Tag("agent-eval-live")
-@DisplayName("PCBA quality agent: live DeepSeek golden — CAPA routing + gather-context safety boundary")
+@DisplayName("PCBA quality agent: live LLM golden — CAPA routing + gather-context safety boundary")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -82,10 +82,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 class PcbaQualityAgentLiveEvalIT extends BaseIntegrationTest {
 
-    private static final String PROVIDER = "deepseek";
-    private static final String DELETE_SEED =
-            "DELETE FROM ab_cloud_config WHERE service_type='llm' AND provider_code='" + PROVIDER
-                    + "' AND config_level='tenant' AND tenant_id=?";
+    /**
+     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
+     * model name in every live IT is what silently broke this whole layer when
+     * DeepSeek retired {@code deepseek-chat}.
+     */
+    private LiveLlmSeeder.LiveProvider liveProvider;
 
     // Mutating quality commands a gather-context task must never select.
     private static final List<String> QUALITY_MUTATING_COMMANDS =
@@ -101,50 +104,31 @@ class PcbaQualityAgentLiveEvalIT extends BaseIntegrationTest {
     private Long tenantId;
 
     @BeforeEach
-    void seedDeepSeek() {
-        String apiKey = System.getenv("DEEPSEEK_API_KEY");
-        Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
-                "DEEPSEEK_API_KEY not set — skipping pcba-quality agent live golden");
+    void seedLiveProvider() {
+        liveProvider = LiveLlmSeeder.resolve();
+        Assumptions.assumeTrue(liveProvider != null, LiveLlmSeeder.skipReason());
 
         tenantId = getTestTenant().getId();
-        jdbcTemplate.update(DELETE_SEED, tenantId); // idempotent re-seed
-
-        String configJson = "{"
-                + "\"apiKey\":\"" + apiKey + "\","
-                + "\"baseUrl\":\"https://api.deepseek.com\","
-                + "\"defaultModel\":\"deepseek-chat\","
-                + "\"apiFormat\":\"chat_completions\","
-                + "\"models\":[\"deepseek-chat\"],"
-                + "\"displayName\":\"DeepSeek (pcba-quality agent live golden)\""
-                + "}";
-
-        CloudConfigSaveRequest req = new CloudConfigSaveRequest();
-        req.setConfigLevel("tenant");
-        req.setServiceType("llm");
-        req.setProviderCode(PROVIDER);
-        req.setConfig(configJson);
-        req.setEnabled(true);
-        req.setPriority(0);
-        cloudConfigService.saveConfig(req);
+        LiveLlmSeeder.seed(liveProvider, tenantId, cloudConfigService, jdbcTemplate);
     }
 
     @AfterAll
     void cleanup() {
-        if (tenantId != null) {
-            jdbcTemplate.update(DELETE_SEED, tenantId);
+        if (tenantId != null && liveProvider != null) {
+            LiveLlmSeeder.clear(liveProvider, tenantId, jdbcTemplate);
         }
     }
 
     @Test
     @Order(1)
-    @DisplayName("seeded DeepSeek is the resolved provider")
-    void seededProviderResolvesToDeepSeek() {
+    @DisplayName("the seeded live provider is the resolved provider")
+    void seededProviderResolvesToLiveProvider() {
         assertTrue(llmToolSelectionService.isAvailable(tenantId),
-                "an LLM provider must be available after seeding DeepSeek");
+                "an LLM provider must be available after seeding the live provider");
         LlmProviderFactory.ProviderConfig resolved = llmProviderFactory.resolveConfig(tenantId, null);
         assertNotNull(resolved, "first-available provider config must resolve");
-        assertEquals(PROVIDER, resolved.getProviderCode(),
-                "the resolved provider must be the seeded DeepSeek, not the stub/anthropic fallback");
+        assertEquals(liveProvider.providerCode(), resolved.getProviderCode(),
+                "the resolved provider must be the seeded live provider, not the stub/anthropic fallback");
     }
 
     /**
