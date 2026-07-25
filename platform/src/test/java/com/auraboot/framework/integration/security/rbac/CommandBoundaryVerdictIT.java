@@ -160,7 +160,7 @@ class CommandBoundaryVerdictIT extends BaseIntegrationTest {
     }
 
     @Test
-    @DisplayName("member: a declared permission they lack is still denied, and leaves no verdict")
+    @DisplayName("member: a declared permission they lack is denied, and the refusal is recorded, not silent")
     void memberIsDeniedTheCodeTheMatrixDeniesThem() {
         CommandPipelineContext ctx = context(List.of(memberDenyCode), memberUserId);
 
@@ -169,9 +169,18 @@ class CommandBoundaryVerdictIT extends BaseIntegrationTest {
                         .isInstanceOf(BusinessException.class)
                         .hasMessageContaining("Command permission denied"));
 
+        // The refusal is now a recorded decision, not a null the pipeline leaves behind. The
+        // load-bearing invariant is unchanged: a denial must never read as an authorization, or
+        // downstream data access could inherit the boundary's authority from a refusal.
         assertThat(ctx.getAuthorizationVerdict())
-                .as("a denied command must not leave an authorization behind")
-                .isNull();
+                .as("a denied command records its refusal rather than leaving no trace")
+                .isNotNull();
+        assertThat(ctx.getAuthorizationVerdict().isAuthorized())
+                .as("a refusal must never read as an authorization")
+                .isFalse();
+        assertThat(ctx.getAuthorizationVerdict().isDenied()).isTrue();
+        assertThat(ctx.getAuthorizationVerdict().reason())
+                .isEqualTo(CommandAuthorizationVerdict.REASON_PERMISSION_DENIED);
     }
 
     /**

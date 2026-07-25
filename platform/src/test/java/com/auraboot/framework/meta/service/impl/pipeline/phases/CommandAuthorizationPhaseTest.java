@@ -111,6 +111,30 @@ class CommandAuthorizationPhaseTest {
         verify(userPermissionService).hasPermission(42L, "dashboard.admin");
     }
 
+    /**
+     * A denial is now a recorded decision, not only a thrown exception. The pipeline still aborts,
+     * but the verdict on the context says the caller was DENIED and which permissions it lacked —
+     * the prerequisite for an explainable audit trail rather than a silent refusal. If this
+     * regresses to leaving the verdict null (or to a verdict that reads as authorized), the "why"
+     * disappears again.
+     */
+    @Test
+    void executeRecordsADeniedVerdictBeforeThrowing() {
+        CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
+        when(userPermissionService.hasPermission(42L, "dashboard.manage")).thenReturn(false);
+        CommandPipelineContext ctx = contextWithPermissions(List.of("dashboard.manage"), 42L);
+
+        assertThatThrownBy(() -> phase.execute(ctx)).isInstanceOf(BusinessException.class);
+
+        assertThat(ctx.getAuthorizationVerdict()).isNotNull();
+        assertThat(ctx.getAuthorizationVerdict().isDenied()).isTrue();
+        assertThat(ctx.getAuthorizationVerdict().isAuthorized()).isFalse();
+        assertThat(ctx.getAuthorizationVerdict().reason())
+                .isEqualTo(CommandAuthorizationVerdict.REASON_PERMISSION_DENIED);
+        assertThat(ctx.getAuthorizationVerdict().requiredPermissions())
+                .containsExactly("dashboard.manage");
+    }
+
     @Test
     void executeIgnoresBlankPermissionEntriesBeforeCheckingAccess() {
         CommandAuthorizationPhase phase = new CommandAuthorizationPhase(userPermissionService);
