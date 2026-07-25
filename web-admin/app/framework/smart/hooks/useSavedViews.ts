@@ -140,7 +140,13 @@ export function useSavedViews(options: UseSavedViewsOptions): UseSavedViewsResul
       const preservedView = selectedViewPidRef.current
         ? scopedViews.find((view) => view.pid === selectedViewPidRef.current)
         : undefined;
-      const nextView = preservedView ?? scopedDefaultView ?? scopedViews[0] ?? null;
+      // Fall back to the backend-resolved default even when it is out of the switcher's
+      // scope (e.g. a plugin-provided global `isDefault` preset) ONLY when no scoped view
+      // applies — so a personal view still wins under scopeFilter='personal', but a list
+      // page with only a global default (e.g. a plugin's kanban preset) renders it instead
+      // of silently falling back to the implicit table view.
+      const nextView =
+        preservedView ?? scopedDefaultView ?? scopedViews[0] ?? defaultView ?? null;
       selectedViewPidRef.current = nextView?.pid ?? null;
       setCurrentView(nextView);
     } catch (err) {
