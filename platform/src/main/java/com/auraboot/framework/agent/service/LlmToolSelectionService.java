@@ -39,8 +39,21 @@ public class LlmToolSelectionService {
     private final LlmProviderFactory llmProviderFactory;
     private final ObjectMapper objectMapper;
 
-    /** Result of one LLM selection round. */
-    public record Selection(List<String> selected, List<String> hallucinated) {
+    /**
+     * Result of one LLM selection round.
+     *
+     * <p>{@code params} carries the argument names the model says it would fill for the
+     * task (its own extraction), so an eval can score <em>parameter completion</em> against
+     * a case's {@code expectedInputKeys} instead of assuming "picked the right tool ⇒ params
+     * are satisfiable". Empty when the model returned none — callers must treat an empty map
+     * as "no parameter evidence", never as "all parameters present".
+     */
+    public record Selection(List<String> selected, List<String> hallucinated, List<String> params) {
+
+        /** Back-compat for callers that predate parameter extraction. */
+        public Selection(List<String> selected, List<String> hallucinated) {
+            this(selected, hallucinated, List.of());
+        }
     }
 
     /**
@@ -111,19 +124,40 @@ public class LlmToolSelectionService {
         if (readOnlyIntent) {
             selected = enforceReadOnlyIntent(selected, candidates, maxTools);
         }
-        return new Selection(selected, hallucinated);
+        return new Selection(selected, hallucinated, parseParams(parsed));
     }
 
     // =========================================================================
     // Prompt construction
     // =========================================================================
 
+    /**
+     * Argument names the model reports it would fill, used to score parameter completion.
+     * Absent/misshapen → empty list ("no evidence"), never a silent pass.
+     */
+    private List<String> parseParams(Map<String, Object> parsed) {
+        Object paramsObj = parsed.get("params");
+        if (!(paramsObj instanceof List<?> raw)) {
+            return List.of();
+        }
+        List<String> params = new ArrayList<>();
+        for (Object item : raw) {
+            if (item instanceof String key && !key.isBlank() && !params.contains(key)) {
+                params.add(key);
+            }
+        }
+        return params;
+    }
+
     private String buildSystemPrompt(List<ToolDefinition> candidates, int maxTools) {
         StringBuilder sb = new StringBuilder();
         sb.append("You select the most relevant tools for a task.\n");
-        sb.append("Reply with ONLY a JSON object: {\"tools\": [\"tool_code\", ...]} — ");
+        sb.append("Reply with ONLY a JSON object: ");
+        sb.append("{\"tools\": [\"tool_code\", ...], \"params\": [\"argument_name\", ...]} — ");
         sb.append("up to ").append(maxTools).append(" codes, most relevant first, ");
-        sb.append("chosen strictly from the catalog below. Never invent codes.\n\n");
+        sb.append("chosen strictly from the catalog below. Never invent codes.\n");
+        sb.append("In \"params\", list the argument names you would fill for this task, ");
+        sb.append("taken only from what the task actually states. Omit anything the task does not say.\n\n");
         sb.append("Tool catalog:\n");
         int count = 0;
         for (ToolDefinition tool : candidates) {

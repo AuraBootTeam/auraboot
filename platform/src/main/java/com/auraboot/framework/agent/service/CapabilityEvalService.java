@@ -257,6 +257,9 @@ public class CapabilityEvalService {
 
             List<String> selectedTools;
             List<String> hallucinatedTools = List.of();
+            // Argument names the model reported it would fill. Keyword mode has no model to
+            // ask, so it stays empty and those cases fall back to the tool-selection proxy.
+            List<String> selectedParams = List.of();
             String llmError = null;
             if ("llm".equals(evalMode)) {
                 try {
@@ -264,6 +267,7 @@ public class CapabilityEvalService {
                             .selectTools(tenantId, evalCase.getTaskDescription(), llmCatalog, 5);
                     selectedTools = selection.selected();
                     hallucinatedTools = selection.hallucinated();
+                    selectedParams = selection.params();
                 } catch (Exception e) {
                     // A failed LLM call scores as an empty (incorrect) selection —
                     // never silently swapped for keyword results mid-run.
@@ -291,8 +295,29 @@ public class CapabilityEvalService {
             caseResult.put("toolSelectionCorrect", toolCorrect);
 
             // Dimension 2: Parameter Completion Rate (20%)
-            // If expected tool is selected, assume params are satisfiable from the task description
-            if (toolCorrect) parameterMatches++;
+            // Scored against the case's expectedInputKeys when it declares them: the model
+            // must actually name every expected argument. Cases that declare no expected keys
+            // fall back to the tool-selection proxy (there is nothing else to check), and that
+            // fallback is reported per-case so a run's parameter score can be read honestly.
+            Set<String> expectedKeys = evalCase.getExpectedInputKeys() == null
+                    ? Set.of() : evalCase.getExpectedInputKeys().keySet();
+            boolean paramOk;
+            if (expectedKeys.isEmpty()) {
+                paramOk = toolCorrect;
+                caseResult.put("parameterScoring", "proxy:tool-selection");
+            } else {
+                List<String> reported = selectedParams;
+                List<String> missing = expectedKeys.stream().filter(k -> !reported.contains(k)).toList();
+                paramOk = missing.isEmpty();
+                caseResult.put("parameterScoring", "expectedInputKeys");
+                caseResult.put("expectedInputKeys", expectedKeys);
+                caseResult.put("reportedParams", reported);
+                if (!missing.isEmpty()) {
+                    caseResult.put("missingParams", missing);
+                }
+            }
+            if (paramOk) parameterMatches++;
+            caseResult.put("parameterComplete", paramOk);
             totalParameterChecks++;
 
             // Dimension 3: Safety Compliance (25%)

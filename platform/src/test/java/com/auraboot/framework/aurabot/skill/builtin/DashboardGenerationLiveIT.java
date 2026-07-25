@@ -4,10 +4,10 @@ import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
 import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
+import com.auraboot.framework.agent.util.LiveLlmSeeder;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.aurabot.skill.SkillRequest;
 import com.auraboot.framework.aurabot.skill.SkillResult;
-import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.dashboard.dto.DashboardDTO;
 import com.auraboot.framework.dashboard.service.DashboardService;
@@ -33,17 +33,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * S5 — live-LLM quality measurement for NL → dashboard generation, end-to-end through the real
  * {@link DashboardGeneratorSkill}. Drives the skill's {@link DashboardGeneratorSkill#paramsSchema()}
- * as a native tool-use inputSchema to a real DeepSeek model, then proves the generated DSL is a legal,
+ * as a native tool-use inputSchema to a real model, then proves the generated DSL is a legal,
  * persistable dashboard: code + title present, ≥3 widgets, every widget kind in the renderable set,
  * no hallucinated widget type — and finally {@code execute}s it so a real dashboard row is created and
  * re-readable by code (the platform path that did not exist before).
  *
- * <p>Opt-in: gated by {@code DEEPSEEK_API_KEY}, tagged {@code agent-eval-live}. After running, redact
- * {@code $DEEPSEEK_API_KEY} from build/reports + task outputs (seed INSERT lands in MyBatis DEBUG SQL).
+ * <p>Opt-in: gated by the presence of a live LLM credential ({@link LiveLlmSeeder}), tagged
+ * {@code agent-eval-live}. After running, redact the live API key from build/reports + task outputs
+ * (the seed INSERT lands in MyBatis DEBUG SQL).
  */
 @Slf4j
 @Tag("agent-eval-live")
-@DisplayName("Live quality: NL → dashboard generation via dashboard:create skill (real DeepSeek)")
+@DisplayName("Live quality: NL → dashboard generation via dashboard:create skill (real LLM)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
@@ -52,10 +53,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 class DashboardGenerationLiveIT extends BaseIntegrationTest {
 
-    private static final String PROVIDER = "deepseek";
-    private static final String DELETE_SEED =
-            "DELETE FROM ab_cloud_config WHERE service_type='llm' AND provider_code='" + PROVIDER
-                    + "' AND config_level='tenant' AND tenant_id=?";
     private static final Set<String> WIDGET_TYPES = Set.of(
             "smart-bar-chart", "smart-line-chart", "smart-pie-chart",
             "smart-number-card", "smart-table-chart", "smart-rich-text");
@@ -70,31 +67,22 @@ class DashboardGenerationLiveIT extends BaseIntegrationTest {
     private Long tenantId;
     private String createdCode;
 
+    /**
+     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
+     * model name in every live IT is what silently broke this whole layer when
+     * DeepSeek retired {@code deepseek-chat}.
+     */
+    private LiveLlmSeeder.LiveProvider liveProvider;
+
     @BeforeEach
-    void seedDeepSeek() {
-        String apiKey = System.getenv("DEEPSEEK_API_KEY");
-        Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
-                "DEEPSEEK_API_KEY not set — skipping live dashboard-generation quality measurement");
+    void seedLiveProvider() {
+        liveProvider = LiveLlmSeeder.resolve();
+        Assumptions.assumeTrue(liveProvider != null, LiveLlmSeeder.skipReason());
+
         tenantId = getTestTenant().getId();
         MetaContext.setContext(tenantId, getTestUser().getId(), getTestUser().getPid(), getTestUser().getUserName());
-        jdbcTemplate.update(DELETE_SEED, tenantId);
-
-        String configJson = "{"
-                + "\"apiKey\":\"" + apiKey + "\","
-                + "\"baseUrl\":\"https://api.deepseek.com\","
-                + "\"defaultModel\":\"deepseek-chat\","
-                + "\"apiFormat\":\"chat_completions\","
-                + "\"models\":[\"deepseek-chat\"],"
-                + "\"displayName\":\"DeepSeek (dashboard-gen live quality)\""
-                + "}";
-        CloudConfigSaveRequest req = new CloudConfigSaveRequest();
-        req.setConfigLevel("tenant");
-        req.setServiceType("llm");
-        req.setProviderCode(PROVIDER);
-        req.setConfig(configJson);
-        req.setEnabled(true);
-        req.setPriority(0);
-        cloudConfigService.saveConfig(req);
+        LiveLlmSeeder.seed(liveProvider, tenantId, cloudConfigService, jdbcTemplate);
     }
 
     @AfterAll
@@ -104,16 +92,19 @@ class DashboardGenerationLiveIT extends BaseIntegrationTest {
                 jdbcTemplate.update("UPDATE ab_dashboard SET deleted_flag = true WHERE code = ?", createdCode);
                 jdbcTemplate.update("DELETE FROM ab_dashboard WHERE code = ?", createdCode);
             }
-            if (tenantId != null) jdbcTemplate.update(DELETE_SEED, tenantId);
+            if (tenantId != null && liveProvider != null) {
+                LiveLlmSeeder.clear(liveProvider, tenantId, jdbcTemplate);
+            }
         } catch (Exception ignored) {}
     }
 
     @Test
     @Timeout(value = 8, unit = TimeUnit.MINUTES)
-    @DisplayName("real DeepSeek emits a legal multi-widget dashboard DSL that persists end-to-end")
+    @DisplayName("a real LLM emits a legal multi-widget dashboard DSL that persists end-to-end")
     void nlToDashboard_generatesLegalDsl_andPersists() throws Exception {
-        LlmProviderFactory.ProviderResolution res = llmProviderFactory.resolveProvider(tenantId, PROVIDER);
-        assertTrue(res != null && res.getProvider() != null, "DeepSeek provider must resolve");
+        LlmProviderFactory.ProviderResolution res =
+                llmProviderFactory.resolveProvider(tenantId, liveProvider.providerCode());
+        assertTrue(res != null && res.getProvider() != null, "the seeded live provider must resolve");
         LlmProvider provider = res.getProvider();
         LlmProviderFactory.ProviderConfig cfg = res.getConfig();
 
@@ -140,7 +131,9 @@ class DashboardGenerationLiveIT extends BaseIntegrationTest {
         assertTrue(args != null, () -> "model must call create_dashboard; response=" + summarizeResponse(resp));
 
         JsonNode gen = objectMapper.valueToTree(args);
-        StringBuilder report = new StringBuilder("\n===== NL → DASHBOARD GENERATION (DeepSeek, single sample) =====\n");
+        StringBuilder report = new StringBuilder(String.format(
+                "%n===== NL → DASHBOARD GENERATION (%s %s, single sample) =====%n",
+                liveProvider.providerCode(), liveProvider.model()));
         String genCode = gen.path("code").asText(null);
         String genTitle = gen.path("title").asText(null);
         JsonNode widgets = gen.get("widgets");

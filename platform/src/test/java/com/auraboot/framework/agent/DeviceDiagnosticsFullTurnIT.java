@@ -1,7 +1,6 @@
 package com.auraboot.framework.agent;
 
 import com.auraboot.framework.agent.dto.ChatRequest;
-import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.conversation.ConversationTurnService;
@@ -9,6 +8,7 @@ import com.auraboot.framework.conversation.InboundMode;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.conversation.TurnRequest;
+import com.auraboot.framework.agent.util.LiveLlmSeeder;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p>Drives a <strong>real</strong> agent turn end-to-end through the
  * {@link ConversationTurnService#runTurn} chokepoint (which creates the agent
- * task/run context) against live DeepSeek: the agent is asked to diagnose device
+ * task/run context) against the live provider: the agent is asked to diagnose device
  * inspections, the real model decides to call {@code list:device_inspection}, the
  * platform <em>executes</em> that tool against the seeded {@code mt_device_inspection}
  * rows, and the model synthesizes a diagnosis citing the failing device. This is the
@@ -58,11 +58,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Uses the platform-registered {@code device_inspection} model (tenant =
  * integration-test-tenant) so no model/table creation is needed.
  *
- * <p>Opt-in: gated by {@code DEEPSEEK_API_KEY}, tagged {@code agent-eval-live}.
- * <pre>{@code DEEPSEEK_API_KEY=sk-... ./gradlew :platform:testAgent --tests '*DeviceDiagnosticsFullTurnIT*'}</pre>
+ * <p>Opt-in: gated by a live LLM credential (see {@link LiveLlmSeeder}), tagged {@code agent-eval-live}.
+ * <pre>{@code DASHSCOPE_API_KEY=... ./gradlew :testAgent --tests '*DeviceDiagnosticsFullTurnIT*' -PincludeLiveEvals}</pre>
  */
 @Tag("agent-eval-live")
-@DisplayName("R1: device diagnostics full conversational turn — live DeepSeek reads seeded rows")
+@DisplayName("R1: device diagnostics full conversational turn — the live model reads seeded rows")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
@@ -71,14 +71,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 class DeviceDiagnosticsFullTurnIT extends BaseIntegrationTest {
 
-    private static final String PROVIDER = "deepseek";
     private static final String MODEL = "device_inspection";
     private static final String AGENT_CODE = "device_fullturn_agent";
     private static final String FIXTURE_REF = "device-diagnostics-fullturn";
     private static final String READ_PERMISSION = "model." + MODEL + ".read";
-    private static final String DELETE_CLOUD =
-            "DELETE FROM ab_cloud_config WHERE service_type='llm' AND provider_code='" + PROVIDER
-                    + "' AND config_level='tenant' AND tenant_id=?";
+
+    /**
+     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
+     * model name in every live IT is what silently broke this whole layer when
+     * DeepSeek retired {@code deepseek-chat}.
+     */
+    private LiveLlmSeeder.LiveProvider liveProvider;
 
     @Autowired private ConversationTurnService conversationTurnService;
     @Autowired private PluginResourceImporter resourceImporter;
@@ -93,22 +97,11 @@ class DeviceDiagnosticsFullTurnIT extends BaseIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        String apiKey = System.getenv("DEEPSEEK_API_KEY");
-        Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
-                "DEEPSEEK_API_KEY not set — skipping R1 full-turn golden");
+        liveProvider = LiveLlmSeeder.resolve();
+        Assumptions.assumeTrue(liveProvider != null, LiveLlmSeeder.skipReason());
         tenantId = getTestTenant().getId();
 
-        jdbcTemplate.update(DELETE_CLOUD, tenantId);
-        CloudConfigSaveRequest req = new CloudConfigSaveRequest();
-        req.setConfigLevel("tenant");
-        req.setServiceType("llm");
-        req.setProviderCode(PROVIDER);
-        req.setConfig("{\"apiKey\":\"" + apiKey + "\",\"baseUrl\":\"https://api.deepseek.com\","
-                + "\"defaultModel\":\"deepseek-chat\",\"apiFormat\":\"chat_completions\","
-                + "\"models\":[\"deepseek-chat\"],\"displayName\":\"DeepSeek (R1 full-turn)\"}");
-        req.setEnabled(true);
-        req.setPriority(0);
-        cloudConfigService.saveConfig(req);
+        LiveLlmSeeder.seed(liveProvider, tenantId, cloudConfigService, jdbcTemplate);
 
         ensureInspectionTable();
         ensureInspectionMetadataAndPermission();
@@ -123,13 +116,13 @@ class DeviceDiagnosticsFullTurnIT extends BaseIntegrationTest {
                 .name("Device Diagnostics Full-Turn Agent")
                 .description("Read-first device inspection diagnostics.")
                 .agentType("reactive")
-                .model("deepseek-chat")
+                .model(liveProvider.model())
                 .systemPrompt("You are a device diagnostics agent. ALWAYS call the list:device_inspection tool "
                         + "to read the inspection records first, then report which devices failed and why, "
                         + "citing each failing device's code and remark. Never fabricate; only use retrieved rows.")
                 .tools(List.of("list:" + MODEL))
                 .skills(List.of("dsl.query"))
-                .guardrails(Map.of("provider", PROVIDER))
+                .guardrails(Map.of("provider", liveProvider.providerCode()))
                 .allowedModels(List.of(MODEL))
                 .allowedOperations(List.of("query"))
                 .maxTools(8)
@@ -145,7 +138,9 @@ class DeviceDiagnosticsFullTurnIT extends BaseIntegrationTest {
         if (tenantId == null) {
             return;
         }
-        jdbcTemplate.update(DELETE_CLOUD, tenantId);
+        if (liveProvider != null) {
+            LiveLlmSeeder.clear(liveProvider, tenantId, jdbcTemplate);
+        }
         jdbcTemplate.update("DELETE FROM ab_agent_definition WHERE tenant_id=? AND agent_code=?", tenantId, AGENT_CODE);
         for (String pid : seededPids) {
             jdbcTemplate.update("DELETE FROM mt_" + MODEL + " WHERE pid=?", pid);

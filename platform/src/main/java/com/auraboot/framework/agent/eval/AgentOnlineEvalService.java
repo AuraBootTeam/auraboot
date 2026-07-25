@@ -39,7 +39,7 @@ public class AgentOnlineEvalService {
      */
     public OnlineEvalSummary sampleAndJudge(Long tenantId, int sinceHours, int maxRuns) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT source_id, obs_agent_id, observation_type, severity "
+                "SELECT source_id, obs_agent_id, observation_type, severity, obs_title, detail "
                         + "  FROM ab_agent_observation "
                         + " WHERE tenant_id = ? AND source_id IS NOT NULL "
                         + "   AND created_at > now() - make_interval(hours => ?) "

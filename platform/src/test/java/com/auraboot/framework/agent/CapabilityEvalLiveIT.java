@@ -7,8 +7,8 @@ import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.service.CapabilityEvalService;
 import com.auraboot.framework.agent.service.LlmToolSelectionService;
-import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
+import com.auraboot.framework.agent.util.LiveLlmSeeder;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import org.junit.jupiter.api.AfterAll;
@@ -46,29 +46,29 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * selection, JSON parsing, and the selected/hallucinated partition actually work
  * end-to-end — not just the plumbing.
  *
- * <p><strong>Opt-in.</strong> Gated by the {@code DEEPSEEK_API_KEY} env var
- * ({@link Assumptions#assumeTrue}) and tagged {@code agent-eval-live}, so a plain
- * {@code ./gradlew :platform:testAgent} skips it. Any cheap OpenAI-compatible
- * provider works; DeepSeek is the default low-cost choice.
+ * <p><strong>Opt-in.</strong> Gated on a live LLM credential resolved by
+ * {@link LiveLlmSeeder} ({@link Assumptions#assumeTrue}) and tagged
+ * {@code agent-eval-live}, so a plain {@code ./gradlew :testAgent} skips it.
+ * Any OpenAI-compatible provider works; qwen is preferred, DeepSeek is the fallback.
  *
  * <pre>{@code
- * cd platform && DEEPSEEK_API_KEY=sk-... \
- *   ./gradlew :platform:testAgent --tests '*CapabilityEvalLiveIT*'
+ * cd platform && DASHSCOPE_API_KEY=... \
+ *   ./gradlew :testAgent --tests '*CapabilityEvalLiveIT*' -PincludeLiveEvals
  * }</pre>
  *
  * <p><strong>Why blank {@code agent.anthropic.api-key}.</strong> The
  * integration-test profile sets it to the stub sentinel, and
  * {@link LlmToolSelectionService} resolves the {@code anthropic} provider
  * <em>first</em>; without blanking it the run would route to the stub instead of
- * the seeded DeepSeek provider. With it blank, the seeded tenant-level DeepSeek
+ * the seeded live provider. With it blank, the seeded tenant-level live
  * config becomes the first (and only) configured provider.
  *
  * <p>The seeded {@code ab_cloud_config} row is tenant-scoped and removed in
- * {@link #cleanup()} (and pre-cleaned in {@link #seedDeepSeek()}) so a real API
+ * {@link #cleanup()} (and pre-cleaned on each re-seed) so a real API
  * key never lingers in the shared evaluation DB.
  */
 @Tag("agent-eval-live")
-@DisplayName("A6: capability eval against a real LLM (DeepSeek) — live regression")
+@DisplayName("A6: capability eval against a real LLM (live provider) — live regression")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -78,10 +78,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 class CapabilityEvalLiveIT extends BaseIntegrationTest {
 
-    private static final String PROVIDER = "deepseek";
-    private static final String DELETE_SEED =
-            "DELETE FROM ab_cloud_config WHERE service_type='llm' AND provider_code='" + PROVIDER
-                    + "' AND config_level='tenant' AND tenant_id=?";
+    /**
+     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider *and its
+     * model name* in every live IT is what silently broke this whole layer when
+     * DeepSeek retired {@code deepseek-chat}.
+     */
+    private LiveLlmSeeder.LiveProvider liveProvider;
 
     @Autowired private CapabilityEvalService capabilityEvalService;
     @Autowired private LlmToolSelectionService llmToolSelectionService;
@@ -97,56 +100,40 @@ class CapabilityEvalLiveIT extends BaseIntegrationTest {
     // one — getTestTenant() is null during @BeforeAll. The leading DELETE keeps
     // it idempotent across the per-test re-seed.
     @BeforeEach
-    void seedDeepSeek() {
-        String apiKey = System.getenv("DEEPSEEK_API_KEY");
-        Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
-                "DEEPSEEK_API_KEY not set — skipping live-LLM eval regression (A6)");
+    void seedLiveProvider() {
+        liveProvider = LiveLlmSeeder.resolve();
+        Assumptions.assumeTrue(liveProvider != null, LiveLlmSeeder.skipReason());
 
         tenantId = getTestTenant().getId();
-        jdbcTemplate.update(DELETE_SEED, tenantId); // idempotent: clear any prior seed
-
-        String configJson = "{"
-                + "\"apiKey\":\"" + apiKey + "\","
-                + "\"baseUrl\":\"https://api.deepseek.com\","
-                + "\"defaultModel\":\"deepseek-chat\","
-                + "\"apiFormat\":\"chat_completions\","
-                + "\"models\":[\"deepseek-chat\"],"
-                + "\"displayName\":\"DeepSeek (A6 live eval)\""
-                + "}";
-
         // MetaContext (tenant/user) is already set by BaseIntegrationTest#setUp,
-        // so saveConfig stamps the correct tenant_id / created_by.
-        CloudConfigSaveRequest req = new CloudConfigSaveRequest();
-        req.setConfigLevel("tenant"); // tenant-scoped so it sorts ahead of any platform provider
-        req.setServiceType("llm");
-        req.setProviderCode(PROVIDER);
-        req.setConfig(configJson);
-        req.setEnabled(true);
-        req.setPriority(0);
-        cloudConfigService.saveConfig(req);
+        // so saveConfig stamps the correct tenant_id / created_by. seed() clears
+        // any prior row first, so the per-test re-seed stays idempotent.
+        LiveLlmSeeder.seed(liveProvider, tenantId, cloudConfigService, jdbcTemplate);
     }
 
     @AfterAll
     void cleanup() {
-        if (tenantId != null) {
-            jdbcTemplate.update(DELETE_SEED, tenantId);
+        if (tenantId != null && liveProvider != null) {
+            LiveLlmSeeder.clear(liveProvider, tenantId, jdbcTemplate);
         }
     }
 
     /** The seeded provider must actually be what the selection path resolves to. */
     @Test
     @Order(1)
-    @DisplayName("seeded DeepSeek is the resolved provider (anthropic blanked)")
-    void seededProviderResolvesToDeepSeek() {
+    @DisplayName("the seeded live provider is the resolved provider (anthropic blanked)")
+    void seededProviderResolvesToLiveProvider() {
         assertTrue(llmToolSelectionService.isAvailable(tenantId),
-                "an LLM provider must be available after seeding DeepSeek");
+                "an LLM provider must be available after seeding the live provider");
 
         LlmProviderFactory.ProviderConfig resolved = llmProviderFactory.resolveConfig(tenantId, null);
         assertNotNull(resolved, "first-available provider config must resolve");
-        assertEquals(PROVIDER, resolved.getProviderCode(),
-                "the resolved provider must be the seeded DeepSeek, not the stub/anthropic fallback");
-        assertTrue(resolved.getBaseUrl() != null && resolved.getBaseUrl().contains("deepseek"),
-                "resolved baseUrl must point at DeepSeek, was: " + resolved.getBaseUrl());
+        assertEquals(liveProvider.providerCode(), resolved.getProviderCode(),
+                "the resolved provider must be the seeded live provider, not the stub/anthropic fallback");
+        assertEquals(liveProvider.baseUrl(), resolved.getBaseUrl(),
+                "resolved baseUrl must point at the seeded live provider, was: " + resolved.getBaseUrl());
+        assertEquals(liveProvider.model(), resolved.getDefaultModel(),
+                "resolved model must be the seeded live model, was: " + resolved.getDefaultModel());
     }
 
     /**
@@ -157,7 +144,7 @@ class CapabilityEvalLiveIT extends BaseIntegrationTest {
     @Test
     @Order(2)
     @Timeout(value = 3, unit = TimeUnit.MINUTES)
-    @DisplayName("real DeepSeek selects the right tool from a controlled catalog + partitions hallucinations")
+    @DisplayName("the real model selects the right tool from a controlled catalog + partitions hallucinations")
     void liveToolSelectionPicksFromCatalog() throws Exception {
         List<ToolDefinition> catalog = List.of(
                 tool("cmd_create_order", "Create a brand new sales order for a customer", "L2"),
@@ -190,7 +177,7 @@ class CapabilityEvalLiveIT extends BaseIntegrationTest {
     @Test
     @Order(3)
     @Timeout(value = 5, unit = TimeUnit.MINUTES)
-    @DisplayName("full eval runs in llm mode against DeepSeek and persists eval_mode=llm")
+    @DisplayName("full eval runs in llm mode against the live provider and persists eval_mode=llm")
     void liveEvalRunsInLlmModeAndPersists() {
         List<CapabilityEvalCase> cases = List.of(
                 CapabilityEvalCase.builder()

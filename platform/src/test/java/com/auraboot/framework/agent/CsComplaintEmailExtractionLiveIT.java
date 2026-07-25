@@ -4,7 +4,7 @@ import com.auraboot.framework.agent.provider.LlmProvider;
 import com.auraboot.framework.agent.provider.LlmProviderFactory;
 import com.auraboot.framework.agent.dto.LlmChatRequest;
 import com.auraboot.framework.agent.dto.LlmChatResponse;
-import com.auraboot.framework.cloudconfig.dto.CloudConfigSaveRequest;
+import com.auraboot.framework.agent.util.LiveLlmSeeder;
 import com.auraboot.framework.cloudconfig.service.CloudConfigService;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import lombok.extern.slf4j.Slf4j;
@@ -48,19 +48,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * native tool-use, a {@link LlmChatRequest} with a JSON {@code inputSchema} sent to the real provider
  * via {@link LlmProvider#chat}; arguments read from the {@code tool_use} block's {@code input}.
  *
- * <p><strong>Opt-in</strong> — gated by {@code DEEPSEEK_API_KEY}, tagged {@code agent-eval-live}; a
+ * <p><strong>Opt-in</strong> — gated on a live credential resolved from the environment by
+ * {@link LiveLlmSeeder} (qwen preferred, DeepSeek fallback), tagged {@code agent-eval-live}; a
  * plain {@code ./gradlew :testAgent} skips it. Assertions are lenient aggregate floors; the printed
  * report carries the real numbers.
  *
  * <pre>{@code
- * cd platform && DEEPSEEK_API_KEY=sk-... ./gradlew :testAgent --tests '*CsComplaintEmailExtractionLiveIT*'
+ * cd platform && DASHSCOPE_API_KEY=sk-... ./gradlew :testAgent --tests '*CsComplaintEmailExtractionLiveIT*'
  * }</pre>
- * <p><strong>After running</strong>: redact {@code $DEEPSEEK_API_KEY} from build/reports +
+ * <p><strong>After running</strong>: redact the live API key from build/reports +
  * build/test-results + task outputs (the seed INSERT lands in MyBatis DEBUG SQL logs).
  */
 @Slf4j
 @Tag("agent-eval-live")
-@DisplayName("Live quality: CS complaint email → field extraction vs a real LLM (DeepSeek)")
+@DisplayName("Live quality: CS complaint email → field extraction vs a real LLM (live provider)")
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @TestPropertySource(properties = {
@@ -69,10 +70,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 class CsComplaintEmailExtractionLiveIT extends BaseIntegrationTest {
 
-    private static final String PROVIDER = "deepseek";
-    private static final String DELETE_SEED =
-            "DELETE FROM ab_cloud_config WHERE service_type='llm' AND provider_code='" + PROVIDER
-                    + "' AND config_level='tenant' AND tenant_id=?";
+    /**
+     * Resolved from the environment (qwen preferred, DeepSeek fallback) rather than
+     * pinned in source — see {@link LiveLlmSeeder}. Hard-coding the provider and its
+     * model name in every live IT is what silently broke this whole layer when
+     * DeepSeek retired {@code deepseek-chat}.
+     */
+    private LiveLlmSeeder.LiveProvider liveProvider;
 
     @Autowired private LlmProviderFactory llmProviderFactory;
     @Autowired private CloudConfigService cloudConfigService;
@@ -137,45 +141,28 @@ class CsComplaintEmailExtractionLiveIT extends BaseIntegrationTest {
     }
 
     @BeforeEach
-    void seedDeepSeek() {
-        String apiKey = System.getenv("DEEPSEEK_API_KEY");
-        Assumptions.assumeTrue(apiKey != null && !apiKey.isBlank(),
-                "DEEPSEEK_API_KEY not set — skipping live CS email extraction quality measurement");
+    void seedLiveProvider() {
+        liveProvider = LiveLlmSeeder.resolve();
+        Assumptions.assumeTrue(liveProvider != null, LiveLlmSeeder.skipReason());
 
         tenantId = getTestTenant().getId();
-        jdbcTemplate.update(DELETE_SEED, tenantId);
-
-        String configJson = "{"
-                + "\"apiKey\":\"" + apiKey + "\","
-                + "\"baseUrl\":\"https://api.deepseek.com\","
-                + "\"defaultModel\":\"deepseek-chat\","
-                + "\"apiFormat\":\"chat_completions\","
-                + "\"models\":[\"deepseek-chat\"],"
-                + "\"displayName\":\"DeepSeek (CS email extraction live quality)\""
-                + "}";
-        CloudConfigSaveRequest req = new CloudConfigSaveRequest();
-        req.setConfigLevel("tenant");
-        req.setServiceType("llm");
-        req.setProviderCode(PROVIDER);
-        req.setConfig(configJson);
-        req.setEnabled(true);
-        req.setPriority(0);
-        cloudConfigService.saveConfig(req);
+        LiveLlmSeeder.seed(liveProvider, tenantId, cloudConfigService, jdbcTemplate);
     }
 
     @AfterAll
     void cleanup() {
-        if (tenantId != null) {
-            jdbcTemplate.update(DELETE_SEED, tenantId);
+        if (tenantId != null && liveProvider != null) {
+            LiveLlmSeeder.clear(liveProvider, tenantId, jdbcTemplate);
         }
     }
 
     @Test
     @Timeout(value = 8, unit = TimeUnit.MINUTES)
-    @DisplayName("real DeepSeek extracts account/contact/description/severity from emails, invents nothing")
+    @DisplayName("the real model extracts account/contact/description/severity from emails, invents nothing")
     void csComplaintEmailExtractionQuality() throws Exception {
-        LlmProviderFactory.ProviderResolution res = llmProviderFactory.resolveProvider(tenantId, PROVIDER);
-        assertTrue(res != null && res.getProvider() != null, "DeepSeek provider must resolve");
+        LlmProviderFactory.ProviderResolution res =
+                llmProviderFactory.resolveProvider(tenantId, liveProvider.providerCode());
+        assertTrue(res != null && res.getProvider() != null, "the live provider must resolve");
         LlmProvider provider = res.getProvider();
         LlmProviderFactory.ProviderConfig cfg = res.getConfig();
 
@@ -241,7 +228,8 @@ class CsComplaintEmailExtractionLiveIT extends BaseIntegrationTest {
         }
 
         StringBuilder report = new StringBuilder();
-        report.append("\n========== CS COMPLAINT EMAIL EXTRACTION (DeepSeek deepseek-chat, single sample) ==========\n");
+        report.append("\n========== CS COMPLAINT EMAIL EXTRACTION (" + liveProvider.providerCode()
+                + " " + cfg.getDefaultModel() + ", single sample) ==========\n");
         report.append(rows);
         report.append("  --------------------------------------------------------------------------------------------\n");
         report.append(String.format("  POSITIVE n=%d  called=%d/%d  requiredComplete=%d/%d  meanFieldAccuracy=%.0f%%  noHallucinatedField=%d/%d%n",

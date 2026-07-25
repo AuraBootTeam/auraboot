@@ -64,8 +64,11 @@ public class CloudConfigSeeder {
                 "{\"displayName\":\"Anthropic (Claude)\",\"apiFormat\":\"messages\",\"baseUrl\":\"https://api.anthropic.com\",\"defaultModel\":\"claude-sonnet-4-6\",\"maxTokens\":4096,\"models\":[\"claude-opus\",\"claude-sonnet\",\"claude-haiku\"]}"));
         m.put("seed_llm_openai", new ProviderSeed("openai", 20,
                 "{\"displayName\":\"OpenAI\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.openai.com\",\"defaultModel\":\"gpt-4o\",\"maxTokens\":4096,\"models\":[\"gpt-4\",\"gpt-3.5\",\"o1-\",\"o3-\",\"o4-\"]}"));
+        // defaultModel tracks DeepSeek's current API model names: `deepseek-chat` was
+        // retired and now hard-fails with 400 invalid_request_error ("supported API
+        // model names are deepseek-v4-pro or deepseek-v4-flash").
         m.put("seed_llm_deepseek", new ProviderSeed("deepseek", 30,
-                "{\"displayName\":\"DeepSeek\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.deepseek.com\",\"defaultModel\":\"deepseek-chat\",\"maxTokens\":4096,\"models\":[\"deepseek\"]}"));
+                "{\"displayName\":\"DeepSeek\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://api.deepseek.com\",\"defaultModel\":\"deepseek-v4-flash\",\"maxTokens\":4096,\"models\":[\"deepseek\"]}"));
         m.put("seed_llm_qianwen", new ProviderSeed("qianwen", 50,
                 "{\"displayName\":\"通义千问 (Qwen)\",\"apiFormat\":\"chat_completions\",\"baseUrl\":\"https://dashscope.aliyuncs.com/compatible-mode\",\"defaultModel\":\"qwen-plus\",\"maxTokens\":4096,\"models\":[\"qwen\"]}"));
         m.put("seed_llm_zhipu", new ProviderSeed("zhipu", 60,
