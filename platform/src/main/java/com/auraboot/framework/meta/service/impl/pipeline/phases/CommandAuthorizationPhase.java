@@ -70,6 +70,11 @@ public class CommandAuthorizationPhase implements CommandPhase {
             }
         }
 
+        // Record the refusal as a decision before throwing: a denial that only ever surfaced as a
+        // thrown exception left no trace on the context for an audit trail (or a future decision plan)
+        // to read. The throw still aborts the pipeline exactly as before — this changes nothing about
+        // enforcement, it only stops the "why" from being silent.
+        ctx.setAuthorizationVerdict(CommandAuthorizationVerdict.denied(requiredPermissions));
         throw new BusinessException(ResponseCode.FORBIDDEN,
                 "Command permission denied: required one of " + String.join(", ", requiredPermissions));
     }
