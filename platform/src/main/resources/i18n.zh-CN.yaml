@@ -990,8 +990,57 @@ workbench:
     view: 查看
     empty: 暂无待办事项
     justNow: 刚刚
+    minutesAgo: "{minutes}分钟前"
+    priorityUrgent: 紧急
+    priorityHigh: 高
+    priorityMedium: 中
+    priorityNormal: 普通
+    priorityLow: 低
+    stateActed: 已处理
+    stateDismissed: 已忽略
+    stateClosed: 已关闭
+    stateExpired: 已过期
     hoursAgo: "{hours}小时前"
     daysAgo: "{days}天前"
+    mention: 提及
+    assignment: 指派
+    refresh: 刷新
+    markAllRead: 全部标为已读
+    itemsNeedAttention: "{count} 项待处理"
+    results: "{count} 条结果"
+    unread: 未读
+    approvals: 待审批
+    dismiss: 忽略
+    open: 打开
+    review: 审阅
+    record: 记录
+    loadFailed: 待办事项加载失败
+    colTitle: 标题
+    colType: 类型
+    colStatus: 状态
+    colTime: 时间
+    colSource: 来源 / 记录
+    colAction: 操作
+    statusPending: 待处理
+    statusAll: 全部
+    statusActed: 已处理
+    statusClosed: 已关闭
+    statusPendingDesc: 仅显示仍需处理的事项。
+    statusAllDesc: 当前队列中的全部事项。
+    statusActedDesc: 你已经处理过的事项。
+    statusClosedDesc: 不再需要关注的事项。
+    copyAllTitle: 全部待办
+    copyAllDesc: 在一处查看所有审批、提醒与指派。
+    copyApprovalTitle: 审批队列
+    copyApprovalDesc: 等待你决策的流程审批。
+    copyAlertTitle: 提醒队列
+    copyAlertDesc: 需要跟进的告警或问题。
+    copyAssignmentTitle: 指派队列
+    copyAssignmentDesc: 关联业务记录的委派工作项。
+    copyTaskTitle: 任务队列
+    copyTaskDesc: 指派给你、仍需处理的工作项。
+    copyMentionTitle: 提及
+    copyMentionDesc: 同事在消息中 @ 你的内容。
   shortcuts:
     title: 快捷操作
     edit: 编辑

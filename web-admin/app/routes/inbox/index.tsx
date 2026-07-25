@@ -17,6 +17,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { useToastContext } from '~/contexts/ToastContext';
+import { useI18n } from '~/contexts/I18nContext';
 import {
   dismissItem,
   getUnreadSummary,
@@ -33,44 +34,55 @@ import { cn } from '~/utils/cn';
 // One tab per item_type the backend can produce (APPROVAL / TASK / MENTION /
 // AI_SUGGESTION / ALERT / ASSIGNMENT). Task and Mention items used to be
 // reachable only through "All" — they were listed but could not be filtered for.
+// Labels resolve through i18n (workbench.inbox.*). The page used to hardcode English
+// while the shell around it rendered Chinese, so a zh-CN user saw "Inbox / Refresh /
+// Mark all read / Pending" inside an otherwise Chinese app. Each t() carries the old
+// English string as its fallback, so a locale missing a key degrades to what shipped
+// before rather than to a raw key.
 const TABS = [
-  { key: '', label: 'All', icon: InboxIcon },
-  { key: 'approval', label: 'Approval', icon: CheckCircleIcon },
-  { key: 'task', label: 'Task', icon: EnvelopeOpenIcon },
-  { key: 'mention', label: 'Mention', icon: BellIcon },
-  { key: 'alert', label: 'Alert', icon: ExclamationTriangleIcon },
-  { key: 'assignment', label: 'Assignment', icon: ArrowRightIcon },
+  { key: '', i18nKey: 'all', fallback: 'All', icon: InboxIcon },
+  { key: 'approval', i18nKey: 'approval', fallback: 'Approval', icon: CheckCircleIcon },
+  { key: 'task', i18nKey: 'task', fallback: 'Task', icon: EnvelopeOpenIcon },
+  { key: 'mention', i18nKey: 'mention', fallback: 'Mention', icon: BellIcon },
+  { key: 'alert', i18nKey: 'alert', fallback: 'Alert', icon: ExclamationTriangleIcon },
+  { key: 'assignment', i18nKey: 'assignment', fallback: 'Assignment', icon: ArrowRightIcon },
 ] as const;
 
 const STATUS_FILTERS = [
-  { key: 'pending', label: 'Pending', description: 'Only items that still need action.' },
-  { key: '', label: 'All', description: 'Everything in the selected queue.' },
-  { key: 'acted', label: 'Acted', description: 'Items you already handled.' },
-  { key: 'closed', label: 'Closed', description: 'Items that no longer require attention.' },
+  { key: 'pending', i18nKey: 'statusPending', fallback: 'Pending', descFallback: 'Only items that still need action.' },
+  { key: '', i18nKey: 'statusAll', fallback: 'All', descFallback: 'Everything in the selected queue.' },
+  { key: 'acted', i18nKey: 'statusActed', fallback: 'Acted', descFallback: 'Items you already handled.' },
+  { key: 'closed', i18nKey: 'statusClosed', fallback: 'Closed', descFallback: 'Items that no longer require attention.' },
 ] as const;
 
-const TYPE_COPY: Record<string, { title: string; description: string }> = {
+const TYPE_COPY: Record<string, { key: string; title: string; description: string }> = {
   '': {
+    key: 'All',
     title: 'All inbox items',
     description: 'Review every approval, alert, and assignment from one place.',
   },
   approval: {
+    key: 'Approval',
     title: 'Approval queue',
     description: 'Inline workflow approvals that still need a decision.',
   },
   alert: {
+    key: 'Alert',
     title: 'Alert queue',
     description: 'Warnings or issues that need follow-up.',
   },
   assignment: {
+    key: 'Assignment',
     title: 'Assignment queue',
     description: 'Delegated work items linked to business records.',
   },
   task: {
+    key: 'Task',
     title: 'Task queue',
     description: 'Work items assigned to you that still need action.',
   },
   mention: {
+    key: 'Mention',
     title: 'Mentions',
     description: 'Messages where a teammate @mentioned you.',
   },
@@ -140,7 +152,7 @@ function resolveRecordPid(item: InboxItem, payload: InboxCardPayload | null): st
   );
 }
 
-function getDisplayItem(item: InboxItem) {
+function getDisplayItem(item: InboxItem, tx: Tx) {
   const payload = parseCardPayload(item);
   const webLink = resolveWebDeepLink(item, payload);
 
@@ -159,7 +171,7 @@ function getDisplayItem(item: InboxItem) {
         : item.subtitle,
       metaModelCode: item.sourceModel || item.modelCode || payload?.sourceModel || payload?.modelCode,
       metaRecordPid: recordPid,
-      actionLabel: webLink ? 'Open' : 'View',
+      actionLabel: webLink ? tx('open', 'Open') : tx('view', 'View'),
       actionHint: webLink ? 'Opens related record' : 'Marks item as read',
       webLink,
     };
@@ -170,7 +182,12 @@ function getDisplayItem(item: InboxItem) {
     subtitle: item.subtitle,
     metaModelCode: item.sourceModel || item.modelCode,
     metaRecordPid: resolveRecordPid(item, payload),
-    actionLabel: item.itemType === 'approval' ? 'Review' : webLink ? 'Open' : 'View',
+    actionLabel:
+      item.itemType === 'approval'
+        ? tx('review', 'Review')
+        : webLink
+          ? tx('open', 'Open')
+          : tx('view', 'View'),
     actionHint:
       item.itemType === 'approval'
         ? 'Opens approval drawer'
@@ -181,23 +198,28 @@ function getDisplayItem(item: InboxItem) {
   };
 }
 
-function timeAgo(dateStr: string): string {
+type Tx = (key: string, fallback: string, params?: Record<string, unknown>) => string;
+
+function timeAgo(dateStr: string, tx: Tx): string {
   const now = Date.now();
   const diff = now - new Date(dateStr).getTime();
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return tx('justNow', 'just now');
+  if (minutes < 60) return tx('minutesAgo', `${minutes}m ago`, { minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return tx('hoursAgo', `${hours}h ago`, { hours });
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return tx('daysAgo', `${days}d ago`, { days });
   return new Date(dateStr).toLocaleDateString();
 }
 
-function priorityBadge(priority: string) {
+function priorityBadge(priority: string, tx: Tx) {
   const styles: Record<string, string> = {
     urgent: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
     high: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+    // The backend emits 'medium' (inbox alerts do), which had no entry here and fell
+    // through to the 'normal' tone while rendering the raw English word.
+    medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
     normal: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
     low: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
   };
@@ -208,12 +230,12 @@ function priorityBadge(priority: string) {
         styles[priority] || styles.normal,
       )}
     >
-      {priority}
+      {tx(`priority${priority.charAt(0).toUpperCase()}${priority.slice(1)}`, priority)}
     </span>
   );
 }
 
-function statusBadge(status: string) {
+function statusBadge(status: string, tx: Tx) {
   const styles: Record<string, string> = {
     pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
     acted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
@@ -228,7 +250,7 @@ function statusBadge(status: string) {
         styles[status] || styles.pending,
       )}
     >
-      {status}
+      {tx(status === 'pending' ? 'statusPending' : `state${status.charAt(0).toUpperCase()}${status.slice(1)}`, status)}
     </span>
   );
 }
@@ -277,6 +299,9 @@ function InboxLoadingSkeleton() {
 }
 
 export default function UnifiedInboxPage() {
+  const { t } = useI18n();
+  const tx = (k: string, fb: string, params?: Record<string, unknown>) =>
+    t(`workbench.inbox.${k}`, params, fb);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { showErrorToast, showSuccessToast } = useToastContext();
@@ -409,7 +434,7 @@ export default function UnifiedInboxPage() {
       return;
     }
 
-    const webLink = getDisplayItem(item).webLink;
+    const webLink = getDisplayItem(item, tx).webLink;
     if (webLink) {
       navigate(webLink);
       return;
@@ -498,9 +523,9 @@ export default function UnifiedInboxPage() {
         <div className="flex items-start gap-3">
           <InboxIcon className="mt-0.5 h-7 w-7 text-gray-700 dark:text-gray-300" />
           <div>
-            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Inbox</h1>
+            <h1 className="text-xl font-semibold text-gray-900 dark:text-white">{tx('title', 'Inbox')}</h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {pageMetrics.pending} items need attention
+              {tx('itemsNeedAttention', `${pageMetrics.pending} items need attention`, { count: pageMetrics.pending })}
             </p>
           </div>
         </div>
@@ -512,7 +537,7 @@ export default function UnifiedInboxPage() {
             data-testid="inbox-refresh"
           >
             <ArrowPathIcon className={cn('h-4 w-4', refreshing && 'animate-spin')} />
-            Refresh
+            {tx('refresh', 'Refresh')}
           </button>
           <button
             type="button"
@@ -521,7 +546,7 @@ export default function UnifiedInboxPage() {
             data-testid="inbox-mark-all-read"
           >
             <EnvelopeOpenIcon className="h-4 w-4" />
-            Mark all read
+            {tx('markAllRead', 'Mark all read')}
           </button>
         </div>
       </div>
@@ -552,7 +577,7 @@ export default function UnifiedInboxPage() {
                     )}
                   >
                     <Icon className="h-4 w-4" />
-                    <span>{tab.label}</span>
+                    <span>{tx(tab.i18nKey, tab.fallback)}</span>
                     <span
                       data-testid={`inbox-tab-count-${countKey}`}
                       className={cn(
@@ -593,13 +618,13 @@ export default function UnifiedInboxPage() {
                           : 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200',
                       )}
                     >
-                      {filter.key === '' ? 'Done' : filter.label}
+                      {filter.key === '' ? tx('statusAll', 'All') : tx(filter.i18nKey, filter.fallback)}
                     </button>
                   );
                 })}
               </div>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                {activeTypeCopy.description}
+                {tx(`copy${activeTypeCopy.key}Desc`, activeTypeCopy.description)}
               </p>
             </div>
 
@@ -614,7 +639,7 @@ export default function UnifiedInboxPage() {
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300',
                 )}
               >
-                All {baseItems.length}
+                {tx('statusAll', 'All')} {baseItems.length}
               </button>
               <button
                 type="button"
@@ -626,7 +651,7 @@ export default function UnifiedInboxPage() {
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300',
                 )}
               >
-                Unread {baseItems.filter((item) => !item.isRead).length}
+                {tx('unread', 'Unread')} {baseItems.filter((item) => !item.isRead).length}
               </button>
               <button
                 type="button"
@@ -638,7 +663,7 @@ export default function UnifiedInboxPage() {
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300',
                 )}
               >
-                Urgent {baseItems.filter((item) => item.priority === 'urgent').length}
+                {tx('urgent', 'Urgent')} {baseItems.filter((item) => item.priority === 'urgent').length}
               </button>
             </div>
           </div>
@@ -649,27 +674,27 @@ export default function UnifiedInboxPage() {
           >
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-white">
-                {activeTypeCopy.title}
+                {tx(`copy${activeTypeCopy.key}Title`, activeTypeCopy.title)}
               </p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                {quickFilterCount} results
+                {tx('results', `${quickFilterCount} results`, { count: quickFilterCount })}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <StatPill label="Unread" value={totalUnread} />
-              <StatPill label="Pending" value={pageMetrics.pending} />
-              <StatPill label="Approvals" value={pageMetrics.approvals} />
-              <StatPill label="Urgent" value={pageMetrics.urgent} tone="danger" />
+              <StatPill label={tx('unread', 'Unread')} value={totalUnread} />
+              <StatPill label={tx('statusPending', 'Pending')} value={pageMetrics.pending} />
+              <StatPill label={tx('approvals', 'Approvals')} value={pageMetrics.approvals} />
+              <StatPill label={tx('urgent', 'Urgent')} value={pageMetrics.urgent} tone="danger" />
             </div>
           </div>
 
           <div className="grid grid-cols-[minmax(0,1.6fr)_110px_110px_120px_200px_120px] gap-4 border-b border-gray-200 bg-gray-50 px-4 py-3 text-xs font-medium tracking-wide text-gray-500 uppercase dark:border-gray-700 dark:bg-gray-900/30 dark:text-gray-400">
-            <div>Title</div>
-            <div>Type</div>
-            <div>Status</div>
-            <div>Time</div>
-            <div>Source / Record</div>
-            <div className="text-right">Action</div>
+            <div>{tx('colTitle', 'Title')}</div>
+            <div>{tx('colType', 'Type')}</div>
+            <div>{tx('colStatus', 'Status')}</div>
+            <div>{tx('colTime', 'Time')}</div>
+            <div>{tx('colSource', 'Source / Record')}</div>
+            <div className="text-right">{tx('colAction', 'Action')}</div>
           </div>
 
           <div className="overflow-hidden bg-white dark:bg-gray-800">
@@ -680,7 +705,7 @@ export default function UnifiedInboxPage() {
               >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-rose-700">Inbox failed to load</p>
+                    <p className="text-sm font-semibold text-rose-700">{tx('loadFailed', 'Inbox failed to load')}</p>
                     <p className="mt-1 text-sm text-rose-600">{error}</p>
                   </div>
                   <button
@@ -727,7 +752,7 @@ export default function UnifiedInboxPage() {
               </div>
             ) : (
               items.map((item, index) => {
-                const display = getDisplayItem(item);
+                const display = getDisplayItem(item, tx);
                 return (
                   <article
                     key={item.id}
@@ -761,7 +786,7 @@ export default function UnifiedInboxPage() {
                           )}
                         </button>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                          {priorityBadge(item.priority)}
+                          {priorityBadge(item.priority, tx)}
                           {item.actionTaken && (
                             <span className="text-xs text-gray-400 dark:text-gray-500">
                               {item.actionTaken}
@@ -772,13 +797,13 @@ export default function UnifiedInboxPage() {
                     </div>
 
                     <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                      <span className="capitalize">{item.itemType}</span>
+                      <span className="capitalize">{tx(item.itemType, item.itemType)}</span>
                     </div>
 
-                    <div className="flex items-center">{statusBadge(item.status)}</div>
+                    <div className="flex items-center">{statusBadge(item.status, tx)}</div>
 
                     <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
-                      {timeAgo(item.createdAt)}
+                      {timeAgo(item.createdAt, tx)}
                     </div>
 
                     <div className="flex min-w-0 items-center text-sm text-gray-500 dark:text-gray-400">
