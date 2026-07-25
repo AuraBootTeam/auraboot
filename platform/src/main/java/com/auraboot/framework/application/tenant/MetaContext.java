@@ -23,6 +23,12 @@ public class MetaContext {
     private static final ThreadLocal<String> COMMAND_AUTHORITY = new ThreadLocal<>();
     /** Aggregate root (master document) the current command was authorized against. */
     private static final ThreadLocal<String> COMMAND_AGGREGATE = new ThreadLocal<>();
+    /**
+     * Row-scope grade ("SELF" / "ALL") the current command was authorized under, published by the
+     * permit plan so the data layer can honour one boundary decision instead of re-deciding at each
+     * site. Carried as a String to keep this low-level context decoupled from the pipeline's types.
+     */
+    private static final ThreadLocal<String> COMMAND_PERMIT_SCOPE = new ThreadLocal<>();
 
     @Getter
     private final Long tenantId;
@@ -92,6 +98,7 @@ public class MetaContext {
         DATA_PERMISSION_BYPASSED.remove();
         COMMAND_AUTHORITY.remove();
         COMMAND_AGGREGATE.remove();
+        COMMAND_PERMIT_SCOPE.remove();
     }
 
     /**
@@ -362,6 +369,39 @@ public class MetaContext {
     /** The aggregate root this thread's work was authorized against, or null when unscoped. */
     public static String getCommandAggregateId() {
         return COMMAND_AGGREGATE.get();
+    }
+
+    /**
+     * Run {@code action} under the row-scope grade the permit plan resolved for this command, so the
+     * data layer can honour that one boundary decision rather than re-resolving scope at each of its
+     * sites. Like {@link #runWithCommandAggregate}, opening the scope only carries a decision the
+     * boundary already made; it restores (never clears) on exit so a nested command cannot strip the
+     * outer scope. A {@code null}/blank grade is a no-op (scope stays unresolved and the data layer
+     * keeps its own evaluation).
+     */
+    public static <T> T runWithCommandPermitScope(String scopeGrade, java.util.function.Supplier<T> action) {
+        if (scopeGrade == null || scopeGrade.isBlank()) {
+            return action.get();
+        }
+        String prior = COMMAND_PERMIT_SCOPE.get();
+        COMMAND_PERMIT_SCOPE.set(scopeGrade);
+        try {
+            return action.get();
+        } finally {
+            COMMAND_PERMIT_SCOPE.set(prior);
+        }
+    }
+
+    public static void runWithCommandPermitScope(String scopeGrade, Runnable action) {
+        runWithCommandPermitScope(scopeGrade, () -> {
+            action.run();
+            return null;
+        });
+    }
+
+    /** The row-scope grade the current command was authorized under ("SELF"/"ALL"), or null. */
+    public static String getCommandPermitScope() {
+        return COMMAND_PERMIT_SCOPE.get();
     }
 
     public static Long getCurrentMemberId() {

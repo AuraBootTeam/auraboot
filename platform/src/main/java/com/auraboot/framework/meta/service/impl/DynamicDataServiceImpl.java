@@ -1846,6 +1846,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         try {
             String rowFilter = DynamicDataQueryScope.rowFilter(tenantId, modelCode, userId,
                     () -> dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId));
+            observePermitScopeAgainstEngine(modelCode, operation, rowFilter);
             appendScopedBulkFilter(sql, rowFilter);
         } catch (Exception e) {
             log.error("Failed to apply row-level data permission for {} on model {} — denying access",
@@ -1861,6 +1862,31 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             log.error("Failed to apply domain filter for {} on model {} — denying access",
                     operation, logSafe(modelCode), e);
             throw new MetaServiceException("Data domain filter evaluation failed for model: " + modelCode, e);
+        }
+    }
+
+    /**
+     * §11.10 stage-1 observe: does the permit plan's row-scope grade agree with what the engine
+     * actually filters on this write? The plan carries one grade the boundary resolved (from this
+     * same engine), so on the paths that publish it they must agree — a divergence means enforcing
+     * the plan here would change behaviour and must be understood before the flip. Log-only; the
+     * engine's filter is still the one applied. A {@code null} grade means no plan is in force (not a
+     * command-driven write), so there is nothing to compare.
+     */
+    private void observePermitScopeAgainstEngine(String modelCode, String operation, String engineRowFilter) {
+        String planScope = MetaContext.getCommandPermitScope();
+        if (planScope == null) {
+            return;
+        }
+        boolean engineRestricts = engineRowFilter != null && !engineRowFilter.isBlank();
+        boolean planRestricts = "SELF".equals(planScope);
+        if (planRestricts != engineRestricts) {
+            log.warn("Permit-plan shadow divergence on {} of model {}: plan scope={} but engine {} the rows "
+                    + "— enforcing the plan here would change behaviour", operation, logSafe(modelCode),
+                    planScope, engineRestricts ? "restricts" : "does not restrict");
+        } else if (log.isDebugEnabled()) {
+            log.debug("Permit-plan scope agrees with engine on {} of model {}: scope={}",
+                    operation, logSafe(modelCode), planScope);
         }
     }
 

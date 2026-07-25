@@ -27,6 +27,7 @@ import com.auraboot.framework.meta.service.impl.CommandHandlerAsyncTaskExecutor;
 import com.auraboot.framework.meta.service.impl.CommandExecutorUtils;
 import com.auraboot.framework.meta.service.impl.DynamicDataQueryScope;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.meta.service.impl.pipeline.RecordSnapshotReader;
 import com.auraboot.framework.plugin.extension.CommandHandlerExtension;
@@ -93,14 +94,30 @@ public class HandlerPhase implements CommandPhase {
 
     @Override
     public void execute(CommandPipelineContext ctx) {
-        var handlerRules = ctx.getRulesByType().getOrDefault("handler", Collections.emptyList());
-        Map<String, Object> handlerResults = withCommandAggregate(ctx, () ->
-                withCommandAuthority(ctx, () -> executeHandlerPhase(
-                        handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
-                        ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig())));
-        ctx.setHandlerResults(handlerResults);
-        persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
-                handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
+        withPermitScope(ctx, () -> {
+            var handlerRules = ctx.getRulesByType().getOrDefault("handler", Collections.emptyList());
+            Map<String, Object> handlerResults = withCommandAggregate(ctx, () ->
+                    withCommandAuthority(ctx, () -> executeHandlerPhase(
+                            handlerRules, ctx.getCommand(), ctx.getPayload(), ctx.getFieldMapResults(),
+                            ctx.getTenantId(), ctx.getUserId(), ctx.getRequest(), ctx.getExecConfig())));
+            ctx.setHandlerResults(handlerResults);
+            persistHandlerResults(ctx.getCommand().getModelCode(), ctx.getPayload(),
+                    handlerResults, ctx.getTenantId(), ctx.getRequest(), ctx.getFieldMapResults());
+            return null;
+        });
+    }
+
+    /**
+     * Publish the permit plan's row-scope grade (D3) for the data layer, so its guarded writes honour
+     * the one scope the boundary resolved rather than re-resolving it per site. Like
+     * {@link #withCommandAggregate}, this only ever carries a decision already made; a plan with no
+     * resolved scope is a no-op (the data layer keeps its own evaluation). Wraps both the handler and
+     * the DSL-persistence path, since both reach the data layer.
+     */
+    <T> T withPermitScope(CommandPipelineContext ctx, java.util.function.Supplier<T> body) {
+        CommandPermitPlan plan = ctx.getPermitPlan();
+        String grade = plan != null && plan.scope() != null ? plan.scope().name() : null;
+        return MetaContext.runWithCommandPermitScope(grade, body);
     }
 
     // ==================== Inlined delegate methods ====================
