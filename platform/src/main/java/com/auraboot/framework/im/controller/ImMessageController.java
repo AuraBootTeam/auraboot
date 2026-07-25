@@ -14,8 +14,11 @@ import com.auraboot.framework.im.model.ImConversation;
 import com.auraboot.framework.im.model.ImMessage;
 import com.auraboot.framework.im.service.ImConversationService;
 import com.auraboot.framework.im.service.ImMessageService;
+import com.auraboot.framework.inbox.listener.InboxImListener;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.web.bind.annotation.*;
+
 
 import java.util.List;
 import java.util.Map;
@@ -29,13 +32,16 @@ public class ImMessageController {
     private final ImMessageService messageService;
     private final ImConversationService conversationService;
     private final ApplicationEventPublisher eventPublisher;
+    private final ObjectProvider<InboxImListener> inboxImListenerProvider;
 
     public ImMessageController(ImMessageService messageService,
                                ImConversationService conversationService,
-                               ApplicationEventPublisher eventPublisher) {
+                               ApplicationEventPublisher eventPublisher,
+                               ObjectProvider<InboxImListener> inboxImListenerProvider) {
         this.messageService = messageService;
         this.conversationService = conversationService;
         this.eventPublisher = eventPublisher;
+        this.inboxImListenerProvider = inboxImListenerProvider;
     }
 
     @PostMapping("/conversations/{id}/messages")
@@ -51,6 +57,7 @@ public class ImMessageController {
 
         request.setConversationId(id);
         ImMessage msg = messageService.sendMessage(request, userId, tenantId);
+        materializeMentionInboxItems(msg, userId, tenantId);
         publishMessageSentEvent(msg, request, tenantId);
         Map<Long, ConversationMemberInfo> senderMap = buildSenderMap(id, tenantId);
         return ApiResponse.success(toResponse(msg, senderMap));
@@ -148,6 +155,22 @@ public class ImMessageController {
     }
 
     /**
+     * Materialize MENTION inbox items for @mentioned users.
+     *
+     * <p>The WebSocket path has always done this ({@code ImWebSocketHandler}), but the REST
+     * path — the one the enterprise chat UI actually uses to send — did not, so an @mention
+     * never reached the recipient's Inbox even though SoT 119 documents that link. Both
+     * entry points now behave identically.</p>
+     */
+    private void materializeMentionInboxItems(ImMessage saved, Long senderId, Long tenantId) {
+        InboxImListener listener = inboxImListenerProvider.getIfAvailable();
+        if (listener == null) {
+            return;
+        }
+        listener.onMessageSent(saved, senderId, tenantId);
+    }
+
+    /**
      * Build a senderId → member info map for sender enrichment.
      * Key is memberId (works for both human and agent members).
      */
@@ -166,7 +189,7 @@ public class ImMessageController {
                 saved.getSenderId(),
                 saved.getSenderType(),
                 saved.getContent(),
-                request.getMentions(),
+                request.effectiveMentions(),
                 saved.getId(),
                 conversationType,
                 saved.getSeq()));

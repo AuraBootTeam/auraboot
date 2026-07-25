@@ -396,6 +396,40 @@
       "goldenSet": false,
       "blocking": false,
       "reason": "not self-contained — it deliberately does not start or reset services, so it needs a host stack brought up outside the runner. RECORDED until it is either wrapped or documented as on-demand."
+    },
+    {
+      "id": "OSS-REL-COLLAB-TRIO",
+      "domain": "oss",
+      "name": "Collaboration trio browser golden (Inbox queue, notification centre, IM/agent mentions)",
+      "command": "./scripts/collab-trio-golden-run.sh",
+      "tier": "release",
+      "coversPaths": [
+        "platform/src/main/java/com/auraboot/framework/inbox/**",
+        "platform/src/main/java/com/auraboot/framework/notification/**",
+        "platform/src/main/java/com/auraboot/framework/im/**",
+        "platform/src/main/java/com/auraboot/framework/agentchat/router/**",
+        "web-admin/app/routes/inbox/**",
+        "web-admin/app/ui/inbox/**",
+        "web-admin/app/ui/notification/**",
+        "web-admin/app/hooks/useNotificationList.ts",
+        "web-admin/app/plugins/core-ops/pages/notifications/**",
+        "web-admin/tests/e2e/collab-review/**",
+        "scripts/collab-trio-golden-run.sh"
+      ],
+      "axes": {
+        "surface": "ui",
+        "dependencies": "real-stack",
+        "verdict": "exact-pin",
+        "driver": "browser"
+      },
+      "goldenSet": true,
+      "blocking": true,
+      "evidence": "golden/evidence/2026-07-25-collab-trio-golden-mutation.md",
+      "seenRed": {
+        "how": "mutation",
+        "mutation": "reverted the unread-total fix to Object.values(summary).reduce(...); separately forced the category-filter condition to false",
+        "result": "IB-1 FAILED (tab 12 vs server total 6) and 2 service tests FAILED (category filter); both green again after restore"
+      }
     }
   ]
 }

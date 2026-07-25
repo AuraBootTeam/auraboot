@@ -18,6 +18,7 @@ import { useI18n } from '~/contexts/I18nContext';
 import { useSmartText } from '~/utils/i18n';
 import { useHydrated } from '~/hooks/useHydrated';
 import { InboxHeaderWidget } from '~/ui/inbox/InboxDropdown';
+import { NotificationHeaderWidget } from '~/ui/notification/NotificationHeaderWidget';
 import { CommandPalette } from '~/ui/CommandPalette';
 import { useAuraBot } from '~/plugins/core-aurabot/components-shell/AuraBotProvider';
 
@@ -234,6 +235,9 @@ export default function Header({
 
           {/* Unified inbox entry point */}
           {!simplified && showNotifications && <InboxHeaderWidget />}
+
+          {/* Notification centre bell (unread badge + SSE live updates) */}
+          {!simplified && showNotifications && <NotificationHeaderWidget />}
 
           {/* Language switch — only shown in non-compact mode */}
           {!simplified && showLanguageSwitch && (

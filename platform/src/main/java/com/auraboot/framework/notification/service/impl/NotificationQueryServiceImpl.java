@@ -8,6 +8,7 @@ import com.auraboot.framework.notification.entity.Notification;
 import com.auraboot.framework.notification.mapper.NotificationMapper;
 import com.auraboot.framework.notification.service.NotificationQueryService;
 import com.auraboot.framework.notification.service.NotificationSseService;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -36,16 +37,26 @@ public class NotificationQueryServiceImpl implements NotificationQueryService {
         int pageSize = Math.min(100, Math.max(1, request.getPageSize()));
         int offset = (pageNum - 1) * pageSize;
 
-        List<Notification> notifications;
-        long total;
+        // Both filters are honoured here, and they compose. Category values are
+        // persisted lower-case (InAppChannel defaults to "system", the UI tabs send
+        // "system"/"approval"/"business"/"alert"), but older rows may carry upper-case
+        // values, so the comparison is case-insensitive on both sides.
+        String category = request.getCategory();
+        boolean hasCategory = category != null && !category.isBlank();
+        String normalizedCategory = hasCategory ? category.trim().toLowerCase() : null;
 
-        if (Boolean.FALSE.equals(request.getIsRead())) {
-            notifications = notificationMapper.findUnreadByUser(tenantId, userId, pageSize, offset);
-            total = notificationMapper.countUnread(tenantId, userId);
-        } else {
-            notifications = notificationMapper.findByUser(tenantId, userId, pageSize, offset);
-            total = notificationMapper.countByUser(tenantId, userId);
-        }
+        LambdaQueryWrapper<Notification> filter = new LambdaQueryWrapper<Notification>()
+                .eq(Notification::getTenantId, tenantId)
+                .eq(Notification::getUserId, userId)
+                .eq(request.getIsRead() != null, Notification::getIsRead, request.getIsRead())
+                .apply(hasCategory, "LOWER(category) = {0}", normalizedCategory);
+
+        long total = notificationMapper.selectCount(filter);
+
+        LambdaQueryWrapper<Notification> pageQuery = filter.clone()
+                .orderByDesc(Notification::getCreatedAt)
+                .last("LIMIT " + pageSize + " OFFSET " + offset);
+        List<Notification> notifications = notificationMapper.selectList(pageQuery);
 
         List<NotificationDTO> dtos = notifications.stream()
                 .map(this::toDTO)
@@ -84,6 +95,26 @@ public class NotificationQueryServiceImpl implements NotificationQueryService {
 
         // Push updated unread count via SSE (will be 0 after marking all as read)
         pushUnreadCountUpdate(userId);
+    }
+
+    @Override
+    @Transactional
+    public int deleteByIds(Long userId, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        Long tenantId = MetaContext.getCurrentTenantId();
+        // Scope the DELETE by (tenantId, userId) so an enumerable id cannot be used
+        // to remove another member's notification — same object-level rule markAsRead uses.
+        int deleted = notificationMapper.delete(new LambdaQueryWrapper<Notification>()
+                .eq(Notification::getTenantId, tenantId)
+                .eq(Notification::getUserId, userId)
+                .in(Notification::getId, ids));
+
+        if (deleted > 0) {
+            pushUnreadCountUpdate(userId);
+        }
+        return deleted;
     }
 
     /**

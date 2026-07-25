@@ -119,6 +119,7 @@ public class TestFixtureController {
                 case "inbox_alert" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "alert", "medium", "E2E Alert Item");
                 case "inbox_mention" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "mention", "low", "E2E Mention Item");
                 case "inbox_assignment" -> createInboxItemsWithType(runId, request.getParams(), authHeader, "assignment", "high", "E2E Assignment Item");
+                case "notifications" -> createNotificationsFixture(runId, request.getParams());
                 case "customers" -> createCustomersFixture(runId, request.getParams());
                 case "multiview" -> createMultiviewFixture(runId, request.getParams());
                 case "chat" -> createChatFixture(runId, request.getParams());
@@ -608,6 +609,103 @@ public class TestFixtureController {
      * Creates inbox items via reflection to avoid compile-time dependency on enterprise-core.
      * Uses ApplicationContext to look up InboxService bean at runtime.
      */
+    /**
+     * Fixture: "notifications"
+     *
+     * <p>Creates one notification per category (approval / system / alert / business) plus
+     * one already-read row, all tagged with the run id. Specs that assert on notification
+     * filtering need rows they own: sharing a pre-seeded set across specs means one spec's
+     * delete silently breaks the next one's assertions.</p>
+     */
+    private FixtureResult createNotificationsFixture(String runId, Map<String, Object> params) {
+        Object notificationMapper;
+        try {
+            notificationMapper = requireRuntimeBean(
+                    new String[]{"notificationMapper"},
+                    new String[]{"com.auraboot.framework.notification.mapper.NotificationMapper"}
+            );
+        } catch (Exception e) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("notifications").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("error", "Notification module is not available"))
+                    .build();
+        }
+
+        Map<String, Object> safeParams = params != null ? params : Map.of();
+        Long tenantId = safeParams.containsKey("tenantId") ? longValue(safeParams.get("tenantId")) : null;
+        Long userId = safeParams.containsKey("userId") ? longValue(safeParams.get("userId")) : null;
+        if (tenantId == null) {
+            var tenant = tenantService.findByName("e2e_test");
+            if (tenant != null) {
+                tenantId = tenant.getId();
+            }
+        }
+        if (userId == null) {
+            var user = userService.findByEmail("e2e@test.local");
+            if (user != null) {
+                userId = user.getId();
+            }
+        }
+        if (tenantId == null || userId == null) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("notifications").testRunId(runId)
+                    .recordsCreated(0).recordPids(List.of())
+                    .metadata(Map.of("error", "Cannot resolve tenantId/userId — call POST /api/test/seed first"))
+                    .build();
+        }
+
+        // {category, priority, alreadyRead}
+        Object[][] spec = {
+                {"approval", "high", false},
+                {"system", "normal", false},
+                {"alert", "urgent", false},
+                {"business", "normal", true},
+        };
+
+        List<String> ids = new ArrayList<>();
+        try {
+            Class<?> entityClass = Class.forName("com.auraboot.framework.notification.entity.Notification");
+            Method insert = notificationMapper.getClass().getMethod("insert", Object.class);
+            for (Object[] row : spec) {
+                String category = (String) row[0];
+                boolean alreadyRead = (Boolean) row[2];
+                Object n = entityClass.getDeclaredConstructor().newInstance();
+                entityClass.getMethod("setTenantId", Long.class).invoke(n, tenantId);
+                entityClass.getMethod("setUserId", Long.class).invoke(n, userId);
+                entityClass.getMethod("setTitle", String.class)
+                        .invoke(n, "E2E " + category + " notification [" + runId + "]");
+                entityClass.getMethod("setContent", String.class)
+                        .invoke(n, "Seeded by E2E test fixture (" + category + ", run " + runId + ")");
+                entityClass.getMethod("setCategory", String.class).invoke(n, category);
+                entityClass.getMethod("setPriority", String.class).invoke(n, (String) row[1]);
+                entityClass.getMethod("setSourceType", String.class).invoke(n, "test");
+                entityClass.getMethod("setSourceId", String.class).invoke(n, runId + "-" + category);
+                entityClass.getMethod("setIsRead", Boolean.class).invoke(n, alreadyRead);
+                if (alreadyRead) {
+                    entityClass.getMethod("setReadAt", java.time.Instant.class).invoke(n, java.time.Instant.now());
+                }
+                insert.invoke(notificationMapper, n);
+                Object id = entityClass.getMethod("getId").invoke(n);
+                ids.add(String.valueOf(id));
+            }
+        } catch (Exception e) {
+            return FixtureResult.builder()
+                    .success(false).fixtureName("notifications").testRunId(runId)
+                    .recordsCreated(ids.size()).recordPids(ids)
+                    .metadata(Map.of("error", "Failed to create notifications: " + e.getMessage()))
+                    .build();
+        }
+
+        return FixtureResult.builder()
+                .success(true).fixtureName("notifications").testRunId(runId)
+                .recordsCreated(ids.size()).recordPids(ids)
+                .metadata(Map.of("tenantId", String.valueOf(tenantId),
+                        "userId", String.valueOf(userId),
+                        "runId", runId))
+                .build();
+    }
+
     private FixtureResult createInboxItemsWithType(String runId, Map<String, Object> params,
                                                     String authHeader, String itemType,
                                                     String priority, String titlePrefix) {

@@ -79,6 +79,21 @@ public class NotificationController {
     }
 
     /**
+     * Delete the caller's notifications in bulk.
+     * DELETE /api/notifications/batch?ids=1,2,3
+     *
+     * <p>The web client serialises its {@code ids} array into a comma-separated
+     * query value, which is exactly what {@code @RequestParam List<Long>} binds.
+     * Returns the number of rows actually deleted so the caller can tell a real
+     * delete apart from "those ids were not yours".</p>
+     */
+    @DeleteMapping("/batch")
+    public ApiResponse<Integer> deleteBatch(@RequestParam List<Long> ids) {
+        Long userId = MetaContext.getCurrentUserId();
+        return ApiResponse.success(notificationQueryService.deleteByIds(userId, ids));
+    }
+
+    /**
      * Get notification preferences for current user.
      * GET /api/notifications/preferences
      */

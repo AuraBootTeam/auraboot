@@ -4,6 +4,8 @@ import com.auraboot.framework.notification.dto.NotificationDTO;
 import com.auraboot.framework.notification.dto.NotificationQueryRequest;
 import com.auraboot.framework.meta.dto.PaginationResult;
 
+import java.util.List;
+
 /**
  * Service for querying user notifications.
  *
@@ -30,4 +32,13 @@ public interface NotificationQueryService {
      * Mark all notifications for a user as read.
      */
     void markAllAsRead(Long userId);
+
+    /**
+     * Delete the caller's notifications by id.
+     *
+     * <p>Scoped to {@code (tenantId, userId)} so a caller can never delete another
+     * member's rows by guessing ids. Returns the number of rows actually removed,
+     * which lets the caller distinguish "deleted" from "nothing matched".</p>
+     */
+    int deleteByIds(Long userId, List<Long> ids);
 }

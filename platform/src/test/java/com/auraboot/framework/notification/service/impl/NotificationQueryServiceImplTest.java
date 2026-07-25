@@ -7,11 +7,18 @@ import com.auraboot.framework.notification.dto.NotificationQueryRequest;
 import com.auraboot.framework.notification.entity.Notification;
 import com.auraboot.framework.notification.mapper.NotificationMapper;
 import com.auraboot.framework.notification.service.NotificationSseService;
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatchers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -22,9 +29,10 @@ import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -40,6 +48,18 @@ class NotificationQueryServiceImplTest {
     private NotificationQueryServiceImpl service;
 
     private MockedStatic<MetaContext> metaContextMock;
+
+    /**
+     * LambdaQueryWrapper resolves column names through MyBatis-Plus's TableInfo cache,
+     * which only gets populated when a SqlSessionFactory boots. These are plain Mockito
+     * tests with no Spring context, so the entity is registered by hand — otherwise every
+     * wrapper build fails with "can not find lambda cache for this entity".
+     */
+    @BeforeAll
+    static void registerEntityMetadata() {
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), ""), Notification.class);
+    }
 
     @BeforeEach
     void setUp() {
@@ -66,8 +86,22 @@ class NotificationQueryServiceImplTest {
         return n;
     }
 
+    /** SQL fragment (WHERE clause + LIMIT) of the wrapper the service handed the mapper. */
+    private String capturedListSql() {
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<LambdaQueryWrapper<Notification>> captor =
+                ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(notificationMapper).selectList(captor.capture());
+        LambdaQueryWrapper<Notification> w = captor.getValue();
+        String sql = w.getSqlSegment() == null ? "" : w.getSqlSegment();
+        for (Object v : w.getParamNameValuePairs().values()) {
+            sql = sql.replaceFirst("#\\{[^}]+}", String.valueOf(v));
+        }
+        return sql.toLowerCase();
+    }
+
     @Test
-    @DisplayName("listByUser unread branch invokes findUnreadByUser + countUnread")
+    @DisplayName("listByUser unread branch filters is_read = false")
     void listUnread() {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
         NotificationQueryRequest req = new NotificationQueryRequest();
@@ -75,31 +109,78 @@ class NotificationQueryServiceImplTest {
         req.setPageNum(2);
         req.setPageSize(10);
 
-        when(notificationMapper.findUnreadByUser(eq(99L), eq(7L), eq(10), eq(10)))
+        when(notificationMapper.selectList(ArgumentMatchers.any()))
                 .thenReturn(List.of(entity(1L, false)));
-        when(notificationMapper.countUnread(99L, 7L)).thenReturn(1);
+        when(notificationMapper.selectCount(ArgumentMatchers.any())).thenReturn(1L);
 
         PaginationResult<NotificationDTO> result = service.listByUser(7L, req);
         assertEquals(1L, result.getTotal());
         assertEquals(1, result.getRecords().size());
-        verify(notificationMapper, never()).findByUser(eq(99L), eq(7L), anyInt(), anyInt());
+        String sql = capturedListSql();
+        assertTrue(sql.contains("is_read"), "unread query must constrain is_read, got: " + sql);
+        assertTrue(sql.contains("limit 10 offset 10"), "pagination must reach SQL, got: " + sql);
     }
 
     @Test
-    @DisplayName("listByUser default (isRead=null) uses findByUser + countByUser")
+    @DisplayName("listByUser default (isRead=null) constrains neither is_read nor category")
     void listAll() {
         metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
         NotificationQueryRequest req = new NotificationQueryRequest();
         req.setPageNum(1);
         req.setPageSize(20);
 
-        when(notificationMapper.findByUser(eq(99L), eq(7L), eq(20), eq(0)))
+        when(notificationMapper.selectList(ArgumentMatchers.any()))
                 .thenReturn(List.of(entity(1L, true), entity(2L, false)));
-        when(notificationMapper.countByUser(99L, 7L)).thenReturn(2L);
+        when(notificationMapper.selectCount(ArgumentMatchers.any())).thenReturn(2L);
 
         PaginationResult<NotificationDTO> result = service.listByUser(7L, req);
         assertEquals(2L, result.getTotal());
         assertEquals(2, result.getRecords().size());
+        String sql = capturedListSql();
+        assertFalse(sql.contains("is_read"), "no read filter was asked for, got: " + sql);
+        assertFalse(sql.contains("category"), "no category filter was asked for, got: " + sql);
+    }
+
+    @Test
+    @DisplayName("listByUser honours the category filter (regression: it used to be ignored)")
+    void listFiltersByCategory() {
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        NotificationQueryRequest req = new NotificationQueryRequest();
+        req.setCategory("Approval");
+        req.setPageNum(1);
+        req.setPageSize(20);
+
+        when(notificationMapper.selectList(ArgumentMatchers.any())).thenReturn(List.of(entity(1L, false)));
+        when(notificationMapper.selectCount(ArgumentMatchers.any())).thenReturn(1L);
+
+        service.listByUser(7L, req);
+
+        // The category the caller asked for must actually reach SQL. Dropping the
+        // `.apply(...)` in the service turns this red — which is the whole point:
+        // the old implementation accepted `category` and silently discarded it.
+        String sql = capturedListSql();
+        assertTrue(sql.contains("category"), "category filter missing from SQL: " + sql);
+        assertTrue(sql.contains("approval"), "category value must be lower-cased into SQL: " + sql);
+    }
+
+    @Test
+    @DisplayName("listByUser combines category AND read-state instead of letting one win")
+    void listCombinesCategoryAndReadState() {
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        NotificationQueryRequest req = new NotificationQueryRequest();
+        req.setCategory("alert");
+        req.setIsRead(true);
+        req.setPageNum(1);
+        req.setPageSize(20);
+
+        when(notificationMapper.selectList(ArgumentMatchers.any())).thenReturn(List.of(entity(1L, true)));
+        when(notificationMapper.selectCount(ArgumentMatchers.any())).thenReturn(1L);
+
+        service.listByUser(7L, req);
+
+        String sql = capturedListSql();
+        assertTrue(sql.contains("category"), "category dropped when combined with isRead: " + sql);
+        assertTrue(sql.contains("is_read"), "isRead dropped when combined with category: " + sql);
     }
 
     @Test
@@ -110,13 +191,39 @@ class NotificationQueryServiceImplTest {
         req.setPageNum(0);     // -> 1
         req.setPageSize(500);  // -> 100
 
-        when(notificationMapper.findByUser(eq(99L), eq(7L), eq(100), eq(0)))
-                .thenReturn(List.of());
-        when(notificationMapper.countByUser(99L, 7L)).thenReturn(0L);
+        when(notificationMapper.selectList(ArgumentMatchers.any())).thenReturn(List.of());
+        when(notificationMapper.selectCount(ArgumentMatchers.any())).thenReturn(0L);
 
         PaginationResult<NotificationDTO> result = service.listByUser(7L, req);
         assertNotNull(result);
-        verify(notificationMapper).findByUser(99L, 7L, 100, 0);
+        assertTrue(capturedListSql().contains("limit 100 offset 0"));
+    }
+
+    @Test
+    @DisplayName("deleteByIds scopes the DELETE to the caller and refreshes the unread badge")
+    void deleteByIdsScoped() {
+        metaContextMock.when(MetaContext::getCurrentTenantId).thenReturn(99L);
+        when(notificationMapper.delete(ArgumentMatchers.any())).thenReturn(2);
+        when(notificationMapper.countUnread(99L, 7L)).thenReturn(1);
+
+        assertEquals(2, service.deleteByIds(7L, List.of(10L, 11L)));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<LambdaQueryWrapper<Notification>> captor =
+                ArgumentCaptor.forClass(LambdaQueryWrapper.class);
+        verify(notificationMapper).delete(captor.capture());
+        String sql = captor.getValue().getSqlSegment().toLowerCase();
+        // A caller must never be able to delete another member's rows by guessing ids.
+        assertTrue(sql.contains("tenant_id"), "DELETE must be tenant-scoped: " + sql);
+        assertTrue(sql.contains("user_id"), "DELETE must be user-scoped: " + sql);
+        verify(notificationSseService).pushUnreadCount(7L, 1);
+    }
+
+    @Test
+    @DisplayName("deleteByIds with no ids touches nothing")
+    void deleteByIdsEmpty() {
+        assertEquals(0, service.deleteByIds(7L, List.of()));
+        verify(notificationMapper, never()).delete(ArgumentMatchers.any());
     }
 
     @Test

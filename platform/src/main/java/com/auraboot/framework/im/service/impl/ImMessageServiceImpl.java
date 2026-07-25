@@ -93,8 +93,12 @@ public class ImMessageServiceImpl implements ImMessageService {
         if (request.getAttachments() != null) {
             message.setAttachments(toJson(request.getAttachments()));
         }
-        if (request.getMentions() != null && !request.getMentions().isEmpty()) {
-            message.setMentions(toJson(request.getMentions()));
+        // Persist the merged mention tokens (legacy list + structured mentionTargets).
+        // InboxImListener reads mentions back off the stored row, so anything dropped
+        // here can never produce a MENTION inbox item.
+        var effectiveMentions = request.effectiveMentions();
+        if (!effectiveMentions.isEmpty()) {
+            message.setMentions(toJson(effectiveMentions));
         }
 
         // Phase C.1: persist Pre-Grounding Triage verdict (Stage 2.5) on the

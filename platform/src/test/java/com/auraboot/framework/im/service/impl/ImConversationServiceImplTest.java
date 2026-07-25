@@ -40,6 +40,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -707,5 +708,28 @@ class ImConversationServiceImplTest {
         assertThat(item.getUnreadCount()).isEqualTo(0L);
         assertThat(item.getMemberCount()).isEqualTo(1);
         assertThat(item.getPinned()).isFalse();
+    }
+
+    @Test
+    void createAndBuildListItem_reportsTheRealMemberCount() {
+        // Regression: this used to return a hard-coded 1, so a group created with
+        // several members reported "1 member" until the list was refreshed.
+        ConversationCreateRequest r = req(ImConstants.TYPE_GROUP);
+        r.setName("team");
+        r.setMemberIds(List.of(1001L, 1002L));
+
+        doAnswer(inv -> {
+            ImConversation c = inv.getArgument(0);
+            c.setId(4242L);
+            return 1;
+        }).when(conversationMapper).insert(any(ImConversation.class));
+
+        when(memberMapper.countHumanMembersByConversationIds(eq(TENANT_ID), eq(List.of(4242L))))
+                .thenReturn(List.of(
+                        ConversationMemberCountRow.builder().conversationId(4242L).memberCount(3L).build()));
+
+        ConversationListItem item = service.createAndBuildListItem(r, USER_ID, TENANT_ID);
+
+        assertThat(item.getMemberCount()).isEqualTo(3);
     }
 }

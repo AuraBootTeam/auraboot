@@ -200,6 +200,18 @@ public class ImConversationServiceImpl implements ImConversationService {
     @Transactional
     public ConversationListItem createAndBuildListItem(ConversationCreateRequest request, Long userId, Long tenantId) {
         ImConversation conv = create(request, userId, tenantId);
+        // Count the members that were actually just created rather than assuming the
+        // creator is alone: a group created with memberIds/agentIds reported "1 member"
+        // no matter how many people were in it. Uses the same human-member definition
+        // listByUser uses, so the number does not change when the list refreshes.
+        int memberCount = 1;
+        if (conv.getId() != null) {
+            memberCount = memberMapper
+                    .countHumanMembersByConversationIds(tenantId, List.of(conv.getId())).stream()
+                    .findFirst()
+                    .map(row -> row.getMemberCount().intValue())
+                    .orElse(1);
+        }
         return ConversationListItem.builder()
                 .conversationId(conv.getId())
                 .type(conv.getType())
@@ -213,7 +225,7 @@ public class ImConversationServiceImpl implements ImConversationService {
                 .unreadCount(0L)
                 .pinned(false)
                 .muted(false)
-                .memberCount(1)
+                .memberCount(memberCount)
                 .build();
     }
 
