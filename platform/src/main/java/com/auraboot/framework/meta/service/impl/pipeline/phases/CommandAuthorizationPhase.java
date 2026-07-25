@@ -3,6 +3,7 @@ package com.auraboot.framework.meta.service.impl.pipeline.phases;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandAuthorizationVerdict;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -49,7 +50,7 @@ public class CommandAuthorizationPhase implements CommandPhase {
         List<String> requiredPermissions = extractPermissions(ctx.getExecConfig().get("permissions"));
         if (requiredPermissions.isEmpty()) {
             reportUndeclared(ctx.getCommandCode());
-            ctx.setAuthorizationVerdict(CommandAuthorizationVerdict
+            applyVerdict(ctx, CommandAuthorizationVerdict
                     .notApplicable(CommandAuthorizationVerdict.REASON_NO_DECLARED_PERMISSIONS));
             return;
         }
@@ -58,14 +59,14 @@ public class CommandAuthorizationPhase implements CommandPhase {
         if (userId == null) {
             log.warn("Skipping command permission check because userId is absent: command={}",
                     ctx.getCommandCode());
-            ctx.setAuthorizationVerdict(CommandAuthorizationVerdict
+            applyVerdict(ctx, CommandAuthorizationVerdict
                     .notApplicable(CommandAuthorizationVerdict.REASON_NO_USER_CONTEXT));
             return;
         }
 
         for (String permission : requiredPermissions) {
             if (userPermissionService.hasPermission(userId, permission)) {
-                ctx.setAuthorizationVerdict(CommandAuthorizationVerdict.authorized(permission));
+                applyVerdict(ctx, CommandAuthorizationVerdict.authorized(permission));
                 return;
             }
         }
@@ -74,9 +75,28 @@ public class CommandAuthorizationPhase implements CommandPhase {
         // thrown exception left no trace on the context for an audit trail (or a future decision plan)
         // to read. The throw still aborts the pipeline exactly as before — this changes nothing about
         // enforcement, it only stops the "why" from being silent.
-        ctx.setAuthorizationVerdict(CommandAuthorizationVerdict.denied(requiredPermissions));
+        applyVerdict(ctx, CommandAuthorizationVerdict.denied(requiredPermissions));
         throw new BusinessException(ResponseCode.FORBIDDEN,
                 "Command permission denied: required one of " + String.join(", ", requiredPermissions));
+    }
+
+    /**
+     * Set the verdict and, in the same breath, record the equivalent {@link CommandPermitPlan.PhaseDecision}
+     * for the plan's deny-overrides combination (architecture §11.15). The verdict is this phase's public
+     * finding; the phase decision is the generic form the {@link CommandPermitPlan} aggregates across
+     * phases. Shadow — recording it consumes nothing and changes no behaviour.
+     */
+    private void applyVerdict(CommandPipelineContext ctx, CommandAuthorizationVerdict verdict) {
+        ctx.setAuthorizationVerdict(verdict);
+        ctx.recordPhaseDecision(toPhaseDecision(verdict));
+    }
+
+    private CommandPermitPlan.PhaseDecision toPhaseDecision(CommandAuthorizationVerdict verdict) {
+        return switch (verdict.outcome()) {
+            case AUTHORIZED -> CommandPermitPlan.PhaseDecision.permit(name());
+            case DENIED -> CommandPermitPlan.PhaseDecision.deny(verdict.reason(), name());
+            case NOT_APPLICABLE -> CommandPermitPlan.PhaseDecision.abstain(name());
+        };
     }
 
     /**
