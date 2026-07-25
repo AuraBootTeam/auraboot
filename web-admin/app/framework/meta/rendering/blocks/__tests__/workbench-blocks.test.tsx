@@ -7,6 +7,7 @@ import { evaluateCondition as evaluateExpressionCondition } from '~/framework/me
 
 import { MetricStripBlockRenderer } from '../MetricStripBlockRenderer';
 import { CandidateListBlockRenderer } from '../CandidateListBlockRenderer';
+import { parseLadderRungs, safeExternalUrl } from '../ReviewDrawerBlockRenderer';
 import { RecordInspectorBlockRenderer } from '../RecordInspectorBlockRenderer';
 import { WorkbenchActionBarBlockRenderer } from '../WorkbenchActionBarBlockRenderer';
 import { EvidencePanelBlockRenderer } from '../EvidencePanelBlockRenderer';
@@ -2061,6 +2062,15 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.getByTestId('review-drawer-candidate-action-confirm_candidate')).toBeDisabled();
     expect(screen.getByTestId('review-drawer-candidate-action-undo_decision')).toBeDisabled();
 
+    // The confirm button must not sit inside the decision panel: that panel is capped at 48% height
+    // and scrolls, so the button went out of view behind the very evidence it confirms. jsdom has no
+    // geometry to prove visibility, but it can prove the button is not in the scrolling container.
+    const actionsFooter = screen.getByTestId('review-drawer-actions');
+    expect(screen.getByTestId('review-drawer-decision-panel')).not.toContainElement(actionsFooter);
+    expect(actionsFooter).toContainElement(
+      screen.getByTestId('review-drawer-candidate-action-confirm_candidate'),
+    );
+
     fireEvent.click(screen.getByTestId('review-drawer-candidate-ME-1'));
     expect(screen.getByText('匹配来源')).toBeInTheDocument();
     expect(screen.getByText('mpn_exact')).toBeInTheDocument();
@@ -2859,5 +2869,43 @@ describe('ArtifactTimelineBlockRenderer', () => {
       'href',
       '/api/file/download/file-1',
     );
+  });
+});
+
+describe('safeExternalUrl', () => {
+  it('accepts http and https and rejects every other scheme', () => {
+    expect(safeExternalUrl('https://www.ickey.cn/detail/1003001033412565/FRC0603P000%20TS.html')).toBe(
+      'https://www.ickey.cn/detail/1003001033412565/FRC0603P000%20TS.html',
+    );
+    expect(safeExternalUrl('http://example.com/a')).toBe('http://example.com/a');
+
+    // Evidence snapshots carry supplier links copied verbatim from an upstream API, so an href is
+    // never built from an unchecked string.
+    expect(safeExternalUrl('javascript:alert(1)')).toBeNull();
+    expect(safeExternalUrl('data:text/html,<script>alert(1)</script>')).toBeNull();
+    expect(safeExternalUrl('file:///etc/passwd')).toBeNull();
+    expect(safeExternalUrl('not a url')).toBeNull();
+    expect(safeExternalUrl('')).toBeNull();
+    expect(safeExternalUrl(null)).toBeNull();
+    expect(safeExternalUrl(42)).toBeNull();
+  });
+});
+
+describe('parseLadderRungs', () => {
+  it('accepts the projected array in object or string form and rejects anything else', () => {
+    const rungs = [
+      { qty: '1', price: '0.3705', current: false },
+      { qty: '100', price: '0.3200', current: true },
+    ];
+    expect(parseLadderRungs(rungs)).toEqual(rungs);
+    // jsonb reaches the client as an array or as its string form depending on the driver.
+    expect(parseLadderRungs(JSON.stringify(rungs))).toEqual(rungs);
+
+    expect(parseLadderRungs(null)).toBeNull();
+    expect(parseLadderRungs([])).toBeNull();
+    expect(parseLadderRungs('not json')).toBeNull();
+    // The old projection was a display string; it must not be mistaken for a ladder.
+    expect(parseLadderRungs('1+: 0.3705  100+: 0.3200')).toBeNull();
+    expect(parseLadderRungs([{ qty: '1' }])).toBeNull();
   });
 });

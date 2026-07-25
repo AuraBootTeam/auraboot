@@ -23,11 +23,13 @@ import { useActionHandler } from '~/framework/meta/hooks/useActionHandler';
 import { resolveStatusTone, StatusDot } from '~/framework/meta/runtime/renderers/statusTone';
 import { useAuth } from '~/contexts/AuthContext';
 import {
+  executeSimpleWorkbenchAction,
   readDataSourceRows,
   readDataSourceState,
   useDataSourceSubscription,
   writeRuntimeState,
 } from './workbenchBlockUtils';
+import { InlineEditCell } from '~/framework/meta/rendering/components/InlineEditCell';
 import { getLegacyCompatibleRecordPid } from '~/framework/meta/utils/publicRecordId';
 
 export interface TableBlockRendererProps {
@@ -229,6 +231,43 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
   // 获取表格数据 - 从 DataSource
   const dataSourceId = typeof block.dataSource === 'string' ? block.dataSource : undefined;
   useDataSourceSubscription(runtime, dataSourceId);
+
+  /**
+   * Inline cell editing, opt-in per table.
+   *
+   * ListTable has offered this for kind:list pages all along, through the same InlineEditCell;
+   * a blockType:table on a workbench page renders here instead and had no way to reach it. Same
+   * JSON shape, different renderer.
+   *
+   * The write goes through command.execute, not a REST PUT: on a workbench block a backend write
+   * is a command, and these tables usually read a namedQuery whose projected column names are not
+   * model fields — so a column names the field it writes with `editField`.
+   *
+   *   "inlineEdit": { "command": "qo_quote_line_common:update", "reload": ["bomPriceWaterfall"] }
+   *   "columns": [{ "field": "qty_per_set", "editField": "qo_ql_qty_per_set", "editable": true }]
+   */
+  const inlineEditConfig = (block as any).table?.inlineEdit || (block as any).inlineEdit;
+  const inlineEditCommand = inlineEditConfig?.command || inlineEditConfig?.commandCode;
+  const handleInlineSave = React.useCallback(
+    async (field: string, value: any, record: Record<string, any>) => {
+      if (!inlineEditCommand) return;
+      const pid = getLegacyCompatibleRecordPid(record);
+      if (!pid) throw new Error('Row has no public record id; inline edit cannot target it');
+      const column = columns.find((col) => col.field === field);
+      const writeField = (column as any)?.editField || field;
+      await executeSimpleWorkbenchAction(runtime, {
+        action: 'command.execute',
+        args: {
+          command: inlineEditCommand,
+          targetRecordPid: pid,
+          payload: { [writeField]: value },
+          reload:
+            inlineEditConfig?.reload ?? (dataSourceId ? [dataSourceId] : []),
+        },
+      });
+    },
+    [runtime, inlineEditCommand, inlineEditConfig?.reload, dataSourceId, columns],
+  );
   const rawData = dataSourceId ? readDataSourceRows(runtime, dataSourceId) : [];
   const dataSourceState = readDataSourceState(runtime, dataSourceId);
   const dataSourceError = dataSourceState?.error as any;
@@ -781,7 +820,24 @@ export const TableBlockRenderer: React.FC<TableBlockRendererProps> = ({ block, r
                             )}
                           </span>
                         )}
-                        {renderCellContent(column, row)}
+                        {(column as any).editable && inlineEditCommand ? (
+                          <InlineEditCell
+                            column={column}
+                            value={row[column.field]}
+                            record={row}
+                            onSave={handleInlineSave}
+                            editable
+                            dictItems={
+                              column.dictCode
+                                ? (dictDataCache.current.get(column.dictCode) ?? [])
+                                : undefined
+                            }
+                          >
+                            {renderCellContent(column, row)}
+                          </InlineEditCell>
+                        ) : (
+                          renderCellContent(column, row)
+                        )}
                       </td>
                     ))}
                     {rowActions.length > 0 && (
