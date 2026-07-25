@@ -62,7 +62,18 @@ app.use((req, res, next) => {
   if (skipBodyParsing(req)) {
     return next();
   }
-  express.json({ limit: '10mb' })(req, res, next);
+  // Keep the bytes the client actually sent. express.json() parses through
+  // JSON.parse, which rounds any integer above 2^53 — and AuraBoot ids are 18-19
+  // digit snowflakes. A request carrying {"id": 339393718375288832} reached the
+  // backend as ...288800: a different, usually non-existent record, with nothing
+  // logged anywhere. The proxy forwards these original bytes when it has them, so
+  // the BFF stops silently rewriting values it only meant to pass along.
+  express.json({
+    limit: '10mb',
+    verify: (req, _res, buf) => {
+      if (buf.length) (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+    },
+  })(req, res, next);
 });
 
 app.use((req, res, next) => {
