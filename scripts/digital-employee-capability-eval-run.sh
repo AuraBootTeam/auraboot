@@ -79,10 +79,45 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 # --- bring up an isolated stack ---------------------------------------------
-log "allocating runtime '$RUNTIME_NAME' on slot $SLOT"
-(cd "$WORKSPACE_ROOT" && ./dev.sh runtime allocate auraboot "$RUNTIME_NAME" --slot "$SLOT" \
-    --purpose "digital-employee capability eval (live LLM)" --ttl 2h) >>"$LOG" 2>&1
-(cd "$WORKSPACE_ROOT" && ./dev.sh infra ensure "$RUNTIME_NAME" --yes) >>"$LOG" 2>&1
+# Slots are shared with every other session on this machine. Never grab one that
+# is already allocated: that is someone else's running stack, and the eval would
+# either fail confusingly or trample their work. Probe upward from the requested
+# slot and take the first free one.
+allocate_on_free_slot() {
+  local slot="$1" attempts=0 out
+  while [ "$attempts" -lt 12 ]; do
+    if out=$(cd "$WORKSPACE_ROOT" && ./dev.sh runtime allocate auraboot "$RUNTIME_NAME" --slot "$slot" \
+               --purpose "digital-employee capability eval (live LLM)" --ttl 2h 2>&1); then
+      printf '%s\n' "$out" >>"$LOG"
+      SLOT="$slot"
+      DB_NAME="auraboot_${SLOT}"
+      log "allocated runtime '$RUNTIME_NAME' on slot $SLOT (db=$DB_NAME)"
+      return 0
+    fi
+    printf '%s\n' "$out" >>"$LOG"
+    case "$out" in
+      *"already allocated"*)
+        log "slot $slot is taken by another session — trying $((slot+1))"
+        slot=$((slot+1)); attempts=$((attempts+1)) ;;
+      *)
+        # Anything other than a slot clash is a real failure: surface it instead of
+        # exiting silently through the trap with the reason buried in the log.
+        log "FAIL: could not allocate a runtime:"; printf '%s\n' "$out" >&2; return 1 ;;
+    esac
+  done
+  log "FAIL: no free runtime slot found starting at $1"
+  return 1
+}
+
+allocate_on_free_slot "$SLOT" || exit 2
+
+if ! out=$(cd "$WORKSPACE_ROOT" && ./dev.sh infra ensure "$RUNTIME_NAME" --yes 2>&1); then
+  printf '%s\n' "$out" >>"$LOG"
+  log "FAIL: infra ensure failed for '$RUNTIME_NAME':"
+  printf '%s\n' "$out" >&2
+  exit 2
+fi
+printf '%s\n' "$out" >>"$LOG"
 
 # The integration-test profile assumes a migrated database. A freshly created one
 # is empty, so the Spring context dies on the first missing table — apply the
