@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   build:
-    name: Build & Quality Gate (Java ${{ matrix.java }})
+    name: Build, Lint & Compile (Java ${{ matrix.java }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
