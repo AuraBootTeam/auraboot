@@ -64,14 +64,17 @@ public class AgentObservationService {
         }
     }
 
-    private String mapToObservationType(String agentEventType) {
+    static String mapToObservationType(String agentEventType) {
+        if ("turn.completed".equals(agentEventType)) return "turn_completed";
+        if ("turn.failed".equals(agentEventType)) return "turn_failed";
+        if ("turn.interrupted".equals(agentEventType)) return "turn_interrupted";
         if (agentEventType.contains("failed") || agentEventType.contains("error")) return "error";
         if (agentEventType.contains("cost") || agentEventType.contains("token")) return "cost";
         if (agentEventType.contains("alert")) return "alert";
         return "activity";
     }
 
-    private String mapToSeverity(String agentEventType) {
+    static String mapToSeverity(String agentEventType) {
         if (agentEventType.contains("failed")) return "error";
         if (agentEventType.contains("alert")) return "warn";
         return "info";

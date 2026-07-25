@@ -13,6 +13,14 @@
 #   AURABOOT_PASSWORD=Test2026x
 #
 # Replace /path/to with the absolute path to your AuraBoot checkout.
+#
+# Live capability eval credentials must be injected by the host's secure wrapper
+# or service environment. Never paste API keys into crontab.
+
+# Nightly digital-employee capability gate (01:30 local time).
+# The runner allocates an isolated runtime, verifies every required JUnit suite,
+# writes build/capability-eval/receipt.env, and tears the runtime down.
+30 1 * * * /path/to/auraboot/scripts/digital-employee-capability-eval-run.sh >> /var/log/digital-employee-capability-eval.log 2>&1
 
 # Nightly perf smoke (2am local time) — fast, ~5 min
 0 2 * * * /path/to/scripts/perf-ci/run-perf-regression.sh --profile smoke >> /var/log/perf-ci.log 2>&1

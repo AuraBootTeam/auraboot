@@ -84,6 +84,9 @@ class PlatformToolProviderTest extends BaseIntegrationTest {
             assertThat(t.getToolCode()).isNotBlank();
             assertThat(t.getToolName()).isNotBlank();
             assertThat(t.getDescription()).isNotBlank();
+            assertThat(t.getParameterSchema())
+                    .as("platform tool %s must expose its production argument contract", t.getToolCode())
+                    .isNotNull();
         });
     }
 

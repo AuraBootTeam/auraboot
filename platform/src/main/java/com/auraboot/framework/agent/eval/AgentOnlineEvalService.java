@@ -2,6 +2,8 @@ package com.auraboot.framework.agent.eval;
 
 import com.auraboot.framework.agent.eval.AgentTurnQualityJudge.TurnSignals;
 import com.auraboot.framework.agent.eval.AgentTurnQualityJudge.TurnVerdict;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -27,10 +29,13 @@ public class AgentOnlineEvalService {
 
     private final JdbcTemplate jdbc;
     private final AgentTurnQualityJudge judge;
+    private final ObjectMapper objectMapper;
 
-    public AgentOnlineEvalService(JdbcTemplate jdbc, AgentTurnQualityJudge judge) {
+    public AgentOnlineEvalService(JdbcTemplate jdbc, AgentTurnQualityJudge judge,
+                                  ObjectMapper objectMapper) {
         this.jdbc = jdbc;
         this.judge = judge;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -60,7 +65,9 @@ public class AgentOnlineEvalService {
         for (Map.Entry<String, List<Map<String, Object>>> e : byRun.entrySet()) {
             String agentId = e.getValue().isEmpty() ? null
                     : String.valueOf(e.getValue().get(0).get("obs_agent_id"));
-            TurnSignals signals = TurnSignals.fromObservations(e.getKey(), agentId, e.getValue());
+            List<Map<String, Object>> observations =
+                    withConversationNarrative(tenantId, e.getKey(), e.getValue());
+            TurnSignals signals = TurnSignals.fromObservations(e.getKey(), agentId, observations);
             verdicts.add(judge.judge(signals));
         }
         OnlineEvalSummary summary = OnlineEvalSummary.from(judge.mode(), verdicts);
@@ -68,6 +75,81 @@ public class AgentOnlineEvalService {
                 tenantId, judge.mode(), summary.sampledTurns(), summary.healthyRate(), summary.failRate());
         return summary;
     }
+
+    /**
+     * Sync-turn observations intentionally store only metadata. When the opt-in LLM judge
+     * is active, hydrate its narrative from the already-persisted inbound/outbound IM rows
+     * instead of copying message content into {@code ab_agent_observation}. The heuristic
+     * path never reads transcript content.
+     *
+     * <p>The lookup is best-effort: legacy/durable observations may not carry an inbound
+     * message id or conversation id, and online eval must keep grading their existing trace.
+     * The judge prompt treats all hydrated text as untrusted data.</p>
+     */
+    private List<Map<String, Object>> withConversationNarrative(
+            Long tenantId, String runPid, List<Map<String, Object>> observations) {
+        if (!"llm".equals(judge.mode()) || observations == null || observations.isEmpty()) {
+            return observations;
+        }
+        try {
+            TranscriptRef ref = transcriptRef(observations);
+            List<Map<String, Object>> enriched = new ArrayList<>();
+
+            if (ref.inboundMessageId() != null) {
+                List<Map<String, Object>> inbound = jdbc.queryForList(
+                        "SELECT content FROM ab_im_message "
+                                + "WHERE tenant_id = ? AND id = ? AND content IS NOT NULL",
+                        tenantId, ref.inboundMessageId());
+                addTranscriptRows(enriched, inbound, "user_message", "User request");
+            }
+
+            enriched.addAll(observations);
+
+            List<Map<String, Object>> outbound = jdbc.queryForList(
+                    "SELECT content FROM ab_im_message "
+                            + "WHERE tenant_id = ? AND client_msg_id = ? AND content IS NOT NULL "
+                            + "ORDER BY id DESC LIMIT 1",
+                    tenantId, "out-" + runPid);
+            addTranscriptRows(enriched, outbound, "assistant_message", "Agent response");
+            return enriched;
+        } catch (Exception e) {
+            log.debug("Online eval could not hydrate transcript for run {}: {}", runPid, e.getMessage());
+            return observations;
+        }
+    }
+
+    private TranscriptRef transcriptRef(List<Map<String, Object>> observations) {
+        for (Map<String, Object> row : observations) {
+            Object detail = row.get("detail");
+            if (detail == null) continue;
+            try {
+                JsonNode node = objectMapper.readTree(String.valueOf(detail));
+                JsonNode inbound = node.get("inboundMessageId");
+                if (inbound != null && inbound.canConvertToLong()) {
+                    return new TranscriptRef(inbound.longValue());
+                }
+            } catch (Exception ignored) {
+                // Durable/legacy observation detail is often plain text, not JSON.
+            }
+        }
+        return new TranscriptRef(null);
+    }
+
+    private static void addTranscriptRows(List<Map<String, Object>> target,
+                                          List<Map<String, Object>> messages,
+                                          String type, String title) {
+        for (Map<String, Object> message : messages) {
+            Object content = message.get("content");
+            if (content == null || String.valueOf(content).isBlank()) continue;
+            target.add(Map.of(
+                    "observation_type", type,
+                    "severity", "info",
+                    "obs_title", title,
+                    "detail", String.valueOf(content)));
+        }
+    }
+
+    private record TranscriptRef(Long inboundMessageId) {}
 
     /** Aggregate quality over the sampled turns. {@link #from} is pure / unit-tested. */
     public record OnlineEvalSummary(String judgeMode, int sampledTurns, double healthyRate,

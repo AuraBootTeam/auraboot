@@ -34,7 +34,8 @@ public final class EvalCaseStructureValidator {
                 violations.add(id + ": taskDescription must be >= 8 chars");
             }
             List<String> expected = c.getExpectedToolCodes();
-            if (expected == null || expected.isEmpty()) {
+            boolean abstention = "abstention".equals(c.getCategory());
+            if (expected == null || (expected.isEmpty() && !abstention)) {
                 violations.add(id + ": expectedToolCodes must be non-empty");
             } else if (expected.stream().anyMatch(e -> e == null)) {
                 violations.add(id + ": expectedToolCodes contains null");
@@ -48,6 +49,15 @@ public final class EvalCaseStructureValidator {
                 if (forbidden.stream().anyMatch(expectedSet::contains)) {
                     violations.add(id + ": expected and forbidden tool codes overlap");
                 }
+            }
+            if (abstention && expected != null && !expected.isEmpty()) {
+                violations.add(id + ": abstention case must have empty expectedToolCodes");
+            }
+            if (abstention && (forbidden == null || forbidden.isEmpty())) {
+                violations.add(id + ": abstention case must declare forbiddenToolCodes");
+            }
+            if (abstention && c.isExpectsConfirmation()) {
+                violations.add(id + ": abstention case cannot expect confirmation");
             }
         }
         return violations;

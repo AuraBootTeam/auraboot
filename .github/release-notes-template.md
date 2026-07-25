@@ -93,8 +93,8 @@ Returning contributors: `@u4`, `@u5`. Thanks!
 - [ ] Each highlight links to docs or PR
 - [ ] Breaking changes have migration steps with diff
 - [ ] CHANGELOG.md updated with same content
-- [ ] Tagged with annotated tag: `git tag -a vX.Y.Z -m "AuraBoot vX.Y.Z"`
-- [ ] Tag pushed: `git push origin vX.Y.Z` (triggers build-image workflow → GHCR)
+- [ ] Tagged through `scripts/release/tag-release.sh X.Y.Z --push` (runs the capability + test-system gates on the exact release commit)
+- [ ] Annotated tag was pushed (triggers build-image workflow → GHCR)
 - [ ] GHCR image confirmed published before announcing
 - [ ] Twitter / GitHub Discussions / WeChat OA cross-posted within 4h of release
 - [ ] First-time contributors @-tagged in the discussion thread

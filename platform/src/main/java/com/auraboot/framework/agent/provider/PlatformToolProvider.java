@@ -57,22 +57,49 @@ public class PlatformToolProvider implements ToolProvider {
         ToolDefinition.builder()
             .toolCode("platform.execute_sql")
             .toolName("Execute SQL Query")
-            .description("Execute a read-only SQL SELECT query with safety validation and tenant isolation")
+            .description("Execute a read-only SQL SELECT query with safety validation and tenant isolation. "
+                    + "Use this directly when the task supplies the SQL; use platform.list_models first "
+                    + "only when table or field names must be discovered.")
             .providerCode("platform")
             .toolType("platform")
             .sourceCode("platform.execute_sql")
+            .operationKind("query")
             .riskLevel("L1")
             .confirmationPolicy("none")
+            .parameterSchema(Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                            "sql", Map.of(
+                                    "type", "string",
+                                    "description", "The read-only SELECT statement to execute"),
+                            "interpretation", Map.of(
+                                    "type", "string",
+                                    "description", "Optional explanation of the requested analysis"),
+                            "chartType", Map.of(
+                                    "type", "string",
+                                    "description", "Optional result presentation type")),
+                    "required", List.of("sql")))
             .build(),
         ToolDefinition.builder()
             .toolCode("platform.list_models")
             .toolName("List Data Models")
-            .description("List available data models with optional field details for schema discovery")
+            .description("List available data models with optional field details for schema discovery. "
+                    + "Use before platform.execute_sql when the task does not provide exact table/field names.")
             .providerCode("platform")
             .toolType("platform")
             .sourceCode("platform.list_models")
+            .operationKind("query")
             .riskLevel("L0")
             .confirmationPolicy("none")
+            .parameterSchema(Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                            "keyword", Map.of(
+                                    "type", "string",
+                                    "description", "Optional model-name search keyword"),
+                            "includeFields", Map.of(
+                                    "type", "boolean",
+                                    "description", "Whether to include field definitions"))))
             .build(),
         ToolDefinition.builder()
             .toolCode("platform.model_suggest")
@@ -83,6 +110,16 @@ public class PlatformToolProvider implements ToolProvider {
             .sourceCode("platform.model_suggest")
             .riskLevel("L1")
             .confirmationPolicy("none")
+            .parameterSchema(Map.of(
+                    "type", "object",
+                    "properties", Map.of(
+                            "description", Map.of(
+                                    "type", "string",
+                                    "description", "Natural language description of the model to suggest"),
+                            "language", Map.of(
+                                    "type", "string",
+                                    "description", "Optional response language requested by the user")),
+                    "required", List.of("description")))
             .build(),
         ToolDefinition.builder()
             .toolCode("platform.create_model")

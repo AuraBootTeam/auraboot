@@ -4,8 +4,8 @@
 #
 # Answers one question: **is this digital employee actually competent?** — not
 # "did it compile" or "is the page wired up". It brings up an isolated stack,
-# runs the live capability evals against a real LLM, and exits non-zero when the
-# agent fails a capability gate.
+# runs the live capability evals against a real LLM plus the plugin import seams,
+# and exits non-zero when the agent fails a capability gate.
 #
 # Owner has no CI budget, so this is the deliverable form: one command, brings up
 # its own stack, tears it down on any exit path, and its exit code IS the result.
@@ -25,7 +25,8 @@
 # DeepSeek retired the `deepseek-chat` model name, all 14 live capability evals
 # broke silently — the layer that proves the agent works was itself dead, and the
 # only reason anyone found out was running it by hand. A gate nobody runs is not
-# a gate.
+# a gate. scripts/perf-ci/cron.example wires this into the nightly rotation, and
+# scripts/release/tag-release.sh runs it on the exact commit before an OSS tag.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -147,7 +148,24 @@ rc=0
 
 log "running agent capability evals (testAgent)"
 "$GRADLE" -p "$REPO_ROOT/platform" :testAgent -PincludeLiveEvals \
-  --tests '*LiveIT' --tests '*LiveEvalIT' --tests '*LiveQualityIT' --tests '*FullTurnIT' \
+  --tests '*AgentEvalCaseImportIT' \
+  --tests '*MultiPluginEvalCaseCoexistenceIT' \
+  --tests '*DeviceAgentSeedImportIT' \
+  --tests '*AgentFormFillHardLiveIT' \
+  --tests '*AgentFormFillLiveIT' \
+  --tests '*AgentMultiStepConvergenceLiveIT' \
+  --tests '*CapabilityEvalLiveIT' \
+  --tests '*CapabilityScorecardLiveIT' \
+  --tests '*ChatBiToolIntentLiveIT' \
+  --tests '*ConversationFaqExtractionLiveIT' \
+  --tests '*CsComplaintEmailExtractionLiveIT' \
+  --tests '*DeviceAgentLiveEvalIT' \
+  --tests '*DeviceDiagnosticsFullTurnIT' \
+  --tests '*DeviceOperationsAgentLiveEvalIT' \
+  --tests '*LlmTurnQualityJudgeLiveIT' \
+  --tests '*NlModelingApplyV4LiveIT' \
+  --tests '*NlModelingLiveQualityIT' \
+  --tests '*PcbaQualityAgentLiveEvalIT' \
   >>"$LOG" 2>&1 || rc=1
 
 log "running aurabot skill evals (testAi)"
@@ -155,48 +173,32 @@ log "running aurabot skill evals (testAi)"
   --tests '*DashboardGenerationLiveIT' \
   >>"$LOG" 2>&1 || rc=1
 
-# --- report from the JUnit XML, not from the exit code -----------------------
-# A gradle exit code cannot distinguish "every eval was skipped" from "every eval
-# passed". The XML is the only evidence that the evals actually ran.
-summarize() {
-  local total=0 skipped=0 failures=0 errors=0 files=0
-  for x in "$REPO_ROOT"/platform/build/test-results/testAgent/TEST-*.xml \
-           "$REPO_ROOT"/platform/build/test-results/testAi/TEST-*.xml; do
-    [ -f "$x" ] || continue
-    case "$(basename "$x")" in *Live*|*FullTurn*) ;; *) continue ;; esac
-    local line t s f e
-    line=$(grep -oE 'tests="[0-9]+" skipped="[0-9]+" failures="[0-9]+" errors="[0-9]+"' "$x" | head -1)
-    t=$(sed -E 's/.*tests="([0-9]+)".*/\1/' <<<"$line")
-    s=$(sed -E 's/.*skipped="([0-9]+)".*/\1/' <<<"$line")
-    f=$(sed -E 's/.*failures="([0-9]+)".*/\1/' <<<"$line")
-    e=$(sed -E 's/.*errors="([0-9]+)".*/\1/' <<<"$line")
-    printf '  %-52s tests=%-3s skip=%-3s fail=%-3s err=%s\n' \
-      "$(basename "$x" .xml | sed 's/TEST-com.auraboot.framework.//')" "$t" "$s" "$f" "$e"
-    total=$((total+t)); skipped=$((skipped+s)); failures=$((failures+f)); errors=$((errors+e)); files=$((files+1))
-  done
-  echo "  ----"
-  echo "  suites=$files tests=$total skipped=$skipped failures=$failures errors=$errors"
-  EVAL_FILES=$files EVAL_TOTAL=$total EVAL_SKIPPED=$skipped EVAL_FAILURES=$((failures+errors))
-}
-
+# --- report from an explicit JUnit inventory, not from the exit code ----------
+# Gradle cannot distinguish "every eval skipped" from "every eval passed". A
+# broad XML glob also cannot distinguish "required suite omitted" from "suite
+# intentionally absent". The checked inventory is the authoritative receipt.
 log "results:"
-summarize | tee "$RUN_DIR/summary.txt"
-read -r EVAL_FILES EVAL_TOTAL EVAL_SKIPPED EVAL_FAILED <<<"$(
-  awk '/^  suites=/{gsub(/[a-z]+=/,""); print $1, $2, $3, $4+$5}' "$RUN_DIR/summary.txt")"
+summary_rc=0
+node "$REPO_ROOT/scripts/lib/capability-eval-junit.mjs" \
+  --results-root "$REPO_ROOT/platform/build/test-results" \
+  | tee "$RUN_DIR/summary.txt" || summary_rc=$?
 
-if [ "${EVAL_FILES:-0}" -eq 0 ] || [ "${EVAL_TOTAL:-0}" -eq 0 ]; then
-  log "FAIL: no capability evals ran. An empty run is not a pass."
-  exit 1
-fi
-if [ "${EVAL_SKIPPED:-0}" -gt 0 ]; then
-  log "FAIL: ${EVAL_SKIPPED} eval(s) skipped — a skipped capability eval proves nothing."
-  exit 1
-fi
-if [ "${EVAL_FAILED:-0}" -gt 0 ] || [ "$rc" -ne 0 ]; then
-  log "FAIL: ${EVAL_FAILED} capability eval(s) failed. Log: $LOG"
+if [ "$summary_rc" -ne 0 ] || [ "$rc" -ne 0 ]; then
+  log "FAIL: required capability eval suite is missing, skipped, or failed. Log: $LOG"
   exit 1
 fi
 
-log "PASS: ${EVAL_TOTAL} capability evals across ${EVAL_FILES} suites, 0 skipped, 0 failed."
+git_sha="$(git -C "$REPO_ROOT" rev-parse HEAD)"
+provider="deepseek"
+[ -n "${DASHSCOPE_API_KEY:-}" ] && provider="qwen"
+{
+  printf 'git_sha=%s\n' "$git_sha"
+  printf 'provider=%s\n' "$provider"
+  printf 'completed_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf 'summary=%s\n' "$RUN_DIR/summary.txt"
+} >"$RUN_DIR/receipt.env"
+
+log "PASS: every required deterministic and live capability suite ran; 0 skipped, 0 failed."
+log "receipt: $RUN_DIR/receipt.env"
 log "log: $LOG"
 exit 0

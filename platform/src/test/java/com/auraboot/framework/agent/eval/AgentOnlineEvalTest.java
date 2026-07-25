@@ -38,6 +38,19 @@ class AgentOnlineEvalTest {
     }
 
     @Test
+    void signals_syncTurnLifecycleTypesArePreserved() {
+        TurnSignals completed = TurnSignals.fromObservations(
+                "turn1", "aurabot", List.of(obs("turn_completed", "info")));
+        assertTrue(completed.completed());
+        assertFalse(completed.failed());
+
+        TurnSignals interrupted = TurnSignals.fromObservations(
+                "turn2", "aurabot", List.of(obs("turn_interrupted", "info")));
+        assertTrue(interrupted.failed());
+        assertEquals(1, interrupted.errorEvents());
+    }
+
+    @Test
     void signals_failedRun_viaFailedTypeAndErrorSeverity() {
         TurnSignals byType = TurnSignals.fromObservations("r", "a", List.of(obs("run_failed", "info")));
         assertTrue(byType.failed());
