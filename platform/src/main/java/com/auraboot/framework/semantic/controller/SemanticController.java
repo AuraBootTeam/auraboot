@@ -1,6 +1,9 @@
 package com.auraboot.framework.semantic.controller;
 
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
 import com.auraboot.framework.semantic.compiler.UserContext;
 import com.auraboot.framework.semantic.dto.SemanticLineageResponse;
@@ -35,10 +38,20 @@ import java.util.Map;
  *   <li>{@code GET  /lineage/{pid}} — incoming + outgoing edges of a node</li>
  * </ul>
  *
- * <p>Tenant scoping uses {@link MetaContext}. Per-metric permissions are
- * enforced inside {@link com.auraboot.framework.semantic.compiler.MetricCompiler}
- * (via metric.requiredPermissions) and RLS injection
- * (via {@link com.auraboot.framework.semantic.compiler.AccessPolicyCompiler}).
+ * <p>Authorization: every endpoint requires an explicit permission —
+ * {@code query/sql/validate/meta/lineage} need {@link MetaPermission#META_SEMANTIC_USE};
+ * {@code publish} needs the stricter {@link MetaPermission#META_SEMANTIC_PUBLISH}.
+ * (Without an annotation the PermissionInterceptor fail-opens, so the guard is
+ * mandatory, not decorative.)
+ *
+ * <p>Tenant scoping uses {@link MetaContext}. Per-metric permissions (a metric's
+ * {@code required_permissions}) are enforced in
+ * {@link com.auraboot.framework.semantic.service.SemanticQueryService} against the
+ * caller before execution, and RLS is injected by
+ * {@link com.auraboot.framework.semantic.compiler.AccessPolicyCompiler}.
+ *
+ * <p>All responses are wrapped in the platform {@link ApiResponse} envelope so
+ * the web client's {@code ResultHelper.isSuccess} contract holds.
  */
 @Slf4j
 @RestController
@@ -55,13 +68,15 @@ public class SemanticController {
     private final UserAttributeService userAttributeService;
 
     @PostMapping("/query")
-    public SemanticQueryResponse query(@RequestBody SemanticQueryRequest request) {
-        return queryService.executeQuery(request, currentUser());
+    @RequirePermission(MetaPermission.META_SEMANTIC_USE)
+    public ApiResponse<SemanticQueryResponse> query(@RequestBody SemanticQueryRequest request) {
+        return ApiResponse.success(queryService.executeQuery(request, currentUser()));
     }
 
     @PostMapping("/sql")
-    public SemanticQueryResponse explain(@RequestBody SemanticQueryRequest request) {
-        return queryService.explainQuery(request, currentUser());
+    @RequirePermission(MetaPermission.META_SEMANTIC_USE)
+    public ApiResponse<SemanticQueryResponse> explain(@RequestBody SemanticQueryRequest request) {
+        return ApiResponse.success(queryService.explainQuery(request, currentUser()));
     }
 
     /**
@@ -70,7 +85,8 @@ public class SemanticController {
      * SchemaInvalid or ValidationException.
      */
     @PostMapping(value = "/validate", consumes = {"application/yaml", "text/yaml", "text/plain"})
-    public Map<String, Object> validate(@RequestBody byte[] yamlBytes) {
+    @RequirePermission(MetaPermission.META_SEMANTIC_USE)
+    public ApiResponse<Map<String, Object>> validate(@RequestBody byte[] yamlBytes) {
         String yaml = new String(yamlBytes, StandardCharsets.UTF_8);
         SemanticModelDTO dto = parser.parse(yaml);
         validator.validate(dto);
@@ -83,7 +99,7 @@ public class SemanticController {
         out.put("entityCount", dto.getEntities().size());
         out.put("accessPolicyCount",
                 dto.getAccessPolicies() == null ? 0 : dto.getAccessPolicies().size());
-        return out;
+        return ApiResponse.success(out);
     }
 
     /**
@@ -92,22 +108,25 @@ public class SemanticController {
      */
     @PostMapping(value = "/publish",
             consumes = {"application/yaml", "text/yaml", "text/plain"})
-    public Map<String, Object> publish(@RequestBody byte[] yamlBytes,
+    @RequirePermission(MetaPermission.META_SEMANTIC_PUBLISH)
+    public ApiResponse<Map<String, Object>> publish(@RequestBody byte[] yamlBytes,
                                         @RequestParam(name = "pluginCode") String pluginCode) {
         UserContext user = currentUser();
         String pid = publishService.publishFromYaml(yamlBytes, pluginCode,
                 user.tenantId(), user.userId());
-        return Map.of("ok", true, "pid", pid);
+        return ApiResponse.success(Map.of("ok", true, "pid", pid));
     }
 
     @GetMapping("/meta")
-    public SemanticMetaResponse meta() {
-        return catalogService.listCatalog(currentTenantId());
+    @RequirePermission(MetaPermission.META_SEMANTIC_USE)
+    public ApiResponse<SemanticMetaResponse> meta() {
+        return ApiResponse.success(catalogService.listCatalog(currentTenantId()));
     }
 
     @GetMapping("/lineage/{pid}")
-    public SemanticLineageResponse lineage(@PathVariable("pid") String pid) {
-        return lineageService.describe(currentTenantId(), pid);
+    @RequirePermission(MetaPermission.META_SEMANTIC_USE)
+    public ApiResponse<SemanticLineageResponse> lineage(@PathVariable("pid") String pid) {
+        return ApiResponse.success(lineageService.describe(currentTenantId(), pid));
     }
 
     // -- helpers -------------------------------------------------------------

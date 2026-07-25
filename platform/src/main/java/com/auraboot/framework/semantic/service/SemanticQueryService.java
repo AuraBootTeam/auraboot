@@ -6,6 +6,7 @@ import com.auraboot.framework.semantic.compiler.MetricCompileException;
 import com.auraboot.framework.semantic.compiler.MetricCompiler;
 import com.auraboot.framework.semantic.compiler.SemanticQueryRequest;
 import com.auraboot.framework.semantic.compiler.UserContext;
+import com.auraboot.framework.semantic.dto.MetricDTO;
 import com.auraboot.framework.semantic.dto.SemanticModelDTO;
 import com.auraboot.framework.semantic.dto.SemanticQueryResponse;
 import com.auraboot.framework.semantic.entity.AbSemanticMetric;
@@ -16,18 +17,22 @@ import com.auraboot.framework.semantic.mapper.AbSemanticModelMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticQueryLogMapper;
 import com.auraboot.framework.semantic.parser.SemanticYamlValidator;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -59,6 +64,7 @@ public class SemanticQueryService {
     private final AbSemanticModelMapper modelMapper;
     private final AbSemanticMetricMapper metricMapper;
     private final AbSemanticQueryLogMapper queryLogMapper;
+    private final UserPermissionService userPermissionService;
     private final ObjectMapper jsonMapper = new ObjectMapper();
 
     /**
@@ -118,8 +124,68 @@ public class SemanticQueryService {
 
     private Compiled compile(SemanticQueryRequest req, UserContext user) {
         SemanticModelDTO model = resolveModel(req, user.tenantId());
+        enforceMetricPermissions(model, req, user);
         CompiledQuery cq = compiler.compile(model, req, user);
         return new Compiled(model, cq);
+    }
+
+    /**
+     * Enforce each selected metric's {@code required_permissions} against the caller
+     * BEFORE any SQL is compiled or executed.
+     *
+     * <p>Previously these codes were declared in YAML, persisted, and surfaced in the
+     * catalog — but never checked, so a governed metric was readable by anyone who could
+     * reach {@code /api/semantic/query}. This closes that gap on the single choke-point
+     * shared by the REST controller, ChatBI v2, and the dashboard aggregate adapter.
+     *
+     * <p>Uses {@link UserPermissionService#hasPermission(Long, String)} — the exact check
+     * {@code @RequirePermission} performs — so wildcard grants and unregistered-code
+     * fail-closed behaviour are identical. A metric whose required code is unregistered
+     * (or a null caller) is therefore denied, which is the safe posture.
+     */
+    private void enforceMetricPermissions(SemanticModelDTO model,
+                                          SemanticQueryRequest req,
+                                          UserContext user) {
+        if (req.getMetrics() == null || req.getMetrics().isEmpty()
+                || model.getMetrics() == null || model.getMetrics().isEmpty()) {
+            return;
+        }
+        String modelCode = model.getSemanticModel() == null ? null
+                : model.getSemanticModel().getCode();
+        Map<String, MetricDTO> byCode = new java.util.HashMap<>();
+        for (MetricDTO m : model.getMetrics()) {
+            if (m.getCode() != null) byCode.put(m.getCode(), m);
+        }
+        Set<String> required = new LinkedHashSet<>();
+        for (String raw : req.getMetrics()) {
+            String bare = stripModelPrefix(raw, modelCode);
+            MetricDTO m = byCode.get(bare);
+            if (m != null && m.getRequiredPermissions() != null) {
+                required.addAll(m.getRequiredPermissions());
+            }
+        }
+        if (required.isEmpty()) {
+            return;
+        }
+        Long userId = user.userId();
+        List<String> missing = new ArrayList<>();
+        for (String code : required) {
+            if (code == null || code.isBlank()) continue;
+            if (userId == null || !userPermissionService.hasPermission(userId, code)) {
+                missing.add(code);
+            }
+        }
+        if (!missing.isEmpty()) {
+            throw new AccessDeniedException(
+                    "Missing required permission(s) for the requested semantic metric(s): "
+                            + missing + " (permissionCode)");
+        }
+    }
+
+    private static String stripModelPrefix(String code, String modelCode) {
+        if (code == null || modelCode == null) return code;
+        String prefix = modelCode + ".";
+        return code.startsWith(prefix) ? code.substring(prefix.length()) : code;
     }
 
     /**

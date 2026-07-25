@@ -39,7 +39,14 @@ public class SemanticYamlValidator {
     private static final Pattern SQL_DENYLIST_PATTERN = Pattern.compile(
             "(?i)(--|/\\*|\\*/|;\\s*(\\w|$)|\\bDROP\\b|\\bTRUNCATE\\b|\\bDELETE\\b|"
                     + "\\bUPDATE\\b|\\bINSERT\\b|\\bALTER\\b|\\bGRANT\\b|\\bREVOKE\\b|"
-                    + "\\bUNION\\b|\\bEXEC\\b|\\bEXECUTE\\b|\\bxp_)"
+                    + "\\bUNION\\b|\\bEXEC\\b|\\bEXECUTE\\b|\\bxp_|"
+                    // Sub-query / CTE tokens: an author SQL fragment (measure.expr,
+                    // metric.filter, access_policy.sql_filter) is a *scalar* expression
+                    // over the model's own table — it must never open a SELECT / CTE.
+                    // Banning SELECT + WITH kills the "(SELECT secret FROM other_table)"
+                    // cross-table / cross-tenant exfiltration vector. FROM is deliberately
+                    // NOT banned so EXTRACT(YEAR FROM col) / SUBSTRING(x FROM y) still work.
+                    + "\\bSELECT\\b|\\bWITH\\b)"
     );
 
     /** Allowed user-attribute placeholder pattern: {@code {user.<snake_case>}}. */

@@ -36,7 +36,6 @@
   "platform/src/main/java/com/auraboot/framework/permission/controller/RecordShareController.java",
   "platform/src/main/java/com/auraboot/framework/plugin/marketplace/controller/MarketplaceStripeWebhookController.java",
   "platform/src/main/java/com/auraboot/framework/saas/bootstrap/controller/BootstrapController.java",
-  "platform/src/main/java/com/auraboot/framework/semantic/controller/SemanticController.java",
   "platform/src/main/java/com/auraboot/framework/tenant/controller/TenantSelectionController.java",
   "platform/src/main/java/com/auraboot/module/aps/controller/ApsController.java",
   "platform/src/main/java/com/auraboot/module/bitemporal/controller/BiTemporalController.java",
