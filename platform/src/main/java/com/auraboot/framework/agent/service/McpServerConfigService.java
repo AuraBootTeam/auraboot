@@ -2,6 +2,7 @@ package com.auraboot.framework.agent.service;
 
 import com.auraboot.framework.common.util.UniqueIdGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +16,8 @@ import java.util.Map;
  * Registry service for external MCP server configurations.
  * <p>
  * Stores connection metadata (URL, transport type, auth) for external MCP servers
- * that agents can consume. Actual MCP client protocol handling is deferred to Phase 6+.
+ * that agents can consume. The protocol client that uses these rows is
+ * {@link com.auraboot.framework.agent.provider.McpClient}.
  * <p>
  * source_type 'mcp_external' in ab_agent_tool references servers registered here.
  */
@@ -31,16 +33,24 @@ public class McpServerConfigService {
      * List all active MCP server configurations for a tenant.
      *
      * @param tenantId the tenant ID
-     * @return list of server config maps (pid, server_name, server_url, transport_type, tool_count, last_synced_at)
+     * @return list of server config maps (pid, server_name, server_url, transport_type,
+     *         auth_type, auth_config, tool_count, last_synced_at); {@code auth_config} is
+     *         decoded from JSONB into a Map. Consume via
+     *         {@link com.auraboot.framework.agent.provider.McpServerTarget#fromRow(Map)}.
      */
     public List<Map<String, Object>> listActiveServers(Long tenantId) {
-        return jdbcTemplate.queryForList(
-                "SELECT pid, server_name, server_url, transport_type, tool_count, last_synced_at " +
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT pid, server_name, server_url, transport_type, auth_type, auth_config, " +
+                "tool_count, last_synced_at " +
                 "FROM ab_agent_mcp_server " +
                 "WHERE tenant_id = ? AND status = 'active' " +
                 "AND (deleted_flag = FALSE OR deleted_flag IS NULL) " +
                 "ORDER BY server_name",
                 tenantId);
+        for (Map<String, Object> row : rows) {
+            row.put("auth_config", parseAuthConfig(row.get("auth_config"), (String) row.get("server_name")));
+        }
+        return rows;
     }
 
     /**
@@ -105,6 +115,41 @@ public class McpServerConfigService {
     // ──────────────────────────────────────────────────────────────
     // Helpers
     // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Decode the {@code auth_config} JSONB column into the map callers expect.
+     *
+     * <p>The driver hands back a {@code PGobject} for a jsonb column, not a Map,
+     * so returning the raw value would leave every consumer's {@code instanceof
+     * Map} check false and silently drop the credentials — the same class of
+     * failure as never selecting the column at all.
+     *
+     * <p>A malformed value raises rather than degrading to {@code null}:
+     * "configured but silently unused" is precisely the failure being fixed
+     * here, and it is invisible at the call site.
+     */
+    private Map<String, Object> parseAuthConfig(Object raw, String serverName) {
+        if (raw == null) {
+            return null;
+        }
+        if (raw instanceof Map<?, ?> map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> typed = (Map<String, Object>) map;
+            return typed;
+        }
+        String json = raw.toString();
+        if (json.isBlank() || "null".equals(json)) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {});
+        } catch (JsonProcessingException e) {
+            // Message deliberately excludes the value — it holds credentials.
+            throw new IllegalStateException(
+                    "MCP server '" + serverName + "' has an auth_config that is not valid JSON object; "
+                            + "re-save its credentials", e);
+        }
+    }
 
     private String toJson(Map<String, Object> map) {
         if (map == null || map.isEmpty()) return null;

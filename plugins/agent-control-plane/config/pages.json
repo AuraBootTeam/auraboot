@@ -3499,16 +3499,18 @@
           },
           {
             "field": "transport_type",
-            "width": 100
+            "width": 100,
+            "dictCode": "mcp_transport_type"
           },
           {
             "field": "auth_type",
-            "width": 120
+            "width": 120,
+            "dictCode": "mcp_auth_type"
           },
           {
             "field": "status",
             "width": 100,
-            "dictCode": "acp_agent_status"
+            "dictCode": "mcp_server_status"
           },
           {
             "field": "tool_count",
@@ -3525,7 +3527,48 @@
         "defaultSort": {
           "field": "server_name",
           "order": "asc"
-        }
+        },
+        "rowActions": [
+          {
+            "code": "view",
+            "label": {
+              "zh-CN": "详情",
+              "en-US": "Detail"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "mcp_server_detail"
+            },
+            "type": "navigate"
+          },
+          {
+            "code": "edit",
+            "label": {
+              "zh-CN": "编辑",
+              "en-US": "Edit"
+            },
+            "action": {
+              "type": "navigate",
+              "to": "mcp_server_form",
+              "command": "acp:update_mcp_server"
+            },
+            "type": "navigate"
+          },
+          {
+            "code": "delete",
+            "variant": "danger",
+            "label": {
+              "zh-CN": "删除",
+              "en-US": "Delete"
+            },
+            "confirm": "delete.confirm",
+            "action": {
+              "type": "command",
+              "command": "acp:delete_mcp_server"
+            },
+            "type": "command"
+          }
+        ]
       }
     ]
   },
@@ -3707,7 +3750,11 @@
           },
           {
             "field": "transport_type",
-            "colSpan": 6
+            "colSpan": 6,
+            "help": {
+              "zh-CN": "平台通过网络连接，只支持 HTTP / SSE；stdio 服务器需以本地子进程方式运行。",
+              "en-US": "The platform connects over the network and supports HTTP / SSE only; stdio servers run as a local child process."
+            }
           },
           {
             "field": "auth_type",
@@ -3719,7 +3766,15 @@
           },
           {
             "field": "auth_config",
-            "colSpan": 12
+            "colSpan": 12,
+            "placeholder": {
+              "zh-CN": "{\"token\":\"...\"}（API Key 可加 \"header\":\"X-API-Key\"）",
+              "en-US": "{\"token\":\"...\"} (API Key may add \"header\":\"X-API-Key\")"
+            },
+            "help": {
+              "zh-CN": "凭据保存后不再回显；留空表示保持不变。",
+              "en-US": "Credentials are not shown again after saving; leave blank to keep unchanged."
+            }
           }
         ]
       },
@@ -3745,6 +3800,75 @@
               "zh-CN": "取消",
               "en-US": "Cancel"
             }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pageKey": "mcp_server_detail",
+    "name:zh-CN": "MCP 服务器详情",
+    "name:en": "MCP Server Detail",
+    "modelCode": "mcp_server",
+    "kind": "detail",
+    "schemaVersion": 4,
+    "layout": {
+      "type": "grid",
+      "cols": 12
+    },
+    "blocks": [
+      {
+        "id": "basic",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "连接信息",
+          "en-US": "Connection"
+        },
+        "fields": [
+          {
+            "field": "server_name",
+            "colSpan": 6,
+            "readOnly": true
+          },
+          {
+            "field": "server_url",
+            "colSpan": 6,
+            "readOnly": true
+          },
+          {
+            "field": "transport_type",
+            "colSpan": 4,
+            "readOnly": true
+          },
+          {
+            "field": "auth_type",
+            "colSpan": 4,
+            "readOnly": true
+          },
+          {
+            "field": "status",
+            "colSpan": 4,
+            "readOnly": true
+          }
+        ]
+      },
+      {
+        "id": "sync",
+        "blockType": "form-section",
+        "title": {
+          "zh-CN": "工具同步",
+          "en-US": "Tool Sync"
+        },
+        "fields": [
+          {
+            "field": "tool_count",
+            "colSpan": 6,
+            "readOnly": true
+          },
+          {
+            "field": "last_synced_at",
+            "colSpan": 6,
+            "readOnly": true
           }
         ]
       }

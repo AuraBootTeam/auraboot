@@ -2,6 +2,8 @@
 
 import { Command } from 'commander';
 
+import { handleCliError } from './cli-error.js';
+
 // ── Existing commands ───────────────────────────────────────────────────────
 import { validateCommand } from './commands/validate.js';
 import { pluginImportCommand } from './commands/plugin-import.js';
@@ -945,5 +947,13 @@ pipe
   });
 
 // ── Parse ───────────────────────────────────────────────────────────────────
+
+// Commander runs async actions without awaiting them, so a rejection from a
+// command surfaces here rather than at the call site. The query helpers throw
+// QueryFailedError instead of exiting inline (that inline exit used to kill the
+// long-lived `aura mcp serve` process), so this is what turns an expected
+// failure back into the one-line message + exit code the CLI has always had.
+process.on('unhandledRejection', handleCliError);
+process.on('uncaughtException', handleCliError);
 
 program.parse();

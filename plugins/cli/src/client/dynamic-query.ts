@@ -1,5 +1,21 @@
-import { ApiClient, EXIT } from './api-client.js';
-import chalk from 'chalk';
+import { ApiClient } from './api-client.js';
+
+/**
+ * Raised when the backend refuses a query.
+ *
+ * <p>These helpers are shared between one-shot CLI commands and the long-lived
+ * `aura mcp serve` process. Exiting the process here would take the whole MCP
+ * server down mid-session — a mistyped model code or a permission error would
+ * disconnect the agent — so the failure is raised instead and handled by the
+ * caller: MCP tool handlers turn it into an `isError` result, and the CLI entry
+ * point prints it and exits (see `handleCliError`).
+ */
+export class QueryFailedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'QueryFailedError';
+  }
+}
 
 export interface QueryOptions {
   pageNum?: number;
@@ -44,8 +60,7 @@ export async function queryDynamicList(
   const resp = await client.get(`/api/dynamic/${pageKey}/list`, params);
 
   if (!resp.ok) {
-    console.error(chalk.red(`Query failed: ${resp.message}`));
-    process.exit(EXIT.FAILURE);
+    throw new QueryFailedError(`Query failed: ${resp.message}`);
   }
 
   return resp.data?.records || resp.data || [];
@@ -67,8 +82,7 @@ export async function queryNamedQuery(
   });
 
   if (!resp.ok) {
-    console.error(chalk.red(`Query failed: ${resp.message}`));
-    process.exit(EXIT.FAILURE);
+    throw new QueryFailedError(`Query failed: ${resp.message}`);
   }
 
   return resp.data?.records || resp.data || [];
