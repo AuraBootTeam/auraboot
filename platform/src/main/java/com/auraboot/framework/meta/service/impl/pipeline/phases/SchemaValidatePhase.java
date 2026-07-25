@@ -17,7 +17,7 @@ import java.util.Map;
  */
 @Slf4j
 @Component
-@Order(200)
+@Order(275)
 @RequiredArgsConstructor
 public class SchemaValidatePhase implements CommandPhase {
 
