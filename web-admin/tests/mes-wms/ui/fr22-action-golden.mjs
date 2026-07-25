@@ -45,8 +45,13 @@ try {
   await p.screenshot({ path: `${OUT}/fr22-act-1-before.png`, fullPage: true });
   const mainBefore = (await p.locator('main').first().innerText().catch(() => '')) || '';
   check('before: table shows a 待签认 row', /待签认/.test(mainBefore), 'status column');
-  const ackBtn = p.getByText(/^签认$/).first();
-  check('before: a 签认 action point is present on the pending row', await ackBtn.isVisible().catch(() => false));
+  // Deterministically target OUR seeded row (by its unique workstation code), not the first 签认 on
+  // the page — repeated create_handover runs leave several pending_ack rows, and `.first()` could
+  // acknowledge someone else's (flaky). The seeded row is uniquely identified by wsCode.
+  const seededRow = p.locator('tr', { hasText: wsCode });
+  await seededRow.scrollIntoViewIfNeeded().catch(() => {});
+  const ackBtn = seededRow.getByText(/^签认$/).first();
+  check('before: a 签认 action point is present on our seeded pending row', await ackBtn.isVisible().catch(() => false));
 
   // STEP 2 — action point: click 签认 → the acknowledge FORM DIALOG opens (incoming_person field).
   await ackBtn.click();
