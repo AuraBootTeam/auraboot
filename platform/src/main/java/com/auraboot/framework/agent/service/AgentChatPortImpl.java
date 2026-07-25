@@ -232,6 +232,23 @@ public class AgentChatPortImpl implements AgentChatPort {
     @Autowired(required = false)
     private MeterRegistry meterRegistry;
 
+    /**
+     * Prompt-level tracing for the named-agent path.
+     *
+     * <p>This path recorded no spans at all. A control run on 2026-07-25 — same request,
+     * same knowledge base, differing only by agentCode — produced 3 spans on the aurabot
+     * path (one carrying the retrieved-knowledge block) and 0 here. So a digital
+     * employee's prompt was unobservable: whether the context carried the knowledge base,
+     * the soul profile or the tool definitions could only be inferred by reading code, and
+     * the eval attribution layer ("was the evidence even in the prompt?") had no data for
+     * this path at all.
+     *
+     * <p>Optional for the same reason MeterRegistry above is: unit tests build this class
+     * through the generated constructor and should not have to supply a tracer.
+     */
+    @Autowired(required = false)
+    private com.auraboot.framework.agent.trace.AiTraceService aiTraceService;
+
     @Autowired(required = false)
     private UserPermissionService userPermissionService;
 
@@ -400,7 +417,7 @@ public class AgentChatPortImpl implements AgentChatPort {
                         profile.profilePermissions(),
                         toolDefs);
         boolean requireInitialToolCall = profile.evidenceFirst();
-        List<AgentContextBlock> contextBlocks = contextAdapter.assemble(ctx, request);
+        List<AgentContextBlock> contextBlocks = traceContextAssembly(ctx, request);
 
         log.info("Agent chat: agentCode={}, provider={}, model={}, tools={}, overrides={}",
                 agentCode, providerCode, model, tools.size(), overrides != null);
@@ -414,6 +431,71 @@ public class AgentChatPortImpl implements AgentChatPort {
     // =========================================================================
     // Tool loop
     // =========================================================================
+
+    /**
+     * Assemble the context blocks and record what they contained.
+     *
+     * <p>Named {@code render_prompt} to match the aurabot path, so one query answers "what
+     * was in the prompt" for both engines instead of only one. The span output carries the
+     * block titles and sizes rather than the full text — enough to answer "did the
+     * knowledge base reach the model", without copying the whole context into the trace
+     * table on every turn.
+     *
+     * <p>Tracing must never change the turn: if no tracer is wired, or starting the span
+     * throws, the assembly still happens and its result is returned.
+     */
+    private List<AgentContextBlock> traceContextAssembly(TurnContext ctx, ChatRequest request) {
+        if (aiTraceService == null) {
+            return contextAdapter.assemble(ctx, request);
+        }
+        com.auraboot.framework.agent.trace.TraceContext trace = null;
+        com.auraboot.framework.agent.trace.SpanContext span = null;
+        try {
+            trace = aiTraceService.createTrace(
+                    ctx != null ? ctx.tenantId() : null,
+                    request != null ? request.getSessionId() : null,
+                    request != null ? request.getMessage() : null,
+                    ctx != null ? ctx.userId() : null,
+                    java.util.Map.of("path", "named_agent",
+                            "agentCode", java.util.Objects.toString(ctx != null ? ctx.agentCode() : null, "")));
+            span = aiTraceService.startSpan(trace, null, "span", "render_prompt", null);
+        } catch (Exception e) {
+            log.warn("Could not start the named-agent prompt span: {}", e.getMessage());
+        }
+
+        List<AgentContextBlock> blocks = contextAdapter.assemble(ctx, request);
+
+        if (span != null) {
+            try {
+                aiTraceService.endSpan(span, describeContextBlocks(blocks), "success");
+            } catch (Exception e) {
+                log.warn("Could not end the named-agent prompt span: {}", e.getMessage());
+            }
+        }
+        return blocks;
+    }
+
+    /**
+     * What the trace records about the assembled context: which blocks were present, how
+     * big each was, and — the question this exists to answer — whether a retrieved-knowledge
+     * block made it in.
+     */
+    private static Map<String, Object> describeContextBlocks(List<AgentContextBlock> blocks) {
+        List<Map<String, Object>> described = new ArrayList<>();
+        boolean hasRetrievedKnowledge = false;
+        for (AgentContextBlock b : blocks == null ? List.<AgentContextBlock>of() : blocks) {
+            described.add(Map.of(
+                    "title", java.util.Objects.toString(b.title(), ""),
+                    "chars", b.body() == null ? 0 : b.body().length()));
+            if (b.body() != null && b.body().contains("<retrieved-data>")) {
+                hasRetrievedKnowledge = true;
+            }
+        }
+        return Map.of(
+                "blockCount", described.size(),
+                "blocks", described,
+                "hasRetrievedKnowledge", hasRetrievedKnowledge);
+    }
 
     private TurnOutcome doAgentToolLoop(TurnContext ctx, String agentCode,
                                         LlmProvider provider, String providerCode,
