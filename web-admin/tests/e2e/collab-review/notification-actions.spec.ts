@@ -164,4 +164,31 @@ test.describe('notification centre actions', () => {
       timeout: 5000,
     });
   });
+
+  test('NC-7: the header actually opens the notification SSE stream', async ({ page }) => {
+    // Mounting the bell is only half the fix. The backend has always pushed
+    // `unread-count` frames and InAppChannel skips the push when no connection is
+    // registered — so a bell that renders but never subscribes leaves "real-time
+    // notifications" exactly as dead as before, and NC-6 alone would not notice.
+    const streamRequests: string[] = [];
+    page.on('request', (r) => {
+      if (r.url().includes('/api/notifications/stream')) streamRequests.push(r.url());
+    });
+
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('[data-testid="notification-bell"]').first()).toBeVisible({
+      timeout: 10000,
+    });
+    // EventSource opens on mount; give it a moment to leave the browser.
+    await page.waitForTimeout(3000);
+
+    fs.writeFileSync(
+      path.join(SHOTS, 'sse-evidence.json'),
+      JSON.stringify({ streamRequests }, null, 2),
+    );
+    expect(
+      streamRequests.length,
+      'the header must subscribe to /api/notifications/stream',
+    ).toBeGreaterThan(0);
+  });
 });
