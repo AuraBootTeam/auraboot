@@ -28,6 +28,7 @@ import { useDesignerDocument, serializeDocument } from '../document/useDesignerD
 import { useDesignerSelection } from '../selection/useDesignerSelection';
 import { useDesignerDnd } from '../dnd/useDesignerDnd';
 import { createDefaultBlockRegistryV3 } from '../registry/BlockRegistry';
+import { pruneStaleFieldComponentProps } from '../registry/InspectorSchemaRegistry';
 import {
   DEVICE_PREVIEW_PRESETS,
   DEFAULT_DEVICE_PREVIEW_ID,
@@ -238,11 +239,28 @@ export function UnifiedDesignerWorkbench({
           return syncFieldLikeBlockFromModelField(block, value, selectedModelFields);
         }
 
-        return setByPath(
+        const updated = setByPath(
           block as unknown as Record<string, unknown>,
           path,
           value,
         ) as unknown as typeof block;
+
+        // When a field's `component` changes, reconcile its props: drop props that
+        // were authored for the OLD component and don't apply to the new one (e.g.
+        // upload's multiple/accept/maxFiles when switching to select, or a picker's
+        // pickerSource/displayField when switching to input). The inspector only
+        // renders the control for the CURRENT component, so such leftovers are
+        // invisible yet still change the new control's runtime behaviour. The prune
+        // rule is derived from the inspector schema registry (which props belong to
+        // which component), so it stays in sync with the schema.
+        if (path === 'props.component') {
+          const prunedProps = pruneStaleFieldComponentProps(updated.props, value);
+          if (prunedProps !== updated.props) {
+            return { ...updated, props: prunedProps };
+          }
+        }
+
+        return updated;
       }),
     }));
   };

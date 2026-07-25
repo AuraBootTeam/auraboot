@@ -190,6 +190,84 @@ const uploadFieldFields: PropertySchema<string>[] = [
   { key: 'props.maxFiles', label: 'Max files', type: 'number' },
 ];
 
+// The component-specific inspector field schemas for a `field` block, keyed by the
+// (lower-cased) `props.component` value. This is the SINGLE source of truth consumed
+// by both getFieldInspectorFields (to render the right controls for the current
+// component) AND pruneStaleFieldComponentProps (to reconcile props when the author
+// switches component), so the "which props belong to which component" rule can never
+// drift between the two. A component absent from this map (input, select, date, …)
+// has no component-specific props — only the shared fieldFields apply.
+const componentSpecificFieldSchemas: Record<string, PropertySchema<string>[]> = {
+  picker: pickerFieldFields,
+  upload: uploadFieldFields,
+  'rich-text': richTextFieldFields,
+  richtext: richTextFieldFields,
+};
+
+/** The component-specific inspector fields for one component (or `[]` if none). */
+function getComponentSpecificFields(component: string): PropertySchema<string>[] {
+  return componentSpecificFieldSchemas[component] ?? [];
+}
+
+/** The bare `props.*` keys (prefix stripped) a schema declares, e.g. `multiple`. */
+function bareComponentPropKeys(fields: PropertySchema<string>[]): string[] {
+  const prefix = 'props.';
+  return fields
+    .map((field) => field.key)
+    .filter((key) => key.startsWith(prefix))
+    .map((key) => key.slice(prefix.length));
+}
+
+// The union of every prop key that is SPECIFIC to some field component (picker /
+// upload / rich-text). Shared field props (label, required, readOnly, placeholder,
+// helpText, options, visibleWhen, validationRules, dictCode, dataType, …) live in
+// fieldFields, NOT in any per-component schema, so they are never members of this set
+// and are therefore never pruned. Derived from componentSpecificFieldSchemas so it
+// stays in lock-step with the schema instead of being a hand-maintained list.
+const componentSpecificPropUniverse: ReadonlySet<string> = new Set(
+  Object.values(componentSpecificFieldSchemas).flatMap(bareComponentPropKeys),
+);
+
+/**
+ * Reconcile a field block's `props` when its `component` changes.
+ *
+ * Removes any prop that is (a) component-specific to SOME component and (b) not part
+ * of the NEW component's schema, while preserving:
+ *   - shared props (label, required, readOnly, visibleWhen, helpText, placeholder,
+ *     defaultValue, options, validationRules, dictCode, dataType, …) — never in the
+ *     specific universe, so always kept;
+ *   - props that the new component legitimately uses (in its own specific schema) —
+ *     e.g. switching between two picker-like components keeps `displayField`.
+ *
+ * This fixes the footgun where a prop authored for the old component (e.g. upload's
+ * `multiple`/`accept`/`maxFiles`, or a picker's `pickerSource`/`displayField`) stays
+ * on the block after switching component. The inspector only renders the control for
+ * the CURRENT component, so the leftover is invisible yet still alters the new
+ * control's runtime behaviour (a stale `multiple:true` makes a `select` render a
+ * native multi-`<select>` instead of the combobox).
+ *
+ * Returns the SAME reference when nothing is pruned (so callers can skip a rebuild).
+ */
+export function pruneStaleFieldComponentProps(
+  props: Record<string, unknown> | undefined,
+  nextComponent: unknown,
+): Record<string, unknown> | undefined {
+  if (!props) return props;
+  const component = getComponentName(nextComponent);
+  const validForNew = new Set(bareComponentPropKeys(getComponentSpecificFields(component)));
+
+  let changed = false;
+  const next: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(props)) {
+    if (componentSpecificPropUniverse.has(key) && !validForNew.has(key)) {
+      changed = true;
+      continue;
+    }
+    next[key] = value;
+  }
+  return changed ? next : props;
+}
+
 const filterFieldFields: PropertySchema<string>[] = [
   ...fieldFields,
   {
@@ -964,14 +1042,9 @@ function getActionInspectorFields(block: DslBlockV3): PropertySchema<string>[] {
 function getFieldInspectorFields(block: DslBlockV3): PropertySchema<string>[] {
   const component = getComponentName(block.props?.component);
   const insertionIndex = fieldFields.findIndex((field) => field.key === 'props.dataType');
-  const componentFields =
-    component === 'picker'
-      ? pickerFieldFields
-      : component === 'upload'
-        ? uploadFieldFields
-      : component === 'rich-text' || component === 'richtext'
-        ? richTextFieldFields
-        : [];
+  // Same source of truth the prune rule reads, so the controls shown and the props
+  // kept on a component switch can never disagree.
+  const componentFields = getComponentSpecificFields(component);
 
   const fields =
     insertionIndex >= 0
