@@ -164,6 +164,61 @@ export function buildPageIndex(specRoots) {
   return index;
 }
 
+/**
+ * Platform-native pages: hand-written React routes declared in a plugin's resources.ts.
+ *
+ * These never appeared in the denominator. The generator reads plugin DSL, and a
+ * platform page is neither a DSL page nor a command — so the knowledge-base UI
+ * (1250 lines, zero browser specs until 2026-07-25) produced no row at all. Not
+ * "untested" — absent, which reads as "not applicable" and is exactly the failure
+ * TEST-SYSTEM rule 1 is about.
+ *
+ * Only entries carrying a `file` count. A fileless entry is a menu pointer at a DSL
+ * route (that is how the AI colleague pages were converted), and the DSL page rows
+ * already cover those — counting both would double-count the same surface.
+ *
+ * Parsed from the source rather than from a running app's /actuator/mappings: a
+ * generator that needs a live stack cannot run where the manifest is checked.
+ */
+export function declaredPlatformPages(webAdminRoot) {
+  const dir = path.join(webAdminRoot, 'app', 'plugins');
+  if (!fs.existsSync(dir)) return [];
+  const out = [];
+  for (const plugin of fs.readdirSync(dir)) {
+    const file = path.join(dir, plugin, 'resources.ts');
+    if (!fs.existsSync(file)) continue;
+    const text = fs.readFileSync(file, 'utf8');
+    // Each resource is one { ... } block; key/path/file may sit on separate lines.
+    for (const block of text.split(/\}\s*,?\s*(?=\{|\]$)/)) {
+      const key = /key:\s*'([^']+)'/.exec(block)?.[1];
+      const route = /path:\s*'([^']+)'/.exec(block)?.[1];
+      const src = /file:\s*'([^']+)'/.exec(block)?.[1];
+      if (key && route && src) out.push({ plugin, key, route, file: src });
+    }
+  }
+  return out.sort((a, b) => a.key.localeCompare(b.key));
+}
+
+/**
+ * Route → spec files that navigate to it.
+ *
+ * Bounded on the right the same way page keys are, so `/aurabot/knowledge` is not
+ * credited with the coverage of `/aurabot/knowledge/:pid`, and a route opened with
+ * parameters still counts.
+ */
+export function buildRouteIndex(specRoots) {
+  const files = [];
+  for (const root of specRoots) for (const f of walk(root, SPEC_EXTS)) files.push(f);
+  const texts = files.map((f) => [path.relative(process.cwd(), f), fs.readFileSync(f, 'utf8')]);
+  return (route) => {
+    const hits = [];
+    const esc = route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`["'\`]${esc}(?=["'\`?#]|/\\$\\{)`);
+    for (const [rel, text] of texts) if (re.test(text)) hits.push(rel);
+    return hits;
+  };
+}
+
 function gitCommit(root) {
   try {
     return execFileSync('git', ['-C', root, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
@@ -244,11 +299,42 @@ export function buildManifest({ repoRoot, pluginRoot, only, specRoots, runId, ta
     groups.push({ id: plugin, title: plugin, rows: [...rows, ...pageRows] });
   }
 
+  // Platform-native pages. Kept in their own group and counted separately so the
+  // report can answer "how covered is the DSL surface" and "how covered is the
+  // hand-written surface" without one diluting the other.
+  let platformTotal = 0;
+  let platformUntested = 0;
+  const webAdminRoot = path.join(repoRoot, 'web-admin');
+  const platformPages = declaredPlatformPages(webAdminRoot);
+  if (platformPages.length > 0) {
+    const routeHits = buildRouteIndex(absSpecRoots);
+    const platformRows = platformPages.map((pp) => {
+      platformTotal += 1;
+      const evidence = routeHits(pp.route);
+      if (evidence.length === 0) platformUntested += 1;
+      return {
+        id: `platform-page:${pp.key}`,
+        action: pp.route,
+        surface: 'platform-page',
+        dependencies: 'real-stack',
+        driver: 'browser',
+        evidence,
+        assertion: evidence.length > 0
+          ? 'a browser spec navigates to this route'
+          : 'no browser spec navigates to this route',
+        verdict: evidence.length > 0 ? 'pass' : 'untested',
+        note: `plugin=${pp.plugin} file=${pp.file}`,
+      };
+    });
+    groups.push({ id: 'platform-pages', title: 'platform-native pages (hand-written React)', rows: platformRows });
+  }
+
   return {
     run: { id: runId, target, commit: gitCommit(repoRoot),
            generator: 'scripts/gen-coverage-manifest.mjs' },
     groups,
-    stats: { commands: total, untested, pages: pageTotal, pagesUntested: pageUntested },
+    stats: { commands: total, untested, pages: pageTotal, pagesUntested: pageUntested,
+             platformPages: platformTotal, platformPagesUntested: platformUntested },
   };
 }
 

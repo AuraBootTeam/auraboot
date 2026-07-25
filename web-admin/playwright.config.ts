@@ -119,9 +119,6 @@ const contractScopeDirs = [
   'action-system',
   'activity',
   'agent-control-plane',
-  // The knowledge-base UI (RAG): platform-native pages, not DSL pages, so the
-  // page-level denominator produced no row for them and the gap was invisible.
-  'aurabot',
   'approval',
   'bpm',
   'command',
