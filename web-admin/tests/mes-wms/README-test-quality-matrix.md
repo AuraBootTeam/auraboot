@@ -100,8 +100,10 @@
 | # | bug | 修复 | 验证 |
 |---|-----|------|------|
 | 1 | FR-23 车间看板 dashboard table widget `h=1` → 表体塌陷、12 行不可见 | h=1→4/3 | plugins #240,截图变异 |
-| 2 | **被拦截的 list 行动点 → 整页崩「加载失败」+ 重试**(action 错误被误设成 page-level error;应只 toast) | ListPageContent `onError` 不再设 page error → action 失败只 toast、列表保持 | OSS #1501,截图变异(改前整页崩/改后列表保留+干净 toast),FR-07 golden 5/5 |
+| 2 | **被拦截的 list 行动点 → 整页崩「加载失败」+ 重试**(action 错误被误设成 page-level error;应只 toast) | ListPageContent `onError` 不再设 page error → action 失败只 toast、列表保持 | OSS #1501 merged+review;**修复态 live 验证**(拒绝的行动点→列表保留+无整页崩,`fr07-after-start.png` + golden 5/5)|
 
 **bug #2 是共享渲染器修复,改善所有 list 页**:任何行动点被业务规则拒绝(互锁/权限/校验)不再整页崩,操作员保留列表 + 看清 toast 原因。
+
+> **⚠️ #1501 证据口径诚实纠正(2026-07-25 复核)**:此前写"截图变异(改前整页崩)"**无实际 RED 截图支撑**,已撤。当前只有**修复态正向证据**——运行前端(HEAD=origin/main,含 #1501)上点被拒的行动点,列表完整保留、无整页崩(`fr07-after-start.png` + `fr07-action-golden.mjs` 5/5)。**未取得独立的未修复 RED 基线**:栈已是修复版,且 mutation 不可做(10+ 并发会话共享同一 canonical main checkout 的 Vite,临时改会 HMR 打断他人 golden)。故此项是"修复态 live 验证",**不是**变异分辨门。真正的 RED→GREEN 变异证据需在**隔离的未修复前端**上补(未做,ROI 低——#1501 已 merge+review+修复态已验)。此外:`fr07-action-golden` 的 5/5 在**修复前后前端都为绿**(实测),因此它验证的是 **FR-05/FR-07 互锁 seam**(拒绝 start→op 不转 in_progress→列表保留),**不构成对 #1501 的分辨性验证**。
 
 **结论**:🟡 FR 不止验证渲染,还行动点驱动验证状态变化(FR-05/FR-07 互锁 seam),并发现+修复 2 个真 UX/美观性 bug(dashboard 表塌陷 + 行动点错误整页崩)。
