@@ -7,6 +7,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
@@ -26,12 +27,18 @@ import org.springframework.util.StringUtils;
  * it. The two invariant phases (state 600, pre-invariant 800) are axis B and deliberately do not feed
  * this plan (§11.15.1).</p>
  *
- * <p><strong>Phase-1 Shadow.</strong> The plan is assembled and stashed on the context, but nothing
- * enforces it yet — the data layer still runs its own {@code isDataPermissionBypassed} decision. The
- * next slice makes the data layer read this plan's scope predicate and version instead of deciding
- * again. Assembling it here changes no behaviour; it only makes the decision available. Row scope
- * (D3) and the optimistic version (D5) are not resolved yet — they join the plan in the following
- * slice — so both are carried as {@code null} for now.</p>
+ * <p>The plan carries the row-scope grade (D3), resolved here from the existing row-scope engine's
+ * own verdict so it can never drift from what that engine filters. The optimistic version (D5) is
+ * captured later, at enforcement.</p>
+ *
+ * <p><strong>Phase-1 Shadow + observe (§11.10 stage 1).</strong> The plan is assembled and stashed
+ * on the context, but nothing enforces it yet — the data layer still runs its own
+ * {@code isDataPermissionBypassed} decision, so assembling the plan changes no behaviour. Because any
+ * denying gate has already thrown before this phase, a command that reaches here was allowed by the
+ * legacy path; so the assembled decision <em>vs</em> that legacy allow is exactly the migration
+ * divergence §11.10 stage 1 asks to record. We meter it by decision: an {@code ABSTAIN} here is a
+ * command the legacy path allows but the plan does not authorize (an undeclared-permission command) —
+ * the surface that must gain a declaration before enforcement can flip on.</p>
  */
 @Slf4j
 @Component
@@ -46,6 +53,13 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
      */
     @Autowired(required = false)
     private DataPermissionEngine dataPermissionEngine;
+
+    /** Optional so a minimal context still assembles; when present, records the shadow divergence. */
+    @Autowired(required = false)
+    private MeterRegistry meterRegistry;
+
+    /** Meter of assembled plan decisions — the §11.10 stage-1 divergence surface (see class doc). */
+    static final String SHADOW_DECISION_METRIC = "command.permit_plan.shadow.decision";
 
     @Override
     public String name() {
@@ -68,10 +82,27 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
                 resolveScope(ctx),
                 null);  // expected version (D5) — captured at enforcement (step 4)
         ctx.setPermitPlan(plan);
+        observe(ctx, plan);
+    }
 
-        if (log.isDebugEnabled()) {
+    /**
+     * Record the shadow divergence (§11.10 stage 1): meter the assembled decision, and surface an
+     * {@code ABSTAIN} — a command the legacy path let through here but the plan does not authorize —
+     * so the undeclared-permission surface is visible before enforcement flips on. Observation only;
+     * it changes nothing.
+     */
+    private void observe(CommandPipelineContext ctx, CommandPermitPlan plan) {
+        if (meterRegistry != null) {
+            meterRegistry.counter(SHADOW_DECISION_METRIC, "decision", plan.decision().name()).increment();
+        }
+        if (plan.decision() == CommandPermitPlan.Decision.ABSTAIN) {
+            log.info("Permit-plan shadow: command {} reached the boundary (legacy allow) but declares no "
+                    + "authorization (plan=ABSTAIN); it would need a permission declaration before enforcement",
+                    ctx.getCommandCode());
+        } else if (log.isDebugEnabled()) {
             log.debug("Permit plan assembled for {}: decision={} deniedByPhase={} aggregateId={} scope={}",
-                    ctx.getCommandCode(), plan.decision(), plan.deniedByPhase(), aggregateId, plan.scope());
+                    ctx.getCommandCode(), plan.decision(), plan.deniedByPhase(),
+                    plan.aggregateId(), plan.scope());
         }
     }
 

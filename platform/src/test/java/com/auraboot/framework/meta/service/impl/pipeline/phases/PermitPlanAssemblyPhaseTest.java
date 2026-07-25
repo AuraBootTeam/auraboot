@@ -7,6 +7,7 @@ import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.PhaseDecision;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -190,6 +191,51 @@ class PermitPlanAssemblyPhaseTest {
         phase.execute(ctx);
 
         assertThat(ctx.getPermitPlan().expectedVersion()).isNull();
+    }
+
+    // ---------- §11.10 stage-1 shadow observe ----------
+
+    /**
+     * An undeclared command (ABSTAIN) is the migration surface — it must be metered so the surface is
+     * visible before enforcement flips on. Legacy allowed it (it reached the boundary); the plan does
+     * not authorize it.
+     */
+    @Test
+    @DisplayName("an undeclared (ABSTAIN) command is metered under its decision")
+    void metersTheAbstainDivergenceSurface() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReflectionTestUtils.setField(phase, "meterRegistry", registry);
+        CommandPipelineContext ctx = ctx("pur_01KPID");
+        ctx.recordPhaseDecision(PhaseDecision.abstain("authorization"));
+
+        phase.execute(ctx);
+
+        assertThat(registry.counter(PermitPlanAssemblyPhase.SHADOW_DECISION_METRIC, "decision", "ABSTAIN")
+                .count()).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("a granted command is metered as PERMIT")
+    void metersPermitDecision() {
+        SimpleMeterRegistry registry = new SimpleMeterRegistry();
+        ReflectionTestUtils.setField(phase, "meterRegistry", registry);
+        CommandPipelineContext ctx = ctx("pur_01KPID");
+        ctx.recordPhaseDecision(PhaseDecision.permit("authorization"));
+
+        phase.execute(ctx);
+
+        assertThat(registry.counter(PermitPlanAssemblyPhase.SHADOW_DECISION_METRIC, "decision", "PERMIT")
+                .count()).isEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("assembly works without a meter registry (minimal context)")
+    void assemblesWithoutAMeterRegistry() {
+        CommandPipelineContext ctx = ctx("pur_01KPID");
+        ctx.recordPhaseDecision(PhaseDecision.abstain("authorization"));
+
+        assertThatCode(() -> phase.execute(ctx)).doesNotThrowAnyException();
+        assertThat(ctx.getPermitPlan()).isNotNull();
     }
 
     @Test
