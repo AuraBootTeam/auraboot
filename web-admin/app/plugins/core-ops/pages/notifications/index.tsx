@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { useI18n } from '~/contexts/I18nContext';
 import {
   useNotificationList,
   type Notification,
@@ -34,6 +35,8 @@ type ReadFilter = 'all' | 'unread' | 'read';
 
 interface CategoryTab {
   key: CategoryKey;
+  /** i18n key under workbench.notificationCenter.*; label is the zh fallback. */
+  i18nKey: string;
   label: string;
   icon: React.ReactNode;
   color: string;
@@ -45,6 +48,7 @@ interface CategoryTab {
 const CATEGORY_TABS: CategoryTab[] = [
   {
     key: '',
+    i18nKey: 'catAll',
     label: '全部',
     icon: <BellIcon className="h-4 w-4" />,
     color: 'text-gray-600 dark:text-gray-400',
@@ -52,6 +56,7 @@ const CATEGORY_TABS: CategoryTab[] = [
   },
   {
     key: 'system',
+    i18nKey: 'catSystem',
     label: '系统',
     icon: <CogIcon className="h-4 w-4" />,
     color: 'text-gray-600 dark:text-gray-400',
@@ -59,6 +64,7 @@ const CATEGORY_TABS: CategoryTab[] = [
   },
   {
     key: 'approval',
+    i18nKey: 'catApproval',
     label: '审批',
     icon: <ClipboardDocumentCheckIcon className="h-4 w-4" />,
     color: 'text-gray-600 dark:text-gray-400',
@@ -66,6 +72,7 @@ const CATEGORY_TABS: CategoryTab[] = [
   },
   {
     key: 'business',
+    i18nKey: 'catBusiness',
     label: '业务',
     icon: <InformationCircleIcon className="h-4 w-4" />,
     color: 'text-gray-600 dark:text-gray-400',
@@ -73,6 +80,7 @@ const CATEGORY_TABS: CategoryTab[] = [
   },
   {
     key: 'alert',
+    i18nKey: 'catAlert',
     label: '告警',
     icon: <ExclamationTriangleIcon className="h-4 w-4" />,
     color: 'text-gray-600 dark:text-gray-400',
@@ -163,6 +171,9 @@ function getPriorityBadge(priority: string): string {
 // -- Component -----------------------------------------------------------
 
 export default function NotificationCenter() {
+  const { t } = useI18n();
+  const tn = (k: string, fb: string, params?: Record<string, unknown>) =>
+    t(`workbench.notificationCenter.${k}`, params, fb);
   const {
     notifications,
     loading,
@@ -295,9 +306,11 @@ export default function NotificationCenter() {
                 <BellAlertIcon className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">通知中心</h1>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">{tn('title', '通知中心')}</h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  {unreadCount > 0 ? `${unreadCount} 条未读通知` : '所有通知已读'}
+                  {unreadCount > 0
+                    ? tn('unreadCount', `${unreadCount} 条未读通知`, { count: unreadCount })
+                    : tn('allRead', '所有通知已读')}
                 </p>
               </div>
             </div>
@@ -305,10 +318,10 @@ export default function NotificationCenter() {
               <Link
                 to="/settings/notification-preferences"
                 className="inline-flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                title="通知偏好设置"
+                title={tn('preferencesTitle', '通知偏好设置')}
               >
                 <Cog6ToothIcon className="h-4 w-4" />
-                <span className="hidden sm:inline">偏好设置</span>
+                <span className="hidden sm:inline">{tn('preferences', '偏好设置')}</span>
               </Link>
             </div>
           </div>
@@ -328,7 +341,7 @@ export default function NotificationCenter() {
                   } `}
                 >
                   {tab.icon}
-                  {tab.label}
+                  {tn(tab.i18nKey, tab.label)}
                 </button>
               );
             })}
@@ -351,7 +364,9 @@ export default function NotificationCenter() {
                 disabled={notifications.length === 0}
               />
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                {someSelected ? `已选 ${selectedIds.size} 项` : '全选'}
+                {someSelected
+                  ? tn('selectedCount', `已选 ${selectedIds.size} 项`, { count: selectedIds.size })
+                  : tn('selectAll', '全选')}
               </span>
             </label>
 
@@ -363,7 +378,7 @@ export default function NotificationCenter() {
                   className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
                 >
                   <TrashIcon className="h-4 w-4" />
-                  删除选中
+                  {tn('deleteSelected', '删除选中')}
                 </button>
               </div>
             )}
@@ -374,9 +389,9 @@ export default function NotificationCenter() {
             <div className="flex items-center rounded-lg bg-gray-100 p-0.5 dark:bg-gray-700">
               {(
                 [
-                  { key: 'all', label: '全部' },
-                  { key: 'unread', label: '未读' },
-                  { key: 'read', label: '已读' },
+                  { key: 'all', label: tn('filterAll', '全部') },
+                  { key: 'unread', label: tn('filterUnread', '未读') },
+                  { key: 'read', label: tn('filterRead', '已读') },
                 ] as { key: ReadFilter; label: string }[]
               ).map((filter) => (
                 <button
@@ -400,7 +415,7 @@ export default function NotificationCenter() {
                 className="inline-flex items-center gap-1.5 rounded-md bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
               >
                 <CheckCircleIcon className="h-4 w-4" />
-                全部已读
+                {tn('markAllRead', '全部已读')}
               </button>
             )}
           </div>
@@ -459,6 +474,9 @@ function NotificationItem({
   onClick: (n: Notification) => void;
   onMarkAsRead: (id: number) => void;
 }) {
+  const { t } = useI18n();
+  const tn = (k: string, fb: string, params?: Record<string, unknown>) =>
+    t(`workbench.notificationCenter.${k}`, params, fb);
   const hasSource = notification.sourceType && notification.sourceId;
 
   return (
@@ -525,7 +543,7 @@ function NotificationItem({
             {hasSource && (
               <span className="inline-flex items-center gap-1 text-xs text-indigo-500 dark:text-indigo-400">
                 <ArrowTopRightOnSquareIcon className="h-3 w-3" />
-                查看详情
+                {tn('viewDetail', '查看详情')}
               </span>
             )}
             {notification.isRead && notification.readAt && (
@@ -545,10 +563,10 @@ function NotificationItem({
                 onMarkAsRead(notification.id);
               }}
               className="inline-flex items-center gap-1 rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-600 transition-colors hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/30"
-              title="标为已读"
+              title={tn('markRead', '标为已读')}
             >
               <CheckIcon className="h-3.5 w-3.5" />
-              已读
+              {tn('read', '已读')}
             </button>
           )}
         </div>
@@ -572,6 +590,9 @@ function EmptyState({
   activeCategory: CategoryKey;
   readFilter: ReadFilter;
 }) {
+  const { t } = useI18n();
+  const tn = (k: string, fb: string, params?: Record<string, unknown>) =>
+    t(`workbench.notificationCenter.${k}`, params, fb);
   const categoryLabel = CATEGORY_TABS.find((t) => t.key === activeCategory)?.label || '全部';
   const filterLabel = readFilter === 'unread' ? '未读' : readFilter === 'read' ? '已读' : '';
 
@@ -586,8 +607,8 @@ function EmptyState({
       </h3>
       <p className="mx-auto max-w-sm text-sm text-gray-500 dark:text-gray-400">
         {readFilter === 'unread'
-          ? '所有通知已处理完毕，做得很棒！'
-          : '当有新的通知时，它们将显示在这里。'}
+          ? tn('allDoneHint', '所有通知已处理完毕，做得很棒！')
+          : tn('emptyHint', '当有新的通知时，它们将显示在这里。')}
       </p>
     </div>
   );
@@ -609,6 +630,9 @@ function Pagination({
   totalPages: number;
   onPageChange: (page: number) => void;
 }) {
+  const { t } = useI18n();
+  const tn = (k: string, fb: string, params?: Record<string, unknown>) =>
+    t(`workbench.notificationCenter.${k}`, params, fb);
   // Generate page numbers with ellipsis
   const pages: (number | 'ellipsis')[] = [];
   if (totalPages <= 7) {
@@ -642,7 +666,7 @@ function Pagination({
           disabled={pageNum === 1}
           className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
         >
-          上一页
+          {tn('prevPage', '上一页')}
         </button>
         {pages.map((p, idx) =>
           p === 'ellipsis' ? (
@@ -668,7 +692,7 @@ function Pagination({
           disabled={pageNum === totalPages}
           className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
         >
-          下一页
+          {tn('nextPage', '下一页')}
         </button>
       </div>
     </div>

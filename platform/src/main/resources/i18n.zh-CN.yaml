@@ -1041,6 +1041,42 @@ workbench:
     copyTaskDesc: 指派给你、仍需处理的工作项。
     copyMentionTitle: 提及
     copyMentionDesc: 同事在消息中 @ 你的内容。
+  notificationCenter:
+    title: 通知中心
+    unreadCount: "{count} 条未读通知"
+    allRead: 所有通知已读
+    preferences: 偏好设置
+    preferencesTitle: 通知偏好设置
+    catAll: 全部
+    catSystem: 系统
+    catApproval: 审批
+    catBusiness: 业务
+    catAlert: 告警
+    filterAll: 全部
+    filterUnread: 未读
+    filterRead: 已读
+    selectAll: 全选
+    selectedCount: "已选 {count} 项"
+    deleteSelected: 删除选中
+    markAllRead: 全部已读
+    markRead: 标为已读
+    read: 已读
+    readAt: 已读于
+    viewDetail: 查看详情
+    priorityHigh: 高
+    priorityNormal: 普通
+    priorityLow: 低
+    justNow: 刚刚
+    minutesAgo: "{minutes}分钟前"
+    hoursAgo: "{hours}小时前"
+    yesterday: 昨天
+    daysAgo: "{days}天前"
+    emptyTitle: "暂无{filter}通知"
+    emptyHint: 当有新的通知时,它们将显示在这里。
+    allDoneHint: 所有通知已处理完毕,做得很棒!
+    prevPage: 上一页
+    nextPage: 下一页
+    pageInfo: "第 {page} 页,共 {total} 条"
   shortcuts:
     title: 快捷操作
     edit: 编辑

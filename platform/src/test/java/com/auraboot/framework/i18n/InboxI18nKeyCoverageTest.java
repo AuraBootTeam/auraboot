@@ -27,6 +27,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DisplayName("workbench.inbox i18n key coverage")
 class InboxI18nKeyCoverageTest {
 
+    /** Keys referenced by web-admin/app/plugins/core-ops/pages/notifications/index.tsx. */
+    private static final List<String> NOTIFICATION_KEYS = List.of(
+            "title", "unreadCount", "allRead", "preferences", "preferencesTitle",
+            "catAll", "catSystem", "catApproval", "catBusiness", "catAlert",
+            "filterAll", "filterUnread", "filterRead",
+            "selectAll", "selectedCount", "deleteSelected", "markAllRead", "markRead",
+            "read", "viewDetail", "emptyHint", "allDoneHint", "prevPage", "nextPage");
+
     /** Keys referenced by web-admin/app/routes/inbox/index.tsx. */
     private static final List<String> REQUIRED_KEYS = List.of(
             // header + toolbar
@@ -80,6 +88,47 @@ class InboxI18nKeyCoverageTest {
                 if (value == null || String.valueOf(value).isBlank()) {
                     problems.add(locale + " is missing workbench.inbox." + key);
                 }
+            }
+        }
+        assertTrue(problems.isEmpty(), String.join("\n", problems));
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> section(String resource, String name) throws Exception {
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream(resource)) {
+            assertTrue(in != null, resource + " must be on the classpath");
+            Map<String, Object> root = new Yaml().load(in);
+            Map<String, Object> workbench = (Map<String, Object>) root.get("workbench");
+            assertTrue(workbench != null, resource + " must define a workbench section");
+            Map<String, Object> sec = (Map<String, Object>) workbench.get(name);
+            assertTrue(sec != null, resource + " must define workbench." + name);
+            return sec;
+        }
+    }
+
+    @Test
+    @DisplayName("the notification centre is translatable too — it used to be hardcoded Chinese")
+    void notificationCentreIsTranslatable() throws Exception {
+        List<String> problems = new ArrayList<>();
+        for (String locale : LOCALES) {
+            Map<String, Object> sec = section(locale, "notificationCenter");
+            for (String key : NOTIFICATION_KEYS) {
+                Object v = sec.get(key);
+                if (v == null || String.valueOf(v).isBlank()) {
+                    problems.add(locale + " is missing workbench.notificationCenter." + key);
+                }
+            }
+        }
+        // And the two locales must actually differ: a page that renders Chinese for an
+        // en-US viewer is the bug this replaced, just relocated into the catalogue.
+        Map<String, Object> zh = section("i18n.zh-CN.yaml", "notificationCenter");
+        Map<String, Object> en = section("i18n.en-US.yaml", "notificationCenter");
+        for (String key : NOTIFICATION_KEYS) {
+            String zhV = String.valueOf(zh.get(key));
+            String enV = String.valueOf(en.get(key));
+            boolean hasCjk = zhV.codePoints().anyMatch(cp -> cp >= 0x4E00 && cp <= 0x9FFF);
+            if (zhV.equals(enV) && !hasCjk) {
+                problems.add("workbench.notificationCenter." + key + " is identical in both locales: " + zhV);
             }
         }
         assertTrue(problems.isEmpty(), String.join("\n", problems));

@@ -754,6 +754,42 @@ workbench:
     copyTaskDesc: Work items assigned to you that still need action.
     copyMentionTitle: Mentions
     copyMentionDesc: Messages where a teammate @mentioned you.
+  notificationCenter:
+    title: Notifications
+    unreadCount: "{count} unread"
+    allRead: All caught up
+    preferences: Preferences
+    preferencesTitle: Notification preferences
+    catAll: All
+    catSystem: System
+    catApproval: Approvals
+    catBusiness: Business
+    catAlert: Alerts
+    filterAll: All
+    filterUnread: Unread
+    filterRead: Read
+    selectAll: Select all
+    selectedCount: "{count} selected"
+    deleteSelected: Delete selected
+    markAllRead: Mark all read
+    markRead: Mark as read
+    read: Read
+    readAt: Read
+    viewDetail: View details
+    priorityHigh: High
+    priorityNormal: Normal
+    priorityLow: Low
+    justNow: Just now
+    minutesAgo: "{minutes}m ago"
+    hoursAgo: "{hours}h ago"
+    yesterday: Yesterday
+    daysAgo: "{days}d ago"
+    emptyTitle: "No {filter}notifications"
+    emptyHint: New notifications will appear here.
+    allDoneHint: Everything is handled — nice work!
+    prevPage: Previous
+    nextPage: Next
+    pageInfo: "Page {page} of {total} items"
   shortcuts:
     title: Quick Actions
     edit: Edit
