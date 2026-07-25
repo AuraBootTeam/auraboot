@@ -601,6 +601,17 @@ public class ChatTurnRuntime {
                             if (policyDef.isRequiresApproval()) {
                                 // Existing approved-tool path owns approvalPid creation until DurableWorkflowEngine
                                 // becomes the execution substrate for all human approvals.
+                                //
+                                // Milestone-gated and deliberate — do not migrate this piecemeal. Converging
+                                // approvals onto the durable engine needs two capabilities it lacks today:
+                                // named-agent runs (AcpDurableWorkflowEngine pins the run assignee to the default
+                                // agent) and a mid-flight chat -> durable handoff. Those same two gaps are why a
+                                // named agent rejects explicit durable flags outright, and why a durable-required
+                                // tool is denied with feedback here instead of escalated (escalatedDurableResult).
+                                //
+                                // Matching invariant: TurnExecutionPlanner does NOT route on requiresApproval alone
+                                // (it only contributes DURABLE_LIFECYCLE_SIGNAL), and TurnExecutionPlannerTest pins
+                                // that. Flipping it belongs to the convergence milestone — it is not a stray bug.
                             } else {
                                 runtimeState = reduceRuntimeState(callbacks, runtimeState,
                                         AgentRuntimeEvent.confirmationRequired(round, toolId, toolName, input));
