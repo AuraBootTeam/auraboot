@@ -80,6 +80,17 @@ public class CommandPipelineContext {
     }
 
     /**
+     * The whole boundary's authorization decision, folded from {@link #phaseDecisions} once the
+     * authorization phases have run (assembled by {@code PermitPlanAssemblyPhase}, order 550 — after
+     * the last authorization gate, before the data layer).
+     *
+     * <p><strong>Phase-1 Shadow.</strong> Assembled but not yet enforced: the data layer still
+     * decides for itself. The next slice makes the data layer read this plan's scope/version instead
+     * of re-deciding. Null until the assembly phase runs (or if it was skipped).</p>
+     */
+    private CommandPermitPlan permitPlan;
+
+    /**
      * Whether the caller may read the record they named in the request — evaluated at the boundary
      * by CommandTargetScopePhase. Null when the command has no user-named target to check.
      *
