@@ -13,6 +13,7 @@
 # Goldens covered (web-admin/tests/e2e/collab-review/):
 #   - notification-actions.spec.ts  category/read filters, delete, header bell + SSE
 #   - inbox-actions.spec.ts         unread badge arithmetic, dismiss, mark-all-read, type tabs
+#   - inbox-i18n.spec.ts            the page renders in the app's language, not English
 #
 # Why these exist: each one pins a defect that shipped green under the previous
 # suite — a filter the backend accepted and ignored, a delete button whose endpoint
@@ -51,6 +52,7 @@ REPEAT=1
 SPECS=(
   tests/e2e/collab-review/notification-actions.spec.ts
   tests/e2e/collab-review/inbox-actions.spec.ts
+  tests/e2e/collab-review/inbox-i18n.spec.ts
 )
 
 die() { echo "[collab-golden] ERROR: $*" >&2; exit 2; }
