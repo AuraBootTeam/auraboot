@@ -180,7 +180,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
 
         // Mock embedding for query
         float[] queryEmbedding = createTestEmbedding(1536, 0.1f); // close to embedding1
-        when(embeddingService.embed(eq(getTestTenant().getId()), anyString(), eq("openai")))
+        when(embeddingService.embed(eq(getTestTenant().getId()), anyString(), anyString()))
                 .thenReturn(queryEmbedding);
 
         // Retrieve
@@ -307,7 +307,7 @@ class RagPipelineIntegrationTest extends BaseIntegrationTest {
         kbService.refreshKbCounters(kb.getPid());
 
         // Mock query embedding (close to stored)
-        when(embeddingService.embed(eq(getTestTenant().getId()), anyString(), eq("openai")))
+        when(embeddingService.embed(eq(getTestTenant().getId()), anyString(), anyString()))
                 .thenReturn(createTestEmbedding(1536, 0.3f));
 
         String context = ragContextProvider.retrieveContext(

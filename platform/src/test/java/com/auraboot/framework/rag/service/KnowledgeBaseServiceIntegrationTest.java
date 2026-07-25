@@ -48,8 +48,15 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(dto.getName()).isEqualTo(req.getName());
         assertThat(dto.getDescription()).isEqualTo(req.getDescription());
         assertThat(dto.getStatus()).isEqualTo("active");
-        assertThat(dto.getEmbeddingProvider()).isEqualTo("openai");
-        assertThat(dto.getEmbeddingModel()).isEqualTo("text-embedding-3-small");
+        // The default is no longer the literal "openai". It resolves to a provider this
+        // deployment has actually enabled — the old default silently produced knowledge
+        // bases where every chunk failed to embed on any stack seeded with a different
+        // vendor, because EmbeddingService's auto-resolve only fires on a blank code.
+        assertThat(dto.getEmbeddingProvider())
+                .as("must be an enabled provider, whichever this stack has")
+                .isNotBlank()
+                .isNotEqualTo("zhipu"); // 2048-wide: could never fill a vector(1536) column
+        assertThat(dto.getEmbeddingModel()).isNotBlank();
         assertThat(dto.getEmbeddingDimension()).isEqualTo(1536);
         assertThat(dto.getChunkStrategy()).isEqualTo("fixed_size");
         assertThat(dto.getChunkSize()).isEqualTo(500);
@@ -65,8 +72,13 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
     void createKnowledgeBase_customSettings() {
         CreateKnowledgeBaseRequest req = new CreateKnowledgeBaseRequest();
         req.setName("Custom KB " + System.currentTimeMillis());
-        req.setEmbeddingProvider("zhipu");
-        req.setEmbeddingModel("embedding-2");
+        // Was 'zhipu': not enabled on this stack, and 2048-wide so it could never fill
+        // ab_kb_chunk.embedding vector(1536) — creation now refuses it up front instead
+        // of baking a dead knowledge base. The point of this case is custom *settings*,
+        // so it names the provider the stack does have.
+        req.setEmbeddingProvider(kbService.resolveEmbeddingProvider(
+                getTestTenant().getId(), null).provider());
+        req.setEmbeddingModel("custom-model-under-test");
         req.setEmbeddingDimension(1024);
         req.setChunkSize(1000);
         req.setChunkOverlap(100);
@@ -74,8 +86,10 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
         KnowledgeBaseDTO dto = kbService.createKnowledgeBase(
                 getTestTenant().getId(), getTestUser().getId(), req);
 
-        assertThat(dto.getEmbeddingProvider()).isEqualTo("zhipu");
-        assertThat(dto.getEmbeddingModel()).isEqualTo("embedding-2");
+        assertThat(dto.getEmbeddingProvider()).isEqualTo(req.getEmbeddingProvider());
+        assertThat(dto.getEmbeddingModel())
+                .as("an explicitly requested model must win over the provider's default")
+                .isEqualTo("custom-model-under-test");
         assertThat(dto.getEmbeddingDimension()).isEqualTo(1024);
         assertThat(dto.getChunkSize()).isEqualTo(1000);
         assertThat(dto.getChunkOverlap()).isEqualTo(100);
@@ -139,8 +153,8 @@ class KnowledgeBaseServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(updated.getName()).isEqualTo(update.getName());
         assertThat(updated.getDescription()).isEqualTo("Updated description");
         assertThat(updated.getChunkSize()).isEqualTo(800);
-        // Unchanged fields should remain
-        assertThat(updated.getEmbeddingProvider()).isEqualTo("openai");
+        // Unchanged fields should remain — whatever the create resolved to, not a literal
+        assertThat(updated.getEmbeddingProvider()).isNotBlank();
     }
 
     @Test

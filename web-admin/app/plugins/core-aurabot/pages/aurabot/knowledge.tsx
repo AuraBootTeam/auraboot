@@ -62,11 +62,16 @@ const DEFAULT_EMBEDDING_MODELS: Record<string, string> = {
   qianwen: 'text-embedding-v4',
 };
 
+// Empty provider means "let the backend pick the one this deployment actually has
+// enabled". Defaulting to a literal 'openai' switched OFF the backend's auto-resolve
+// (EmbeddingService only falls back when the code is blank, #1390 F3), so on any
+// deployment seeded with a different vendor the default walked the user into a
+// knowledge base where every chunk failed to embed.
 const DEFAULT_FORM: CreateKbForm = {
   name: '',
   description: '',
-  embeddingProvider: 'openai',
-  embeddingModel: DEFAULT_EMBEDDING_MODELS.openai,
+  embeddingProvider: '',
+  embeddingModel: '',
   chunkSize: 500,
   chunkOverlap: 50,
 };
@@ -450,6 +455,7 @@ function KbForm({
               keyless); put it back here once its config pins dimensions=1536 and that has been
               verified against the live API.
             */}
+            <option value="">{t('ai.knowledge.form.providerAuto', undefined, 'Auto (use what this deployment has configured)')}</option>
             <option value="openai">OpenAI</option>
             <option value="qianwen">通义千问 (DashScope)</option>
           </select>
