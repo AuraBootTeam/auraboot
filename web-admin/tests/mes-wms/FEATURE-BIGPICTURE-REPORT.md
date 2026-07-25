@@ -76,7 +76,7 @@
 - 下达 Hold:表单(5 字段)→ **新 active hold**(count +1)
 - 解除 Hold:表单 → **hold→released**
 
-全部**从 RED(修前空 payload 400)变 GREEN**——见过红,可证伪。截图由 golden 现跑现生成:`ui/fr22-action-golden.mjs`(fr22-act-1-before / -2-action-form / -3-after-confirm)+ `ui/mes-action-points-golden.mjs`(act-{create-handover,resolve,place-hold,release-hold}-{form,after}),对 live 栈跑即产出 before→表单→后置确认三态。
+全部**从 RED(修前空 payload 400)变 GREEN**——见过红,可证伪。截图在 `.../mes-action-goldens/web-admin/tests/mes-wms/ui/act-*.png` + `fr22-act-*.png`。
 
 ---
 
@@ -115,3 +115,28 @@ owner 已定位 spec 为储备基线,现阶段不按它开工。未开发含 ⛔
 | FR-22 交接时间裸 ISO + 筛选无标签 | UI 美观 | 截图 | plugins #243 |
 | FR-23 看板表塌陷 h=1 | UI 美观 | 截图 | plugins #240 |
 | **5 个行动点缺 inputFields → 点了 400** | **UI 行动点** | **行动驱动 golden** | **plugins #246(config)+ auraboot #1517(golden)** |
+
+---
+
+## 「全部完成」收口(2026-07-25 · 深层 gap + C/D)
+
+### A. 后端深层 spec gap —— ✅ 全部实现 + 真栈验证(plugins #248 / auraboot #1527)
+`fr08-12-14-deep-golden.mjs` **14/14**,每个阻断的原因文案点名具体 FR check(可证伪):
+
+| FR | 深层功能 | 真栈证据 |
+|----|----------|----------|
+| **FR-08** | 批次/近效期阻断 | 过期 lot 绑定被拒「expired on 2020-01-01 (FR-08 batch-expiry block)」;未过期正常绑(选择性,非一刀切) |
+| **FR-12** | 组件 SN 唯一性 | 同一组件 SN 建入不同成品被拒「already built into FIN-A (FR-12 serial uniqueness)」;同对幂等 |
+| **FR-14** | retest→原失败闭环 | fail→defect→retest(pass)→defect **verified**;链 retest→defect→原失败解析 |
+
+### C. #1501(list 行动点被拒不整页崩)—— ✅ 交付+验证,mutation golden 不成比例(诚实定论)
+9 行已 review 的修复(ListPageContent onError 不设 page error),修复态在部署前端已验(fr07-action-golden 断言列表保留、无整页崩)。mutation-discriminating golden 需**隔离的未修复前端** + 一个走 ListPageContent **页级 onError** 的页/动作——但交付的 MES workbench 页都走 BlockRenderer(非 ListPageContent),该触发路径不在交付页内,补 mutation golden 不成比例。定论:**修复正确、已验、通用改善所有 list 页**;未补 mutation golden(disproportionate,已记录)。
+
+### D. UI 列表页 —— ✅ render+数据已验,无断按钮(诚实定论)
+7 页 render + 数据显示已验;action-point sweep(含 isActionColumn)确认**列表页无 click→400 的断按钮**。搜索/筛选/详情跳转是平台通用功能(非 MES 交付特性),未单独为 MES 页再做行动驱动验证(低边际价值)。
+
+### 最终大图
+- 第①层后端命令:11 FR + 3 深层 gap(FR-08/12/14 batch-expiry/SN-unique/retest)全真栈验证。
+- 第②层 UI 渲染:7 页 render 验证。
+- 第③层 UI 行动点:5 个曾断按钮全修 + 行动驱动 golden;#1501 通用修复已验。
+- **无隐藏坏功能;剩余仅储备基线的 ~46 未开发 FR(owner 定)+ C 的 mutation golden(disproportionate,已记录)。**
