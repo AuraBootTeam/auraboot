@@ -37,6 +37,13 @@ try {
   check('FR-22 metric-strip renders (待签认)', /待签认/.test(main));
   check('FR-22 #228 shift dict resolved (白班/夜班 not day/night)', /白班|夜班/.test(main) && !/\bday\b|\bnight\b/.test(main), 'shift labels');
   check('FR-22 status dict resolved (已签认/待签认 not pending_ack)', /已签认|待签认/.test(main) && !/pending_ack|acknowledged/.test(main), 'status labels');
+  // Aesthetics fix (2026-07-25): handover-time column must render formatted datetime, NOT a raw
+  // ISO-8601 timestamp. Falsifiable: drop renderType:"datetime" → the raw `...T..:..:..` reappears.
+  const rawIso = main.match(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+  check('FR-22 handover-time formatted, no raw ISO timestamp', !rawIso && /\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/.test(main), rawIso ? `raw ISO leaked: ${rawIso[0]}` : 'formatted');
+  // Filters must carry visible labels, not two blank 请选择 dropdowns. Falsifiable: drop the field
+  // labels → 工位/交接状态 disappear.
+  check('FR-22 filters labeled (工位 + 交接状态)', /工位/.test(main) && /交接状态/.test(main), 'filter labels');
 } catch (e) { check('no exception', false, String(e.message).slice(0, 160)); await p.screenshot({ path: `${OUT}/err.png` }).catch(() => {}); }
 await b.close();
 const pass = results.filter((r) => r.pass).length;

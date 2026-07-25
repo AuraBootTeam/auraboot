@@ -143,23 +143,16 @@ async function frTestReworkLinkage() {
 
   // FR-14 core part 1: the failing result must auto-create a defect linked back to it.
   //
-  // ⚠️ SHIPPED PRODUCT BUG (this assertion is RED against the live stack, correctly):
-  //   RecordTestResultHandler.execute() reads the just-created result via db.getById and
-  //   gates defect creation on `rawDataObj instanceof Map` (qc_tr_raw_data). But the platform
-  //   read-shape contract (DynamicDataServiceImpl.java:273-274 / :1004-1005 →
-  //   JsonbFieldHelper.normalizeJsonReadValues: "json/jsonb fields leave as JSON strings, never
-  //   PGobject") returns json fields as STRINGS, so `instanceof Map` is never true → NO
-  //   qc_test_defect is ever auto-created (0 rows in the DB), even though qc_tr_raw_data is
-  //   correctly persisted as jsonb with a failures[] array. Because CreateReworkOrderHandler can
-  //   only link a rework order to a failure via a qc_test_defect (or qc_ncr) source, the FR-14
-  //   fail→rework linkage cannot form through the shipped happy-path. Fix = handler should
-  //   JSON-parse the string (or platform should return json as a Map). This golden stays RED
-  //   until then — do NOT lower the bar / seed the defect via raw INSERT to make it green.
+  // This golden first surfaced a shipped product bug here (defect never created): the handler
+  // gated defect creation on `qc_tr_raw_data instanceof Map`, but the platform read-shape contract
+  // (JsonbFieldHelper.normalizeJsonReadValues) returns json/jsonb fields as JSON *strings*, so the
+  // gate was never true → 0 defects. Fixed in RecordTestResultHandler by coercing the string to a
+  // Map before reading failures[]. Falsifiable: revert that fix → this assertion goes RED again.
   const defRows = queryDb(`select pid, qc_td_test_result_id, qc_td_defect_type, qc_td_rework_status from mt_qc_test_defect where qc_td_test_result_id='${sq(trPid)}'`);
   const def = defRows[0];
   if (!R.check('FR-14', 'failing result auto-created a defect linked to the test result',
       !!def && def[1] === trPid,
-      `defect=${JSON.stringify(def)} testResult=${trPid} — PRODUCT BUG: RecordTestResultHandler gates on 'raw_data instanceof Map' but platform read-shape returns json as String → defect never created (0 rows)`)) return;
+      `defect=${JSON.stringify(def)} testResult=${trPid}`)) return;
   const defectId = def[0];
 
   // Create a rework order for that failed defect (source_type=test_defect + source_id=defect).
