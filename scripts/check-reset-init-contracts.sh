@@ -7,6 +7,7 @@ cd "$PROJECT_ROOT"
 echo "[reset-init-contracts] shell syntax"
 bash -n scripts/oss-reset-and-init.sh
 bash -n scripts/reset-db.sh
+bash -n scripts/db/cleanup-scheduler-residue.sh
 bash -n scripts/import-plugins.sh
 bash -n scripts/lib/reset-init-common.sh
 bash -n scripts/seed-marketplace.sh
@@ -23,6 +24,7 @@ bash -n scripts/oss-test.sh
 echo "[reset-init-contracts] node regression"
 node --test scripts/dev/lib/env-registry.test.mjs
 node --test scripts/reset-init-contracts.test.mjs
+node --test scripts/db/cleanup-scheduler-residue.test.mjs
 node --test scripts/audit-oss-plugins.test.mjs
 node --test scripts/oss-test-fixture-gate.test.mjs
 node web-admin/scripts/run-showcase-seed-sequence.test.mjs

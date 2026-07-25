@@ -13,6 +13,7 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /set -euo pipefail/);
   assert.match(gate, /bash -n scripts\/oss-reset-and-init\.sh/);
   assert.match(gate, /bash -n scripts\/reset-db\.sh/);
+  assert.match(gate, /bash -n scripts\/db\/cleanup-scheduler-residue\.sh/);
   assert.match(gate, /bash -n scripts\/import-plugins\.sh/);
   assert.match(gate, /bash -n scripts\/lib\/reset-init-common\.sh/);
   assert.match(gate, /bash -n scripts\/seed-marketplace\.sh/);
@@ -26,6 +27,7 @@ test('OSS reset init contract gate covers reset, DB, marketplace, and seed runne
   assert.match(gate, /bash -n scripts\/oss-test\.sh/);
   assert.match(gate, /node --test scripts\/dev\/lib\/env-registry\.test\.mjs/);
   assert.match(gate, /node --test scripts\/reset-init-contracts\.test\.mjs/);
+  assert.match(gate, /node --test scripts\/db\/cleanup-scheduler-residue\.test\.mjs/);
   assert.match(gate, /node --test scripts\/oss-test-fixture-gate\.test\.mjs/);
   assert.match(gate, /node web-admin\/scripts\/run-showcase-seed-sequence\.test\.mjs/);
 });
