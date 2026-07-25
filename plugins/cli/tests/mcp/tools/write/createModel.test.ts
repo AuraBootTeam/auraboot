@@ -44,6 +44,16 @@ describe('createModelTool', () => {
   });
 
   describe('dryRun behavior', () => {
+    it('defaults omitted dryRun to true at the MCP schema boundary', () => {
+      const tool = createModelTool({} as ApiClient);
+      const parsed = tool.inputSchema.parse({
+        code: 'crm_lead',
+        displayName: 'Lead',
+      });
+
+      expect(parsed.dryRun).toBe(true);
+    });
+
     it('does not call backend when dryRun=true', async () => {
       const post = vi.fn();
       const client = { post, get: vi.fn() } as unknown as ApiClient;

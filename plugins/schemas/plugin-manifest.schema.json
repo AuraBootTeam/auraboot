@@ -210,6 +210,7 @@
         "reports": { "type": "string" },
         "namedQueries": { "type": "string" },
         "rules": { "type": "string" },
+        "capabilities": { "type": "string" },
         "decisionDefinitions": { "type": "string" },
         "conditionFragments": { "type": "string" },
         "eventPolicies": { "type": "string" },
@@ -1505,6 +1506,10 @@
           "type": "object",
           "description": "Data scope configuration"
         },
+        "policySchema": {
+          "type": "object",
+          "description": "Policy schema for configurable permission policies and dynamic ABAC"
+        },
         "parentCode": {
           "type": "string",
           "description": "Parent permission code for hierarchy"
@@ -1783,6 +1788,10 @@
           "type": "object",
           "description": "Page data sources",
           "additionalProperties": { "type": "object" }
+        },
+        "recordSource": {
+          "type": "object",
+          "description": "Optional record-prefill source for custom form/detail endpoints"
         },
         "profile": {
           "type": "string",

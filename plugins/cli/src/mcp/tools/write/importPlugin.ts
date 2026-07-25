@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ApiClient } from '../../../client/api-client.js';
+import { WRITE_ROUTES } from '../../../client/write-routes.js';
 import { toolErrorFromBackend } from '../../errors.js';
 import type { Tool } from '../../registry.js';
 
@@ -76,7 +77,7 @@ export function importPluginTool(client: ApiClient): Tool<Params> {
 
       try {
         const resp = await client.post(
-          '/api/plugins/import/execute-direct',
+          WRITE_ROUTES.importPlugin,
           manifest,
           query,
         );

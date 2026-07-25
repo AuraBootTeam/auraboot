@@ -694,6 +694,7 @@ skills
 
 skills
   .command('install')
+  .alias('update')
   .description('Install bundled Skills into agent clients')
   .option('--client <name>', 'claude | cursor | codex | all (comma-separated)', 'all')
   .option('--root <dir>', 'Workspace root to install into (default: cwd)')

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ApiClient } from '../../../client/api-client.js';
+import { WRITE_ROUTES } from '../../../client/write-routes.js';
 import { toolErrorFromBackend } from '../../errors.js';
 import type { Tool } from '../../registry.js';
 
@@ -36,9 +37,7 @@ export function rollbackImportTool(client: ApiClient): Tool<Params> {
     annotations: { destructiveHint: true, idempotentHint: true, openWorldHint: false },
     handler: async (params) => {
       try {
-        const resp = await client.post(
-          `/api/plugins/import/${encodeURIComponent(params.importId)}/rollback`,
-        );
+        const resp = await client.post(WRITE_ROUTES.rollbackImport(params.importId));
 
         if (!resp.ok) {
           // Inject importId so the LLM can echo it back in the user-facing

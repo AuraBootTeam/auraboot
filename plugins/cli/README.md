@@ -171,7 +171,10 @@ no OAuth flow, reuses your existing CLI token. Requests without a valid
 tenant-bearing token get `401`. The server runs stateless: a fresh, profile-scoped,
 audited tool registry is built per request against that caller's token, so
 different callers never share tenant state. `--profile` / `AURA_MCP_PROFILE` scope
-the tools exactly as for stdio.
+the maximum tool set exactly as for stdio. A caller can add
+`x-aura-tools: read|dsl-authoring|full` to narrow its own request below that
+server ceiling; a request that tries to widen the ceiling is rejected with
+`403`, and an invalid profile is rejected with `400`.
 
 Client config (any MCP client that supports Streamable HTTP), pointing at the URL
 with the `Authorization` header set to a token from `aura login`.
@@ -225,6 +228,7 @@ themselves — the platform stays the sole authority on permissions.
 aura skills list                                  # the 6 bundled skills
 aura skills install                               # into all clients under cwd
 aura skills install --client claude --root .      # just Claude Code, explicit root
+aura skills update --client claude --root .       # refresh stale copies (install alias)
 aura skills check                                 # installed / stale / not-installed
 aura skills remove --client cursor
 ```
@@ -239,8 +243,9 @@ Clients and their skill directories:
 
 Bundled skills: `auraboot-data-modeling`, `auraboot-ui-builder`, `auraboot-workflow`,
 `auraboot-permissions`, `auraboot-runtime-ops`, `auraboot-dsl-gitops`. Add `--agent-mode`
-to `list` / `check` for JSON output. Restart the agent client after install so it
-re-scans the skills directory.
+to `list` / `check` for JSON output. `update` is a named alias for the idempotent
+installer and overwrites stale bundled copies. Restart the agent client after
+install or update so it re-scans the skills directory.
 
 ### `aura dsl plan / apply / drift` (desired-state reconciler)
 

@@ -55,6 +55,13 @@ describe('createCommandTool', () => {
   });
 
   describe('dryRun', () => {
+    it('defaults omitted dryRun to true at the MCP schema boundary', () => {
+      const tool = createCommandTool({} as ApiClient);
+      const parsed = tool.inputSchema.parse(validBase);
+
+      expect(parsed.dryRun).toBe(true);
+    });
+
     it('does not call backend and surfaces wouldCreate', async () => {
       const client = makeClient({});
       const tool = createCommandTool(client);
