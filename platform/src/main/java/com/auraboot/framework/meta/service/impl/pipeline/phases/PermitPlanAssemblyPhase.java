@@ -1,10 +1,14 @@
 package com.auraboot.framework.meta.service.impl.pipeline.phases;
 
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.entity.CommandDefinition;
+import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan;
+import com.auraboot.framework.meta.service.impl.pipeline.CommandPermitPlan.ScopeGrade;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPhase;
 import com.auraboot.framework.meta.service.impl.pipeline.CommandPipelineContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
@@ -34,6 +38,15 @@ import org.springframework.util.StringUtils;
 @Order(550)
 public class PermitPlanAssemblyPhase implements CommandPhase {
 
+    /**
+     * The existing row-scope engine — the same one the data layer calls at each of its ~40 sites
+     * today. We call it once here, at the boundary, so the plan carries the scope grade instead of
+     * each site re-deciding it (the whole point of §11.15). Optional so a minimal context without the
+     * engine still assembles a plan (scope simply stays unresolved).
+     */
+    @Autowired(required = false)
+    private DataPermissionEngine dataPermissionEngine;
+
     @Override
     public String name() {
         return "permit_plan_assembly";
@@ -52,13 +65,52 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
         CommandPermitPlan plan = CommandPermitPlan.fromPhaseDecisions(
                 ctx.getPhaseDecisions(),
                 aggregateId,
-                null,   // row scope (D3) — resolved in the next slice
-                null);  // expected version (D5) — captured in the next slice
+                resolveScope(ctx),
+                null);  // expected version (D5) — captured at enforcement (step 4)
         ctx.setPermitPlan(plan);
 
         if (log.isDebugEnabled()) {
-            log.debug("Permit plan assembled for {}: decision={} deniedByPhase={} aggregateId={}",
-                    ctx.getCommandCode(), plan.decision(), plan.deniedByPhase(), aggregateId);
+            log.debug("Permit plan assembled for {}: decision={} deniedByPhase={} aggregateId={} scope={}",
+                    ctx.getCommandCode(), plan.decision(), plan.deniedByPhase(), aggregateId, plan.scope());
+        }
+    }
+
+    /**
+     * Resolve the row-scope grade (D3) the whole command runs under, from the existing row-scope
+     * engine's own verdict — so the plan's grade can never drift from what the engine actually
+     * filters. {@code buildRowFilter} returns a blank fragment exactly when the caller has ALL access
+     * (or no row policy at all — the unrestricted default), and a non-blank fragment when it is
+     * restricted (SELF, and — folded to SELF for phase-1, per §11.13 — DEPARTMENT / CUSTOM). Multiple
+     * roles are already combined most-permissive-wins inside the engine, so a caller with any ALL
+     * grant comes back blank → {@link ScopeGrade#ALL}.
+     *
+     * <p>Returns {@code null} (unresolved) when the inputs to decide a grade are absent, or when the
+     * engine is unavailable or errors. This is deliberate <strong>shadow safety</strong>: nothing
+     * enforces the grade yet, so resolving it here must not add a failure the command would not
+     * otherwise hit — the data layer's own fail-secure evaluation is still the one in force. Step 4
+     * makes this boundary resolution authoritative and fail-secure, retiring the per-site calls.</p>
+     */
+    private ScopeGrade resolveScope(CommandPipelineContext ctx) {
+        if (dataPermissionEngine == null) {
+            return null;
+        }
+        CommandDefinition command = ctx.getCommand();
+        String modelCode = command == null ? null : command.getModelCode();
+        Long tenantId = ctx.getTenantId();
+        Long userId = ctx.getUserId();
+        if (modelCode == null || tenantId == null || userId == null) {
+            return null;
+        }
+        try {
+            String rowFilter = dataPermissionEngine.buildRowFilter(tenantId, modelCode, userId);
+            return StringUtils.hasText(rowFilter) ? ScopeGrade.SELF : ScopeGrade.ALL;
+        } catch (RuntimeException e) {
+            // Shadow safety only: the grade is not consumed yet, so a resolution failure here must
+            // not break a command the data layer would have run. The data layer keeps its own
+            // fail-secure evaluation until step 4 moves enforcement onto this plan.
+            log.warn("Shadow scope resolution failed for {} (model {}); leaving scope unresolved",
+                    ctx.getCommandCode(), modelCode, e);
+            return null;
         }
     }
 }
