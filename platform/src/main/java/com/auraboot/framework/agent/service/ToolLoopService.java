@@ -78,6 +78,7 @@ public class ToolLoopService {
     private final ToolProviderRegistry toolProviderRegistry;
     private final ResultContractEmitter resultContractEmitter;
     private final RuntimeAuthorizationService runtimeAuthorizationService;
+    private final AiActionGuardrail aiActionGuardrail;
 
     @Autowired(required = false)
     private SkillToolExecutor skillToolExecutor;
@@ -209,6 +210,17 @@ public class ToolLoopService {
             log.info("Tool ACL deny: tenant={} profile={} channel={} run_kind={} tool={} → {}",
                     tenantId, profileId, channel, runKind, toolName, reason);
             return "Error: Tool '" + toolName + "' is not permitted for this agent profile / channel (ACL: " + reason + ")";
+        }
+
+        // BLOCKED means "never, not even with approval". Every layer below this one can be
+        // satisfied — each either allows or asks a human who can then allow — so a forbidden
+        // action must be refused before the approval machinery can offer it to someone.
+        // Until now nothing in the execution path consulted the risk assessor at all: it was
+        // reachable only through a mobile endpoint that no client calls.
+        AiActionGuardrail.Decision guardrail =
+                aiActionGuardrail.check(tenantId, agentCode, runPid, toolName, toolDef, input);
+        if (!guardrail.allowed()) {
+            return guardrail.message();
         }
 
         RuntimeAuthorizationService.IncrementalAuthorization authorization =
@@ -500,6 +512,17 @@ public class ToolLoopService {
         if (!acl.isAllowed()) {
             String reason = acl.getReason() == null ? "denied_by_tool_acl" : acl.getReason();
             return "Error: Tool '" + toolName + "' is not permitted for this agent profile / channel (ACL: " + reason + ")";
+        }
+
+        // BLOCKED means "never, not even with approval". Every layer below this one can be
+        // satisfied — each either allows or asks a human who can then allow — so a forbidden
+        // action must be refused before the approval machinery can offer it to someone.
+        // Until now nothing in the execution path consulted the risk assessor at all: it was
+        // reachable only through a mobile endpoint that no client calls.
+        AiActionGuardrail.Decision guardrail =
+                aiActionGuardrail.check(tenantId, agentCode, runPid, toolName, toolDef, input);
+        if (!guardrail.allowed()) {
+            return guardrail.message();
         }
 
         RuntimeAuthorizationService.IncrementalAuthorization authorization =

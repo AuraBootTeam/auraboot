@@ -46,7 +46,8 @@ class GoalDriftObservationTest {
             new com.fasterxml.jackson.databind.ObjectMapper(),
             mock(com.auraboot.framework.agent.provider.ToolProviderRegistry.class),
             mock(ResultContractEmitter.class),
-            mock(com.auraboot.framework.agent.authorization.RuntimeAuthorizationService.class));
+            mock(com.auraboot.framework.agent.authorization.RuntimeAuthorizationService.class),
+            mock(AiActionGuardrail.class));
 
     private AgentToolDefinition tool(String kind) {
         return AgentToolDefinition.builder()

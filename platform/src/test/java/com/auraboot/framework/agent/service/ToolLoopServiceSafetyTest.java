@@ -63,6 +63,7 @@ class ToolLoopServiceSafetyTest {
     @Mock private DurableToolExecutionLedger durableToolExecutionLedger;
 
     private ToolLoopService service;
+    private AiActionRiskAssessor aiActionRiskAssessor;
 
     @BeforeEach
     void setup() {
@@ -77,7 +78,8 @@ class ToolLoopServiceSafetyTest {
                 new ObjectMapper(),
                 toolProviderRegistry,
                 resultContractEmitter,
-                runtimeAuthorizationService);
+                runtimeAuthorizationService,
+                allowingGuardrail());
         when(toolAclChecker.check(anyLong(), nullable(String.class), nullable(String.class), anyString(), anyString()))
                 .thenReturn(ToolAclChecker.Decision.builder()
                         .allowed(true)
@@ -690,5 +692,53 @@ class ToolLoopServiceSafetyTest {
         verify(commandExecutor).execute(eq("pe:submit_procurement_comparison"), requestCaptor.capture());
         assertThat(requestCaptor.getValue().getTargetRecordId()).isEqualTo("PC-1");
         assertThat(result).contains("\"success\":true").contains("review_required");
+    }
+
+    /**
+     * A real guardrail over an assessor that returns MEDIUM: the BLOCKED tier is exercised
+     * by AiActionGuardrailTest, and these cases are about the layers below it.
+     */
+    private AiActionGuardrail allowingGuardrail() {
+        aiActionRiskAssessor = mock(AiActionRiskAssessor.class);
+        // lenient: most cases in this class use non-command tools, so the assessor is never
+        // reached and strict stubs would fail the whole class on an unused stubbing.
+        org.mockito.Mockito.lenient().when(aiActionRiskAssessor.assess(anyString(), anyString(), anyLong()))
+                .thenReturn(com.auraboot.framework.agent.dto.AiActionRiskLevel.MEDIUM);
+        @SuppressWarnings("unchecked")
+        org.springframework.beans.factory.ObjectProvider<io.micrometer.tracing.Tracer> tracer =
+                mock(org.springframework.beans.factory.ObjectProvider.class);
+        return new AiActionGuardrail(aiActionRiskAssessor, mock(AiActionAuditService.class), tracer,
+                new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+    }
+
+    /**
+     * The wiring test. AiActionGuardrailTest proves the guardrail decides correctly; this
+     * proves ToolLoopService actually asks it — and asks it before the layers that could
+     * approve the action. Without this, deleting the call from the tool loop would leave
+     * every guardrail unit test green, which is exactly the failure mode the guardrail was
+     * built to fix.
+     */
+    @Test
+    @DisplayName("a BLOCKED command is refused by the tool loop before authorization or execution")
+    void blockedCommandIsRefusedByTheToolLoop() {
+        org.mockito.Mockito.reset(aiActionRiskAssessor);
+        when(aiActionRiskAssessor.assess(anyString(), anyString(), anyLong()))
+                .thenReturn(com.auraboot.framework.agent.dto.AiActionRiskLevel.BLOCKED);
+
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("cmd:order_delete")
+                .description("Delete an order")
+                .toolType("dsl_command")
+                .sourceCode("order_delete")
+                .operationKind("delete")
+                .riskLevel("L4")
+                .build();
+
+        String result = service.executeToolCall(1L, "run-blocked", "task-blocked", "agent",
+                tool.getName(), Map.of("targetRecordPid", "abc"), List.of(tool), null);
+
+        assertThat(result).contains("blocked for AI execution").contains("No data was changed");
+        verifyNoInteractions(commandExecutor);
+        verify(runtimeAuthorizationService, never()).authorizeIncremental(any());
     }
 }

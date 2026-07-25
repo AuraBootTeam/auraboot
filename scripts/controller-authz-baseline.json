@@ -1,5 +1,4 @@
 [
-  "platform/src/main/java/com/auraboot/framework/agent/controller/AiActionAuditController.java",
   "platform/src/main/java/com/auraboot/framework/agent/controller/AiScoringController.java",
   "platform/src/main/java/com/auraboot/framework/agent/controller/InterruptController.java",
   "platform/src/main/java/com/auraboot/framework/agent/controller/UserSoulProfileController.java",

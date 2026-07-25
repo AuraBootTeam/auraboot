@@ -3,6 +3,7 @@ package com.auraboot.framework.agent.controller;
 import com.auraboot.framework.agent.service.AiActionAuditService;
 import com.auraboot.framework.agent.service.AiActionRiskAssessor;
 import com.auraboot.framework.application.tenant.MetaContext;
+import com.auraboot.framework.agent.dto.AiActionRiskLevel;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,7 +16,12 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AI action audit controller")
@@ -29,6 +35,11 @@ class AiActionAuditControllerTest {
     @BeforeEach
     void setUp() {
         MetaContext.setContext(7L, 11L, "user-11", "auditor");
+        // The controller re-assesses risk instead of trusting the posted value, so the
+        // assessor has to answer. assess() never returns null in production — every branch
+        // returns a level — so an unstubbed mock is not a realistic shape.
+        lenient().when(riskAssessor.assess(anyString(), nullable(String.class), anyLong()))
+                .thenReturn(AiActionRiskLevel.MEDIUM);
         controller = new AiActionAuditController(riskAssessor, auditService);
     }
 
@@ -69,7 +80,7 @@ class AiActionAuditControllerTest {
                 eq("success"),
                 eq(null),
                 eq("operator confirmed"),
-                eq(Map.of("field", "status"))
+                eq(Map.of("field", "status", "clientClaimedRiskLevel", "medium"))
         );
     }
 
@@ -101,7 +112,30 @@ class AiActionAuditControllerTest {
                 eq(null),
                 eq(null),
                 eq(null),
-                eq(null)
+                eq(Map.of("clientClaimedRiskLevel", "medium"))
         );
+    }
+
+    @Test
+    @DisplayName("a client's risk claim does not become the audited risk level")
+    void clientRiskClaimIsNotTrusted() {
+        org.mockito.Mockito.reset(riskAssessor);
+        when(riskAssessor.assess(anyString(), nullable(String.class), anyLong()))
+                .thenReturn(AiActionRiskLevel.BLOCKED);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("actionType", "execute_command");
+        body.put("commandCode", "crm.account.delete");
+        body.put("riskLevel", "low");            // the client's claim, and it is wrong
+        body.put("userDecision", "confirmed");
+
+        controller.recordAudit(body);
+
+        verify(auditService).record(
+                eq(7L), eq(11L), eq(null), eq(null),
+                eq("execute_command"), eq("crm.account.delete"), eq(null), eq(null),
+                eq("blocked"),               // the server's verdict, not "low"
+                eq("confirmed"), eq(null), eq(null), eq(null),
+                eq(Map.of("clientClaimedRiskLevel", "low")));
     }
 }
