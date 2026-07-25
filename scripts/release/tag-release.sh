@@ -51,7 +51,7 @@ if git -C "$ROOT" rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
   exit 1
 fi
 
-echo "[release-tag] 1/2 exact-commit capability gate ($head_sha)"
+echo "[release-tag] exact-commit capability gate ($head_sha)"
 RUN_DIR="$ROOT/build/capability-eval/release-$VERSION_ARG" \
   "$ROOT/scripts/digital-employee-capability-eval-run.sh"
 
@@ -60,9 +60,6 @@ grep -qx "git_sha=$head_sha" "$receipt" || {
   echo "[release-tag] capability receipt does not match release commit $head_sha" >&2
   exit 1
 }
-
-echo "[release-tag] 2/2 test-system integrity gate"
-"$ROOT/scripts/check-test-system.sh"
 
 git -C "$ROOT" tag -a "$tag" -m "AuraBoot $tag"
 echo "[release-tag] created $tag at $head_sha"

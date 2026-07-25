@@ -10,7 +10,7 @@
 | **generator** | 4 | Regenerate a tracked artifact (manifests, snapshots). Output is committed; rerun when inputs change. |
 | **entrypoint** | 25 | Self-contained runners invoked by hand / crontab (owner has no CI). `refs=0` is normal here — nothing imports them. |
 | **pipeline/lib** | 10 | Shared library modules for the aura-pipeline / other scripts. Not run directly. |
-| **tooling** | 65 | Reusable dev/ops helpers referenced by other scripts, package.json, or docs. |
+| **tooling** | 66 | Reusable dev/ops helpers referenced by other scripts, package.json, or docs. |
 | **test** | 20 | Co-located `*.test.mjs` unit tests for the scripts above. |
 
 ## Conventions
@@ -125,13 +125,14 @@
 | `lib/reset-init-common.sh` | 7 | 2026-05-17 | Shared reset/init primitives. This file is sourced by lifecycle scripts; keep |
 | `lib/test-multi-worktree-guard.sh` | 1 | 2026-05-22 | Sanity tests for scripts/lib/multi-worktree-guard.sh |
 
-## tooling (65)
+## tooling (66)
 
 | script | refs | updated | purpose |
 |---|--:|---|---|
 | `agent-git-guard.mjs` | 4 | 2026-06-24 |  |
 | `agent-write-guard.mjs` | 2 | 2026-06-24 |  |
 | `aps-fixtures/compare-strategies.sh` | 1 | 2026-05-28 | Compare APS V2 scheduling strategies on the fixture data set. |
+| `db/cleanup-scheduler-residue.sh` | 0 | 2026-07-26 | Read-only-by-default cleanup for three exact retired system scheduler definitions. |
 | `behavior-keyed-load-test.mjs` | 0 | 2026-06-23 |  |
 | `db/deploy-migrate.sh` | 1 | 2026-06-18 | Deploy-time schema step: migrate the target DB, validate, and record the |
 | `db/flyway-common.sh` | 5 | 2026-06-18 | Shared Flyway environment + invocation for AuraBoot PostgreSQL schema governance. |
