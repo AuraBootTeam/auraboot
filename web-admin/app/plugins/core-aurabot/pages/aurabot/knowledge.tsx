@@ -181,6 +181,7 @@ export default function KnowledgeBasePage() {
             </div>
           </div>
           <button
+            data-testid="kb-new-button"
             onClick={() => {
               setForm(DEFAULT_FORM);
               setShowCreate(true);
@@ -284,6 +285,7 @@ function KbCard({
 
   return (
     <div
+      data-testid={`kb-card-${kb.pid}`}
       className={`group rounded-xl border p-5 transition-all hover:-translate-y-0.5 hover:shadow-md ${
         isActive
           ? 'border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
@@ -390,6 +392,7 @@ function KbForm({
           {t('ai.knowledge.form.name', undefined, 'Name')} *
         </label>
         <input
+          data-testid="kb-name-input"
           type="text"
           value={form.name}
           onChange={(e) => update('name', e.target.value)}
@@ -490,6 +493,7 @@ function KbForm({
       </div>
 
       <button
+        data-testid="kb-submit-button"
         onClick={onSubmit}
         className="w-full rounded-lg bg-blue-600 py-2.5 font-medium text-white transition-colors hover:bg-blue-700"
       >
