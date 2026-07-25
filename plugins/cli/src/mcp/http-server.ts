@@ -5,7 +5,12 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { ApiClient } from '../client/api-client.js';
 import { makeAuditWrapper } from './audit.js';
 import { authenticateHttpRequest } from './http-auth.js';
-import { DEFAULT_MCP_PROFILE, resolveMcpProfile } from './profiles.js';
+import {
+  DEFAULT_MCP_PROFILE,
+  McpRequestProfileError,
+  resolveMcpProfile,
+  resolveRequestMcpProfile,
+} from './profiles.js';
 import { buildToolRegistry } from './server.js';
 
 /**
@@ -51,6 +56,21 @@ export async function startHttpMcpServer(opts: {
         return;
       }
 
+      let requestProfile;
+      try {
+        requestProfile = resolveRequestMcpProfile(req.headers['x-aura-tools'], profile);
+      } catch (error) {
+        if (!(error instanceof McpRequestProfileError)) throw error;
+        res.writeHead(error.status, { 'content-type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            error: { code: -32602, message: error.message },
+          }),
+        );
+        return;
+      }
+
       const body = req.method === 'POST' ? await readJsonBody(req) : undefined;
 
       // Per-request client scoped to THIS caller's token + tenant.
@@ -58,7 +78,7 @@ export async function startHttpMcpServer(opts: {
       const audit = makeAuditWrapper(auth.ctx, { remoteClient: client });
 
       const mcpServer = new McpServer({ name: 'aura', version: '2.0.0' });
-      buildToolRegistry(client, { profile }).attachTo(mcpServer, audit);
+      buildToolRegistry(client, { profile: requestProfile }).attachTo(mcpServer, audit);
 
       const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
       res.on('close', () => {
@@ -78,7 +98,14 @@ export async function startHttpMcpServer(opts: {
     }
   });
 
-  await new Promise<void>((resolve) => server.listen(port, host, resolve));
+  await new Promise<void>((resolve, reject) => {
+    const onError = (error: Error): void => reject(error);
+    server.once('error', onError);
+    server.listen(port, host, () => {
+      server.off('error', onError);
+      resolve();
+    });
+  });
 
   const profileHint = profile === DEFAULT_MCP_PROFILE ? ' (default)' : '';
   console.error(

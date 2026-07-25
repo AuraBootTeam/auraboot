@@ -1,6 +1,7 @@
 import chalk from 'chalk';
 import { readFileSync } from 'node:fs';
 import { ApiClient, EXIT } from '../../client/api-client.js';
+import { WRITE_ROUTES } from '../../client/write-routes.js';
 import { readStdin } from './stdin.js';
 import { resolveOutputOptions } from '../../output/formatter.js';
 
@@ -51,7 +52,7 @@ export async function execCommand(commandCode: string, options: ExecOptions): Pr
   // 3. Dry-run
   if (options.dryRun) {
     for (const body of bodies) {
-      console.error(chalk.yellow(`[dry-run] POST /api/meta/commands/execute/${commandCode}`));
+      console.error(chalk.yellow(`[dry-run] POST ${WRITE_ROUTES.executeCommand(commandCode)}`));
       console.log(JSON.stringify(body, null, 2));
     }
     return;
@@ -71,7 +72,7 @@ async function executeSingle(
   body: Record<string, unknown>,
   outputOpts: { format: string; agentMode: boolean },
 ): Promise<void> {
-  const resp = await client.post(`/api/meta/commands/execute/${commandCode}`, body);
+  const resp = await client.post(WRITE_ROUTES.executeCommand(commandCode), body);
   if (resp.ok) {
     const resultData = (resp.data as any)?.data ?? {};
     const recordPid = resultData?.recordPid ?? '';
@@ -103,7 +104,7 @@ async function executeBatch(
   const results: any[] = [];
 
   for (let i = 0; i < bodies.length; i++) {
-    const resp = await client.post(`/api/meta/commands/execute/${commandCode}`, bodies[i]);
+    const resp = await client.post(WRITE_ROUTES.executeCommand(commandCode), bodies[i]);
     if (resp.ok) {
       successCount++;
       const resultData = (resp.data as any)?.data ?? {};

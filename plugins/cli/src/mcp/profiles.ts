@@ -20,6 +20,22 @@ export const DEFAULT_MCP_PROFILE: McpProfileName = 'read';
 
 export const MCP_PROFILE_NAMES: readonly McpProfileName[] = ['read', 'dsl-authoring', 'full'];
 
+const PROFILE_RANK: Record<McpProfileName, number> = {
+  read: 0,
+  'dsl-authoring': 1,
+  full: 2,
+};
+
+export class McpRequestProfileError extends Error {
+  constructor(
+    message: string,
+    readonly status: 400 | 403,
+  ) {
+    super(message);
+    this.name = 'McpRequestProfileError';
+  }
+}
+
 /** Tiers granted by each profile (cumulative). */
 const PROFILE_TIERS: Record<McpProfileName, readonly McpToolTier[]> = {
   read: ['read'],
@@ -65,6 +81,41 @@ export function resolveMcpProfile(name: string | undefined): McpProfileName {
   throw new Error(
     `Unknown MCP profile "${name}". Valid profiles: ${MCP_PROFILE_NAMES.join(', ')}.`,
   );
+}
+
+/**
+ * Resolve the optional Streamable HTTP `x-aura-tools` request header.
+ *
+ * The server startup profile is a capability ceiling. A caller may narrow its
+ * own request (for example full -> read), but a header can never widen what the
+ * operator allowed at startup.
+ */
+export function resolveRequestMcpProfile(
+  header: string | string[] | undefined,
+  serverProfile: McpProfileName,
+): McpProfileName {
+  if (header === undefined) return serverProfile;
+  if (Array.isArray(header)) {
+    throw new McpRequestProfileError(
+      'x-aura-tools must contain exactly one profile name.',
+      400,
+    );
+  }
+
+  let requested: McpProfileName;
+  try {
+    requested = resolveMcpProfile(header.trim());
+  } catch (error) {
+    throw new McpRequestProfileError((error as Error).message, 400);
+  }
+
+  if (PROFILE_RANK[requested] > PROFILE_RANK[serverProfile]) {
+    throw new McpRequestProfileError(
+      `Requested MCP profile "${requested}" exceeds the server ceiling "${serverProfile}".`,
+      403,
+    );
+  }
+  return requested;
 }
 
 export function toolAllowedInProfile(toolName: string, profile: McpProfileName): boolean {

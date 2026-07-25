@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_MCP_PROFILE,
   filterToolsByProfile,
+  McpRequestProfileError,
   resolveMcpProfile,
+  resolveRequestMcpProfile,
   toolAllowedInProfile,
 } from '../../src/mcp/profiles.js';
 
@@ -49,6 +51,36 @@ describe('toolAllowedInProfile', () => {
     expect(toolAllowedInProfile('mystery_new_tool', 'read')).toBe(false);
     expect(toolAllowedInProfile('mystery_new_tool', 'dsl-authoring')).toBe(false);
     expect(toolAllowedInProfile('mystery_new_tool', 'full')).toBe(true);
+  });
+});
+
+describe('resolveRequestMcpProfile', () => {
+  it('uses the server profile when the request does not specify a narrower profile', () => {
+    expect(resolveRequestMcpProfile(undefined, 'full')).toBe('full');
+  });
+
+  it('allows a caller to narrow the server profile', () => {
+    expect(resolveRequestMcpProfile('read', 'full')).toBe('read');
+    expect(resolveRequestMcpProfile('dsl-authoring', 'full')).toBe('dsl-authoring');
+    expect(resolveRequestMcpProfile('read', 'dsl-authoring')).toBe('read');
+  });
+
+  it('rejects attempts to widen the server capability ceiling', () => {
+    expect(() => resolveRequestMcpProfile('full', 'dsl-authoring')).toThrow(
+      expect.objectContaining<McpRequestProfileError>({ status: 403 }),
+    );
+    expect(() => resolveRequestMcpProfile('dsl-authoring', 'read')).toThrow(
+      expect.objectContaining<McpRequestProfileError>({ status: 403 }),
+    );
+  });
+
+  it('rejects invalid or repeated profile headers', () => {
+    expect(() => resolveRequestMcpProfile('bogus', 'full')).toThrow(
+      expect.objectContaining<McpRequestProfileError>({ status: 400 }),
+    );
+    expect(() => resolveRequestMcpProfile(['read', 'full'], 'full')).toThrow(
+      expect.objectContaining<McpRequestProfileError>({ status: 400 }),
+    );
   });
 });
 

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ApiClient, ApiResponse } from '../../../client/api-client.js';
+import { WRITE_ROUTES } from '../../../client/write-routes.js';
 import { toolErrorFromBackend } from '../../errors.js';
 import type { Tool } from '../../registry.js';
 
@@ -126,7 +127,7 @@ export function createCommandTool(client: ApiClient): Tool<Params> {
       let createResp: ApiResponse<CommandDefinitionCreateResponse>;
       try {
         createResp = await client.post<CommandDefinitionCreateResponse>(
-          '/api/meta/commands',
+          WRITE_ROUTES.createCommand,
           commandBody,
         );
       } catch (e) {
@@ -154,10 +155,7 @@ export function createCommandTool(client: ApiClient): Tool<Params> {
         const rule = bindingRules[i];
         let ruleResp: ApiResponse<unknown>;
         try {
-          ruleResp = await client.post(
-            `/api/meta/commands/${encodeURIComponent(commandPid)}/binding-rules`,
-            rule,
-          );
+          ruleResp = await client.post(WRITE_ROUTES.createBindingRule(commandPid), rule);
         } catch (e) {
           return rollback(client, commandPid, i, created, (e as Error).message);
         }
@@ -201,7 +199,7 @@ async function rollback(
   let rollbackOk = false;
   let rollbackError: string | undefined;
   try {
-    const del = await client.delete(`/api/meta/commands/${encodeURIComponent(commandPid)}`);
+    const del = await client.delete(WRITE_ROUTES.deleteCommand(commandPid));
     rollbackOk = del.ok;
     if (!del.ok) {
       rollbackError = del.message ?? `Status ${del.status}`;

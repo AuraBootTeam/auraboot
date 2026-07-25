@@ -3,8 +3,13 @@
     "code": "admin:create_member",
     "displayName:zh-CN": "新建成员",
     "displayName:en": "Create Member",
-    "description:en": "Create a tenant member directly: creates the user if needed, activates the membership, and grants the given roles. Payload: name, email, password (optional), phone (optional), roleCodes (optional). These are command arguments, not tenant_member fields — a custom command must not declare them as inputFields, which is a whitelist of MODEL fields and is enforced as field-level edit permission.",
-    "description:zh-CN": "直接创建租户成员:按需创建用户、激活成员资格,并授予指定角色。",
+    "description": "直接创建租户成员:按需创建用户、激活成员资格,并授予指定角色。参数 name、email、password、phone、roleCodes 是命令参数而非 tenant_member 模型字段，因此 custom 命令不得把它们声明为 inputFields。",
+    "extension": {
+      "localizedDescriptions": {
+        "en-US": "Create a tenant member directly: creates the user if needed, activates the membership, and grants the given roles. Payload: name, email, password (optional), phone (optional), roleCodes (optional). These are command arguments, not tenant_member fields, so a custom command must not declare them as inputFields.",
+        "zh-CN": "直接创建租户成员:按需创建用户、激活成员资格,并授予指定角色。参数 name、email、password、phone、roleCodes 是命令参数而非 tenant_member 模型字段，因此 custom 命令不得把它们声明为 inputFields。"
+      }
+    },
     "type": "custom",
     "modelCode": "tenant_member",
     "permissions": [

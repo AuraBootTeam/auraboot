@@ -13,6 +13,10 @@ All notable changes to `@auraboot/cli`. Format follows [Keep a Changelog](https:
 - Local audit log at `~/.aura/mcp-audit.log`: every tool invocation records timestamp, tenant, duration, and success/error.
 - New read-only MCP tools for write-tool context: `query_dsl_capabilities`, `query_existing_models`, `query_page_schemas`, `describe_command_pipeline`.
 - `ApiClient.put<T>(path, body)` and `ApiClient.delete<T>(path)` helpers (paving the way for write tools in W2).
+- `aura skills update` as a named alias for the idempotent Skills installer, so stale client copies can be refreshed explicitly.
+- Streamable HTTP callers can narrow the server's MCP profile per request with `x-aura-tools`; the startup profile remains a non-widenable capability ceiling.
 
 ### Internal
 - Refactored MCP server to use a central `ToolRegistry` (`src/mcp/registry.ts`) so each tool is one file under `src/mcp/tools/read/` (and, in W2, `src/mcp/tools/write/`). Behavior of the original 6 read tools is unchanged.
+- Centralized every agent-native mutation endpoint in `WRITE_ROUTES` and added a structural gate that prevents MCP write tools from opening their own transport or embedding mutation paths.
+- Aligned shipped plugin fixtures and the validation schema for lowercase `modelType`, page `recordSource`, permission `policySchema`, and capability resource directories; unsupported localized command descriptions now live in `extension.localizedDescriptions`.

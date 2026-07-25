@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ApiClient } from '../../../client/api-client.js';
+import { WRITE_ROUTES } from '../../../client/write-routes.js';
 import { toolErrorFromBackend } from '../../errors.js';
 import type { Tool } from '../../registry.js';
 
@@ -142,7 +143,7 @@ export function createModelTool(client: ApiClient): Tool<Params> {
       }
 
       try {
-        const resp = await client.post('/api/meta/models', body);
+        const resp = await client.post(WRITE_ROUTES.createModel, body);
         if (!resp.ok) {
           return toolErrorFromBackend(resp);
         }

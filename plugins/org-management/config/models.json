@@ -58,7 +58,7 @@
     "displayName:zh-CN": "团队",
     "displayName:en": "Team",
     "description": "Platform team facade backed by ab_team",
-    "modelType": "ENTITY",
+    "modelType": "entity",
     "modelCategory": "master",
     "extension": {
       "icon": "Users",
