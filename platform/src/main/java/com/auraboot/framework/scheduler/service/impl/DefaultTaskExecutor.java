@@ -94,7 +94,15 @@ public class DefaultTaskExecutor implements TaskExecutor {
      */
     private static final java.util.Set<String> ALLOWED_HANDLER_PREFIXES = java.util.Set.of(
             "scheduledTask", "taskHandler", "jobHandler", "cronHandler",
-            "idempotent", "cleanup", "sync", "digest", "sla", "decisionAlarm", "invariantAlarm"
+            "idempotent", "cleanup", "sync", "digest", "sla", "decisionAlarm", "invariantAlarm",
+            // System task handlers registered by SystemTaskInitializer whose bean names
+            // don't follow the *-prefix convention above. Listed by exact name so this
+            // stays a tight allowlist, not a broadened prefix (these are concrete beans
+            // defined in framework code, never tenant-supplied). Before this, none of
+            // them matched a prefix, so every one silently failed the allowlist on each
+            // trigger and never ran — outbox dispatch included.
+            "outboxWorkerImpl", "idempotencyServiceImpl", "fieldUsageServiceImpl",
+            "inboxCleanupTask", "embeddingRetryService", "documentReconcileService"
     );
 
     private void invokeHandler(ScheduledTask task) {
