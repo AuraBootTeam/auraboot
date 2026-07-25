@@ -45,6 +45,11 @@ try {
   const after = Number(db("select count(*) from mt_mfg_work_order_operation_pcba_execution where mfg_wop_status='in_progress'"));
   check('FR-05 interlock blocks start (no illegal pending→in_progress)', after === before, `in_progress ${before}→${after}`);
   check('interlock reason surfaced to the operator', /interlock|互锁|blocked|product_version|生产版本/i.test(toastText), 'block message');
+  // A blocked row action must NOT blank the whole list into the full-page "加载失败" ErrorAlert —
+  // it should stay rendered so the operator can act on other rows (fixed in ListPageContent).
+  const mainAfter = (await p.locator('main').first().innerText().catch(() => '')) || '';
+  const rowsAfter = await p.locator('table tbody tr').count().catch(() => 0);
+  check('list stays rendered after blocked action (no 加载失败 blank)', !/加载失败/.test(mainAfter) && rowsAfter > 0, `rows=${rowsAfter}`);
 } catch (e) { check('no exception', false, String(e.message).slice(0, 160)); await p.screenshot({ path: `${OUT}/fr07-action-err.png` }).catch(() => {}); }
 await b.close();
 const pass = results.filter((r) => r.pass).length;
