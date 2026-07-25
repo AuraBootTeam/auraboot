@@ -1738,7 +1738,14 @@ function ListPageContentInner(props: PageContentProps) {
     t,
     token: token || undefined,
     showToast,
-    onError: (err) => setError(err.message),
+    // A failed row/toolbar ACTION (e.g. a command rejected by a business rule such as the FR-05
+    // startup interlock) must surface as a toast only — useActionHandler already calls notifyToast.
+    // Do NOT route it into the page-level `error` state: that replaces the whole list with the
+    // full-page "加载失败" ErrorAlert (which is reserved for data/schema load failures), forcing a
+    // reload to recover. Blocking a single row's action should never blank the table.
+    onError: (err) => {
+      if (import.meta.env?.DEV) console.warn('[ListPageContent] action error (shown via toast):', err.message);
+    },
   });
 
   // Listen for cell-button-click events from Button field renderer (GAP-131)
