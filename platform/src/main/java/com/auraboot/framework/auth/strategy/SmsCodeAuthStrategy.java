@@ -5,6 +5,7 @@ import com.auraboot.framework.auth.dto.AuthenticationResponse;
 import com.auraboot.framework.auth.service.VerificationCodeService;
 import com.auraboot.framework.common.constant.ResponseCode;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -32,6 +33,7 @@ public class SmsCodeAuthStrategy implements AuthStrategy {
     private final VerificationCodeService verificationCodeService;
     private final LoginCompletionHelper loginCompletionHelper;
     private final UserMapper userMapper;
+    private final SystemModeService systemModeService;
 
     @Override
     public String getChannelCode() {
@@ -59,8 +61,14 @@ public class SmsCodeAuthStrategy implements AuthStrategy {
         // Find user by mobile
         User user = findUserByMobile(mobile);
 
-        // Auto-register if user not found
+        // Auto-register if user not found — but only when self-registration is
+        // enabled, the same gate EmailCodeAuthStrategy and the password register
+        // path enforce. Without it, a valid SMS code minted a brand-new account
+        // even with self-registration turned off.
         if (user == null) {
+            if (!systemModeService.isRegistrationAllowed()) {
+                throw new BusinessException(ResponseCode.CommonValidationFailed, "Self-registration is disabled");
+            }
             log.info("Auto-registering new user via SMS OTP");
             user = autoRegisterByMobile(mobile);
         }

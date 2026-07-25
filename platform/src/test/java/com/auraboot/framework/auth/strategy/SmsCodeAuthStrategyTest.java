@@ -4,6 +4,7 @@ import com.auraboot.framework.auth.dto.AuthStrategyRequest;
 import com.auraboot.framework.auth.dto.AuthenticationResponse;
 import com.auraboot.framework.auth.service.VerificationCodeService;
 import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.saas.config.service.SystemModeService;
 import com.auraboot.framework.user.dao.entity.User;
 import com.auraboot.framework.user.mapper.UserMapper;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,9 @@ class SmsCodeAuthStrategyTest {
 
     @Mock
     private UserMapper userMapper;
+
+    @Mock
+    private SystemModeService systemModeService;
 
     @InjectMocks
     private SmsCodeAuthStrategy strategy;
@@ -161,9 +165,10 @@ class SmsCodeAuthStrategyTest {
     // =========================================================
 
     @Test
-    void authenticate_newUser_autoRegisters() {
+    void authenticate_newUser_whenSelfRegistrationAllowed_autoRegisters() {
         when(verificationCodeService.verifyCode(any(), any(), any())).thenReturn(true);
         when(userMapper.selectOne(any())).thenReturn(null); // user not found
+        when(systemModeService.isRegistrationAllowed()).thenReturn(true);
 
         when(loginCompletionHelper.completeLogin(any(), any(), any()))
                 .thenReturn(mock(AuthenticationResponse.class));
@@ -171,6 +176,20 @@ class SmsCodeAuthStrategyTest {
         strategy.authenticate(buildRequest("+8613900139000", "987654"));
 
         verify(userMapper).insert(any(User.class));
+    }
+
+    @Test
+    void authenticate_newUser_whenSelfRegistrationDisabled_rejectsAutoRegistration() {
+        when(verificationCodeService.verifyCode(any(), any(), any())).thenReturn(true);
+        when(userMapper.selectOne(any())).thenReturn(null); // user not found
+        when(systemModeService.isRegistrationAllowed()).thenReturn(false);
+
+        assertThatThrownBy(() -> strategy.authenticate(buildRequest("+8613900139000", "987654")))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("Self-registration is disabled");
+
+        verify(userMapper, never()).insert(any(User.class));
+        verify(loginCompletionHelper, never()).completeLogin(any(), any(), any());
     }
 
     // =========================================================
