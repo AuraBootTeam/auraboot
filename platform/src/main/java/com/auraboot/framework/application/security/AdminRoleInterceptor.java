@@ -3,6 +3,7 @@ package com.auraboot.framework.application.security;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.enums.RoleCodes;
+import com.auraboot.framework.observability.TraceCorrelation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -102,6 +103,13 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
     private final AdminAuditService auditService;
     private final RequestBodySummarizer bodySummarizer;
 
+    /** Absent when tracing is disabled (dev profile), hence ObjectProvider. */
+    private final org.springframework.beans.factory.ObjectProvider<io.micrometer.tracing.Tracer> tracerProvider;
+
+    private io.micrometer.tracing.Tracer tracer() {
+        return tracerProvider == null ? null : tracerProvider.getIfAvailable();
+    }
+
     @Override
     public boolean preHandle(HttpServletRequest request,
                              HttpServletResponse response,
@@ -148,7 +156,9 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
                     request.getMethod(),
                     DENY_CODE,
                     bodySummarizer.summarize(request),
-                    0);
+                    0,
+                    TraceCorrelation.traceId(tracer()),
+                    TraceCorrelation.spanId(tracer()));
             return false;
         }
         request.setAttribute(ATTR_START_TIME_MS, System.currentTimeMillis());
@@ -177,7 +187,11 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
                 req.getMethod(),
                 resp.getStatus(),
                 bodySummarizer.summarize(req),
-                latencyMs);
+                latencyMs,
+                // Captured here, on the request thread: adminAuditExecutor has no
+                // TaskDecorator, so the writer cannot resolve either channel itself.
+                TraceCorrelation.traceId(tracer()),
+                TraceCorrelation.spanId(tracer()));
     }
 
     /**

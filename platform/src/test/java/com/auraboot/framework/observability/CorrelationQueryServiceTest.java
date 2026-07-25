@@ -48,6 +48,8 @@ class CorrelationQueryServiceTest {
     private AdminEventLogMapper adminEventLogMapper;
     @Mock
     private PermissionAuditLogMapper permissionAuditLogMapper;
+    @Mock
+    private com.auraboot.framework.application.security.AdminAuditService adminAuditService;
 
     @InjectMocks
     private CorrelationQueryService service;
@@ -60,6 +62,12 @@ class CorrelationQueryServiceTest {
     @AfterEach
     void tearDown() {
         MetaContext.clear();
+    }
+
+    private static com.auraboot.framework.application.security.AdminAuditService.AdminActionView
+            adminAction(String path, int status) {
+        return new com.auraboot.framework.application.security.AdminAuditService.AdminActionView(
+                path, "GET", status, "tenant_admin", "42", 12, null);
     }
 
     private static PermissionAuditLog denial(String resource, String action, String reason) {
@@ -84,6 +92,8 @@ class CorrelationQueryServiceTest {
         when(adminEventLogMapper.selectList(any())).thenReturn(List.of(new AdminEventLog()));
         when(permissionAuditLogMapper.findByOtelTraceId(eq(7L), eq("trace-abc"), anyInt()))
                 .thenReturn(List.of(denial("crm_account", "delete", "denied by policy")));
+        when(adminAuditService.findByTraceId(eq(7L), eq("trace-abc"), anyInt()))
+                .thenReturn(List.of(adminAction("/api/admin/users", 200)));
 
         CorrelationView view = service.byTrace("trace-abc");
 
@@ -95,6 +105,7 @@ class CorrelationQueryServiceTest {
         assertThat(view.getBehaviorEvents()).hasSize(1);
         assertThat(view.getAuditEvents()).hasSize(1);
         assertThat(view.getPermissionDenials()).hasSize(1);
+        assertThat(view.getAdminActions()).hasSize(1);
     }
 
     /**
@@ -111,6 +122,7 @@ class CorrelationQueryServiceTest {
         when(adminEventLogMapper.selectList(any())).thenReturn(List.of());
         when(permissionAuditLogMapper.findByOtelTraceId(eq(7L), eq("t-1"), anyInt()))
                 .thenReturn(List.of(denial("crm_account", "delete", "denied by policy")));
+        when(adminAuditService.findByTraceId(any(), any(), anyInt())).thenReturn(List.of());
 
         CorrelationView view = service.byTrace("t-1");
 
@@ -121,6 +133,29 @@ class CorrelationQueryServiceTest {
         // memberId crosses the browser boundary, so it travels as string digits, not a
         // JSON number that would lose precision past 2^53.
         assertThat(view.getPermissionDenials().get(0).memberId()).isEqualTo("4242");
+    }
+
+    /**
+     * ab_admin_action_log was the last audit surface SoT 121 §6 listed as missing from the
+     * unified entry point. AdminRoleInterceptor writes a row for rejected requests too, so a
+     * 403'd admin call is now reachable from the trace id its own response carried.
+     */
+    @Test
+    @DisplayName("byTrace surfaces admin HTTP requests, including rejected ones")
+    void byTraceSurfacesAdminActions() {
+        when(commandAuditLogMapper.findByTraceId(any(), any())).thenReturn(List.of());
+        when(genAiUsageMapper.selectList(any())).thenReturn(List.of());
+        when(behaviorEventMapper.selectList(any())).thenReturn(List.of());
+        when(adminEventLogMapper.selectList(any())).thenReturn(List.of());
+        when(permissionAuditLogMapper.findByOtelTraceId(any(), any(), anyInt())).thenReturn(List.of());
+        when(adminAuditService.findByTraceId(eq(7L), eq("t-3"), anyInt()))
+                .thenReturn(List.of(adminAction("/api/admin/roles", 403)));
+
+        CorrelationView view = service.byTrace("t-3");
+
+        assertThat(view.getAdminActions()).hasSize(1);
+        assertThat(view.getAdminActions().get(0).status()).isEqualTo(403);
+        assertThat(view.getAdminActions().get(0).path()).isEqualTo("/api/admin/roles");
     }
 
     /**
@@ -136,6 +171,7 @@ class CorrelationQueryServiceTest {
         when(behaviorEventMapper.selectList(any())).thenReturn(List.of());
         when(adminEventLogMapper.selectList(any())).thenReturn(List.of());
         when(permissionAuditLogMapper.findByOtelTraceId(any(), any(), anyInt())).thenReturn(List.of());
+        when(adminAuditService.findByTraceId(any(), any(), anyInt())).thenReturn(List.of());
 
         service.byTrace("t-2");
 

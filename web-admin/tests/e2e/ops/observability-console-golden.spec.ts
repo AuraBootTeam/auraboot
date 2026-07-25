@@ -123,18 +123,28 @@ test.describe('observability console', () => {
    * which is indistinguishable from "no denials" — the exact ambiguity this domain was
    * added to remove.
    */
-  test('the correlation endpoint returns the permission-denial domain', async ({ page }) => {
+  test('the correlation endpoint returns every audit domain the console renders', async ({ page }) => {
     await page.goto('/ops/troubleshooting');
     const res = await page.request.get(`/api/observability/correlation/${'0'.repeat(31)}1`);
     expect(res.status()).toBe(200);
 
     const body = await res.json();
     const payload = body?.data ?? body;
-    expect(
-      Object.prototype.hasOwnProperty.call(payload, 'permissionDenials'),
-      `permissionDenials missing from the correlation payload. Keys: ${Object.keys(payload).join(', ')}`,
-    ).toBe(true);
-    expect(Array.isArray(payload.permissionDenials)).toBe(true);
+
+    // Every domain the page renders a panel for. A missing key means that panel silently
+    // renders nothing, which is indistinguishable from "no rows" — the exact ambiguity these
+    // domains were added to remove. permissionDenials and adminActions are the two that used
+    // to have no trace column at all, so they are the ones most worth pinning.
+    for (const domain of [
+      'commandAudits', 'llmUsage', 'behaviorEvents', 'auditEvents',
+      'permissionDenials', 'adminActions',
+    ]) {
+      expect(
+        Object.prototype.hasOwnProperty.call(payload, domain),
+        `${domain} missing from the correlation payload. Keys: ${Object.keys(payload).join(', ')}`,
+      ).toBe(true);
+      expect(Array.isArray(payload[domain]), `${domain} should be an array`).toBe(true);
+    }
   });
 
   /**

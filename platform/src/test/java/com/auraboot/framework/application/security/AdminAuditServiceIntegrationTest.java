@@ -49,6 +49,9 @@ class AdminAuditServiceIntegrationTest extends BaseIntegrationTest {
         }
     }
 
+    private static final String TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736";
+    private static final String SPAN_ID = "00f067aa0ba902b7";
+
     @Test
     @DisplayName("logAdminAction writes a row asynchronously with all fields populated")
     void logAdminAction_writesRowAsync() {
@@ -56,7 +59,7 @@ class AdminAuditServiceIntegrationTest extends BaseIntegrationTest {
         Long userId = 999_001L;
 
         auditService.logAdminAction(tenantId, userId, "tenant_admin",
-                "/api/admin/users", "GET", 200, null, 42);
+                "/api/admin/users", "GET", 200, null, 42, TRACE_ID, SPAN_ID);
 
         Awaitility.await()
                 .atMost(Duration.ofSeconds(3))
@@ -73,6 +76,11 @@ class AdminAuditServiceIntegrationTest extends BaseIntegrationTest {
                     assertThat(row.get("status")).isEqualTo(200);
                     assertThat(((Number) row.get("latency_ms")).intValue()).isEqualTo(42);
                     assertThat(row.get("request_body_summary")).isNull();
+                    // The trace columns are the whole point of V20260725160000: this writer is
+                    // @Async on a pool with no TaskDecorator, so the ids have to arrive as
+                    // parameters or they silently persist as NULL.
+                    assertThat(row.get("trace_id")).isEqualTo(TRACE_ID);
+                    assertThat(row.get("span_id")).isEqualTo(SPAN_ID);
                 });
     }
 
@@ -84,7 +92,7 @@ class AdminAuditServiceIntegrationTest extends BaseIntegrationTest {
         String summary = "{\"keys\":[\"userId\",\"password\"]}";
 
         auditService.logAdminAction(tenantId, userId, "tenant_admin",
-                "/api/admin/users", "POST", 200, summary, 50);
+                "/api/admin/users", "POST", 200, summary, 50, TRACE_ID, SPAN_ID);
 
         Awaitility.await()
                 .atMost(Duration.ofSeconds(3))

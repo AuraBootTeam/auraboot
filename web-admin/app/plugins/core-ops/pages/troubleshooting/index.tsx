@@ -72,6 +72,16 @@ interface PermissionDenial {
   createdAt: string | null;
 }
 
+interface AdminAction {
+  path: string | null;
+  method: string | null;
+  status: number | null;
+  actorRole: string | null;
+  actorUserId: string | null;
+  latencyMs: number | null;
+  createdAt: string | null;
+}
+
 interface CorrelationView {
   traceId: string;
   commandAudits: CommandAudit[];
@@ -79,6 +89,7 @@ interface CorrelationView {
   behaviorEvents: BehaviorEvent[];
   auditEvents: AuditEvent[];
   permissionDenials: PermissionDenial[];
+  adminActions: AdminAction[];
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +169,7 @@ export default function TroubleshootingPage() {
         behaviorEvents: data.behaviorEvents ?? [],
         auditEvents: data.auditEvents ?? [],
         permissionDenials: data.permissionDenials ?? [],
+        adminActions: data.adminActions ?? [],
       });
       setQueried(true);
     } catch (e) {
@@ -191,7 +203,8 @@ export default function TroubleshootingPage() {
     (view?.llmUsage.length ?? 0) +
     (view?.behaviorEvents.length ?? 0) +
     (view?.auditEvents.length ?? 0) +
-    (view?.permissionDenials.length ?? 0);
+    (view?.permissionDenials.length ?? 0) +
+    (view?.adminActions.length ?? 0);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900" data-testid="troubleshooting-page">
@@ -249,8 +262,8 @@ export default function TroubleshootingPage() {
             className="rounded-md border border-gray-200 bg-white px-6 py-10 text-center text-sm text-gray-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400"
           >
             {l(
-              '该 traceId 没有关联到任何权限拒绝、命令、LLM、行为或审计记录。',
-              'No permission denial, command, LLM, behavior or audit record correlates to this traceId.',
+              '该 traceId 没有关联到任何权限拒绝、命令、LLM、行为、管理请求或审计记录。',
+              'No permission denial, command, LLM, behavior, admin request or audit record correlates to this traceId.',
             )}
           </div>
         )}
@@ -449,6 +462,57 @@ export default function TroubleshootingPage() {
                           <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{b.source || '—'}</td>
                           <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{[b.pageId, b.elementCode].filter(Boolean).join(' / ') || '—'}</td>
                           <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400">{fmtTime(b.occurredAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Section>
+
+            {/* Admin HTTP requests — includes the ones AdminRoleInterceptor rejected */}
+            <Section
+              title={l('管理请求', 'Admin Requests')}
+              count={view.adminActions.length}
+              testid="section-admin-actions"
+            >
+              {view.adminActions.length === 0 ? (
+                <EmptyRow text={l('无管理请求记录', 'No admin requests')} />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-left text-xs uppercase text-gray-500 dark:border-gray-700 dark:text-gray-400">
+                        <th className="px-3 py-2">{l('方法', 'Method')}</th>
+                        <th className="px-3 py-2">{l('路径', 'Path')}</th>
+                        <th className="px-3 py-2">{l('状态', 'Status')}</th>
+                        <th className="px-3 py-2">{l('角色', 'Role')}</th>
+                        <th className="px-3 py-2">{l('耗时', 'Latency')}</th>
+                        <th className="px-3 py-2">{l('时间', 'Time')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {view.adminActions.map((a, i) => (
+                        <tr key={i} className="border-b border-gray-100 dark:border-gray-700/50" data-testid="admin-action-row">
+                          <td className="px-3 py-2 font-mono text-gray-600 dark:text-gray-300">{a.method || '—'}</td>
+                          <td className="px-3 py-2 font-mono text-gray-900 dark:text-gray-100">{a.path || '—'}</td>
+                          <td className="px-3 py-2">
+                            <span
+                              className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${
+                                a.status != null && a.status >= 400
+                                  ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+                                  : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                              }`}
+                              data-testid="admin-action-status"
+                            >
+                              {a.status ?? '—'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">{a.actorRole || '—'}</td>
+                          <td className="px-3 py-2 text-gray-600 dark:text-gray-300">
+                            {a.latencyMs != null ? `${a.latencyMs} ms` : '—'}
+                          </td>
+                          <td className="px-3 py-2 whitespace-nowrap text-gray-500 dark:text-gray-400">{fmtTime(a.createdAt)}</td>
                         </tr>
                       ))}
                     </tbody>

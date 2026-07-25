@@ -195,8 +195,24 @@ CREATE TABLE public.ab_admin_action_log (
     status integer NOT NULL,
     request_body_summary character varying(2048),
     latency_ms integer,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    trace_id character varying(36),
+    span_id character varying(36)
 );
+
+
+--
+-- Name: COLUMN ab_admin_action_log.trace_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_admin_action_log.trace_id IS 'OTel W3C traceId (32-hex) of the request, captured on the request thread by AdminRoleInterceptor and passed to the @Async writer';
+
+
+--
+-- Name: COLUMN ab_admin_action_log.span_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_admin_action_log.span_id IS 'OTel spanId of the request, captured on the request thread';
 
 
 --
@@ -20319,6 +20335,13 @@ ALTER TABLE ONLY public.ab_user_data_domain
 --
 
 CREATE UNIQUE INDEX email_idx ON public.ab_user USING btree (email) WHERE (deleted_flag = false);
+
+
+--
+-- Name: idx_ab_admin_action_log_trace_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_admin_action_log_trace_id ON public.ab_admin_action_log USING btree (trace_id) WHERE (trace_id IS NOT NULL);
 
 
 --

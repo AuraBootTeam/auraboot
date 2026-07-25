@@ -2,6 +2,7 @@ package com.auraboot.framework.observability;
 
 import com.auraboot.framework.agent.trace.entity.GenAiUsageRecord;
 import com.auraboot.framework.agent.trace.mapper.GenAiUsageMapper;
+import com.auraboot.framework.application.security.AdminAuditService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.audit.entity.AdminEventLog;
 import com.auraboot.framework.audit.mapper.AdminEventLogMapper;
@@ -31,11 +32,15 @@ public class CorrelationQueryService {
      */
     private static final int PERMISSION_DENIAL_LIMIT = 200;
 
+    /** One request writes at most a couple of admin-audit rows; bounded for the same reason. */
+    private static final int ADMIN_ACTION_LIMIT = 50;
+
     private final CommandAuditLogMapper commandAuditLogMapper;
     private final GenAiUsageMapper genAiUsageMapper;
     private final BehaviorEventMapper behaviorEventMapper;
     private final AdminEventLogMapper adminEventLogMapper;
     private final PermissionAuditLogMapper permissionAuditLogMapper;
+    private final AdminAuditService adminAuditService;
 
     public CorrelationView byTrace(String traceId) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -61,6 +66,8 @@ public class CorrelationQueryService {
                         .stream()
                         .map(PermissionDenialView::from)
                         .toList());
+        view.setAdminActions(
+                adminAuditService.findByTraceId(tenantId, traceId, ADMIN_ACTION_LIMIT));
         return view;
     }
 }
