@@ -56,11 +56,11 @@ public class McpToolProvider implements ToolProvider {
 
         List<ToolDefinition> allTools = new ArrayList<>();
         for (Map<String, Object> server : servers) {
-            String serverName = (String) server.get("server_name");
-            String serverUrl = (String) server.get("server_url");
+            McpServerTarget target = McpServerTarget.fromRow(server);
+            String serverName = target.serverName();
 
             try {
-                List<McpClient.McpToolInfo> tools = mcpClient.listTools(serverUrl);
+                List<McpClient.McpToolInfo> tools = mcpClient.listTools(target);
                 for (McpClient.McpToolInfo tool : tools) {
                     String toolCode = PREFIX + serverName + ":" + tool.getName();
                     allTools.add(ToolDefinition.builder()
@@ -75,7 +75,7 @@ public class McpToolProvider implements ToolProvider {
                 log.debug("Discovered {} tools from MCP server '{}'", tools.size(), serverName);
             } catch (Exception e) {
                 log.warn("Failed to discover tools from MCP server '{}' at {}: {}",
-                        serverName, serverUrl, e.getMessage());
+                        serverName, target.serverUrl(), e.getMessage());
                 // Continue with other servers — one failure should not block all discovery
             }
         }
@@ -104,9 +104,9 @@ public class McpToolProvider implements ToolProvider {
         String serverName = parts[1];
         String toolName = parts[2];
 
-        // Resolve server URL
-        String serverUrl = resolveServerUrl(tenantId, serverName);
-        if (serverUrl == null) {
+        // Resolve the registered server (URL + transport + credentials)
+        McpServerTarget target = resolveTarget(tenantId, serverName);
+        if (target == null) {
             return ProviderExecutionResult.builder()
                     .success(false)
                     .errorMessage("MCP server '" + serverName + "' not found or inactive for tenant " + tenantId)
@@ -116,7 +116,7 @@ public class McpToolProvider implements ToolProvider {
 
         // Execute via MCP client
         try {
-            Map<String, Object> result = mcpClient.callTool(serverUrl, toolName, params);
+            Map<String, Object> result = mcpClient.callTool(target, toolName, params);
             return ProviderExecutionResult.builder()
                     .success(true)
                     .data(result)
@@ -134,13 +134,13 @@ public class McpToolProvider implements ToolProvider {
     }
 
     /**
-     * Resolve server URL by server name for the given tenant.
+     * Resolve a registered server by name for the given tenant.
      */
-    private String resolveServerUrl(Long tenantId, String serverName) {
+    private McpServerTarget resolveTarget(Long tenantId, String serverName) {
         List<Map<String, Object>> servers = mcpServerConfigService.listActiveServers(tenantId);
         for (Map<String, Object> server : servers) {
             if (serverName.equals(server.get("server_name"))) {
-                return (String) server.get("server_url");
+                return McpServerTarget.fromRow(server);
             }
         }
         return null;

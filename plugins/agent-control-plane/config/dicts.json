@@ -1208,5 +1208,117 @@
         }
       }
     ]
+  },
+  {
+    "code": "mcp_server_status",
+    "name": "MCP Server Status",
+    "name:zh-CN": "MCP 服务器状态",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "active",
+        "label": "Active",
+        "label:zh-CN": "已启用",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "inactive",
+        "label": "Inactive",
+        "label:zh-CN": "已停用",
+        "sortNo": 20,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "mcp_transport_type",
+    "name": "MCP Transport",
+    "name:zh-CN": "MCP 传输方式",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "HTTP",
+        "label": "HTTP",
+        "label:zh-CN": "HTTP",
+        "sortNo": 10,
+        "color": "#52c41a",
+        "status": "enabled",
+        "extension": {
+          "color": "green"
+        }
+      },
+      {
+        "value": "SSE",
+        "label": "SSE",
+        "label:zh-CN": "SSE",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "STDIO",
+        "label": "stdio (local only)",
+        "label:zh-CN": "stdio（仅本地）",
+        "sortNo": 30,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      }
+    ]
+  },
+  {
+    "code": "mcp_auth_type",
+    "name": "MCP Auth Type",
+    "name:zh-CN": "MCP 认证方式",
+    "dictType": "static",
+    "items": [
+      {
+        "value": "NONE",
+        "label": "None",
+        "label:zh-CN": "无",
+        "sortNo": 10,
+        "color": "#d9d9d9",
+        "status": "enabled",
+        "extension": {
+          "color": "gray"
+        }
+      },
+      {
+        "value": "BEARER",
+        "label": "Bearer Token",
+        "label:zh-CN": "Bearer 令牌",
+        "sortNo": 20,
+        "color": "#1890ff",
+        "status": "enabled",
+        "extension": {
+          "color": "blue"
+        }
+      },
+      {
+        "value": "API_KEY",
+        "label": "API Key",
+        "label:zh-CN": "API Key",
+        "sortNo": 30,
+        "color": "#faad14",
+        "status": "enabled",
+        "extension": {
+          "color": "amber"
+        }
+      }
+    ]
   }
 ]

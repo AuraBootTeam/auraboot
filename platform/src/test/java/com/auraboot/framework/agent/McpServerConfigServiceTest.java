@@ -1,5 +1,6 @@
 package com.auraboot.framework.agent;
 
+import com.auraboot.framework.agent.provider.McpServerTarget;
 import com.auraboot.framework.agent.service.McpServerConfigService;
 import com.auraboot.framework.application.TestApplication;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
@@ -204,5 +205,77 @@ public class McpServerConfigServiceTest extends BaseIntegrationTest {
         // This proves the update path works without errors
         assertThatCode(() -> mcpServerConfigService.updateSyncResult(tenantId, pid, 42))
                 .doesNotThrowAnyException();
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Test 8: credentials survive the round-trip to the connection target
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * The registry used to write auth_type / auth_config and never read them
+     * back — the listing query did not select those columns — so a token entered
+     * in the admin UI reached the database and stopped there, and every
+     * authenticated MCP server answered 401. This asserts the whole path:
+     * registered credentials come back out, already decoded from JSONB into the
+     * shape {@link McpServerTarget} consumes.
+     */
+    @Test
+    @Order(8)
+    @DisplayName("registered credentials come back from listActiveServers as a usable target")
+    void registeredCredentials_reachTheConnectionTarget() {
+        Long tenantId = getTestTenant().getId();
+        String name = "Authenticated MCP " + System.currentTimeMillis();
+
+        String pid = mcpServerConfigService.registerServer(
+                tenantId, name, "https://mcp.example.com/rpc",
+                "HTTP", "BEARER", Map.of("token", "tok-round-trip"));
+
+        Map<String, Object> row = mcpServerConfigService.listActiveServers(tenantId).stream()
+                .filter(s -> pid.equals(s.get("pid")))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("registered server missing from listing"));
+
+        assertThat(row.get("auth_type")).isEqualTo("BEARER");
+
+        McpServerTarget target = McpServerTarget.fromRow(row);
+        assertThat(target.authType()).isEqualTo("BEARER");
+        assertThat(target.authConfig())
+                .as("auth_config must be decoded from JSONB, not left as a raw PGobject")
+                .isNotNull()
+                .containsEntry("token", "tok-round-trip");
+        assertThat(target.isHttpTransport()).isTrue();
+    }
+
+    /** A server registered without credentials must not grow any. */
+    @Test
+    @Order(9)
+    @DisplayName("server without auth yields a target with no credentials")
+    void serverWithoutAuth_hasNoCredentials() {
+        Long tenantId = getTestTenant().getId();
+        String pid = mcpServerConfigService.registerServer(
+                tenantId, "Plain MCP " + System.currentTimeMillis(),
+                "https://plain.example.com/rpc", "HTTP", null, null);
+
+        Map<String, Object> row = mcpServerConfigService.listActiveServers(tenantId).stream()
+                .filter(s -> pid.equals(s.get("pid")))
+                .findFirst()
+                .orElseThrow();
+
+        McpServerTarget target = McpServerTarget.fromRow(row);
+        assertThat(target.authType()).isNull();
+        assertThat(target.authConfig()).isNull();
+    }
+
+    /** The secret must never be rendered into a log line or error message. */
+    @Test
+    @Order(10)
+    @DisplayName("target toString omits credentials")
+    void targetToString_omitsCredentials() {
+        McpServerTarget target = new McpServerTarget(
+                "vendor", "https://x.example/rpc", "HTTP", "BEARER", Map.of("token", "super-secret"));
+
+        assertThat(target.toString())
+                .contains("vendor")
+                .doesNotContain("super-secret");
     }
 }

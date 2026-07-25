@@ -1,6 +1,7 @@
 package com.auraboot.framework.agent;
 
 import com.auraboot.framework.agent.provider.McpClient;
+import com.auraboot.framework.agent.provider.McpServerTarget;
 import com.auraboot.framework.agent.provider.McpToolProvider;
 import com.auraboot.framework.agent.provider.ToolDefinition;
 import com.auraboot.framework.agent.provider.ToolDiscoveryContext;
@@ -17,6 +18,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -99,7 +101,7 @@ class PromptInjectionBoundaryTest {
         McpClient.McpToolInfo remote = new McpClient.McpToolInfo();
         remote.setName("search");
         remote.setDescription(hostile);
-        when(client.listTools(anyString())).thenReturn(List.of(remote));
+        when(client.listTools(any(McpServerTarget.class))).thenReturn(List.of(remote));
 
         List<ToolDefinition> discovered = new McpToolProvider(client, config)
                 .discover(ToolDiscoveryContext.builder().tenantId(1L).build());
