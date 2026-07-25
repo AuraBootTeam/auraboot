@@ -1,4 +1,4 @@
-import { test, expect } from '../fixtures';
+import { test, expect } from '../../fixtures';
 test.use({ storageState: 'tests/storage/admin.json' });
 test.describe.configure({ timeout: 120000 });
 
