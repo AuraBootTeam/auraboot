@@ -37,4 +37,36 @@ public class SendMessageRequest {
     }
 
     private List<MentionTarget> mentionTargets;
+
+    /**
+     * The mention tokens every consumer should use: the legacy {@code mentions} list
+     * merged with {@code mentionTargets}, agents normalised to {@code agent:<id>}.
+     *
+     * <p>Three places consume mentions — message persistence (which is what
+     * {@code InboxImListener} later reads back), the {@code ImMessageSentEvent} that
+     * drives {@code GroupChatAgentRouter}, and the WebSocket handler. Each of them used
+     * to read the raw {@code mentions} list, so a client populating the structured
+     * {@code mentionTargets} field got its mentions silently dropped: no agent reply and
+     * no Inbox item. Deriving all three from this one method keeps them from drifting.</p>
+     */
+    public List<String> effectiveMentions() {
+        List<String> merged = new java.util.ArrayList<>();
+        if (mentions != null) {
+            merged.addAll(mentions);
+        }
+        if (mentionTargets != null) {
+            for (MentionTarget target : mentionTargets) {
+                if (target == null || target.getId() == null) {
+                    continue;
+                }
+                String token = "agent".equalsIgnoreCase(target.getType())
+                        ? "agent:" + target.getId()
+                        : String.valueOf(target.getId());
+                if (!merged.contains(token)) {
+                    merged.add(token);
+                }
+            }
+        }
+        return merged;
+    }
 }

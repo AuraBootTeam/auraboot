@@ -130,19 +130,36 @@ public class GroupChatAgentRouter {
         }
 
         Set<Long> availableIds = new HashSet<>();
+        // Agent codes are also accepted: the enterprise chat UI tags a mention with the
+        // agent's code (its MentionPopover has no numeric id to hand), so an "agent:<id>"
+        // only contract meant @-ing an AI colleague there never routed. Matching is limited
+        // to agents that are members of THIS conversation, so a code can never pull in an
+        // agent the sender cannot already see.
+        java.util.Map<String, Long> idByCode = new java.util.HashMap<>();
         for (AgentMemberDto agent : agentMembers) {
             availableIds.add(agent.getAgentId());
+            if (agent.getAgentCode() != null && !agent.getAgentCode().isBlank()) {
+                idByCode.put(agent.getAgentCode().trim().toLowerCase(), agent.getAgentId());
+            }
         }
 
         // LinkedHashSet preserves input order while deduplicating
         Set<Long> result = new java.util.LinkedHashSet<>();
         for (String mention : mentions) {
+            if (mention == null || mention.isBlank()) {
+                continue;
+            }
             Matcher matcher = AGENT_MENTION_PATTERN.matcher(mention);
             if (matcher.matches()) {
                 Long agentId = Long.parseLong(matcher.group(1));
                 if (availableIds.contains(agentId)) {
                     result.add(agentId);
                 }
+                continue;
+            }
+            Long byCode = idByCode.get(mention.trim().toLowerCase());
+            if (byCode != null) {
+                result.add(byCode);
             }
         }
         return new ArrayList<>(result);

@@ -30,9 +30,14 @@ import {
 import { BpmTaskDrawer } from '~/plugins/core-bpm/components/BpmTaskDrawer';
 import { cn } from '~/utils/cn';
 
+// One tab per item_type the backend can produce (APPROVAL / TASK / MENTION /
+// AI_SUGGESTION / ALERT / ASSIGNMENT). Task and Mention items used to be
+// reachable only through "All" — they were listed but could not be filtered for.
 const TABS = [
   { key: '', label: 'All', icon: InboxIcon },
   { key: 'approval', label: 'Approval', icon: CheckCircleIcon },
+  { key: 'task', label: 'Task', icon: EnvelopeOpenIcon },
+  { key: 'mention', label: 'Mention', icon: BellIcon },
   { key: 'alert', label: 'Alert', icon: ExclamationTriangleIcon },
   { key: 'assignment', label: 'Assignment', icon: ArrowRightIcon },
 ] as const;
@@ -60,6 +65,14 @@ const TYPE_COPY: Record<string, { title: string; description: string }> = {
   assignment: {
     title: 'Assignment queue',
     description: 'Delegated work items linked to business records.',
+  },
+  task: {
+    title: 'Task queue',
+    description: 'Work items assigned to you that still need action.',
+  },
+  mention: {
+    title: 'Mentions',
+    description: 'Messages where a teammate @mentioned you.',
   },
 };
 
@@ -455,7 +468,16 @@ export default function UnifiedInboxPage() {
   }, [baseItems, quickFilter]);
   const total = page?.total || 0;
   const totalPages = page?.pages || 0;
-  const totalUnread = Object.values(summary).reduce((acc, value) => acc + value, 0);
+  // /api/inbox/unread-summary returns the per-type counts *plus* a `total` key
+  // ({task, mention, alert, assignment, total}). Summing every value therefore
+  // double-counts — prefer the server's own total and only fall back to summing
+  // the per-type entries, never the aggregate one.
+  const totalUnread =
+    typeof summary.total === 'number'
+      ? summary.total
+      : Object.entries(summary)
+          .filter(([key]) => key !== 'total')
+          .reduce((acc, [, value]) => acc + value, 0);
   const activeTypeCopy = TYPE_COPY[activeTab] || TYPE_COPY[''];
   const quickFilterCount =
     quickFilter === 'unread'
