@@ -605,6 +605,21 @@ function DrawerEditForm({
   }
 
   async function submit() {
+    // A field marked required must not be cleared: a non-standard BOM's description is Yunhan's
+    // search key, so submitting it blank would re-price against nothing.
+    const missing = fields.find(
+      (f: any) => f.required && (values[f.field] ?? '').trim() === '',
+    );
+    if (missing) {
+      setError(
+        getLocalizedText(
+          missing.requiredMessage || { 'zh-CN': '规格描述不能为空', en: 'Description is required' },
+          locale,
+          t,
+        ),
+      );
+      return;
+    }
     setSaving(true);
     setError(null);
     // Only send fields the user actually filled: the handler leaves a blank field alone, so an
@@ -658,7 +673,10 @@ function DrawerEditForm({
                   data-testid={`review-drawer-edit-field-${key}`}
                   className="text-text-2 flex min-w-[160px] flex-1 flex-col gap-1 text-xs"
                 >
-                  <span>{getLocalizedText(f.label || key, locale, t)}</span>
+                  <span>
+                    {getLocalizedText(f.label || key, locale, t)}
+                    {f.required && <span className="text-status-red ml-0.5">*</span>}
+                  </span>
                   <input
                     className="rounded-control border-border bg-panel text-text border px-2 py-1 text-sm"
                     value={values[key] ?? ''}
@@ -1487,35 +1505,33 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                                     title={value}
                                   >
                                     {field.format === 'ladder' && parseLadderRungs(rawValue) ? (
-                                      <table
-                                        className="w-full text-xs"
+                                      // A self-contained tier card: quantity and price sit next to
+                                      // each other (an inline-grid so the columns hug their content
+                                      // instead of spanning the whole field), and the tier the line
+                                      // quotes at is a filled row rather than only coloured text.
+                                      <div
+                                        className="border-border bg-subtle inline-grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 rounded-control border p-1.5 text-xs tabular-nums"
                                         data-testid={`review-drawer-candidate-${rowKey}-ladder`}
                                       >
-                                        <tbody>
-                                          {parseLadderRungs(rawValue)!.map((rung) => (
-                                            <tr
-                                              key={String(rung.qty)}
-                                              data-testid={
-                                                rung.current
-                                                  ? `review-drawer-ladder-current-${rowKey}`
-                                                  : undefined
-                                              }
-                                              className={
-                                                rung.current
-                                                  ? 'text-accent font-semibold'
-                                                  : 'text-text-2'
-                                              }
-                                            >
-                                              <td className="pr-2 whitespace-nowrap">
-                                                {String(rung.qty)}+
-                                              </td>
-                                              <td className="text-right whitespace-nowrap">
-                                                {String(rung.price)}
-                                              </td>
-                                            </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
+                                        {parseLadderRungs(rawValue)!.map((rung) => (
+                                          <div
+                                            key={String(rung.qty)}
+                                            data-testid={
+                                              rung.current
+                                                ? `review-drawer-ladder-current-${rowKey}`
+                                                : undefined
+                                            }
+                                            className={`col-span-2 grid grid-cols-subgrid rounded px-1.5 py-0.5 ${
+                                              rung.current
+                                                ? 'bg-accent text-white font-semibold'
+                                                : 'text-text-2'
+                                            }`}
+                                          >
+                                            <span className="whitespace-nowrap">{String(rung.qty)}+</span>
+                                            <span className="whitespace-nowrap text-right">{String(rung.price)}</span>
+                                          </div>
+                                        ))}
+                                      </div>
                                     ) : field.format === 'link' && safeExternalUrl(rawValue) ? (
                                       <a
                                         href={safeExternalUrl(rawValue) as string}

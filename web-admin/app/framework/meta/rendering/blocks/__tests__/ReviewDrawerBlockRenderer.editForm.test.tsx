@@ -112,6 +112,27 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     expect('qo_ql_mpn' in config.args.payload).toBe(false);
   });
 
+  it('refuses to submit when a required field is cleared', async () => {
+    // A non-standard BOM's description is Yunhan's search key, so clearing it and submitting would
+    // re-price against nothing. Marking the field required blocks that; a blank optional field
+    // still means "keep the current value".
+    const b = block();
+    (b as any).editForm.fields = [
+      { field: 'qo_ql_description', label: { 'zh-CN': '规格描述' }, valueField: 'material_label', required: true },
+      { field: 'qo_ql_mpn', label: { 'zh-CN': 'MPN' }, valueField: 'mpn' },
+    ];
+    render(<ReviewDrawerBlockRenderer block={b} runtime={makeRuntime(LINE)} />);
+
+    fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
+    const desc = screen.getByTestId('review-drawer-edit-field-qo_ql_description').querySelector('input')!;
+    fireEvent.change(desc, { target: { value: '' } });
+    fireEvent.click(screen.getByTestId('review-drawer-edit-submit'));
+
+    // no command fires, and the error is shown
+    await waitFor(() => expect(screen.getByTestId('review-drawer-edit-error')).toBeInTheDocument());
+    expect(executeSimpleWorkbenchAction).not.toHaveBeenCalled();
+  });
+
   it('renders nothing when the block declares no editForm', () => {
     const b = block();
     delete (b as any).editForm;
