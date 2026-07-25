@@ -111,7 +111,12 @@ public class CommandTargetScopePhase implements CommandPhase {
         }
         ctx.setTargetRecordReadable(readable);
         if (readable) {
-            ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.permit(name()));
+            // A gate, not a grant: a readable target means this phase has no objection, not that it
+            // authorizes. Only the RBAC capability phase (@200) emits PERMIT; if this phase granted,
+            // an undeclared command on any record the caller can see would read as authorized —
+            // conflating "can see" with "may act", the exact projection the 2026-07-22 incident came
+            // from. So it abstains.
+            ctx.recordPhaseDecision(CommandPermitPlan.PhaseDecision.abstain(name()));
             return;
         }
 
