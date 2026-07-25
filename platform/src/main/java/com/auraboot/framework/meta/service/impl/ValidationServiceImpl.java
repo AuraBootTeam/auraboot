@@ -358,6 +358,17 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
             if (when == null || when.getField() == null || when.getIn() == null || when.getIn().isEmpty()) {
                 continue;
             }
+            // A lock whose state field does not exist on the model can never engage — the
+            // classic silently-disarmed invariant, and exactly the failure this line of work
+            // exists to remove. Distinguish it from a state field that exists but holds null
+            // (a legitimate "no lock"): a reference to an undeclared field is a typo, and for
+            // an invariant the safe direction is closed — refuse the guarded write rather than
+            // let a possibly-illegal change through because the guard was misconfigured.
+            if (!modelHasField(modelDefinition, when.getField())) {
+                errors.add("Field '" + label + "' declares immutableWhen on unknown field '"
+                        + when.getField() + "'");
+                continue;
+            }
             // The lock is decided by the record's CURRENT state, not by whatever the
             // caller is trying to set the state to in this same payload.
             Object currentState = existingRecord.get(when.getField());
@@ -393,6 +404,18 @@ public class ValidationServiceImpl extends BaseMetaService implements Validation
      * rendered form before declaring a change keeps an unchanged round-trip from tripping
      * a lock it never touched.</p>
      */
+    private static boolean modelHasField(ModelDefinition model, String code) {
+        if (model.getFields() == null) {
+            return false;
+        }
+        for (FieldDefinition f : model.getFields()) {
+            if (code.equals(f.getCode())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static boolean valueChanges(Object current, Object incoming) {
         if (current == null && incoming == null) {
             return false;

@@ -212,6 +212,35 @@ class ValidationServiceImmutabilityTest {
         assertTrue(r.getValid());
     }
 
+    /**
+     * A lock pointed at a field the model does not declare can never engage. That is the
+     * silently-disarmed-invariant failure this whole line of work exists to remove, so it fails
+     * closed: the guarded write is refused and the error names the typo, rather than the lock
+     * quietly doing nothing. (Contrast {@link #missingStateLeavesFieldWritable}: there the state
+     * field IS declared, it just holds null on this row — a legitimate no-lock.)
+     */
+    @Test
+    @DisplayName("immutableWhen pointing at an undeclared field fails closed, naming the typo")
+    void immutableWhenOnUnknownFieldFailsClosed() {
+        FieldDefinition price = FieldDefinition.builder()
+                .code("price").name("Price")
+                .immutableWhen(FieldDefinition.ImmutableWhen.builder()
+                        .field("staus")  // typo: the model declares "status"
+                        .in(List.of("approved"))
+                        .build())
+                .build();
+        FieldDefinition status = FieldDefinition.builder().code("status").name("Status").build();
+        ModelDefinition model = ModelDefinition.builder()
+                .code("quote").fields(List.of(price, status)).build();
+
+        ValidationResult r = validation.validateImmutability(
+                model, change("price", 200), storedApprovedQuote());
+
+        assertFalse(r.getValid(), "a lock that can never engage must not pass unnoticed");
+        assertTrue(r.getErrors().stream().anyMatch(e -> e.contains("unknown field") && e.contains("staus")),
+                "the error must name the undeclared field, got: " + r.getErrors());
+    }
+
     @Test
     @DisplayName("the locking state field being absent from the stored row leaves the field writable")
     void missingStateLeavesFieldWritable() {
