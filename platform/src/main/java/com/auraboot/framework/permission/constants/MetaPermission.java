@@ -571,6 +571,23 @@ public final class MetaPermission {
      */
     public static final String META_CHATBI_USE = "meta.chatbi.use";
 
+    /**
+     * Semantic layer — query governed metrics, read the catalog + lineage,
+     * validate/compile a model. PRD 16 §6. Read/use scope; the {@code
+     * /api/semantic/*} query, meta, lineage, validate and sql endpoints require it.
+     */
+    public static final String META_SEMANTIC_USE = "meta.semantic.use";
+
+    /**
+     * Semantic layer — publish (create/update) a semantic model from YAML.
+     * PRD 16 §6. This is a privileged authoring capability: a published
+     * {@code measure.expr} / {@code metric.filter} is an author-supplied SQL
+     * fragment inlined into generated SQL, so publishing effectively grants the
+     * ability to shape read queries. Kept separate from — and stricter than —
+     * {@link #META_SEMANTIC_USE}; default-bootstrap grants it to admins only.
+     */
+    public static final String META_SEMANTIC_PUBLISH = "meta.semantic.publish";
+
     // ==================== SYS permissions ====================
 
     /**

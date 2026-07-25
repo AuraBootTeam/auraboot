@@ -11,6 +11,10 @@ import com.auraboot.framework.bpm.converter.BpmnConversionException;
 import com.auraboot.framework.i18n.service.I18nService;
 import com.auraboot.framework.i18n.util.I18nLocaleResolver;
 import com.auraboot.framework.meta.exception.TemporalParseException;
+import com.auraboot.framework.semantic.compiler.AccessException;
+import com.auraboot.framework.semantic.compiler.MetricCompileException;
+import com.auraboot.framework.semantic.exception.SemanticValidationException;
+import com.auraboot.framework.semantic.exception.SemanticYamlInvalidException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
@@ -357,6 +361,43 @@ public class GlobalExceptionHandler {
         log.warn("Access denied: {}", ex.getMessage());
 
         ApiResponse<Object> response = ApiResponse.errorWithContext(ResponseCode.FORBIDDEN, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+    }
+
+    /**
+     * Semantic-layer authoring / query errors. Author-input problems
+     * (invalid YAML, denylisted SQL token, unknown metric/dimension) are the
+     * caller's fault → {@code 400}; a semantic RLS/access failure → {@code 403}.
+     * Previously these fell through to the {@code Exception} catch-all and
+     * surfaced as {@code 500 Internal system error}, hiding the real cause from
+     * the semantic-model author and the ChatBI caller.
+     */
+    @ExceptionHandler({SemanticValidationException.class, SemanticYamlInvalidException.class,
+            MetricCompileException.class})
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleSemanticBadRequest(RuntimeException ex) {
+        log.warn("Semantic bad request: {}: {}", ex.getClass().getSimpleName(), ex.getMessage());
+        String code = ex instanceof SemanticValidationException sve ? sve.getErrorCode()
+                : ex instanceof SemanticYamlInvalidException sie ? sie.getErrorCode()
+                : ex instanceof MetricCompileException mce ? mce.getErrorCode() : null;
+        Map<String, Object> detail = new HashMap<>();
+        detail.put("exception", ex.getClass().getSimpleName());
+        if (code != null) detail.put("errorCode", code);
+        detail.put("detail", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.error(ResponseCode.BadParam,
+                ex.getMessage(), detail);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(AccessException.class)
+    @ResponseBody
+    public ResponseEntity<ApiResponse<Object>> handleSemanticAccessException(AccessException ex) {
+        log.warn("Semantic access denied: {}: {}", ex.getErrorCode(), ex.getMessage());
+        Map<String, Object> detail = new HashMap<>();
+        detail.put("errorCode", ex.getErrorCode());
+        detail.put("detail", ex.getMessage());
+        ApiResponse<Object> response = ApiResponse.error(ResponseCode.FORBIDDEN,
+                ex.getMessage(), detail);
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
     }
 

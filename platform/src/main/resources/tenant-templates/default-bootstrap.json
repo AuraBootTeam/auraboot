@@ -315,6 +315,26 @@
       "resourceType": "function"
     },
     {
+      "code": "meta.semantic.use",
+      "name": "语义层查询",
+      "description": "查询治理指标、读取语义目录与血缘、校验/编译语义模型",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:semantic",
+      "action": "use",
+      "resourceType": "function"
+    },
+    {
+      "code": "meta.semantic.publish",
+      "name": "语义模型发布",
+      "description": "从 YAML 发布（创建/更新）语义模型；作者可内联 SQL 片段，属高权限授权，默认仅管理员",
+      "type": "function",
+      "module": "meta",
+      "resource": "meta:semantic",
+      "action": "publish",
+      "resourceType": "function"
+    },
+    {
       "code": "meta.filter.manage",
       "name": "筛选预设管理",
       "description": "管理筛选预设（创建、编辑、删除、设为默认）",

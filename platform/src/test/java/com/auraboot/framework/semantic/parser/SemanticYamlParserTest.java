@@ -132,6 +132,44 @@ class SemanticYamlParserTest {
                 });
     }
 
+    /**
+     * A scalar {@code measure.expr} that smuggles a sub-SELECT reading another table
+     * contains NO classic denylisted token ({@code ;}, {@code --}, {@code UNION},
+     * {@code DROP}) — only a bare {@code SELECT}. The hardened denylist must still
+     * reject it; otherwise the compiler inlines it verbatim and any caller can
+     * exfiltrate arbitrary columns cross-table / cross-tenant.
+     */
+    @Test
+    void subquerySelectInMeasureExprRejectedByValidator() throws IOException {
+        String yaml = loadFixture("invalid/validator/subquery-exfil-measure.semantic.yml");
+        SemanticModelDTO dto = parser.parse(yaml); // schema OK
+        assertThatThrownBy(() -> validator.validate(dto))
+                .isInstanceOf(SemanticValidationException.class)
+                .satisfies(ex -> assertThat(((SemanticValidationException) ex).getErrorCode())
+                        .isEqualTo("SQL_INJECTION_DETECTED"));
+    }
+
+    /**
+     * False-positive guard: banning sub-queries must NOT ban {@code FROM}, because
+     * {@code EXTRACT(<part> FROM <col>)} is a legitimate scalar expression. This is the
+     * mutation-verification counterpart to {@link #subquerySelectInMeasureExprRejectedByValidator()}
+     * — if someone "fixes" the denylist by banning {@code \bFROM\b}, this goes red.
+     */
+    @Test
+    void extractFromInMeasureExprIsAllowed() {
+        String yaml = ""
+                + "version: \"0.1\"\n"
+                + "semantic_model: {code: t, model_ref: ab_role, primary_entity: id}\n"
+                + "entities: [{name: id, type: primary, field_ref: id}]\n"
+                + "dimensions: [{code: y, type: categorical, field_ref: created_at}]\n"
+                + "measures: [{code: yr, agg: MAX, expr: \"EXTRACT(YEAR FROM created_at)\"}]\n"
+                + "metrics: [{code: m, type: simple, type_params: {measure: yr}}]\n";
+        SemanticModelDTO dto = parser.parse(yaml);
+        // Must not throw — EXTRACT(... FROM ...) is a valid scalar expression.
+        validator.validate(dto);
+        assertThat(dto.getMeasures()).extracting(m -> m.getCode()).contains("yr");
+    }
+
     // -- malformed YAML (not a structural error in schema, but parser-level) -
 
     @Test

@@ -1,0 +1,21 @@
+version: "0.1"
+# Regression fixture for the cross-table / cross-tenant exfiltration vector:
+# a benign-looking scalar measure.expr that smuggles a sub-SELECT reading another
+# table (ab_user password). No denylisted keyword (no ;, --, UNION, DROP) — only a
+# bare SELECT — so the OLD denylist let it through and the compiler inlined it
+# verbatim. The hardened denylist must reject it (SQL_INJECTION_DETECTED).
+semantic_model:
+  code: exfil
+  model_ref: ab_role
+  primary_entity: id
+entities: [{name: id, type: primary, field_ref: id}]
+dimensions: [{code: status, type: categorical, field_ref: status}]
+measures:
+  - code: stolen
+    agg: MAX
+    expr: "(SELECT password FROM ab_user LIMIT 1)"
+metrics:
+  - code: leak
+    type: simple
+    type_params:
+      measure: stolen

@@ -32,9 +32,14 @@ import java.util.regex.Pattern;
 @Component
 public class AccessPolicyCompiler {
 
-    /** Mirrors SemanticYamlValidator denylist. Keep in sync. */
+    /**
+     * Mirrors SemanticYamlValidator denylist. Keep in sync. {@code select} + {@code with}
+     * are banned so an {@code access_policy.sql_filter} can never open a sub-query / CTE
+     * (the cross-tenant exfiltration vector); {@code from} is intentionally allowed so
+     * {@code EXTRACT(YEAR FROM col)} still compiles.
+     */
     private static final Pattern DENY = Pattern.compile(
-            "(--|/\\*|\\*/|;|\\b(drop|delete|truncate|alter|create|grant|revoke|insert|update|union|exec|execute)\\b)",
+            "(--|/\\*|\\*/|;|\\b(drop|delete|truncate|alter|create|grant|revoke|insert|update|union|exec|execute|select|with)\\b)",
             Pattern.CASE_INSENSITIVE);
 
     private static final Pattern USER_PLACEHOLDER = Pattern.compile("\\{user\\.([a-z][a-z0-9_]*)\\}");

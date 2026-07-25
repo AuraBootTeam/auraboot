@@ -34,9 +34,13 @@ import java.util.Map;
  *
  * <p>Idempotent on yaml SHA-256: re-publishing the same source is a no-op.
  *
- * <p>For W2 D4-5 this is invoked directly via API; plugin lifecycle wiring
- * (resourceDirs.semantic auto-scan) is registered separately by
- * SemanticPluginResourceImporter (also in this commit).
+ * <p>Invocation: the only wired entry point today is
+ * {@code POST /api/semantic/publish} (guarded by {@code META_SEMANTIC_PUBLISH}).
+ * Automatic plugin-resource scanning of a {@code resourceDirs.semantic} directory
+ * is NOT yet implemented — do not assume a bundled {@code *.semantic.yml} is
+ * auto-published. (A prior version of this javadoc claimed an accompanying
+ * {@code SemanticPluginResourceImporter}; no such class exists — see the
+ * hardening backlog for the follow-up.)
  */
 @Slf4j
 @Service
