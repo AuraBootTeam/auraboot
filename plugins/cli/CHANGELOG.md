@@ -16,6 +16,11 @@ All notable changes to `@auraboot/cli`. Format follows [Keep a Changelog](https:
 - `aura skills update` as a named alias for the idempotent Skills installer, so stale client copies can be refreshed explicitly.
 - Streamable HTTP callers can narrow the server's MCP profile per request with `x-aura-tools`; the startup profile remains a non-widenable capability ceiling.
 
+### Fixed
+- `aura dsl scaffold model/pages` now emits importable flat V4 list/form/detail pages, canonical lower-case field types, working menu/page links and create navigation, and idempotently upserts page keys.
+- Published tarballs now include the validation schemas and DSL registry, so `aura plugin validate` no longer silently skips structural or enum checks outside the monorepo.
+- Publish completion links now use the plugin's first visible menu path instead of a hard-coded sample URL.
+
 ### Internal
 - Refactored MCP server to use a central `ToolRegistry` (`src/mcp/registry.ts`) so each tool is one file under `src/mcp/tools/read/` (and, in W2, `src/mcp/tools/write/`). Behavior of the original 6 read tools is unchanged.
 - Centralized every agent-native mutation endpoint in `WRITE_ROUTES` and added a structural gate that prevents MCP write tools from opening their own transport or embedding mutation paths.

@@ -134,3 +134,4 @@ docs/standards/
 
 # Per-worktree isolated Maven repo (multi-worktree publish; never a repo artifact)
 .m2/
+plugins/cli/schemas/

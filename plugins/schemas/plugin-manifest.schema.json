@@ -1718,7 +1718,7 @@
     "pageDefinition": {
       "type": "object",
       "description": "Page schema definition for DSL-driven UI",
-      "required": ["pageKey"],
+      "required": ["pageKey", "kind", "schemaVersion", "layout", "blocks"],
       "properties": {
         "pageKey": {
           "type": "string",
@@ -1744,15 +1744,10 @@
           "type": "string",
           "description": "Page description"
         },
-        "pageType": {
-          "type": "string",
-          "description": "Page type",
-          "enum": ["list", "form", "detail", "dashboard", "custom", "composite"]
-        },
         "kind": {
           "type": "string",
-          "description": "V2 page kind",
-          "enum": ["list", "form", "detail", "dashboard", "custom", "composite"]
+          "description": "Importable v4 page kind",
+          "enum": ["list", "form", "detail"]
         },
         "pageCategory": {
           "type": "string",
@@ -1771,18 +1766,75 @@
           "type": "string",
           "description": "Route path for the page"
         },
-        "dslSchema": {
-          "description": "DSL schema defining page structure",
-          "$ref": "dsl-schema.generated.json#/definitions/DslSchema"
-        },
         "layout": {
           "type": "object",
-          "description": "V2 page layout"
+          "description": "V4 page layout",
+          "required": ["type"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["grid", "stack"]
+            }
+          },
+          "additionalProperties": true
         },
         "blocks": {
           "type": "array",
-          "description": "V2 page blocks",
-          "items": { "type": "object" }
+          "description": "Flat v4 page blocks",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "blockType"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "blockType": {
+                "type": "string",
+                "enum": [
+                  "form",
+                  "form-section",
+                  "form-buttons",
+                  "form-wizard",
+                  "table",
+                  "filters",
+                  "toolbar",
+                  "description",
+                  "chart",
+                  "tabs",
+                  "sub-table",
+                  "monthly-grid",
+                  "stat-card",
+                  "ai-fill-banner",
+                  "embedded-list",
+                  "detail-section",
+                  "activity-timeline",
+                  "record-comments",
+                  "field-history",
+                  "bpm-panel",
+                  "metric-strip",
+                  "record-inspector",
+                  "candidate-list",
+                  "workbench-action-bar",
+                  "evidence-panel",
+                  "artifact-timeline",
+                  "review-drawer",
+                  "status-banner",
+                  "trace-graph",
+                  "divider",
+                  "rich-text",
+                  "selection-info",
+                  "gerber-viewer",
+                  "card-grid",
+                  "code-snippet",
+                  "conversation-panel",
+                  "custom"
+                ]
+              }
+            },
+            "additionalProperties": true
+          }
         },
         "dataSources": {
           "type": "object",
@@ -1803,9 +1855,8 @@
         },
         "schemaVersion": {
           "type": "integer",
-          "description": "DSL schema format version (single integer, default 1)",
-          "default": 1,
-          "minimum": 1
+          "description": "Current flat page schema version",
+          "const": 4
         },
         "metaInfo": {
           "type": "object",

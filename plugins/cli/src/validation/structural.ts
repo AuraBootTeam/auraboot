@@ -5,7 +5,13 @@ import type { PluginFiles } from '../utils/plugin-loader.js';
 import { ajvHint } from './ajv-hints.js';
 import { type ValidationResult, createResult, addMessage } from './types.js';
 
-const SCHEMA_DIR = resolve(import.meta.dirname, '../../../schemas');
+const SCHEMA_DIR = [
+  // Monorepo source/build layout: plugins/cli/{src,dist}/validation → plugins/schemas.
+  resolve(import.meta.dirname, '../../../schemas'),
+  // Published package layout: @auraboot/cli/dist/validation → @auraboot/cli/schemas.
+  resolve(import.meta.dirname, '../../schemas'),
+].find(candidate => existsSync(join(candidate, 'plugin-manifest.schema.json')))
+  || resolve(import.meta.dirname, '../../../schemas');
 
 const RESOURCE_SCHEMAS: Record<string, string> = {
   models: 'models.schema.json',

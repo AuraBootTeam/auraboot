@@ -80,6 +80,7 @@ describe('scaffolded sample plugin is schema-valid', () => {
   it('menu carries a pageKey pointing at the auto-generated list page', () => {
     const [menu] = read('menus');
     expect(menu.pageKey).toBe('smpl_sample_list');
+    expect(menu.path).toBe('/p/smpl_sample');
   });
 
   it('ships empty pages/commands/i18n (platform auto-generates default pages)', () => {

@@ -11,12 +11,14 @@
   },
   "files": [
     "dist",
+    "schemas",
     "skills",
     "README.md",
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsc",
+    "build": "node scripts/copy-schemas.mjs && tsc",
+    "prepack": "npm run build",
     "prepublishOnly": "npm run build",
     "dev": "tsx src/index.ts",
     "lint": "tsc --noEmit",
