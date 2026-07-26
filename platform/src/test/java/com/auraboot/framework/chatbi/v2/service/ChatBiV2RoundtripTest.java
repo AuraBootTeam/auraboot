@@ -7,6 +7,7 @@ import com.auraboot.framework.chatbi.v2.dto.SearchToken;
 import com.auraboot.framework.chatbi.v2.dto.TokenType;
 import com.auraboot.framework.chatbi.v2.entity.ChatBiAnswer;
 import com.auraboot.framework.chatbi.v2.mapper.ChatBiAnswerMapper;
+import com.auraboot.framework.chatbi.v2.lexer.TokenLexer;
 import com.auraboot.framework.chatbi.v2.provider.ConversationContext;
 import com.auraboot.framework.chatbi.v2.provider.IntentResult;
 import com.auraboot.framework.chatbi.v2.provider.LlmProviderRouter;
@@ -56,6 +57,7 @@ class ChatBiV2RoundtripTest {
     private LlmProviderRouter router;
     private SemanticCatalogService catalog;
     private SemanticQueryService queryService;
+    private TokenLexer tokenLexer;
     private TokenCompiler compiler;
     private ConversationService conversationService;
     private DisambiguationService disambig;
@@ -68,6 +70,7 @@ class ChatBiV2RoundtripTest {
         router = mock(LlmProviderRouter.class);
         catalog = mock(SemanticCatalogService.class);
         queryService = mock(SemanticQueryService.class);
+        tokenLexer = mock(TokenLexer.class);
         compiler = mock(TokenCompiler.class);
         conversationService = mock(ConversationService.class);
         disambig = mock(DisambiguationService.class);
@@ -76,7 +79,9 @@ class ChatBiV2RoundtripTest {
         // no-op in a plain unit test), so existing verify(answerMapper) checks still hold.
         persistence = new ChatBiAnswerPersistence(answerMapper, conversationService);
         service = new ChatBiAnswerService(router, catalog, queryService,
-                compiler, conversationService, disambig, persistence);
+                tokenLexer, compiler, conversationService, disambig, persistence);
+        when(tokenLexer.lex(anyString(), any(), any())).thenAnswer(invocation ->
+                ((IntentResult) invocation.getArgument(2)).tokens());
         MetaContext.setCurrentTenantId(1L);
         MetaContext.setCurrentUserId(100L);
         when(catalog.listCatalog(1L)).thenReturn(new SemanticMetaResponse());

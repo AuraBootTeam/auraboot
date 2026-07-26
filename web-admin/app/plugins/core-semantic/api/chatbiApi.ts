@@ -6,10 +6,10 @@
  * ResponseEntity<T>, not the ApiResponse envelope), so this client reads the
  * raw JSON and keys off the HTTP status + the answer's own {@code status} field.
  *
- * NL translation requires a configured LLM provider
- * ({@code aura.chatbi.v2.llm-provider = anthropic | openai}). With no provider
- * the router downgrades and {@code ask} returns {@code status: "FAILED"} — the
- * UI surfaces this honestly rather than pretending to answer.
+ * Configured LLM providers are the primary NL translator. With no provider the
+ * router downgrades to a catalog-bound deterministic parser: questions that
+ * explicitly name a real metric/dimension remain usable, while unmatched or
+ * ambiguous questions fail honestly instead of inventing a query.
  */
 
 export interface ChatBiConversation {

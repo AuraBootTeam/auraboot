@@ -7,8 +7,10 @@ import com.auraboot.framework.semantic.parser.SemanticYamlParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -170,6 +172,20 @@ class SemanticPublishServiceTest {
                 service.publishFromYaml(bad, "x", 1L, 100L))
                 .isInstanceOf(com.auraboot.framework.semantic.exception.SemanticYamlInvalidException.class);
         verifyNoInteractions(dimensionMapper, metricMapper, lineageMapper);
+    }
+
+    @Test
+    void validationFailuresDoNotMarkOuterPluginImportTransactionRollbackOnly()
+            throws NoSuchMethodException {
+        Method method = SemanticPublishService.class.getMethod(
+                "publishFromYaml", byte[].class, String.class, Long.class, Long.class);
+        Transactional transactional = method.getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+        assertThat(transactional.noRollbackFor())
+                .containsExactlyInAnyOrder(
+                        com.auraboot.framework.semantic.exception.SemanticYamlInvalidException.class,
+                        com.auraboot.framework.semantic.exception.SemanticValidationException.class);
     }
 
     private String sha256(String s) {

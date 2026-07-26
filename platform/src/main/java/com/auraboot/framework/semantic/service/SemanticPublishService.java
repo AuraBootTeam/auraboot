@@ -4,6 +4,8 @@ import com.auraboot.framework.common.util.UlidGenerator;
 import com.auraboot.framework.semantic.dto.*;
 import com.auraboot.framework.semantic.entity.*;
 import com.auraboot.framework.semantic.enums.SemanticModelStatus;
+import com.auraboot.framework.semantic.exception.SemanticValidationException;
+import com.auraboot.framework.semantic.exception.SemanticYamlInvalidException;
 import com.auraboot.framework.semantic.mapper.*;
 import com.auraboot.framework.semantic.parser.SemanticYamlValidator;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
@@ -34,13 +36,11 @@ import java.util.Map;
  *
  * <p>Idempotent on yaml SHA-256: re-publishing the same source is a no-op.
  *
- * <p>Invocation: the only wired entry point today is
- * {@code POST /api/semantic/publish} (guarded by {@code META_SEMANTIC_PUBLISH}).
- * Automatic plugin-resource scanning of a {@code resourceDirs.semantic} directory
- * is NOT yet implemented — do not assume a bundled {@code *.semantic.yml} is
- * auto-published. (A prior version of this javadoc claimed an accompanying
- * {@code SemanticPluginResourceImporter}; no such class exists — see the
- * hardening backlog for the follow-up.)
+ * <p>Invocation: explicit publishing is available through
+ * {@code POST /api/semantic/publish} (guarded by {@code META_SEMANTIC_PUBLISH});
+ * plugin import also calls this service for each discovered
+ * {@code resourceDirs.semantic/*.semantic.yml} after plugin models have been
+ * imported and synchronized.
  */
 @Slf4j
 @Service
@@ -60,7 +60,10 @@ public class SemanticPublishService {
      *
      * @return the pid of the resulting (created or updated) {@link AbSemanticModel}
      */
-    @Transactional
+    @Transactional(noRollbackFor = {
+            SemanticYamlInvalidException.class,
+            SemanticValidationException.class
+    })
     public String publishFromYaml(byte[] yamlBytes, String pluginCode, Long tenantId, Long userId) {
         String yaml = new String(yamlBytes, StandardCharsets.UTF_8);
         SemanticModelDTO dto = parser.parse(yaml);

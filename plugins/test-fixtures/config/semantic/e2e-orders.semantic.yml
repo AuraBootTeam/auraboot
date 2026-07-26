@@ -1,0 +1,64 @@
+version: "0.1"
+
+semantic_model:
+  code: e2e_orders
+  label:
+    zh-CN: 测试订单分析
+    en-US: Test Order Analytics
+  description: Governed semantic fixture for plugin import and ChatBI E2E.
+  model_ref: e2et_order
+  primary_entity: order_id
+
+entities:
+  - name: order_id
+    type: primary
+    field_ref: id
+
+dimensions:
+  - code: order_status
+    label:
+      zh-CN: 订单状态
+      en-US: Order Status
+    field_ref: e2et_order_status
+    type: categorical
+
+  - code: order_date
+    label:
+      zh-CN: 下单日期
+      en-US: Order Date
+    field_ref: e2et_order_date
+    type: time
+    time_grains: [day, week, month, quarter, year]
+    primary_time: true
+
+measures:
+  - code: order_count_measure
+    label:
+      zh-CN: 订单数
+      en-US: Order Count
+    agg: COUNT
+    expr: "*"
+
+  - code: order_amount_measure
+    label:
+      zh-CN: 订单总额
+      en-US: Total Order Amount
+    agg: SUM
+    field_ref: e2et_order_amount
+
+metrics:
+  - code: order_count
+    label:
+      zh-CN: 订单数
+      en-US: Order Count
+    type: simple
+    type_params:
+      measure: order_count_measure
+
+  - code: total_order_amount
+    label:
+      zh-CN: 订单总额
+      en-US: Total Order Amount
+    type: simple
+    type_params:
+      measure: order_amount_measure

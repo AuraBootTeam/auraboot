@@ -97,7 +97,7 @@ class LlmProviderRouterTest {
         LlmProviderRouter.RouteOutcome out = router.translate(
                 "q", new SemanticMetaResponse(), ConversationContext.empty());
 
-        assertThat(out.winner()).isEqualTo("keyword-v1");
+        assertThat(out.winner()).isEqualTo("keyword-catalog");
         assertThat(out.result().confidence()).isZero();
         assertThat(out.attempts()).hasSize(3);
         assertThat(out.attempts().get(2).outcome())
@@ -207,7 +207,7 @@ class LlmProviderRouterTest {
         LlmProviderRouter.RouteOutcome out = custom.translate(
                 "q", new SemanticMetaResponse(), ConversationContext.empty());
 
-        assertThat(out.winner()).isEqualTo("keyword-v1");
+        assertThat(out.winner()).isEqualTo("keyword-catalog");
         assertThat(out.result().confidence()).isZero();
     }
 }

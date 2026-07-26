@@ -4,6 +4,7 @@ import com.auraboot.framework.plugin.dto.imports.ModelDefinitionDTO;
 import com.auraboot.framework.plugin.dto.imports.PluginManifestExtended;
 import com.auraboot.framework.plugin.exception.PluginException;
 import com.auraboot.framework.plugin.service.impl.PluginDirectoryLoader;
+import com.auraboot.framework.plugin.source.FileSystemPluginSource;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
@@ -307,6 +308,61 @@ class PluginDirectoryLoaderTest {
                 .hasSize(1);
         assertThat(manifest.getNamedQueries().get(0).getCode()).isEqualTo("test_named_query");
         assertThat(manifest.getNamedQueries().get(0).getFields()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("Should load semantic resources in stable path order from directory")
+    void shouldLoadSemanticResourcesFromDirectory() throws IOException {
+        Path semanticDir = tempDir.resolve("config/semantic");
+        Files.createDirectories(semanticDir);
+        Files.writeString(tempDir.resolve("plugin.json"), """
+                {
+                  "pluginId": "com.test.semantic",
+                  "namespace": "semantic_test",
+                  "version": "1.0.0",
+                  "resourceDirs": {"semantic": "config/semantic"}
+                }
+                """);
+        Files.writeString(semanticDir.resolve("02-b.semantic.yml"), "version: \"0.1\"");
+        Files.writeString(semanticDir.resolve("01-a.semantic.yml"), "version: \"0.1\"");
+        Files.writeString(semanticDir.resolve("ignored.yaml"), "version: \"0.1\"");
+
+        PluginManifestExtended manifest = loader.loadFromDirectory(tempDir);
+
+        assertThat(manifest.getSemanticResources())
+                .extracting(PluginManifestExtended.SemanticResource::path)
+                .containsExactly(
+                        "config/semantic/01-a.semantic.yml",
+                        "config/semantic/02-b.semantic.yml");
+        assertThat(manifest.getResourceCounts()).containsEntry("semantic", 2);
+        assertThat(manifest.hasResources()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should load a single semantic resource through PluginSource")
+    void shouldLoadSingleSemanticResourceFromSource() throws IOException {
+        Path semanticFile = tempDir.resolve("config/orders.semantic.yml");
+        Files.createDirectories(semanticFile.getParent());
+        Files.writeString(tempDir.resolve("plugin.json"), """
+                {
+                  "pluginId": "com.test.semantic-source",
+                  "namespace": "semantic_source",
+                  "version": "1.0.0",
+                  "resourceDirs": {"semantic": "config/orders.semantic.yml"}
+                }
+                """);
+        Files.writeString(semanticFile, "version: \"0.1\"");
+
+        PluginManifestExtended manifest =
+                loader.loadFromSource(new FileSystemPluginSource(tempDir));
+
+        assertThat(manifest.getSemanticResources()).singleElement()
+                .satisfies(resource -> {
+                    assertThat(resource.path())
+                            .isEqualTo("config/orders.semantic.yml");
+                    assertThat(new String(resource.content()))
+                            .contains("version");
+                });
     }
 
     // ==================== Helpers ====================

@@ -7,6 +7,7 @@ import com.auraboot.framework.chatbi.v2.dto.ChatBiAnswerResponse;
 import com.auraboot.framework.chatbi.v2.dto.SearchToken;
 import com.auraboot.framework.chatbi.v2.dto.TokenType;
 import com.auraboot.framework.chatbi.v2.entity.ChatBiAnswer;
+import com.auraboot.framework.chatbi.v2.lexer.TokenLexer;
 import com.auraboot.framework.chatbi.v2.mapper.ChatBiAnswerMapper;
 import com.auraboot.framework.chatbi.v2.provider.ConversationContext;
 import com.auraboot.framework.chatbi.v2.provider.Disambiguation;
@@ -18,6 +19,9 @@ import com.auraboot.framework.semantic.dto.SemanticMetaResponse;
 import com.auraboot.framework.semantic.dto.SemanticQueryResponse;
 import com.auraboot.framework.semantic.service.SemanticCatalogService;
 import com.auraboot.framework.semantic.service.SemanticQueryService;
+import com.auraboot.framework.tenant.typehandler.JsonStringTypeHandler;
+import com.baomidou.mybatisplus.annotation.TableField;
+import org.apache.ibatis.type.JdbcType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +29,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
@@ -46,6 +51,7 @@ class ChatBiAnswerServiceTest {
     private LlmProviderRouter router;
     private SemanticCatalogService catalog;
     private SemanticQueryService queryService;
+    private TokenLexer tokenLexer;
     private TokenCompiler compiler;
     private ConversationService conversationService;
     private DisambiguationService disambig;
@@ -58,6 +64,7 @@ class ChatBiAnswerServiceTest {
         router = mock(LlmProviderRouter.class);
         catalog = mock(SemanticCatalogService.class);
         queryService = mock(SemanticQueryService.class);
+        tokenLexer = mock(TokenLexer.class);
         compiler = mock(TokenCompiler.class);
         conversationService = mock(ConversationService.class);
         disambig = mock(DisambiguationService.class);
@@ -70,7 +77,9 @@ class ChatBiAnswerServiceTest {
         persistence = new ChatBiAnswerPersistence(answerMapper, conversationService);
 
         service = new ChatBiAnswerService(router, catalog, queryService,
-                compiler, conversationService, disambig, persistence);
+                tokenLexer, compiler, conversationService, disambig, persistence);
+        when(tokenLexer.lex(anyString(), any(), any())).thenAnswer(invocation ->
+                ((IntentResult) invocation.getArgument(2)).tokens());
 
         MetaContext.setCurrentTenantId(1L);
         MetaContext.setCurrentUserId(100L);
@@ -93,6 +102,15 @@ class ChatBiAnswerServiceTest {
         return new LlmProviderRouter.RouteOutcome(r, winner, List.of(
                 new LlmProviderRouter.Attempt(winner,
                         LlmProviderRouter.Outcome.SUCCESS, null)));
+    }
+
+    private static SemanticMetaResponse catalogWith(String pid, String code) {
+        SemanticMetaResponse meta = new SemanticMetaResponse();
+        SemanticMetaResponse.ModelMeta model = new SemanticMetaResponse.ModelMeta();
+        model.setPid(pid);
+        model.setCode(code);
+        meta.setModels(List.of(model));
+        return meta;
     }
 
     // -- happy path ------------------------------------------------------
@@ -128,11 +146,14 @@ class ChatBiAnswerServiceTest {
         assertThat(cap.getValue().getStatus())
                 .isEqualTo(ChatBiAnswerResponse.STATUS_SUCCESS);
         assertThat(cap.getValue().getLlmUsed()).isEqualTo("anthropic");
+        assertThat(cap.getValue().getSemanticModelPid()).isEqualTo("MODEL-PID");
+        assertThat(cap.getValue().getTokensJson()).contains("sales.total_sales");
+        assertThat(cap.getValue().getSemanticRequestJson()).contains("\"metrics\"");
     }
 
     @Test
     void askWithoutConversationPidSkipsAppend() throws Exception {
-        when(catalog.listCatalog(1L)).thenReturn(new SemanticMetaResponse());
+        when(catalog.listCatalog(1L)).thenReturn(catalogWith("SALES-PID", "sales"));
         when(router.translate(any(), any(), any()))
                 .thenReturn(routeOutcome(goodIntent(0.9), "anthropic"));
         when(disambig.evaluate(any(), anyLong(), anyString(), anyString()))
@@ -216,6 +237,18 @@ class ChatBiAnswerServiceTest {
         }
     }
 
+    @Test
+    void answerJsonColumnsUsePostgresJsonbTypeHandler() throws Exception {
+        for (String fieldName : List.of(
+                "tokensJson", "semanticRequestJson", "vizConfigJson")) {
+            Field field = ChatBiAnswer.class.getDeclaredField(fieldName);
+            TableField mapping = field.getAnnotation(TableField.class);
+            assertThat(mapping).as("%s must have @TableField", fieldName).isNotNull();
+            assertThat(mapping.jdbcType()).isEqualTo(JdbcType.OTHER);
+            assertThat(mapping.typeHandler()).isEqualTo(JsonStringTypeHandler.class);
+        }
+    }
+
     // -- short-circuits --------------------------------------------------
 
     @Test
@@ -224,6 +257,49 @@ class ChatBiAnswerServiceTest {
         assertThat(r.getStatus()).isEqualTo(ChatBiAnswerResponse.STATUS_FAILED);
         assertThat(r.getErrorMessage()).contains("empty");
         verify(router, never()).translate(anyString(), any(), any());
+    }
+
+    @Test
+    void noProviderUsesCatalogLexerBeforeDisambiguationAndCompile() throws Exception {
+        SemanticMetaResponse meta = catalogWith("ORDERS-PID", "orders");
+        when(catalog.listCatalog(1L)).thenReturn(meta);
+        when(router.translate(any(), any(), any()))
+                .thenReturn(routeOutcome(IntentResult.empty(), "keyword-catalog"));
+        List<SearchToken> offline = List.of(
+                SearchToken.metric("orders.order_count", "订单数", 0));
+        when(tokenLexer.lex(eq("订单数"), eq(meta), any())).thenReturn(offline);
+        when(disambig.evaluate(any(), eq(1L), anyString(), anyString()))
+                .thenReturn(DisambiguationService.Verdict.useTop1());
+        when(compiler.compile(eq(offline), any())).thenReturn(new SemanticQueryRequest());
+        SemanticQueryResponse exec = new SemanticQueryResponse();
+        exec.setRows(List.of(Map.of("order_count", 2)));
+        exec.setRowcount(1);
+        when(queryService.executeQuery(any(), any())).thenReturn(exec);
+
+        ChatBiAnswerResponse response = service.ask("订单数", null, null);
+
+        assertThat(response.getStatus()).isEqualTo(ChatBiAnswerResponse.STATUS_SUCCESS);
+        assertThat(response.getConfidence()).isEqualTo(0.80d);
+        assertThat(response.getLlmUsed()).isEqualTo("keyword-catalog");
+        ArgumentCaptor<ChatBiAnswer> answer = ArgumentCaptor.forClass(ChatBiAnswer.class);
+        verify(answerMapper).insert(answer.capture());
+        assertThat(answer.getValue().getSemanticModelPid()).isEqualTo("ORDERS-PID");
+    }
+
+    @Test
+    void unmatchedCatalogQuestionFailsBeforeEmptyDisambiguation() {
+        SemanticMetaResponse meta = new SemanticMetaResponse();
+        when(catalog.listCatalog(1L)).thenReturn(meta);
+        when(router.translate(any(), any(), any()))
+                .thenReturn(routeOutcome(IntentResult.empty(), "keyword-catalog"));
+        when(tokenLexer.lex(any(), any(), any())).thenReturn(List.of());
+
+        ChatBiAnswerResponse response = service.ask("无法匹配的问题", null, null);
+
+        assertThat(response.getStatus()).isEqualTo(ChatBiAnswerResponse.STATUS_FAILED);
+        assertThat(response.getErrorMessage()).contains("catalog metric");
+        verify(disambig, never()).evaluate(any(), anyLong(), anyString(), anyString());
+        verify(compiler, never()).compile(any(), any());
     }
 
     @Test
@@ -246,17 +322,14 @@ class ChatBiAnswerServiceTest {
         assertThat(r.getDisambiguation().ambiguousTerm()).isEqualTo("销量");
         verify(compiler, never()).compile(any(), any());
         verify(queryService, never()).executeQuery(any(), any());
-        ArgumentCaptor<ChatBiAnswer> cap = ArgumentCaptor.forClass(ChatBiAnswer.class);
-        verify(answerMapper).insert(cap.capture());
-        assertThat(cap.getValue().getStatus())
-                .isEqualTo(ChatBiAnswerResponse.STATUS_DISAMBIGUATION);
+        verify(answerMapper, never()).insert(any(ChatBiAnswer.class));
     }
 
     // -- failures --------------------------------------------------------
 
     @Test
     void compileFailureReturnsFailed() throws Exception {
-        when(catalog.listCatalog(1L)).thenReturn(new SemanticMetaResponse());
+        when(catalog.listCatalog(1L)).thenReturn(catalogWith("SALES-PID", "sales"));
         when(router.translate(any(), any(), any()))
                 .thenReturn(routeOutcome(goodIntent(0.9), "anthropic"));
         when(disambig.evaluate(any(), anyLong(), anyString(), anyString()))
@@ -273,7 +346,7 @@ class ChatBiAnswerServiceTest {
 
     @Test
     void executeFailureReturnsFailed() throws Exception {
-        when(catalog.listCatalog(1L)).thenReturn(new SemanticMetaResponse());
+        when(catalog.listCatalog(1L)).thenReturn(catalogWith("SALES-PID", "sales"));
         when(router.translate(any(), any(), any()))
                 .thenReturn(routeOutcome(goodIntent(0.9), "anthropic"));
         when(disambig.evaluate(any(), anyLong(), anyString(), anyString()))
@@ -286,6 +359,25 @@ class ChatBiAnswerServiceTest {
 
         assertThat(r.getStatus()).isEqualTo(ChatBiAnswerResponse.STATUS_FAILED);
         assertThat(r.getErrorMessage()).contains("execution");
+    }
+
+    @Test
+    void executionWarningCannotMasqueradeAsSuccessfulZeroRows() throws Exception {
+        when(catalog.listCatalog(1L)).thenReturn(catalogWith("SALES-PID", "sales"));
+        when(router.translate(any(), any(), any()))
+                .thenReturn(routeOutcome(goodIntent(0.9), "anthropic"));
+        when(disambig.evaluate(any(), anyLong(), anyString(), anyString()))
+                .thenReturn(DisambiguationService.Verdict.useTop1());
+        when(compiler.compile(any(), any())).thenReturn(new SemanticQueryRequest());
+        SemanticQueryResponse exec = new SemanticQueryResponse();
+        exec.getWarnings().add("execution_failed: bad SQL grammar");
+        when(queryService.executeQuery(any(), any())).thenReturn(exec);
+
+        ChatBiAnswerResponse response = service.ask("broken query", "CONV", null);
+
+        assertThat(response.getStatus()).isEqualTo(ChatBiAnswerResponse.STATUS_FAILED);
+        assertThat(response.getErrorMessage()).contains("execution");
+        verify(answerMapper, never()).insert(any(ChatBiAnswer.class));
     }
 
     // -- viz heuristic ---------------------------------------------------

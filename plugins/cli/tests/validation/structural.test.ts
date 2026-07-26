@@ -48,6 +48,37 @@ describe('validateStructural plugin manifest schema', () => {
     expect(result.errorCount).toBe(0);
   });
 
+  it('accepts resourceDirs.semantic while keeping unknown resource keys closed', () => {
+    const accepted = validateStructural(
+      pluginWithManifest({
+        pluginId: 'semantic-plugin',
+        namespace: 'semantic_plugin',
+        version: '1.0.0',
+        resourceDirs: {
+          semantic: 'config/semantic',
+        },
+      }),
+    );
+    expect(accepted.messages.filter((message) => message.code === 'L1-MANIFEST')).toEqual([]);
+
+    const rejected = validateStructural(
+      pluginWithManifest({
+        pluginId: 'semantic-plugin',
+        namespace: 'semantic_plugin',
+        version: '1.0.0',
+        resourceDirs: {
+          semanticUnknown: 'config/semantic',
+        },
+      }),
+    );
+    expect(rejected.messages.filter((message) => message.code === 'L1-MANIFEST'))
+      .toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          message: expect.stringContaining('must NOT have additional properties'),
+        }),
+      ]));
+  });
+
   it('rejects the removed top-level entryPoint field', () => {
     const result = validateStructural(
       pluginWithManifest({

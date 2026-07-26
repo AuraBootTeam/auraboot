@@ -1,6 +1,8 @@
 package com.auraboot.framework.semantic.service;
 
 import com.auraboot.framework.common.util.UlidGenerator;
+import com.auraboot.framework.meta.service.MetaModelService;
+import com.auraboot.framework.permission.service.UserPermissionService;
 import com.auraboot.framework.semantic.compiler.CompiledQuery;
 import com.auraboot.framework.semantic.compiler.MetricCompileException;
 import com.auraboot.framework.semantic.compiler.MetricCompiler;
@@ -15,9 +17,8 @@ import com.auraboot.framework.semantic.entity.AbSemanticQueryLog;
 import com.auraboot.framework.semantic.mapper.AbSemanticMetricMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticModelMapper;
 import com.auraboot.framework.semantic.mapper.AbSemanticQueryLogMapper;
-import com.auraboot.framework.semantic.parser.SemanticYamlValidator;
 import com.auraboot.framework.semantic.parser.SemanticYamlParser;
-import com.auraboot.framework.permission.service.UserPermissionService;
+import com.auraboot.framework.semantic.parser.SemanticYamlValidator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,6 +65,7 @@ public class SemanticQueryService {
     private final AbSemanticModelMapper modelMapper;
     private final AbSemanticMetricMapper metricMapper;
     private final AbSemanticQueryLogMapper queryLogMapper;
+    private final MetaModelService metaModelService;
     private final UserPermissionService userPermissionService;
     private final ObjectMapper jsonMapper = new ObjectMapper();
 
@@ -216,10 +218,33 @@ public class SemanticQueryService {
             // Re-parse stored YAML to recover measures (v0.1 has no measure table).
             SemanticModelDTO model = parser.parse(row.getYamlSource());
             validator.validate(model);
+            resolvePhysicalModelRef(model);
             return model;
         } catch (Exception e) {
+            if (e instanceof MetricCompileException metricCompileException) {
+                throw metricCompileException;
+            }
             throw new MetricCompileException("MODEL_REF_MISSING",
                     "yaml_source for model " + prefix + " is invalid: " + e.getMessage());
+        }
+    }
+
+    /**
+     * {@code semantic_model.model_ref} is a governed MetaModel code, not a raw
+     * SQL table name. Resolve it through the canonical metadata service at query
+     * time so plugin models target their generated {@code mt_*} table and YAML
+     * cannot bypass model governance by naming an arbitrary physical table.
+     */
+    private void resolvePhysicalModelRef(SemanticModelDTO model) {
+        String modelCode = model.getSemanticModel().getModelRef();
+        try {
+            String tableName = metaModelService.getTableName(modelCode);
+            model.getSemanticModel().setModelRef(tableName);
+        } catch (RuntimeException e) {
+            throw new MetricCompileException(
+                    "UNKNOWN_MODEL_REF",
+                    "semantic model_ref does not resolve to a published MetaModel: "
+                            + modelCode);
         }
     }
 

@@ -209,6 +209,17 @@ public class PluginManifestExtended extends PluginManifest {
      */
     private Map<String, String> resourceDirs;
 
+    /**
+     * Raw {@code *.semantic.yml} resources discovered from {@link #resourceDirs}.
+     *
+     * <p>This is loader-internal state rather than an inline manifest contract:
+     * keeping the bytes alongside their relative path lets directory, source and
+     * ZIP imports share the same publish stage without exposing base64 content in
+     * plugin.json or API responses.
+     */
+    @JsonIgnore
+    private List<SemanticResource> semanticResources;
+
     // ==================== Import Configuration ====================
 
     /**
@@ -659,7 +670,8 @@ public class PluginManifestExtended extends PluginManifest {
                 || (decisionDefinitions != null && !decisionDefinitions.isEmpty())
                 || (conditionFragments != null && !conditionFragments.isEmpty())
                 || (eventPolicies != null && !eventPolicies.isEmpty())
-                || (automations != null && !automations.isEmpty());
+                || (automations != null && !automations.isEmpty())
+                || (semanticResources != null && !semanticResources.isEmpty());
     }
 
     /**
@@ -690,7 +702,8 @@ public class PluginManifestExtended extends PluginManifest {
                 Map.entry("decisionDefinitions", decisionDefinitions != null ? decisionDefinitions.size() : 0),
                 Map.entry("conditionFragments", conditionFragments != null ? conditionFragments.size() : 0),
                 Map.entry("eventPolicies", eventPolicies != null ? eventPolicies.size() : 0),
-                Map.entry("automations", automations != null ? automations.size() : 0)
+                Map.entry("automations", automations != null ? automations.size() : 0),
+                Map.entry("semantic", semanticResources != null ? semanticResources.size() : 0)
         );
     }
 
@@ -758,6 +771,11 @@ public class PluginManifestExtended extends PluginManifest {
     }
 
     // ==================== Nested Classes ====================
+
+    /**
+     * One discovered semantic source, ordered by its plugin-relative path.
+     */
+    public record SemanticResource(String path, byte[] content) {}
 
     @Data
     @NoArgsConstructor

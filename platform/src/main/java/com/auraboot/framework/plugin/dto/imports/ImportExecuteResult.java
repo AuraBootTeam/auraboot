@@ -152,11 +152,19 @@ public class ImportExecuteResult {
      * Increment resource count.
      */
     public void incrementResourceCount(ResourceType type, ResourceAction action) {
+        incrementResourceCount(type.name(), action);
+    }
+
+    /**
+     * Increment an extension-resource count that is intentionally not part of
+     * {@link ResourceType} (and therefore not stored in ab_plugin_resource).
+     */
+    public void incrementResourceCount(String type, ResourceAction action) {
         if (resourceCounts == null) {
             resourceCounts = new HashMap<>();
         }
         resourceCounts
-                .computeIfAbsent(type.name(), k -> new HashMap<>())
+                .computeIfAbsent(type, k -> new HashMap<>())
                 .merge(action.name(), 1, Integer::sum);
     }
 
@@ -164,11 +172,19 @@ public class ImportExecuteResult {
      * Add created resource.
      */
     public void addCreatedResource(ResourceType type, String pid) {
+        addCreatedResource(type.name(), pid);
+    }
+
+    /**
+     * Record a created extension resource without expanding the DB-backed
+     * {@link ResourceType} enum.
+     */
+    public void addCreatedResource(String type, String pid) {
         if (createdResources == null) {
             createdResources = new HashMap<>();
         }
         createdResources
-                .computeIfAbsent(type.name(), k -> new ArrayList<>())
+                .computeIfAbsent(type, k -> new ArrayList<>())
                 .add(pid);
     }
 
