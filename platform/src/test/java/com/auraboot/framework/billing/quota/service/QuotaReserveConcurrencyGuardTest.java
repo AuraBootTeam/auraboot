@@ -2,6 +2,7 @@ package com.auraboot.framework.billing.quota.service;
 
 import com.auraboot.framework.billing.quota.mapper.QuotaBucketMapper;
 import com.auraboot.framework.billing.quota.model.QuotaBucket;
+import com.auraboot.framework.billing.observability.BillingQuotaMetrics;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -37,6 +38,8 @@ class QuotaReserveConcurrencyGuardTest {
 
     @Mock
     private QuotaBucketMapper quotaBucketMapper;
+    @Mock
+    private BillingQuotaMetrics metrics;
 
     @InjectMocks
     private QuotaServiceImpl service;

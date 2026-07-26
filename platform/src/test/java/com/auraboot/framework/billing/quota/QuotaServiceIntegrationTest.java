@@ -1,10 +1,12 @@
 package com.auraboot.framework.billing.quota;
 
 import com.auraboot.framework.billing.BillingAccountSeedHelper;
+import com.auraboot.framework.billing.observability.BillingQuotaMetrics;
 import com.auraboot.framework.billing.quota.mapper.*;
 import com.auraboot.framework.billing.quota.model.*;
 import com.auraboot.framework.billing.quota.spi.*;
 import com.auraboot.framework.integration.BaseIntegrationTest;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Propagation;
@@ -55,6 +57,9 @@ class QuotaServiceIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private QuotaLedgerMapper ledgerMapper;
+
+    @Autowired
+    private MeterRegistry meterRegistry;
 
     // ── test fixtures ─────────────────────────────────────────────────────────
 
@@ -144,6 +149,21 @@ class QuotaServiceIntegrationTest extends BaseIntegrationTest {
         return quotaBucketMapper.selectById(currentBucketId);
     }
 
+    private double quotaAuthorizeCount(String outcome, String reason) {
+        var counter = meterRegistry.find(BillingQuotaMetrics.AUTHORIZE_TOTAL)
+                .tag("outcome", outcome)
+                .tag("reason", reason)
+                .counter();
+        return counter != null ? counter.count() : 0.0d;
+    }
+
+    private double quotaCommitCount(String outcome) {
+        var counter = meterRegistry.find(BillingQuotaMetrics.COMMIT_TOTAL)
+                .tag("outcome", outcome)
+                .counter();
+        return counter != null ? counter.count() : 0.0d;
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // Test 1: Reserve → Commit → verify used/reserved, no negatives
     // ═════════════════════════════════════════════════════════════════════════
@@ -168,11 +188,13 @@ class QuotaServiceIntegrationTest extends BaseIntegrationTest {
                 .isEqualByComparingTo("5000");  // 10000 - 0 - 5000
 
         // Commit 4300 (< 5000 estimated)
+        double commitCountBefore = quotaCommitCount("success");
         QuotaCommitResult result = quotaService.commit(
                 decision.getReservationCode(), new BigDecimal("4300"));
 
         assertThat(result.getActualAmount()).isEqualByComparingTo("4300");
         assertThat(result.getReleasedDelta()).isEqualByComparingTo("700");
+        assertThat(quotaCommitCount("success")).isEqualTo(commitCountBefore + 1.0d);
 
         QuotaBucket afterCommit = freshBucket();
         assertThat(afterCommit.getUsedAmount())
@@ -219,6 +241,7 @@ class QuotaServiceIntegrationTest extends BaseIntegrationTest {
     @Order(3)
     @DisplayName("request 15000 > bucket 10000 → DENY INSUFFICIENT_QUOTA")
     void hardLimitDeny() {
+        double before = quotaAuthorizeCount("deny", "insufficient_quota");
         QuotaDecision decision = quotaService.authorize(
                 buildRequest(new BigDecimal("15000"), "idem-deny-1"));
 
@@ -229,6 +252,8 @@ class QuotaServiceIntegrationTest extends BaseIntegrationTest {
         QuotaBucket bucket = freshBucket();
         assertThat(bucket.getReservedAmount()).isEqualByComparingTo("0");
         assertThat(bucket.getUsedAmount()).isEqualByComparingTo("0");
+        assertThat(quotaAuthorizeCount("deny", "insufficient_quota"))
+                .isEqualTo(before + 1.0d);
     }
 
     // ═════════════════════════════════════════════════════════════════════════

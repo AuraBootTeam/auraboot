@@ -377,7 +377,7 @@ export default function DashboardViewerPage() {
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="inline-flex items-center rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
+            className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
           >
             <ArrowPathIcon className={`mr-1.5 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             {t('dashboard.refresh')}

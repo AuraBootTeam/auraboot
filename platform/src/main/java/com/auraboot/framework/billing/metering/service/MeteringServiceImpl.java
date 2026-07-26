@@ -9,6 +9,7 @@ import com.auraboot.framework.billing.metering.model.UsageEvent;
 import com.auraboot.framework.billing.metering.spi.MeteringResult;
 import com.auraboot.framework.billing.metering.spi.MeteringService;
 import com.auraboot.framework.billing.metering.spi.UsageEventRequest;
+import com.auraboot.framework.billing.observability.BillingMeteringMetrics;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -62,6 +63,7 @@ public class MeteringServiceImpl implements MeteringService {
     private final UsageEventMapper       usageEventMapper;
     private final MeteringInsertHelper   insertHelper;
     private final ObjectMapper           objectMapper;
+    private final BillingMeteringMetrics metrics;
 
     // ─────────────────────────────────────────────────────────────────────────
     // record
@@ -70,6 +72,18 @@ public class MeteringServiceImpl implements MeteringService {
     @Override
     @Transactional
     public MeteringResult record(UsageEventRequest request) {
+        long startedAt = System.nanoTime();
+        try {
+            MeteringResult result = doRecord(request);
+            metrics.record(result.getStatus(), System.nanoTime() - startedAt);
+            return result;
+        } catch (RuntimeException e) {
+            metrics.recordFailure(System.nanoTime() - startedAt);
+            throw e;
+        }
+    }
+
+    private MeteringResult doRecord(UsageEventRequest request) {
         // 1. Schema validation — required fields
         MeteringResult validationError = validateRequired(request);
         if (validationError != null) {
