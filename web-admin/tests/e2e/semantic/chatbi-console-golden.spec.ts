@@ -1,5 +1,6 @@
 import { Client } from 'pg';
 import { test, expect } from '../../fixtures';
+import { PG_CONN } from '../../helpers/environments';
 
 test.use({ storageState: 'tests/storage/admin.json' });
 test.describe.configure({ timeout: 120000 });
@@ -22,11 +23,8 @@ test('chatbi console: offline catalog fallback answers a governed metric questio
   expect(importedModel?.pid).toBeTruthy();
 
   const db = new Client({
-    host: process.env.PGHOST ?? '127.0.0.1',
-    port: Number(process.env.PGPORT ?? 5432),
-    user: process.env.PGUSER ?? 'auraboot',
-    password: process.env.PGPASSWORD ?? 'auraboot',
-    database: process.env.PGDATABASE ?? 'aura_boot',
+    ...PG_CONN,
+    password: PG_CONN.password ?? 'auraboot',
   });
   await db.connect();
   const fixturePid = 'chatbi_semantic_golden_order';
