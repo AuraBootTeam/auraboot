@@ -59,10 +59,10 @@ PLUGINS_PATH="${PLUGINS_PATH:-/app/plugins}"
 PLUGINS=(
   core-meta
   core-bpm
+  platform-admin
   core-decisionops
   core-aurabot
   page-manager
-  platform-admin
   org-management
   crm-starter
   showcase
@@ -141,7 +141,15 @@ import_one() {
   resp="$(curl_ -X POST "${BACKEND_URL}/api/plugins/import/import-directory-sync" \
     -H "Authorization: Bearer ${JWT}" -H 'Content-Type: application/json' \
     -d "{\"path\":\"${PLUGINS_PATH}/${plugin}\",\"conflictStrategy\":\"OVERWRITE\"}")"
-  [[ "$(echo "${resp}" | json "print(d.get('success'))")" == "True" ]]
+  if [[ "$(echo "${resp}" | json "print(d.get('success'))")" == "True" ]]; then
+    return 0
+  fi
+
+  local response_excerpt
+  response_excerpt="$(printf '%s' "${resp}" | python3 -c \
+    'import sys; response=sys.stdin.read(); print(response[:1000])')"
+  say "    ${DIM}plugin import failed response (first 1000 chars):${NC} ${response_excerpt}"
+  return 1
 }
 
 say "${DIM}Importing plugins …${NC}"

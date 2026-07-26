@@ -194,6 +194,40 @@ test('plugin import profiles use explicit semantic names and deprecate default',
   }
 });
 
+test('Docker bootstrap entrypoints preserve plugin dependency order', () => {
+  for (const path of ['scripts/quickstart.sh', 'scripts/docker-bootstrap.sh']) {
+    const script = read(path);
+    const adminIndex = script.indexOf('\n  platform-admin');
+    const decisionOpsIndex = script.indexOf('\n  core-decisionops');
+
+    assert.ok(adminIndex >= 0, `${path} must import platform-admin`);
+    assert.ok(decisionOpsIndex >= 0, `${path} must import core-decisionops`);
+    assert.ok(
+      adminIndex < decisionOpsIndex,
+      `${path} must import platform-admin before core-decisionops because DecisionOps webhooks reuse admin_webhook permission`,
+    );
+  }
+});
+
+test('Docker quickstart reports a bounded plugin import response when an import fails', () => {
+  const quickstart = read('scripts/quickstart.sh');
+
+  assert.match(quickstart, /plugin import failed response \(first 1000 chars\)/);
+  assert.match(quickstart, /response\[:1000\]/);
+});
+
+test('Docker quickstart CI always runs on main and manual dispatch, and detects all bootstrap inputs on PRs', () => {
+  const workflow = read('.github/workflows/quickstart.yml');
+
+  assert.match(
+    workflow,
+    /if \[ "\$\{\{ github\.event_name \}\}" != "pull_request" \]; then[\s\S]*echo "run=true"[\s\S]*exit 0/,
+  );
+  assert.ok(workflow.includes('plugins/'));
+  assert.ok(workflow.includes('scripts/quickstart\\.sh'));
+  assert.ok(workflow.includes('scripts/docker-bootstrap\\.sh'));
+});
+
 test('Gradle resolves SmartEngine artifacts from Maven Central before Aliyun mirrors', () => {
   const build = read('platform/build.gradle');
   const smartEngineCentral = build.indexOf("name = 'Maven Central SmartEngine'");
