@@ -1,8 +1,12 @@
 package com.auraboot.framework.plugin.service;
 
+import com.auraboot.framework.plugin.dto.PluginResourceOwner;
 import com.auraboot.framework.plugin.dto.imports.OwnershipType;
 import com.auraboot.framework.plugin.dto.imports.ResourceType;
-import com.auraboot.framework.plugin.dto.uninstall.*;
+import com.auraboot.framework.plugin.dto.uninstall.ResourceDiff;
+import com.auraboot.framework.plugin.dto.uninstall.UninstallPreviewResult;
+import com.auraboot.framework.plugin.dto.uninstall.UninstallRequest;
+import com.auraboot.framework.plugin.dto.uninstall.UninstallResult;
 import com.auraboot.framework.plugin.entity.PluginResource;
 
 import java.util.List;
@@ -24,6 +28,17 @@ public interface PluginResourceService {
      * Find resource by tenant, type and code.
      */
     PluginResource findByTypeAndCode(Long tenantId, ResourceType type, String code);
+
+    /**
+     * Resolve a managed resource together with its owning plugin metadata.
+     * Returns {@code null} when the resource is missing or user-managed.
+     */
+    PluginResourceOwner findResourceOwner(Long tenantId, ResourceType type, String code);
+
+    /**
+     * Export re-importable resource snapshots for a plugin, grouped by resource type.
+     */
+    Map<String, List<Map<String, Object>>> exportPluginConfig(String pluginId);
 
     /**
      * Check if a resource exists and is managed by a plugin.

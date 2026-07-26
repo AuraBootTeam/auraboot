@@ -52,6 +52,16 @@ class ArchitectureTest {
     }
 
     @Test
+    @DisplayName("Rule 2b: PluginResourceController must not access mapper layer")
+    void pluginResourceControllerShouldNotAccessMappers() {
+        noClasses()
+                .that().haveSimpleName("PluginResourceController")
+                .should().dependOnClassesThat().resideInAnyPackage("..mapper..")
+                .because("Plugin resource APIs must go through PluginResourceService")
+                .check(classes);
+    }
+
+    @Test
     @DisplayName("Rule 3: Service layer must not depend on controller layer")
     void servicesShouldNotDependOnControllers() {
         noClasses()
