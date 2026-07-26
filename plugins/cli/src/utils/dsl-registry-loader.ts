@@ -23,7 +23,10 @@ export function loadDslRegistry(): DslRegistryData {
 
   const moduleDir = dirname(fileURLToPath(import.meta.url));
   const candidates = [
+    // Monorepo source/build layout: plugins/cli/{src,dist}/utils → plugins/schemas.
     resolve(moduleDir, '..', '..', '..', 'schemas', 'dsl-registry.json'),
+    // Published package layout: @auraboot/cli/dist/utils → @auraboot/cli/schemas.
+    resolve(moduleDir, '..', '..', 'schemas', 'dsl-registry.json'),
     resolve(process.cwd(), 'plugins', 'schemas', 'dsl-registry.json'),
   ];
 

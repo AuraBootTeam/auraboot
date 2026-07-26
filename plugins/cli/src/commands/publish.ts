@@ -173,13 +173,26 @@ export async function publishCommand(dir: string, options: PublishOptions): Prom
     }
 
     log.blank();
-    const ns = plugin.manifest.namespace;
-    console.log(chalk.dim(`Visit: ${options.target}/dynamic/${ns}-sample`));
+    const visitUrl = resolveVisitUrl(options.target, plugin.resourceFiles.get('menus') || []);
+    if (visitUrl) {
+      console.log(chalk.dim(`Visit: ${visitUrl}`));
+    }
 
   } catch (e) {
     log.error((e as Error).message);
     process.exit(1);
   }
+}
+
+export function resolveVisitUrl(target: string, menus: any[]): string | null {
+  const firstVisiblePath = menus.find(menu =>
+    menu?.visible !== false
+    && typeof menu?.path === 'string'
+    && menu.path.trim().length > 0,
+  )?.path.trim();
+  if (!firstVisiblePath) return null;
+  const path = firstVisiblePath.startsWith('/') ? firstVisiblePath : `/${firstVisiblePath}`;
+  return `${target.replace(/\/$/, '')}${path}`;
 }
 
 function inferCategory(namespace: string): string {

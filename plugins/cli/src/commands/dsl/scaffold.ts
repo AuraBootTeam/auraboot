@@ -29,10 +29,186 @@ function parseFieldSpec(spec: string): ParsedField[] {
   if (!spec) return [];
   return spec.split(',').map(s => {
     const parts = s.trim().split(':');
-    const field: ParsedField = { code: parts[0], dataType: parts[1] || 'string' };
+    const rawType = (parts[1] || 'string').toLowerCase();
+    // SELECT is the documented authoring shorthand for the platform's canonical
+    // enum data type. All other platform data types are case-insensitive here
+    // and must be emitted in the lower-case form accepted by the import API.
+    const dataType = rawType === 'select'
+      ? 'enum'
+      : rawType === 'textarea'
+        ? 'text'
+        : rawType;
+    const field: ParsedField = { code: parts[0], dataType };
     if (parts[2]) field.referenceModel = parts[2];
     return field;
   });
+}
+
+function humanizeField(fieldCode: string, modelCode: string): string {
+  const shortCode = fieldCode.startsWith(`${modelCode}_`)
+    ? fieldCode.slice(modelCode.length + 1)
+    : fieldCode;
+  return shortCode
+    .split('_')
+    .filter(Boolean)
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function pageTitle(modelCode: string, kind: 'list' | 'form' | 'detail') {
+  const suffix = kind.charAt(0).toUpperCase() + kind.slice(1);
+  const title = `${humanizeField(modelCode, '')} ${suffix}`;
+  return { 'zh-CN': title, en: title };
+}
+
+function generateV4Pages(
+  modelCode: string,
+  namespace: string,
+  fields: Array<{ code: string; dataType?: string; binding?: { required?: boolean } }>,
+) {
+  const shortCode = modelCode.replace(`${namespace}_`, '');
+  const permissionCode = `${namespace.toUpperCase()}.${shortCode}.manage`;
+  const createCommand = `${namespace}:create_${shortCode}`;
+  const updateCommand = `${namespace}:update_${shortCode}`;
+  const deleteCommand = `${namespace}:delete_${shortCode}`;
+  const fieldLabel = (fieldCode: string) => {
+    const label = humanizeField(fieldCode, modelCode);
+    return { 'zh-CN': label, en: label };
+  };
+  const pageBase = (kind: 'list' | 'form' | 'detail') => ({
+    pageKey: `${modelCode}_${kind}`,
+    'name:zh-CN': pageTitle(modelCode, kind)['zh-CN'],
+    'name:en': pageTitle(modelCode, kind).en,
+    kind,
+    schemaVersion: 4,
+    modelCode,
+    title: pageTitle(modelCode, kind),
+    layout: { type: 'stack' },
+  });
+
+  const listPage = {
+    ...pageBase('list'),
+    blocks: [
+      {
+        id: `${modelCode}_toolbar`,
+        blockType: 'toolbar',
+        area: 'toolbar',
+        buttons: [{
+          code: 'create',
+          action: 'create',
+          primary: true,
+          icon: 'Plus',
+          commandCode: createCommand,
+          navigateTo: `${modelCode}_form`,
+          permissionCode,
+          label: { 'zh-CN': '新建', en: 'Create' },
+        }],
+      },
+      {
+        id: `${modelCode}_table`,
+        blockType: 'table',
+        area: 'main',
+        columns: fields.slice(0, 8).map(field => ({
+          field: field.code,
+          label: fieldLabel(field.code),
+          width: 150,
+          sortable: true,
+        })),
+        rowActions: [
+          {
+            code: 'view',
+            action: 'detail',
+            navigateTo: `${modelCode}_detail`,
+            label: { 'zh-CN': '查看', en: 'View' },
+          },
+          {
+            code: 'edit',
+            action: 'edit',
+            icon: 'Edit',
+            commandCode: updateCommand,
+            navigateTo: `${modelCode}_form`,
+            permissionCode,
+            label: { 'zh-CN': '编辑', en: 'Edit' },
+          },
+          {
+            code: 'delete',
+            action: 'delete',
+            icon: 'Trash2',
+            commandCode: deleteCommand,
+            permissionCode,
+            label: { 'zh-CN': '删除', en: 'Delete' },
+          },
+        ],
+      },
+    ],
+  };
+
+  const formPage = {
+    ...pageBase('form'),
+    blocks: [
+      {
+        id: `${modelCode}_basic`,
+        blockType: 'form-section',
+        area: 'main',
+        title: { 'zh-CN': '基本信息', 'en-US': 'Basic Information' },
+        fields: fields.map((field, index) => ({
+          field: field.code,
+          label: fieldLabel(field.code),
+          colSpan: field.dataType === 'text' ? 12 : 6,
+          required: field.binding?.required === true || index === 0,
+        })),
+      },
+      {
+        id: `${modelCode}_buttons`,
+        blockType: 'form-buttons',
+        area: 'footer',
+        buttons: [
+          {
+            code: 'submit',
+            action: 'save',
+            commandCode: createCommand,
+            primary: true,
+            label: { 'zh-CN': '提交', en: 'Submit' },
+          },
+          {
+            code: 'cancel',
+            action: 'cancel',
+            label: { 'zh-CN': '取消', en: 'Cancel' },
+          },
+        ],
+      },
+    ],
+  };
+
+  const detailPage = {
+    ...pageBase('detail'),
+    blocks: [{
+      id: `${modelCode}_detail_basic`,
+      blockType: 'form-section',
+      area: 'main',
+      readOnly: true,
+      title: { 'zh-CN': '基本信息', 'en-US': 'Basic Information' },
+      fields: fields.map(field => ({
+        field: field.code,
+        label: fieldLabel(field.code),
+        colSpan: field.dataType === 'text' ? 12 : 6,
+      })),
+    }],
+  };
+
+  return [listPage, formPage, detailPage];
+}
+
+function upsertByKey<T extends Record<string, any>>(
+  existing: T[],
+  incoming: T[],
+  key: keyof T,
+): T[] {
+  const incomingKeys = new Set(incoming.map(item => item[key]));
+  return [
+    ...existing.filter(item => !incomingKeys.has(item[key])),
+    ...incoming,
+  ];
 }
 
 function generateModelScaffold(code: string, namespace: string, fields: ParsedField[], description?: string) {
@@ -52,14 +228,14 @@ function generateModelScaffold(code: string, namespace: string, fields: ParsedFi
       code: `${code}_${f.code}`,
       'displayName:zh-CN': f.code,
       'displayName:en': f.code,
-      dataType: f.dataType.toUpperCase(),
+      dataType: f.dataType,
       constraints: f.dataType === 'string' ? { maxLength: 200 } : {},
       extension: f.referenceModel ? { referenceModel: f.referenceModel } : {},
     })),
   ];
 
   // Check if status field exists for state machine
-  const hasStatus = fields.some(f => f.code === 'status' || f.dataType === 'select');
+  const hasStatus = fields.some(f => f.code === 'status' || f.dataType === 'enum');
 
   const bindings = fieldDefs.map((f, i) => ({
     modelCode: code,
@@ -121,88 +297,14 @@ function generateModelScaffold(code: string, namespace: string, fields: ParsedFi
     },
   ];
 
-  // Pages: LIST + FORM
-  const listPage = {
-    pageKey: `${code}_list`,
-    'name:zh-CN': `${code} List`,
-    'name:en': `${code} List`,
-    pageType: 'list',
-    modelCode: code,
-    dslSchema: {
-      kind: 'List',
-      version: '1.0.0',
-      id: `list.${code}`,
-      modelCode: code,
-      layout: {
-        areas: ['toolbar', 'main'],
-        areasConfig: {
-          toolbar: { type: 'flex', direction: 'row', justify: 'space-between', align: 'center' },
-          main: { type: 'grid', cols: 12, rowGap: 0, colGap: 0 },
-        },
-      },
-      areas: {
-        toolbar: {
-          blocks: [{
-            id: 'block_toolbar',
-            blockType: 'toolbar',
-            buttons: [{
-              code: 'create',
-              action: 'create',
-              primary: true,
-              icon: 'Plus',
-              commandCode: commands[0].code,
-            }],
-          }],
-        },
-        main: {
-          blocks: [{
-            id: 'block_table',
-            blockType: 'data-table',
-            columns: fieldDefs.slice(0, 6).map(f => ({ field: f.code, width: 150 })),
-            rowActions: [
-              { code: 'edit', action: 'edit', icon: 'Edit', commandCode: commands[1].code, navigateTo: `${code}_form` },
-              { code: 'delete', action: 'delete', icon: 'Trash2', commandCode: commands[2].code },
-            ],
-            defaultSort: { field: 'created_at', order: 'desc' },
-          }],
-        },
-      },
-    },
-  };
-
-  const formPage = {
-    pageKey: `${code}_form`,
-    'name:zh-CN': `${code} Form`,
-    'name:en': `${code} Form`,
-    pageType: 'form',
-    modelCode: code,
-    dslSchema: {
-      kind: 'Form',
-      version: '1.0.0',
-      id: `form.${code}`,
-      modelCode: code,
-      layout: {
-        areas: ['main'],
-        areasConfig: {
-          main: { type: 'flex', direction: 'column', rowGap: 16 },
-        },
-      },
-      areas: {
-        main: {
-          blocks: [{
-            id: 'section_basic',
-            blockType: 'form-section',
-            title: { 'zh-CN': 'Basic Info', 'en-US': 'Basic Info' },
-            columns: 2,
-            fields: fieldDefs.map((f, i) => ({
-              field: f.code,
-              span: f.dataType === 'text' ? 2 : 1,
-            })),
-          }],
-        },
-      },
-    },
-  };
+  const [listPage, formPage, detailPage] = generateV4Pages(
+    code,
+    namespace,
+    fieldDefs.map((field, index) => ({
+      ...field,
+      binding: { required: index === 0 },
+    })),
+  );
 
   // Permissions
   const shortCode = code.replace(`${namespace}_`, '');
@@ -229,7 +331,8 @@ function generateModelScaffold(code: string, namespace: string, fields: ParsedFi
     parentCode: null,
     'name:zh-CN': shortCode,
     'name:en': shortCode,
-    path: `/dynamic/${code.replace(/_/g, '-')}`,
+    path: `/p/${code}`,
+    pageKey: `${code}_list`,
     icon: 'FileText',
     type: 1,
     permissionCode: `${namespace.toUpperCase()}.${shortCode}.read`,
@@ -249,7 +352,7 @@ function generateModelScaffold(code: string, namespace: string, fields: ParsedFi
     })),
   ];
 
-  return { model, fieldDefs, bindings, commands, listPage, formPage, permissions, menu, i18n };
+  return { model, fieldDefs, bindings, commands, listPage, formPage, detailPage, permissions, menu, i18n };
 }
 
 function generateCommandsForModel(modelCode: string, namespace: string, idx: any) {
@@ -331,97 +434,7 @@ function generateCommandsForModel(modelCode: string, namespace: string, idx: any
 
 function generatePagesForModel(modelCode: string, namespace: string, idx: any) {
   const fields = idx.fieldsByModel.get(modelCode) || [];
-  const fieldCodes = fields.map((f: any) => f.code);
-
-  const listPage = {
-    pageKey: `${modelCode}_list`,
-    'name:zh-CN': `${modelCode} List`,
-    'name:en': `${modelCode} List`,
-    pageType: 'list',
-    modelCode,
-    dslSchema: {
-      kind: 'List',
-      version: '1.0.0',
-      id: `list.${modelCode}`,
-      modelCode,
-      layout: {
-        areas: ['toolbar', 'main'],
-        areasConfig: {
-          toolbar: { type: 'flex', direction: 'row', justify: 'space-between', align: 'center' },
-          main: { type: 'grid', cols: 12 },
-        },
-      },
-      areas: {
-        toolbar: { blocks: [{ id: 'block_toolbar', blockType: 'toolbar', buttons: [{ code: 'create', action: 'create', primary: true, icon: 'Plus' }] }] },
-        main: {
-          blocks: [{
-            id: 'block_table',
-            blockType: 'data-table',
-            columns: fieldCodes.slice(0, 8).map((fc: string) => ({ field: fc, width: 150 })),
-            rowActions: [
-              { code: 'edit', action: 'edit', icon: 'Edit' },
-              { code: 'delete', action: 'delete', icon: 'Trash2' },
-            ],
-            defaultSort: { field: 'created_at', order: 'desc' },
-          }],
-        },
-      },
-    },
-  };
-
-  const formPage = {
-    pageKey: `${modelCode}_form`,
-    'name:zh-CN': `${modelCode} Form`,
-    'name:en': `${modelCode} Form`,
-    pageType: 'form',
-    modelCode,
-    dslSchema: {
-      kind: 'Form',
-      version: '1.0.0',
-      id: `form.${modelCode}`,
-      modelCode,
-      layout: { areas: ['main'], areasConfig: { main: { type: 'flex', direction: 'column', rowGap: 16 } } },
-      areas: {
-        main: {
-          blocks: [{
-            id: 'section_basic',
-            blockType: 'form-section',
-            title: { 'zh-CN': 'Basic Info', 'en-US': 'Basic Info' },
-            columns: 2,
-            fields: fieldCodes.map((fc: string) => ({ field: fc, span: 1 })),
-          }],
-        },
-      },
-    },
-  };
-
-  const detailPage = {
-    pageKey: `${modelCode}_detail`,
-    'name:zh-CN': `${modelCode} Detail`,
-    'name:en': `${modelCode} Detail`,
-    pageType: 'detail',
-    modelCode,
-    dslSchema: {
-      kind: 'Detail',
-      version: '1.0.0',
-      id: `detail.${modelCode}`,
-      modelCode,
-      layout: { areas: ['main'], areasConfig: { main: { type: 'flex', direction: 'column', rowGap: 16 } } },
-      areas: {
-        main: {
-          blocks: [{
-            id: 'section_basic',
-            blockType: 'detail-section',
-            title: { 'zh-CN': 'Basic Info', 'en-US': 'Basic Info' },
-            columns: 2,
-            fields: fieldCodes.map((fc: string) => ({ field: fc, span: 1 })),
-          }],
-        },
-      },
-    },
-  };
-
-  return [listPage, formPage, detailPage];
+  return generateV4Pages(modelCode, namespace, fields);
 }
 
 export async function scaffoldCommand(
@@ -450,7 +463,11 @@ export async function scaffoldCommand(
     ];
 
     // Pages as separate array
-    filesToWrite.push({ path: 'config/pages.json', resourceType: 'pages', data: [scaffold.listPage, scaffold.formPage] });
+    filesToWrite.push({
+      path: 'config/pages.json',
+      resourceType: 'pages',
+      data: [scaffold.listPage, scaffold.formPage, scaffold.detailPage],
+    });
 
     if (options.dryRun) {
       const result: ScaffoldResult = {
@@ -565,12 +582,17 @@ export async function scaffoldCommand(
     const pages = generatePagesForModel(code, ns, idx);
 
     if (options.dryRun) {
-      const output = successOutput('dsl.scaffold', { type: 'pages', code, dryRun: true, pages: pages.map(p => ({ pageKey: p.pageKey, pageType: p.pageType })) });
+      const output = successOutput('dsl.scaffold', {
+        type: 'pages',
+        code,
+        dryRun: true,
+        pages: pages.map(p => ({ pageKey: p.pageKey, kind: p.kind })),
+      });
       if (options.pretty) {
         formatOutput(output, fmt);
         console.log(chalk.bold.cyan(`[DRY RUN] Scaffold pages for: ${code}`));
         for (const p of pages) {
-          console.log(`  ${chalk.green('+')} ${p.pageKey} (${p.pageType})`);
+          console.log(`  ${chalk.green('+')} ${p.pageKey} (${p.kind})`);
         }
       } else {
         formatOutput(output, fmt);
@@ -584,7 +606,7 @@ export async function scaffoldCommand(
     try {
       existing = JSON.parse(readFileSync(pagesPath, 'utf-8'));
     } catch { /* ignore missing files and parse errors */ }
-    writeFileSync(pagesPath, JSON.stringify([...existing, ...pages], null, 2) + '\n', 'utf-8');
+    writeFileSync(pagesPath, JSON.stringify(upsertByKey(existing, pages, 'pageKey'), null, 2) + '\n', 'utf-8');
 
     const output = successOutput('dsl.scaffold', {
       type: 'pages',

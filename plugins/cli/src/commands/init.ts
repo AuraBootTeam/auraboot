@@ -257,7 +257,7 @@ function generatePlugin(dir: string, opts: InitOptions): void {
 
     // menus.json — points at the model's platform-generated default list page (<model>_list)
     const menus = [
-      { code: `${modelCode}_menu`, parentCode: null, 'name:zh-CN': opts.displayName, 'name:en': opts.displayName, path: `/dynamic/${modelCode.replace(/_/g, '-')}`, pageKey: `${modelCode}_list`, component: null, icon: 'IconList', type: 1, permissionCode: `${ns}.sample.manage`, orderNo: 100, visible: true },
+      { code: `${modelCode}_menu`, parentCode: null, 'name:zh-CN': opts.displayName, 'name:en': opts.displayName, path: `/p/${modelCode}`, pageKey: `${modelCode}_list`, component: null, icon: 'IconList', type: 1, permissionCode: `${ns}.sample.manage`, orderNo: 100, visible: true },
     ];
     writeFileSync(join(configDir, 'menus.json'), JSON.stringify(menus, null, 2) + '\n');
     log.success('Created config/menus.json');
