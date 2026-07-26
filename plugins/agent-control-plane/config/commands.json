@@ -454,14 +454,16 @@
     "displayName:zh-CN": "创建 MCP 服务器",
     "displayName:en": "Create MCP Server",
     "type": "custom",
-    "modelCode": "mcp_server"
+    "modelCode": "mcp_server",
+    "permissions": ["acp_agent_definition"]
   },
   {
     "code": "acp:update_mcp_server",
     "displayName:zh-CN": "更新 MCP 服务器",
     "displayName:en": "Update MCP Server",
     "type": "custom",
-    "modelCode": "mcp_server"
+    "modelCode": "mcp_server",
+    "permissions": ["acp_agent_definition"]
   },
   {
     "code": "acp:delete_mcp_server",
@@ -469,6 +471,7 @@
     "displayName:en": "Delete MCP Server",
     "type": "custom",
     "modelCode": "mcp_server",
+    "permissions": ["acp_agent_definition"],
     "extension": { "confirmMessage:zh-CN": "确认删除此 MCP 服务器？", "confirmMessage:en": "Confirm delete this MCP server?" }
   }
 ]
