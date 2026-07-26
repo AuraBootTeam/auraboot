@@ -1,6 +1,8 @@
 package com.auraboot.framework.agent.eval;
 
+import com.auraboot.framework.agent.eval.AgentOnlineEvalService.AttributionSummary;
 import com.auraboot.framework.agent.eval.AgentOnlineEvalService.OnlineEvalSummary;
+import com.auraboot.framework.agent.eval.AgentOnlineEvalService.TurnAttribution;
 import com.auraboot.framework.agent.service.AgentObservationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -106,6 +108,35 @@ class ScheduledOnlineEvalJobTest {
         verify(observationService, never())
                 .publish(anyLong(), anyString(), anyString(), any(), any(), any());
         assertTrue((Boolean) result.get("qualityOk"));
+    }
+
+    @Test
+    void runOnceExposesJudgeCoverageComparisonAndAttributionReport() {
+        TurnAttribution row = new TurnAttribution(
+                "run-1", "hybrid", "generation", true, true,
+                0.3, 0.8, 1.0, 0.9);
+        OnlineEvalSummary report = new OnlineEvalSummary(
+                "llm", 4, 0.5, 0.25, 0.0, 0.6, List.of(),
+                2, 2, 1, 2, 0.5,
+                new AttributionSummary(1, 1, 1, 0, 1), List.of(row));
+        when(onlineEvalService.sampleAndJudge(anyLong(), anyInt(), anyInt()))
+                .thenReturn(report);
+
+        Map<String, Object> result = job.runOnce(1L);
+
+        assertEquals("llm", result.get("judgeMode"));
+        assertEquals(2, result.get("judgedTurns"));
+        assertEquals(2, result.get("skippedTurns"));
+        assertEquals(1, result.get("keywordPathTurns"));
+        assertEquals(2, result.get("judgeComparisonTurns"));
+        assertEquals(0.5, result.get("judgeConsistencyRate"));
+        assertEquals(Map.of(
+                "normal", 1,
+                "retrievalProblems", 1,
+                "generationProblems", 1,
+                "configurationProblems", 0,
+                "unattributed", 1), result.get("attribution"));
+        assertEquals(List.of(row), result.get("turnAttributions"));
     }
 
     @Test

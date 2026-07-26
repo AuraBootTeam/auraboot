@@ -47,6 +47,7 @@ public class AgentDefinitionDTO {
     private String soulGoals;
     private List<String> allowedModels;
     private List<String> allowedOperations;
+    private List<String> knowledgeBaseIds;
     private Integer maxTools;
     private Integer maxConcurrentRuns;
     private Integer executionTimeoutSeconds;

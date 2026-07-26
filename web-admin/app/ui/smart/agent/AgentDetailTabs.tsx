@@ -1,7 +1,7 @@
 /**
  * AI Colleague Detail — Tabbed Configuration Page
  *
- * 5 tabs: Profile, Tools & Skills, Memory, Run History, Schedules.
+ * 6 tabs: Profile, Tools & Skills, Knowledge, Memory, Run History, Schedules.
  * AuraBot (aurabot) renders in read-only mode.
  */
 
@@ -12,6 +12,7 @@ import {
   UserCircleIcon,
   WrenchScrewdriverIcon,
   BookOpenIcon,
+  CircleStackIcon,
   ClockIcon,
   CalendarDaysIcon,
   CheckIcon,
@@ -67,6 +68,7 @@ interface AgentDetail {
   execution_timeout_seconds: number;
   allowed_models: string[] | string | null; // null or "*" = all, or ["crm_account","crm_lead"]
   allowed_operations: string[] | null; // ["query","create","update","delete","transition"]
+  knowledge_base_ids: string[] | string | null;
   visibility: 'private' | 'team' | 'tenant';
   employee_id: number | null;
   system_user_id: number | null;
@@ -106,6 +108,15 @@ interface MemoryItem {
   created_at: string;
 }
 
+interface KnowledgeBase {
+  pid: string;
+  name: string;
+  description: string | null;
+  status: 'active' | 'disabled';
+  docCount: number;
+  chunkCount: number;
+}
+
 interface RunRecord {
   pid: string;
   run_status: string;
@@ -125,7 +136,7 @@ interface RunRecord {
 
 const AURABOT_CODE = 'aurabot';
 
-type TabKey = 'profile' | 'tools' | 'memory' | 'runs' | 'schedules';
+type TabKey = 'profile' | 'tools' | 'knowledge' | 'memory' | 'runs' | 'schedules';
 
 const AGENT_TYPES = ['reactive', 'copilot', 'autonomous', 'workflow'];
 const COMM_STYLES = ['professional', 'friendly', 'concise', 'detailed'];
@@ -145,6 +156,11 @@ function useTabs(t: (key: string, params?: Record<string, any>, fallback?: strin
       key: 'tools' as TabKey,
       label: t('ai.colleagues.tab.tools', undefined, 'Tools & Skills'),
       icon: WrenchScrewdriverIcon,
+    },
+    {
+      key: 'knowledge' as TabKey,
+      label: t('ai.colleagues.tab.knowledge', undefined, 'Knowledge'),
+      icon: CircleStackIcon,
     },
     {
       key: 'memory' as TabKey,
@@ -1366,6 +1382,287 @@ function SchedulesTab({ agentCode }: { agentCode: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Knowledge Bases Tab
+// ---------------------------------------------------------------------------
+
+function parseKnowledgeBaseIds(raw: AgentDetail['knowledge_base_ids']): string[] {
+  if (Array.isArray(raw)) {
+    return [
+      ...new Set(
+        raw
+          .filter((value) => typeof value === 'string' && value.trim())
+          .map((value) => value.trim()),
+      ),
+    ];
+  }
+  if (!raw || raw === '*') return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? [
+          ...new Set(
+            parsed
+              .filter((value) => typeof value === 'string' && value.trim())
+              .map((value) => value.trim()),
+          ),
+        ]
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function KnowledgeBasesTab({
+  agent,
+  readOnly,
+  onSave,
+  saving,
+  onManageKnowledge,
+}: {
+  agent: AgentDetail;
+  readOnly: boolean;
+  onSave: (data: Partial<AgentDetail>) => void;
+  saving: boolean;
+  onManageKnowledge: () => void;
+}) {
+  const { t } = useI18n();
+  const [knowledgeBases, setKnowledgeBases] = useState<KnowledgeBase[]>([]);
+  const [selectedIds, setSelectedIds] = useState<string[]>(() =>
+    parseKnowledgeBaseIds(agent.knowledge_base_ids),
+  );
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    setSelectedIds(parseKnowledgeBaseIds(agent.knowledge_base_ids));
+  }, [agent.knowledge_base_ids]);
+
+  const fetchKnowledgeBases = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const res = await get<KnowledgeBase[]>('/api/ai/knowledge');
+      if (ResultHelper.isSuccess(res)) {
+        setKnowledgeBases(res.data ?? []);
+      } else {
+        setLoadError(true);
+      }
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchKnowledgeBases();
+  }, [fetchKnowledgeBases]);
+
+  const toggleKnowledgeBase = (knowledgeBase: KnowledgeBase) => {
+    const isSelected = selectedIds.includes(knowledgeBase.pid);
+    if (readOnly || (!isSelected && knowledgeBase.status !== 'active')) return;
+    setSelectedIds((current) =>
+      isSelected
+        ? current.filter((pid) => pid !== knowledgeBase.pid)
+        : [...current, knowledgeBase.pid],
+    );
+  };
+
+  if (readOnly) {
+    return (
+      <div
+        className="max-w-2xl rounded-xl border border-blue-200 bg-blue-50 p-5 dark:border-blue-900 dark:bg-blue-950/30"
+        data-testid="aurabot-knowledge-policy"
+      >
+        <div className="flex gap-3">
+          <InformationCircleIcon className="mt-0.5 h-5 w-5 shrink-0 text-blue-600 dark:text-blue-400" />
+          <div>
+            <h3 className="font-semibold text-blue-950 dark:text-blue-100">
+              {t(
+                'ai.colleagues.knowledge.aurabotTitle',
+                undefined,
+                'AuraBot uses tenant knowledge',
+              )}
+            </h3>
+            <p className="mt-1 text-sm leading-6 text-blue-800 dark:text-blue-200">
+              {t(
+                'ai.colleagues.knowledge.aurabotDescription',
+                undefined,
+                'AuraBot is the general assistant. Choose knowledge bases in each conversation; per-colleague bindings apply only to named AI colleagues.',
+              )}
+            </p>
+            <button
+              type="button"
+              onClick={onManageKnowledge}
+              className="mt-3 text-sm font-medium text-blue-700 hover:underline dark:text-blue-300"
+              data-testid="manage-knowledge-bases-link"
+            >
+              {t('ai.colleagues.knowledge.manage', undefined, 'Manage knowledge bases')}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl space-y-5" data-testid="agent-knowledge-tab-panel">
+      <div>
+        <h3 className="text-sm font-semibold tracking-wide text-gray-900 uppercase dark:text-white">
+          {t('ai.colleagues.knowledge.title', undefined, 'Assigned knowledge bases')}
+        </h3>
+        <p className="mt-2 text-sm leading-6 text-gray-500 dark:text-gray-400">
+          {t(
+            'ai.colleagues.knowledge.description',
+            undefined,
+            'This colleague reads only the knowledge bases selected here. A per-conversation selection overrides this list; an empty list does not grant tenant-wide access.',
+          )}
+        </p>
+      </div>
+
+      {loading && (
+        <div className="space-y-3" data-testid="agent-knowledge-loading">
+          {[0, 1].map((item) => (
+            <div
+              key={item}
+              className="h-20 animate-pulse rounded-xl bg-gray-100 dark:bg-gray-800"
+            />
+          ))}
+        </div>
+      )}
+
+      {!loading && loadError && (
+        <div
+          className="rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30"
+          data-testid="agent-knowledge-error"
+        >
+          <p className="text-sm text-red-700 dark:text-red-300">
+            {t(
+              'ai.colleagues.knowledge.loadFailed',
+              undefined,
+              'Knowledge bases could not be loaded.',
+            )}
+          </p>
+          <button
+            type="button"
+            onClick={() => void fetchKnowledgeBases()}
+            className="mt-2 text-sm font-medium text-red-700 hover:underline dark:text-red-300"
+            data-testid="agent-knowledge-retry"
+          >
+            {t('common.retry', undefined, 'Retry')}
+          </button>
+        </div>
+      )}
+
+      {!loading && !loadError && knowledgeBases.length === 0 && (
+        <div
+          className="rounded-xl border border-dashed border-gray-300 p-8 text-center dark:border-gray-700"
+          data-testid="agent-knowledge-empty"
+        >
+          <CircleStackIcon className="mx-auto h-10 w-10 text-gray-300 dark:text-gray-600" />
+          <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-200">
+            {t('ai.colleagues.knowledge.empty', undefined, 'No knowledge bases yet')}
+          </p>
+          <button
+            type="button"
+            onClick={onManageKnowledge}
+            className="mt-2 text-sm font-medium text-blue-600 hover:underline dark:text-blue-400"
+            data-testid="agent-knowledge-create-link"
+          >
+            {t('ai.colleagues.knowledge.create', undefined, 'Create a knowledge base')}
+          </button>
+        </div>
+      )}
+
+      {!loading && !loadError && knowledgeBases.length > 0 && (
+        <div className="space-y-3" data-testid="agent-knowledge-options">
+          {knowledgeBases.map((knowledgeBase) => {
+            const selected = selectedIds.includes(knowledgeBase.pid);
+            const unavailable = knowledgeBase.status !== 'active';
+            const disabled = unavailable && !selected;
+            return (
+              <button
+                type="button"
+                key={knowledgeBase.pid}
+                onClick={() => toggleKnowledgeBase(knowledgeBase)}
+                disabled={disabled}
+                aria-pressed={selected}
+                className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition-colors ${
+                  selected
+                    ? 'border-blue-500 bg-blue-50 dark:border-blue-500 dark:bg-blue-950/30'
+                    : 'border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-900'
+                } ${disabled ? 'cursor-not-allowed opacity-55' : ''}`}
+                data-testid={`agent-knowledge-option-${knowledgeBase.pid}`}
+              >
+                <span
+                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                    selected
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-gray-300 dark:border-gray-600'
+                  }`}
+                  aria-hidden="true"
+                >
+                  {selected && <CheckIcon className="h-3.5 w-3.5" />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-gray-900 dark:text-white">
+                      {knowledgeBase.name}
+                    </span>
+                    {unavailable && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                        {t('ai.colleagues.knowledge.disabled', undefined, 'Disabled')}
+                      </span>
+                    )}
+                  </span>
+                  {knowledgeBase.description && (
+                    <span className="mt-1 block text-sm text-gray-500 dark:text-gray-400">
+                      {knowledgeBase.description}
+                    </span>
+                  )}
+                  <span className="mt-2 block text-xs text-gray-400 dark:text-gray-500">
+                    {t(
+                      'ai.colleagues.knowledge.counts',
+                      { documents: knowledgeBase.docCount, chunks: knowledgeBase.chunkCount },
+                      `${knowledgeBase.docCount} documents · ${knowledgeBase.chunkCount} chunks`,
+                    )}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
+        <p
+          className="text-xs text-gray-500 dark:text-gray-400"
+          data-testid="agent-knowledge-selection-count"
+        >
+          {t(
+            'ai.colleagues.knowledge.selectedCount',
+            { count: selectedIds.length },
+            `${selectedIds.length} selected`,
+          )}
+        </p>
+        <button
+          type="button"
+          onClick={() => onSave({ knowledge_base_ids: selectedIds })}
+          disabled={saving || loading || loadError}
+          className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          data-testid="agent-knowledge-save"
+        >
+          <CheckIcon className="h-4 w-4" />
+          {saving
+            ? t('common.saving', undefined, 'Saving...')
+            : t('common.save', undefined, 'Save')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Memory Tab
 // ---------------------------------------------------------------------------
 
@@ -1464,7 +1761,10 @@ function MemoryTab({ agentPid }: { agentPid: string }) {
 // Enroll Employee Dialog
 // ---------------------------------------------------------------------------
 
-function flattenDepts(nodes: DepartmentTreeNode[], depth = 0): { pid: string; name: string; depth: number }[] {
+function flattenDepts(
+  nodes: DepartmentTreeNode[],
+  depth = 0,
+): { pid: string; name: string; depth: number }[] {
   const result: { pid: string; name: string; depth: number }[] = [];
   for (const node of nodes) {
     result.push({ pid: node.pid, name: node.name, depth });
@@ -1488,7 +1788,9 @@ function EnrollEmployeeDialog({
 }) {
   const { t } = useI18n();
   const toast = useToastContext();
-  const [departments, setDepartments] = useState<{ pid: string; name: string; depth: number }[]>([]);
+  const [departments, setDepartments] = useState<{ pid: string; name: string; depth: number }[]>(
+    [],
+  );
   const [positions, setPositions] = useState<PositionItem[]>([]);
   const [selectedDeptPid, setSelectedDeptPid] = useState('');
   const [selectedPosPid, setSelectedPosPid] = useState('');
@@ -1516,7 +1818,12 @@ function EnrollEmployeeDialog({
     }
     setLoadingPos(true);
     get<{ records: PositionItem[] }>('/api/dynamic/org_position/list', {
-      params: { pageSize: 200, filters: JSON.stringify([{ fieldName: 'org_pos_dept_id', operator: 'EQ', value: selectedDeptPid }]) },
+      params: {
+        pageSize: 200,
+        filters: JSON.stringify([
+          { fieldName: 'org_pos_dept_id', operator: 'EQ', value: selectedDeptPid },
+        ]),
+      },
     })
       .then((res) => {
         if (ResultHelper.isSuccess(res) && res.data?.records) {
@@ -1530,7 +1837,9 @@ function EnrollEmployeeDialog({
 
   const handleSubmit = async () => {
     if (!selectedDeptPid) {
-      toast.showErrorToast(t('ai.colleagues.enroll.error.deptRequired', undefined, 'Please select a department'));
+      toast.showErrorToast(
+        t('ai.colleagues.enroll.error.deptRequired', undefined, 'Please select a department'),
+      );
       return;
     }
     setSubmitting(true);
@@ -1541,12 +1850,20 @@ function EnrollEmployeeDialog({
       });
       if (ResultHelper.isSuccess(res)) {
         toast.showSuccessToast(
-          t('ai.colleagues.enroll.success', { name: agentName }, `${agentName} has been enrolled as a digital employee`),
+          t(
+            'ai.colleagues.enroll.success',
+            { name: agentName },
+            `${agentName} has been enrolled as a digital employee`,
+          ),
         );
         onSuccess();
       } else {
         toast.showErrorToast(
-          t('ai.colleagues.enroll.error.failed', undefined, 'Enrollment failed. Ensure the agent has a system account.'),
+          t(
+            'ai.colleagues.enroll.error.failed',
+            undefined,
+            'Enrollment failed. Ensure the agent has a system account.',
+          ),
         );
       }
     } catch {
@@ -1579,7 +1896,11 @@ function EnrollEmployeeDialog({
                 {t('ai.colleagues.enroll.title', undefined, 'Enroll as Employee')}
               </h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                {t('ai.colleagues.enroll.subtitle', { name: agentName }, `Add ${agentName} to the org chart`)}
+                {t(
+                  'ai.colleagues.enroll.subtitle',
+                  { name: agentName },
+                  `Add ${agentName} to the org chart`,
+                )}
               </p>
             </div>
           </div>
@@ -1616,20 +1937,29 @@ function EnrollEmployeeDialog({
             <div className="relative">
               <select
                 value={selectedDeptPid}
-                onChange={(e) => { setSelectedDeptPid(e.target.value); setSelectedPosPid(''); }}
+                onChange={(e) => {
+                  setSelectedDeptPid(e.target.value);
+                  setSelectedPosPid('');
+                }}
                 className={selectClass}
                 data-testid="enroll-dept-select"
               >
                 <option value="">
-                  {t('ai.colleagues.enroll.placeholder.department', undefined, '— Select Department —')}
+                  {t(
+                    'ai.colleagues.enroll.placeholder.department',
+                    undefined,
+                    '— Select Department —',
+                  )}
                 </option>
                 {departments.map((d) => (
                   <option key={d.pid} value={d.pid}>
-                    {'  '.repeat(d.depth)}{d.depth > 0 ? '└ ' : ''}{d.name}
+                    {'  '.repeat(d.depth)}
+                    {d.depth > 0 ? '└ ' : ''}
+                    {d.name}
                   </option>
                 ))}
               </select>
-              <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
             </div>
           )}
         </div>
@@ -1653,7 +1983,11 @@ function EnrollEmployeeDialog({
               <option value="">
                 {loadingPos
                   ? t('ai.colleagues.enroll.loading', undefined, 'Loading...')
-                  : t('ai.colleagues.enroll.placeholder.position', undefined, '— Select Position —')}
+                  : t(
+                      'ai.colleagues.enroll.placeholder.position',
+                      undefined,
+                      '— Select Position —',
+                    )}
               </option>
               {positions.map((p) => (
                 <option key={p.pid} value={p.pid}>
@@ -1661,15 +1995,22 @@ function EnrollEmployeeDialog({
                 </option>
               ))}
             </select>
-            <ChevronDownIcon className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <ChevronDownIcon className="pointer-events-none absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 text-gray-400" />
           </div>
           {!selectedDeptPid && (
             <p className="mt-1 text-xs text-gray-400">
-              {t('ai.colleagues.enroll.hint.selectDeptFirst', undefined, 'Select a department first to load positions')}
+              {t(
+                'ai.colleagues.enroll.hint.selectDeptFirst',
+                undefined,
+                'Select a department first to load positions',
+              )}
             </p>
           )}
           {selectedDeptPid && !loadingPos && positions.length === 0 && (
-            <p className="mt-1 text-xs text-amber-600 dark:text-amber-500" data-testid="enroll-position-empty">
+            <p
+              className="mt-1 text-xs text-amber-600 dark:text-amber-500"
+              data-testid="enroll-position-empty"
+            >
               {t(
                 'ai.colleagues.enroll.empty.position',
                 undefined,
@@ -1729,14 +2070,22 @@ function RemoveFromOrgDialog({
       const res = await del<void>(`/api/agent/definitions/${agentPid}/enroll-employee`);
       if (ResultHelper.isSuccess(res)) {
         toast.showSuccessToast(
-          t('ai.colleagues.removeOrg.success', { name: agentName }, `${agentName} has been removed from the org chart`),
+          t(
+            'ai.colleagues.removeOrg.success',
+            { name: agentName },
+            `${agentName} has been removed from the org chart`,
+          ),
         );
         onSuccess();
       } else {
-        toast.showErrorToast(t('ai.colleagues.removeOrg.error', undefined, 'Failed to remove from org'));
+        toast.showErrorToast(
+          t('ai.colleagues.removeOrg.error', undefined, 'Failed to remove from org'),
+        );
       }
     } catch {
-      toast.showErrorToast(t('ai.colleagues.removeOrg.error', undefined, 'Failed to remove from org'));
+      toast.showErrorToast(
+        t('ai.colleagues.removeOrg.error', undefined, 'Failed to remove from org'),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -1822,7 +2171,11 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
         toast.showSuccessToast(
           isSuspended
             ? t('ai.colleagues.resume.success', undefined, 'Colleague resumed')
-            : t('ai.colleagues.suspend.success', undefined, 'Colleague suspended — it will not take new work'),
+            : t(
+                'ai.colleagues.suspend.success',
+                undefined,
+                'Colleague suspended — it will not take new work',
+              ),
         );
         await fetchAgent();
       } else {
@@ -1929,7 +2282,11 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
           agentPid={agentPid}
           agentName={agent.name}
           onClose={() => setShowEnrollDialog(false)}
-          onSuccess={() => { setShowEnrollDialog(false); fetchAgent(); void fetchPlacement(); }}
+          onSuccess={() => {
+            setShowEnrollDialog(false);
+            fetchAgent();
+            void fetchPlacement();
+          }}
         />
       )}
       {showRemoveOrgDialog && agentPid && (
@@ -1937,7 +2294,11 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
           agentPid={agentPid}
           agentName={agent.name}
           onClose={() => setShowRemoveOrgDialog(false)}
-          onSuccess={() => { setShowRemoveOrgDialog(false); fetchAgent(); void fetchPlacement(); }}
+          onSuccess={() => {
+            setShowRemoveOrgDialog(false);
+            fetchAgent();
+            void fetchPlacement();
+          }}
         />
       )}
 
@@ -2072,6 +2433,15 @@ export function AgentDetailTabs(_props?: { block?: unknown; runtime?: unknown })
         )}
         {activeTab === 'tools' && agent && (
           <ToolsSkillsTab agent={agent} readOnly={readOnly} onSave={handleSave} saving={saving} />
+        )}
+        {activeTab === 'knowledge' && agent && (
+          <KnowledgeBasesTab
+            agent={agent}
+            readOnly={readOnly}
+            onSave={handleSave}
+            saving={saving}
+            onManageKnowledge={() => navigate('/aurabot/knowledge')}
+          />
         )}
         {activeTab === 'memory' && agentPid && <MemoryTab agentPid={agentPid} />}
         {activeTab === 'runs' && agent && <RunHistoryTab agentCode={agent.agent_code} />}

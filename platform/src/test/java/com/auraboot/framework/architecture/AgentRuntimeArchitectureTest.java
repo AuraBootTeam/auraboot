@@ -750,7 +750,7 @@ class AgentRuntimeArchitectureTest {
                 .exists();
         assertThat(text)
                 .contains("private final AgentChatContextAdapter contextAdapter;")
-                .contains("contextAdapter.assemble(ctx, request)")
+                .contains("contextAdapter.assembleWithDiagnostics(ctx, request, boundKnowledgeBaseIds)")
                 .doesNotContain("new AgentContextAssembler(objectMapper).assemble(");
     }
 

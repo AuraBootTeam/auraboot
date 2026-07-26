@@ -2,6 +2,7 @@ package com.auraboot.framework.conversation;
 
 import com.auraboot.framework.agent.service.AgentObservationService;
 import com.auraboot.framework.agent.triage.TriageBucket;
+import com.auraboot.framework.aurabot.service.RagContextProvider;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -73,6 +74,41 @@ class TurnCompletionObservationListenerTest {
     // =========================================================================
     // Anti-filter assertions (the point of this seam)
     // =========================================================================
+
+    @Test
+    @DisplayName("B-2: terminal observation carries raw event, answer, trace and retrieval diagnostics")
+    void retrievalDiagnostics_areCarriedIntoObservation() {
+        TurnEvalTelemetryRegistry registry = new TurnEvalTelemetryRegistry();
+        registry.recordInput("01HW3KTEST", "What is the calibration interval?");
+        registry.recordTrace("01HW3KTEST", "trace-42");
+        registry.recordRetrieval("01HW3KTEST", new RagContextProvider.RetrievalDiagnostics(
+                "hybrid",
+                1,
+                List.of(new RagContextProvider.RetrievalScore(
+                        "chunk-1", 0.82, 0.64, 0.77, 0.91)),
+                List.of()));
+        org.springframework.test.util.ReflectionTestUtils.setField(
+                listener, "turnEvalTelemetryRegistry", registry);
+
+        listener.onTurnCompleted(new TurnCompletedEvent(
+                newCtx(TriageBucket.CONTEXTUAL_ANSWER, 100L, 42L, "support_agent"),
+                new TurnOutcome.Success("Every 137 days.", Map.of())));
+
+        Map<String, Object> detail = capturePublishedDetail(
+                TurnCompletionObservationListener.EVENT_COMPLETED, "support_agent");
+        assertThat(detail).containsEntry("eventType", "turn.completed");
+        assertThat(detail).containsEntry("input", "What is the calibration interval?");
+        assertThat(detail).containsEntry("output", "Every 137 days.");
+        assertThat(detail).containsEntry("traceId", "trace-42");
+        assertThat(detail.get("retrieval"))
+                .isEqualTo(new RagContextProvider.RetrievalDiagnostics(
+                        "hybrid",
+                        1,
+                        List.of(new RagContextProvider.RetrievalScore(
+                                "chunk-1", 0.82, 0.64, 0.77, 0.91)),
+                        List.of()));
+        assertThat(registry.take("01HW3KTEST")).isNull();
+    }
 
     @Test
     @DisplayName("LIGHT_CHAT Success IS recorded — no bucket filter (anti-bias, review G1/G3)")

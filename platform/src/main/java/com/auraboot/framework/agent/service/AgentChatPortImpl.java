@@ -22,6 +22,7 @@ import com.auraboot.framework.agent.runtime.context.AgentContextAssembler;
 import com.auraboot.framework.agent.runtime.policy.AgentProfile;
 import com.auraboot.framework.agent.runtime.policy.AgentProfileResolver;
 import com.auraboot.framework.agent.runtime.policy.DefaultAgentProfileResolver;
+import com.auraboot.framework.agent.util.JsonbColumns;
 import com.auraboot.framework.agent.dto.ChatMessage;
 import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.common.util.LogSanitizer;
@@ -30,6 +31,7 @@ import com.auraboot.framework.conversation.TurnContext;
 import com.auraboot.framework.conversation.TurnOutcome;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.permission.service.UserPermissionService;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -250,6 +252,9 @@ public class AgentChatPortImpl implements AgentChatPort {
     private com.auraboot.framework.agent.trace.AiTraceService aiTraceService;
 
     @Autowired(required = false)
+    private com.auraboot.framework.conversation.TurnEvalTelemetryRegistry turnEvalTelemetryRegistry;
+
+    @Autowired(required = false)
     private UserPermissionService userPermissionService;
 
     @Autowired(required = false)
@@ -417,7 +422,9 @@ public class AgentChatPortImpl implements AgentChatPort {
                         profile.profilePermissions(),
                         toolDefs);
         boolean requireInitialToolCall = profile.evidenceFirst();
-        List<AgentContextBlock> contextBlocks = traceContextAssembly(ctx, request);
+        List<String> boundKnowledgeBaseIds = boundKnowledgeBaseIds(agentDef);
+        List<AgentContextBlock> contextBlocks =
+                traceContextAssembly(ctx, request, boundKnowledgeBaseIds);
 
         log.info("Agent chat: agentCode={}, provider={}, model={}, tools={}, overrides={}",
                 agentCode, providerCode, model, tools.size(), overrides != null);
@@ -444,30 +451,48 @@ public class AgentChatPortImpl implements AgentChatPort {
      * <p>Tracing must never change the turn: if no tracer is wired, or starting the span
      * throws, the assembly still happens and its result is returned.
      */
-    private List<AgentContextBlock> traceContextAssembly(TurnContext ctx, ChatRequest request) {
-        if (aiTraceService == null) {
-            return contextAdapter.assemble(ctx, request);
+    private List<AgentContextBlock> traceContextAssembly(TurnContext ctx,
+                                                         ChatRequest request,
+                                                         List<String> boundKnowledgeBaseIds) {
+        if (turnEvalTelemetryRegistry != null && ctx != null) {
+            turnEvalTelemetryRegistry.recordInput(
+                    ctx.turnId(), request != null ? request.getMessage() : null);
         }
         com.auraboot.framework.agent.trace.TraceContext trace = null;
         com.auraboot.framework.agent.trace.SpanContext span = null;
-        try {
-            trace = aiTraceService.createTrace(
-                    ctx != null ? ctx.tenantId() : null,
-                    request != null ? request.getSessionId() : null,
-                    request != null ? request.getMessage() : null,
-                    ctx != null ? ctx.userId() : null,
-                    java.util.Map.of("path", "named_agent",
-                            "agentCode", java.util.Objects.toString(ctx != null ? ctx.agentCode() : null, "")));
-            span = aiTraceService.startSpan(trace, null, "span", "render_prompt", null);
-        } catch (Exception e) {
-            log.warn("Could not start the named-agent prompt span: {}", e.getMessage());
+        if (aiTraceService != null) {
+            try {
+                trace = aiTraceService.createTrace(
+                        ctx != null ? ctx.tenantId() : null,
+                        request != null ? request.getSessionId() : null,
+                        request != null ? request.getMessage() : null,
+                        ctx != null ? ctx.userId() : null,
+                        java.util.Map.of("path", "named_agent",
+                                "agentCode", java.util.Objects.toString(
+                                        ctx != null ? ctx.agentCode() : null, "")));
+                span = aiTraceService.startSpan(trace, null, "span", "render_prompt", null);
+                if (turnEvalTelemetryRegistry != null && ctx != null && trace != null) {
+                    turnEvalTelemetryRegistry.recordTrace(ctx.turnId(), trace.getTraceId());
+                }
+            } catch (Exception e) {
+                log.warn("Could not start the named-agent prompt span: {}", e.getMessage());
+            }
         }
 
-        List<AgentContextBlock> blocks = contextAdapter.assemble(ctx, request);
+        AgentChatContextAdapter.AssemblyResult assembly =
+                contextAdapter.assembleWithDiagnostics(ctx, request, boundKnowledgeBaseIds);
+        List<AgentContextBlock> blocks = assembly.blocks();
+        if (turnEvalTelemetryRegistry != null && ctx != null) {
+            turnEvalTelemetryRegistry.recordRetrieval(
+                    ctx.turnId(), assembly.retrievalDiagnostics());
+        }
 
         if (span != null) {
             try {
-                aiTraceService.endSpan(span, describeContextBlocks(blocks), "success");
+                aiTraceService.endSpan(
+                        span,
+                        describeContextBlocks(blocks, assembly.retrievalDiagnostics()),
+                        "success");
             } catch (Exception e) {
                 log.warn("Could not end the named-agent prompt span: {}", e.getMessage());
             }
@@ -476,11 +501,37 @@ public class AgentChatPortImpl implements AgentChatPort {
     }
 
     /**
+     * Generic agent-definition reads expose JSONB as a PostgreSQL driver wrapper.
+     * Parse the explicit binding defensively; malformed data narrows to no knowledge
+     * rather than broadening to tenant-wide retrieval.
+     */
+    private List<String> boundKnowledgeBaseIds(Map<String, Object> agentDef) {
+        if (agentDef == null) {
+            return List.of();
+        }
+        String json = JsonbColumns.toJsonText(agentDef.get("knowledge_base_ids"), objectMapper);
+        if (json == null) {
+            return List.of();
+        }
+        try {
+            List<String> parsed = objectMapper.readValue(
+                    json, new TypeReference<List<String>>() {});
+            return AgentChatContextAdapter.effectiveKnowledgeBaseIds(List.of(), parsed);
+        } catch (Exception e) {
+            log.warn("Invalid knowledge_base_ids on named agent — retrieval disabled: {}",
+                    e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
      * What the trace records about the assembled context: which blocks were present, how
      * big each was, and — the question this exists to answer — whether a retrieved-knowledge
      * block made it in.
      */
-    private static Map<String, Object> describeContextBlocks(List<AgentContextBlock> blocks) {
+    private static Map<String, Object> describeContextBlocks(
+            List<AgentContextBlock> blocks,
+            com.auraboot.framework.aurabot.service.RagContextProvider.RetrievalDiagnostics diagnostics) {
         List<Map<String, Object>> described = new ArrayList<>();
         boolean hasRetrievedKnowledge = false;
         for (AgentContextBlock b : blocks == null ? List.<AgentContextBlock>of() : blocks) {
@@ -491,10 +542,14 @@ public class AgentChatPortImpl implements AgentChatPort {
                 hasRetrievedKnowledge = true;
             }
         }
-        return Map.of(
-                "blockCount", described.size(),
-                "blocks", described,
-                "hasRetrievedKnowledge", hasRetrievedKnowledge);
+        Map<String, Object> output = new java.util.LinkedHashMap<>();
+        output.put("blockCount", described.size());
+        output.put("blocks", described);
+        output.put("hasRetrievedKnowledge", hasRetrievedKnowledge);
+        if (diagnostics != null) {
+            output.put("retrieval", diagnostics);
+        }
+        return output;
     }
 
     private TurnOutcome doAgentToolLoop(TurnContext ctx, String agentCode,

@@ -1641,5 +1641,13 @@
     "required": false,
     "visible": true,
     "editable": true
+  },
+  {
+    "modelCode": "agent_definition",
+    "fieldCode": "knowledge_base_ids",
+    "sequence": 67,
+    "required": false,
+    "visible": true,
+    "editable": true
   }
 ]

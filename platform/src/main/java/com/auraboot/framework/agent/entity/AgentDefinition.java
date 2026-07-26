@@ -50,6 +50,17 @@ public class AgentDefinition {
     @TableField(typeHandler = JsonbListTypeHandler.class)
     private List<String> allowedOperations;
 
+    /**
+     * Public knowledge-base PIDs explicitly assigned to this named agent.
+     *
+     * <p>An empty list deliberately means no retrieval. It must never be interpreted
+     * as "all active knowledge bases in the tenant": that tenant-wide behaviour is
+     * appropriate for the general AuraBot assistant, not a digital employee with a
+     * bounded job.
+     */
+    @TableField(typeHandler = JsonbListTypeHandler.class)
+    private List<String> knowledgeBaseIds;
+
     private Integer maxTools;
     private Integer maxConcurrentRuns;
     private Integer executionTimeoutSeconds;

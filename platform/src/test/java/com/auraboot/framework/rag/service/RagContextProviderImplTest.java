@@ -7,7 +7,9 @@ import com.auraboot.framework.rag.d7.D7ContextAssembler;
 import com.auraboot.framework.rag.d7.D7KnowledgeProperties;
 import com.auraboot.framework.rag.d7.D7RetrievalTraceWriter;
 import com.auraboot.framework.rag.d7.D7SourceRef;
+import com.auraboot.framework.rag.dto.RetrievalOutcome;
 import com.auraboot.framework.rag.dto.RetrievalResult;
+import com.auraboot.framework.aurabot.service.RagContextProvider;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -30,6 +32,98 @@ class RagContextProviderImplTest {
 
     @TempDir
     Path tempDir;
+
+    @Test
+    @DisplayName("B-2: diagnostic retrieval keeps path and ranked scores beside rendered context")
+    void retrieveContextWithDiagnostics_keepsPathAndScores() {
+        RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
+        D7KnowledgeProperties properties = new D7KnowledgeProperties();
+        properties.setEnabled(false);
+        RetrievalResult hit = RetrievalResult.builder()
+                .chunkPid("chunk-1")
+                .docName("handbook")
+                .content("calibrate every 137 days")
+                .chunkIndex(0)
+                .vectorScore(0.82)
+                .bm25Score(0.64)
+                .hybridScore(0.77)
+                .similarity(0.91)
+                .build();
+        when(ragRetrievalService.retrieveWithDiagnostics(
+                1L, "query", List.of("kb1"), 5, null))
+                .thenReturn(new RetrievalOutcome(
+                        List.of(hit), List.of("dimension fallback avoided"), "hybrid"));
+
+        RagContextProviderImpl provider = new RagContextProviderImpl(
+                ragRetrievalService,
+                mock(D7CompiledKnowledgeService.class),
+                new D7ContextAssembler(),
+                mock(D7RetrievalTraceWriter.class),
+                properties);
+
+        RagContextProvider.RetrievedContext result =
+                provider.retrieveContextWithDiagnostics(1L, "query", List.of("kb1"));
+
+        assertThat(result.context()).contains("calibrate every 137 days");
+        assertThat(result.diagnostics().path()).isEqualTo("hybrid");
+        assertThat(result.diagnostics().resultCount()).isEqualTo(1);
+        assertThat(result.diagnostics().scores()).singleElement().satisfies(score -> {
+            assertThat(score.chunkPid()).isEqualTo("chunk-1");
+            assertThat(score.vectorScore()).isEqualTo(0.82);
+            assertThat(score.bm25Score()).isEqualTo(0.64);
+            assertThat(score.hybridScore()).isEqualTo(0.77);
+        });
+        assertThat(result.diagnostics().warnings()).containsExactly("dimension fallback avoided");
+    }
+
+    @Test
+    @DisplayName("B-2: D7 diagnostic retrieval counts compiled and raw evidence from one search")
+    void retrieveContextWithDiagnostics_d7KeepsCompiledAndRawEvidenceTogether() {
+        RagRetrievalService ragRetrievalService = mock(RagRetrievalService.class);
+        D7CompiledKnowledgeService d7Service = mock(D7CompiledKnowledgeService.class);
+        D7KnowledgeProperties properties = new D7KnowledgeProperties();
+        properties.setEnabled(true);
+        properties.setMaxCompiledPages(2);
+        properties.setRawTopK(4);
+        D7CompiledKnowledgePage page = D7CompiledKnowledgePage.builder()
+                .id("compiled.b2")
+                .title("Compiled handbook")
+                .body("compiled evidence")
+                .build();
+        D7CompiledKnowledgeMatch compiled =
+                new D7CompiledKnowledgeMatch(page, 1.0, false);
+        RetrievalResult raw = RetrievalResult.builder()
+                .chunkPid("chunk-b2")
+                .docName("raw handbook")
+                .content("raw evidence")
+                .chunkIndex(0)
+                .vectorScore(0.8)
+                .bm25Score(0.6)
+                .hybridScore(0.75)
+                .similarity(0.9)
+                .build();
+        when(d7Service.retrieve(1L, "query", 2)).thenReturn(List.of(compiled));
+        when(ragRetrievalService.retrieveWithDiagnostics(
+                1L, "query", List.of("kb1"), 4, null))
+                .thenReturn(new RetrievalOutcome(List.of(raw), List.of(), "hybrid"));
+
+        RagContextProviderImpl provider = new RagContextProviderImpl(
+                ragRetrievalService,
+                d7Service,
+                new D7ContextAssembler(),
+                mock(D7RetrievalTraceWriter.class),
+                properties);
+
+        RagContextProvider.RetrievedContext result =
+                provider.retrieveContextWithDiagnostics(1L, "query", List.of("kb1"));
+
+        assertThat(result.context()).contains("compiled evidence").contains("raw evidence");
+        assertThat(result.diagnostics().path()).isEqualTo("hybrid");
+        assertThat(result.diagnostics().resultCount()).isEqualTo(2);
+        assertThat(result.diagnostics().scores()).singleElement()
+                .extracting(RagContextProvider.RetrievalScore::chunkPid)
+                .isEqualTo("chunk-b2");
+    }
 
     @Test
     @DisplayName("hasActiveKnowledgeBases keeps raw RAG as first signal")

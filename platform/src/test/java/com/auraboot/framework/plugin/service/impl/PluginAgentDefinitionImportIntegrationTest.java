@@ -42,6 +42,9 @@ class PluginAgentDefinitionImportIntegrationTest extends BaseIntegrationTest {
                 .containsKey(ResourceType.AGENT_DEFINITION.name());
         assertThat(activeAgentCount(tenantId, agentCode)).isEqualTo(1);
         assertThat(agentName(tenantId, agentCode)).isEqualTo("Initial Agent");
+        assertThat(hasKnowledgeBaseIds(
+                tenantId, agentCode, "[\"kb-product-manual\",\"kb-return-policy\"]"))
+                .isTrue();
 
         PluginManifestExtended updated = manifest(pluginId, "1.0.1",
                 agent(agentCode, "Updated Agent", "Updated prompt"));
@@ -76,6 +79,7 @@ class PluginAgentDefinitionImportIntegrationTest extends BaseIntegrationTest {
                 .guardrails(Map.of("writePolicy", "approval_required"))
                 .allowedModels(List.of("it_agent_quote"))
                 .allowedOperations(List.of("query"))
+                .knowledgeBaseIds(List.of("kb-product-manual", "kb-return-policy"))
                 .maxTools(8)
                 .maxConcurrentRuns(2)
                 .executionTimeoutSeconds(120)
@@ -120,6 +124,16 @@ class PluginAgentDefinitionImportIntegrationTest extends BaseIntegrationTest {
                   AND agent_code = ?
                   AND deleted_flag = FALSE
                 """, String.class, tenantId, agentCode);
+    }
+
+    private Boolean hasKnowledgeBaseIds(Long tenantId, String agentCode, String expectedJson) {
+        return jdbcTemplate.queryForObject("""
+                SELECT knowledge_base_ids = CAST(? AS jsonb)
+                FROM ab_agent_definition
+                WHERE tenant_id = ?
+                  AND agent_code = ?
+                  AND deleted_flag = FALSE
+                """, Boolean.class, expectedJson, tenantId, agentCode);
     }
 
     private Integer pluginResourceCount(Long tenantId, String agentCode) {

@@ -82,6 +82,19 @@ class OnlineEvalQualityGateTest {
     }
 
     @Test
+    void allSkippedSampleIsReportedAsNotJudged() {
+        OnlineEvalSummary skipped = new OnlineEvalSummary(
+                "llm", 3, 0, 0, 0, 0, List.of(),
+                0, 3, 2, 0, 0,
+                AgentOnlineEvalService.AttributionSummary.empty(), List.of());
+
+        Verdict verdict = OnlineEvalQualityGate.evaluate(skipped, T);
+
+        assertTrue(verdict.ok());
+        assertEquals("no_judged_sample", verdict.summary());
+    }
+
+    @Test
     void nullSummaryIsNoOpPass() {
         Verdict v = OnlineEvalQualityGate.evaluate(null, T);
         assertTrue(v.ok());
