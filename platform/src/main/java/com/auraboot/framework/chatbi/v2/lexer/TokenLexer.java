@@ -19,8 +19,7 @@ import java.util.List;
  *   <li>Never throws — invalid tokens are dropped (and W3's audit log
  *       records the drop).</li>
  *   <li>{@code llmHint} may be {@link IntentResult#empty()}; implementations
- *       must degrade gracefully (W2 returns an empty list, W3 swaps in
- *       v1 keyword fallback via {@code ChatBIService}).</li>
+ *       must degrade gracefully using catalog-bound deterministic parsing.</li>
  * </ul>
  */
 public interface TokenLexer {

@@ -69,6 +69,9 @@ import com.auraboot.framework.rbac.entity.RolePermission;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.entity.Role;
 import com.auraboot.framework.rbac.service.RoleService;
+import com.auraboot.framework.semantic.exception.SemanticValidationException;
+import com.auraboot.framework.semantic.exception.SemanticYamlInvalidException;
+import com.auraboot.framework.semantic.service.SemanticPublishService;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -156,6 +159,7 @@ public class PluginImportServiceImpl implements PluginImportService {
     private final ConditionFragmentService conditionFragmentService;
     private final EventPolicyDefinitionService eventPolicyDefinitionService;
     private final EventPolicyVersionService eventPolicyVersionService;
+    private final SemanticPublishService semanticPublishService;
     private final JdbcTemplate jdbcTemplate;
     /** Used by {@link #verifyImportReferenceIntegrity()} to enumerate the tenant's commands. */
     private final com.auraboot.framework.meta.mapper.CommandDefinitionMapper commandDefinitionMapper;
@@ -578,6 +582,15 @@ public class PluginImportServiceImpl implements PluginImportService {
                 }
             }
 
+            if (resourceDirs.containsKey("semantic")) {
+                List<PluginManifestExtended.SemanticResource> semanticResources =
+                        loadSemanticResourcesFromZip(files, resourceDirs.get("semantic"));
+                if (!semanticResources.isEmpty()) {
+                    manifest.setSemanticResources(
+                            mergeResourceList(manifest.getSemanticResources(), semanticResources));
+                }
+            }
+
             loadAgentDefinitionsFromZipByConvention(manifest, files, resourceDirs);
 
             log.info("Loaded resources from ZIP resourceDirs: {}", logSafe(manifest.getResourceCounts()));
@@ -647,6 +660,38 @@ public class PluginImportServiceImpl implements PluginImportService {
             } catch (Exception e) {
                 log.warn("Failed to parse resource file {}: {}", logSafe(child), logSafe(e.getMessage()));
             }
+        }
+        return resources;
+    }
+
+    private List<PluginManifestExtended.SemanticResource> loadSemanticResourcesFromZip(
+            Map<String, byte[]> files, String path) {
+        if (path == null || path.isBlank()) {
+            return List.of();
+        }
+        String normalized = path.replace('\\', '/');
+        if (normalized.startsWith("/") || Arrays.asList(normalized.split("/")).contains("..")) {
+            throw new PluginException("Invalid semantic resource path: " + path);
+        }
+
+        List<String> resourcePaths;
+        if (normalized.endsWith(".semantic.yml")) {
+            resourcePaths = files.containsKey(normalized) ? List.of(normalized) : List.of();
+        } else {
+            String prefix = normalized.endsWith("/") ? normalized : normalized + "/";
+            resourcePaths = files.keySet().stream()
+                    .filter(entry -> entry.startsWith(prefix)
+                            && entry.endsWith(".semantic.yml")
+                            && entry.indexOf('/', prefix.length()) < 0)
+                    .sorted()
+                    .toList();
+        }
+
+        List<PluginManifestExtended.SemanticResource> resources =
+                new ArrayList<>(resourcePaths.size());
+        for (String resourcePath : resourcePaths) {
+            resources.add(new PluginManifestExtended.SemanticResource(
+                    resourcePath, files.get(resourcePath)));
         }
         return resources;
     }
@@ -1586,6 +1631,10 @@ public class PluginImportServiceImpl implements PluginImportService {
         // Post-processing: Auto-publish DRAFT models and sync PUBLISHED models
         autoPublishAndSyncModels(importedModelCodes, request, manifest.getNamespace(), tenantId);
 
+        // Semantic resources reference imported model/field codes, so publication
+        // must run only after model auto-publish and schema synchronization.
+        publishSemanticResources(manifest, result, tenantId);
+
         // Post-processing: Auto-publish DRAFT fields and commands for newly published models.
         // Fields are imported BEFORE models (importOrder FIELD=20 < MODEL=30), so field autoPublish
         // at create time skips fields whose model is still draft. Publish them now.
@@ -1671,6 +1720,40 @@ public class PluginImportServiceImpl implements PluginImportService {
 
                 // Ensure hierarchical permissions exist (idempotent — skips if already created)
                 autoPermissionAssignmentService.autoAssignPermissions(modelCode, pluginNamespace, tenantId);
+            }
+        }
+    }
+
+    /**
+     * Publish semantic sources after the models they reference are ready.
+     *
+     * <p>Parser/schema and semantic business-rule failures are isolated to the
+     * offending file so a valid sibling can still publish. Persistence and
+     * infrastructure failures deliberately escape: swallowing those exceptions
+     * would turn a rolled-back/partial import into a false success.
+     */
+    void publishSemanticResources(PluginManifestExtended manifest,
+                                  ImportExecuteResult result,
+                                  Long tenantId) {
+        List<PluginManifestExtended.SemanticResource> resources =
+                manifest.getSemanticResources();
+        if (resources == null || resources.isEmpty()) {
+            return;
+        }
+        for (PluginManifestExtended.SemanticResource resource : resources) {
+            try {
+                String pid = semanticPublishService.publishFromYaml(
+                        resource.content(), manifest.getNamespace(), tenantId,
+                        MetaContext.getCurrentUserId());
+                result.incrementResourceCount("SEMANTIC", ResourceAction.CREATE);
+                result.addCreatedResource("SEMANTIC", pid);
+            } catch (SemanticYamlInvalidException | SemanticValidationException e) {
+                String warning = "Skipped semantic resource " + resource.path()
+                        + ": " + e.getMessage();
+                result.addWarning(warning);
+                result.incrementResourceCount("SEMANTIC", ResourceAction.SKIP);
+                log.warn("{} (pluginId={})", logSafe(warning),
+                        logSafe(manifest.getPluginId()));
             }
         }
     }

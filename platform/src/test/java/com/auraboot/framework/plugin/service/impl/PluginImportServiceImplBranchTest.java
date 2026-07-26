@@ -29,6 +29,7 @@ import com.auraboot.framework.plugin.validation.PluginQualityScorer;
 import com.auraboot.framework.plugin.validation.PluginValidationPipeline;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
 import com.auraboot.framework.rbac.service.RoleService;
+import com.auraboot.framework.semantic.service.SemanticPublishService;
 import com.auraboot.framework.view.mapper.SavedViewMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -95,6 +96,7 @@ class PluginImportServiceImplBranchTest {
     @Mock private DocumentCommandGenerator documentCommandGenerator;
     @Mock private DroolsRuleService droolsRuleService;
     @Mock private SlaConfigService slaConfigService;
+    @Mock private SemanticPublishService semanticPublishService;
     @Mock private JdbcTemplate jdbcTemplate;
 
     @InjectMocks private PluginImportServiceImpl service;

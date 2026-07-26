@@ -1,11 +1,13 @@
 package com.auraboot.framework.chatbi.v2.entity;
 
+import com.auraboot.framework.tenant.typehandler.JsonStringTypeHandler;
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import org.apache.ibatis.type.JdbcType;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -42,9 +44,11 @@ public class ChatBiAnswer {
     private String nlQuery;
 
     /** JSON array of {@link com.auraboot.framework.chatbi.v2.dto.SearchToken}. */
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String tokensJson;
 
     /** JSON dump of the compiled {@code SemanticQueryRequest}. */
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String semanticRequestJson;
 
     /** SHA-256 fingerprint of the executed SQL, joins to {@code ab_semantic_query_log}. */
@@ -53,6 +57,7 @@ public class ChatBiAnswer {
     /** {@code kpi / bar / line / pivot / table}. */
     private String vizType;
 
+    @TableField(jdbcType = JdbcType.OTHER, typeHandler = JsonStringTypeHandler.class)
     private String vizConfigJson;
 
     private Integer rowCount;

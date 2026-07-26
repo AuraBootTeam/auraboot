@@ -4,8 +4,9 @@
  * Wires the previously-headless {@code /api/chatbi/v2/**} surface into a UI:
  * conversation lifecycle (create / list / close) + ask, rendering all three
  * answer states — SUCCESS (rows + SQL + confidence), DISAMBIGUATION (pick a
- * candidate), FAILED (error). NL translation needs a configured LLM provider;
- * the banner says so plainly rather than silently returning nothing.
+ * candidate), FAILED (error). A catalog-bound deterministic parser keeps
+ * explicit metric/dimension questions usable without an LLM; configured
+ * providers remain the richer primary path.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -149,15 +150,15 @@ export default function ChatBiPage() {
         </h1>
       </header>
 
-      {/* Honest capability banner: NL needs an LLM provider. */}
+      {/* Honest capability banner: deterministic catalog fallback has a bounded surface. */}
       <div
         data-testid="chatbi-llm-banner"
-        className="flex-shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-1.5 text-[11px] text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
+        className="flex-shrink-0 border-b border-blue-200 bg-blue-50 px-4 py-1.5 text-[11px] text-blue-700 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300"
       >
         {t(
           'chatbi.llm_hint',
           undefined,
-          '自然语言翻译需在后端配置 LLM 提供方（aura.chatbi.v2.llm-provider = anthropic | openai）。未配置时问答会返回失败；治理指标可在「语义模型」控制台直接查询。',
+          '未配置 LLM 时会使用语义目录关键词解析，可回答明确包含指标或维度名称的问题；配置 LLM 后可获得更自然的表达理解与消歧。',
         )}
       </div>
 

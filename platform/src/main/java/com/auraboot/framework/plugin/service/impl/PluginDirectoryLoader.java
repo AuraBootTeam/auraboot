@@ -391,6 +391,16 @@ public class PluginDirectoryLoader {
                 manifest.setSlaConfigs(mergeList(manifest.getSlaConfigs(), slaConfigs));
             }
         }
+
+        if (resourceDirs.containsKey("semantic")) {
+            List<PluginManifestExtended.SemanticResource> semanticResources =
+                    loadSemanticResources(pluginDir,
+                            resourcePath(pluginDir, resourceDirs, "semantic"));
+            if (!semanticResources.isEmpty()) {
+                manifest.setSemanticResources(
+                        mergeList(manifest.getSemanticResources(), semanticResources));
+            }
+        }
     }
 
     private Path resourcePath(Path pluginDir, Map<String, String> resourceDirs, String key) {
@@ -579,6 +589,46 @@ public class PluginDirectoryLoader {
         return result;
     }
 
+    private List<PluginManifestExtended.SemanticResource> loadSemanticResources(
+            Path pluginDir, Path resourcePath) throws IOException {
+        if (!Files.exists(resourcePath)) {
+            return List.of();
+        }
+        if (Files.isRegularFile(resourcePath)) {
+            if (!resourcePath.getFileName().toString().endsWith(".semantic.yml")) {
+                return List.of();
+            }
+            return List.of(new PluginManifestExtended.SemanticResource(
+                    pluginRelativePath(pluginDir, resourcePath),
+                    Files.readAllBytes(resourcePath)));
+        }
+        if (!Files.isDirectory(resourcePath)) {
+            return List.of();
+        }
+        try (Stream<Path> files = Files.list(resourcePath)) {
+            List<Path> semanticFiles = files
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().endsWith(".semantic.yml"))
+                    .sorted()
+                    .toList();
+            List<PluginManifestExtended.SemanticResource> resources =
+                    new ArrayList<>(semanticFiles.size());
+            for (Path semanticFile : semanticFiles) {
+                resources.add(new PluginManifestExtended.SemanticResource(
+                        pluginRelativePath(pluginDir, semanticFile),
+                        Files.readAllBytes(semanticFile)));
+            }
+            return resources;
+        }
+    }
+
+    private String pluginRelativePath(Path pluginDir, Path resource) {
+        return pluginDir.toAbsolutePath().normalize()
+                .relativize(resource.toAbsolutePath().normalize())
+                .toString()
+                .replace(FileSystems.getDefault().getSeparator(), "/");
+    }
+
     // ==================== PluginSource-based loading ====================
 
     private void loadResourcesFromSource(PluginSource source, PluginManifestExtended manifest,
@@ -664,6 +714,15 @@ public class PluginDirectoryLoader {
         // Automation seeds
         loadSourceResource(source, resourceDirs, "automations", AutomationDefinitionDTO.class,
                 manifest::getAutomations, manifest::setAutomations);
+
+        if (resourceDirs.containsKey("semantic")) {
+            List<PluginManifestExtended.SemanticResource> semanticResources =
+                    loadSemanticResourcesFromSource(source, resourceDirs.get("semantic"));
+            if (!semanticResources.isEmpty()) {
+                manifest.setSemanticResources(
+                        mergeList(manifest.getSemanticResources(), semanticResources));
+            }
+        }
     }
 
     private void loadAgentDefinitionsByConventionFromSource(PluginSource source, PluginManifestExtended manifest,
@@ -764,5 +823,24 @@ public class PluginDirectoryLoader {
             }
         }
         return result;
+    }
+
+    private List<PluginManifestExtended.SemanticResource> loadSemanticResourcesFromSource(
+            PluginSource source, String path) throws IOException {
+        List<String> resourcePaths;
+        if (path.endsWith(".semantic.yml") && source.exists(path)) {
+            resourcePaths = List.of(path);
+        } else {
+            resourcePaths = source.listFiles(path, ".semantic.yml").stream().sorted().toList();
+        }
+        List<PluginManifestExtended.SemanticResource> resources =
+                new ArrayList<>(resourcePaths.size());
+        for (String resourcePath : resourcePaths) {
+            try (InputStream input = source.readResource(resourcePath)) {
+                resources.add(new PluginManifestExtended.SemanticResource(
+                        resourcePath, input.readAllBytes()));
+            }
+        }
+        return resources;
     }
 }

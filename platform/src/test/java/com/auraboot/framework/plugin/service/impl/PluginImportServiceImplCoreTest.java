@@ -77,6 +77,8 @@ import com.auraboot.framework.plugin.mapper.PluginResourceMapper;
 import com.auraboot.framework.plugin.service.PlatformVersionChecker;
 import com.auraboot.framework.plugin.service.PluginImportService.ImportHistoryDTO;
 import com.auraboot.framework.plugin.source.PluginSource;
+import com.auraboot.framework.semantic.exception.SemanticYamlInvalidException;
+import com.auraboot.framework.semantic.service.SemanticPublishService;
 import com.auraboot.framework.plugin.validation.PluginQualityScorer;
 import com.auraboot.framework.plugin.validation.PluginValidationPipeline;
 import com.auraboot.framework.rbac.mapper.RolePermissionMapper;
@@ -169,6 +171,7 @@ class PluginImportServiceImplCoreTest {
     @Mock private ConditionFragmentService conditionFragmentService;
     @Mock private EventPolicyDefinitionService eventPolicyDefinitionService;
     @Mock private EventPolicyVersionService eventPolicyVersionService;
+    @Mock private SemanticPublishService semanticPublishService;
     @Mock private JdbcTemplate jdbcTemplate;
 
     @InjectMocks private PluginImportServiceImpl service;
@@ -324,6 +327,91 @@ class PluginImportServiceImplCoreTest {
                 .isInstanceOf(PluginException.class)
                 .hasMessageContaining("Failed to parse ZIP resource file")
                 .hasMessageContaining("config/binding-rules/rules.json");
+    }
+
+    @Test
+    @DisplayName("ZIP resourceDirs loads semantic YAML files in stable order")
+    void zipResourceDirs_loadsSemanticResources() {
+        PluginManifestExtended m = baseManifest();
+        m.setResourceDirs(Map.of("semantic", "config/semantic"));
+        Map<String, byte[]> files = Map.of(
+                "config/semantic/02-b.semantic.yml",
+                "version: \"0.1\"".getBytes(StandardCharsets.UTF_8),
+                "config/semantic/01-a.semantic.yml",
+                "version: \"0.1\"".getBytes(StandardCharsets.UTF_8),
+                "config/semantic/ignored.yaml",
+                "version: \"0.1\"".getBytes(StandardCharsets.UTF_8));
+
+        invokeLoadResourcesFromZip(m, files);
+
+        assertThat(m.getSemanticResources())
+                .extracting(PluginManifestExtended.SemanticResource::path)
+                .containsExactly(
+                        "config/semantic/01-a.semantic.yml",
+                        "config/semantic/02-b.semantic.yml");
+    }
+
+    @Test
+    @DisplayName("ZIP semantic resourceDirs rejects traversal")
+    void zipResourceDirs_semanticTraversalRejected() {
+        PluginManifestExtended m = baseManifest();
+        m.setResourceDirs(Map.of("semantic", "../semantic"));
+
+        assertThatThrownBy(() -> invokeLoadResourcesFromZip(m, Map.of()))
+                .isInstanceOf(PluginException.class)
+                .hasMessageContaining("Invalid semantic resource path");
+    }
+
+    @Test
+    @DisplayName("Semantic publish isolates invalid YAML and continues valid siblings")
+    void publishSemanticResources_isolatesInvalidYaml() {
+        PluginManifestExtended m = baseManifest();
+        m.setSemanticResources(List.of(
+                new PluginManifestExtended.SemanticResource(
+                        "semantic/01-valid.semantic.yml", "valid-1".getBytes(StandardCharsets.UTF_8)),
+                new PluginManifestExtended.SemanticResource(
+                        "semantic/02-invalid.semantic.yml", "bad".getBytes(StandardCharsets.UTF_8)),
+                new PluginManifestExtended.SemanticResource(
+                        "semantic/03-valid.semantic.yml", "valid-2".getBytes(StandardCharsets.UTF_8))));
+        ImportExecuteResult result = ImportExecuteResult.success(
+                "import-1", "plugin-pid", m.getPluginId(), m.getNamespace(), m.getVersion());
+        when(semanticPublishService.publishFromYaml(
+                any(byte[].class), eq("demo"), eq(1L), eq(100L)))
+                .thenReturn("SEM-1")
+                .thenThrow(new SemanticYamlInvalidException(
+                        "schema invalid", List.of("$.version")))
+                .thenReturn("SEM-2");
+
+        service.publishSemanticResources(m, result, 1L);
+
+        assertThat(result.getWarnings()).singleElement()
+                .asString().contains("semantic/02-invalid.semantic.yml");
+        assertThat(result.getResourceCounts().get("SEMANTIC"))
+                .containsEntry("CREATE", 2)
+                .containsEntry("SKIP", 1);
+        assertThat(result.getCreatedResources().get("SEMANTIC"))
+                .containsExactly("SEM-1", "SEM-2");
+        verify(semanticPublishService, times(3))
+                .publishFromYaml(any(byte[].class), eq("demo"), eq(1L), eq(100L));
+    }
+
+    @Test
+    @DisplayName("Semantic publish does not hide persistence failures")
+    void publishSemanticResources_propagatesInfrastructureFailure() {
+        PluginManifestExtended m = baseManifest();
+        m.setSemanticResources(List.of(
+                new PluginManifestExtended.SemanticResource(
+                        "semantic/orders.semantic.yml", "valid".getBytes(StandardCharsets.UTF_8))));
+        ImportExecuteResult result = ImportExecuteResult.success(
+                "import-1", "plugin-pid", m.getPluginId(), m.getNamespace(), m.getVersion());
+        when(semanticPublishService.publishFromYaml(
+                any(byte[].class), eq("demo"), eq(1L), eq(100L)))
+                .thenThrow(new RuntimeException("database unavailable"));
+
+        assertThatThrownBy(() -> service.publishSemanticResources(m, result, 1L))
+                .isInstanceOf(RuntimeException.class)
+                .hasMessageContaining("database unavailable");
+        assertThat(result.getWarnings()).isEmpty();
     }
 
     @Test

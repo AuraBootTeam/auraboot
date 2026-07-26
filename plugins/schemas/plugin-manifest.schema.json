@@ -219,6 +219,7 @@
         "savedViews": { "type": "string" },
         "fieldMasks": { "type": "string" },
         "i18n": { "type": "string" },
+        "semantic": { "type": "string" },
         "defaultBootstrap": { "type": "string" },
         "data": { "type": "string" }
       },

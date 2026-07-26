@@ -24,7 +24,8 @@
     "i18n": "config/i18n.json",
     "processes": "config/processes.json",
     "roles": "config/roles.json",
-    "dashboards": "config/dashboards"
+    "dashboards": "config/dashboards",
+    "semantic": "config/semantic"
   },
   "importOptions": {
     "conflictStrategy": "overwrite",

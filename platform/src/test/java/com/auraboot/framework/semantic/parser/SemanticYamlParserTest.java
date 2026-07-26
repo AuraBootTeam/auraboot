@@ -11,6 +11,8 @@ import org.springframework.core.io.ClassPathResource;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -61,6 +63,20 @@ class SemanticYamlParserTest {
 
         // Validator runs cleanly
         validator.validate(dto);
+    }
+
+    @Test
+    void pluginImportGoldenFixtureParsesAndValidates() throws IOException {
+        Path fixture = Path.of(
+                "../plugins/test-fixtures/config/semantic/e2e-orders.semantic.yml");
+        SemanticModelDTO dto = parser.parse(Files.readString(fixture));
+
+        validator.validate(dto);
+        assertThat(dto.getSemanticModel().getCode()).isEqualTo("e2e_orders");
+        assertThat(dto.getSemanticModel().getModelRef()).isEqualTo("e2et_order");
+        assertThat(dto.getMetrics())
+                .extracting(metric -> metric.getCode())
+                .containsExactly("order_count", "total_order_amount");
     }
 
     @Test

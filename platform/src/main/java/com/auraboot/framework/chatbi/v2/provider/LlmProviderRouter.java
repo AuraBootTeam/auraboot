@@ -20,9 +20,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <ol>
  *   <li><b>Primary</b> — {@link AnthropicLlmProvider} when wired</li>
  *   <li><b>Secondary</b> — {@link OpenAiLlmProvider} when wired</li>
- *   <li><b>Tertiary</b> — {@code keyword-parser} via the v1 path (caller's
- *       responsibility; router returns {@link IntentResult#empty()} to
- *       signal the downgrade)</li>
+ *   <li><b>Tertiary</b> — catalog-bound deterministic parsing in
+ *       {@code TokenLexer}; the router returns {@link IntentResult#empty()} to
+ *       signal the downgrade.</li>
  * </ol>
  *
  * <p>Each provider tier owns a tiny in-process circuit breaker keyed by
@@ -76,9 +76,11 @@ public class LlmProviderRouter {
             return new RouteOutcome(secondaryResult, SECONDARY_KEY, attempts);
         }
 
-        // Tertiary: caller falls back to keyword v1 path on empty.
-        attempts.add(new Attempt("keyword-v1", Outcome.DOWNGRADED, "no llm responded"));
-        return new RouteOutcome(IntentResult.empty(), "keyword-v1", attempts);
+        // Tertiary: caller invokes the catalog-bound lexer on empty.
+        attempts.add(new Attempt(
+                "keyword-catalog", Outcome.DOWNGRADED, "no llm responded"));
+        return new RouteOutcome(
+                IntentResult.empty(), "keyword-catalog", attempts);
     }
 
     private IntentResult tryProvider(String key,
@@ -183,7 +185,7 @@ public class LlmProviderRouter {
         FAILED,         // wire / parse failure
         CIRCUIT_OPEN,   // skipped — breaker open
         UNAVAILABLE,    // bean not wired
-        DOWNGRADED      // caller must fall back to v1 keyword path
+        DOWNGRADED      // caller must fall back to catalog-bound lexing
     }
 
     public record Attempt(String provider, Outcome outcome, String detail) {}

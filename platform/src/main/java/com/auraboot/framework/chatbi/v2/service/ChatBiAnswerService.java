@@ -6,6 +6,7 @@ import com.auraboot.framework.chatbi.v2.compiler.TokenCompiler;
 import com.auraboot.framework.chatbi.v2.dto.ChatBiAnswerResponse;
 import com.auraboot.framework.chatbi.v2.dto.SearchToken;
 import com.auraboot.framework.chatbi.v2.entity.ChatBiAnswer;
+import com.auraboot.framework.chatbi.v2.lexer.TokenLexer;
 import com.auraboot.framework.chatbi.v2.provider.AnswerCorrelation;
 import com.auraboot.framework.chatbi.v2.provider.ConversationContext;
 import com.auraboot.framework.chatbi.v2.provider.IntentResult;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -37,12 +39,14 @@ import java.util.Map;
  *   2. Stamp AnswerCorrelation so the LLM provider's audit row links back.
  *   3. Load conversation context (sliding window of last 5 pairs).
  *   4. LlmProviderRouter.translate (3-level fallback).
- *   5. DisambiguationService.evaluate — short-circuit to UI prompt on
+ *   5. TokenLexer validates provider tokens against catalog or performs the
+ *      deterministic catalog fallback when no provider is configured.
+ *   6. DisambiguationService.evaluate — short-circuit to UI prompt on
  *      low confidence / close-margin top-2.
- *   6. TokenCompiler.compile → SemanticQueryRequest.
- *   7. SemanticQueryService.executeQuery → rows + SQL fingerprint.
- *   8. Persist ChatBiAnswer + append (user, assistant) turn to conversation.
- *   9. Return ChatBiAnswerResponse.
+ *   7. TokenCompiler.compile → SemanticQueryRequest.
+ *   8. SemanticQueryService.executeQuery → rows + SQL fingerprint.
+ *   9. Persist ChatBiAnswer + append (user, assistant) turn to conversation.
+ *   10. Return ChatBiAnswerResponse.
  * </pre>
  *
  * <p>Transactional boundary: the answer-row insert + conversation append are
@@ -63,6 +67,7 @@ public class ChatBiAnswerService {
     private final LlmProviderRouter router;
     private final SemanticCatalogService catalogService;
     private final SemanticQueryService queryService;
+    private final TokenLexer tokenLexer;
     private final TokenCompiler tokenCompiler;
     private final ConversationService conversationService;
     private final DisambiguationService disambiguationService;
@@ -106,10 +111,26 @@ public class ChatBiAnswerService {
 
         // 4. Translate via router.
         SemanticMetaResponse catalog = catalogService.listCatalog(tenantId);
-        LlmProviderRouter.RouteOutcome outcome = router.translate(nlQuery, catalog, ctx);
-        IntentResult intent = outcome.result();
+        SemanticMetaResponse scopedCatalog = scopeCatalog(catalog, semanticModelPid);
+        LlmProviderRouter.RouteOutcome outcome = router.translate(
+                nlQuery, scopedCatalog, ctx);
+        IntentResult routedIntent = outcome.result() == null
+                ? IntentResult.empty() : outcome.result();
 
-        // 5. Disambiguation.
+        // 5. Validate provider tokens or apply the catalog-only fallback.
+        List<SearchToken> lexedTokens =
+                tokenLexer.lex(nlQuery, scopedCatalog, routedIntent);
+        IntentResult intent = withLexedTokens(routedIntent, lexedTokens);
+        boolean explicitClarification = routedIntent.needsClarification()
+                && routedIntent.disambiguation() != null;
+        if (lexedTokens.isEmpty() && !explicitClarification) {
+            return failed(answerPid, conversationPid, nlQuery,
+                    "No semantic catalog metric matched. Use an exact metric or dimension name.");
+        }
+        ResolvedSemanticModel resolvedModel =
+                resolveSemanticModel(catalog, semanticModelPid, lexedTokens);
+
+        // 6. Disambiguation.
         DisambiguationService.Verdict verdict;
         try {
             verdict = disambiguationService.evaluate(intent, tenantId, answerPid, nlQuery);
@@ -133,23 +154,28 @@ public class ChatBiAnswerService {
                     .llmUsed(outcome.winner())
                     .build();
             persistAnswer(answerPid, tenantId, userId, conversationPid,
-                          semanticModelPid, nlQuery, intent,
+                          resolvedModel != null ? resolvedModel.pid() : null,
+                          nlQuery, intent,
                           null, null,
                           ChatBiAnswerResponse.STATUS_DISAMBIGUATION,
                           outcome.winner());
             return resp;
         }
 
-        // 6. Compile.
+        // 7. Compile.
+        if (resolvedModel == null || resolvedModel.code() == null) {
+            return failed(answerPid, conversationPid, nlQuery,
+                    "No single semantic model matched the question");
+        }
         SemanticQueryRequest req;
         try {
-            req = tokenCompiler.compile(intent.tokens(), semanticModelCode(catalog, semanticModelPid));
+            req = tokenCompiler.compile(intent.tokens(), resolvedModel.code());
         } catch (TokenCompileException e) {
             return failed(answerPid, conversationPid, nlQuery,
                     "Could not compile your question: " + e.getMessage());
         }
 
-        // 7. Execute.
+        // 8. Execute.
         SemanticQueryResponse exec;
         try {
             exec = queryService.executeQuery(req,
@@ -159,10 +185,17 @@ public class ChatBiAnswerService {
             return failed(answerPid, conversationPid, nlQuery,
                     "Query execution failed");
         }
+        String executionFailure = executionFailure(exec);
+        if (executionFailure != null) {
+            log.warn("Semantic query returned execution failure for answer {}: {}",
+                    answerPid, executionFailure);
+            return failed(answerPid, conversationPid, nlQuery,
+                    "Query execution failed");
+        }
 
-        // 8. Persist.
+        // 9. Persist.
         persistAnswer(answerPid, tenantId, userId, conversationPid,
-                      semanticModelPid, nlQuery, intent,
+                      resolvedModel.pid(), nlQuery, intent,
                       req, exec,
                       ChatBiAnswerResponse.STATUS_SUCCESS, outcome.winner());
 
@@ -201,6 +234,11 @@ public class ChatBiAnswerService {
                                SemanticQueryResponse exec,
                                String status,
                                String llmUsed) {
+        if (semanticModelPid == null || semanticModelPid.isBlank()) {
+            log.debug("Skipping ChatBiAnswer persistence without a resolved semantic model: {}",
+                    answerPid);
+            return;
+        }
         ChatBiAnswer row = new ChatBiAnswer();
         row.setPid(answerPid);
         row.setTenantId(tenantId);
@@ -208,8 +246,8 @@ public class ChatBiAnswerService {
         row.setConversationPid(conversationPid);
         row.setSemanticModelPid(semanticModelPid);
         row.setNlQuery(nlQuery);
-        row.setTokensJson(serialise(intent.tokens()));
-        if (req != null) row.setSemanticRequestJson(serialise(req));
+        row.setTokensJson(serialise(intent.tokens() == null ? List.of() : intent.tokens()));
+        row.setSemanticRequestJson(serialise(req == null ? Map.of() : req));
         if (exec != null) {
             row.setSqlHash(exec.getSqlFingerprint());
             row.setRowCount(exec.getRowcount());
@@ -253,18 +291,96 @@ public class ChatBiAnswerService {
         return "(" + n + " rows)";
     }
 
-    /**
-     * Resolve {@code semanticModelCode} from {@code semanticModelPid} via the
-     * catalog. Falls back to null when no mapping found — the compiler then
-     * emits bare codes and the downstream catalog lookup fails loudly.
-     */
-    private String semanticModelCode(SemanticMetaResponse catalog, String pid) {
-        if (pid == null || catalog == null || catalog.getModels() == null) return null;
-        return catalog.getModels().stream()
-                .filter(m -> pid.equals(m.getPid()))
-                .map(SemanticMetaResponse.ModelMeta::getCode)
+    private String executionFailure(SemanticQueryResponse response) {
+        if (response == null || response.getWarnings() == null) {
+            return null;
+        }
+        return response.getWarnings().stream()
+                .filter(warning -> warning != null
+                        && warning.startsWith("execution_failed:"))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * Resolve the model selected by either the explicit request pid or the
+     * catalog-qualified tokens emitted by {@link TokenLexer}. The offline
+     * catalog fallback always emits {@code <model>.<element>} codes, so a
+     * cross-model conversation can still persist the concrete model chosen for
+     * this answer.
+     */
+    private ResolvedSemanticModel resolveSemanticModel(
+            SemanticMetaResponse catalog,
+            String requestedPid,
+            List<SearchToken> tokens) {
+        String tokenModelCode = tokenModelCode(tokens);
+        if (requestedPid != null && !requestedPid.isBlank()) {
+            String catalogCode = catalog == null || catalog.getModels() == null
+                    ? null
+                    : catalog.getModels().stream()
+                            .filter(model -> requestedPid.equals(model.getPid()))
+                            .map(SemanticMetaResponse.ModelMeta::getCode)
+                            .findFirst()
+                            .orElse(null);
+            String code = catalogCode != null ? catalogCode : tokenModelCode;
+            return new ResolvedSemanticModel(requestedPid, code);
+        }
+        if (tokenModelCode == null || catalog == null || catalog.getModels() == null) {
+            return null;
+        }
+        return catalog.getModels().stream()
+                .filter(model -> tokenModelCode.equals(model.getCode()))
+                .filter(model -> model.getPid() != null && !model.getPid().isBlank())
+                .map(model -> new ResolvedSemanticModel(model.getPid(), model.getCode()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private String tokenModelCode(List<SearchToken> tokens) {
+        if (tokens == null) {
+            return null;
+        }
+        List<String> modelCodes = tokens.stream()
+                .filter(token -> token != null
+                        && (token.type() == com.auraboot.framework.chatbi.v2.dto.TokenType.METRIC
+                            || token.type() == com.auraboot.framework.chatbi.v2.dto.TokenType.DIMENSION))
+                .map(SearchToken::resolvedCode)
+                .filter(code -> code != null && code.contains("."))
+                .map(code -> code.substring(0, code.indexOf('.')))
+                .distinct()
+                .limit(2)
+                .toList();
+        return modelCodes.size() == 1 ? modelCodes.get(0) : null;
+    }
+
+    private SemanticMetaResponse scopeCatalog(SemanticMetaResponse catalog, String pid) {
+        if (pid == null || pid.isBlank() || catalog == null
+                || catalog.getModels() == null) {
+            return catalog;
+        }
+        SemanticMetaResponse scoped = new SemanticMetaResponse();
+        scoped.setModels(new ArrayList<>(catalog.getModels().stream()
+                .filter(model -> pid.equals(model.getPid()))
+                .toList()));
+        return scoped;
+    }
+
+    private IntentResult withLexedTokens(IntentResult routed,
+                                         List<SearchToken> lexedTokens) {
+        List<SearchToken> safeTokens = lexedTokens == null
+                ? List.of() : List.copyOf(lexedTokens);
+        if (safeTokens.equals(routed.tokens())) {
+            return routed;
+        }
+        boolean offlineFallback = routed.tokens() == null || routed.tokens().isEmpty();
+        return new IntentResult(
+                safeTokens,
+                offlineFallback && !safeTokens.isEmpty() ? 0.80d : routed.confidence(),
+                offlineFallback ? false : routed.needsClarification(),
+                offlineFallback ? null : routed.disambiguation(),
+                routed.suggestedFollowUps() == null
+                        ? List.of() : routed.suggestedFollowUps(),
+                routed.usage());
     }
 
     /**
@@ -285,4 +401,6 @@ public class ChatBiAnswerService {
         if (dimCount >= 2 && metricCount >= 1) return "pivot";
         return "table";
     }
+
+    private record ResolvedSemanticModel(String pid, String code) {}
 }
