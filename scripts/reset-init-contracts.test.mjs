@@ -216,6 +216,23 @@ test('Docker quickstart reports a bounded plugin import response when an import 
   assert.match(quickstart, /response\[:1000\]/);
 });
 
+test('Docker bootstrap entrypoints use two-phase reference validation', () => {
+  for (const path of ['scripts/quickstart.sh', 'scripts/docker-bootstrap.sh']) {
+    const script = read(path);
+
+    assert.match(
+      script,
+      /deferReferenceValidation\\":true/,
+      `${path} must defer cross-plugin references during each cold-start import`,
+    );
+    assert.match(
+      script,
+      /\/api\/plugins\/import\/verify-reference-integrity/,
+      `${path} must close the deferred batch with a reference-integrity sweep`,
+    );
+  }
+});
+
 test('Docker quickstart CI always runs on main and manual dispatch, and detects all bootstrap inputs on PRs', () => {
   const workflow = read('.github/workflows/quickstart.yml');
 

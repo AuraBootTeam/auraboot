@@ -177,7 +177,7 @@ import_plugin() {
     "${BACKEND_URL}/api/plugins/import/import-directory-sync" \
     -H "${AUTH_HEADER}" \
     -H "Content-Type: application/json" \
-    -d "{\"path\":\"${container_path}\",\"conflictStrategy\":\"OVERWRITE\"}" \
+    -d "{\"path\":\"${container_path}\",\"conflictStrategy\":\"OVERWRITE\",\"deferReferenceValidation\":true}" \
     2>/dev/null)
 
   local success
@@ -210,6 +210,21 @@ if [[ "${FAILED}" -gt 0 ]]; then
   exit 1
 fi
 echo -e "${GREEN}   All plugins imported successfully${NC}"
+
+REFERENCE_RESP=$(NO_PROXY=localhost curl -s -X POST \
+  "${BACKEND_URL}/api/plugins/import/verify-reference-integrity" \
+  -H "${AUTH_HEADER}" \
+  -H "Content-Type: application/json" \
+  2>/dev/null)
+REFERENCE_VALID=$(echo "$REFERENCE_RESP" | python3 -c \
+  "import sys,json; print(json.load(sys.stdin).get('valid', False))" 2>/dev/null || echo "False")
+if [[ "${REFERENCE_VALID}" != "True" ]]; then
+  echo -e "${RED}FAIL: Closing plugin reference-integrity sweep failed.${NC}"
+  echo "      Response: $(printf '%s' "${REFERENCE_RESP}" | python3 -c \
+    'import sys; response=sys.stdin.read(); print(response[:1000])')"
+  exit 1
+fi
+echo -e "${GREEN}   Plugin reference integrity verified${NC}"
 
 # ── Step 4: Verify BPM menu is present ───────────────────────────────────────
 echo ""
