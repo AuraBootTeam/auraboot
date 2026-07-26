@@ -9,8 +9,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -26,6 +28,10 @@ import static org.assertj.core.api.Assertions.*;
 @Slf4j
 @SpringBootTest(classes = TestApplication.class)
 @ActiveProfiles("integration-test")
+@TestPropertySource(properties = {
+        "agent.mcp.stdio.allowed-commands=npx",
+        "security.field-encryption.key=MDEyMjkwMDAwMDEyMjkwMDAwMDEyMjkwMDAwMDFfMzI="
+})
 @DisplayName("McpServerConfigService - Integration Tests")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @Transactional
@@ -34,6 +40,9 @@ public class McpServerConfigServiceTest extends BaseIntegrationTest {
 
     @Autowired
     private McpServerConfigService mcpServerConfigService;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     // ──────────────────────────────────────────────────────────────
     // Test 1: register → list → server appears with correct fields
@@ -46,11 +55,13 @@ public class McpServerConfigServiceTest extends BaseIntegrationTest {
         Long tenantId = getTestTenant().getId();
         String uniqueSuffix = String.valueOf(System.currentTimeMillis());
         String name = "GitHub MCP " + uniqueSuffix;
-        String url = "npx @modelcontextprotocol/server-github-" + uniqueSuffix;
+        String url = "npx";
 
         String pid = mcpServerConfigService.registerServer(
                 tenantId, name, url,
-                "stdio", "bearer", Map.of("token", "ghp_test_" + uniqueSuffix));
+                "stdio", "bearer", Map.of("token", "ghp_test_" + uniqueSuffix),
+                List.of("-y", "@modelcontextprotocol/server-github-" + uniqueSuffix),
+                Map.of("GITHUB_TOKEN", "stdio-secret-" + uniqueSuffix));
 
         assertThat(pid).isNotBlank().hasSize(26);
 
@@ -64,6 +75,8 @@ public class McpServerConfigServiceTest extends BaseIntegrationTest {
         assertThat(found.get("server_name")).isEqualTo(name);
         assertThat(found.get("server_url")).isEqualTo(url);
         assertThat(found.get("transport_type")).isEqualTo("stdio");
+        assertThat(found.get("stdio_args")).isEqualTo(
+                List.of("-y", "@modelcontextprotocol/server-github-" + uniqueSuffix));
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -106,8 +119,8 @@ public class McpServerConfigServiceTest extends BaseIntegrationTest {
 
         String pid = mcpServerConfigService.registerServer(
                 tenantId, "TmpMCP " + uniqueSuffix,
-                "npx @mcp/tmp-" + uniqueSuffix,
-                "stdio", "none", null);
+                "npx", "stdio", "none", null,
+                List.of("-y", "@mcp/tmp-" + uniqueSuffix), Map.of());
 
         // Verify it appears first
         List<Map<String, Object>> before = mcpServerConfigService.listActiveServers(tenantId);
@@ -136,8 +149,8 @@ public class McpServerConfigServiceTest extends BaseIntegrationTest {
         String uniqueSuffix = String.valueOf(System.currentTimeMillis());
         String pid = mcpServerConfigService.registerServer(
                 tenantIdA, "Private MCP " + uniqueSuffix,
-                "npx @mcp/private-" + uniqueSuffix,
-                "stdio", null, null);
+                "npx", "stdio", null, null,
+                List.of("-y", "@mcp/private-" + uniqueSuffix), Map.of());
 
         // Tenant A can see it
         List<Map<String, Object>> tenantAServers = mcpServerConfigService.listActiveServers(tenantIdA);
@@ -160,6 +173,31 @@ public class McpServerConfigServiceTest extends BaseIntegrationTest {
         // Should log a warning and not throw
         assertThatCode(() -> mcpServerConfigService.deactivateServer(tenantId, UniqueIdGenerator.generate()))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    @Order(13)
+    @DisplayName("deactivate after generic soft-delete still persists inactive status")
+    void deactivate_afterGenericSoftDelete_persistsInactiveStatus() {
+        Long tenantId = getTestTenant().getId();
+        String pid = mcpServerConfigService.registerServer(
+                tenantId, "Soft-deleted MCP " + System.currentTimeMillis(),
+                "npx", "stdio", "none", null,
+                List.of("-y", "@mcp/soft-deleted"), Map.of());
+        jdbcTemplate.update(
+                "UPDATE ab_agent_mcp_server SET deleted_flag = TRUE "
+                        + "WHERE tenant_id = ? AND pid = ?",
+                tenantId, pid);
+
+        mcpServerConfigService.deactivateServer(tenantId, pid);
+
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT status, deleted_flag FROM ab_agent_mcp_server "
+                        + "WHERE tenant_id = ? AND pid = ?",
+                tenantId, pid);
+        assertThat(row)
+                .containsEntry("status", "inactive")
+                .containsEntry("deleted_flag", true);
     }
 
     // ──────────────────────────────────────────────────────────────
@@ -195,8 +233,8 @@ public class McpServerConfigServiceTest extends BaseIntegrationTest {
 
         String pid = mcpServerConfigService.registerServer(
                 tenantId, "Syncable MCP " + uniqueSuffix,
-                "npx @mcp/syncable-" + uniqueSuffix,
-                "stdio", null, null);
+                "npx", "stdio", null, null,
+                List.of("-y", "@mcp/syncable-" + uniqueSuffix), Map.of());
 
         // Simulate post-sync update (Phase 6+ will call this after discovering tools)
         mcpServerConfigService.updateSyncResult(tenantId, pid, 42);
@@ -235,10 +273,10 @@ public class McpServerConfigServiceTest extends BaseIntegrationTest {
                 .findFirst()
                 .orElseThrow(() -> new AssertionError("registered server missing from listing"));
 
-        assertThat(row.get("auth_type")).isEqualTo("BEARER");
+        assertThat(row.get("auth_type")).isEqualTo("bearer");
 
         McpServerTarget target = McpServerTarget.fromRow(row);
-        assertThat(target.authType()).isEqualTo("BEARER");
+        assertThat(target.authType()).isEqualTo("bearer");
         assertThat(target.authConfig())
                 .as("auth_config must be decoded from JSONB, not left as a raw PGobject")
                 .isNotNull()
@@ -277,5 +315,89 @@ public class McpServerConfigServiceTest extends BaseIntegrationTest {
         assertThat(target.toString())
                 .contains("vendor")
                 .doesNotContain("super-secret");
+    }
+
+    @Test
+    @Order(11)
+    @DisplayName("auth and stdio environment secrets are ciphertext at rest and absent from safe APIs")
+    void secrets_areEncryptedAtRestAndSafeProjectionOmitsValues() {
+        Long tenantId = getTestTenant().getId();
+        String suffix = String.valueOf(System.currentTimeMillis());
+        String authSecret = "auth-secret-" + suffix;
+        String envSecret = "env-secret-" + suffix;
+
+        String pid = mcpServerConfigService.registerServer(
+                tenantId, "Encrypted MCP " + suffix, "npx", "stdio", "bearer",
+                Map.of("token", authSecret),
+                List.of("-y", "@mcp/encrypted"),
+                Map.of("MCP_TOKEN", envSecret));
+
+        Map<String, Object> stored = jdbcTemplate.queryForMap(
+                "SELECT auth_config::text AS auth, transport_config::text AS transport "
+                        + "FROM ab_agent_mcp_server WHERE tenant_id = ? AND pid = ?",
+                tenantId, pid);
+        assertThat(String.valueOf(stored.get("auth")))
+                .contains("ENC:")
+                .doesNotContain(authSecret);
+        assertThat(String.valueOf(stored.get("transport")))
+                .contains("ENC:")
+                .doesNotContain(envSecret);
+
+        Map<String, Object> safe = mcpServerConfigService.listSafeServers(tenantId).stream()
+                .filter(row -> pid.equals(row.get("pid")))
+                .findFirst()
+                .orElseThrow();
+        assertThat(safe)
+                .doesNotContainKeys("auth_config", "stdio_env")
+                .containsEntry("auth_configured", true);
+        assertThat(safe.get("stdio_env_keys")).isEqualTo(List.of("MCP_TOKEN"));
+        assertThat(safe.toString())
+                .doesNotContain(authSecret)
+                .doesNotContain(envSecret)
+                .doesNotContain("ENC:");
+    }
+
+    @Test
+    @Order(12)
+    @DisplayName("portable sync is idempotent and preserves secrets plus live sync facts")
+    void portableSync_unchangedConfigHasNoPersistenceSideEffects() {
+        Long tenantId = getTestTenant().getId();
+        String suffix = String.valueOf(System.currentTimeMillis());
+        String name = "Portable MCP " + suffix;
+        String pid = mcpServerConfigService.registerServer(
+                tenantId, name, "npx", "stdio", "bearer",
+                Map.of("token", "auth-" + suffix),
+                List.of("-y", "@mcp/portable"),
+                Map.of("MCP_TOKEN", "env-" + suffix));
+        mcpServerConfigService.updateSyncResult(tenantId, pid, 7);
+
+        Map<String, Object> before = jdbcTemplate.queryForMap(
+                "SELECT auth_config::text AS auth, transport_config::text AS transport, "
+                        + "tool_count, last_synced_at, updated_at "
+                        + "FROM ab_agent_mcp_server WHERE tenant_id = ? AND pid = ?",
+                tenantId, pid);
+
+        List<Map<String, Object>> plan = mcpServerConfigService.syncPortableServers(
+                tenantId,
+                Map.of(name, Map.of(
+                        "transport", "stdio",
+                        "command", "npx",
+                        "args", List.of("-y", "@mcp/portable"),
+                        "authType", "bearer")),
+                false);
+
+        assertThat(plan).singleElement().satisfies(item ->
+                assertThat(item).containsEntry("action", "unchanged"));
+        Map<String, Object> after = jdbcTemplate.queryForMap(
+                "SELECT auth_config::text AS auth, transport_config::text AS transport, "
+                        + "tool_count, last_synced_at, updated_at "
+                        + "FROM ab_agent_mcp_server WHERE tenant_id = ? AND pid = ?",
+                tenantId, pid);
+        assertThat(after).isEqualTo(before);
+
+        McpServerTarget target = McpServerTarget.fromRow(
+                mcpServerConfigService.findActiveServer(tenantId, name));
+        assertThat(target.authConfig()).containsEntry("token", "auth-" + suffix);
+        assertThat(target.stdioEnv()).containsEntry("MCP_TOKEN", "env-" + suffix);
     }
 }

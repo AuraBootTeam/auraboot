@@ -1149,7 +1149,10 @@ CREATE TABLE public.ab_agent_mcp_server (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false,
+    stdio_args jsonb DEFAULT '[]'::jsonb NOT NULL,
+    transport_config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    last_sync_error character varying(1000)
 );
 
 
@@ -1158,6 +1161,34 @@ CREATE TABLE public.ab_agent_mcp_server (
 --
 
 COMMENT ON TABLE public.ab_agent_mcp_server IS 'External MCP server registry — configurations for agent tool consumption via MCP protocol';
+
+
+--
+-- Name: COLUMN ab_agent_mcp_server.auth_config; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_mcp_server.auth_config IS 'authentication metadata; secret fields are stored as ENC: ciphertext';
+
+
+--
+-- Name: COLUMN ab_agent_mcp_server.stdio_args; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_mcp_server.stdio_args IS 'stdio argv array; executable remains in server_url and is never interpreted by a shell';
+
+
+--
+-- Name: COLUMN ab_agent_mcp_server.transport_config; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_mcp_server.transport_config IS 'transport-specific protected settings; stdio environment values use ENC: field encryption';
+
+
+--
+-- Name: COLUMN ab_agent_mcp_server.last_sync_error; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_mcp_server.last_sync_error IS 'bounded credential-free error from the latest failed live tools/list';
 
 
 --

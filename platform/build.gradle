@@ -225,6 +225,7 @@ ext {
     xxlJobVersion = '3.4.0'
     springKafkaVersion = '3.2.0'
     kafkaClientsVersion = '3.7.0'
+    mcpSdkVersion = '2.0.0'
     testWorkerNum = project.findProperty('workerNum') ?: '1'
 }
 
@@ -232,6 +233,7 @@ dependencyManagement {
     imports {
         mavenBom "io.sentry:sentry-bom:${sentryVersion}"
         mavenBom "com.baomidou:mybatis-plus-bom:${mybatisPlusVersion}"
+        mavenBom "io.modelcontextprotocol.sdk:mcp-bom:${mcpSdkVersion}"
 
     }
 
@@ -336,6 +338,8 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'    // IM WebSocket
     implementation "com.xuxueli:xxl-job-core:${xxlJobVersion}"
+    implementation 'io.modelcontextprotocol.sdk:mcp-core'
+    implementation 'io.modelcontextprotocol.sdk:mcp-json-jackson2'
 
     // MyBatis Plus
     implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'

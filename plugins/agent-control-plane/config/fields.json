@@ -1468,18 +1468,24 @@
       "options": [
         {
           "value": "stdio",
-          "label:zh-CN": "STDIO",
-          "label:en": "STDIO"
+          "label": {
+            "zh-CN": "STDIO",
+            "en-US": "STDIO"
+          }
         },
         {
           "value": "sse",
-          "label:zh-CN": "SSE",
-          "label:en": "SSE"
+          "label": {
+            "zh-CN": "SSE",
+            "en-US": "SSE"
+          }
         },
         {
-          "value": "http",
-          "label:zh-CN": "HTTP",
-          "label:en": "HTTP"
+          "value": "streamable_http",
+          "label": {
+            "zh-CN": "Streamable HTTP",
+            "en-US": "Streamable HTTP"
+          }
         }
       ]
     }
@@ -1493,18 +1499,24 @@
       "options": [
         {
           "value": "none",
-          "label:zh-CN": "无",
-          "label:en": "None"
+          "label": {
+            "zh-CN": "无",
+            "en-US": "None"
+          }
         },
         {
           "value": "bearer",
-          "label:zh-CN": "Bearer Token",
-          "label:en": "Bearer Token"
+          "label": {
+            "zh-CN": "Bearer Token",
+            "en-US": "Bearer Token"
+          }
         },
         {
           "value": "api_key",
-          "label:zh-CN": "API Key",
-          "label:en": "API Key"
+          "label": {
+            "zh-CN": "API Key",
+            "en-US": "API Key"
+          }
         }
       ]
     }
@@ -1517,6 +1529,59 @@
     "extension": {
       "multiline": true,
       "rows": 3
+    }
+  },
+  {
+    "code": "stdio_args",
+    "displayName:zh-CN": "stdio 参数",
+    "displayName:en": "stdio Arguments",
+    "dataType": "json",
+    "extension": {
+      "multiline": true,
+      "rows": 3,
+      "placeholder:zh-CN": "[\"-y\", \"@modelcontextprotocol/server-github\"]",
+      "placeholder:en": "[\"-y\", \"@modelcontextprotocol/server-github\"]"
+    }
+  },
+  {
+    "code": "mcp_auth_secret",
+    "displayName:zh-CN": "认证密钥",
+    "displayName:en": "Authentication Secret",
+    "dataType": "string",
+    "feature": {
+      "virtualType": "transient"
+    },
+    "extension": {
+      "inputType": "password",
+      "autoComplete": "new-password"
+    }
+  },
+  {
+    "code": "mcp_api_key_header",
+    "displayName:zh-CN": "API Key 请求头",
+    "displayName:en": "API Key Header",
+    "dataType": "string",
+    "feature": {
+      "virtualType": "transient"
+    },
+    "extension": {
+      "placeholder:zh-CN": "X-API-Key",
+      "placeholder:en": "X-API-Key"
+    }
+  },
+  {
+    "code": "mcp_stdio_env",
+    "displayName:zh-CN": "stdio 环境变量",
+    "displayName:en": "stdio Environment",
+    "dataType": "json",
+    "feature": {
+      "virtualType": "transient"
+    },
+    "extension": {
+      "multiline": true,
+      "rows": 4,
+      "placeholder:zh-CN": "{\"GITHUB_PERSONAL_ACCESS_TOKEN\":\"...\"}",
+      "placeholder:en": "{\"GITHUB_PERSONAL_ACCESS_TOKEN\":\"...\"}"
     }
   },
   {
@@ -1535,6 +1600,16 @@
     "dataType": "datetime",
     "extension": {
       "readonly": true
+    }
+  },
+  {
+    "code": "last_sync_error",
+    "displayName:zh-CN": "最后同步错误",
+    "displayName:en": "Last Sync Error",
+    "dataType": "text",
+    "extension": {
+      "readonly": true,
+      "multiline": true
     }
   },
   {

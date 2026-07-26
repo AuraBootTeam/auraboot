@@ -1,5 +1,6 @@
 package com.auraboot.framework.common.crypto;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -22,9 +23,10 @@ import java.util.Set;
  * <p>
  * Encrypted format: {@code ENC:} + Base64(12-byte-IV + ciphertext + 16-byte-GCM-tag)
  * <p>
- * When no encryption key is configured, operates in transparent passthrough mode
- * (data stored/returned as-is). Existing plaintext data (no {@code ENC:} prefix)
- * is returned as-is on decrypt, enabling zero-downtime migration.
+ * When no encryption key is configured, dev/local/test profiles use transparent
+ * passthrough mode. Other profiles fail closed on encryption so a missing key
+ * cannot silently persist a new plaintext secret. Existing plaintext data (no
+ * {@code ENC:} prefix) is returned as-is on decrypt for zero-downtime migration.
  *
  * @since 6.2.0
  */
@@ -233,7 +235,8 @@ public class FieldEncryptionService {
      * and fields {@code {"password"}}, returns
      * {@code {"password":"ENC:...","username":"alice"}}.
      * Non-existent fields and null values are left untouched.
-     * If no encryption key is configured, the JSON is returned unchanged.
+     * Without a key, dev/local/test profiles preserve passthrough behavior and
+     * non-dev profiles fail closed exactly like {@link #encrypt(String)}.
      *
      * @param json   the JSON string to process; null/blank values pass through
      * @param fields set of field names whose values should be encrypted
@@ -243,29 +246,33 @@ public class FieldEncryptionService {
         if (json == null || json.isBlank() || fields == null || fields.isEmpty()) {
             return json;
         }
-        if (secretKey == null) {
-            return json; // passthrough — encryption disabled
+        JsonNode root;
+        try {
+            root = objectMapper.readTree(json);
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to encrypt JSON fields: {}", e.getMessage());
+            return json;
+        }
+        if (!root.isObject()) {
+            return json;
+        }
+
+        ObjectNode obj = (ObjectNode) root;
+        for (String field : fields) {
+            if (obj.has(field) && !obj.get(field).isNull()) {
+                String plainValue = obj.get(field).asText();
+                if (!isEncrypted(plainValue)) {
+                    // Deliberately outside the JSON parse/serialize catch:
+                    // the production no-key guard must propagate to the caller.
+                    obj.put(field, encrypt(plainValue));
+                }
+            }
         }
 
         try {
-            JsonNode root = objectMapper.readTree(json);
-            if (!root.isObject()) {
-                return json;
-            }
-
-            ObjectNode obj = (ObjectNode) root;
-            for (String field : fields) {
-                if (obj.has(field) && !obj.get(field).isNull()) {
-                    String plainValue = obj.get(field).asText();
-                    if (!isEncrypted(plainValue)) {
-                        obj.put(field, encrypt(plainValue));
-                    }
-                }
-            }
-
             return objectMapper.writeValueAsString(obj);
-        } catch (Exception e) {
-            log.warn("Failed to encrypt JSON fields: {}", e.getMessage());
+        } catch (JsonProcessingException e) {
+            log.warn("Failed to serialize encrypted JSON fields: {}", e.getMessage());
             return json;
         }
     }

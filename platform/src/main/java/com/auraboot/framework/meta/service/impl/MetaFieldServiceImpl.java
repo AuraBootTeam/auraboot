@@ -10,6 +10,7 @@ import com.auraboot.framework.exception.ValidationException;
 import com.auraboot.framework.meta.dto.*;
 import com.auraboot.framework.meta.entity.Field;
 import com.auraboot.framework.meta.entity.FieldDictBinding;
+import com.auraboot.framework.meta.entity.payload.FieldFeatureBean;
 import com.auraboot.framework.meta.entity.payload.FieldRefTargetBean;
 import com.auraboot.framework.meta.exception.ColumnHasDataException;
 import com.auraboot.framework.meta.mapper.MetaFieldMapper;
@@ -123,6 +124,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
         entity.setCode(request.getCode());
         entity.setDataType(request.getDataType());
         entity.setDataSourceId(request.getDataSourceId());
+        entity.setFeature(mapToBean(request.getFeature(), FieldFeatureBean.class, "feature"));
         entity.setRefTarget(mapToBean(request.getRefTarget(), FieldRefTargetBean.class, "refTarget"));
         entity.setVersion(nextVersion);
         entity.setIsCurrent(true);
@@ -739,6 +741,7 @@ public class MetaFieldServiceImpl implements MetaFieldService {
                 .status(entity.getStatus())
                 .tenantId(entity.getTenantId())
 
+                .feature(beanToMap(entity.getFeature()))
                 .refTarget(beanToMap(entity.getRefTarget()))
                 .extension(extensionConverter.toMap(entity.getExtension())) // ✅ 使用ExtensionConverter将ExtensionBean转换为Map
                 .createdAt(DateUtil.toUtcLocalDateTime(entity.getCreatedAt()))

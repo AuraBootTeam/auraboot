@@ -276,4 +276,32 @@ class FieldEncryptionServiceTest {
         // The fail-closed guard is on write (encrypt) only; reads of existing plaintext must still work.
         assertEquals("legacy-plain", service.decrypt("legacy-plain"));
     }
+
+    @Test
+    @DisplayName("No key + non-dev profile — JSON secret encryption also fails closed")
+    void testNoKeyNonDevJsonEncryptionRefused() throws Exception {
+        FieldEncryptionService service = createService("");
+        setProfile(service, "prod");
+
+        assertThrows(IllegalStateException.class, () ->
+                service.encryptJsonFields(
+                        "{\"token\":\"must-not-be-plaintext\",\"label\":\"safe\"}",
+                        Set.of("token")));
+    }
+
+    @Test
+    @DisplayName("JSON secret fields encrypt and decrypt without changing safe fields")
+    void testJsonFieldRoundTrip() throws Exception {
+        FieldEncryptionService service = createService(TEST_KEY);
+
+        String encrypted = service.encryptJsonFields(
+                "{\"token\":\"secret-token\",\"label\":\"safe\"}",
+                Set.of("token"));
+        assertTrue(encrypted.contains("ENC:"));
+        assertFalse(encrypted.contains("secret-token"));
+
+        String decrypted = service.decryptJsonFields(encrypted, Set.of("token"));
+        assertTrue(decrypted.contains("secret-token"));
+        assertTrue(decrypted.contains("\"label\":\"safe\""));
+    }
 }

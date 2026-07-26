@@ -1,10 +1,16 @@
 package com.auraboot.framework.agent.provider;
 
 import com.auraboot.framework.agent.service.McpServerConfigService;
-import lombok.RequiredArgsConstructor;
+import com.auraboot.framework.agent.service.McpServerConfigChangedEvent;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -19,7 +25,6 @@ import java.util.Map;
  */
 @Service
 @Slf4j
-@RequiredArgsConstructor
 public class McpToolProvider implements ToolProvider {
 
     private static final String PROVIDER_CODE = "mcp";
@@ -28,6 +33,27 @@ public class McpToolProvider implements ToolProvider {
 
     private final McpClient mcpClient;
     private final McpServerConfigService mcpServerConfigService;
+    private final Cache<String, List<McpClient.McpToolInfo>> toolCatalogues;
+
+    /** Spring constructor with a bounded, configurable discovery TTL. */
+    @Autowired
+    public McpToolProvider(
+            McpClient mcpClient,
+            McpServerConfigService mcpServerConfigService,
+            @Value("${agent.mcp.tool-cache-ttl:PT30S}") Duration cacheTtl) {
+        this.mcpClient = mcpClient;
+        this.mcpServerConfigService = mcpServerConfigService;
+        this.toolCatalogues = Caffeine.newBuilder()
+                .maximumSize(10_000)
+                .expireAfterWrite(cacheTtl)
+                .build();
+    }
+
+    /** Test-focused constructor retaining the previous public surface. */
+    public McpToolProvider(
+            McpClient mcpClient, McpServerConfigService mcpServerConfigService) {
+        this(mcpClient, mcpServerConfigService, Duration.ofSeconds(30));
+    }
 
     @Override
     public String providerCode() {
@@ -60,7 +86,7 @@ public class McpToolProvider implements ToolProvider {
             String serverName = target.serverName();
 
             try {
-                List<McpClient.McpToolInfo> tools = mcpClient.listTools(target);
+                List<McpClient.McpToolInfo> tools = cachedTools(target);
                 for (McpClient.McpToolInfo tool : tools) {
                     String toolCode = PREFIX + serverName + ":" + tool.getName();
                     allTools.add(ToolDefinition.builder()
@@ -74,8 +100,8 @@ public class McpToolProvider implements ToolProvider {
                 }
                 log.debug("Discovered {} tools from MCP server '{}'", tools.size(), serverName);
             } catch (Exception e) {
-                log.warn("Failed to discover tools from MCP server '{}' at {}: {}",
-                        serverName, target.serverUrl(), e.getMessage());
+                log.warn("Failed to discover tools from MCP server '{}': errorType={}",
+                        serverName, e.getClass().getSimpleName());
                 // Continue with other servers — one failure should not block all discovery
             }
         }
@@ -123,8 +149,8 @@ public class McpToolProvider implements ToolProvider {
                     .durationMs(System.currentTimeMillis() - startTime)
                     .build();
         } catch (Exception e) {
-            log.error("MCP tool execution failed: server='{}', tool='{}', error={}",
-                    serverName, toolName, e.getMessage());
+            log.error("MCP tool execution failed: server='{}', tool='{}', errorType={}",
+                    serverName, toolName, e.getClass().getSimpleName());
             return ProviderExecutionResult.builder()
                     .success(false)
                     .errorMessage("MCP tool execution failed: " + e.getMessage())
@@ -137,13 +163,68 @@ public class McpToolProvider implements ToolProvider {
      * Resolve a registered server by name for the given tenant.
      */
     private McpServerTarget resolveTarget(Long tenantId, String serverName) {
-        List<Map<String, Object>> servers = mcpServerConfigService.listActiveServers(tenantId);
-        for (Map<String, Object> server : servers) {
-            if (serverName.equals(server.get("server_name"))) {
-                return McpServerTarget.fromRow(server);
+        Map<String, Object> server =
+                mcpServerConfigService.findActiveServer(tenantId, serverName);
+        return server == null ? null : McpServerTarget.fromRow(server);
+    }
+
+    private List<McpClient.McpToolInfo> cachedTools(McpServerTarget target) {
+        String cacheKey = target.connectionKey();
+        List<McpClient.McpToolInfo> cached = toolCatalogues.getIfPresent(cacheKey);
+        if (cached != null) {
+            return cached;
+        }
+        try {
+            List<McpClient.McpToolInfo> loaded = List.copyOf(mcpClient.listTools(target));
+            toolCatalogues.put(cacheKey, loaded);
+            if (target.tenantId() != null && target.pid() != null) {
+                mcpServerConfigService.updateSyncResult(
+                        target.tenantId(), target.pid(), loaded.size());
+            }
+            return loaded;
+        } catch (RuntimeException error) {
+            if (target.tenantId() != null && target.pid() != null) {
+                mcpServerConfigService.updateSyncFailure(
+                        target.tenantId(), target.pid(), safeSyncError(target, error));
+            }
+            throw error;
+        }
+    }
+
+    @EventListener
+    public void onServerConfigChanged(McpServerConfigChangedEvent event) {
+        if (event == null) {
+            return;
+        }
+        toolCatalogues.invalidate(
+                String.valueOf(event.tenantId()) + ":" + event.pid());
+    }
+
+    private String safeSyncError(McpServerTarget target, RuntimeException error) {
+        String message = error.getMessage();
+        if (message == null || message.isBlank()) {
+            return error.getClass().getSimpleName();
+        }
+        String safe = message.replaceAll(
+                "(?i)(bearer|token|api[_-]?key)\\s+[A-Za-z0-9._~+/=-]+",
+                "$1 [redacted]");
+        if (target.authConfig() != null) {
+            for (Object value : target.authConfig().values()) {
+                safe = redactValue(safe, value);
             }
         }
-        return null;
+        if (target.stdioEnv() != null) {
+            for (String value : target.stdioEnv().values()) {
+                safe = redactValue(safe, value);
+            }
+        }
+        return safe;
+    }
+
+    private String redactValue(String message, Object value) {
+        String secret = value == null ? null : String.valueOf(value);
+        return secret == null || secret.isBlank()
+                ? message : message.replace(secret, "[redacted]");
     }
     /**
      * Maximum characters kept from a remote tool description.

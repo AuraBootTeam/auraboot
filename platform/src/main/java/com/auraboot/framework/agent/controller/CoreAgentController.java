@@ -125,7 +125,7 @@ public class CoreAgentController {
     @GetMapping("/mcp-servers")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> listMcpServers() {
         Long tenantId = MetaContext.getCurrentTenantId();
-        List<Map<String, Object>> servers = mcpServerConfigService.listActiveServers(tenantId);
+        List<Map<String, Object>> servers = mcpServerConfigService.listSafeServers(tenantId);
         return ResponseEntity.ok(ApiResponse.success(servers));
     }
 
@@ -149,7 +149,10 @@ public class CoreAgentController {
         Long tenantId = MetaContext.getCurrentTenantId();
 
         String name = (String) body.get("name");
-        String url = (String) body.get("url");
+        String url = stringValue(body.get("url"));
+        if (url == null) {
+            url = stringValue(body.get("command"));
+        }
         if (name == null || name.isBlank()) {
             return ResponseEntity.ok(ApiResponse.error("name is required"));
         }
@@ -162,10 +165,64 @@ public class CoreAgentController {
         String authType = (String) body.get("authType");
         Map<String, Object> authConfig = body.get("authConfig") instanceof Map
                 ? (Map<String, Object>) body.get("authConfig") : null;
+        List<String> args = stringList(body.get("args"));
+        Map<String, String> env = stringMap(body.get("env"));
 
         String pid = mcpServerConfigService.registerServer(tenantId, name, url,
-                transportType, authType, authConfig);
+                transportType, authType, authConfig, args, env);
         return ResponseEntity.ok(ApiResponse.success(Map.of("pid", pid)));
+    }
+
+    /** Update one server while preserving omitted secret material. */
+    @PutMapping("/mcp-servers/{pid}")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    @SuppressWarnings("unchecked")
+    public ResponseEntity<ApiResponse<Void>> updateMcpServer(
+            @PathVariable String pid, @RequestBody Map<String, Object> body) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        String name = stringValue(body.get("name"));
+        String endpoint = stringValue(body.get("url"));
+        if (endpoint == null) {
+            endpoint = stringValue(body.get("command"));
+        }
+        if (name == null || endpoint == null) {
+            return ResponseEntity.ok(ApiResponse.error(
+                    "name and either url or command are required"));
+        }
+        mcpServerConfigService.updateServer(
+                tenantId, pid, name, endpoint,
+                stringValue(body.get("transportType")),
+                stringValue(body.get("authType")),
+                body.get("authConfig") instanceof Map
+                        ? (Map<String, Object>) body.get("authConfig") : null,
+                stringListOrNull(body.get("args")),
+                stringMapOrNull(body.get("env")));
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    /** Export a portable, credential-free config for {@code aura mcp pull}. */
+    @GetMapping("/mcp-servers/export")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> exportMcpServers() {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        return ResponseEntity.ok(ApiResponse.success(
+                mcpServerConfigService.exportSafeConfig(tenantId)));
+    }
+
+    /** Upsert a portable CLI config; dry-run returns the same deterministic plan. */
+    @PostMapping("/mcp-servers/sync")
+    @RequirePermission(MetaPermission.ACP_RUNTIME_MANAGE)
+    @SuppressWarnings("unchecked")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> syncMcpServers(
+            @RequestBody Map<String, Object> body) {
+        Long tenantId = MetaContext.getCurrentTenantId();
+        Map<String, Object> servers = body.get("servers") instanceof Map
+                ? (Map<String, Object>) body.get("servers") : null;
+        boolean dryRun = Boolean.TRUE.equals(body.get("dryRun"));
+        List<Map<String, Object>> plan =
+                mcpServerConfigService.syncPortableServers(tenantId, servers, dryRun);
+        return ResponseEntity.ok(ApiResponse.success(Map.of(
+                "dryRun", dryRun, "changes", plan, "total", plan.size())));
     }
 
     /**
@@ -177,6 +234,40 @@ public class CoreAgentController {
         Long tenantId = MetaContext.getCurrentTenantId();
         mcpServerConfigService.deactivateServer(tenantId, pid);
         return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    private static String stringValue(Object value) {
+        return value instanceof String text && !text.isBlank() ? text : null;
+    }
+
+    private static List<String> stringList(Object value) {
+        List<String> result = stringListOrNull(value);
+        return result == null ? List.of() : result;
+    }
+
+    private static List<String> stringListOrNull(Object value) {
+        if (!(value instanceof List<?> raw)) {
+            return null;
+        }
+        return raw.stream().map(String::valueOf).toList();
+    }
+
+    private static Map<String, String> stringMap(Object value) {
+        Map<String, String> result = stringMapOrNull(value);
+        return result == null ? Map.of() : result;
+    }
+
+    private static Map<String, String> stringMapOrNull(Object value) {
+        if (!(value instanceof Map<?, ?> raw)) {
+            return null;
+        }
+        Map<String, String> result = new LinkedHashMap<>();
+        raw.forEach((key, item) -> {
+            if (key != null && item != null) {
+                result.put(String.valueOf(key), String.valueOf(item));
+            }
+        });
+        return result;
     }
 
     // ──────────────────────────────────────────────────────────────

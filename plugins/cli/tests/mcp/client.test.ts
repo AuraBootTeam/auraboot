@@ -2,6 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { writeFileSync, mkdirSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import {
+  mergePulledMcpConfig,
+  normalizeMcpConfig,
+  selectMcpServersForPush,
+} from '../../src/mcp/client.js';
 
 // We test config logic by mocking the config path
 // Since the module uses a constant, we test the functions via their logic patterns
@@ -21,6 +26,18 @@ describe('MCP Client — Config Management', () => {
   });
 
   describe('McpServerConfig types', () => {
+    it('normalizes the legacy HTTP spelling to Streamable HTTP', () => {
+      const normalized = normalizeMcpConfig({
+        servers: {
+          vendor: {
+            transport: 'http' as any,
+            url: 'https://vendor.example/mcp',
+          },
+        },
+      });
+      expect(normalized.servers.vendor.transport).toBe('streamable_http');
+    });
+
     it('should represent SSE server config', () => {
       const config = {
         url: 'http://localhost:3001',
@@ -51,6 +68,62 @@ describe('MCP Client — Config Management', () => {
       };
       expect(config.env).toBeDefined();
       expect(config.env!.GITHUB_TOKEN).toBe('ghp_xxx');
+    });
+  });
+
+  describe('platform config synchronization', () => {
+    it('pull preserves local-only servers and secret values', () => {
+      const merged = mergePulledMcpConfig({
+        servers: {
+          vendor: {
+            transport: 'streamable_http',
+            url: 'https://old.example/mcp',
+            authType: 'bearer',
+            authConfig: { token: 'local-secret' },
+          },
+          localOnly: { transport: 'stdio', command: 'node' },
+        },
+      }, {
+        servers: {
+          vendor: {
+            transport: 'streamable_http',
+            url: 'https://new.example/mcp',
+            authType: 'bearer',
+            secretRequired: true,
+          },
+        },
+      });
+
+      expect(merged.config.servers.vendor.url).toBe('https://new.example/mcp');
+      expect(merged.config.servers.vendor.authConfig?.token).toBe('local-secret');
+      expect(merged.config.servers.localOnly.command).toBe('node');
+      expect(merged.secretsRequired).toEqual([]);
+    });
+
+    it('pull explicitly reports remote secrets that cannot be exported', () => {
+      const merged = mergePulledMcpConfig({ servers: {} }, {
+        servers: {
+          github: {
+            transport: 'stdio',
+            command: 'npx',
+            envKeys: ['GITHUB_TOKEN'],
+            secretRequired: true,
+          },
+        },
+      });
+      expect(merged.secretsRequired).toEqual(['github']);
+      expect(merged.config.servers.github).not.toHaveProperty('env');
+    });
+
+    it('push selects one server without leaking unrelated local config', () => {
+      const selected = selectMcpServersForPush({
+        servers: {
+          github: { transport: 'stdio', command: 'npx' },
+          slack: { transport: 'sse', url: 'https://slack.example/sse' },
+        },
+      }, 'github');
+      expect(Object.keys(selected)).toEqual(['github']);
+      expect(selected.github.command).toBe('npx');
     });
   });
 
