@@ -1,124 +1,92 @@
-# MES/WMS 交付 FR — 测试质量矩阵(单一权威）
+# MES/WMS 测试质量矩阵（单一权威）
 
-> ⚠️ **诚实纠正(2026-07-25)**:本仓 `mes-wms-acceptance-report.html`(#1508 生成)曾报「🟢21 全绿」,但它把 UI 行的**「页面渲染了」当成「功能可用了」**——高估了 UI 层。真去驱动行动点后发现:workbench 上 **5 个操作按钮点了就 400**(命令要 inputFields 但页配置没声明 → 空 payload)。已全部修复(plugins #246)+ 行动驱动 golden 验证(auraboot #1517/#1520)。**真实的三层大图见 [`FEATURE-BIGPICTURE-REPORT.md`](./FEATURE-BIGPICTURE-REPORT.md)**(后端命令层 / UI 渲染层 / UI 行动点层,各层证据强度不同)。旧 HTML 报告仅作历史留存,勿当"端到端可用"依据。
+> evidence date：2026-07-26
+> allowed claim：**本 handover 授权的 L1–L4 定向闭环通过**。这不是 MES 28 + WMS 32 FR 的全量完成声明，也不是 canonical OSS full E2E 通过声明。
 
-> 覆盖金轮交付的 8 个 FR 的**真栈 IT**(命令管道 API + DB round-trip）+ **注册 UI golden**（真浏览器驱动行动点）。
-> 由自包含 runner `scripts/mes-wms-golden-run.sh` 一键跑（起栈→import→seed→backend IT→UI golden→报告→拆栈）。
-> 层次定义见 `auraboot-enterprise/docs/standards/core/testing-layering.md`：**IT = 真栈 + 真 DB**；golden = 固定集 + 见过红 + 注册可复跑。
+## 范围与当前证据
 
-## 2026-07-25 完成轮（报告 untested 清零 + FR-22 美观 + 3 个真 bug 修复）
+- 需求真源：AMOS `AMOS_MES_WMS_终局产品需求与UX规格_v1.1.docx`。
+- 当前可执行 SOT：AMOS `10-mes-endgame-delivery.md`、`11-mes-fr-crosswalk.md`、`20-wms-endgame-delivery.md`。
+- 证据索引：`mes-wms-acceptance-report.html`，SHA-256
+  `5b66afb4f42dd07f2e7d52effcf1566308d339da9e929c061a1f78518bcddeb5`。
+- 最终 slot 64：fresh 16-jar stage、24 个 focused packages、102 个 mfg commands；
+  backend 34/34、FR-10 13/13、baseline 22/22、deep 34/34。
+- 最终 HTML：11 个分组行均为绿色，0 黄色、0 红色、0 未测；每行的 exit/screenshot evidence 均已解析。
+- runtime artifact manifest SHA-256：
+  `cfc1b88b7f34eee5652faa85a92d635e8df13604fcabf35a24ab6952a4adb388`；
+  该 manifest 的运行时临时路径会随 task cleanup 删除，hash、源码根、HEAD、jar/config hash 已固化在本节。
 
-HTML 报告 `mes-wms-acceptance-report.html`:**🟢21 🟡1 🔴0 ⬜0 / 22**(#1501 唯一 🟡,诚实定论)。本轮把之前报告里 4 个 ⬜ untested 全部补齐为真栈 golden,沿途真栈 golden 抓到并修复 **3 个 shipped 产品 bug**(Mockito 单测全看不见,只真命令管道抓到):
+## Feature / action coverage matrix
 
-| 项 | golden | 结果 | 修的 bug |
-|----|--------|------|----------|
-| **FR-10 FEFO 拣货** | `fr10-fefo-golden.mjs` | 🟢 10/10 变异验证过 | **inventory available_qty 初始化**:入库 create 分支设 inv_bal_qty 不设 inv_bal_available_qty → 新入库 lot available=0 → GeneratePickOrder 跳过 → FEFO 排序不可达。修 `updateInventoryWithDimensions`/`adjustInventoryForStockCheck` 首写初始化(#244)|
-| **FR-08 材料验证 + FR-12 序列化** | `fr08-12-14-golden.mjs` | 🟢 22/22 | (无 bug;错料阻断+消耗+SN 谱系真栈验证)|
-| **FR-14 测试维修联动** | `fr08-12-14-golden.mjs` | 🟢 22/22 | **2 个 bug**:① `RecordTestResultHandler` `qc_tr_raw_data instanceof Map` 门控建 defect,但 JSONB 读回 String → 永假 → 0 defect(修:coerce String→Map);② `CreateReworkOrderHandler` 自持久化缺 `dslPersistence:false` + `qc_rw_code` 未生成 → rework 建不出(修:命令加 dslPersistence:false + handler 自生成 code)(#244)|
-| **FR-22 美观**(owner 点名「太丑」)| `mes-wms-ui-golden.mjs` 7/7 | 🟢 | (无 bug;交接时间裸 ISO→datetime、筛选器加标签、状态列不折行,#243)|
+测试身份统一按 **被测面 / 依赖 / 裁决权 / 驱动入口** 四轴描述；下表的 L1–L4 是 handover 工作项名称，不是测试层编号。
 
-**深层 spec gap 诚实标 DEFER 未覆盖**(golden 里显式列):FR-08 批次/近效期阻断、FR-12 SN unique 约束、FR-14 retest→原失败闭环。证的是 shipped happy-path + 关键阻断/链路,不是全 spec。三条 falsifiable(改被测行为→变红)。
+| 行动点 | 四轴 | browser evidence | backend / artifact evidence | 状态与边界 |
+|---|---|---|---|---|
+| 已交付 MES/WMS 命令基础集 | api / real-stack / on-demand / it | N/A | `mes-wms-backend-golden.mjs` 34/34 + DB round-trip | PASS；FR-10 由独立 suite 裁决 |
+| FR-10 FEFO/FIFO | api / real-stack / on-demand / it | N/A | `fr10-fefo-golden.mjs` 13/13 | PASS；真实入库 create 路径，无 available-qty update workaround |
+| FR-08 错料/过期/生产窗口门禁 | api / real-stack / on-demand / it | N/A | baseline 22/22 + deep 34/34 中的 expiry/window/safe-lot 断言 | PASS；MSL/烘烤寿命和完整替代料审批仍不在本轮 |
+| FR-12 SN 唯一与重复扫描幂等 | journey / real-stack / on-demand / it | N/A | deep suite：跨成品拒绝、同组合不新增重复 row | PASS（API-driven） |
+| FR-12 relabel | journey / real-stack / on-demand / it | did not run | deep suite：旧标签终态、新标签 active、predecessor/root 不变、旧标签复扫拒绝 | PASS（API-driven）；未声明 UI command 可达 |
+| FR-12 reprint | journey / real-stack / on-demand / it | did not run | deep suite：旧打印标签终态、successor 保留 predecessor/root | PASS（API-driven）；未声明 UI command 可达 |
+| FR-12 recover_identity | journey / real-stack / on-demand / it | did not run | 证据、requester、server-owned confirmer、confidence 回查；自确认拒绝且不落 successor | PASS（API-driven）；未做非 admin 角色矩阵 |
+| FR-12 invalidate | journey / real-stack / on-demand / it | did not run | deep suite：终态、原因、时间戳回查 | PASS（API-driven）；未声明 UI command 可达 |
+| FR-14 retest closure | journey / real-stack / on-demand / it | N/A | fail→defect→retest→verified，链回原失败 | PASS |
+| FR-14 replace_component | journey / real-stack / on-demand / it | did not run | original retained/replaced；replacement serial/material/lot/predecessor/reason 回查 | PASS（API-driven）；未声明 UI command 可达 |
+| MES 存量页面渲染 | ui / real-stack / on-demand / browser | `mes-wms-yellow-fr-golden.mjs` 33/33 + screenshots | live list/data/console signals | PASS；只证明已列页面渲染与数据可见 |
+| FR-07 Start 互锁拒绝 | journey / real-stack / on-demand / browser | 真菜单/行行动、拒绝反馈、列表保留 | 后端 400 + 状态未非法转移 | PASS |
+| FR-22 交接与签认 | journey / real-stack / on-demand / browser | 真输入/点击、表单、状态与接班人回显 | DB pending_ack→acknowledged | PASS |
+| 4 类曾断工作台行动 | journey / real-stack / on-demand / browser | 生成交接单、解决异常、下达 Hold、解除 Hold 的表单与截图 | 每个行动的 DB count/status 变化 | PASS |
+| L3 列表搜索与详情 | journey / real-stack / on-demand / browser | 菜单进入；搜索前 N>1、唯一值后 1 行；View 跳转精确实体 | 真 list/detail HTTP response | PASS，3/3 |
+| L1 #1501 分辨门 | journey / real-stack / on-demand / browser | mutant 整页“加载失败”；fixed 列表与目标行保留 | source sentinel + 同一真后端行动 400；两侧各 2/2 | PASS，mutation 在已运行多轮的 slot 64 DB 上执行 |
 
-## 覆盖矩阵
+约 46 个 reserve FR 继续由 AMOS crosswalk 标为 `WONT_DO for this handover`。它们未实现、未测试、不进入 HTML 分母，也不能从“11 个绿色分组行”推导为已交付。
 
-| FR | 能力 | 主命令 | 后端真栈 IT（API+DB） | UI golden | 状态 |
-|----|------|--------|----------------------|-----------|------|
-| **FR-04** | HandlingUnit pack/split/merge | `inv:pack` `inv:split_hu` `inv:merge_hu` | 执行 pack→查 `inv_handling_unit` 数量守恒 + `inv_handling_unit_event` 事件行；note 用 code 非 pid | HU 列表/详情页真点 pack + 事件历史断言 | ⬜ |
-| **FR-10** | FEFO/FIFO 拣货分配 | `inv:create_pick_order` | 建效期不同的库存→create_pick_order→断言分配按 FEFO（近效期先）+ 生产窗口排除 | 拣货页真点 + 分配结果断言 | ⬜ |
-| **FR-13** | 齐套分析 | `inv:compute_kitting` | 建工单+缺料→compute_kitting→断言 full/critical 齐套结果落 `inv_kitting_result` | 齐套页真点 + 结果断言 | ⬜ |
-| **FR-05** | 开工互锁（7 检查） | `mfg_work_order_operation_pcba_execution:check_interlock` | 建 WO 操作（违反 msl/env/tooling）→check→断言 blocked + 具体 reason | 互锁卡真渲染 7 检查 + 截图 | ⬜ |
-| **FR-09** | SMT 工装寿命 | `mfg_tooling_pcba_asset:record_usage` | 建工装→record_usage×N→断言使用计数累加 + 到寿告警 | 工装页真点 record_usage | ⬜ |
-| **FR-16** | Hold 与解除 | `mfg_hold:place_hold` `mfg_hold:release_hold` | 建目标→place_hold→断言拦开工 + 传播 + 部分解除 | Hold 工作台真点 place/release | ⬜ |
-| **FR-20** | 设备停机（防重叠重复计时） | `mfg_equipment_pcba_asset:breakdown` `:end_downtime` | breakdown→再 breakdown（重叠）→断言不重复计时（open 检查）；end_downtime→断言时长 | 停机工作台真点 | ⬜ |
-| **FR-22** | 班次交接 + 双签认 | `mfg_shift_handover:create_handover` `:acknowledge_handover` | create→断言快照 + carry-forward；acknowledge→断言签认；标题/引用解析 | 交接工作台真点 create+ack + 抽屉断言 | ⬜ |
+## 可信度审计
 
-状态图例：⬜ 未做 · 🟡 IT 绿/UI 待 · 🟢 IT+UI 双绿（变异验证过）· 🔴 发现产品 bug
+- 新增的 `list-interaction-golden.mjs` 和 `list-action-error-mutation-golden.mjs`：
+  `page.request=0`、`waitForTimeout=0`、`skip/fixme=0`、`retries=0`；列表入口经侧边栏菜单，`page.goto` 只用于登录首页。
+- L1 可证伪记录：
+  - mutation：仅恢复 `ListPageContent` 行行动错误时的 `setError(err.message)`；
+  - observed red：mutant 同一 400 后整页失败、列表行归零；
+  - DB state：slot 64 已完成多轮运行，非 fresh-only 假红；
+  - restored green：fixed 同一 400 后列表与目标行保留；
+  - green class：真绿。
+- `report-gen` self-test 通过；manifest claimed-pass 若缺 evidence 会强制变红。
+- 新增/修改配置的 `page-golden-audit --contract-only` 为 0 error / 0 warning，fresh 平台 import 为 24/24 packages、102 mfg commands。
+- strict 全插件 page audit 在 feature 与 canonical main 上均为同一组 12 个历史错误；本轮没有把这些历史页面债务包装成通过，因此 FR-12 生命周期命令明确标为 API-driven、UI did not run。
+- 报告纳入的历史浏览器脚本仍有 37 处 `waitForTimeout`，但无 `skip/fixme` 或 retries。本轮不据此声称 canonical full golden UI；新建的两个分辨门不含固定等待。
+- 后端模块未配置有效 JaCoCo/coverage task，`integration_coverage=coverage_not_measured`；245/245 是测试通过数，不换算为 80% 覆盖率。
 
-### 实际进度（2026-07-24 本会话 — pcba 依赖网攻克后）
+## Final Evidence Pack
 
-**后端真栈 golden:28/28 checks 全绿,0 fail,2 deferred。6 个 FR 完全覆盖。**
+```text
+acceptance_report: web-admin/tests/mes-wms/mes-wms-acceptance-report.html (sha256 5b66afb4...)
+claim_level: targeted handover completion claim
+current_sot: AMOS 10/11/20 + this test-quality matrix
+business_scope: owner-authorized MES/WMS handover L1-L4; ~46 reserve FR explicitly excluded/WONT_DO
+integration_tests: plugin unit 245/245; OSS platform targeted 19/19; slot64 backend 34/34 + FR10 13/13 + baseline 22/22 + deep 34/34
+integration_coverage: coverage_not_measured
+e2e_specs: render 33/33; FR07 5/5; FR22 8/8; action points 9/9; UI 5/5; list 3/3; mutation mutant 2/2 + fixed 2/2
+feature_action_matrix: table above; no silent rows, API-driven and did-not-run UI paths explicit
+browser_evidence: HTML inline screenshots + exact list/detail and mutant/fixed evidence
+backend_evidence: fresh jar/PF4J/import/command pipeline/real PostgreSQL round-trip
+artifact_evidence: HTML sha256 5b66afb4...; runtime manifest sha256 cfc1b88b...; pcba jar/config hashes recorded
+permission_negative: self-confirm recovery rejected; FR07 interlock rejected; non-admin RBAC matrix did_not_run
+visual_feedback: screenshots inspected for list retention/blanking, exact detail, FR22 labels/layout, and action forms/results
+skip_fixme_threshold_retry_audit: skip=0, fixme=0, retries=0; new discriminators waitForTimeout=0; inherited report scripts waitForTimeout=37
+did_not_run: canonical OSS full E2E; non-admin RBAC; UI reachability for the five new FR12/14 lifecycle commands; release-image/docker parity
+remaining_blockers: none for the authorized L1-L4 targeted closure; the did-not-run items prevent a broader full-product/golden-UI claim
+allowed_claim: handover L1-L4 targeted closure passed; not all 60 FR, not canonical full E2E, not full golden UI
+```
 
-| FR | 后端真栈 IT | live 验证的交付 |
-|----|------------|----------------|
-| **FR-04** HandlingUnit | 🟢 6/6 | pack 数量守恒 5+10=15 + child 链 + 2 event + **note 用 code 非 pid（#230）** |
-| **FR-05** 开工互锁 | 🟢 6/6 | check_interlock **checkedItems=7** + 明细表 7 项含 **tooling_life（#219 第7检查）** |
-| **FR-09** SMT 工装 | 🟢 3/3 | create tooling → record_usage → used_cycles 累加 |
-| **FR-16** Hold | 🟢 3/3 | place_hold → active hold 行持久化 |
-| **FR-20** 设备停机 | 🟢 4/4 | breakdown 转 status + **重叠 breakdown 不重复计时=1 open downtime（#219）** |
-| **FR-22** 班次交接 | 🟢 5/5 | create → pending_ack → acknowledge → **acknowledged（双签认）** |
-| **FR-13** 齐套 | 🟢 7/7 | product→BOM→line→work order→compute_kitting → 1 kitting_result / **status=short_non_critical rate=0（缺料正确报缺,非静默 kitted=临界件安全）** |
-| FR-10 FEFO | ⬜ 1 DEFER | 唯一未覆盖:需 warehouse(strategy=fefo)+ 2 效期 lot + balance(经 warehouse_in 收货流)+ pick source demand 的多步 seed;FEFO 排序逻辑已在 #217 交付,golden 待此 seed |
+## 复跑
 
-**7/8 FR 后端真栈 golden 全绿(34/34 checks,0 fail,1 deferred)**。断言全 falsifiable(DB 守恒值/事件数/互锁明细表 7 项/状态机),真命令管道 + 真 DB round-trip(psql 直查,非 API scope)。live 验证交付:**#219(互锁 tooling_life 第7检查 + 停机防重叠)+ #230(note 用 code)**。
-
-### ✅ Infra 突破（本会话攻克 pcba 依赖网）
-- **16 个 hybrid jar 全 fresh 构建**(15 in `plugins/` + quote-engine in `aura-quote/`)→ `AURA_PLUGINS_DIR` 加载。
-- **跨仓 `--profile=pcba-agent` 单次 import(两阶段 defer)**:`mfg 命令 97 个注册`。关键洞察:整 profile 一次导入让 defer 解析依赖网(pcba-industry 的 pe:* handler 从 jar 加载即可、config import 失败不影响命令注册)。3 个失败插件(pcba-solution/pcba-sales/pcba-quote)是 FR 不需要的 quote 侧。
-- runner `scripts/mes-wms-golden-run.sh` 已 codify 全流程(build 16 jar → stage → runtime → schema → backend → bootstrap → import profile → golden → teardown)。
-
-### UI golden(真浏览器)—— 路径跑通 + FR-22 验证
-`tests/mes-wms/ui/mes-wms-ui-golden.mjs`:Playwright 驱动登录表单 → 导航 standalone DSL 页(`/p/c/<key>`)→ 断言 + 截图。**FR-22 handover workbench 5/5 绿**:
-- 页渲染(班次交接工作台)+ metric-strip(待签认)
-- **#228 polish live 验证**:交班/接班班次 = 白班/夜班(dict 解析,非裸 day/night)、状态 = 已签认(非 pending_ack)
-- 截图 `fr22-handover-workbench.png`(亲眼看过:metric-strip + 表格 + 色点 dict 标签)
-- 关键坑:app proxy SSE → `waitForLoadState('networkidle')` 永不触发(禁用);登录邮箱字段是 `input[autocomplete="username"]`
-
-### 剩余（诚实）
-- **FR-10 后端**:FEFO balance-per-lot seed 墙(add_lot_txn≠balance、wh_in line 无 lot;需正确 lot-aware 收货流 + warehouse_out demand)。已探测记录。
-- **UI golden 其余 7 页**:按 FR-22 已验证 pattern 扩(每页 login→navigate→assert→screenshot)。
-- **HTML 报告**:runner 已接线 backend+UI golden;HTML 汇总报告未做(矩阵 SoT 是当前报告)。
-
-## 证据口径
-- **真栈 IT**：Playwright API spec `mes-wms-commands.spec.ts`，`executeCommandViaApi` → `POST /api/meta/commands/execute/{code}` → `GET /api/dynamic/{model}/list` 反查 DB。凭据 = spec pass + 断言查的是**结果**（DB 行/字段值）非请求次数。
-- **UI golden**：Playwright E2E spec `mes-wms/*.spec.ts`，真点每个行动点 + 断言状态变化 + 截图；截图存 `test-results/`。
-- **变异验证**：每个新断言当场做（改 seed / 去掉修复 → 必须变红 → 还原）。
-- **报告**：runner 跑完出 `mes-wms-golden-report.html`（内联截图 + 每 FR pass/fail + DB 断言证据）。
-
-## 基础设施（Phase 0 gate — 已通过）
-- 6 hybrid jar（inventory/pcba-manufacturing fresh 构建 + product-catalog/quality/crm/procurement）staged 到 AURA_PLUGINS_DIR。
-- host-first 隔离栈（dev.sh runtime slot 63，零 docker）；backend `java -jar bootJar` + AURA_PLUGINS_DIR；跨仓 import（`--enterprise-plugin-root=/Users/ghj/work/auraboot/plugins`）。
-- 验证：backend UP + `HandlingUnitHandler commandType=inv:pack` 等 FR handler 真加载。
-
----
-
-## 🟡 存量 MES FR — 真栈 UI golden + 美观性截图验证（2026-07-25）
-
-`tests/mes-wms/ui/mes-wms-yellow-fr-golden.mjs`:真浏览器导航每个 🟡 FR 用户页 + 截图 + 断言（渲染/无404/内容匹配/无裸码/无 console error）。**33/33 pass**;截图逐张 agent-vision 复核美观性。
-
-| FR | 页面 | 真栈 UI | 美观性（截图复核） |
-|----|------|---------|-------------------|
-| **FR-01** 工单接入/冻结 | 生产管理列表 | 🟢 有数据 | 优秀:工单/KitWO 行、BOM 列蓝链接（reference 解析）、计划产量、查看链接 |
-| **FR-03** 派工/工位分配 | 工位派工列表 | 🟢 渲染 | 干净列表 |
-| **FR-07** 工序执行 | 工位执行列表 | 🟢 有数据 | 优秀:工单/工序行、状态待开始(dict)、Alice、start 操作链 |
-| **FR-15** 异常/Andon | Andon 工作台 | 🟢 渲染 | 优秀:6卡 metric-strip + filters + 分段tab + 表 + 证据面板,空态整洁 |
-| **FR-21** 产出/结案 | 报工记录列表 | 🟢 有数据(seed 3条) | 优秀:工序蓝链接、班次白班(dict)、完成80/不良2/工时45、编辑链接 |
-| **FR-23** 生产控制塔 | 车间看板 dashboard | 🟢 **修复后** | **发现+修复美观性 bug**:工位状态表 widget `h=1` 塌陷→`h=4`,12 工位行完整显示(SMT贴片/可用/产能100);未解决异常表 `h=3`。plugins #240,截图变异验证 |
-| FR-08/12/14 | 材料验证/序列化/测试维修 | — | **无独立 UI 页**(backend/handler 或 field 级 sub-feature,非 standalone 页,不做 UI golden) |
-
-**发现并修复的美观性问题(1)**:FR-23 车间看板 dashboard 的 `smart-table-chart` widget `h=1` 导致表体压缩到 ~1 行高、12 行不可见 → h=1→4/3(参照 pe_oee_dashboard h=3)。plugins #240 merged。
-
-**结论**:🟡 存量 FR 里有用户页的 6 个（FR-01/03/07/15/21/23)全部真栈 UI golden 通过 + 截图美观性复核优秀,1 个 dashboard 布局 bug 已修;FR-08/12/14 无独立 UI 页(sub-feature）。
-
----
-
-## 🟡 FR 行动点驱动 golden(真点按钮 + 断言状态变化)+ 发现修复 2 个 UX bug
-
-不止「页面渲染」——真点行动点断言状态变化(§2.2 门禁绿≠功能可用)。
-
-### FR-07 工位执行 · start 行动点(`fr07-action-golden.mjs`,5/5)
-真点某工序的 **start** 按钮 → 观察到 **FR-05 开工互锁正确拦截**(该工序无激活生产版本):
-- DB 断言:工序**未非法转 in_progress**(拦截生效)
-- 拦截原因**以 toast 呈现**给操作员(product_version 检查失败 + 指向 Interlock Card + override 命令)
-- **FR-05/FR-07 seam 真栈 UI 端到端验证**(互锁门控 start)
-
-### 🔧 发现并修复的 UX bug(2 个,都在美观性 /goal 范围)
-| # | bug | 修复 | 验证 |
-|---|-----|------|------|
-| 1 | FR-23 车间看板 dashboard table widget `h=1` → 表体塌陷、12 行不可见 | h=1→4/3 | plugins #240,截图变异 |
-| 2 | **被拦截的 list 行动点 → 整页崩「加载失败」+ 重试**(action 错误被误设成 page-level error;应只 toast) | ListPageContent `onError` 不再设 page error → action 失败只 toast、列表保持 | OSS #1501 merged+review;**修复态 live 验证**(拒绝的行动点→列表保留+无整页崩,`fr07-after-start.png` + golden 5/5)|
-
-**bug #2 是共享渲染器修复,改善所有 list 页**:任何行动点被业务规则拒绝(互锁/权限/校验)不再整页崩,操作员保留列表 + 看清 toast 原因。
-
-> **⚠️ #1501 证据口径诚实纠正(2026-07-25 复核)**:此前写"截图变异(改前整页崩)"**无实际 RED 截图支撑**,已撤。当前只有**修复态正向证据**——运行前端(HEAD=origin/main,含 #1501)上点被拒的行动点,列表完整保留、无整页崩(`fr07-after-start.png` + `fr07-action-golden.mjs` 5/5)。**未取得独立的未修复 RED 基线**:栈已是修复版,且 mutation 不可做(10+ 并发会话共享同一 canonical main checkout 的 Vite,临时改会 HMR 打断他人 golden)。故此项是"修复态 live 验证",**不是**变异分辨门。真正的 RED→GREEN 变异证据需在**隔离的未修复前端**上补(未做,ROI 低——#1501 已 merge+review+修复态已验)。此外:`fr07-action-golden` 的 5/5 在**修复前后前端都为绿**(实测),因此它验证的是 **FR-05/FR-07 互锁 seam**(拒绝 start→op 不转 in_progress→列表保留),**不构成对 #1501 的分辨性验证**。
-
-**结论**:🟡 FR 不止验证渲染,还行动点驱动验证状态变化(FR-05/FR-07 互锁 seam),并发现+修复 2 个真 UX/美观性 bug(dashboard 表塌陷 + 行动点错误整页崩)。
+```bash
+AURA_PLUGINS_PROJECT_ROOT=/path/to/plugins scripts/mes-wms-golden-run.sh --slot 64 --keep --no-ui
+BASE=http://127.0.0.1:5164 \
+FIXED_BASE=http://127.0.0.1:5164 \
+MUTANT_BASE=http://127.0.0.1:5264 \
+BACKEND_URL=http://127.0.0.1:6464 \
+PG_DB=auraboot_64 \
+web-admin/tests/mes-wms/report-run.sh
+```

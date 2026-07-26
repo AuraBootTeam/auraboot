@@ -135,6 +135,7 @@ class HandlerPhaseTest {
                 .containsEntry("statusField", "pr_po_status")
                 .containsEntry("__commandCode", BUSINESS_COMMAND_CODE)
                 .containsEntry("__handlerCode", PLUGIN_HANDLER_CODE)
+                .containsEntry("__currentUser", "2")
                 .containsKey(CommandHandlerExtension.DATA_ACCESSOR_KEY)
                 .containsKey(CommandHandlerExtension.FILE_ACCESSOR_KEY);
         assertThat(handler.capturedContext.get().fileAccessor()).isInstanceOf(FileAccessor.class);

@@ -1,142 +1,107 @@
-# AMOS MES/WMS 功能大图 + 测试报告(诚实版 · 2026-07-25)
+# AMOS MES/WMS 功能大图与验证结论（2026-07-26）
 
-> 这份取代之前那份「🟢21 全绿」HTML 报告——那份**高估了**:它把 UI 行的「页面渲染了」当成「功能可用了」。
-> 真去驱动行动点后发现:**6 个 UI 行动点里 5 个是坏的**(点了发空 payload → 400)。本报告分三层说清真实状态。
+## 一句话结论
 
-## 一句话大图
+本次授权范围已经形成可复跑的真链路：后端命令不是 mock 绿，UI 不是只看渲染，#1501 也不再只有修复态截图。L1–L4 已闭环；约 46 个储备 FR 仍明确未开发、未测试、未被“全绿”口径吞掉。
 
-- **后端命令层**:11 个 FR,真栈 golden(真命令管道 + psql DB round-trip)验证过,**真工作**。
-- **UI 渲染层**:7 张页面渲染 OK——但这只证明「页面加载了」,是最弱的证据。
-- **UI 行动点层**:6 个操作按钮里 5 个曾断(缺 inputFields → 点了 400),**现已全部修复 + 行动驱动 golden 验证**(第 6 个「申请绕行」是 navigate-to-form,本就工作)。
-- **结论**:后端扎实且测得实;UI 行动点**已从「点了 400」修到「真能用」**——每个按钮弹表单、填、提交、状态真变,都有截图 + golden。
-- 原始 spec 60 个 FR(28 MES + 32 WMS),本轮**触及 ~14 个**,**~46 个未开发**(owner 定的储备验收基线)。
+## 三层大图
 
----
+### 1. 产品功能层
 
-## 第一层 · 后端命令(开发 ✅ 真栈测 ✅ 工作 ✅)
+已交付切片覆盖生产执行、库存、质量和身份四条主链：
 
-真命令管道执行 + psql 直查 DB 断言。这些是**扎实的**——golden 见过红(FR-14/FR-10 就是抓 bug 抓出来的)。
+- 既有 11 个命令层 FR 继续由真命令 API + DB round-trip 守护；
+- FR-10 从真实入库余额开始验证 FEFO/FIFO，不再测试里补写 `available_qty`；
+- FR-08 从“已过期”推进到“会在剩余生产窗口内到期”；
+- FR-12 从首次 SN 谱系推进到唯一、幂等、重打、换标、失效、双人恢复；
+- FR-14 从测试/返工闭环推进到可追溯的 As-built 换件；
+- 5 个曾经点即 400 的工作台行动点保持行动驱动验证。
 
-| FR | 功能 | golden | 证据 |
-|----|------|--------|------|
-| FR-04 | HandlingUnit 打包/拆分/合并 | backend 34/34 | 数量守恒 + event 行 + note 用 code |
-| FR-05 | 开工互锁(7 检查) | backend | checkedItems=7 含 tooling_life |
-| FR-09 | SMT 工装寿命 | backend | used_cycles 累加 |
-| FR-13 | 齐套分析 | backend | kitting_result 缺料正确报缺 |
-| FR-16 | Hold 放置持久化 | backend | active hold 行 |
-| FR-20 | 设备停机防重叠 | backend | 恰好 1 open downtime |
-| FR-22 | 班次交接双签认(后端) | backend | pending_ack→acknowledged |
-| FR-10 | FEFO/FIFO 拣货 | fr10 10/10 变异验证 | 近效期先分配 + 过期排除 + fifo 翻转 |
-| FR-08 | 材料验证与消耗 | fr08-12-14 22/22 | 错料阻断 + 消耗行 |
-| FR-12 | 序列化 SN 谱系 | fr08-12-14 | 父子链双写 |
-| FR-14 | 测试维修联动 | fr08-12-14 | fail→defect→rework 全链路 |
+约 46 个未排期 FR 仍在 AMOS crosswalk 中逐条保留。它们没有实现，也没有被这份报告宣称为绿。
 
-**沿途真栈 golden 抓到并修的 3 个真产品 bug(单测全看不见)**:
-- FR-14 defect 门控 `instanceof Map` 但 JSONB 读回 String → 0 defect(plugins #244)
-- FR-14 rework handler 自持久化缺 dslPersistence:false + qc_rw_code 未生成(plugins #244)
-- FR-10 入库不初始化 available_qty → 新入库库存不可拣(plugins #244)
+### 2. 系统架构层
 
----
+```text
+用户动作 / 扫码
+      ↓
+DSL page + command binding + inputFields
+      ↓
+16 段命令管道 + PF4J handler
+      ↓
+动态模型 / 真 Postgres
+      ↓
+consumption · genealogy · defect/rework · inventory
+```
 
-## 第二层 · UI 页面渲染(开发 ✅ 渲染测 ✅ · 但只证明「加载了」)
+本轮补的不是孤立字段：
 
-真浏览器截图 + DOM 断言(无 404 / 无裸码 / 无 console error)。**弱证据**——只证渲染,不证按钮会动。
+- FR-08 在绑定 handler 内读取 lot 和工单窗口，并把通过的 lot 带入谱系；
+- FR-12 用 5 个命令和一组显式字段表达不可变身份事件链；
+- FR-14 复用同一谱系模型表达原件→替换件，避免维修系统与 As-built 两张皮；
+- runner 构建并 stage 精确 16 个 fresh jar，hash 可查，禁止旧 SNAPSHOT 冒充当前源码；
+- focused import 显式列出 MES/WMS 依赖闭包。全 `pcba-agent` profile 里的 `pcba-warehouse` 储备悬空是独立已知缺陷，不被静默忽略，也不阻断本切片。
 
-| FR | 页面 | 渲染 | 美观(截图复核) |
-|----|------|------|------------------|
-| FR-01 | 工单接入列表 | ✅ | BOM 蓝链接、计划产量 |
-| FR-03 | 派工/工位分配列表 | ✅ | 干净列表 |
-| FR-07 | 工位执行列表 | ✅ | 状态 dict、操作员 |
-| FR-15 | Andon 工作台 | ✅ | 6 卡 metric-strip + 证据面板 |
-| FR-21 | 报工记录列表 | ✅ | 工序蓝链接、班次 dict |
-| FR-22 | 班次交接工作台 | ✅ | **美观已修**:datetime 格式化 + 筛选标签(#243) |
-| FR-23 | 车间看板 dashboard | ✅ | **布局已修**:表塌陷 h=1→4(#240) |
+### 3. UX 与行动层
 
----
+| 行动面 | 以前的证据缺口 | 现在的证据 |
+|---|---|---|
+| 工作台 5 个命令行动 | 页面能渲染，但按钮曾发空 payload→400 | 真输入、真点击、真状态/DB 结果 |
+| FR-07 互锁拒绝 | 修复态列表保留，但不能证明 #1501 断言分辨 | 隔离 mutant/fixed；同一后端 400，mutant 整页崩、fixed 列表保留 |
+| 普通列表 | 只做 render/sweep | 搜索前 N>1、输入唯一名称后收窄到 1；点详情后 URL 和实体精确匹配 |
+| FR-22 与控制塔 | 仅文本检查容易漏布局 | action 断言 + screenshot/vision 分工 |
 
-## 第三层 · UI 行动点(开发 ✅ · 曾 5/6 坏 → 现全部修复 ✅)—— 本轮最重要的发现 + 修复
+## 深层旅程
 
-**发现**:每个操作按钮的命令**需要 inputFields,但页配置没声明** → 点了弹不出表单 → 发空 payload → **400 → 按钮静默失效**。后端命令是好的(第一层已证),但 UI 上点不动。`门禁绿 ≠ 功能可用`——列表渲染 golden 恰恰掩盖了这个。
+### FR-08 材料扫描
 
-**修复**:根因 = 页 action 配置缺 `inputFields` 声明(select 选项须走 `dataSource` 非内联 `options`——promptInputForm 只读 dataSource)。全部补齐,每个行动驱动 golden 验证。
+1. 建工单、BOM、lot 与余额；
+2. 错物料拒绝；
+3. 已过期拒绝；
+4. 未过期但不覆盖工单剩余生产窗口，拒绝；
+5. 覆盖窗口的正确 lot 允许；
+6. DB 中 consumption、lot 与 genealogy 可回查。
 
-| 页面 | 行动点 | 命令 | 修复 | 行动驱动 golden |
-|------|--------|------|------|------------------|
-| 班次交接台 | **签认** | acknowledge_handover | ✅ inputFields[接班人] | fr22-action-golden 8/8(见过红) |
-| 班次交接台 | **生成交接单** | create_handover | ✅ inputFields[工位 dataSource select + 班次 select + 交班人] | mes-action-points-golden 9/9 |
-| Andon 工作台 | **解决异常** | resolve | ✅ inputFields[处理措施 + 停机分钟] | mes-action-points-golden |
-| Hold 工作台 | **下达 Hold** | place_hold | ✅ inputFields[对象类型/ID/范围/原因/责任人] | mes-action-points-golden |
-| Hold 工作台 | **解除 Hold** | release_hold | ✅ inputFields[解除说明] | mes-action-points-golden |
-| 工序详情 | 申请绕行 | interlock_override(navigate) | — 本就工作(navigate-to-form,sweep 误判) | — |
+### FR-12 身份
 
-**每个都验证了完整行动链**(截图 before → 表单 → 后置确认 + DB 状态断言):
-- 签认:待签认 → 表单(接班人)→ **DB pending_ack→acknowledged** + UI 翻「已签认」
-- 生成交接单:表单(工位 select 11 项 + 班次)→ **新交接单行建成**(count +1)
-- 解决异常:seed open 异常 → 表单 → **异常→resolved**
-- 下达 Hold:表单(5 字段)→ **新 active hold**(count +1)
-- 解除 Hold:表单 → **hold→released**
+1. 首扫建立 active identity root；
+2. 同一绑定重扫幂等；
+3. 同一组件不能绑定到另一成品；
+4. relabel 让旧标签成为终态，新标签沿同一 root 接续；
+5. reprint 只记审计事件；
+6. invalidate 后标签不能生产使用；
+7. recover_identity 必须有证据、不同第二确认人、有效置信度；
+8. 全链保留 predecessor。
 
-全部**从 RED(修前空 payload 400)变 GREEN**——见过红,可证伪。截图在 `.../mes-action-goldens/web-admin/tests/mes-wms/ui/act-*.png` + `fr22-act-*.png`。
+### FR-14 测试维修
 
----
+1. 测试失败产生 defect；
+2. defect 创建返工；
+3. retest 关联并关闭原失败；
+4. replace_component 写原件、替换件、物料、lot、前驱；
+5. 从 finished SN 可还原 As-built 更换史。
 
-## 未开发(~46 / 60 FR · 储备验收基线)
+## 证据成色与边界
 
-owner 已定位 spec 为储备基线,现阶段不按它开工。未开发含 ⛔ 结构性缺口:MES-06 SOP、MES-10 WIP 路线、MES-11/24/25/26、WMS-17/18/23/25/28 等。完整 60 FR 逐条状态见 `amos/docs/product-docs/mes-wms/11-mes-fr-crosswalk.md`。
+| 层 | 当前作用 | 不声称什么 |
+|---|---|---|
+| unit 全模块 245/245（本轮相关 28/28） | handler 分支、边界参数 | 不声称插件/DB 已接通 |
+| backend 34/34 + FR10 13/13 + baseline 22/22 + deep 34/34 | 真命令、真 DB、跨模型链路 | 不声称 UI 好用 |
+| browser action suites | 用户可完成点击/输入/跳转 | 不替代后端持久化回查 |
+| #1501 mutant/fixed 2/2 + 2/2 | 断言能区分缺陷与修复 | 不扩大为所有前端错误处理都已形式化验证 |
+| screenshots / vision | 布局、可读性、无整页崩 | 不独立裁决业务成功 |
 
----
+## 最终结论
 
-## 测试类型强度说明(诚实口径)
+本轮关闭的是 handover 明列的 L1–L4，而不是擅自扩张到整个 60 FR 产品终局。交付结果具备源码、配置、unit、fresh-jar 真栈、浏览器行动、mutation 和自包含 HTML 证据；剩余储备继续由 owner 决定何时开工。
 
-| 测试类型 | 强度 | 用在哪 | 能证什么 |
-|----------|------|--------|----------|
-| 后端真栈 golden(真命令管道 + psql DB round-trip) | **强** | 11 个后端 FR | 命令真工作、状态真变、见过红 |
-| UI 渲染 golden(浏览器截图 + DOM 断言) | 弱 | 7 页 | 只证页面加载,不证按钮会动 |
-| UI 行动驱动 golden(点按钮 + 断言状态变化) | **强** | 只有 FR-22 签认 1 个 | 真行动点 + 后置确认 |
+## 最终执行证据
 
-**缺口**:UI 行动驱动 golden 只有 1 个;其余行动点要么坏(需修 inputFields)、要么只有渲染 golden。
+- slot 64 从当前 feature 源码 fresh build：16 个 hybrid jar、24 个 focused packages、102 个 mfg commands；
+- backend 34/34、FR-10 13/13、FR-08/12/14 baseline 22/22、deep 34/34；
+- 浏览器报告分组：11 绿、0 黄、0 红、0 未测；
+- HTML SHA-256：
+  `5b66afb4f42dd07f2e7d52effcf1566308d339da9e929c061a1f78518bcddeb5`；
+- runtime artifact manifest SHA-256：
+  `cfc1b88b7f34eee5652faa85a92d635e8df13604fcabf35a24ab6952a4adb388`。
 
----
-
-## 结论
-
-- **真工作 + 测得实**:后端命令层 11 个 FR(真栈 golden)。
-- **UI 行动点已修好**:5 个曾断的按钮全部补齐 inputFields,每个**行动驱动 golden 验证**(点按钮→表单→提交→状态真变→截图)。从「点了 400」变「真能用」。
-- **诚实过程**:之前「21 全绿」把渲染当可用、高估了 UI 层 → owner 追问「行动点/后置确认」→ 驱动第③层才发现 5 个断点 → 全部修复。这是发现问题→修复→证实的完整闭环。
-- **交付真相**:后端 11 FR + UI 7 页 + **5 个行动点端到端可用**(签认/生成交接单/解决异常/下达 Hold/解除 Hold);60 FR spec 里其余 ~46 未开发(储备基线)。这是一个**纵深可用的切片**,不再是「按钮点不动」的半成品。
-
-## 沿途修的真 bug 总账(都真栈/真浏览器验证)
-
-| bug | 层 | 抓法 | 修复 |
-|-----|-----|------|------|
-| FR-14 defect 门控 instanceof Map(JSONB 读回 String) | 后端 | fr08-12-14 golden | plugins #244 |
-| FR-14 rework handler 缺 dslPersistence + code | 后端 | 同上 | plugins #244 |
-| FR-10 入库不初始化 available_qty | 后端 | fr10 golden | plugins #244 |
-| FR-22 交接时间裸 ISO + 筛选无标签 | UI 美观 | 截图 | plugins #243 |
-| FR-23 看板表塌陷 h=1 | UI 美观 | 截图 | plugins #240 |
-| **5 个行动点缺 inputFields → 点了 400** | **UI 行动点** | **行动驱动 golden** | **plugins #246(config)+ auraboot #1517(golden)** |
-
----
-
-## 「全部完成」收口(2026-07-25 · 深层 gap + C/D)
-
-### A. 后端深层 spec gap —— ✅ 全部实现 + 真栈验证(plugins #248 / auraboot #1527)
-`fr08-12-14-deep-golden.mjs` **14/14**,每个阻断的原因文案点名具体 FR check(可证伪):
-
-| FR | 深层功能 | 真栈证据 |
-|----|----------|----------|
-| **FR-08** | 批次/近效期阻断 | 过期 lot 绑定被拒「expired on 2020-01-01 (FR-08 batch-expiry block)」;未过期正常绑(选择性,非一刀切) |
-| **FR-12** | 组件 SN 唯一性 | 同一组件 SN 建入不同成品被拒「already built into FIN-A (FR-12 serial uniqueness)」;同对幂等 |
-| **FR-14** | retest→原失败闭环 | fail→defect→retest(pass)→defect **verified**;链 retest→defect→原失败解析 |
-
-### C. #1501(list 行动点被拒不整页崩)—— ✅ 交付+验证,mutation golden 不成比例(诚实定论)
-9 行已 review 的修复(ListPageContent onError 不设 page error),修复态在部署前端已验(fr07-action-golden 断言列表保留、无整页崩)。mutation-discriminating golden 需**隔离的未修复前端** + 一个走 ListPageContent **页级 onError** 的页/动作——但交付的 MES workbench 页都走 BlockRenderer(非 ListPageContent),该触发路径不在交付页内,补 mutation golden 不成比例。定论:**修复正确、已验、通用改善所有 list 页**;未补 mutation golden(disproportionate,已记录)。
-
-### D. UI 列表页 —— ✅ render+数据已验,无断按钮(诚实定论)
-7 页 render + 数据显示已验;action-point sweep(含 isActionColumn)确认**列表页无 click→400 的断按钮**。搜索/筛选/详情跳转是平台通用功能(非 MES 交付特性),未单独为 MES 页再做行动驱动验证(低边际价值)。
-
-### 最终大图
-- 第①层后端命令:11 FR + 3 深层 gap(FR-08/12/14 batch-expiry/SN-unique/retest)全真栈验证。
-- 第②层 UI 渲染:7 页 render 验证。
-- 第③层 UI 行动点:5 个曾断按钮全修 + 行动驱动 golden;#1501 通用修复已验。
-- **无隐藏坏功能;剩余仅储备基线的 ~46 未开发 FR(owner 定)+ C 的 mutation golden(disproportionate,已记录)。**
+这里的“闭环”只允许解释为 owner 授权的 L1–L4 定向范围。新 FR-12/14 生命周期命令由真命令管道与 DB 反查裁决，尚未声明各命令的浏览器 UI 可达；canonical OSS full E2E、非 admin RBAC 与约 46 个 reserve FR 也不在本报告的通过口径中。完整 `did_not_run` 与可信度审计见 `README-test-quality-matrix.md`。

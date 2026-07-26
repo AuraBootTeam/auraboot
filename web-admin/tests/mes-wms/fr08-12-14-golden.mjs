@@ -174,17 +174,14 @@ async function frTestReworkLinkage() {
 }
 try { await frTestReworkLinkage(); } catch (e) { R.check('FR-14', 'no exception', false, String(e.message).slice(0, 200)); }
 
-// ------------------------------------------------------------------ deeper-gap caveats (honest)
-// This golden proves the SHIPPED happy-path + the key blocking/linkage of each FR. It does NOT
-// cover these deeper spec gaps (they are genuinely not implemented / out of scope for this pass):
-R.deferred('FR-08', 'batch-expiry / near-expiry blocking on scan not covered (handler matches BOM membership + lot code, not expiry)');
-R.deferred('FR-12', 'SN uniqueness constraint not covered (genealogy is append-only; no unique guard on finished/component SN)');
-R.deferred('FR-14', 'retest→original-failure closed-loop chain not covered (proved fail→defect→rework link; not the retest-result-back-to-original-fail loop)');
+// The companion fr08-12-14-deep-golden.mjs owns the next layer: expiry/production-window
+// rejection, serialized-identity lifecycle and uniqueness, retest closure, and As-built
+// replacement. Keep this baseline focused; the canonical runner executes both files.
 
 // ------------------------------------------------------------------ summary
 const s = R.summary();
 const frCovered = [...new Set(R.results.filter((r) => !r.deferred).map((r) => r.fr))];
 console.log(`\n=== SUMMARY: ${s.pass}/${s.total} checks pass, ${s.fail} fail, ${s.deferred} deferred ===`);
 console.log(`    FRs covered: ${frCovered.sort().join(', ')}`);
-console.log(`    Deferred (deeper gaps, honest): ${[...new Set(R.results.filter((r) => r.deferred).map((r) => r.fr))].join(', ')}`);
+console.log('    Deep layer: fr08-12-14-deep-golden.mjs (executed by mes-wms-golden-run.sh)');
 process.exit(s.fail > 0 ? 1 : 0);
