@@ -56,25 +56,25 @@ export default function DashboardViewByCode() {
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-200 bg-white px-6 py-4">
-        <div className="flex items-center">
+      <div className="flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-6 py-4">
+        <div className="min-w-0 flex items-center">
           <Link to="/dashboards" className="mr-3 text-gray-400 hover:text-gray-600">
             <ArrowLeftIcon className="h-5 w-5" />
           </Link>
           <ChartBarSquareIcon className="mr-3 h-7 w-7 text-blue-600" />
-          <div>
-            <h1 className="text-xl font-semibold text-gray-900">{dashboard?.title || code}</h1>
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold text-gray-900">{dashboard?.title || code}</h1>
             {dashboard?.description && (
-              <p className="text-sm text-gray-500">{dashboard.description}</p>
+              <p className="truncate text-sm text-gray-500">{dashboard.description}</p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex shrink-0 items-center space-x-2">
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="inline-flex items-center rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
+            className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-gray-100 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50"
           >
             <ArrowPathIcon className={`mr-1.5 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             {l('刷新', 'Refresh')}
@@ -89,7 +89,7 @@ export default function DashboardViewByCode() {
           {dashboard?.pid && (
             <Link
               to={`/dashboard-designer/${dashboard.pid}`}
-              className="inline-flex items-center rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-blue-700"
+              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-md bg-blue-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-blue-700"
             >
               <PencilSquareIcon className="mr-1.5 h-4 w-4" />
               {l('编辑', 'Edit')}

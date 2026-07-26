@@ -1,6 +1,7 @@
 package com.auraboot.framework.billing.quota.service;
 
 import com.auraboot.framework.billing.catalog.spi.ResourceCatalogService;
+import com.auraboot.framework.billing.observability.BillingQuotaMetrics;
 import com.auraboot.framework.billing.quota.config.BillingQuotaProperties;
 import com.auraboot.framework.billing.quota.mapper.*;
 import com.auraboot.framework.billing.quota.model.*;
@@ -62,6 +63,7 @@ public class QuotaServiceImpl implements QuotaService {
     private final QuotaReservationLineMapper reservationLineMapper;
     private final QuotaLedgerMapper       ledgerMapper;
     private final BillingQuotaProperties  billingQuotaProperties;
+    private final BillingQuotaMetrics     metrics;
 
     // ─────────────────────────────────────────────────────────────────────────
     // provision (GRANT)
@@ -195,6 +197,18 @@ public class QuotaServiceImpl implements QuotaService {
     @Override
     @Transactional
     public QuotaDecision authorize(QuotaAuthorizeRequest request) {
+        long startedAt = System.nanoTime();
+        try {
+            QuotaDecision decision = doAuthorize(request);
+            metrics.recordAuthorization(decision, System.nanoTime() - startedAt);
+            return decision;
+        } catch (RuntimeException e) {
+            metrics.recordAuthorizationFailure(System.nanoTime() - startedAt);
+            throw e;
+        }
+    }
+
+    private QuotaDecision doAuthorize(QuotaAuthorizeRequest request) {
         // 1. Validate resource exists in catalog
         if (!resourceCatalogService.isRegistered(request.getResourceCode())) {
             log.warn("[quota] authorize rejected — unregistered resource: {}", request.getResourceCode());
@@ -289,73 +303,84 @@ public class QuotaServiceImpl implements QuotaService {
     @Override
     @Transactional
     public QuotaCommitResult commit(String reservationCode, BigDecimal actualQuantity) {
-        QuotaReservation reservation = requireActiveReservation(reservationCode);
+        long startedAt = System.nanoTime();
+        try {
+            QuotaReservation reservation = requireActiveReservation(reservationCode);
 
-        // OSS: actual must be <= estimated
-        // TODO(G2-02): enterprise impl handles actual > estimated (top-up deduction)
-        BigDecimal estimated = reservation.getEstimatedAmount();
-        if (actualQuantity.compareTo(estimated) > 0) {
-            log.warn("[quota] commit capping actual {} to estimated {} — top-up TODO(G2-02)",
-                    actualQuantity, estimated);
-            actualQuantity = estimated;
-        }
-        if (actualQuantity.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("actualQuantity must be >= 0, got: " + actualQuantity);
-        }
-
-        // Load lines
-        List<QuotaReservationLine> lines = reservationLineMapper.selectList(
-                new LambdaQueryWrapper<QuotaReservationLine>()
-                        .eq(QuotaReservationLine::getReservationId, reservation.getId())
-                        .orderByAsc(QuotaReservationLine::getId)
-        );
-        if (lines.isEmpty()) {
-            throw new IllegalStateException("No reservation lines for " + reservationCode);
-        }
-
-        // Proportional commit across lines
-        BigDecimal totalEstimated = lines.stream()
-                .map(QuotaReservationLine::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal releasedTotal = BigDecimal.ZERO;
-
-        for (QuotaReservationLine line : lines) {
-            QuotaBucket bucket = requireBucket(line.getBucketId());
-            // Proportional split: lineActual = actualQuantity * (line.amount / totalEstimated)
-            BigDecimal lineActual = totalEstimated.compareTo(BigDecimal.ZERO) == 0
-                    ? BigDecimal.ZERO
-                    : actualQuantity.multiply(line.getAmount())
-                            .divide(totalEstimated, 6, RoundingMode.DOWN);
-            BigDecimal lineRelease = line.getAmount().subtract(lineActual);
-            releasedTotal = releasedTotal.add(lineRelease);
-
-            applyCommitWithRetry(bucket, lineActual, line.getAmount());
-            // COMMIT ledger: used += lineActual
-            writeLedger(bucket, reservation.getId(),
-                    OperationType.COMMIT, lineActual,
-                    reservation.getIdempotencyKey());
-            // RELEASE ledger: if there's a delta return
-            if (lineRelease.compareTo(BigDecimal.ZERO) > 0) {
-                writeLedger(bucket, reservation.getId(),
-                        OperationType.RELEASE, lineRelease,
-                        reservation.getIdempotencyKey());
+            // OSS: actual must be <= estimated
+            // TODO(G2-02): enterprise impl handles actual > estimated (top-up deduction)
+            BigDecimal estimated = reservation.getEstimatedAmount();
+            boolean capped = actualQuantity.compareTo(estimated) > 0;
+            if (capped) {
+                log.warn("[quota] commit capping actual {} to estimated {} — top-up TODO(G2-02)",
+                        actualQuantity, estimated);
+                actualQuantity = estimated;
             }
+            if (actualQuantity.compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException(
+                        "actualQuantity must be >= 0, got: " + actualQuantity);
+            }
+
+            // Load lines
+            List<QuotaReservationLine> lines = reservationLineMapper.selectList(
+                    new LambdaQueryWrapper<QuotaReservationLine>()
+                            .eq(QuotaReservationLine::getReservationId, reservation.getId())
+                            .orderByAsc(QuotaReservationLine::getId)
+            );
+            if (lines.isEmpty()) {
+                throw new IllegalStateException("No reservation lines for " + reservationCode);
+            }
+
+            // Proportional commit across lines
+            BigDecimal totalEstimated = lines.stream()
+                    .map(QuotaReservationLine::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal releasedTotal = BigDecimal.ZERO;
+
+            for (QuotaReservationLine line : lines) {
+                QuotaBucket bucket = requireBucket(line.getBucketId());
+                // Proportional split: lineActual = actualQuantity * (line.amount / totalEstimated)
+                BigDecimal lineActual = totalEstimated.compareTo(BigDecimal.ZERO) == 0
+                        ? BigDecimal.ZERO
+                        : actualQuantity.multiply(line.getAmount())
+                                .divide(totalEstimated, 6, RoundingMode.DOWN);
+                BigDecimal lineRelease = line.getAmount().subtract(lineActual);
+                releasedTotal = releasedTotal.add(lineRelease);
+
+                applyCommitWithRetry(bucket, lineActual, line.getAmount());
+                // COMMIT ledger: used += lineActual
+                writeLedger(bucket, reservation.getId(),
+                        OperationType.COMMIT, lineActual,
+                        reservation.getIdempotencyKey());
+                // RELEASE ledger: if there's a delta return
+                if (lineRelease.compareTo(BigDecimal.ZERO) > 0) {
+                    writeLedger(bucket, reservation.getId(),
+                            OperationType.RELEASE, lineRelease,
+                            reservation.getIdempotencyKey());
+                }
+            }
+
+            // Update reservation to COMMITTED
+            reservation.setStatus(ReservationStatus.COMMITTED.name());
+            reservation.setActualAmount(actualQuantity);
+            reservationMapper.updateById(reservation);
+
+            BigDecimal remaining =
+                    computeRemaining(reservation.getAccountId(), reservation.getResourceCode());
+            log.info("[quota] commit — reservationCode={} actual={} released={}",
+                    reservationCode, actualQuantity, releasedTotal);
+            QuotaCommitResult result = QuotaCommitResult.builder()
+                    .reservationCode(reservationCode)
+                    .actualAmount(actualQuantity)
+                    .releasedDelta(releasedTotal)
+                    .remainingAfterCommit(remaining)
+                    .build();
+            metrics.recordCommit(capped, System.nanoTime() - startedAt);
+            return result;
+        } catch (RuntimeException e) {
+            metrics.recordCommitFailure(System.nanoTime() - startedAt);
+            throw e;
         }
-
-        // Update reservation to COMMITTED
-        reservation.setStatus(ReservationStatus.COMMITTED.name());
-        reservation.setActualAmount(actualQuantity);
-        reservationMapper.updateById(reservation);
-
-        BigDecimal remaining = computeRemaining(reservation.getAccountId(), reservation.getResourceCode());
-        log.info("[quota] commit — reservationCode={} actual={} released={}",
-                reservationCode, actualQuantity, releasedTotal);
-        return QuotaCommitResult.builder()
-                .reservationCode(reservationCode)
-                .actualAmount(actualQuantity)
-                .releasedDelta(releasedTotal)
-                .remainingAfterCommit(remaining)
-                .build();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -470,6 +495,7 @@ public class QuotaServiceImpl implements QuotaService {
             }
             int updated = quotaBucketMapper.casAddReserved(fresh.getId(), amount, fresh.getVersion());
             if (updated == 1) return;
+            metrics.recordOptimisticRetry("reserve");
             log.debug("[quota] reserve CAS retry {}/{} bucketId={}", attempt + 1, MAX_RETRY, bucket.getId());
         }
         throw new IllegalStateException("Optimistic lock failed after " + MAX_RETRY + " retries on bucket " + bucket.getId());
@@ -484,6 +510,7 @@ public class QuotaServiceImpl implements QuotaService {
             QuotaBucket fresh = attempt == 0 ? bucket : requireBucket(bucket.getId());
             int updated = quotaBucketMapper.casCommit(fresh.getId(), actual, lineReserved, fresh.getVersion());
             if (updated == 1) return;
+            metrics.recordOptimisticRetry("commit");
             log.debug("[quota] commit CAS retry {}/{} bucketId={}", attempt + 1, MAX_RETRY, bucket.getId());
         }
         throw new IllegalStateException("Optimistic lock failed after " + MAX_RETRY + " retries on bucket " + bucket.getId());
@@ -498,6 +525,7 @@ public class QuotaServiceImpl implements QuotaService {
             QuotaBucket fresh = attempt == 0 ? bucket : requireBucket(bucket.getId());
             int updated = quotaBucketMapper.casSubtractReserved(fresh.getId(), amount, fresh.getVersion());
             if (updated == 1) return;
+            metrics.recordOptimisticRetry("release");
             log.debug("[quota] release CAS retry {}/{} bucketId={}", attempt + 1, MAX_RETRY, bucket.getId());
         }
         throw new IllegalStateException("Optimistic lock failed after " + MAX_RETRY + " retries on bucket " + bucket.getId());

@@ -11,8 +11,10 @@ import com.auraboot.framework.billing.metering.spi.MeteringResult;
 import com.auraboot.framework.billing.metering.spi.MeteringResultStatus;
 import com.auraboot.framework.billing.metering.spi.MeteringService;
 import com.auraboot.framework.billing.metering.spi.UsageEventRequest;
+import com.auraboot.framework.billing.observability.BillingMeteringMetrics;
 import com.auraboot.framework.integration.BaseIntegrationTest;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Propagation;
@@ -78,6 +80,9 @@ class MeteringServiceIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UsageDedupeConflictMapper conflictMapper;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
     // ── test isolation ────────────────────────────────────────────────────────
 
     /** All test events created in this class use this account */
@@ -137,6 +142,13 @@ class MeteringServiceIntegrationTest extends BaseIntegrationTest {
         return "idem-" + UUID.randomUUID().toString().replace("-", "");
     }
 
+    private double meteringCount(String outcome) {
+        var counter = meterRegistry.find(BillingMeteringMetrics.RECORD_TOTAL)
+                .tag("outcome", outcome)
+                .counter();
+        return counter != null ? counter.count() : 0.0d;
+    }
+
     // ═════════════════════════════════════════════════════════════════════════
     // Test 1: ACCEPTED — new event recorded with UNIQUE + PENDING
     // ═════════════════════════════════════════════════════════════════════════
@@ -147,6 +159,7 @@ class MeteringServiceIntegrationTest extends BaseIntegrationTest {
     void recordNewEvent_Accepted() {
         String key = randomKey();
         UsageEventRequest req = baseRequest(key);
+        double before = meteringCount("accepted");
 
         MeteringResult result = meteringService.record(req);
 
@@ -163,6 +176,7 @@ class MeteringServiceIntegrationTest extends BaseIntegrationTest {
         assertThat(event.getDedupeStatus()).isEqualTo(DedupeStatus.UNIQUE.name());
         assertThat(event.getRatingStatus()).isEqualTo(RatingStatus.PENDING.name());
         assertThat(event.getReceivedAt()).isNotNull();
+        assertThat(meteringCount("accepted")).isEqualTo(before + 1.0d);
     }
 
     // ═════════════════════════════════════════════════════════════════════════
