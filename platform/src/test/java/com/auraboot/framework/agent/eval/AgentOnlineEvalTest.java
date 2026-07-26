@@ -6,6 +6,7 @@ import com.auraboot.framework.agent.eval.AgentTurnQualityJudge.TurnVerdict;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,6 +27,48 @@ class AgentOnlineEvalTest {
     }
 
     // ── TurnSignals.fromObservations ──
+
+    @Test
+    void signals_readsRawTurnTypeAndRetrievalDiagnosticsFromDetail() {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("observation_type", "activity");
+        row.put("severity", "info");
+        row.put("obs_title", "turn.completed: run-1");
+        row.put("detail", """
+                {"eventType":"turn.completed","input":"question","output":"answer",
+                 "retrieval":{"path":"hybrid","resultCount":1,
+                   "scores":[{"chunkPid":"chunk-1","vectorScore":0.8,
+                              "bm25Score":0.6,"hybridScore":0.75,"similarity":0.9}],
+                   "warnings":[]}}
+                """);
+
+        TurnSignals signals = TurnSignals.fromObservations("run-1", "agent-a", List.of(row));
+
+        assertTrue(signals.completed());
+        assertEquals("hybrid", signals.retrieval().path());
+        assertEquals(1, signals.retrieval().resultCount());
+        assertTrue(signals.narrative().stream().anyMatch(line -> line.contains("question")));
+        assertTrue(signals.narrative().stream().anyMatch(line -> line.contains("answer")));
+    }
+
+    @Test
+    void signals_preservesInputWhenTheEarlierOutputIsLong() {
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("output", "long-answer-" + "x".repeat(2_000));
+        detail.put("eventType", "turn.completed");
+        detail.put("input", "which calibration rule applies?");
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("observation_type", "activity");
+        row.put("severity", "info");
+        row.put("detail", detail);
+
+        TurnSignals signals = TurnSignals.fromObservations("run-long", "agent-a", List.of(row));
+
+        assertTrue(signals.narrative().stream()
+                .anyMatch(line -> line.contains("which calibration rule applies?")));
+        assertTrue(signals.narrative().stream()
+                .anyMatch(line -> line.contains("long-answer-")));
+    }
 
     @Test
     void signals_completedCleanRun() {
@@ -129,5 +172,39 @@ class AgentOnlineEvalTest {
         assertEquals((1.0 + 0.9 + 0.0 + 0.5) / 4, s.avgScore(), 1e-9);
         assertEquals(2, s.unhealthy().size());             // r3, r4
         assertEquals("heuristic", s.judgeMode());
+    }
+
+    @Test
+    void summary_excludesKeywordPathAndReportsAttributionCounts() {
+        TurnSignals keyword = TurnSignals.withRetrieval(
+                "keyword-run", "agent-a", true,
+                new TurnSignals.RetrievalSignals("keyword", 2, 0.0, 0.7, 0.7));
+        TurnSignals retrieved = TurnSignals.withRetrieval(
+                "generation-run", "agent-a", true,
+                new TurnSignals.RetrievalSignals("hybrid", 2, 0.8, 0.6, 0.75));
+        TurnSignals missed = TurnSignals.withRetrieval(
+                "retrieval-run", "agent-a", true,
+                new TurnSignals.RetrievalSignals("hybrid", 0, 0.0, 0.0, 0.0));
+
+        OnlineEvalSummary summary = OnlineEvalSummary.fromEvaluations("llm", List.of(
+                new AgentOnlineEvalService.TurnEvaluation(
+                        keyword, TurnVerdict.skipped("keyword-run", "path=keyword"), null),
+                new AgentOnlineEvalService.TurnEvaluation(
+                        retrieved, new TurnVerdict("generation-run", 0.2, false,
+                                "ignored retrieved evidence"), null),
+                new AgentOnlineEvalService.TurnEvaluation(
+                        missed, new TurnVerdict("retrieval-run", 0.9, true,
+                                "honestly declined"), null)));
+
+        assertEquals(3, summary.sampledTurns());
+        assertEquals(2, summary.judgedTurns());
+        assertEquals(1, summary.keywordPathTurns());
+        assertEquals(0.5, summary.healthyRate(), 1e-9);
+        assertEquals(1, summary.attribution().configurationProblems());
+        assertEquals(1, summary.attribution().generationProblems());
+        assertEquals(1, summary.attribution().retrievalProblems());
+        assertTrue(summary.turnAttributions().stream()
+                .anyMatch(row -> row.runPid().equals("keyword-run")
+                        && row.attribution().equals("configuration")));
     }
 }

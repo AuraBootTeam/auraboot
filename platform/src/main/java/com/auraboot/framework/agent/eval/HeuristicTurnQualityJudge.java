@@ -13,9 +13,9 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
  *   <li>no completion + no failure (e.g. still running / truncated sample) → ambiguous, score 0.5.</li>
  * </ul>
  *
- * This is the CI-safe default that closes the L4 loop without burning tokens. The
- * LLM-judge that reads the turn detail to grade nuance is the LLM-key-gated follow-up
- * (it would implement the same {@link AgentTurnQualityJudge} interface).
+ * This is the CI-safe default that closes the L4 loop without burning tokens. In
+ * opt-in LLM mode it still runs beside {@link LlmTurnQualityJudge} as the deterministic
+ * comparison baseline.
  */
 @Component
 @ConditionalOnProperty(

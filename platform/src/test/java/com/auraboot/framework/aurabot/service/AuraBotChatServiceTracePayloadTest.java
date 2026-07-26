@@ -9,6 +9,7 @@ import com.auraboot.framework.agent.runtime.ChatTurnRuntime;
 import com.auraboot.framework.agent.trace.AiTraceService;
 import com.auraboot.framework.conversation.ResponseSink;
 import com.auraboot.framework.conversation.TurnContext;
+import com.auraboot.framework.conversation.TurnEvalTelemetryRegistry;
 import com.auraboot.framework.agent.dto.ChatRequest;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.service.MetaModelService;
@@ -16,6 +17,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -48,6 +50,22 @@ class AuraBotChatServiceTracePayloadTest {
     }
 
     @Test
+    @DisplayName("B-2 prompt span keeps retrieval path and scores")
+    void buildPromptSpanOutput_keepsRetrievalDiagnostics() {
+        var diagnostics = new RagContextProvider.RetrievalDiagnostics(
+                "hybrid",
+                1,
+                List.of(new RagContextProvider.RetrievalScore(
+                        "chunk-1", 0.8, 0.6, 0.75, 0.9)),
+                List.of());
+
+        Map<String, Object> payload =
+                AuraBotChatService.buildPromptSpanOutput("prompt", diagnostics);
+
+        assertThat(payload).containsEntry("retrieval", diagnostics);
+    }
+
+    @Test
     @DisplayName("resolve tools span keeps inspectable request and selected tools")
     void buildResolveToolsPayloads_keepUsefulDetails() {
         Map<String, Object> input = AuraBotChatService.buildResolveToolsSpanInput(
@@ -62,6 +80,40 @@ class AuraBotChatServiceTracePayloadTest {
         assertThat(input).containsEntry("model_code", "crm_account");
         assertThat(output).containsEntry("tool_count", 1);
         assertThat((List<?>) output.get("tools")).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("terminal no-provider turn still records the user input for online eval")
+    void missingProviderStillRecordsInput() {
+        MetaContext.setContext(1L, 100L, null, "tester");
+        LlmProviderFactory factory = mock(LlmProviderFactory.class);
+        AuraBotChatService service = new AuraBotChatService(
+                factory,
+                mock(PromptTemplateService.class),
+                mock(ChatToolResolver.class),
+                mock(ChatToolExecutor.class),
+                new ObjectMapper(),
+                mock(AiTraceService.class),
+                mock(MetaModelService.class),
+                new ChatTurnRuntime(),
+                (Executor) Runnable::run);
+        TurnEvalTelemetryRegistry telemetry = new TurnEvalTelemetryRegistry();
+        ReflectionTestUtils.setField(service, "turnEvalTelemetryRegistry", telemetry);
+
+        ChatRequest request = new ChatRequest();
+        request.setSessionId("session-no-provider");
+        request.setMessage("What policy applies?");
+        ChatRequest.ChatOptions options = new ChatRequest.ChatOptions();
+        options.setProvider("openai");
+        request.setOptions(options);
+        when(factory.resolveConfig(eq(1L), eq("openai"))).thenReturn(null);
+
+        TurnContext context = TurnContext.legacyDefault(1L, 100L, 100L);
+        service.executeAuraBotTurn(context, request, new CapturingResponseSink());
+
+        assertThat(telemetry.take(context.turnId()))
+                .extracting(TurnEvalTelemetryRegistry.Snapshot::input)
+                .isEqualTo("What policy applies?");
     }
 
     @Test

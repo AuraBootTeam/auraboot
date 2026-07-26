@@ -46,6 +46,12 @@ public final class OnlineEvalQualityGate {
         if (summary == null || summary.sampledTurns() == 0) {
             return new Verdict(true, "no_sample", List.of());
         }
+        if (summary.judgedTurns() == 0) {
+            // LLM mode without a configured provider/key and keyword-only retrieval
+            // rounds are explicit skips. They are observable in the report, but must
+            // not become either a fake-green quality sample or a model regression.
+            return new Verdict(true, "no_judged_sample", List.of());
+        }
         List<Violation> violations = new ArrayList<>();
         if (summary.healthyRate() < t.minHealthyRate()) {
             violations.add(new Violation("healthyRate", summary.healthyRate(), t.minHealthyRate(), true));

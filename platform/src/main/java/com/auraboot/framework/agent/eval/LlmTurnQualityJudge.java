@@ -24,14 +24,13 @@ import java.util.List;
  * grades that difference.
  *
  * <p><strong>Opt-in, never the default.</strong> It burns tokens per sampled turn, so it
- * only replaces the heuristic when {@code aura.agent.online-eval.judge=llm} is set. The
- * heuristic stays the CI-safe default.
+ * becomes the primary judge only when {@code aura.agent.online-eval.judge=llm} is set.
+ * The heuristic stays the CI-safe default and also runs as a comparison baseline.
  *
- * <p><strong>Fails closed, and says so.</strong> If no provider is configured, the model
- * errors, or the reply does not parse, the turn is scored as <em>not healthy</em> with the
- * reason recorded — never silently as healthy. An online-eval judge that answers "fine"
- * when it could not actually look is worse than no judge, because the dashboard then
- * reports health it never measured.
+ * <p><strong>Missing evidence is skipped, and says so.</strong> If no provider is
+ * configured, the model errors, or the reply does not parse, the turn is marked
+ * <em>not judged</em> with the reason recorded. It is neither a generation failure nor
+ * silently healthy, and it stays outside the quality denominator.
  */
 @Slf4j
 @Component
@@ -58,15 +57,14 @@ public class LlmTurnQualityJudge implements AgentTurnQualityJudge {
         // A turn with no narrative carries no evidence of quality. Grading it "good" would
         // manufacture health out of missing data, so defer to the observable facts instead.
         if (s.narrative().isEmpty()) {
-            boolean broke = s.failed() || s.errorEvents() > 0;
-            return new TurnVerdict(s.runPid(), broke ? 0.0 : 0.5, false,
+            return TurnVerdict.skipped(s.runPid(),
                     "no turn narrative recorded — cannot judge answer quality");
         }
 
         try {
             LlmProviderFactory.ProviderConfig config = llmProviderFactory.resolveConfig(tenantId, null);
             if (config == null) {
-                return new TurnVerdict(s.runPid(), 0.0, false,
+                return TurnVerdict.skipped(s.runPid(),
                         "no LLM provider configured for tenant " + tenantId + " — turn not judged");
             }
             String providerCode = LlmProviderFactory.effectiveProviderCode(null, config);
@@ -89,7 +87,7 @@ public class LlmTurnQualityJudge implements AgentTurnQualityJudge {
             // Deliberately broad: any provider/parse failure must degrade to "not judged",
             // never to "healthy". The reason is carried through so the dashboard shows why.
             log.warn("LLM turn judge failed for run {}: {}", s.runPid(), e.getMessage());
-            return new TurnVerdict(s.runPid(), 0.0, false,
+            return TurnVerdict.skipped(s.runPid(),
                     "judge unavailable: " + e.getMessage());
         }
     }
@@ -129,12 +127,12 @@ public class LlmTurnQualityJudge implements AgentTurnQualityJudge {
 
     private TurnVerdict parseVerdict(TurnSignals s, String text) throws Exception {
         if (text == null || text.isBlank()) {
-            return new TurnVerdict(s.runPid(), 0.0, false, "judge returned an empty reply");
+            return TurnVerdict.skipped(s.runPid(), "judge returned an empty reply");
         }
         JsonNode node = objectMapper.readTree(stripFences(text));
         JsonNode scoreNode = node.get("score");
         if (scoreNode == null || !scoreNode.isNumber()) {
-            return new TurnVerdict(s.runPid(), 0.0, false, "judge reply missing a numeric score");
+            return TurnVerdict.skipped(s.runPid(), "judge reply missing a numeric score");
         }
         double score = Math.max(0.0, Math.min(1.0, scoreNode.doubleValue()));
         // The model's own healthy flag is honoured, but a low score can never be healthy —

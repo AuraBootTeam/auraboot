@@ -68,6 +68,10 @@ public class AuraBotChatService {
     @Autowired(required = false)
     private RagContextProvider ragContextProvider;
 
+    /** Short-lived B-2 bridge into the terminal-turn observation seam. */
+    @Autowired(required = false)
+    private com.auraboot.framework.conversation.TurnEvalTelemetryRegistry turnEvalTelemetryRegistry;
+
     // ConversationTurnServiceImpl owns agentCode dispatch. This service is the
     // aurabot-only turn implementation behind that chokepoint.
 
@@ -241,10 +245,19 @@ public class AuraBotChatService {
     }
 
     static Map<String, Object> buildPromptSpanOutput(String systemPrompt) {
-        return Map.of(
-                "system_prompt", systemPrompt,
-                "char_count", systemPrompt != null ? systemPrompt.length() : 0
-        );
+        return buildPromptSpanOutput(systemPrompt, null);
+    }
+
+    static Map<String, Object> buildPromptSpanOutput(
+            String systemPrompt,
+            RagContextProvider.RetrievalDiagnostics diagnostics) {
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("system_prompt", systemPrompt);
+        output.put("char_count", systemPrompt != null ? systemPrompt.length() : 0);
+        if (diagnostics != null) {
+            output.put("retrieval", diagnostics);
+        }
+        return output;
     }
 
     static Map<String, Object> buildGroundingSpanInput(String userMessage, String modelCode,
@@ -378,6 +391,13 @@ public class AuraBotChatService {
         // Aurabot-only path. Named-agent routing is owned by the conversation
         // chokepoint, so this method assumes agentCode is null/blank/"aurabot".
         Long tenantId = ctx.tenantId();
+        if (turnEvalTelemetryRegistry != null) {
+            // Capture the question before provider resolution. A missing provider is a
+            // terminal turn too, and its observation must not lose the user input merely
+            // because no trace could be created.
+            turnEvalTelemetryRegistry.recordInput(
+                    ctx.turnId(), request != null ? request.getMessage() : null);
+        }
 
         // 1. Resolve provider and config
         ChatRequest.ChatOptions options = request.getOptions() != null ? request.getOptions() : new ChatRequest.ChatOptions();
@@ -408,6 +428,11 @@ public class AuraBotChatService {
         TraceContext trace = aiTraceService.createTrace(tenantId, request.getSessionId(),
                 request.getMessage(), MetaContext.getCurrentUserId(), traceMetadata,
                 request.getOtelTraceId());
+        if (turnEvalTelemetryRegistry != null) {
+            if (trace != null) {
+                turnEvalTelemetryRegistry.recordTrace(ctx.turnId(), trace.getTraceId());
+            }
+        }
 
         // 2. Resolve model and options
         String model = options.getModel();
@@ -487,7 +512,13 @@ public class AuraBotChatService {
         // --- Trace: render prompt span ---
         SpanContext promptSpan = aiTraceService.startSpan(trace, null, "span", "render_prompt", null);
         List<String> contextWarnings = new ArrayList<>();
-        AgentContextBundle contextBundle = buildAgentContextBundle(tenantId, request, contextWarnings);
+        ContextAssembly contextAssembly =
+                buildAgentContextAssembly(tenantId, request, contextWarnings);
+        AgentContextBundle contextBundle = contextAssembly.bundle();
+        if (turnEvalTelemetryRegistry != null) {
+            turnEvalTelemetryRegistry.recordRetrieval(
+                    ctx.turnId(), contextAssembly.retrievalDiagnostics());
+        }
         // A knowledge base that could not be searched is not a detail to log and move on from: the
         // user is about to read a confident answer that was built without it, and nothing else on
         // screen would tell them apart.
@@ -513,7 +544,10 @@ public class AuraBotChatService {
                 systemPrompt = soul.get().renderedPromptText() + "\n\n" + systemPrompt;
             }
         }
-        aiTraceService.endSpan(promptSpan, buildPromptSpanOutput(systemPrompt), "success");
+        aiTraceService.endSpan(
+                promptSpan,
+                buildPromptSpanOutput(systemPrompt, contextAssembly.retrievalDiagnostics()),
+                "success");
 
         try {
             TurnOutcome streamOutcome;
@@ -665,18 +699,31 @@ public class AuraBotChatService {
 
     private AgentContextBundle buildAgentContextBundle(Long tenantId, ChatRequest request,
                                                         List<String> warnings) {
+        return buildAgentContextAssembly(tenantId, request, warnings).bundle();
+    }
+
+    private ContextAssembly buildAgentContextAssembly(Long tenantId,
+                                                      ChatRequest request,
+                                                      List<String> warnings) {
         ChatRequest.PageContext ctx = request != null ? request.getPageContext() : null;
         String modelSchemaText = ctx != null ? buildModelSchemaText(ctx.getModelCode()) : "";
-        String ragContext = request != null ? resolveRagContext(tenantId, request, warnings) : "";
+        RagContextProvider.RetrievedContext retrieved = request != null
+                ? resolveRagContextWithDiagnostics(tenantId, request, warnings)
+                : new RagContextProvider.RetrievedContext("", null);
         AgentContextBundle contextBundle = contextAssembler.assemble(
                 new AgentContextAssembler.Request(
                         tenantId,
                         null,
                         ctx,
                         modelSchemaText,
-                        ragContext,
+                        retrieved.context(),
                         request != null ? request.getKnowledgeBaseIds() : null));
-        return contextBundle;
+        return new ContextAssembly(contextBundle, retrieved.diagnostics());
+    }
+
+    private record ContextAssembly(
+            AgentContextBundle bundle,
+            RagContextProvider.RetrievalDiagnostics retrievalDiagnostics) {
     }
 
     /**
@@ -772,19 +819,36 @@ public class AuraBotChatService {
      *                 to the response sink
      */
     private String resolveRagContext(Long tenantId, ChatRequest request, List<String> warnings) {
-        if (ragContextProvider == null) return "";
+        return resolveRagContextWithDiagnostics(tenantId, request, warnings).context();
+    }
+
+    private RagContextProvider.RetrievedContext resolveRagContextWithDiagnostics(
+            Long tenantId, ChatRequest request, List<String> warnings) {
+        if (ragContextProvider == null) {
+            return new RagContextProvider.RetrievedContext("", null);
+        }
         try {
             List<String> kbIds = request.getKnowledgeBaseIds();
             boolean hasExplicitKbs = kbIds != null && !kbIds.isEmpty();
 
             // Only query RAG if explicitly requested or tenant has active KBs
             if (!hasExplicitKbs && !ragContextProvider.hasActiveKnowledgeBases(tenantId)) {
-                return "";
+                return new RagContextProvider.RetrievedContext("", null);
             }
 
             String retrievalQuery = buildRetrievalQuery(request.getHistory(), request.getMessage());
-            String context = ragContextProvider.retrieveContext(tenantId, retrievalQuery, kbIds);
-            return context != null ? context : "";
+            RagContextProvider.RetrievedContext retrieved =
+                    ragContextProvider.retrieveContextWithDiagnostics(
+                            tenantId, retrievalQuery, kbIds);
+            if (retrieved == null) {
+                retrieved = new RagContextProvider.RetrievedContext(
+                        ragContextProvider.retrieveContext(tenantId, retrievalQuery, kbIds), null);
+            }
+            if (retrieved.diagnostics() != null
+                    && !retrieved.diagnostics().warnings().isEmpty()) {
+                warnings.addAll(retrieved.diagnostics().warnings());
+            }
+            return retrieved;
         } catch (Exception e) {
             // The turn must survive a broken knowledge base — but the user must not be left thinking
             // the answer was informed by it. Without this they get a fluent, confident reply built on
@@ -794,7 +858,13 @@ public class AuraBotChatService {
                     + "base: {}", tenantId, e.getMessage());
             warnings.add("The knowledge base could not be searched, so this answer does not use it. "
                     + "Try again, or check the knowledge base's embedding provider.");
-            return "";
+            return new RagContextProvider.RetrievedContext(
+                    "",
+                    new RagContextProvider.RetrievalDiagnostics(
+                            "error",
+                            0,
+                            List.of(),
+                            List.of(Objects.toString(e.getMessage(), e.getClass().getSimpleName()))));
         }
     }
 

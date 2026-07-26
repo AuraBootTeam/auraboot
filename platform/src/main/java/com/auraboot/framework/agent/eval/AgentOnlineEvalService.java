@@ -5,6 +5,8 @@ import com.auraboot.framework.agent.eval.AgentTurnQualityJudge.TurnVerdict;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -19,23 +21,46 @@ import java.util.Map;
  * aggregates a quality summary. This is the only layer that measures quality against the
  * <em>real production distribution</em> rather than a curated offline set.
  *
- * <p>Default judge is {@link HeuristicTurnQualityJudge} (deterministic, no token cost);
- * swapping in an LLM judge to grade nuance is the LLM-key-gated follow-up. Sampling +
- * grouping is read-only; the heuristic grading + aggregation are pure and unit-tested.
+ * <p>Default judge is {@link HeuristicTurnQualityJudge} (deterministic, no token cost).
+ * With {@code judge=llm}, the LLM verdict becomes primary while the heuristic still runs
+ * as a comparison baseline. Missing provider/key is an explicit skipped verdict, never a
+ * fabricated healthy result or a generation failure.
  */
 @Slf4j
 @Service
 public class AgentOnlineEvalService {
 
     private final JdbcTemplate jdbc;
-    private final AgentTurnQualityJudge judge;
+    private final List<AgentTurnQualityJudge> judges;
+    private final String configuredJudgeMode;
     private final ObjectMapper objectMapper;
 
-    public AgentOnlineEvalService(JdbcTemplate jdbc, AgentTurnQualityJudge judge,
-                                  ObjectMapper objectMapper) {
+    @Autowired
+    public AgentOnlineEvalService(
+            JdbcTemplate jdbc,
+            List<AgentTurnQualityJudge> judges,
+            @Value("${aura.agent.online-eval.judge:heuristic}") String configuredJudgeMode,
+            ObjectMapper objectMapper) {
         this.jdbc = jdbc;
-        this.judge = judge;
+        this.judges = judges == null ? List.of() : List.copyOf(judges);
+        this.configuredJudgeMode = configuredJudgeMode == null
+                ? "heuristic"
+                : configuredJudgeMode.trim().toLowerCase();
         this.objectMapper = objectMapper;
+    }
+
+    AgentOnlineEvalService(
+            JdbcTemplate jdbc,
+            List<AgentTurnQualityJudge> judges,
+            String configuredJudgeMode) {
+        this(jdbc, judges, configuredJudgeMode, new ObjectMapper());
+    }
+
+    AgentOnlineEvalService(
+            JdbcTemplate jdbc,
+            AgentTurnQualityJudge judge,
+            ObjectMapper objectMapper) {
+        this(jdbc, List.of(judge), judge.mode(), objectMapper);
     }
 
     /**
@@ -61,18 +86,44 @@ public class AgentOnlineEvalService {
             byRun.computeIfAbsent(runPid, k -> new ArrayList<>()).add(row);
         }
 
-        List<TurnVerdict> verdicts = new ArrayList<>();
+        AgentTurnQualityJudge primaryJudge = judge(configuredJudgeMode);
+        AgentTurnQualityJudge heuristicJudge = judge("heuristic");
+        List<TurnEvaluation> evaluations = new ArrayList<>();
         for (Map.Entry<String, List<Map<String, Object>>> e : byRun.entrySet()) {
             String agentId = e.getValue().isEmpty() ? null
                     : String.valueOf(e.getValue().get(0).get("obs_agent_id"));
-            List<Map<String, Object>> observations =
-                    withConversationNarrative(tenantId, e.getKey(), e.getValue());
-            TurnSignals signals = TurnSignals.fromObservations(e.getKey(), agentId, observations);
-            verdicts.add(judge.judge(signals));
+            TurnSignals signals = TurnSignals.fromObservations(e.getKey(), agentId, e.getValue());
+            TurnVerdict primary;
+            if (signals.retrieval() != null
+                    && signals.retrieval().configurationInvalid()) {
+                // A keyword-only fallback means the vector provider/config is broken.
+                // It is still reported in B-5 attribution, but never pollutes generation
+                // quality rates or creates a regression candidate.
+                primary = TurnVerdict.skipped(
+                        signals.runPid(), "path=keyword — configuration-invalid for generation quality");
+            } else if (primaryJudge == null) {
+                primary = TurnVerdict.skipped(
+                        signals.runPid(), "judge mode unavailable: " + configuredJudgeMode);
+            } else {
+                List<Map<String, Object>> observations =
+                        withConversationNarrative(tenantId, e.getKey(), e.getValue());
+                signals = TurnSignals.fromObservations(e.getKey(), agentId, observations);
+                primary = primaryJudge.judge(signals);
+            }
+            TurnVerdict heuristicComparison = null;
+            if ("llm".equals(configuredJudgeMode)
+                    && heuristicJudge != null
+                    && (signals.retrieval() == null
+                        || !signals.retrieval().configurationInvalid())) {
+                heuristicComparison = heuristicJudge.judge(signals);
+            }
+            evaluations.add(new TurnEvaluation(signals, primary, heuristicComparison));
         }
-        OnlineEvalSummary summary = OnlineEvalSummary.from(judge.mode(), verdicts);
+        OnlineEvalSummary summary =
+                OnlineEvalSummary.fromEvaluations(configuredJudgeMode, evaluations);
         log.debug("Online eval tenant={} judge={} sampled={} healthyRate={} failRate={}",
-                tenantId, judge.mode(), summary.sampledTurns(), summary.healthyRate(), summary.failRate());
+                tenantId, configuredJudgeMode, summary.sampledTurns(),
+                summary.healthyRate(), summary.failRate());
         return summary;
     }
 
@@ -88,7 +139,9 @@ public class AgentOnlineEvalService {
      */
     private List<Map<String, Object>> withConversationNarrative(
             Long tenantId, String runPid, List<Map<String, Object>> observations) {
-        if (!"llm".equals(judge.mode()) || observations == null || observations.isEmpty()) {
+        if (!"llm".equals(configuredJudgeMode)
+                || observations == null
+                || observations.isEmpty()) {
             return observations;
         }
         try {
@@ -151,25 +204,217 @@ public class AgentOnlineEvalService {
 
     private record TranscriptRef(Long inboundMessageId) {}
 
+    private AgentTurnQualityJudge judge(String mode) {
+        return judges.stream()
+                .filter(candidate -> candidate.mode().equalsIgnoreCase(mode))
+                .findFirst()
+                .orElse(null);
+    }
+
+    public record TurnEvaluation(TurnSignals signals,
+                                 TurnVerdict verdict,
+                                 TurnVerdict heuristicComparison) {
+    }
+
+    public record AttributionSummary(int normal,
+                                     int retrievalProblems,
+                                     int generationProblems,
+                                     int configurationProblems,
+                                     int unattributed) {
+        static AttributionSummary empty() {
+            return new AttributionSummary(0, 0, 0, 0, 0);
+        }
+    }
+
+    public record TurnAttribution(String runPid,
+                                  String retrievalPath,
+                                  String attribution,
+                                  boolean generationQualityIncluded,
+                                  boolean judged,
+                                  double score,
+                                  double maxVectorScore,
+                                  double maxBm25Score,
+                                  double maxHybridScore) {
+    }
+
     /** Aggregate quality over the sampled turns. {@link #from} is pure / unit-tested. */
     public record OnlineEvalSummary(String judgeMode, int sampledTurns, double healthyRate,
                                     double failRate, double costFlaggedRate, double avgScore,
-                                    List<TurnVerdict> unhealthy) {
+                                    List<TurnVerdict> unhealthy,
+                                    int judgedTurns,
+                                    int skippedTurns,
+                                    int keywordPathTurns,
+                                    int judgeComparisonTurns,
+                                    double judgeConsistencyRate,
+                                    AttributionSummary attribution,
+                                    List<TurnAttribution> turnAttributions) {
+
+        /** Back-compatible constructor used by gate/job tests that do not exercise attribution. */
+        public OnlineEvalSummary(String judgeMode, int sampledTurns, double healthyRate,
+                                 double failRate, double costFlaggedRate, double avgScore,
+                                 List<TurnVerdict> unhealthy) {
+            this(judgeMode, sampledTurns, healthyRate, failRate, costFlaggedRate, avgScore,
+                    unhealthy, sampledTurns, 0, 0, 0, 0.0,
+                    AttributionSummary.empty(), List.of());
+        }
 
         public static OnlineEvalSummary from(String judgeMode, List<TurnVerdict> verdicts) {
             int n = verdicts.size();
             if (n == 0) {
-                return new OnlineEvalSummary(judgeMode, 0, 0, 0, 0, 0, List.of());
+                return new OnlineEvalSummary(
+                        judgeMode, 0, 0, 0, 0, 0, List.of(),
+                        0, 0, 0, 0, 0.0,
+                        AttributionSummary.empty(), List.of());
             }
-            long healthy = verdicts.stream().filter(TurnVerdict::healthy).count();
-            double scoreSum = verdicts.stream().mapToDouble(TurnVerdict::score).sum();
+            List<TurnVerdict> judged = verdicts.stream().filter(TurnVerdict::judged).toList();
+            int denominator = judged.size();
+            long healthy = judged.stream().filter(TurnVerdict::healthy).count();
+            double scoreSum = judged.stream().mapToDouble(TurnVerdict::score).sum();
             // failRate = unhealthy with score 0 (a hard failure, not merely ambiguous).
-            long hardFail = verdicts.stream().filter(v -> !v.healthy() && v.score() <= 0.0).count();
-            long costFlagged = verdicts.stream().filter(v -> v.reason() != null && v.reason().contains("cost")).count();
-            List<TurnVerdict> unhealthy = verdicts.stream().filter(v -> !v.healthy()).toList();
-            return new OnlineEvalSummary(judgeMode, n,
-                    (double) healthy / n, (double) hardFail / n, (double) costFlagged / n,
-                    scoreSum / n, unhealthy);
+            long hardFail = judged.stream()
+                    .filter(v -> !v.healthy() && v.score() <= 0.0)
+                    .count();
+            long costFlagged = judged.stream()
+                    .filter(v -> v.reason() != null && v.reason().contains("cost"))
+                    .count();
+            List<TurnVerdict> unhealthy = judged.stream().filter(v -> !v.healthy()).toList();
+            return new OnlineEvalSummary(
+                    judgeMode,
+                    n,
+                    rate(healthy, denominator),
+                    rate(hardFail, denominator),
+                    rate(costFlagged, denominator),
+                    denominator == 0 ? 0.0 : scoreSum / denominator,
+                    unhealthy,
+                    denominator,
+                    n - denominator,
+                    0,
+                    0,
+                    0.0,
+                    AttributionSummary.empty(),
+                    List.of());
+        }
+
+        public static OnlineEvalSummary fromEvaluations(
+                String judgeMode, List<TurnEvaluation> evaluations) {
+            if (evaluations == null || evaluations.isEmpty()) {
+                return new OnlineEvalSummary(
+                        judgeMode, 0, 0, 0, 0, 0, List.of(),
+                        0, 0, 0, 0, 0.0,
+                        AttributionSummary.empty(), List.of());
+            }
+
+            List<TurnVerdict> judged = evaluations.stream()
+                    .map(TurnEvaluation::verdict)
+                    .filter(java.util.Objects::nonNull)
+                    .filter(TurnVerdict::judged)
+                    .toList();
+            int judgedCount = judged.size();
+            long healthy = judged.stream().filter(TurnVerdict::healthy).count();
+            long hardFail = judged.stream()
+                    .filter(v -> !v.healthy() && v.score() <= 0.0)
+                    .count();
+            long costFlagged = evaluations.stream()
+                    .filter(e -> e.verdict() != null && e.verdict().judged())
+                    .filter(e -> e.signals() != null && e.signals().costFlagged())
+                    .count();
+            double scoreSum = judged.stream().mapToDouble(TurnVerdict::score).sum();
+
+            List<TurnAttribution> rows = evaluations.stream()
+                    .map(OnlineEvalSummary::attribute)
+                    .toList();
+            int keyword = (int) rows.stream()
+                    .filter(row -> "configuration".equals(row.attribution()))
+                    .count();
+            AttributionSummary attribution = new AttributionSummary(
+                    (int) rows.stream().filter(row -> "normal".equals(row.attribution())).count(),
+                    (int) rows.stream().filter(row ->
+                            row.attribution().startsWith("retrieval")).count(),
+                    (int) rows.stream().filter(row ->
+                            row.attribution().equals("generation")
+                                    || row.attribution().equals("retrieval+generation")).count(),
+                    keyword,
+                    (int) rows.stream().filter(row -> "unattributed".equals(row.attribution())).count());
+
+            List<TurnEvaluation> compared = evaluations.stream()
+                    .filter(e -> e.verdict() != null && e.verdict().judged())
+                    .filter(e -> e.heuristicComparison() != null
+                            && e.heuristicComparison().judged())
+                    .toList();
+            long consistent = compared.stream()
+                    .filter(e -> e.verdict().healthy() == e.heuristicComparison().healthy())
+                    .count();
+
+            return new OnlineEvalSummary(
+                    judgeMode,
+                    evaluations.size(),
+                    rate(healthy, judgedCount),
+                    rate(hardFail, judgedCount),
+                    rate(costFlagged, judgedCount),
+                    judgedCount == 0 ? 0.0 : scoreSum / judgedCount,
+                    judged.stream().filter(v -> !v.healthy()).toList(),
+                    judgedCount,
+                    evaluations.size() - judgedCount,
+                    keyword,
+                    compared.size(),
+                    rate(consistent, compared.size()),
+                    attribution,
+                    rows);
+        }
+
+        private static TurnAttribution attribute(TurnEvaluation evaluation) {
+            TurnSignals signals = evaluation.signals();
+            TurnVerdict verdict = evaluation.verdict();
+            TurnSignals.RetrievalSignals retrieval =
+                    signals != null ? signals.retrieval() : null;
+            String path = retrieval != null ? retrieval.path() : "not_attempted";
+            String attribution;
+            boolean generationIncluded = verdict != null && verdict.judged();
+
+            if (retrieval != null && retrieval.configurationInvalid()) {
+                attribution = "configuration";
+                generationIncluded = false;
+            } else if (retrieval == null) {
+                attribution = "unattributed";
+            } else if ("error".equalsIgnoreCase(retrieval.path())
+                    || retrieval.resultCount() <= 0) {
+                attribution = verdict != null && verdict.judged() && !verdict.healthy()
+                        && indicatesUnsupportedAnswer(verdict.reason())
+                        ? "retrieval+generation"
+                        : "retrieval";
+            } else if (verdict == null || !verdict.judged()) {
+                attribution = "unattributed";
+                generationIncluded = false;
+            } else {
+                attribution = verdict.healthy() ? "normal" : "generation";
+            }
+
+            return new TurnAttribution(
+                    signals != null ? signals.runPid()
+                            : (verdict != null ? verdict.runPid() : ""),
+                    path,
+                    attribution,
+                    generationIncluded,
+                    verdict != null && verdict.judged(),
+                    verdict != null ? verdict.score() : 0.0,
+                    retrieval != null ? retrieval.maxVectorScore() : 0.0,
+                    retrieval != null ? retrieval.maxBm25Score() : 0.0,
+                    retrieval != null ? retrieval.maxHybridScore() : 0.0);
+        }
+
+        private static boolean indicatesUnsupportedAnswer(String reason) {
+            if (reason == null) {
+                return false;
+            }
+            String normalized = reason.toLowerCase();
+            return normalized.contains("hallucin")
+                    || normalized.contains("fabricat")
+                    || normalized.contains("invent")
+                    || normalized.contains("unsupported");
+        }
+
+        private static double rate(long numerator, int denominator) {
+            return denominator == 0 ? 0.0 : (double) numerator / denominator;
         }
     }
 }

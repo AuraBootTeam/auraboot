@@ -896,7 +896,9 @@ CREATE TABLE public.ab_agent_definition (
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     created_by bigint,
     updated_by bigint,
-    deleted_flag boolean DEFAULT false
+    deleted_flag boolean DEFAULT false,
+    knowledge_base_ids jsonb DEFAULT '[]'::jsonb NOT NULL,
+    CONSTRAINT chk_agent_definition_knowledge_base_ids_array CHECK ((jsonb_typeof(knowledge_base_ids) = 'array'::text))
 );
 
 
@@ -919,6 +921,13 @@ COMMENT ON COLUMN public.ab_agent_definition.execution_config IS 'JSONB executio
 --
 
 COMMENT ON COLUMN public.ab_agent_definition.visibility IS 'Who can see this agent: private (creator only), team (same dept), tenant (all users)';
+
+
+--
+-- Name: COLUMN ab_agent_definition.knowledge_base_ids; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_agent_definition.knowledge_base_ids IS 'Explicit public knowledge-base PIDs used as named-agent fallback when a chat request supplies no knowledgeBaseIds';
 
 
 --

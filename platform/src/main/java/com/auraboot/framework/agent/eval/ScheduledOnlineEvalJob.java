@@ -23,9 +23,10 @@ import java.util.Map;
  *
  * <p><strong>Default off + non-blocking.</strong> With {@code enabled=false} (default) the
  * tick is a no-op — zero runtime behavior change. Operators opt in per-deployment. The
- * default judge is the deterministic {@link HeuristicTurnQualityJudge} (no token cost);
- * swapping in an LLM judge to grade nuance is the LLM-key-gated follow-up and changes
- * nothing here. The degradation signal is observability-only — it never fails a request.
+ * default judge is the deterministic {@link HeuristicTurnQualityJudge} (no token cost).
+ * Operators may opt into the LLM judge; the summary then includes the heuristic
+ * comparison rate and explicit skipped samples. The degradation signal is
+ * observability-only — it never fails a request.
  */
 @Slf4j
 @Component
@@ -99,10 +100,22 @@ public class ScheduledOnlineEvalJob {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("judgeMode", summary.judgeMode());
         result.put("sampledTurns", summary.sampledTurns());
+        result.put("judgedTurns", summary.judgedTurns());
+        result.put("skippedTurns", summary.skippedTurns());
+        result.put("keywordPathTurns", summary.keywordPathTurns());
         result.put("healthyRate", summary.healthyRate());
         result.put("failRate", summary.failRate());
         result.put("costFlaggedRate", summary.costFlaggedRate());
         result.put("avgScore", summary.avgScore());
+        result.put("judgeComparisonTurns", summary.judgeComparisonTurns());
+        result.put("judgeConsistencyRate", summary.judgeConsistencyRate());
+        result.put("attribution", Map.of(
+                "normal", summary.attribution().normal(),
+                "retrievalProblems", summary.attribution().retrievalProblems(),
+                "generationProblems", summary.attribution().generationProblems(),
+                "configurationProblems", summary.attribution().configurationProblems(),
+                "unattributed", summary.attribution().unattributed()));
+        result.put("turnAttributions", summary.turnAttributions());
         result.put("qualityOk", verdict.ok());
         result.put("qualitySummary", verdict.summary());
 
@@ -130,6 +143,12 @@ public class ScheduledOnlineEvalJob {
         detail.put("summary", verdict.summary());
         detail.put("judgeMode", summary.judgeMode());
         detail.put("sampledTurns", summary.sampledTurns());
+        detail.put("judgedTurns", summary.judgedTurns());
+        detail.put("keywordPathTurns", summary.keywordPathTurns());
+        detail.put("attribution", Map.of(
+                "retrievalProblems", summary.attribution().retrievalProblems(),
+                "generationProblems", summary.attribution().generationProblems(),
+                "configurationProblems", summary.attribution().configurationProblems()));
         detail.put("violations", verdict.violations().stream().map(v -> Map.of(
                 "dimension", v.dimension(),
                 "value", String.valueOf(v.value()),

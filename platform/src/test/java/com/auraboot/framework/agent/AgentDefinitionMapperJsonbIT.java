@@ -50,6 +50,7 @@ class AgentDefinitionMapperJsonbIT extends BaseIntegrationTest {
         agent.setStatus("active");
         agent.setDeletedFlag(false);
         agent.setAllowedOperations(allowedOperations);
+        agent.setKnowledgeBaseIds(List.of("kb-manual", "kb-policy"));
         agentDefinitionMapper.insert(agent);
         return agent;
     }
@@ -66,6 +67,9 @@ class AgentDefinitionMapperJsonbIT extends BaseIntegrationTest {
         assertThat(loaded.getAllowedOperations())
                 .as("the JSONB array must come back as the declared List<String>")
                 .containsExactlyElementsOf(ops);
+        assertThat(loaded.getKnowledgeBaseIds())
+                .as("per-agent knowledge-base bindings must round-trip through PostgreSQL JSONB")
+                .containsExactly("kb-manual", "kb-policy");
     }
 
     @Test

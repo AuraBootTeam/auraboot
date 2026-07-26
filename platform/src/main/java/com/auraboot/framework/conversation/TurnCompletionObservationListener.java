@@ -3,6 +3,7 @@ package com.auraboot.framework.conversation;
 import com.auraboot.framework.agent.service.AgentObservationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -59,8 +60,12 @@ public class TurnCompletionObservationListener {
 
     /** Error text is diagnostic breadcrumb, not archival storage. */
     private static final int MAX_ERROR_CHARS = 300;
+    private static final int MAX_OUTPUT_CHARS = 4_000;
 
     private final AgentObservationService observationService;
+
+    @Autowired(required = false)
+    private TurnEvalTelemetryRegistry turnEvalTelemetryRegistry;
 
     @Async
     @EventListener
@@ -95,10 +100,11 @@ public class TurnCompletionObservationListener {
             case TurnOutcome.Success s -> {
                 eventType = EVENT_COMPLETED;
                 detail.put("responseChars", s.finalResponse() != null ? s.finalResponse().length() : 0);
+                putIfPresent(detail, "output", truncate(s.finalResponse(), MAX_OUTPUT_CHARS));
             }
             case TurnOutcome.Failed f -> {
                 eventType = EVENT_FAILED;
-                putIfPresent(detail, "error", truncate(f.errorMessage()));
+                putIfPresent(detail, "error", truncate(f.errorMessage(), MAX_ERROR_CHARS));
             }
             case TurnOutcome.Interrupted i -> {
                 eventType = EVENT_INTERRUPTED;
@@ -113,6 +119,20 @@ public class TurnCompletionObservationListener {
                 return;
             }
         }
+        // AgentObservationService deliberately buckets observation_type into
+        // activity/error/cost/alert for the ACP UI. Preserve the raw event here so L4
+        // eval can distinguish a completed chat from a generic activity row.
+        detail.put("eventType", eventType);
+
+        TurnEvalTelemetryRegistry.Snapshot evalTelemetry =
+                turnEvalTelemetryRegistry != null
+                        ? turnEvalTelemetryRegistry.take(ctx.turnId())
+                        : null;
+        if (evalTelemetry != null) {
+            putIfPresent(detail, "input", evalTelemetry.input());
+            putIfPresent(detail, "traceId", evalTelemetry.traceId());
+            putIfPresent(detail, "retrieval", evalTelemetry.retrieval());
+        }
 
         putIfPresent(detail, "turnId", ctx.turnId());
         putIfPresent(detail, "channel", ctx.channel());
@@ -126,7 +146,9 @@ public class TurnCompletionObservationListener {
         }
         putIfPresent(detail, "userId", ctx.userId());
         putIfPresent(detail, "conversationId", ctx.conversationId());
-        putIfPresent(detail, "traceId", ctx.traceId());
+        if (!detail.containsKey("traceId")) {
+            putIfPresent(detail, "traceId", ctx.traceId());
+        }
         if (ctx.beginAt() != null) {
             detail.put("latencyMs", Duration.between(ctx.beginAt(), Instant.now()).toMillis());
         }
@@ -147,12 +169,12 @@ public class TurnCompletionObservationListener {
         }
     }
 
-    private static String truncate(String message) {
+    private static String truncate(String message, int maxChars) {
         if (message == null) {
             return null;
         }
-        return message.length() > MAX_ERROR_CHARS
-                ? message.substring(0, MAX_ERROR_CHARS) + "..."
+        return message.length() > maxChars
+                ? message.substring(0, maxChars) + "..."
                 : message;
     }
 }

@@ -1558,5 +1558,16 @@
       "placeholder:zh-CN": "JSON 数组:query/create/update/delete/transition",
       "placeholder:en": "JSON array: query/create/update/delete/transition"
     }
+  },
+  {
+    "code": "knowledge_base_ids",
+    "displayName:zh-CN": "绑定知识库",
+    "displayName:en": "Bound Knowledge Bases",
+    "dataType": "json",
+    "extension": {
+      "multiline": true,
+      "placeholder:zh-CN": "由 AI 同事详情页选择；空数组表示不检索",
+      "placeholder:en": "Choose on the AI colleague detail page; an empty array disables retrieval"
+    }
   }
 ]

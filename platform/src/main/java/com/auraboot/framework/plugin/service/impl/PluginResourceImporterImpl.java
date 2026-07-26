@@ -2326,6 +2326,9 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         target.setAllowedOperations(dto.getAllowedOperations() != null
                 ? dto.getAllowedOperations()
                 : List.of("query", "create", "update", "delete", "transition"));
+        target.setKnowledgeBaseIds(dto.getKnowledgeBaseIds() != null
+                ? dto.getKnowledgeBaseIds()
+                : List.of());
         target.setMaxTools(dto.getMaxTools() != null ? dto.getMaxTools() : 20);
         target.setMaxConcurrentRuns(dto.getMaxConcurrentRuns() != null ? dto.getMaxConcurrentRuns() : 3);
         target.setExecutionTimeoutSeconds(dto.getExecutionTimeoutSeconds() != null
@@ -2352,6 +2355,7 @@ public class PluginResourceImporterImpl implements PluginResourceImporter {
         state.put("soulProfile", dto.getSoulProfile());
         state.put("allowedModels", dto.getAllowedModels());
         state.put("allowedOperations", dto.getAllowedOperations());
+        state.put("knowledgeBaseIds", dto.getKnowledgeBaseIds());
         state.put("maxTools", dto.getMaxTools());
         state.put("maxConcurrentRuns", dto.getMaxConcurrentRuns());
         state.put("executionTimeoutSeconds", dto.getExecutionTimeoutSeconds());

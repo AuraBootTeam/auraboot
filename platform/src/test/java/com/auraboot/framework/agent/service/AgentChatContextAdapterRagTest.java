@@ -66,6 +66,30 @@ class AgentChatContextAdapterRagTest {
     }
 
     @Test
+    void named_agent_assembly_exposes_retrieval_diagnostics_for_trace_and_observation() {
+        RagContextProvider rag = mock(RagContextProvider.class);
+        var diagnostics = new RagContextProvider.RetrievalDiagnostics(
+                "hybrid",
+                1,
+                List.of(new RagContextProvider.RetrievalScore(
+                        "chunk-1", 0.82, 0.64, 0.77, 0.91)),
+                List.of());
+        when(rag.retrieveContextWithDiagnostics(anyLong(), anyString(), any()))
+                .thenReturn(new RagContextProvider.RetrievedContext(
+                        "Bound handbook evidence.", diagnostics));
+        var adapter = adapterWith(rag);
+
+        AgentChatContextAdapter.AssemblyResult result =
+                adapter.assembleWithDiagnostics(
+                        TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
+                        request(null),
+                        List.of("kb-bound"));
+
+        assertThat(hasRagBlock(result.blocks())).isTrue();
+        assertThat(result.retrievalDiagnostics()).isEqualTo(diagnostics);
+    }
+
+    @Test
     void named_ids_reach_the_prompt_as_a_retrieved_knowledge_block() {
         RagContextProvider rag = mock(RagContextProvider.class);
         when(rag.retrieveContext(anyLong(), anyString(), any()))
@@ -74,7 +98,7 @@ class AgentChatContextAdapterRagTest {
 
         List<AgentContextBlock> blocks =
                 adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
-                        request(List.of("kb-1")));
+                        request(List.of("kb-1")), List.of("kb-bound"));
 
         assertThat(hasRagBlock(blocks))
                 .as("a named agent given a knowledge base id must get a retrieved-data block")
@@ -82,34 +106,55 @@ class AgentChatContextAdapterRagTest {
         assertThat(blocks.stream().anyMatch((b) -> b.body().contains("137 days")))
                 .as("the retrieved text itself must be present, not just the wrapper")
                 .isTrue();
+        verify(rag).retrieveContext(TENANT_ID,
+                "how often is ZQ-7731 calibrated?", List.of("kb-1"));
     }
 
     @Test
-    void no_ids_means_no_retrieval_at_all() {
-        // The behaviour every existing caller relies on. A named agent has a defined
-        // job; retrieving because the tenant happens to own a knowledge base would
-        // change what the agent is. That decision belongs to per-agent binding.
+    void no_request_ids_fall_back_to_the_agents_explicit_binding() {
+        RagContextProvider rag = mock(RagContextProvider.class);
+        when(rag.retrieveContext(anyLong(), anyString(), any()))
+                .thenReturn("Bound handbook evidence.");
+        var adapter = adapterWith(rag);
+
+        List<AgentContextBlock> blocks =
+                adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
+                        request(null), List.of("kb-bound"));
+
+        verify(rag).retrieveContext(TENANT_ID,
+                "how often is ZQ-7731 calibrated?", List.of("kb-bound"));
+        verify(rag, never()).hasActiveKnowledgeBases(anyLong());
+        assertThat(hasRagBlock(blocks)).isTrue();
+    }
+
+    @Test
+    void empty_request_ids_also_fall_back_to_the_agents_explicit_binding() {
+        RagContextProvider rag = mock(RagContextProvider.class);
+        when(rag.retrieveContext(anyLong(), anyString(), any()))
+                .thenReturn("Bound handbook evidence.");
+        var adapter = adapterWith(rag);
+
+        adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
+                request(List.of()), List.of("kb-bound"));
+
+        verify(rag).retrieveContext(TENANT_ID,
+                "how often is ZQ-7731 calibrated?", List.of("kb-bound"));
+    }
+
+    @Test
+    void no_request_ids_and_no_binding_means_no_retrieval_at_all() {
+        // A named agent has a defined job. Empty configuration must not broaden to
+        // every active tenant knowledge base, even though AuraBot may do that.
         RagContextProvider rag = mock(RagContextProvider.class);
         var adapter = adapterWith(rag);
 
         List<AgentContextBlock> blocks =
                 adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
-                        request(null));
+                        request(null), List.of());
 
         verify(rag, never()).retrieveContext(anyLong(), anyString(), any());
         verify(rag, never()).hasActiveKnowledgeBases(anyLong());
         assertThat(hasRagBlock(blocks)).isFalse();
-    }
-
-    @Test
-    void empty_id_list_also_means_no_retrieval() {
-        RagContextProvider rag = mock(RagContextProvider.class);
-        var adapter = adapterWith(rag);
-
-        adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
-                request(List.of()));
-
-        verify(rag, never()).retrieveContext(anyLong(), anyString(), any());
     }
 
     @Test
@@ -121,7 +166,7 @@ class AgentChatContextAdapterRagTest {
 
         List<AgentContextBlock> blocks =
                 adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
-                        request(List.of("kb-1")));
+                        request(List.of("kb-1")), List.of());
 
         // Answering without the knowledge base beats not answering; the operator sees a warn.
         assertThat(hasRagBlock(blocks)).isFalse();
@@ -133,7 +178,7 @@ class AgentChatContextAdapterRagTest {
 
         List<AgentContextBlock> blocks =
                 adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
-                        request(List.of("kb-1")));
+                        request(List.of("kb-1")), List.of());
 
         assertThat(hasRagBlock(blocks)).isFalse();
     }
@@ -147,7 +192,8 @@ class AgentChatContextAdapterRagTest {
         ChatRequest req = request(List.of("kb-1"));
         req.setMessage("   ");
 
-        adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID), req);
+        adapter.assemble(TurnContext.legacyDefault(TENANT_ID, USER_ID, USER_ID),
+                req, List.of());
 
         verify(rag, never()).retrieveContext(anyLong(), anyString(), any());
     }

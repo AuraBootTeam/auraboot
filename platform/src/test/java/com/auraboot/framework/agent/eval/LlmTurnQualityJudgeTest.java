@@ -110,13 +110,14 @@ class LlmTurnQualityJudgeTest {
     }
 
     @Test
-    @DisplayName("no configured provider means not judged, never healthy")
-    void missingProviderFailsClosed() {
+    @DisplayName("no configured provider is explicitly skipped, never counted as generation failure")
+    void missingProviderIsSkipped() {
         when(llmProviderFactory.resolveConfig(any(), any())).thenReturn(null);
 
         var v = judge.judge(turnWithNarrative());
 
         assertThat(v.healthy()).isFalse();
+        assertThat(v.judged()).isFalse();
         assertThat(v.reason()).contains("no LLM provider configured");
     }
 
@@ -136,6 +137,7 @@ class LlmTurnQualityJudgeTest {
         var v = judge.judge(turnWithNarrative());
 
         assertThat(v.healthy()).isFalse();
+        assertThat(v.judged()).isFalse();
         assertThat(v.reason()).contains("judge unavailable");
     }
 
@@ -159,6 +161,7 @@ class LlmTurnQualityJudgeTest {
         var v = judge.judge(signals);
 
         assertThat(v.healthy()).isFalse();
+        assertThat(v.judged()).isFalse();
         assertThat(v.reason()).contains("no turn narrative");
     }
 

@@ -10,6 +10,42 @@ import java.util.List;
 public interface RagContextProvider {
 
     /**
+     * One ranked raw-chunk score. Keeping this transport type in the SPI avoids leaking
+     * the RAG module's persistence DTO into the conversation/agent layers.
+     */
+    record RetrievalScore(String chunkPid,
+                          double vectorScore,
+                          double bm25Score,
+                          double hybridScore,
+                          double similarity) {
+    }
+
+    /**
+     * Diagnostics for the retrieval that actually served a turn.
+     *
+     * <p>{@code path=keyword} is not a weaker generation result. It means the vector
+     * provider was unavailable and the turn is configuration-invalid for generation
+     * quality statistics. Callers must preserve this value through trace/observation.
+     */
+    record RetrievalDiagnostics(String path,
+                                int resultCount,
+                                List<RetrievalScore> scores,
+                                List<String> warnings) {
+        public RetrievalDiagnostics {
+            path = path == null || path.isBlank() ? "none" : path;
+            scores = scores == null ? List.of() : List.copyOf(scores);
+            warnings = warnings == null ? List.of() : List.copyOf(warnings);
+        }
+    }
+
+    /** Rendered prompt context plus the retrieval evidence used to build it. */
+    record RetrievedContext(String context, RetrievalDiagnostics diagnostics) {
+        public RetrievedContext {
+            context = context == null ? "" : context;
+        }
+    }
+
+    /**
      * Check if tenant has active knowledge bases with embedded content.
      */
     boolean hasActiveKnowledgeBases(Long tenantId);
@@ -23,4 +59,17 @@ public interface RagContextProvider {
      * @return formatted Markdown context section, or empty string if no results
      */
     String retrieveContext(Long tenantId, String query, List<String> kbPids);
+
+    /**
+     * Diagnostic form used by trace/eval-aware callers.
+     *
+     * <p>The default keeps third-party/optional implementations source-compatible.
+     * Such implementations still return their context, but report no diagnostic path
+     * until they opt into this richer seam.
+     */
+    default RetrievedContext retrieveContextWithDiagnostics(Long tenantId,
+                                                            String query,
+                                                            List<String> kbPids) {
+        return new RetrievedContext(retrieveContext(tenantId, query, kbPids), null);
+    }
 }
