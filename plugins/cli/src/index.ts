@@ -75,6 +75,8 @@ import {
   mcpRemoveCommand,
   mcpTestCommand,
   mcpToolsCommand,
+  mcpPushCommand,
+  mcpPullCommand,
 } from './commands/mcp.js';
 
 // ── skills (end-user agent skills) ──────────────────────────────────────────
@@ -639,12 +641,15 @@ mcp
 mcp
   .command('add <name>')
   .description('Add an MCP server')
-  .requiredOption('--transport <type>', 'Transport type: stdio or sse')
-  .option('--url <url>', 'Server URL (for SSE transport)')
+  .requiredOption('--transport <type>', 'Transport: stdio, sse, or streamable_http')
+  .option('--url <url>', 'Server URL (for SSE or Streamable HTTP)')
   .option('--command <cmd>', 'Executable command (for stdio transport)')
   .option('--args <args>', 'Comma-separated command arguments (for stdio)')
   .option('--description <text>', 'Human-readable description')
   .option('--env <pairs...>', 'Environment variables as KEY=VALUE')
+  .option('--auth-type <type>', 'Authentication: none, bearer, or api_key')
+  .option('--token <secret>', 'Bearer token or API key')
+  .option('--header <name>', 'API key header name (default X-API-Key)')
   .action(async (name: string, cmdOpts: any) => {
     await mcpAddCommand(name, { ...program.opts(), ...cmdOpts });
   });
@@ -668,6 +673,21 @@ mcp
   .description('List tools provided by an MCP server')
   .action(async (name: string) => {
     await mcpToolsCommand(name, program.opts());
+  });
+
+mcp
+  .command('push [name]')
+  .description('Push local MCP config to the platform registry')
+  .option('--dry-run', 'Preview platform changes without writing')
+  .action(async (name: string | undefined, cmdOpts: any) => {
+    await mcpPushCommand(name, { ...program.opts(), ...cmdOpts });
+  });
+
+mcp
+  .command('pull [name]')
+  .description('Pull credential-free platform MCP config and preserve local secrets')
+  .action(async (name: string | undefined) => {
+    await mcpPullCommand(name, program.opts());
   });
 
 // ── skills (end-user agent skills) ──────────────────────────────────────────

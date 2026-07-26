@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
@@ -8,7 +9,7 @@ import { homedir } from 'node:os';
 // ── Config types ─────────────────────────────────────────────────────────────
 
 export interface McpServerConfig {
-  /** URL for SSE transport */
+  /** URL for SSE or Streamable HTTP transport */
   url?: string;
   /** Command for stdio transport */
   command?: string;
@@ -17,13 +18,24 @@ export interface McpServerConfig {
   /** Environment variables for stdio transport */
   env?: Record<string, string>;
   /** Transport type */
-  transport: 'stdio' | 'sse';
+  transport: 'stdio' | 'sse' | 'streamable_http';
+  /** Optional HTTP authentication, kept only in the local config. */
+  authType?: 'none' | 'bearer' | 'api_key';
+  authConfig?: {
+    token?: string;
+    header?: string;
+  };
   /** Human-readable description */
   description?: string;
 }
 
 export interface McpConfigFile {
   servers: Record<string, McpServerConfig>;
+}
+
+export interface PortableMcpServerConfig extends Omit<McpServerConfig, 'env' | 'authConfig'> {
+  envKeys?: string[];
+  secretRequired?: boolean;
 }
 
 // ── Config file management ───────────────────────────────────────────────────
@@ -42,10 +54,68 @@ export function loadMcpConfig(): McpConfigFile {
   try {
     const raw = readFileSync(CONFIG_PATH, 'utf-8');
     const parsed = JSON.parse(raw);
-    return { servers: parsed.servers || {} };
+    return normalizeMcpConfig({ servers: parsed.servers || {} });
   } catch {
     return { servers: {} };
   }
+}
+
+/** Normalize the historical `http` spelling without rewriting on read. */
+export function normalizeMcpConfig(config: McpConfigFile): McpConfigFile {
+  const servers: Record<string, McpServerConfig> = {};
+  for (const [name, raw] of Object.entries(config.servers || {})) {
+    const transport = (raw.transport as string) === 'http'
+      ? 'streamable_http'
+      : raw.transport;
+    servers[name] = { ...raw, transport };
+  }
+  return { servers };
+}
+
+/**
+ * Merge a credential-free platform export into local configuration.
+ *
+ * Local-only servers remain untouched. Existing auth/env secrets are preserved
+ * because the platform never exports reusable credentials.
+ */
+export function mergePulledMcpConfig(
+  local: McpConfigFile,
+  remote: { servers: Record<string, PortableMcpServerConfig> },
+): { config: McpConfigFile; secretsRequired: string[] } {
+  const merged = normalizeMcpConfig(local);
+  const secretsRequired: string[] = [];
+  for (const [name, portable] of Object.entries(remote.servers || {})) {
+    const existing = merged.servers[name];
+    const next: McpServerConfig = {
+      transport: portable.transport,
+      ...(portable.url ? { url: portable.url } : {}),
+      ...(portable.command ? { command: portable.command } : {}),
+      ...(portable.args ? { args: portable.args } : {}),
+      ...(portable.description ? { description: portable.description } : {}),
+      ...(portable.authType ? { authType: portable.authType } : {}),
+    };
+    if (existing?.env) next.env = existing.env;
+    if (existing?.authConfig) next.authConfig = existing.authConfig;
+    if (portable.secretRequired && !next.env && !next.authConfig) {
+      secretsRequired.push(name);
+    }
+    merged.servers[name] = next;
+  }
+  return { config: merged, secretsRequired };
+}
+
+/** Select a deterministic whole-config or single-server payload for push. */
+export function selectMcpServersForPush(
+  config: McpConfigFile,
+  name?: string,
+): Record<string, McpServerConfig> {
+  const normalized = normalizeMcpConfig(config);
+  if (!name) return normalized.servers;
+  const selected = normalized.servers[name];
+  if (!selected) {
+    throw new Error(`MCP server "${name}" is not configured locally`);
+  }
+  return { [name]: selected };
 }
 
 /**
@@ -119,20 +189,38 @@ export async function connectToServer(
     if (!config.url) {
       throw new Error(`Server "${name}" is configured for SSE but has no url`);
     }
-    transport = new SSEClientTransport(new URL(config.url));
+    const requestInit = { headers: authHeaders(config) };
+    transport = new SSEClientTransport(new URL(config.url), {
+      requestInit,
+      eventSourceInit: { fetch: (url, init) => fetch(url, {
+        ...init,
+        headers: { ...authHeaders(config), ...(init?.headers || {}) },
+      }) },
+    });
+  } else if (config.transport === 'streamable_http') {
+    if (!config.url) {
+      throw new Error(`Server "${name}" is configured for Streamable HTTP but has no url`);
+    }
+    transport = new StreamableHTTPClientTransport(new URL(config.url), {
+      requestInit: { headers: authHeaders(config) },
+    });
   } else {
     throw new Error(`Unsupported transport: ${config.transport}`);
   }
 
   // Connect with timeout
-  const timer = setTimeout(() => {
-    throw new Error(`Connection to "${name}" timed out after ${timeoutMs}ms`);
-  }, timeoutMs);
-
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await client.connect(transport);
+    await Promise.race([
+      client.connect(transport),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(
+          new Error(`Connection to "${name}" timed out after ${timeoutMs}ms`),
+        ), timeoutMs);
+      }),
+    ]);
   } finally {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
   }
 
   return {
@@ -141,6 +229,18 @@ export async function connectToServer(
       await client.close();
     },
   };
+}
+
+function authHeaders(config: McpServerConfig): Record<string, string> {
+  const token = config.authConfig?.token;
+  if (!token || !config.authType || config.authType === 'none') return {};
+  if (config.authType === 'bearer') {
+    return { Authorization: `Bearer ${token}` };
+  }
+  if (config.authType === 'api_key') {
+    return { [config.authConfig?.header || 'X-API-Key']: token };
+  }
+  return {};
 }
 
 /**

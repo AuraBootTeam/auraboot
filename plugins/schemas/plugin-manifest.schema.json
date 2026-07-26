@@ -218,6 +218,7 @@
         "sla": { "type": "string" },
         "savedViews": { "type": "string" },
         "fieldMasks": { "type": "string" },
+        "capabilities": { "type": "string" },
         "i18n": { "type": "string" },
         "semantic": { "type": "string" },
         "defaultBootstrap": { "type": "string" },
@@ -1519,6 +1520,10 @@
           "type": "array",
           "description": "Tags for filtering",
           "items": { "type": "string" }
+        },
+        "policySchema": {
+          "type": "object",
+          "description": "Policy schema for configurable permission policies and dynamic ABAC"
         },
         "extension": {
           "type": "object",

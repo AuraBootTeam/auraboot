@@ -2885,11 +2885,6 @@
       "type": "grid",
       "cols": 12
     },
-    "recordSource": {
-      "mode": "singleton",
-      "method": "get",
-      "endpoint": "/api/tenant/info"
-    },
     "extension": {
       "editMode": true,
       "recordSource": {
@@ -3297,11 +3292,6 @@
     "title": {
       "zh-CN": "系统偏好",
       "en": "System Preferences"
-    },
-    "recordSource": {
-      "mode": "singleton",
-      "method": "get",
-      "endpoint": "/api/admin/system-preferences"
     },
     "extension": {
       "editMode": true,

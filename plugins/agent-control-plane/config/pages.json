@@ -3752,8 +3752,8 @@
             "field": "transport_type",
             "colSpan": 6,
             "help": {
-              "zh-CN": "平台通过网络连接，只支持 HTTP / SSE；stdio 服务器需以本地子进程方式运行。",
-              "en-US": "The platform connects over the network and supports HTTP / SSE only; stdio servers run as a local child process."
+              "zh-CN": "支持 Streamable HTTP、SSE 和受控 stdio。内网/回环地址默认拒绝，部署管理员需通过 AURA_SSRF_ALLOWED_PRIVATE_HOSTS 显式放行；stdio 可执行文件需加入 AURA_MCP_STDIO_ALLOWED_COMMANDS。",
+              "en-US": "Supports Streamable HTTP, SSE, and controlled stdio. Private/loopback hosts are denied unless deployment owners allow them with AURA_SSRF_ALLOWED_PRIVATE_HOSTS; stdio executables require AURA_MCP_STDIO_ALLOWED_COMMANDS."
             }
           },
           {
@@ -3761,19 +3761,45 @@
             "colSpan": 6
           },
           {
-            "field": "status",
-            "colSpan": 6
-          },
-          {
-            "field": "auth_config",
+            "field": "stdio_args",
             "colSpan": 12,
             "placeholder": {
-              "zh-CN": "{\"token\":\"...\"}（API Key 可加 \"header\":\"X-API-Key\"）",
-              "en-US": "{\"token\":\"...\"} (API Key may add \"header\":\"X-API-Key\")"
+              "zh-CN": "[\"-y\", \"@modelcontextprotocol/server-github\"]",
+              "en-US": "[\"-y\", \"@modelcontextprotocol/server-github\"]"
             },
             "help": {
-              "zh-CN": "凭据保存后不再回显；留空表示保持不变。",
-              "en-US": "Credentials are not shown again after saving; leave blank to keep unchanged."
+              "zh-CN": "仅 stdio 使用；可执行文件填在服务器地址中，参数逐项写入 JSON 数组。",
+              "en-US": "stdio only; put the executable in Server URL and arguments in this JSON array."
+            }
+          },
+          {
+            "field": "mcp_stdio_env",
+            "colSpan": 12,
+            "transient": true,
+            "submitPayload": true,
+            "help": {
+              "zh-CN": "仅 stdio 使用；所有值加密保存且永不回显。留空表示保持不变。",
+              "en-US": "stdio only; values are encrypted at rest and never echoed. Leave blank to keep unchanged."
+            }
+          },
+          {
+            "field": "mcp_auth_secret",
+            "colSpan": 6,
+            "transient": true,
+            "submitPayload": true,
+            "help": {
+              "zh-CN": "Bearer Token 或 API Key，加密保存且永不回显；编辑时留空表示保持不变。",
+              "en-US": "Bearer token or API key. Encrypted at rest and never echoed; leave blank on edit to keep unchanged."
+            }
+          },
+          {
+            "field": "mcp_api_key_header",
+            "colSpan": 6,
+            "transient": true,
+            "submitPayload": true,
+            "help": {
+              "zh-CN": "仅 API Key 使用，默认 X-API-Key。",
+              "en-US": "API key only; defaults to X-API-Key."
             }
           }
         ]
@@ -3868,6 +3894,11 @@
           {
             "field": "last_synced_at",
             "colSpan": 6,
+            "readOnly": true
+          },
+          {
+            "field": "last_sync_error",
+            "colSpan": 12,
             "readOnly": true
           }
         ]

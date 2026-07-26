@@ -453,23 +453,21 @@
     "code": "acp:create_mcp_server",
     "displayName:zh-CN": "创建 MCP 服务器",
     "displayName:en": "Create MCP Server",
-    "type": "create",
-    "modelCode": "mcp_server",
-    "inputFields": ["server_name", "server_url", "transport_type", "auth_type", "auth_config", "status"]
+    "type": "custom",
+    "modelCode": "mcp_server"
   },
   {
     "code": "acp:update_mcp_server",
     "displayName:zh-CN": "更新 MCP 服务器",
     "displayName:en": "Update MCP Server",
-    "type": "update",
-    "modelCode": "mcp_server",
-    "inputFields": ["server_name", "server_url", "transport_type", "auth_type", "auth_config", "status"]
+    "type": "custom",
+    "modelCode": "mcp_server"
   },
   {
     "code": "acp:delete_mcp_server",
     "displayName:zh-CN": "删除 MCP 服务器",
     "displayName:en": "Delete MCP Server",
-    "type": "delete",
+    "type": "custom",
     "modelCode": "mcp_server",
     "extension": { "confirmMessage:zh-CN": "确认删除此 MCP 服务器？", "confirmMessage:en": "Confirm delete this MCP server?" }
   }

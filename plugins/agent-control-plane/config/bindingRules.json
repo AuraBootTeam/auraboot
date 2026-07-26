@@ -1,0 +1,23 @@
+[
+  {
+    "commandCode": "acp:create_mcp_server",
+    "ruleType": "handler",
+    "handlerClass": "mcpServerCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "acp:update_mcp_server",
+    "ruleType": "handler",
+    "handlerClass": "mcpServerCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  },
+  {
+    "commandCode": "acp:delete_mcp_server",
+    "ruleType": "handler",
+    "handlerClass": "mcpServerCommandHandler",
+    "sequence": 10,
+    "enabled": true
+  }
+]

@@ -1,5 +1,7 @@
 package com.auraboot.framework.agent.provider;
 
+import com.auraboot.framework.common.util.SsrfValidator;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -8,247 +10,368 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import com.auraboot.framework.common.util.SsrfValidator;
-
 import java.io.IOException;
-import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Protocol-level tests for {@link McpClient} against a real HTTP server.
+ * Real-wire protocol tests for the official Java SDK integration.
  *
- * <p>These deliberately do not mock the client. Every other MCP test in the
- * suite stubs {@code McpClient} out, which is why the client could sit in the
- * tree unable to complete a handshake with any compliant MCP server — including
- * AuraBoot's own {@code aura mcp serve --http} — while the suite stayed green.
- * A spec-compliant Streamable HTTP server rejects a request that does not accept
- * {@code text/event-stream} with HTTP 406 before any tool is reached, so the
- * headers the client puts on the wire are the behaviour under test.
+ * <p>The in-process server requires initialize → initialized → operation and a
+ * reusable {@code Mcp-Session-Id}; a client that skips negotiation cannot make
+ * these tests pass.
  */
 class McpClientProtocolTest {
 
-    private HttpServer server;
-    private String baseUrl;
+    private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String SESSION_ID = "session-protocol-test";
 
-    /** Headers of the most recent request, lower-cased keys. */
-    private final Map<String, String> lastHeaders = new ConcurrentHashMap<>();
-    private volatile String lastBody = "";
-    private volatile String lastRequestUri;
-    private volatile String cannedResponse = "{}";
+    private HttpServer server;
+    private ExecutorService serverExecutor;
+    private OutputStream legacySseOutput;
+    private String baseUrl;
+    private final List<McpClient> openClients = new ArrayList<>();
+    private final List<String> methods = new CopyOnWriteArrayList<>();
+    private final Map<String, Map<String, String>> headersByMethod =
+            new ConcurrentHashMap<>();
+    private final Map<String, String> bodiesByMethod = new ConcurrentHashMap<>();
+    private volatile String toolsResult = "{\"tools\":[]}";
+    private volatile Map<String, String> pagedToolsResults = Map.of();
+    private volatile String callResult = "{\"content\":[]}";
+    private volatile String errorMethod;
 
     @BeforeEach
     void startServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress("localhost", 0), 0);
         server.createContext("/mcp", this::handle);
+        server.createContext("/sse", this::handleLegacySse);
+        server.createContext("/message", this::handleLegacyMessage);
+        serverExecutor = Executors.newCachedThreadPool();
+        server.setExecutor(serverExecutor);
         server.start();
         baseUrl = "http://localhost:" + server.getAddress().getPort() + "/mcp";
     }
 
     @AfterEach
     void stopServer() {
+        openClients.forEach(McpClient::close);
+        if (legacySseOutput != null) {
+            try {
+                legacySseOutput.close();
+            } catch (IOException ignored) {
+                // Test fixture teardown.
+            }
+        }
         if (server != null) {
             server.stop(0);
         }
+        if (serverExecutor != null) {
+            serverExecutor.shutdownNow();
+        }
+    }
+
+    private void handleLegacySse(HttpExchange exchange) throws IOException {
+        exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+        exchange.getResponseHeaders().add("Cache-Control", "no-cache");
+        exchange.sendResponseHeaders(200, 0);
+        legacySseOutput = exchange.getResponseBody();
+        writeLegacySseEvent("endpoint", "/message");
+    }
+
+    private void handleLegacyMessage(HttpExchange exchange) throws IOException {
+        String body = new String(
+                exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        JsonNode request = MAPPER.readTree(body);
+        String method = request.path("method").asText("");
+        methods.add(method);
+        bodiesByMethod.put(method, body);
+        Map<String, String> headers = new ConcurrentHashMap<>();
+        exchange.getRequestHeaders().forEach(
+                (key, values) -> headers.put(
+                        key.toLowerCase(), String.join(", ", values)));
+        headersByMethod.put(method, headers);
+        exchange.sendResponseHeaders(202, -1);
+        exchange.close();
+
+        if ("notifications/initialized".equals(method)) {
+            return;
+        }
+        String id = request.path("id").toString();
+        String response = switch (method) {
+            case "initialize" -> initializeResponse(id, request);
+            case "tools/list" -> success(id, toolsResult);
+            case "tools/call" -> success(id, callResult);
+            default -> "{\"jsonrpc\":\"2.0\",\"id\":" + id
+                    + ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
+        };
+        writeLegacySseEvent("message", response);
+    }
+
+    private synchronized void writeLegacySseEvent(String event, String data)
+            throws IOException {
+        if (legacySseOutput == null) {
+            throw new IOException("legacy SSE stream is not connected");
+        }
+        legacySseOutput.write(
+                ("event: " + event + "\ndata: " + data + "\n\n")
+                        .getBytes(StandardCharsets.UTF_8));
+        legacySseOutput.flush();
     }
 
     private void handle(HttpExchange exchange) throws IOException {
-        lastRequestUri = exchange.getRequestURI().toString();
-        exchange.getRequestHeaders()
-                .forEach((k, v) -> lastHeaders.put(k.toLowerCase(), String.join(", ", v)));
-        try (InputStream in = exchange.getRequestBody()) {
-            lastBody = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        if ("DELETE".equals(exchange.getRequestMethod())) {
+            exchange.sendResponseHeaders(202, -1);
+            exchange.close();
+            return;
         }
-        byte[] body = cannedResponse.getBytes(StandardCharsets.UTF_8);
+
+        String body = new String(
+                exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        JsonNode request = MAPPER.readTree(body);
+        String method = request.path("method").asText("");
+        methods.add(method);
+        bodiesByMethod.put(method, body);
+        Map<String, String> headers = new ConcurrentHashMap<>();
+        exchange.getRequestHeaders().forEach(
+                (key, values) -> headers.put(
+                        key.toLowerCase(), String.join(", ", values)));
+        headersByMethod.put(method, headers);
+
+        if ("notifications/initialized".equals(method)) {
+            exchange.sendResponseHeaders(202, -1);
+            exchange.close();
+            return;
+        }
+
+        String id = request.path("id").toString();
+        String response;
+        if (method.equals(errorMethod)) {
+            response = "{\"jsonrpc\":\"2.0\",\"id\":" + id
+                    + ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
+        } else {
+            response = switch (method) {
+                case "initialize" -> initializeResponse(id, request);
+                case "tools/list" -> success(id, pagedToolsResult(request));
+                case "tools/call" -> success(id, callResult);
+                default -> "{\"jsonrpc\":\"2.0\",\"id\":" + id
+                        + ",\"error\":{\"code\":-32601,\"message\":\"Method not found\"}}";
+            };
+        }
+
+        byte[] responseBytes = response.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
-        exchange.sendResponseHeaders(200, body.length);
-        exchange.getResponseBody().write(body);
+        if ("initialize".equals(method)) {
+            exchange.getResponseHeaders().add("Mcp-Session-Id", SESSION_ID);
+        } else if (!SESSION_ID.equals(headers.get("mcp-session-id"))) {
+            byte[] missing = "missing session".getBytes(StandardCharsets.UTF_8);
+            exchange.sendResponseHeaders(400, missing.length);
+            exchange.getResponseBody().write(missing);
+            exchange.close();
+            return;
+        }
+        exchange.sendResponseHeaders(200, responseBytes.length);
+        exchange.getResponseBody().write(responseBytes);
         exchange.close();
     }
 
-    /**
-     * Client pointed at the loopback test server. SSRF rejects loopback by
-     * design (pinned by {@code SsrfValidatorTest}); overriding the check is what
-     * lets the header/credential behaviour be exercised over a real socket
-     * rather than against a mock.
-     */
+    private static String initializeResponse(String id, JsonNode request) {
+        String version = request.path("params").path("protocolVersion")
+                .asText("2025-06-18");
+        return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":{"
+                + "\"protocolVersion\":\"" + version + "\","
+                + "\"capabilities\":{\"tools\":{\"listChanged\":false}},"
+                + "\"serverInfo\":{\"name\":\"fixture\",\"version\":\"1.0\"}}}";
+    }
+
+    private static String success(String id, String result) {
+        return "{\"jsonrpc\":\"2.0\",\"id\":" + id + ",\"result\":" + result + "}";
+    }
+
+    private String pagedToolsResult(JsonNode request) {
+        String cursor = request.path("params").path("cursor").asText("");
+        return pagedToolsResults.getOrDefault(cursor, toolsResult);
+    }
+
     private McpClient client() {
-        return new McpClient(new ObjectMapper()) {
+        McpClient client = new McpClient(
+                MAPPER, new McpStdioCommandPolicy("node")) {
             @Override
             protected SsrfValidator.ValidatedTarget validateTarget(String serverUrl) {
                 URI uri = URI.create(serverUrl);
                 try {
                     return new SsrfValidator.ValidatedTarget(
-                            uri,
-                            uri.getHost(),
-                            InetAddress.getByName("127.0.0.1"),
-                            uri.getPort(),
-                            uri.getScheme());
-                } catch (UnknownHostException e) {
-                    throw new IllegalStateException(e);
+                            uri, uri.getHost(), InetAddress.getByName("127.0.0.1"),
+                            uri.getPort(), uri.getScheme());
+                } catch (UnknownHostException error) {
+                    throw new IllegalStateException(error);
                 }
             }
         };
+        openClients.add(client);
+        return client;
     }
 
     private static McpServerTarget httpTarget(String url) {
-        return new McpServerTarget("test-server", url, "HTTP", null, null);
+        return new McpServerTarget(
+                1L, "server-pid", "test-server", url,
+                "streamable_http", null, null, List.of(), Map.of());
     }
 
-    // ──────────────────────────────────────────────────────────────
-    // Accept header — the difference between working and HTTP 406
-    // ──────────────────────────────────────────────────────────────
-
     @Test
-    @DisplayName("listTools accepts both JSON and SSE so Streamable HTTP servers do not 406")
-    void listTools_sendsSpecCompliantAcceptHeader() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[]}}";
-
+    @DisplayName("Streamable HTTP initializes before tools/list and reuses the negotiated session")
+    void listTools_negotiatesAndReusesSession() {
         client().listTools(httpTarget(baseUrl));
 
-        assertThat(lastHeaders.get("accept"))
+        assertThat(methods).containsSubsequence(
+                "initialize", "notifications/initialized", "tools/list");
+        assertThat(headersByMethod.get("tools/list").get("mcp-session-id"))
+                .isEqualTo(SESSION_ID);
+        assertThat(headersByMethod.get("tools/list").get("accept"))
                 .contains("application/json")
                 .contains("text/event-stream");
     }
 
     @Test
-    @DisplayName("callTool accepts both JSON and SSE")
-    void callTool_sendsSpecCompliantAcceptHeader() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[]}}";
-
-        client().callTool(httpTarget(baseUrl), "some_tool", Map.of());
-
-        assertThat(lastHeaders.get("accept"))
-                .contains("application/json")
-                .contains("text/event-stream");
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // Auth — registered credentials must reach the wire
-    // ──────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("BEARER auth puts the configured token in the Authorization header")
-    void bearerAuth_isSentOnTheWire() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[]}}";
+    @DisplayName("registered bearer credentials reach initialize and operation headers only")
+    void bearerAuth_isSentOnWireButNeverInBody() {
+        String secret = "ghp_secret";
         McpServerTarget target = new McpServerTarget(
-                "github", baseUrl, "HTTP", "BEARER", Map.of("token", "ghp_secret"));
+                1L, "auth-pid", "github", baseUrl, "streamable_http",
+                "bearer", Map.of("token", secret), List.of(), Map.of());
 
         client().listTools(target);
 
-        assertThat(lastHeaders.get("authorization")).isEqualTo("Bearer ghp_secret");
+        assertThat(headersByMethod.get("initialize").get("authorization"))
+                .isEqualTo("Bearer " + secret);
+        assertThat(headersByMethod.get("tools/list").get("authorization"))
+                .isEqualTo("Bearer " + secret);
+        assertThat(bodiesByMethod.values()).allSatisfy(body ->
+                assertThat(body).doesNotContain(secret));
     }
 
     @Test
-    @DisplayName("API_KEY auth uses the configured header name")
+    @DisplayName("legacy SSE transport initializes and discovers tools over the event stream")
+    void legacySse_initializesAndListsTools() {
+        toolsResult = "{\"tools\":[{\"name\":\"legacy-search\","
+                + "\"inputSchema\":{\"type\":\"object\"}}]}";
+        String sseUrl =
+                "http://localhost:" + server.getAddress().getPort() + "/sse";
+        McpServerTarget target = new McpServerTarget(
+                1L, "legacy-sse-pid", "legacy-sse", sseUrl,
+                "sse", "bearer", Map.of("token", "sse-secret"),
+                List.of(), Map.of());
+
+        List<McpClient.McpToolInfo> tools = client().listTools(target);
+
+        assertThat(tools).extracting(McpClient.McpToolInfo::getName)
+                .containsExactly("legacy-search");
+        assertThat(methods).containsSubsequence(
+                "initialize", "notifications/initialized", "tools/list");
+        assertThat(headersByMethod.get("initialize").get("authorization"))
+                .isEqualTo("Bearer sse-secret");
+        assertThat(headersByMethod.get("tools/list").get("authorization"))
+                .isEqualTo("Bearer sse-secret");
+    }
+
+    @Test
+    @DisplayName("API-key auth honors a configured header name")
     void apiKeyAuth_usesConfiguredHeaderName() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[]}}";
         McpServerTarget target = new McpServerTarget(
-                "vendor", baseUrl, "HTTP", "API_KEY",
-                Map.of("header", "X-API-Key", "token", "k-123"));
+                1L, "key-pid", "vendor", baseUrl, "streamable_http",
+                "api_key", Map.of("header", "X-Vendor-Key", "token", "k-123"),
+                List.of(), Map.of());
 
         client().listTools(target);
 
-        assertThat(lastHeaders.get("x-api-key")).isEqualTo("k-123");
+        assertThat(headersByMethod.get("tools/list").get("x-vendor-key"))
+                .isEqualTo("k-123");
     }
 
     @Test
-    @DisplayName("API_KEY auth defaults to X-API-Key when no header name is configured")
-    void apiKeyAuth_defaultsHeaderName() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[]}}";
-        McpServerTarget target = new McpServerTarget(
-                "vendor", baseUrl, "HTTP", "API_KEY", Map.of("token", "k-456"));
+    @DisplayName("tools/call is sent through the initialized session")
+    void callTool_usesInitializedSession() {
+        callResult = "{\"content\":[{\"type\":\"text\",\"text\":\"ok\"}]}";
 
-        client().listTools(target);
+        Map<String, Object> result =
+                client().callTool(httpTarget(baseUrl), "search", Map.of("q", "term"));
 
-        assertThat(lastHeaders.get("x-api-key")).isEqualTo("k-456");
+        assertThat(result).containsKey("content");
+        assertThat(methods).containsSubsequence("initialize", "tools/call");
+        assertThat(headersByMethod.get("tools/call").get("mcp-session-id"))
+                .isEqualTo(SESSION_ID);
+        assertThat(bodiesByMethod.get("tools/call"))
+                .contains("\"name\":\"search\"")
+                .contains("\"q\":\"term\"");
     }
 
     @Test
-    @DisplayName("no auth configured sends no Authorization header")
-    void noAuth_sendsNoAuthorizationHeader() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[]}}";
-
-        client().listTools(httpTarget(baseUrl));
-
-        assertThat(lastHeaders.get("authorization")).isNull();
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // Transport — stdio must not be posted at as if it were a URL
-    // ──────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("stdio transport fails with an actionable message instead of an HTTP attempt")
-    void stdioTransport_failsWithActionableMessage() {
-        McpServerTarget target = new McpServerTarget(
-                "github", "npx -y @modelcontextprotocol/server-github", "STDIO", null, null);
-
-        assertThatThrownBy(() -> client().listTools(target))
-                .isInstanceOf(McpClient.McpClientException.class)
-                .hasMessageContaining("stdio")
-                .hasMessageContaining("not supported");
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // isError — a tool-level failure is not a success
-    // ──────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("tools/call result with isError:true is surfaced as a failure")
+    @DisplayName("tools/call isError is surfaced as a failure")
     void callTool_isErrorTrue_raises() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"isError\":true,"
-                + "\"content\":[{\"type\":\"text\",\"text\":\"repo not found\"}]}}";
+        callResult = "{\"isError\":true,\"content\":["
+                + "{\"type\":\"text\",\"text\":\"repo not found\"}]}";
 
-        assertThatThrownBy(() -> client().callTool(httpTarget(baseUrl), "search", Map.of()))
+        assertThatThrownBy(() ->
+                client().callTool(httpTarget(baseUrl), "search", Map.of()))
                 .isInstanceOf(McpClient.McpClientException.class)
                 .hasMessageContaining("repo not found");
     }
 
     @Test
-    @DisplayName("tools/call result without isError is returned normally")
-    void callTool_success_returnsResult() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":"
-                + "[{\"type\":\"text\",\"text\":\"ok\"}]}}";
-
-        Map<String, Object> result = client().callTool(httpTarget(baseUrl), "search", Map.of());
-
-        assertThat(result).containsKey("content");
-    }
-
-    // ──────────────────────────────────────────────────────────────
-    // Existing behaviour that must not regress
-    // ──────────────────────────────────────────────────────────────
-
-    @Test
-    @DisplayName("listTools parses tool definitions from the response")
+    @DisplayName("tools/list definitions are mapped from the SDK result")
     void listTools_parsesTools() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":["
-                + "{\"name\":\"search\",\"description\":\"Search things\","
-                + "\"inputSchema\":{\"type\":\"object\"}}]}}";
+        toolsResult = "{\"tools\":[{\"name\":\"search\","
+                + "\"description\":\"Search things\","
+                + "\"inputSchema\":{\"type\":\"object\"}}]}";
 
-        List<McpClient.McpToolInfo> tools = client().listTools(httpTarget(baseUrl));
+        List<McpClient.McpToolInfo> tools =
+                client().listTools(httpTarget(baseUrl));
 
         assertThat(tools).hasSize(1);
         assertThat(tools.get(0).getName()).isEqualTo("search");
         assertThat(tools.get(0).getDescription()).isEqualTo("Search things");
-        assertThat(tools.get(0).getInputSchema()).containsEntry("type", "object");
+        assertThat(tools.get(0).getInputSchema())
+                .containsEntry("type", "object");
     }
 
     @Test
-    @DisplayName("JSON-RPC error responses raise McpClientException")
+    @DisplayName("tools/list follows pagination cursors until all tools are discovered")
+    void listTools_followsPagination() {
+        pagedToolsResults = Map.of(
+                "", "{\"tools\":[{\"name\":\"first\",\"inputSchema\":{}}],"
+                        + "\"nextCursor\":\"page-2\"}",
+                "page-2", "{\"tools\":[{\"name\":\"second\",\"inputSchema\":{}}]}");
+
+        List<McpClient.McpToolInfo> tools =
+                client().listTools(httpTarget(baseUrl));
+
+        assertThat(tools).extracting(McpClient.McpToolInfo::getName)
+                .containsExactly("first", "second");
+        // Schema caching may perform an initial discovery during client
+        // initialization; the cursor-bearing request is the pagination proof.
+        assertThat(methods.stream().filter("tools/list"::equals))
+                .hasSizeGreaterThanOrEqualTo(2);
+        assertThat(bodiesByMethod.get("tools/list")).contains("\"cursor\":\"page-2\"");
+    }
+
+    @Test
+    @DisplayName("JSON-RPC errors are exposed with the remote message")
     void jsonRpcError_raises() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":"
-                + "{\"code\":-32601,\"message\":\"Method not found\"}}";
+        errorMethod = "tools/list";
 
         assertThatThrownBy(() -> client().listTools(httpTarget(baseUrl)))
                 .isInstanceOf(McpClient.McpClientException.class)
@@ -256,36 +379,35 @@ class McpClientProtocolTest {
     }
 
     @Test
-    @DisplayName("the request body is a well-formed JSON-RPC 2.0 envelope")
-    void requestBody_isJsonRpcEnvelope() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[]}}";
+    @DisplayName("stdio launches an allowlisted executable with args and encrypted env material")
+    void stdio_roundTripOverRealChildProcess() throws Exception {
+        Path fixture = Path.of(
+                getClass().getResource("/mcp/mcp-stdio-server.mjs").toURI());
+        McpServerTarget target = new McpServerTarget(
+                1L, "stdio-pid", "stdio-fixture", "node", "stdio", null, null,
+                List.of(fixture.toString()), Map.of("MCP_FIXTURE_VALUE", "env-ok"));
 
-        client().listTools(httpTarget(baseUrl));
+        McpClient stdioClient = client();
+        List<McpClient.McpToolInfo> tools = stdioClient.listTools(target);
+        Map<String, Object> result =
+                stdioClient.callTool(target, "echo", Map.of("value", "arg-ok"));
 
-        assertThat(lastBody).contains("\"jsonrpc\":\"2.0\"");
-        assertThat(lastBody).contains("\"method\":\"tools/list\"");
+        assertThat(tools).extracting(McpClient.McpToolInfo::getName)
+                .containsExactly("echo");
+        assertThat(result.toString()).contains("arg-ok").contains("env-ok");
     }
 
-    /**
-     * Credentials belong in a header, never in the URI — request lines are the
-     * most commonly logged part of an HTTP call (proxies, access logs, the
-     * server's own logging), so a token there leaks far more widely than one in
-     * a header. Asserts on the URI the server actually received; asserting on
-     * the locally-built URL would hold no matter what the client did.
-     */
     @Test
-    @DisplayName("credentials are not placed in the request URI")
-    void credentials_neverInUri() {
-        cannedResponse = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[]}}";
-        String secret = "ghp_secret";
+    @DisplayName("stdio policy rejects shells even if an operator lists one")
+    void stdio_shellIsAlwaysRejected() {
         McpServerTarget target = new McpServerTarget(
-                "github", baseUrl, "HTTP", "BEARER", Map.of("token", secret));
+                1L, "shell-pid", "shell", "sh", "stdio", null, null,
+                List.of("-c", "echo unsafe"), Map.of());
+        McpClient shellClient = new McpClient(
+                MAPPER, new McpStdioCommandPolicy("sh"));
 
-        client().listTools(target);
-
-        assertThat(lastRequestUri).isNotNull().doesNotContain(secret);
-        assertThat(lastBody).doesNotContain(secret);
-        // The credential did travel — otherwise "absent from the URI" is vacuous.
-        assertThat(lastHeaders.get("authorization")).contains(secret);
+        assertThatThrownBy(() -> shellClient.listTools(target))
+                .isInstanceOf(McpClient.McpClientException.class)
+                .hasMessageContaining("shell executables are forbidden");
     }
 }

@@ -1477,9 +1477,9 @@
           "label:en": "SSE"
         },
         {
-          "value": "http",
-          "label:zh-CN": "HTTP",
-          "label:en": "HTTP"
+          "value": "streamable_http",
+          "label:zh-CN": "Streamable HTTP",
+          "label:en": "Streamable HTTP"
         }
       ]
     }
@@ -1520,6 +1520,59 @@
     }
   },
   {
+    "code": "stdio_args",
+    "displayName:zh-CN": "stdio 参数",
+    "displayName:en": "stdio Arguments",
+    "dataType": "json",
+    "extension": {
+      "multiline": true,
+      "rows": 3,
+      "placeholder:zh-CN": "[\"-y\", \"@modelcontextprotocol/server-github\"]",
+      "placeholder:en": "[\"-y\", \"@modelcontextprotocol/server-github\"]"
+    }
+  },
+  {
+    "code": "mcp_auth_secret",
+    "displayName:zh-CN": "认证密钥",
+    "displayName:en": "Authentication Secret",
+    "dataType": "string",
+    "feature": {
+      "virtualType": "transient"
+    },
+    "extension": {
+      "inputType": "password",
+      "autoComplete": "new-password"
+    }
+  },
+  {
+    "code": "mcp_api_key_header",
+    "displayName:zh-CN": "API Key 请求头",
+    "displayName:en": "API Key Header",
+    "dataType": "string",
+    "feature": {
+      "virtualType": "transient"
+    },
+    "extension": {
+      "placeholder:zh-CN": "X-API-Key",
+      "placeholder:en": "X-API-Key"
+    }
+  },
+  {
+    "code": "mcp_stdio_env",
+    "displayName:zh-CN": "stdio 环境变量",
+    "displayName:en": "stdio Environment",
+    "dataType": "json",
+    "feature": {
+      "virtualType": "transient"
+    },
+    "extension": {
+      "multiline": true,
+      "rows": 4,
+      "placeholder:zh-CN": "{\"GITHUB_PERSONAL_ACCESS_TOKEN\":\"...\"}",
+      "placeholder:en": "{\"GITHUB_PERSONAL_ACCESS_TOKEN\":\"...\"}"
+    }
+  },
+  {
     "code": "tool_count",
     "displayName:zh-CN": "工具数量",
     "displayName:en": "Tool Count",
@@ -1535,6 +1588,16 @@
     "dataType": "datetime",
     "extension": {
       "readonly": true
+    }
+  },
+  {
+    "code": "last_sync_error",
+    "displayName:zh-CN": "最后同步错误",
+    "displayName:en": "Last Sync Error",
+    "dataType": "text",
+    "extension": {
+      "readonly": true,
+      "multiline": true
     }
   },
   {

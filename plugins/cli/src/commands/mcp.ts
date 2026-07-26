@@ -6,14 +6,20 @@ import {
   getServer,
   connectToServer,
   listServerTools,
+  saveMcpConfig,
+  mergePulledMcpConfig,
+  selectMcpServersForPush,
   CONFIG_PATH,
   type McpServerConfig,
 } from '../mcp/client.js';
+import { ApiClient } from '../client/api-client.js';
 import { resolveOutputOptions, printOutput, type ColumnDef } from '../output/formatter.js';
 
 interface McpCommandOptions {
   format?: string;
   agentMode?: boolean;
+  token?: string;
+  env?: string;
 }
 
 // ── aura mcp list ────────────────────────────────────────────────────────────
@@ -58,25 +64,32 @@ export async function mcpListCommand(options: McpCommandOptions): Promise<void> 
 
 // ── aura mcp add ─────────────────────────────────────────────────────────────
 
-export interface McpAddOptions extends McpCommandOptions {
+export interface McpAddOptions extends Omit<McpCommandOptions, 'env'> {
   url?: string;
   command?: string;
   args?: string;
   transport: string;
   description?: string;
   env?: string[];
+  authType?: string;
+  token?: string;
+  header?: string;
 }
 
 export async function mcpAddCommand(name: string, options: McpAddOptions): Promise<void> {
-  const transport = options.transport as 'stdio' | 'sse';
+  const transport = options.transport === 'http'
+    ? 'streamable_http'
+    : options.transport as 'stdio' | 'sse' | 'streamable_http';
 
-  if (transport !== 'stdio' && transport !== 'sse') {
-    console.error(chalk.red(`Invalid transport "${transport}". Must be "stdio" or "sse".`));
+  if (!['stdio', 'sse', 'streamable_http'].includes(transport)) {
+    console.error(chalk.red(
+      `Invalid transport "${transport}". Must be stdio, sse, or streamable_http.`,
+    ));
     process.exit(1);
   }
 
-  if (transport === 'sse' && !options.url) {
-    console.error(chalk.red('SSE transport requires --url'));
+  if (transport !== 'stdio' && !options.url) {
+    console.error(chalk.red(`${transport} transport requires --url`));
     process.exit(1);
   }
 
@@ -87,7 +100,7 @@ export async function mcpAddCommand(name: string, options: McpAddOptions): Promi
 
   const serverConfig: McpServerConfig = { transport };
 
-  if (transport === 'sse') {
+  if (transport !== 'stdio') {
     serverConfig.url = options.url;
   } else {
     serverConfig.command = options.command;
@@ -98,6 +111,25 @@ export async function mcpAddCommand(name: string, options: McpAddOptions): Promi
 
   if (options.description) {
     serverConfig.description = options.description;
+  }
+
+  if (options.authType) {
+    const authType = options.authType.toLowerCase().replace('-', '_');
+    if (!['none', 'bearer', 'api_key'].includes(authType)) {
+      console.error(chalk.red('Invalid auth type. Must be none, bearer, or api_key.'));
+      process.exit(1);
+    }
+    serverConfig.authType = authType as McpServerConfig['authType'];
+    if (authType !== 'none') {
+      if (!options.token) {
+        console.error(chalk.red(`${authType} authentication requires --token`));
+        process.exit(1);
+      }
+      serverConfig.authConfig = {
+        token: options.token,
+        ...(options.header ? { header: options.header } : {}),
+      };
+    }
   }
 
   // Parse --env KEY=VALUE pairs
@@ -114,6 +146,69 @@ export async function mcpAddCommand(name: string, options: McpAddOptions): Promi
   addServer(name, serverConfig);
   console.log(chalk.green(`✓ Added MCP server "${name}" (${transport})`));
   console.log(chalk.dim(`  Config saved to ${CONFIG_PATH}`));
+}
+
+export interface McpSyncOptions extends McpCommandOptions {
+  dryRun?: boolean;
+}
+
+export async function mcpPushCommand(
+  name: string | undefined,
+  options: McpSyncOptions,
+  client: ApiClient = new ApiClient(options),
+): Promise<void> {
+  const local = loadMcpConfig();
+  const servers = selectMcpServersForPush(local, name);
+  await client.requireAuth();
+  const response = await client.post<{
+    dryRun: boolean;
+    changes: Array<{ name: string; action: string; transport: string }>;
+    total: number;
+  }>('/api/agent/mcp-servers/sync', {
+    servers,
+    dryRun: Boolean(options.dryRun),
+  });
+  if (!response.ok) {
+    throw new Error(response.message || 'MCP configuration push failed');
+  }
+  printOutput(response.data.changes, [
+    { key: 'name', header: 'name' },
+    { key: 'action', header: 'action' },
+    { key: 'transport', header: 'transport' },
+  ], resolveOutputOptions(options));
+}
+
+export async function mcpPullCommand(
+  name: string | undefined,
+  options: McpCommandOptions,
+  client: ApiClient = new ApiClient(options),
+): Promise<void> {
+  await client.requireAuth();
+  const response = await client.get<{
+    servers: Record<string, import('../mcp/client.js').PortableMcpServerConfig>;
+  }>('/api/agent/mcp-servers/export');
+  if (!response.ok) {
+    throw new Error(response.message || 'MCP configuration pull failed');
+  }
+  const remoteServers = name
+    ? { [name]: response.data.servers[name] }
+    : response.data.servers;
+  if (name && !response.data.servers[name]) {
+    throw new Error(`Server "${name}" does not exist on the platform`);
+  }
+  const merged = mergePulledMcpConfig(
+    loadMcpConfig(),
+    { servers: remoteServers },
+  );
+  saveMcpConfig(merged.config);
+  console.log(chalk.green(
+    `✓ Pulled ${Object.keys(remoteServers).length} MCP server configuration(s)`,
+  ));
+  if (merged.secretsRequired.length > 0) {
+    console.warn(chalk.yellow(
+      `Secrets must be entered locally for: ${merged.secretsRequired.join(', ')}`,
+    ));
+  }
 }
 
 // ── aura mcp remove ──────────────────────────────────────────────────────────

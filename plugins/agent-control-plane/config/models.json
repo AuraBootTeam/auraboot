@@ -282,6 +282,6 @@
     "semantic_description": "External MCP (Model Context Protocol) server registry: hostname, port, protocol, authentication. Decouples tool hosting from AuraBoot platform. Grounds: where is this tool provider located and how does the agent reach it?",
     "domain_category": "platform",
     "data_sensitivity": "internal",
-    "lifecycle_description": "DRAFT → REGISTERED → HEALTH_CHECK_FAILED → DEREGISTERED (MCP server availability; health checks periodically; HEALTH_CHECK_FAILED is transient, agent may retry or skip)"
+    "lifecycle_description": "ACTIVE ↔ INACTIVE (ACTIVE connections participate in tool discovery and execution; INACTIVE records are retained but never contacted)"
   }
 ]
