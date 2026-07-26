@@ -179,7 +179,7 @@
   },
   {
     "code": "acp_mcp_servers",
-    "parentCode": "acp_agents",
+    "parentCode": "ai_settings",
     "name:zh-CN": "MCP 服务器",
     "name:en": "MCP Servers",
     "path": "/p/mcp_server",
@@ -188,8 +188,7 @@
     "type": 1,
     "permissionCode": "acp_agent_definition",
     "orderNo": 5,
-    "visible": false,
-    "_deprecated": "MOVED_TO_AI_CENTER — Accessed via AI Center > Agent detail. DSL page still accessible at /p/mcp-server.",
+    "visible": true,
     "extension": {
       "platforms": [
         "web"

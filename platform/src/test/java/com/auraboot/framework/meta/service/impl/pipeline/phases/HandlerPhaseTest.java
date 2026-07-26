@@ -4,8 +4,11 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.meta.dto.AsyncTaskDTO;
 import com.auraboot.framework.meta.dto.AsyncTaskSubmitRequest;
 import com.auraboot.framework.meta.dto.CommandExecuteRequest;
+import com.auraboot.framework.meta.entity.BindingRule;
 import com.auraboot.framework.meta.entity.CommandDefinition;
 import com.auraboot.framework.meta.mapper.DynamicDataMapper;
+import com.auraboot.framework.exception.BusinessException;
+import com.auraboot.framework.meta.service.CommandHandler;
 import com.auraboot.framework.meta.service.DataDomainService;
 import com.auraboot.framework.meta.service.DataPermissionEngine;
 import com.auraboot.framework.meta.service.impl.AsyncTaskServiceImpl;
@@ -241,6 +244,34 @@ class HandlerPhaseTest {
         assertThat(handler.capturedContext.get().settings())
                 .containsEntry("__commandCode", BUSINESS_COMMAND_CODE)
                 .containsEntry("__handlerCode", BUSINESS_COMMAND_CODE);
+    }
+
+    @Test
+    void execute_preservesBusinessErrorWithoutLeakingHandlerBeanName() {
+        CommandHandler handler = new CommandHandler() {
+            @Override
+            public String getHandlerName() {
+                return "internalSecretHandlerBean";
+            }
+
+            @Override
+            public Map<String, Object> execute(
+                    com.auraboot.framework.meta.service.CommandHandlerContext context) {
+                throw new BusinessException("MCP stdio shell executables are forbidden: sh");
+            }
+        };
+        when(applicationContext.getBean("internalSecretHandlerBean", CommandHandler.class))
+                .thenReturn(handler);
+        BindingRule rule = new BindingRule();
+        rule.setHandlerClass("internalSecretHandlerBean");
+        CommandPipelineContext ctx =
+                buildContext(BUSINESS_COMMAND_CODE, "pr_purchase_order", Map.of("type", "custom"));
+        ctx.getRulesByType().put("handler", List.of(rule));
+
+        assertThatThrownBy(() -> phase.execute(ctx))
+                .isInstanceOf(BusinessException.class)
+                .hasMessage("MCP stdio shell executables are forbidden: sh")
+                .hasMessageNotContaining("internalSecretHandlerBean");
     }
 
     @Test

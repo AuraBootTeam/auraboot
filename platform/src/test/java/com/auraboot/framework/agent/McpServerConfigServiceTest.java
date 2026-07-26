@@ -175,6 +175,31 @@ public class McpServerConfigServiceTest extends BaseIntegrationTest {
                 .doesNotThrowAnyException();
     }
 
+    @Test
+    @Order(13)
+    @DisplayName("deactivate after generic soft-delete still persists inactive status")
+    void deactivate_afterGenericSoftDelete_persistsInactiveStatus() {
+        Long tenantId = getTestTenant().getId();
+        String pid = mcpServerConfigService.registerServer(
+                tenantId, "Soft-deleted MCP " + System.currentTimeMillis(),
+                "npx", "stdio", "none", null,
+                List.of("-y", "@mcp/soft-deleted"), Map.of());
+        jdbcTemplate.update(
+                "UPDATE ab_agent_mcp_server SET deleted_flag = TRUE "
+                        + "WHERE tenant_id = ? AND pid = ?",
+                tenantId, pid);
+
+        mcpServerConfigService.deactivateServer(tenantId, pid);
+
+        Map<String, Object> row = jdbcTemplate.queryForMap(
+                "SELECT status, deleted_flag FROM ab_agent_mcp_server "
+                        + "WHERE tenant_id = ? AND pid = ?",
+                tenantId, pid);
+        assertThat(row)
+                .containsEntry("status", "inactive")
+                .containsEntry("deleted_flag", true);
+    }
+
     // ──────────────────────────────────────────────────────────────
     // Test 6: register server with null authConfig → list succeeds
     // ──────────────────────────────────────────────────────────────

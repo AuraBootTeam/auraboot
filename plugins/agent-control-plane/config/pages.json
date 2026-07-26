@@ -439,7 +439,10 @@
           {
             "code": "pause",
             "visibleWhen": "row.mission_status === 'active'",
-            "label": "pause",
+            "label": {
+              "zh-CN": "暂停",
+              "en-US": "Pause"
+            },
             "confirm": "pause.confirm",
             "action": {
               "type": "command",
@@ -466,7 +469,10 @@
             "code": "complete",
             "variant": "primary",
             "visibleWhen": "row.mission_status === 'active'",
-            "label": "complete",
+            "label": {
+              "zh-CN": "完成",
+              "en-US": "Complete"
+            },
             "confirm": "complete.confirm",
             "action": {
               "type": "state_transition",
@@ -680,7 +686,10 @@
           },
           {
             "code": "dispatch",
-            "label": "dispatch",
+            "label": {
+              "zh-CN": "派发",
+              "en-US": "Dispatch"
+            },
             "variant": "primary",
             "visibleWhen": "row.assignee_type === 'agent' && row.assignee_id && (row.task_status === 'backlog' || row.task_status === 'todo')",
             "confirm": "action.dispatch.confirm",
@@ -719,7 +728,10 @@
             "code": "complete",
             "variant": "primary",
             "visibleWhen": "row.task_status === 'in_progress'",
-            "label": "complete",
+            "label": {
+              "zh-CN": "完成",
+              "en-US": "Complete"
+            },
             "confirm": "complete.confirm",
             "action": {
               "type": "state_transition",
@@ -731,7 +743,10 @@
             "code": "block",
             "variant": "danger",
             "visibleWhen": "row.task_status === 'in_progress'",
-            "label": "block",
+            "label": {
+              "zh-CN": "阻塞",
+              "en-US": "Block"
+            },
             "confirm": "block.confirm",
             "action": {
               "type": "command",
@@ -743,7 +758,10 @@
             "code": "cancel",
             "variant": "danger",
             "visibleWhen": "row.task_status !== 'done' && row.task_status !== 'cancelled'",
-            "label": "cancel_task",
+            "label": {
+              "zh-CN": "取消任务",
+              "en-US": "Cancel Task"
+            },
             "confirm": "cancel.confirm",
             "action": {
               "type": "state_transition",
@@ -980,7 +998,10 @@
             "code": "cancel",
             "variant": "danger",
             "visibleWhen": "row.run_status === 'running'",
-            "label": "cancel_run",
+            "label": {
+              "zh-CN": "取消运行",
+              "en-US": "Cancel Run"
+            },
             "confirm": "cancel.confirm",
             "action": {
               "type": "state_transition",
@@ -1373,7 +1394,10 @@
           {
             "code": "pause",
             "visibleWhen": "row.schedule_status === 'active'",
-            "label": "pause",
+            "label": {
+              "zh-CN": "暂停",
+              "en-US": "Pause"
+            },
             "confirm": "pause.confirm",
             "action": {
               "type": "state_transition",
@@ -1385,7 +1409,10 @@
             "code": "activate",
             "variant": "primary",
             "visibleWhen": "row.schedule_status === 'paused'",
-            "label": "activate",
+            "label": {
+              "zh-CN": "启用",
+              "en-US": "Activate"
+            },
             "confirm": "activate.confirm",
             "action": {
               "type": "state_transition",

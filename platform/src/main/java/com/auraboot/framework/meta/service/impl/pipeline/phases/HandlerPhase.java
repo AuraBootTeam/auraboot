@@ -144,10 +144,13 @@ public class HandlerPhase implements CommandPhase {
                 if (result != null) {
                     handlerResults.putAll(result);
                 }
+            } catch (BusinessException e) {
+                log.warn("Handler {} rejected command: {}", rule.getHandlerClass(), e.getMessage());
+                throw e;
             } catch (Exception e) {
                 log.error("Handler {} execution failed: {}", rule.getHandlerClass(), e.getMessage(), e);
                 throw new BusinessException(ResponseCode.BadParam,
-                        "Handler '" + rule.getHandlerClass() + "' failed: " + e.getMessage());
+                        "Command handler failed");
             }
         }
 

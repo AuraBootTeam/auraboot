@@ -116,4 +116,29 @@ class McpServerCommandHandlerTest {
                 .hasMessageContaining("pid is required");
         verifyNoInteractions(service);
     }
+
+    @Test
+    void policyRejectionBecomesAUserSafeBusinessError() {
+        McpServerConfigService service = mock(McpServerConfigService.class);
+        when(service.registerServer(
+                7L, "Unsafe", "sh", "stdio", "none",
+                Map.of(), List.of(), Map.of()))
+                .thenThrow(new IllegalArgumentException(
+                        "MCP stdio shell executables are forbidden: sh"));
+        McpServerCommandHandler handler =
+                new McpServerCommandHandler(service, new ObjectMapper());
+        CommandHandlerContext context = CommandHandlerContext.builder()
+                .tenantId(7L)
+                .commandCode("acp:create_mcp_server")
+                .payload(Map.of(
+                        "server_name", "Unsafe",
+                        "server_url", "sh",
+                        "transport_type", "stdio",
+                        "auth_type", "none"))
+                .build();
+
+        assertThatThrownBy(() -> handler.execute(context))
+                .isInstanceOf(com.auraboot.framework.exception.BusinessException.class)
+                .hasMessage("MCP stdio shell executables are forbidden: sh");
+    }
 }

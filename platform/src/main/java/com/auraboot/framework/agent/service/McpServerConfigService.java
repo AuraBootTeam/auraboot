@@ -178,8 +178,7 @@ public class McpServerConfigService {
     public void deactivateServer(Long tenantId, String pid) {
         int updated = jdbcTemplate.update(
                 "UPDATE ab_agent_mcp_server SET status = 'inactive', updated_at = NOW() "
-                        + "WHERE tenant_id = ? AND pid = ? "
-                        + "AND (deleted_flag = FALSE OR deleted_flag IS NULL)",
+                        + "WHERE tenant_id = ? AND pid = ?",
                 tenantId, pid);
         if (updated == 0) {
             log.warn("deactivateServer: no server found for tenant={} pid={}", tenantId, pid);

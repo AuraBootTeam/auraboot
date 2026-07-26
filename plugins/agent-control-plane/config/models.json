@@ -27,7 +27,8 @@
     "extension": {
       "titleField": "title",
       "tableName": "ab_mission",
-      "softDelete": true
+      "softDelete": true,
+      "skipDetailPage": true
     },
     "semantic_description": "High-level mission/goal decomposing into one or more agent_task entries. Captures intent, expected outcome, and success criteria. Grounds: what is the business objective we're trying to accomplish?",
     "domain_category": "platform",
@@ -45,7 +46,8 @@
       "titleField": "title",
       "subtitleField": "task_status",
       "tableName": "ab_agent_task",
-      "softDelete": true
+      "softDelete": true,
+      "skipDetailPage": true
     },
     "semantic_description": "Individual task assigned to an agent or human: work item capturing input requirements, owner, deadline, and status. May be part of a mission or standalone. Grounds: what discrete unit of work needs to be done?",
     "domain_category": "platform",
@@ -63,7 +65,8 @@
       "titleField": "task_id",
       "subtitleField": "run_status",
       "tableName": "ab_agent_run",
-      "softDelete": false
+      "softDelete": false,
+      "skipDetailPage": true
     },
     "semantic_description": "Execution trace of one agent task: plan (steps), tool calls (input/output), token/cost accounting, state transitions, and final outcome. Immutable audit record. Grounds: what happened when we executed this task and how many resources were consumed?",
     "domain_category": "platform",
@@ -81,7 +84,8 @@
       "titleField": "title",
       "subtitleField": "artifact_type",
       "tableName": "ab_agent_artifact",
-      "softDelete": true
+      "softDelete": true,
+      "skipDetailPage": true
     },
     "semantic_description": "Output artifact produced by agent run: generated document, code snippet, report, or data export. Linked to originating run_id and includes metadata (mime_type, size, storage_url). Grounds: what tangible asset did the agent create and where can I access it?",
     "domain_category": "platform",
@@ -99,7 +103,8 @@
       "titleField": "title",
       "subtitleField": "schedule_type",
       "tableName": "ab_agent_schedule",
-      "softDelete": true
+      "softDelete": true,
+      "skipDetailPage": true
     },
     "semantic_description": "Scheduled or event-triggered agent task execution: cron expression, enabled flag, and linked agent_definition. Controls when agent wakes up and auto-dispatches. Grounds: when should this agent run autonomously?",
     "domain_category": "platform",
@@ -116,7 +121,8 @@
     "extension": {
       "titleField": "policy_name",
       "tableName": "ab_approval_policy",
-      "softDelete": true
+      "softDelete": true,
+      "skipDetailPage": true
     },
     "semantic_description": "Policy governing when agent actions require human approval: risk_level threshold, field pattern matching, or tool-specific gates. Evaluated during EXECUTE phase of event loop. Grounds: which agent actions are risky enough to block and require human authorization?",
     "domain_category": "platform",
@@ -134,7 +140,8 @@
       "titleField": "approval_title",
       "subtitleField": "approval_status",
       "tableName": "ab_agent_approval",
-      "softDelete": false
+      "softDelete": false,
+      "skipDetailPage": true
     },
     "semantic_description": "Human-in-the-loop approval request for a risky agent action: queued action_id, requested_by (agent), assigned_to (human), deadline, and approval_result (approved/rejected/expired). Immutable audit record. Grounds: is this dangerous action authorized?",
     "domain_category": "platform",
@@ -151,7 +158,8 @@
     "extension": {
       "titleField": "memory_title",
       "subtitleField": "memory_type",
-      "tableName": "ab_agent_memory"
+      "tableName": "ab_agent_memory",
+      "skipDetailPage": true
     },
     "semantic_description": "Persistent memory entry capturing facts, preferences, or lessons for agents (Mem0 three-layer: session/user/agent). append-only, tagged with importance/validity_window/source_run_id. Grounds: what should the agent remember from prior experience to improve future decisions?",
     "domain_category": "platform",
@@ -169,7 +177,8 @@
       "titleField": "obs_title",
       "subtitleField": "observation_type",
       "tableName": "ab_agent_observation",
-      "softDelete": false
+      "softDelete": false,
+      "skipDetailPage": true
     },
     "semantic_description": "System metrics, costs, and observations during agent execution: token_count, latency_ms, cost_usd, error_messages, LLM model used. Grounds: is the agent performing within budget and latency SLA?",
     "domain_category": "platform",
@@ -187,7 +196,8 @@
       "titleField": "tool_name",
       "subtitleField": "tool_type",
       "tableName": "ab_agent_tool",
-      "softDelete": true
+      "softDelete": true,
+      "skipDetailPage": true
     },
     "semantic_description": "Executable tool definition available to agents: DSL command, HTTP API, MCP server endpoint, or LLM-native function. Includes parameter schema, requires_approval flag, cost model, and risk_level. Grounds: what single capability can this agent invoke and with what constraints?",
     "domain_category": "platform",
@@ -205,7 +215,8 @@
       "titleField": "skill_name",
       "subtitleField": "skill_level",
       "tableName": "ab_agent_skill",
-      "softDelete": true
+      "softDelete": true,
+      "skipDetailPage": true
     },
     "semantic_description": "Reusable skill bundle packaging atomic tools and workflow patterns. Includes instructions, example uses, and bundled tools. Can be deployed to agent as a group or individually. Grounds: what is this skill and when should the agent invoke it as a unit?",
     "domain_category": "platform",
@@ -223,7 +234,8 @@
       "titleField": "action_code",
       "subtitleField": "action_status",
       "tableName": "ab_agent_action",
-      "softDelete": false
+      "softDelete": false,
+      "skipDetailPage": true
     },
     "semantic_description": "ACP ActionEngine audit trail: every tool execution, approval decision, or state change is logged. Captures actor (agent_code or user_id), action_type, payload_before/after, and timestamp. Immutable audit for compliance. Grounds: who did what when and what changed?",
     "domain_category": "platform",
@@ -241,7 +253,8 @@
       "titleField": "alias",
       "subtitleField": "model_code",
       "tableName": "ab_object_alias",
-      "softDelete": false
+      "softDelete": false,
+      "skipDetailPage": true
     },
     "semantic_description": "D1 Grounding alias mapping: natural language synonyms/abbreviations to canonical model codes (e.g., 'customer' → 'tcrm_account', 'PO' → 'pr_purchase_order'). Enables LLM to understand user intent from synonyms. Grounds: when the user says X, which data model do they mean?",
     "domain_category": "platform",
@@ -259,7 +272,8 @@
       "titleField": "term",
       "subtitleField": "term_type",
       "tableName": "ab_semantic_term",
-      "softDelete": false
+      "softDelete": false,
+      "skipDetailPage": true
     },
     "semantic_description": "D1 Grounding semantic term definition: domain-specific jargon (e.g., 'MRR' = Monthly Recurring Revenue, 'SKU' = Stock Keeping Unit) with definition and usage context. Injected into LLM system prompt to prevent hallucinations. Grounds: what does this industry term mean in our context?",
     "domain_category": "platform",

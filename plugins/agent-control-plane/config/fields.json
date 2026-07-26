@@ -1468,18 +1468,24 @@
       "options": [
         {
           "value": "stdio",
-          "label:zh-CN": "STDIO",
-          "label:en": "STDIO"
+          "label": {
+            "zh-CN": "STDIO",
+            "en-US": "STDIO"
+          }
         },
         {
           "value": "sse",
-          "label:zh-CN": "SSE",
-          "label:en": "SSE"
+          "label": {
+            "zh-CN": "SSE",
+            "en-US": "SSE"
+          }
         },
         {
           "value": "streamable_http",
-          "label:zh-CN": "Streamable HTTP",
-          "label:en": "Streamable HTTP"
+          "label": {
+            "zh-CN": "Streamable HTTP",
+            "en-US": "Streamable HTTP"
+          }
         }
       ]
     }
@@ -1493,18 +1499,24 @@
       "options": [
         {
           "value": "none",
-          "label:zh-CN": "无",
-          "label:en": "None"
+          "label": {
+            "zh-CN": "无",
+            "en-US": "None"
+          }
         },
         {
           "value": "bearer",
-          "label:zh-CN": "Bearer Token",
-          "label:en": "Bearer Token"
+          "label": {
+            "zh-CN": "Bearer Token",
+            "en-US": "Bearer Token"
+          }
         },
         {
           "value": "api_key",
-          "label:zh-CN": "API Key",
-          "label:en": "API Key"
+          "label": {
+            "zh-CN": "API Key",
+            "en-US": "API Key"
+          }
         }
       ]
     }

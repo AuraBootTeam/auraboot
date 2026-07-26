@@ -84,16 +84,20 @@ public class McpServerCommandHandler implements CommandHandler {
             return result(create ? "create" : "update", pid, true);
         }
 
-        if (create) {
-            pid = configService.registerServer(
-                    context.getTenantId(), name, endpoint, transport, authType,
-                    authConfig,
-                    args == null ? List.of() : args,
-                    environment == null ? Map.of() : environment);
-        } else {
-            configService.updateServer(
-                    context.getTenantId(), pid, name, endpoint, transport, authType,
-                    authConfig, args, environment);
+        try {
+            if (create) {
+                pid = configService.registerServer(
+                        context.getTenantId(), name, endpoint, transport, authType,
+                        authConfig,
+                        args == null ? List.of() : args,
+                        environment == null ? Map.of() : environment);
+            } else {
+                configService.updateServer(
+                        context.getTenantId(), pid, name, endpoint, transport, authType,
+                        authConfig, args, environment);
+            }
+        } catch (IllegalArgumentException error) {
+            throw new BusinessException(error.getMessage());
         }
         return result(create ? "create" : "update", pid, false);
     }

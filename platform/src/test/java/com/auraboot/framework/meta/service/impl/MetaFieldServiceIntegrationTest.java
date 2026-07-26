@@ -13,6 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -193,5 +195,23 @@ public class MetaFieldServiceIntegrationTest extends BaseIntegrationTest {
         log.info("✓ 完整 CRUD 生命周期测试通过 (更新和删除步骤跳过)");
     }
 
+    @Test
+    @Order(9)
+    @DisplayName("首次创建保留 transient 字段特性")
+    public void testCreatePersistsTransientFeature() {
+        String fieldCode = "fld_transient_" + System.currentTimeMillis();
+        MetaFieldCreateRequest request = new MetaFieldCreateRequest();
+        request.setCode(fieldCode);
+        request.setDataType("string");
+        request.setFeature(Map.of("virtualType", "transient"));
+
+        MetaFieldDTO created = metaFieldService.create(request);
+        MetaFieldDTO persisted = metaFieldService.findByPid(created.getPid());
+
+        assertNotNull(persisted, "创建后的字段应该可查询");
+        assertNotNull(persisted.getFeature(), "字段特性应该持久化");
+        assertEquals("transient", persisted.getFeature().get("virtualType"),
+                "首次创建不能丢失 transient 特性，否则动态查询会访问不存在的物理列");
+    }
 
 }

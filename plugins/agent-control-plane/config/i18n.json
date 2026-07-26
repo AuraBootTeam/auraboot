@@ -295,7 +295,22 @@
   { "key": "model.semantic_term.description.label", "zh-CN": "描述", "en-US": "Description", "source": "import", "refType": "field" },
   { "key": "model.semantic_term.acp_priority.label", "zh-CN": "优先级", "en-US": "Priority", "source": "import", "refType": "field" },
 
+  { "key": "model.mcp_server._meta.label", "zh-CN": "MCP 服务器", "en-US": "MCP Server", "source": "import", "refType": "model" },
+  { "key": "model.mcp_server.server_name.label", "zh-CN": "服务器名称", "en-US": "Server Name", "source": "import", "refType": "field" },
+  { "key": "model.mcp_server.server_url.label", "zh-CN": "服务器地址", "en-US": "Server URL", "source": "import", "refType": "field" },
+  { "key": "model.mcp_server.transport_type.label", "zh-CN": "传输类型", "en-US": "Transport Type", "source": "import", "refType": "field" },
+  { "key": "model.mcp_server.auth_type.label", "zh-CN": "认证类型", "en-US": "Auth Type", "source": "import", "refType": "field" },
+  { "key": "model.mcp_server.mcp_auth_secret.label", "zh-CN": "认证密钥", "en-US": "Authentication Secret", "source": "import", "refType": "field" },
+  { "key": "model.mcp_server.mcp_api_key_header.label", "zh-CN": "API Key 请求头", "en-US": "API Key Header", "source": "import", "refType": "field" },
+  { "key": "model.mcp_server.stdio_args.label", "zh-CN": "stdio 参数", "en-US": "stdio Arguments", "source": "import", "refType": "field" },
+  { "key": "model.mcp_server.mcp_stdio_env.label", "zh-CN": "stdio 环境变量", "en-US": "stdio Environment", "source": "import", "refType": "field" },
+  { "key": "model.mcp_server.status.label", "zh-CN": "状态", "en-US": "Status", "source": "import", "refType": "field" },
+  { "key": "model.mcp_server.tool_count.label", "zh-CN": "工具数量", "en-US": "Tool Count", "source": "import", "refType": "field" },
+  { "key": "model.mcp_server.last_synced_at.label", "zh-CN": "最后同步时间", "en-US": "Last Synced At", "source": "import", "refType": "field" },
+  { "key": "model.mcp_server.last_sync_error.label", "zh-CN": "最后同步错误", "en-US": "Last Sync Error", "source": "import", "refType": "field" },
+
   { "key": "menu.acp_actions", "zh-CN": "Agent 动作", "en-US": "Agent Actions", "source": "import", "refType": "menu" },
   { "key": "menu.acp_object_aliases", "zh-CN": "对象别名", "en-US": "Object Aliases", "source": "import", "refType": "menu" },
-  { "key": "menu.acp_semantic_terms", "zh-CN": "语义术语", "en-US": "Semantic Terms", "source": "import", "refType": "menu" }
+  { "key": "menu.acp_semantic_terms", "zh-CN": "语义术语", "en-US": "Semantic Terms", "source": "import", "refType": "menu" },
+  { "key": "menu.acp_mcp_servers", "zh-CN": "MCP 服务器", "en-US": "MCP Servers", "source": "import", "refType": "menu" }
 ]
