@@ -71,6 +71,23 @@ class CommandHandlerAsyncTaskExecutorTest {
     }
 
     @Test
+    void injectsAuthenticatedUserAsServerOwnedPluginSetting() throws Exception {
+        AtomicReference<CommandHandlerExtension.CommandContext> captured = new AtomicReference<>();
+        CommandHandlerExtension handler = mock(CommandHandlerExtension.class);
+        when(handler.execute(org.mockito.ArgumentMatchers.any())).thenAnswer(inv -> {
+            captured.set(inv.getArgument(0));
+            return Map.of("success", true);
+        });
+        when(extensionRegistry.getCommandHandler(eq("bom:import_material_library")))
+                .thenReturn(Optional.of(handler));
+
+        AsyncTaskResult result = executor.execute(params("bom:import_material_library"), noop);
+
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(captured.get().settings()).containsEntry("__currentUser", "45");
+    }
+
+    @Test
     void failsWhenHandlerNotRegistered() {
         when(extensionRegistry.getCommandHandler(org.mockito.ArgumentMatchers.anyString()))
                 .thenReturn(Optional.empty());

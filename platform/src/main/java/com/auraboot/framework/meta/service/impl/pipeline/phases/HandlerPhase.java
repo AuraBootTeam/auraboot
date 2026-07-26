@@ -524,6 +524,12 @@ public class HandlerPhase implements CommandPhase {
             pluginSettings.putAll(resolveHandlerParams(execConfig));
             pluginSettings.put("__commandCode", commandCode);
             pluginSettings.put("__handlerCode", handlerCode);
+            // Authenticated actor identity is a server-owned setting, never a client payload
+            // value. Hybrid handlers use it for independent confirmation/audit invariants.
+            // Keep the established String shape expected by existing plugin handlers.
+            if (userId != null) {
+                pluginSettings.put("__currentUser", userId.toString());
+            }
             pluginSettings.put("__dataAccessor",
                     new com.auraboot.framework.plugin.pf4j.DynamicDataAccessorImpl(dynamicDataService));
             if (biTemporalService != null) {

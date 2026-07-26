@@ -107,6 +107,9 @@ public class CommandHandlerAsyncTaskExecutor implements AsyncTaskExecutor {
             Map<String, Object> pluginSettings = new HashMap<>(handlerParams);
             pluginSettings.put("__commandCode", commandCode != null ? commandCode : handlerCode);
             pluginSettings.put("__handlerCode", handlerCode);
+            if (userId != null) {
+                pluginSettings.put("__currentUser", userId.toString());
+            }
             pluginSettings.put("__dataAccessor", new DynamicDataAccessorImpl(dynamicDataService));
             final ProgressCallback cb = callback;
             pluginSettings.put("__progressReporter",

@@ -23,26 +23,17 @@
 //   6. inv:confirm_warehouse_in        → ConfirmWarehouseInHandler creates one inv_balance row per
 //      line, each with inv_bal_lot_id linked to the pre-created lot. THIS is the real pipeline
 //      creating the lot-linked balance FEFO sorts on.
-//   7. Normalize inv_bal_available_qty = inv_bal_qty via the dynamic-update API — see the honest
-//      caveat below.
+//   7. Assert the inbound pipeline initialized inv_bal_available_qty = inv_bal_qty for fresh,
+//      unreserved stock (#244). No update workaround is allowed here.
 //   8. inv:create_warehouse_out + inv:add_wh_out_line → the pick demand (an inv_outbound record;
 //      GeneratePickOrderHandler reads context.recordId() as an inv_outbound, its inv_out_date as the
 //      production-window end, and its lines' product/qty).
 //   9. inv:generate_pick_order (targetRecordPid = outbound) → the handler under test: sorts the
 //      lot-linked inv_balance candidates FEFO/FIFO and applies the expiry-window exclusion.
 //
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// HONEST CAVEAT (AGENTS §15 / §1 — do not fake, do not raw-insert balance):
-//   The inbound pipeline (updateInventoryWithDimensions create-branch) sets inv_bal_qty but NEVER
-//   initializes inv_bal_available_qty; only reserveInventoryForPick / the wave-release path derive
-//   it (= onhand − reserved − blocked). generate_pick_order's candidate filter skips any row with
-//   available_qty <= 0, so a FRESHLY-INBOUNDED lot has available_qty = NULL → 0 → is unpickable.
-//   That is a real end-to-end gap (#217 shipped the FEFO SORT, but the feature is unreachable with
-//   pipeline-seeded fresh stock until a reservation cycle happens to populate available_qty). This
-//   golden does NOT paper over the SORT under test: it only sets available_qty to the exact value
-//   calculateAvailableQty would derive for zero-reservation fresh stock (= qty) via the platform
-//   update API, on rows the real pipeline already created. It never raw-inserts a balance row and
-//   never sets a lot link — those come from ConfirmWarehouseInHandler. The gap is reported, not hidden.
+// #244 closed the former fresh-stock reachability gap: ConfirmWarehouseInHandler now initializes
+// available quantity on first write. This golden deliberately performs no balance update; reverting
+// #244 makes the fresh-available assertion and the downstream pick assertions go RED.
 //
 // FALSIFIABILITY: scenarios A (fefo) and C (fifo) seed the SAME two lots (NEAR +5d, FAR +90d) and
 // the allocation FLIPS — fefo picks NEAR, fifo picks FAR. If the strategy sort were ignored/broken
@@ -125,10 +116,11 @@ async function inboundReceipt(whId, prodId, locId, lines) {
   return rcpt.recordId;
 }
 
-// Normalize available_qty = qty on every balance row of this warehouse (see honest caveat at top).
-function normalizeAvailable(whId) {
-  const rows = queryDb(`select pid, inv_bal_qty from mt_inv_balance where inv_bal_warehouse_id='${sq(whId)}'`);
-  return Promise.all(rows.map(([pid, qty]) => dynUpdate('inv_balance', pid, { inv_bal_available_qty: Number(qty) })));
+function assertFreshAvailableInitialized(whId, scenario) {
+  const rows = queryDb(`select inv_bal_qty, inv_bal_available_qty from mt_inv_balance where inv_bal_warehouse_id='${sq(whId)}'`);
+  R.check('FR-10', `${scenario}: fresh inbound initializes available_qty without a test workaround`,
+    rows.length > 0 && rows.every(([qty, available]) => Number(qty) === Number(available)),
+    `balances=${JSON.stringify(rows)}`);
 }
 
 // Create the pick demand (outbound + line) and run generate_pick_order → returns the pick line rows.
@@ -164,7 +156,7 @@ async function scenarioFefo() {
   const bal = queryDb(`select inv_bal_lot_id from mt_inv_balance where inv_bal_warehouse_id='${sq(wh)}' order by created_at`);
   R.check('FR-10', 'A: pipeline created 2 lot-linked balance rows',
     bal.length === 2 && bal.every((r) => r[0]) , `lot_ids=${bal.map((r) => r[0]).join(',')}`);
-  await normalizeAvailable(wh);
+  assertFreshAvailableInitialized(wh, 'A');
 
   const { gen, lines } = await generatePick(wh, prod, 0, 50); // window=today: both lots kept
   R.check('FR-10', 'A: generate_pick_order executed', gen.ok, `code=${gen.code} status=${gen.status} ctx=${JSON.stringify(gen.raw?.context || '').slice(0, 120)}`);
@@ -185,7 +177,7 @@ async function scenarioExclusion() {
   const short = await createLot(`LOT-SHORT-${u}`, prod, 5);   // expires in 5d — SOONEST
   const ok = await createLot(`LOT-OK-${u}`, prod, 90);        // expires in 90d
   await inboundReceipt(wh, prod, loc, [{ lotCode: short.code, qty: 100 }, { lotCode: ok.code, qty: 100 }]);
-  await normalizeAvailable(wh);
+  assertFreshAvailableInitialized(wh, 'B');
 
   // Production-window end = today+30. SHORT (today+5) expires BEFORE the window → excluded even though
   // it is fully available and sorts first by FEFO. OK (today+90) is kept.
@@ -212,7 +204,7 @@ async function scenarioFifoFlip(refLots) {
   await inboundReceipt(wh, prod, loc, [{ lotCode: far.code, qty: 100 }]);
   await sleep(50);
   await inboundReceipt(wh, prod, loc, [{ lotCode: near.code, qty: 100 }]);
-  await normalizeAvailable(wh);
+  assertFreshAvailableInitialized(wh, 'C');
 
   const { gen, lines } = await generatePick(wh, prod, 0, 50);
   R.check('FR-10', 'C: generate_pick_order executed', gen.ok, `code=${gen.code} status=${gen.status} ctx=${JSON.stringify(gen.raw?.context || '').slice(0, 120)}`);
