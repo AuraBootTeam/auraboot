@@ -69,6 +69,28 @@ export function referencedCommands(pluginDir) {
   return found;
 }
 
+/**
+ * Commands referenced by any page/menu in the scanned plugin roots.
+ *
+ * A command's implementation and its UI entry point may deliberately live in
+ * different plugins. QuoteOps, for example, keeps pricing handlers in
+ * quote-engine while quote-core owns the assembled quote workbench. Requiring
+ * the reference to sit beside the declaration reports a reachable cross-plugin
+ * action as an orphan.
+ */
+export function referencedCommandsInRoots(roots) {
+  const found = new Set();
+  for (const root of roots) {
+    if (!fs.existsSync(root)) continue;
+    for (const entry of fs.readdirSync(root).sort()) {
+      const pluginDir = path.join(root, entry);
+      if (!fs.statSync(pluginDir).isDirectory()) continue;
+      for (const code of referencedCommands(pluginDir)) found.add(code);
+    }
+  }
+  return found;
+}
+
 function isExempt(code, exemptSuffixes) {
   const local = code.includes(':') ? code.slice(code.indexOf(':') + 1) : code;
   return exemptSuffixes.some((p) => local.startsWith(p));
@@ -78,6 +100,7 @@ export function auditReachability({ roots, config }) {
   const findings = [];
   const summary = [];
   const exempt = config.exemptPrefixes ?? DEFAULT_EXEMPT_SUFFIXES;
+  const referenced = referencedCommandsInRoots(roots);
 
   for (const root of roots) {
     if (!fs.existsSync(root)) {
@@ -91,7 +114,6 @@ export function auditReachability({ roots, config }) {
       const declared = declaredCommands(pluginDir);
       if (declared.length === 0) continue;
 
-      const referenced = referencedCommands(pluginDir);
       const allow = config.allow?.[entry] ?? {};
       let unreachable = 0;
 

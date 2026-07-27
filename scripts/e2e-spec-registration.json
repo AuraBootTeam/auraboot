@@ -11,19 +11,5 @@
   "allow": {
     "web-admin/tests/e2e/pcba-solution": {}
   },
-  "baseline": {
-    "web-admin/tests/e2e/pcba-solution": [
-      "bom-format-review-ui",
-      "bom-workbench-lines",
-      "quote-actions",
-      "quote-bom-badfile-permissions",
-      "quote-bom-convert-export",
-      "quote-bom-customer-crud-isolation",
-      "quote-bom-forms-search-datascope",
-      "quote-bom-org-admin",
-      "quote-data-scope-isolation",
-      "quote-doc-excel",
-      "quote-form-dropdowns"
-    ]
-  }
+  "baseline": {}
 }

@@ -82,6 +82,21 @@ const quoteOpsCurrentSpecNames = [
   // heavily guarded; this one had no UI coverage at all until now.
   'bom-import-gateway-manual-path',
   'bom-material-library-golden',
+  // Current breadth/depth suites. These cover bad input, required-empty forms,
+  // self/all data scopes, BOM review/export, quote actions, dropdowns, org
+  // administration, and parsed Excel artifacts. Keeping them outside this
+  // array made the quoteops project silently select none of them.
+  'bom-format-review-ui',
+  'bom-workbench-lines',
+  'quote-actions',
+  'quote-bom-badfile-permissions',
+  'quote-bom-convert-export',
+  'quote-bom-customer-crud-isolation',
+  'quote-bom-forms-search-datascope',
+  'quote-bom-org-admin',
+  'quote-data-scope-isolation',
+  'quote-doc-excel',
+  'quote-form-dropdowns',
 ];
 const quoteOpsCurrentGatePattern = new RegExp(
   String.raw`.*\/pcba-solution\/(${quoteOpsCurrentSpecNames.join('|')})\.spec\.ts$`,

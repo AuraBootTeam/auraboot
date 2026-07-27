@@ -45,8 +45,8 @@ async function waitForAsyncTaskTerminal(page: Page, taskCode: string): Promise<a
 function createInvalidCorrectedBomWorkbook(filePath: string): string {
   const workbook = XLSXUtils.book_new();
   const worksheet = XLSXUtils.aoa_to_sheet([
-    ['Part Number', 'Count'],
-    ['BAD-HEADER-ROW', 1],
+    ['Notes', 'Owner'],
+    ['opaque-row-value', 'e2e-owner'],
   ]);
   XLSXUtils.book_append_sheet(workbook, worksheet, 'Invalid BOM');
   const bytes = write(workbook, { bookType: 'xlsx', type: 'buffer' });
@@ -88,10 +88,12 @@ test.describe('QuoteOps visual feedback golden', () => {
     const dirtyQuotes = await queryDynamicRecords(page, 'qo_quote_common', [
       { fieldName: 'qo_quote_notes', operator: 'EQ', value: notes },
     ]);
-    expect(dirtyQuotes, 'empty submit must not persist a quote with the draft note').toHaveLength(0);
+    expect(dirtyQuotes, 'empty submit must not persist a quote with the draft note').toHaveLength(
+      0,
+    );
   });
 
-  test('surfaces async failure feedback for an invalid corrected BOM upload', async ({
+  test('surfaces pending-recognition feedback for an unreadable quick-lane BOM', async ({
     page,
   }, testInfo) => {
     const created: CreatedRows = await seedQuoteForCorrectedBomUpload(page);
@@ -111,7 +113,9 @@ test.describe('QuoteOps visual feedback golden', () => {
       const commandResponsePromise = page.waitForResponse(
         (response) =>
           response.request().method() === 'POST' &&
-          response.url().includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom'),
+          response
+            .url()
+            .includes('/api/meta/commands/execute/qo_quote_common:import_corrected_bom'),
         { timeout: 60_000 },
       );
       const fileChooserPromise = page.waitForEvent('filechooser', { timeout: 10_000 });
@@ -132,35 +136,50 @@ test.describe('QuoteOps visual feedback golden', () => {
         timeout: 20_000,
       });
       const task = await waitForAsyncTaskTerminal(page, taskCode!);
-      expect(task.status).toBe('failed');
+      expect(task.status).toBe('completed');
 
       // The corrected-BOM upload uses panel feedback (promptUpload.feedbackMode='panel'):
-      // failure surfaces in the import-result modal (AsyncTaskProgressModal), NOT the inline
-      // status-banner. Assert the visible failure the user actually sees — the modal shows the
-      // failed state and the real backend error, so a bad file is never a silent success.
-      await expect(page.getByText(/任务执行失败\s*\/\s*Failed/i).first()).toBeVisible({
+      // an unreadable customer layout is preserved for the Yunhan quick lane instead of being
+      // discarded. The task completes, while the import record and row visibly stay partial/pending.
+      await expect(page.getByText(/已完成|Completed/i).first()).toBeVisible({
         timeout: 20_000,
       });
-      // The standard-BOM-only requirement was lifted: a customer/raw BOM now parses
-      // into the quick lane, so "not a standard BOM" is no longer a rejection reason.
-      // This workbook is rejected for a different reason — its "Part Number"/"Count"
-      // 2-column header (above) matches neither an MPN/spec column nor a QTY column,
-      // so no usable header row is found at all. Assert the user-facing Chinese message
-      // for that, and its diagnostic tail, so a raw English exception can never leak
-      // back into the UI unnoticed.
-      await expect(page.getByText(/无法识别为有效的BOM/i).first()).toBeVisible({
-        timeout: 20_000,
-      });
-      await expect(page.getByText(/未找到同时包含.*表头行/i).first()).toBeVisible();
 
       const imports = await queryDynamicRecords(page, 'qo_bom_import_common', [
         { fieldName: 'qo_bi_quote_id', operator: 'EQ', value: created.quoteId },
       ]);
+      expect(imports).toHaveLength(1);
+      expect(imports[0]).toEqual(
+        expect.objectContaining({
+          qo_bi_status: 'partial',
+          qo_bi_total_rows: 1,
+          qo_bi_valid_rows: 0,
+          qo_bi_error_rows: 0,
+        }),
+      );
+      expect(String(imports[0].qo_bi_error_report ?? '')).toContain('待云汉识别');
+
+      const importRows = await queryDynamicRecords(page, 'qo_bom_import_row_common', [
+        { fieldName: 'qo_bir_quote_id', operator: 'EQ', value: created.quoteId },
+      ]);
+      expect(importRows).toHaveLength(1);
+      expect(importRows[0].qo_bir_validation_status).toBe('pending');
+      expect(String(importRows[0].qo_bir_validation_message ?? '')).toContain('待云汉识别');
+
       const quoteLines = await queryDynamicRecords(page, 'qo_quote_line_common', [
         { fieldName: 'qo_ql_quote_id', operator: 'EQ', value: created.quoteId },
       ]);
-      expect(imports, 'invalid workbook must not leave an import header').toHaveLength(0);
-      expect(quoteLines, 'invalid workbook must not create quote lines').toHaveLength(0);
+      expect(
+        quoteLines,
+        'unreadable raw row must be preserved for upstream recognition',
+      ).toHaveLength(1);
+      expect(quoteLines[0].qo_ql_validation_status).toBe('pending');
+      expect(String(quoteLines[0].qo_ql_description ?? '')).toContain('opaque-row-value');
+
+      const main = page.locator('main');
+      await expect(main).toContainText('invalid-corrected-bom.xlsx', { timeout: 20_000 });
+      await expect(main).toContainText(/部分导入|partial/i);
+      await expect(main).toContainText(/待云汉识别/i);
     } finally {
       await cleanupRows(page, created);
     }

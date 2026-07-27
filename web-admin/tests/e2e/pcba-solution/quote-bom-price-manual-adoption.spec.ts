@@ -129,7 +129,8 @@ test.describe('PCBA quote BOM price manual adoption', () => {
       expect(headers).toEqual([
         'Excel行',
         '物料',
-        'BOM用量',
+        '单套用量',
+        '总用量',
         PURCHASE_ANALYSIS_RECENT_PRICE_LABEL,
         YUNHAN_PRICE_LABEL,
         'DeepSeek建议价',
@@ -144,7 +145,8 @@ test.describe('PCBA quote BOM price manual adoption', () => {
         ]),
       );
       expect(cellTextByHeader.get('Excel行')).toBe('2');
-      expect(cellTextByHeader.get('BOM用量')).toBe('10');
+      expect(cellTextByHeader.get('单套用量')).toBe('10');
+      expect(cellTextByHeader.get('总用量')).toBe('10');
       expect(cellTextByHeader.get(PURCHASE_ANALYSIS_RECENT_PRICE_LABEL) ?? '').toMatch(/^[-—–]?$/);
       // No yunhan price-evidence row was seeded for this line (seedBomPriceManualReviewQuote
       // only seeds deepseek_llm + kingdee_purchase_history), so the column stays empty.

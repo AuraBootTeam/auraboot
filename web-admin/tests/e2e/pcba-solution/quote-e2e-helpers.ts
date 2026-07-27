@@ -54,6 +54,7 @@ export type BomWorkbenchSeed = CreatedRows & {
   projectId: string;
   taskId: string;
   standardLineId: string;
+  directLineId: string;
   rawLineId: string;
   canonicalLineId: string;
   matchResultId: string;
@@ -72,6 +73,7 @@ type QuoteLineSeed = {
   mpn: string;
   packageName: string;
   qty: number;
+  qtyPerSet?: number;
   itemType?: string;
   unitCost?: number;
   lineCost?: number;
@@ -916,6 +918,7 @@ async function seedQuoteScaffold(
           qo_ql_refdes: line.refdes,
           qo_ql_mpn: line.mpn,
           qo_ql_package: line.packageName,
+          qo_ql_qty_per_set: line.qtyPerSet ?? line.qty,
           qo_ql_qty: line.qty,
           qo_ql_unit: 'PCS',
           qo_ql_unit_cost: line.unitCost ?? 0,
@@ -1070,6 +1073,7 @@ export async function seedBomWorkbench(
     projectId: '',
     taskId: '',
     standardLineId: '',
+    directLineId: '',
     rawLineId: '',
     canonicalLineId: '',
     matchResultId: '',
@@ -1181,11 +1185,12 @@ export async function seedBomWorkbench(
         bom_std_candidate_codes: `${created.candidateCode},E2E-R-10K-B-${suffix}`,
         bom_std_manual_confirmed: false,
         bom_std_raw_hash: `raw-hash-${suffix}-1`,
+        bom_std_exclusion_status: 'active',
       },
       created.rows,
     );
 
-    const directLineId = await dynamicCreate(
+    created.directLineId = await dynamicCreate(
       page,
       'bom_standard_line_pcba',
       {
@@ -1204,6 +1209,7 @@ export async function seedBomWorkbench(
         bom_std_reason_code: 'direct_copy',
         bom_std_manual_confirmed: false,
         bom_std_raw_hash: `raw-hash-${suffix}-2`,
+        bom_std_exclusion_status: 'active',
       },
       created.rows,
     );
@@ -1226,7 +1232,7 @@ export async function seedBomWorkbench(
       'bom_match_result_pcba',
       {
         bom_mr_task_id: created.taskId,
-        bom_mr_std_item_id: directLineId,
+        bom_mr_std_item_id: created.directLineId,
         bom_mr_status_color: 'green',
         bom_mr_reason: '100% 直接复制',
         bom_mr_match_source: 'direct_copy',
