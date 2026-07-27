@@ -39,7 +39,8 @@ class AuthorizationIntersectionTest {
     private RuntimeAuthorizationService.ToolCallIntent intent(Set<EffectClass> effects) {
         return new RuntimeAuthorizationService.ToolCallIntent(
                 7L, "run-1", 0, 0, "cmd:crm:delete_account", "crm.delete",
-                "plan-hash", effects, BlastRadius.IRREVERSIBLE, "argh", Map.of(), "sess-1");
+                "plan-hash", effects, BlastRadius.IRREVERSIBLE, "L1", false,
+                "argh", Map.of(), "sess-1");
     }
 
     @AfterEach
@@ -92,5 +93,36 @@ class AuthorizationIntersectionTest {
         assertThat(service.authorizeIncremental(intent(Set.of(
                 EffectClass.WRITE_PLATFORM_STATE, EffectClass.EXTERNAL_NETWORK))).granted())
                 .isTrue();
+    }
+
+    @Test
+    @DisplayName("high-risk mutation is granted only through the existing approval path")
+    void highRiskMutationRequiresApproval() {
+        RuntimeAuthorizationService.ToolCallIntent highRisk =
+                new RuntimeAuthorizationService.ToolCallIntent(
+                        7L, "run-1", 0, 0, "cmd:crm:delete_account", "crm.delete",
+                        "plan-hash", Set.of(EffectClass.WRITE_PLATFORM_STATE),
+                        BlastRadius.IRREVERSIBLE, "L4", false,
+                        "argh", Map.of(), "sess-1");
+
+        RuntimeAuthorizationService.IncrementalAuthorization decision =
+                service.authorizeIncremental(highRisk);
+
+        assertThat(decision.granted()).isTrue();
+        assertThat(decision.requireApproval()).isTrue();
+        assertThat(decision.approvalRequestId()).isNull();
+    }
+
+    @Test
+    @DisplayName("skill runtime may own its confirmation without a second approval gate")
+    void externallyManagedApprovalIsNotDuplicated() {
+        RuntimeAuthorizationService.ToolCallIntent skill =
+                new RuntimeAuthorizationService.ToolCallIntent(
+                        7L, "run-1", 0, 0, "skill:model:create", "model:create",
+                        "plan-hash", Set.of(EffectClass.WRITE_PLATFORM_STATE),
+                        BlastRadius.SHARED_STATE, "L3", true,
+                        "argh", Map.of(), "sess-1");
+
+        assertThat(service.authorizeIncremental(skill).requireApproval()).isFalse();
     }
 }

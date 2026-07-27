@@ -22,8 +22,8 @@ import java.util.Set;
  * The risk classification follows the design doc (18-ai-action-safety.md):
  * - L1 (LOW): copy, navigate — read-only / no side effects
  * - L2 (MEDIUM): create_task — creates new data but reversible
- * - L3 (HIGH): execute_command with state_transition or delete
- * - BLOCKED: delete commands, permission changes — AI must not suggest
+ * - L3/L4 (HIGH): execute_command with state_transition or delete; approval required
+ * - BLOCKED: reserved for an explicit policy prohibition, not inferred from risk
  */
 @Slf4j
 @Service
@@ -43,9 +43,6 @@ public class AiActionRiskAssessor {
     private static final Set<String> HIGH_RISK_EXECUTION_TYPES = Set.of(
             "state_transition", "delete", "bulk_delete", "bulk_update"
     );
-
-    /** Command execution types that are BLOCKED (AI must never suggest). */
-    private static final Set<String> BLOCKED_EXECUTION_TYPES = Set.of("delete");
 
     /**
      * Assess risk level for an AI action.
@@ -87,13 +84,6 @@ public class AiActionRiskAssessor {
         CommandRiskInputs inputs = resolveCommandRiskInputs(commandCode, tenantId);
         String executionType = inputs.executionType();
 
-        if (BLOCKED_EXECUTION_TYPES.contains(executionType)) {
-            // "Never offer this" is not a score, and nothing declared in
-            // cmd_risk_level can lift it — L4 means irreversible, which is a
-            // different statement from forbidden.
-            return AiActionRiskLevel.BLOCKED;
-        }
-
         AiActionRiskLevel fromExecutionType = HIGH_RISK_EXECUTION_TYPES.contains(executionType)
                 ? AiActionRiskLevel.HIGH
                 // create, update commands via execute_command are MEDIUM
@@ -113,7 +103,8 @@ public class AiActionRiskAssessor {
         if (inputs.declaredLevel() == null || inputs.declaredLevel().isBlank()) {
             return fromExecutionType;
         }
-        AiActionRiskLevel declared = AiActionRiskLevel.fromPlatformRiskLevel(inputs.declaredLevel());
+        AiActionRiskLevel declared =
+                AiActionRiskLevel.fromPlatformRiskLevel(inputs.declaredLevel());
         return declared.ordinal() > fromExecutionType.ordinal() ? declared : fromExecutionType;
     }
 

@@ -222,7 +222,9 @@ public class ToolLoopService {
                     tenantId, runPid, toolName, reason, authorization.rejectedBy());
             return "Error: Runtime authorization denied for tool '" + toolName + "': " + reason;
         }
-        if (authorization.requireApproval()) {
+        if (authorization.requireApproval()
+                && authorization.approvalRequestId() != null
+                && !authorization.approvalRequestId().isBlank()) {
             String approvalPid = authorization.approvalRequestId() == null
                     ? ""
                     : authorization.approvalRequestId();
@@ -237,7 +239,8 @@ public class ToolLoopService {
         // AND this is a write tool (cmd_*), regardless of per-tool flag. Closes the
         // D1 Grounding → Approval Gate loop (spec §5.1 RiskEvaluator quality gate).
         boolean auraBotSkill = isAuraBotSkill(toolDef);
-        boolean requiresApproval = toolDef.isRequiresApproval();
+        boolean requiresApproval =
+                toolDef.isRequiresApproval() || authorization.requireApproval();
         if (!requiresApproval) {
             com.auraboot.framework.agent.dto.BusinessIntentFrame bif = BifContext.getCurrentBif();
             if (bif != null && isHighRisk(bif.getRiskLevel()) && isWriteTool(toolName, toolDef)) {
@@ -975,6 +978,8 @@ public class ToolLoopService {
                 null,
                 deriveEffects(toolName, toolDef),
                 deriveBlastRadius(toolName, toolDef),
+                toolDef != null ? toolDef.getRiskLevel() : null,
+                isAuraBotSkill(toolDef),
                 hashArgs(input),
                 input != null ? input : Map.of(),
                 null);

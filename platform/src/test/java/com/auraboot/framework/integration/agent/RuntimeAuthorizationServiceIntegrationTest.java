@@ -90,6 +90,8 @@ class RuntimeAuthorizationServiceIntegrationTest extends BaseIntegrationTest {
                 "plan_hash_xyz",
                 Set.of(EffectClass.WRITE_PLATFORM_STATE),
                 BlastRadius.SHARED_STATE,
+                "L1",
+                false,
                 "abc123hashprefix",
                 Map.of(),
                 "session_001"));
@@ -118,6 +120,38 @@ class RuntimeAuthorizationServiceIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    @DisplayName("high-risk mutation is persisted as approval-required")
+    void authorizeIncremental_highRiskMutationRequiresApproval() {
+        IncrementalAuthorization result = authzService.authorizeIncremental(
+                new ToolCallIntent(
+                        tenantId, runId, 0, 0,
+                        "dsl:cmd_crm_account_delete",
+                        "crm.account.delete",
+                        "plan_hash_delete",
+                        Set.of(EffectClass.WRITE_PLATFORM_STATE),
+                        BlastRadius.IRREVERSIBLE,
+                        "L4",
+                        false,
+                        "delete-hash",
+                        Map.of("recordPid", "ACCOUNT-1"),
+                        "session_approval"));
+
+        assertThat(result.granted()).isTrue();
+        assertThat(result.requireApproval()).isTrue();
+        assertThat(result.approvalRequestId()).isNull();
+
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT require_approval, policy_id, decision_reason "
+                        + "FROM ab_agent_authorization_decision "
+                        + "WHERE tenant_id = ? AND decision_kind = 'incremental'",
+                tenantId);
+        assertThat(row.get("require_approval")).isEqualTo(true);
+        assertThat(row.get("policy_id")).isEqualTo("runtime-risk-approval");
+        assertThat(row.get("decision_reason")).isEqualTo(
+                "approval_required: high-risk mutating effect");
+    }
+
+    @Test
     @DisplayName("GrantScope.matches honors effect / toolRefPattern / blastRadius / argHashConstraint")
     void grantScope_matchingRules() {
         ToolCallIntent intent = new ToolCallIntent(
@@ -127,6 +161,8 @@ class RuntimeAuthorizationServiceIntegrationTest extends BaseIntegrationTest {
                 "plan_hash",
                 Set.of(EffectClass.WRITE_PLATFORM_STATE),
                 BlastRadius.SHARED_STATE,
+                "L1",
+                false,
                 "abc123hashprefix",
                 Map.of(),
                 null);
