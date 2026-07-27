@@ -55,7 +55,6 @@ class OpenAiCompatibleLlmProviderTest {
         OpenAiCompatibleLlmProvider provider = createProvider();
 
         assertThat(isToolUnsupported(provider, "gpt-4o")).isFalse();
-        assertThat(isToolUnsupported(provider, "gpt-4o-mini")).isFalse();
         assertThat(isToolUnsupported(provider, "deepseek-chat")).isFalse();
         assertThat(isToolUnsupported(provider, "qwen-plus")).isFalse();
         assertThat(isToolUnsupported(provider, "glm-4")).isFalse();

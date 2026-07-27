@@ -13,6 +13,7 @@ import com.auraboot.framework.meta.mapper.DynamicDataMapper;
 import com.auraboot.framework.meta.service.EventStore;
 import com.auraboot.framework.meta.service.MetaModelService;
 import com.auraboot.framework.meta.service.OutboxWriter;
+import com.auraboot.framework.observability.TraceCorrelation;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micrometer.tracing.Tracer;
@@ -96,10 +97,8 @@ public class CommandEffectExecutor {
             auditLog.setCreatedAt(Instant.now());
             // Anchor the audit row to the request's OTel trace (A-G2, P1). Synchronous
             // command path -> the request span is active on this thread. Null otherwise.
-            if (tracer.currentSpan() != null) {
-                auditLog.setTraceId(tracer.currentSpan().context().traceId());
-                auditLog.setSpanId(tracer.currentSpan().context().spanId());
-            }
+            auditLog.setTraceId(TraceCorrelation.traceId(tracer));
+            auditLog.setSpanId(TraceCorrelation.spanId(tracer));
 
             commandAuditLogMapper.insertLog(auditLog);
         } catch (Exception e) {

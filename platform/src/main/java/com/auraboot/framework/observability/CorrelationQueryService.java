@@ -2,6 +2,7 @@ package com.auraboot.framework.observability;
 
 import com.auraboot.framework.agent.trace.entity.GenAiUsageRecord;
 import com.auraboot.framework.agent.trace.mapper.GenAiUsageMapper;
+import com.auraboot.framework.application.security.AdminAuditService;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.audit.entity.AdminEventLog;
 import com.auraboot.framework.audit.mapper.AdminEventLogMapper;
@@ -10,6 +11,8 @@ import com.auraboot.framework.behavior.mapper.BehaviorEventMapper;
 import com.auraboot.framework.meta.dto.CommandAuditLogDTO;
 import com.auraboot.framework.meta.mapper.CommandAuditLogMapper;
 import com.auraboot.framework.observability.dto.CorrelationView;
+import com.auraboot.framework.observability.dto.PermissionDenialView;
+import com.auraboot.framework.permission.mapper.PermissionAuditLogMapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,10 +26,15 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class CorrelationQueryService {
 
+    private static final int PERMISSION_DENIAL_LIMIT = 200;
+    private static final int ADMIN_ACTION_LIMIT = 50;
+
     private final CommandAuditLogMapper commandAuditLogMapper;
     private final GenAiUsageMapper genAiUsageMapper;
     private final BehaviorEventMapper behaviorEventMapper;
     private final AdminEventLogMapper adminEventLogMapper;
+    private final PermissionAuditLogMapper permissionAuditLogMapper;
+    private final AdminAuditService adminAuditService;
 
     public CorrelationView byTrace(String traceId) {
         Long tenantId = MetaContext.getCurrentTenantId();
@@ -44,6 +52,14 @@ public class CorrelationQueryService {
         view.setAuditEvents(adminEventLogMapper.selectList(new LambdaQueryWrapper<AdminEventLog>()
                 .eq(AdminEventLog::getTenantId, tenantId)
                 .eq(AdminEventLog::getTraceId, traceId)));
+        view.setPermissionDenials(
+                permissionAuditLogMapper.findByOtelTraceId(
+                                tenantId, traceId, PERMISSION_DENIAL_LIMIT)
+                        .stream()
+                        .map(PermissionDenialView::from)
+                        .toList());
+        view.setAdminActions(
+                adminAuditService.findByTraceId(tenantId, traceId, ADMIN_ACTION_LIMIT));
         return view;
     }
 }

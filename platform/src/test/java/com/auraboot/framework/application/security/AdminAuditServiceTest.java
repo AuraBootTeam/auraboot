@@ -32,7 +32,9 @@ class AdminAuditServiceTest {
                         "GET",
                         200,
                         null,
-                        12))
+                        12,
+                        null,
+                        null))
                 .withMessageContaining("actorUserId required for admin audit");
 
         // Fail-loud: must not attempt the insert when the actor is unidentified.

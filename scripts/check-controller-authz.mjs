@@ -81,17 +81,75 @@ for (const file of walk(SRC)) {
 }
 unguarded.sort();
 
-if (WRITE) {
-  fs.writeFileSync(BASELINE, JSON.stringify(unguarded, null, 2) + '\n');
-  console.log(`[controller-authz] baseline written: ${unguarded.length} unguarded write controllers`);
-  process.exit(0);
+/**
+ * The baseline accepts two entry shapes:
+ *
+ *   "platform/.../FooController.java"
+ *   { "file": "platform/.../FooController.java", "reason": "why this is accepted" }
+ *
+ * Bare strings are the inherited entries, from before this gate asked for a reason. New
+ * entries must carry one — see the --write-baseline path below.
+ */
+function readBaseline() {
+  const raw = JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
+  const files = [];
+  const reasons = new Map();
+  for (const entry of raw) {
+    if (typeof entry === 'string') {
+      files.push(entry);
+    } else if (entry && typeof entry.file === 'string') {
+      files.push(entry.file);
+      if (entry.reason) reasons.set(entry.file, entry.reason);
+    } else {
+      console.error(`[controller-authz] malformed baseline entry: ${JSON.stringify(entry)}`);
+      process.exit(2);
+    }
+  }
+  return { files, reasons };
 }
 
 let baseline = [];
-try { baseline = JSON.parse(fs.readFileSync(BASELINE, 'utf8')); } catch {
-  console.error(`[controller-authz] missing baseline ${BASELINE} — run with --write-baseline first`);
-  process.exit(2);
+let baselineReasons = new Map();
+try {
+  const parsed = readBaseline();
+  baseline = parsed.files;
+  baselineReasons = parsed.reasons;
+} catch {
+  if (!WRITE) {
+    console.error(`[controller-authz] missing baseline ${BASELINE} — run with --write-baseline first`);
+    process.exit(2);
+  }
 }
+
+if (WRITE) {
+  // Rewriting used to flatten everything back to bare strings, which silently destroyed any
+  // reason anyone had recorded — that is why this file accumulated 40 entries with no
+  // justification for any of them. Reasons are now preserved, and a genuinely new entry has
+  // to explain itself: an accepted fail-open surface with no stated reason is indistinguishable
+  // from one nobody looked at.
+  const reasonArg = process.argv.indexOf('--reason');
+  const reason = reasonArg > -1 ? process.argv[reasonArg + 1] : null;
+  const brandNew = unguarded.filter((f) => !baseline.includes(f));
+
+  if (brandNew.length && !reason) {
+    console.error(`\n❌ ${brandNew.length} controller(s) would be newly baselined with no reason:`);
+    brandNew.forEach((f) => console.error(`   + ${f}`));
+    console.error('\nRe-run with --reason "why this fail-open surface is accepted".');
+    process.exit(1);
+  }
+
+  const out = unguarded.map((f) => {
+    const existing = baselineReasons.get(f);
+    if (existing) return { file: f, reason: existing };
+    if (brandNew.includes(f) && reason) return { file: f, reason };
+    return f;   // inherited entry, reason never recorded — left as-is rather than invented
+  });
+  fs.writeFileSync(BASELINE, JSON.stringify(out, null, 2) + '\n');
+  console.log(`[controller-authz] baseline written: ${out.length} entries `
+    + `(${out.filter((e) => typeof e !== 'string').length} with a recorded reason)`);
+  process.exit(0);
+}
+
 const baseSet = new Set(baseline);
 const curSet = new Set(unguarded);
 const added = unguarded.filter((f) => !baseSet.has(f));

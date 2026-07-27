@@ -195,8 +195,24 @@ CREATE TABLE public.ab_admin_action_log (
     status integer NOT NULL,
     request_body_summary character varying(2048),
     latency_ms integer,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    trace_id character varying(36),
+    span_id character varying(36)
 );
+
+
+--
+-- Name: COLUMN ab_admin_action_log.trace_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_admin_action_log.trace_id IS 'OTel W3C trace id captured on the request thread before the async audit hop';
+
+
+--
+-- Name: COLUMN ab_admin_action_log.span_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_admin_action_log.span_id IS 'OTel span id captured on the request thread before the async audit hop';
 
 
 --
@@ -10707,8 +10723,24 @@ CREATE TABLE public.ab_permission_audit_log (
     result boolean NOT NULL,
     reason text,
     evaluation_trace jsonb,
-    created_at timestamp without time zone DEFAULT now()
+    created_at timestamp without time zone DEFAULT now(),
+    trace_id character varying(36),
+    span_id character varying(36)
 );
+
+
+--
+-- Name: COLUMN ab_permission_audit_log.trace_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_permission_audit_log.trace_id IS 'OTel W3C trace id of the request; distinct from Rule Center ids in evaluation_trace';
+
+
+--
+-- Name: COLUMN ab_permission_audit_log.span_id; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.ab_permission_audit_log.span_id IS 'OTel span id when available to the asynchronous audit writer';
 
 
 --
@@ -20307,6 +20339,13 @@ CREATE UNIQUE INDEX email_idx ON public.ab_user USING btree (email) WHERE (delet
 
 
 --
+-- Name: idx_ab_admin_action_log_trace_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_admin_action_log_trace_id ON public.ab_admin_action_log USING btree (trace_id) WHERE (trace_id IS NOT NULL);
+
+
+--
 -- Name: idx_ab_admin_event_log_action_type; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -20913,6 +20952,13 @@ CREATE INDEX idx_ab_perm_audit_resource ON public.ab_permission_audit_log USING 
 --
 
 CREATE INDEX idx_ab_perm_audit_resource_record_pid ON public.ab_permission_audit_log USING btree (tenant_id, resource_code, record_pid, created_at) WHERE (record_pid IS NOT NULL);
+
+
+--
+-- Name: idx_ab_permission_audit_log_trace_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ab_permission_audit_log_trace_id ON public.ab_permission_audit_log USING btree (trace_id) WHERE (trace_id IS NOT NULL);
 
 
 --

@@ -29,6 +29,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 import com.auraboot.framework.common.constant.StatusConstants;
+import com.auraboot.framework.observability.TraceCorrelation;
 
 /**
  * Query audit service implementation.
@@ -73,10 +74,11 @@ public class QueryAuditServiceImpl implements QueryAuditService {
                      logSafe(request.getModelCode()), request.getUserId(), executionTimeMs);
 
             QueryAuditLog auditLog = new QueryAuditLog();
-            if (tracer != null && tracer.currentSpan() != null) {
-                auditLog.setTraceId(tracer.currentSpan().context().traceId());
-                auditLog.setSpanId(tracer.currentSpan().context().spanId());
-            }
+            // This method is @Async: there is no span on the worker thread, so reading
+            // tracer.currentSpan() here never produced a trace id. TraceCorrelation falls
+            // back to the MetaContext snapshot that TenantAwareTaskDecorator carried over.
+            auditLog.setTraceId(TraceCorrelation.traceId(tracer));
+            auditLog.setSpanId(TraceCorrelation.spanId(tracer));
 
             // Basic info
             auditLog.setTenantId(request.getTenantId());
@@ -151,10 +153,11 @@ public class QueryAuditServiceImpl implements QueryAuditService {
                      logSafe(request.getModelCode()), request.getUserId(), logSafe(error.getMessage()));
 
             QueryAuditLog auditLog = new QueryAuditLog();
-            if (tracer != null && tracer.currentSpan() != null) {
-                auditLog.setTraceId(tracer.currentSpan().context().traceId());
-                auditLog.setSpanId(tracer.currentSpan().context().spanId());
-            }
+            // This method is @Async: there is no span on the worker thread, so reading
+            // tracer.currentSpan() here never produced a trace id. TraceCorrelation falls
+            // back to the MetaContext snapshot that TenantAwareTaskDecorator carried over.
+            auditLog.setTraceId(TraceCorrelation.traceId(tracer));
+            auditLog.setSpanId(TraceCorrelation.spanId(tracer));
 
             auditLog.setTenantId(request.getTenantId());
             auditLog.setUserId(request.getUserId());

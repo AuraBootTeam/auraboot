@@ -43,18 +43,12 @@ public class SlowQueryInterceptor implements Interceptor {
 
     private final long thresholdMs;
     private final boolean logParams;
-    private final Counter slowQueryCounter;
-    private final Timer slowQueryTimer;
+    private final MeterRegistry registry;
 
     public SlowQueryInterceptor(long thresholdMs, boolean logParams, MeterRegistry registry) {
         this.thresholdMs = thresholdMs;
         this.logParams = logParams;
-        this.slowQueryCounter = Counter.builder(METRIC_SLOW_QUERY_COUNT)
-                .description("Number of slow SQL queries detected")
-                .register(registry);
-        this.slowQueryTimer = Timer.builder(METRIC_SLOW_QUERY_TIMER)
-                .description("Duration of slow SQL queries")
-                .register(registry);
+        this.registry = registry;
     }
 
     @Override
@@ -74,8 +68,21 @@ public class SlowQueryInterceptor implements Interceptor {
         MappedStatement ms = (MappedStatement) invocation.getArgs()[0];
         String mapperId = ms.getId();
 
-        slowQueryCounter.increment();
-        slowQueryTimer.record(Duration.ofMillis(elapsedMs));
+        // Tagged by mapper id. Untagged, these two meters answered only "did slow-query
+        // volume go up", and the follow-up question — which statement — had to be
+        // answered by grepping logs, even though the sibling SqlCountFilter has always
+        // tagged its metric by method and path. Mapper ids are a bounded set (one per
+        // mapper method), so this does not risk a cardinality explosion.
+        Counter.builder(METRIC_SLOW_QUERY_COUNT)
+                .description("Number of slow SQL queries detected")
+                .tag("mapper", mapperId)
+                .register(registry)
+                .increment();
+        Timer.builder(METRIC_SLOW_QUERY_TIMER)
+                .description("Duration of slow SQL queries")
+                .tag("mapper", mapperId)
+                .register(registry)
+                .record(Duration.ofMillis(elapsedMs));
 
         if (logParams) {
             Object param = invocation.getArgs()[1];

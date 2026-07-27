@@ -6,10 +6,13 @@ import com.auraboot.framework.permission.engine.model.PermissionExplanation;
 import com.auraboot.framework.permission.entity.PermissionAuditLog;
 import com.auraboot.framework.permission.mapper.PermissionAuditLogMapper;
 import com.auraboot.framework.permission.service.PermissionAuditService;
+import com.auraboot.framework.observability.TraceCorrelation;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +38,22 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
 
     private final PermissionAuditLogMapper auditLogMapper;
     private final ObjectMapper objectMapper;
+    private final ObjectProvider<Tracer> tracerProvider;
+
+    /**
+     * Trace enrichment must not suppress the denial row when tracing is absent
+     * or misconfigured, so it is isolated from the best-effort insert block.
+     */
+    private void stampTrace(PermissionAuditLog entry) {
+        try {
+            Tracer tracer = tracerProvider == null ? null : tracerProvider.getIfAvailable();
+            entry.setTraceId(TraceCorrelation.traceId(tracer));
+            entry.setSpanId(TraceCorrelation.spanId(tracer));
+        } catch (Exception exception) {
+            log.debug("Could not resolve trace ids for permission audit: {}",
+                    exception.getMessage());
+        }
+    }
 
     @Override
     @Async
@@ -68,6 +87,7 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
                     explanation.steps(),
                     objectMapper.getTypeFactory().constructCollectionType(List.class, Object.class));
             entry.setEvaluationTrace(trace);
+            stampTrace(entry);
 
             entry.setCreatedAt(Instant.now());
             auditLogMapper.insertAuditLog(entry);
@@ -137,6 +157,7 @@ public class PermissionAuditServiceImpl implements PermissionAuditService {
                     List.of(step),
                     objectMapper.getTypeFactory().constructCollectionType(List.class, Object.class));
             entry.setEvaluationTrace(trace);
+            stampTrace(entry);
             entry.setCreatedAt(Instant.now());
             auditLogMapper.insertAuditLog(entry);
         } catch (Exception e) {

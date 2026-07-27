@@ -64,7 +64,7 @@ public class ChatBiAnswer {
 
     private Integer durationMs;
 
-    /** {@code claude-haiku-4-5 / gpt-4o-mini / null}. */
+    /** {@code claude-haiku-4-5 / gpt-4o / null}. */
     private String llmUsed;
 
     private BigDecimal llmCostCents;
