@@ -338,8 +338,10 @@ dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-mail'
     implementation 'org.springframework.boot:spring-boot-starter-websocket'    // IM WebSocket
     implementation "com.xuxueli:xxl-job-core:${xxlJobVersion}"
-    implementation 'io.modelcontextprotocol.sdk:mcp-core'
-    implementation 'io.modelcontextprotocol.sdk:mcp-json-jackson2'
+    implementation "io.modelcontextprotocol.sdk:mcp-core:${mcpSdkVersion}"
+    implementation("io.modelcontextprotocol.sdk:mcp-json-jackson2:${mcpSdkVersion}") {
+        exclude group: 'com.networknt', module: 'json-schema-validator'
+    }
 
     // MyBatis Plus
     implementation 'com.baomidou:mybatis-plus-spring-boot3-starter'
