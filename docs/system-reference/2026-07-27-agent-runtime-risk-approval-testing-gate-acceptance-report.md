@@ -1,3 +1,8 @@
+---
+type: system-reference
+status: active
+---
+
 # Agent runtime risk approval testing-gate acceptance report
 
 Date: 2026-07-27
