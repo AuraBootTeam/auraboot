@@ -254,6 +254,12 @@ test.describe('PCBA quote minimal create regression', () => {
         'form-field-qo_quote_project_id',
         'form-field-qo_quote_set_count',
       ]);
+      await expect(
+        page.getByTestId('form-field-qo_quote_set_count').locator('input').first(),
+      ).toHaveValue('1');
+      await expect(
+        page.getByTestId('form-field-qo_quote_price_factor').locator('input').first(),
+      ).toHaveValue('100');
       await expect(page.getByTestId('form-field-gerber_source_file')).toBeVisible();
       await expect(page.getByTestId('form-field-cpl_source_file')).toBeVisible();
       await expect(page.getByTestId('form-field-corrected_bom_file')).toBeVisible();

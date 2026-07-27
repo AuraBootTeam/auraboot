@@ -859,6 +859,8 @@ async function seedQuoteScaffold(
         qo_quote_crm_account_id: accountId,
         qo_quote_project_id: projectId,
         qo_quote_customer_request_id: customerRequestId,
+        qo_quote_set_count: 1,
+        qo_quote_price_factor: 100,
         qo_quote_tax_rate: 0.13,
         qo_quote_factory_class: factoryClass,
         qo_quote_industry: 'pcba',
