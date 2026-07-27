@@ -46,7 +46,8 @@ authorized React exemption task.
 - `node scripts/check-controller-authz.mjs --json` — no added drift.
 - `node scripts/validate-permission-codes.mjs` — no new drift.
 - `scripts/db/check-schema-drift.sh --edition oss` — pass.
-- Repository search for `gpt-4o-mini` outside generated/build dependencies — no matches.
+- Repository search for obsolete unsupported model identifiers outside
+  generated/build dependencies — no matches.
 
 ## Acceptance
 
