@@ -40,15 +40,17 @@ public enum AiActionRiskLevel {
      * here rather than discovered in production.
      *
      * <p>L4 is irreversible and L3 external: both warrant the full-screen
-     * confirmation. BLOCKED has no L-equivalent — it means "never offer this",
-     * a decision taken before risk is scored — so it maps to the highest level
-     * rather than inventing an L5.
+     * confirmation and route through the runtime approval gate. BLOCKED has no
+     * L-equivalent; it is reserved for an explicit prohibition policy.
      */
     public String toPlatformRiskLevel() {
         return switch (this) {
             case LOW -> "L0";
             case MEDIUM -> "L1";
             case HIGH -> "L3";
+            // Compatibility projection only. An explicit prohibition must be
+            // enforced by policy before this risk-only bridge is used; L4 itself
+            // remains approvable and therefore cannot encode BLOCKED losslessly.
             case BLOCKED -> "L4";
         };
     }
@@ -61,8 +63,7 @@ public enum AiActionRiskLevel {
         return switch (platformLevel.trim().toUpperCase(java.util.Locale.ROOT)) {
             case "L0" -> LOW;
             case "L1", "L2" -> MEDIUM;
-            case "L3" -> HIGH;
-            case "L4" -> BLOCKED;
+            case "L3", "L4" -> HIGH;
             // Unknown means unrecognised, not safe. Defaulting down would turn a
             // scale we failed to parse into an action nobody was asked about.
             default -> HIGH;

@@ -196,6 +196,36 @@ class ToolLoopServiceSafetyTest {
     }
 
     @Test
+    @DisplayName("runtime risk decision creates an approval through the existing approval gate")
+    void runtimeAuthorizationApprovalUsesExistingApprovalGate() {
+        when(runtimeAuthorizationService.authorizeIncremental(any()))
+                .thenReturn(RuntimeAuthorizationService.IncrementalAuthorization.needsApproval(null));
+        when(approvalGate.checkAndRequestApproval(
+                eq(1L), eq("run-risk"), eq("task-risk"), anyString(), anyString(), anyMap(), eq(true)))
+                .thenReturn("approval-risk");
+        AgentToolDefinition tool = AgentToolDefinition.builder()
+                .name("cmd:crm:delete_account")
+                .description("Delete account")
+                .toolType("dsl_command")
+                .sourceCode("crm:delete_account")
+                .riskLevel("L4")
+                .requiresApproval(false)
+                .build();
+
+        String result = service.executeToolCall(
+                1L, "run-risk", "task-risk", "agent",
+                tool.getName(), Map.of("recordPid", "account-1"), List.of(tool), null);
+
+        assertThat(result)
+                .contains("\"approvalRequired\":true")
+                .contains("\"approvalPid\":\"approval-risk\"");
+        verify(approvalGate).checkAndRequestApproval(
+                eq(1L), eq("run-risk"), eq("task-risk"), eq(tool.getName()),
+                eq(tool.getDescription()), anyMap(), eq(true));
+        verifyNoInteractions(commandExecutor);
+    }
+
+    @Test
     @DisplayName("R3 alias in BIF risk escalates colon command tool to approval")
     void r3AliasEscalatesColonCommandToApproval() {
         BifContext.setCurrentBif(BusinessIntentFrame.builder()

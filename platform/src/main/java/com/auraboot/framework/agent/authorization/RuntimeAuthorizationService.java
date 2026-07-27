@@ -63,6 +63,8 @@ public interface RuntimeAuthorizationService {
             String currentPlanHash,
             Set<EffectClass> requiredEffects,
             BlastRadius blastRadius,
+            String riskLevel,
+            boolean approvalManagedExternally,
             String argHash,
             Map<String, Object> argPreview,
             String channelSessionId

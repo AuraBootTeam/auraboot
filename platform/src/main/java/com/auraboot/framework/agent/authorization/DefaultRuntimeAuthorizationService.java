@@ -19,23 +19,26 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * Minimal viable {@link RuntimeAuthorizationService} implementation.
+ * Built-in {@link RuntimeAuthorizationService} implementation.
  *
- * <p><b>Scope</b>: this default implementation grants every requested effect
- * for plan and incremental decisions and persists the audit row to
- * {@code ab_agent_authorization_decision}. The 5-input-source synthesis
+ * <p><b>Scope</b>: this implementation enforces the current capability ceiling,
+ * routes high-risk mutating effects to the existing approval lifecycle, and
+ * persists every decision to {@code ab_agent_authorization_decision}. The
+ * 5-input-source synthesis
  * (user permissions / tenant policy / channel ACL / capability default /
  * runtime downgrade) and the principle-of-least-privilege merge are
- * <b>not</b> implemented here; they are deferred to a policy-engine
- * implementation that swaps this bean by Phase B caller emergence.
+ * <b>not</b> implemented here; those remain the responsibility of a future
+ * policy-engine implementation.
  *
  * <p>Why this is still useful in Phase B prep:
  * <ul>
- *   <li>Interface contract is exercisable end-to-end (callers can wire up)
+ *   <li>Interface contract is exercisable end-to-end
  *   <li>Audit table receives every decision, enabling backfill of historical
  *       records once the policy engine arrives
  *   <li>{@link GrantScope#matches(RuntimeAuthorizationService.ToolCallIntent)}
  *       is real and tested, so plan/incremental sharing works
+ *   <li>L3/L4 mutations cannot bypass the platform's approval service merely
+ *       because a tool definition forgot its legacy {@code requiresApproval} flag
  * </ul>
  *
  * <p>Caller migration to a stricter impl is a single bean-replacement; the
@@ -170,6 +173,15 @@ public class DefaultRuntimeAuthorizationService implements RuntimeAuthorizationS
             }
         }
         boolean allowed = rejected.isEmpty();
+        boolean requireApproval = allowed
+                && !intent.approvalManagedExternally()
+                && isHighRisk(intent.riskLevel())
+                && requested.stream().anyMatch(MUTATING_EFFECTS::contains);
+        String decisionReason = allowed
+                ? requireApproval
+                        ? "approval_required: high-risk mutating effect"
+                        : ceiling.grantReason()
+                : "capability_ceiling_" + ceiling.name();
 
         persistDecision(
                 intent.tenantId(), intent.runId(), intent.stepIndex(), intent.toolCallIndex(),
@@ -178,18 +190,32 @@ public class DefaultRuntimeAuthorizationService implements RuntimeAuthorizationS
                 intent.blastRadius() != null ? intent.blastRadius().name() : null,
                 requested, granted, rejected,
                 intent.currentPlanHash(), null,
-                ceiling.policyId(), 1,
-                allowed ? ceiling.grantReason() : "capability_ceiling_" + ceiling.name(),
-                false, null,
+                requireApproval ? "runtime-risk-approval" : ceiling.policyId(), 1,
+                decisionReason,
+                requireApproval, null,
                 buildSessionScopeKey(intent.tenantId(), null, null, intent.channelSessionId()));
-        recordAuthorizationDecision("incremental", allowed ? "granted" : "rejected");
+        recordAuthorizationDecision("incremental",
+                allowed ? requireApproval ? "approval_required" : "granted" : "rejected");
 
         if (allowed) {
-            return IncrementalAuthorization.grant();
+            return requireApproval
+                    ? IncrementalAuthorization.needsApproval(null)
+                    : IncrementalAuthorization.grant();
         }
         return new IncrementalAuthorization(false, false, null,
                 "capability ceiling " + ceiling.name() + " does not permit " + rejected.keySet(),
                 "runtime-authorization");
+    }
+
+    private static boolean isHighRisk(String riskLevel) {
+        if (riskLevel == null || riskLevel.isBlank()) {
+            return false;
+        }
+        String normalized = riskLevel.trim().toUpperCase(java.util.Locale.ROOT);
+        return switch (normalized) {
+            case "L3", "L4", "R3", "R4", "HIGH", "CRITICAL", "BLOCKED" -> true;
+            default -> false;
+        };
     }
 
     /** Effects that change something; a read-only ceiling exists to keep these out. */

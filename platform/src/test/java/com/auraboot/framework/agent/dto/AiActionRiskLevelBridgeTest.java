@@ -40,7 +40,7 @@ class AiActionRiskLevelBridgeTest {
             // the irreversible and external levels that earn a full-screen stop.
             "L2, MEDIUM",
             "L3, HIGH",
-            "L4, BLOCKED",
+            "L4, HIGH",
     })
     void readsThePlatformScale(String platformLevel, AiActionRiskLevel expected) {
         assertThat(AiActionRiskLevel.fromPlatformRiskLevel(platformLevel)).isEqualTo(expected);
@@ -52,12 +52,22 @@ class AiActionRiskLevelBridgeTest {
         // The direction that matters. A mapping that quietly downgraded on the
         // way back would turn a full-screen stop into a silent action, which is
         // exactly the failure a bridge between two scales is there to prevent.
-        for (AiActionRiskLevel level : AiActionRiskLevel.values()) {
+        for (AiActionRiskLevel level : new AiActionRiskLevel[]{
+                AiActionRiskLevel.LOW,
+                AiActionRiskLevel.MEDIUM,
+                AiActionRiskLevel.HIGH}) {
             AiActionRiskLevel back = AiActionRiskLevel.fromPlatformRiskLevel(level.toPlatformRiskLevel());
             assertThat(back.ordinal())
                     .as("%s must not come back weaker than it went in", level)
                     .isGreaterThanOrEqualTo(level.ordinal());
         }
+    }
+
+    @Test
+    @DisplayName("L4 means approval risk, not an implicit prohibition")
+    void irreversibleRiskIsNotBlockedWithoutPolicy() {
+        assertThat(AiActionRiskLevel.fromPlatformRiskLevel("L4"))
+                .isEqualTo(AiActionRiskLevel.HIGH);
     }
 
     @ParameterizedTest(name = "unrecognised input {0} is treated as high, not low")

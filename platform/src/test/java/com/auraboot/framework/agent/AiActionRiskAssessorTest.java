@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
  * {@code PGobject} — not a String, not a Map. The pre-fix code handled only
  * {@code instanceof Map} / {@code instanceof String}, so a PGobject fell through to
  * the {@code "update"} default — which silently DOWNGRADED the AI-action safety
- * gating: a {@code delete} command that must be BLOCKED was assessed as MEDIUM, and a
+ * gating: a {@code delete} command that requires strong approval was assessed as MEDIUM, and a
  * {@code state_transition} that must be HIGH became MEDIUM. These tests feed a real
  * PGobject and assert the gating is correct; they fail against the pre-fix code.
  */
@@ -85,12 +85,12 @@ class AiActionRiskAssessorTest {
         }
 
         @Test
-        @org.junit.jupiter.api.DisplayName("a default L1 does not lower a delete out of BLOCKED")
+        @org.junit.jupiter.api.DisplayName("a default L1 does not lower a delete out of HIGH")
         void declaredLevelNeverLowersRisk() {
             // The direction that matters. cmd_risk_level defaults to l1, so a
             // naive read would downgrade every unlabelled destructive command.
             stubRow("delete", "l1");
-            assertEquals(AiActionRiskLevel.BLOCKED, assessor.assess("execute_command", "order:delete", 1L));
+            assertEquals(AiActionRiskLevel.HIGH, assessor.assess("execute_command", "order:delete", 1L));
         }
 
         @Test
@@ -120,11 +120,11 @@ class AiActionRiskAssessorTest {
     }
 
     @Test
-    void pgobjectDeleteConfig_isBlocked_notDowngradedToMedium() {
+    void pgobjectDeleteConfig_isHigh_notDowngradedToMedium() {
         stubExecConfig(jsonb("{\"type\":\"delete\"}"));
-        assertEquals(AiActionRiskLevel.BLOCKED,
+        assertEquals(AiActionRiskLevel.HIGH,
                 assessor.assess("execute_command", "order:delete", 1L),
-                "delete execution_config returned as PGobject must still gate BLOCKED");
+                "delete execution_config returned as PGobject must still require strong approval");
     }
 
     @Test
@@ -152,7 +152,7 @@ class AiActionRiskAssessorTest {
     @Test
     void mapExecConfig_stillParsed_regression() {
         stubExecConfig(Map.of("type", "delete"));
-        assertEquals(AiActionRiskLevel.BLOCKED,
+        assertEquals(AiActionRiskLevel.HIGH,
                 assessor.assess("execute_command", "order:delete", 1L));
     }
 }
