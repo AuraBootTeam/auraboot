@@ -24,6 +24,15 @@ package com.auraboot.framework.permission.constants;
  */
 public final class MetaPermission {
 
+    // ==================== SYSTEM permissions ====================
+
+    /**
+     * Legacy system-administration permission used by the system menu and its
+     * operational pages. Keep the literal centralized until the permission
+     * catalog is migrated to a namespaced code.
+     */
+    public static final String SYSTEM_MANAGEMENT = "system_management";
+
     // ==================== MODEL permissions ====================
 
     /**

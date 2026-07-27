@@ -59,6 +59,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private com.auraboot.framework.rbac.service.UserRoleService userRoleService;
 
+    /**
+     * Absent when tracing is disabled (the dev profile sets
+     * {@code management.tracing.enabled: false}), so this must stay optional.
+     */
+    @Autowired(required = false)
+    private io.micrometer.tracing.Tracer tracer;
+
     public JwtAuthenticationFilter(JwtUtil jwtUtil, UserDetailsService userDetailsService) {
         this.jwtUtil = jwtUtil;
         this.userDetailsService = userDetailsService;
@@ -194,6 +201,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
                 if (userDetails.getUserId() != null) {
                     MDC.put("userId", String.valueOf(userDetails.getUserId()));
+                }
+
+                // Snapshot the request's OTel trace id into MetaContext so work that
+                // hops to a pooled thread can still stamp it. TenantAwareTaskDecorator
+                // carries MetaContext across @Async boundaries but not the OTel context,
+                // so a writer on a worker thread has no span to read — which is why
+                // ab_query_audit_log.trace_id and ab_gen_ai_usage.trace_id were NULL for
+                // every row (85 and 278 respectively in live databases). Setting it here,
+                // once per request, is the only place that sees both the span and every
+                // downstream write. Cleared by MetaContext.clear() in the finally below.
+                if (tracer != null) {
+                    var span = tracer.currentSpan();
+                    if (span != null) {
+                        MetaContext.setOtelTraceId(span.context().traceId());
+                    }
                 }
 
                 setAuthenticationContext(request, userDetails);

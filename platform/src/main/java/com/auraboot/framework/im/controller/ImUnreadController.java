@@ -4,12 +4,14 @@ import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.im.dto.UnreadSummary;
 import com.auraboot.framework.im.service.ImConversationService;
+import com.auraboot.framework.permission.annotation.AuthenticatedAccess;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/im")
+@AuthenticatedAccess("self-scoped unread summary; userId and tenantId come from MetaContext")
 public class ImUnreadController {
 
     private final ImConversationService conversationService;

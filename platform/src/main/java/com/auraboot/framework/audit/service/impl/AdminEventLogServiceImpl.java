@@ -5,6 +5,7 @@ import com.auraboot.framework.audit.entity.AdminEventLog;
 import com.auraboot.framework.audit.mapper.AdminEventLogMapper;
 import com.auraboot.framework.audit.service.AdminEventLogService;
 import com.auraboot.framework.common.util.UniqueIdGenerator;
+import com.auraboot.framework.observability.TraceCorrelation;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import io.micrometer.tracing.Tracer;
 import lombok.extern.slf4j.Slf4j;
@@ -69,10 +70,8 @@ public class AdminEventLogServiceImpl implements AdminEventLogService {
             }
             // Anchor the audit row to the request's OTel trace (A-G2, P1). Admin ops
             // run on the request thread -> span active. Null for system-context events.
-            if (tracer != null && tracer.currentSpan() != null) {
-                logEntry.setTraceId(tracer.currentSpan().context().traceId());
-                logEntry.setSpanId(tracer.currentSpan().context().spanId());
-            }
+            logEntry.setTraceId(TraceCorrelation.traceId(tracer));
+            logEntry.setSpanId(TraceCorrelation.spanId(tracer));
 
             adminEventLogMapper.insertEventLog(logEntry);
         } catch (Exception e) {

@@ -3,7 +3,9 @@ package com.auraboot.framework.application.security;
 import com.auraboot.framework.application.tenant.MetaContext;
 import com.auraboot.framework.common.dto.ApiResponse;
 import com.auraboot.framework.permission.enums.RoleCodes;
+import com.auraboot.framework.observability.TraceCorrelation;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Tracer;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +13,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.PathContainer;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.util.pattern.PathPattern;
 import org.springframework.web.util.pattern.PathPatternParser;
@@ -101,6 +104,11 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
     private final ObjectMapper objectMapper;
     private final AdminAuditService auditService;
     private final RequestBodySummarizer bodySummarizer;
+    private final ObjectProvider<Tracer> tracerProvider;
+
+    private Tracer tracer() {
+        return tracerProvider == null ? null : tracerProvider.getIfAvailable();
+    }
 
     @Override
     public boolean preHandle(HttpServletRequest request,
@@ -148,7 +156,9 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
                     request.getMethod(),
                     DENY_CODE,
                     bodySummarizer.summarize(request),
-                    0);
+                    0,
+                    TraceCorrelation.traceId(tracer()),
+                    TraceCorrelation.spanId(tracer()));
             return false;
         }
         request.setAttribute(ATTR_START_TIME_MS, System.currentTimeMillis());
@@ -177,7 +187,9 @@ public class AdminRoleInterceptor implements HandlerInterceptor {
                 req.getMethod(),
                 resp.getStatus(),
                 bodySummarizer.summarize(req),
-                latencyMs);
+                latencyMs,
+                TraceCorrelation.traceId(tracer()),
+                TraceCorrelation.spanId(tracer()));
     }
 
     /**

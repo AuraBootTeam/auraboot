@@ -6,6 +6,8 @@ import com.auraboot.framework.permission.engine.model.PermissionExplanation;
 import com.auraboot.framework.permission.entity.PermissionAuditLog;
 import com.auraboot.framework.permission.mapper.PermissionAuditLogMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.tracing.Tracer;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -13,6 +15,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 import java.util.Map;
@@ -38,6 +41,9 @@ class PermissionAuditServiceImplTest {
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
+
+    @Mock
+    private ObjectProvider<Tracer> tracerProvider;
 
     @InjectMocks
     private PermissionAuditServiceImpl service;
@@ -260,5 +266,24 @@ class PermissionAuditServiceImplTest {
                 .thenReturn(List.of(new PermissionAuditLog()));
 
         assertThat(service.getLogsByTraceId(100L, "trace-permission-001", 10)).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("trace resolution failure does not suppress the denial row")
+    void traceStampFailureDoesNotPreventAuditRow() {
+        when(tracerProvider.getIfAvailable())
+                .thenThrow(new IllegalStateException("tracer unavailable"));
+        PermissionExplanation explanation = new PermissionExplanation(
+                1L, "model.user", "read", 10L, "USER-PID-10", false,
+                List.of(new EvaluationStep(
+                        "DataScope", EvaluationVerdict.DENY, "out of scope")));
+
+        service.logEvaluation(100L, explanation);
+
+        ArgumentCaptor<PermissionAuditLog> captor =
+                ArgumentCaptor.forClass(PermissionAuditLog.class);
+        verify(auditLogMapper).insertAuditLog(captor.capture());
+        assertThat(captor.getValue().getReason()).isEqualTo("out of scope");
+        assertThat(captor.getValue().getTraceId()).isNull();
     }
 }

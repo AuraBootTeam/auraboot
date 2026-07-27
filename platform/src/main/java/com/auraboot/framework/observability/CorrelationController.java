@@ -13,10 +13,9 @@ import org.springframework.web.bind.annotation.RestController;
  * Unified eagle-eye correlation API (SoT §2.3): one trace id → its command executions
  * + LLM cost + behavior events + audit events, joined across domains. Tenant-scoped.
  *
- * <p>Gated by {@link MetaPermission#COMMAND_READ} — the same read permission the error
- * board / command-audit endpoint uses — because the joined view now surfaces command
- * request payloads / results, which must not be readable by every authenticated tenant
- * user, only by troubleshooters.
+ * <p>Gated by {@link MetaPermission#SYSTEM_MANAGEMENT}, matching the
+ * {@code /ops/troubleshooting} menu contract. The joined view surfaces command
+ * payloads and cross-domain audit data and is not a tenant-wide general read API.
  */
 @RestController
 @RequestMapping("/api/observability/correlation")
@@ -26,7 +25,7 @@ public class CorrelationController {
     private final CorrelationQueryService correlationQueryService;
 
     @GetMapping("/{traceId}")
-    @RequirePermission(MetaPermission.COMMAND_READ)
+    @RequirePermission(MetaPermission.SYSTEM_MANAGEMENT)
     public CorrelationView byTrace(@PathVariable String traceId) {
         return correlationQueryService.byTrace(traceId);
     }

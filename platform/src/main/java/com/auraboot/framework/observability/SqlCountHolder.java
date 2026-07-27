@@ -9,9 +9,6 @@ package com.auraboot.framework.observability;
  */
 public final class SqlCountHolder {
 
-    public static final int WARN_THRESHOLD_DEFAULT = 10;
-    public static final int ERROR_THRESHOLD_DEFAULT = 50;
-
     private static final ThreadLocal<int[]> COUNTER = ThreadLocal.withInitial(() -> new int[]{0});
 
     private SqlCountHolder() {}

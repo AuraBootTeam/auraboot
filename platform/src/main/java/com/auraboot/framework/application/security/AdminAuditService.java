@@ -1,5 +1,7 @@
 package com.auraboot.framework.application.security;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -48,14 +50,16 @@ public class AdminAuditService {
                                String method,
                                int status,
                                String requestBodySummary,
-                               Integer latencyMs) {
+                               Integer latencyMs,
+                               String traceId,
+                               String spanId) {
         Objects.requireNonNull(actorUserId, "actorUserId required for admin audit");
         try {
             jdbcTemplate.update(
                     "INSERT INTO ab_admin_action_log " +
                             "(tenant_id, actor_user_id, actor_role, path, method, " +
-                            " status, request_body_summary, latency_ms, created_at) " +
-                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())",
+                            " status, request_body_summary, latency_ms, trace_id, span_id, created_at) " +
+                            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())",
                     tenantId,
                     actorUserId.toString(),
                     actorRole,
@@ -63,10 +67,43 @@ public class AdminAuditService {
                     method,
                     status,
                     requestBodySummary,
-                    latencyMs);
+                    latencyMs,
+                    traceId,
+                    spanId);
         } catch (Exception e) {
             log.warn("admin audit insert failed: tenantId={} userId={} path={} err={}",
                     tenantId, actorUserId, path, e.getMessage());
         }
+    }
+
+    /** Tenant-scoped admin HTTP requests correlated to one OTel trace id. */
+    public List<AdminActionView> findByTraceId(Long tenantId, String traceId, int limit) {
+        if (tenantId == null || traceId == null || traceId.isBlank()) {
+            return List.of();
+        }
+        return jdbcTemplate.query(
+                "SELECT path, method, status, actor_role, actor_user_id, latency_ms, created_at "
+                        + "FROM ab_admin_action_log WHERE tenant_id = ? AND trace_id = ? "
+                        + "ORDER BY created_at DESC LIMIT ?",
+                (resultSet, rowNum) -> new AdminActionView(
+                        resultSet.getString("path"),
+                        resultSet.getString("method"),
+                        resultSet.getInt("status"),
+                        resultSet.getString("actor_role"),
+                        resultSet.getString("actor_user_id"),
+                        (Integer) resultSet.getObject("latency_ms"),
+                        resultSet.getTimestamp("created_at") == null
+                                ? null : resultSet.getTimestamp("created_at").toInstant()),
+                tenantId, traceId, limit);
+    }
+
+    public record AdminActionView(
+            String path,
+            String method,
+            int status,
+            String actorRole,
+            String actorUserId,
+            Integer latencyMs,
+            Instant createdAt) {
     }
 }

@@ -381,8 +381,6 @@ public class OpenAiCompatibleLlmProvider implements LlmProvider {
         final String m = model == null ? null : model.toLowerCase();
         if (m == null) {
             inputRate = 2.5; outputRate = 10.0;
-        } else if (m.contains("gpt-4o-mini")) {
-            inputRate = 0.15; outputRate = 0.6;
         } else if (m.contains("gpt-4o")) {
             inputRate = 2.5; outputRate = 10.0;
         } else if (m.contains("gpt-4.1")) {

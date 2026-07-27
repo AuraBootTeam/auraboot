@@ -1,6 +1,9 @@
 package com.auraboot.framework.observability;
 
+import com.auraboot.framework.agent.trace.GenAiUsageRecorder;
 import com.auraboot.framework.common.dto.ApiResponse;
+import com.auraboot.framework.permission.annotation.RequirePermission;
+import com.auraboot.framework.permission.constants.MetaPermission;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.search.Search;
@@ -32,6 +35,7 @@ public class ObservabilityController {
     }
 
     @GetMapping("/snapshot")
+    @RequirePermission(MetaPermission.SYSTEM_MANAGEMENT)
     public ApiResponse<Map<String, Object>> getMetricsSnapshot() {
         Map<String, Object> snapshot = new LinkedHashMap<>();
 
@@ -72,6 +76,12 @@ public class ObservabilityController {
         business.put("pluginInstalls", sumCounter("auraboot_plugin_install_total"));
         business.put("llmRequests", sumCounter("auraboot_llm_requests_total"));
         business.put("llmTokensTotal", sumCounter("auraboot_llm_token_usage_total"));
+        business.put("llmLedgerWriteFailures",
+                sumCounter(GenAiUsageRecorder.METRIC_WRITE_FAILURE));
+        business.put("llmUnpricedCalls",
+                sumCounter(GenAiUsageRecorder.METRIC_UNPRICED));
+        business.put("llmCacheUnpricedCalls",
+                sumCounter(GenAiUsageRecorder.METRIC_CACHE_UNPRICED));
         snapshot.put("business", business);
 
         // Prometheus endpoint info

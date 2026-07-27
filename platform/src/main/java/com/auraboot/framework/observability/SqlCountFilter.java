@@ -4,18 +4,19 @@ import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponseWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.http.MediaType;
-import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 
 /**
  * Servlet filter that tracks the number of SQL statements executed per HTTP request.
@@ -28,13 +29,43 @@ import java.io.IOException;
  *   <li>Logs an error if count exceeds the error threshold</li>
  *   <li>Records the count as a Prometheus distribution summary metric with endpoint tags</li>
  * </ul>
+ *
+ * <h2>Why the header is stamped lazily instead of buffering the body</h2>
+ *
+ * <p>A header can only be set before the response commits, but the SQL count is only
+ * known after the handler runs — so an earlier version wrapped every response in a
+ * {@code ContentCachingResponseWrapper}, buffered the whole body in a
+ * {@code ByteArrayOutputStream}, set the header, then copied the body out. That made
+ * the header reliable at the cost of holding every response in heap, including file
+ * downloads and report exports: nine controllers in this codebase return an
+ * {@code InputStreamResource} or streaming body, so an arbitrarily large download was
+ * an arbitrarily large heap allocation.
+ *
+ * <p>It also had to guess, up front, which responses were streams — because buffering
+ * an SSE response yields an empty 200 with the events sitting in a buffer nobody
+ * flushes. Guessing wrong was silent, so the guess accumulated an {@code Accept} check,
+ * a URI check, and a loud error for when it was wrong anyway.
+ *
+ * <p>Both problems come from buffering, so this no longer buffers. The header is
+ * stamped the moment the body is first asked for ({@code getOutputStream()} /
+ * {@code getWriter()} / {@code flushBuffer()}): acquiring the stream does not commit the
+ * response, so setting a header there is still legal, and for a normal MVC request the
+ * handler has already returned by then, so the count is complete. Responses that never
+ * write a body are stamped in the {@code finally} block instead. Nothing is copied,
+ * nothing is held, and a streaming response passes straight through — no detection
+ * heuristic required, and no way to swallow one.
+ *
+ * <p>The trade-off is explicit: SQL executed <em>after</em> the first byte of the body
+ * is written is not reflected in the header. It is still counted in the metric and the
+ * threshold logs, which run at request end. For streaming endpoints that is a partial
+ * header count instead of the previous behaviour, which was a swallowed response.
  */
 @Slf4j
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class SqlCountFilter extends OncePerRequestFilter {
 
-    private static final String HEADER_SQL_COUNT = "X-SQL-Count";
+    static final String HEADER_SQL_COUNT = "X-SQL-Count";
     private static final String METRIC_NAME = "auraboot_request_sql_count";
 
     private final int warnThreshold;
@@ -59,48 +90,19 @@ public class SqlCountFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         SqlCountHolder.reset();
 
-        // SSE endpoints stream asynchronously. ContentCachingResponseWrapper buffers the body, so
-        // wrapping one produces an empty 200 with Content-Length: 0 while the events are written
-        // into a buffer nobody ever flushes — no exception, no log, just a client that receives
-        // nothing.
-        //
-        // Detection is best-effort and deliberately generous, because getting it wrong is silent.
-        // An SSE client SHOULD send Accept: text/event-stream, and EventSource does — but fetch()
-        // does not add it on its own, so a POST-based stream can arrive with no hint in the
-        // headers at all. The old check also keyed off "/stream" appearing in the URI, which meant
-        // an endpoint's streaming worked or broke depending on what it happened to be called.
-        String accept = request.getHeader("Accept");
-        boolean acceptsEventStream = accept != null && accept.contains(MediaType.TEXT_EVENT_STREAM_VALUE);
-        String uri = request.getRequestURI();
-        // The URI check is a legacy fallback for clients that send no Accept header. It is kept
-        // because removing it would break them, not because it is a good way to identify a stream.
-        boolean looksLikeStream = uri.contains("/stream") || uri.contains("/sse");
-        boolean skipWrapping = acceptsEventStream || looksLikeStream;
+        LazySqlCountHeaderResponse stamping =
+                headerEnabled ? new LazySqlCountHeaderResponse(response) : null;
+        HttpServletResponse effectiveResponse = stamping != null ? stamping : response;
 
-        // Wrap response to buffer output, allowing header injection after chain completes
-        ContentCachingResponseWrapper wrappedResponse = (headerEnabled && !skipWrapping)
-                ? new ContentCachingResponseWrapper(response)
-                : null;
-        HttpServletResponse effectiveResponse = wrappedResponse != null ? wrappedResponse : response;
         try {
             filterChain.doFilter(request, effectiveResponse);
         } finally {
             int count = SqlCountHolder.get();
 
-            if (wrappedResponse != null) {
-                // The guess was wrong: this response IS a stream, and by wrapping it we have just
-                // swallowed it. Nothing can be recovered here — but say so loudly, because the
-                // symptom (an empty 200) points nowhere near this filter.
-                if (MediaType.TEXT_EVENT_STREAM_VALUE.equals(wrappedResponse.getContentType())
-                        || request.isAsyncStarted()) {
-                    log.error("SQL-count wrapper buffered a streaming response for {} — the client will "
-                                    + "receive an empty body. Have the client send 'Accept: {}', or extend the "
-                                    + "skip check in SqlCountFilter.",
-                            uri, MediaType.TEXT_EVENT_STREAM_VALUE);
-                }
-                wrappedResponse.setIntHeader(HEADER_SQL_COUNT, count);
-                wrappedResponse.copyBodyToResponse();
-            } else if (headerEnabled && !skipWrapping) {
+            // Bodyless responses (204, redirects, empty 200) never ask for the stream, so
+            // they were never stamped on the way through — and by definition are not
+            // committed yet.
+            if (stamping != null && !stamping.stamped() && !response.isCommitted()) {
                 response.setIntHeader(HEADER_SQL_COUNT, count);
             }
 
@@ -131,6 +133,52 @@ public class SqlCountFilter extends OncePerRequestFilter {
             }
 
             SqlCountHolder.reset();
+        }
+    }
+
+    /**
+     * Sets {@code X-SQL-Count} the first time the body is asked for, then gets out of the
+     * way. The wrapped stream and writer are returned untouched, so nothing is buffered
+     * and a streaming response is unaffected.
+     */
+    static final class LazySqlCountHeaderResponse extends HttpServletResponseWrapper {
+
+        private boolean stamped;
+
+        LazySqlCountHeaderResponse(HttpServletResponse response) {
+            super(response);
+        }
+
+        boolean stamped() {
+            return stamped;
+        }
+
+        private void stamp() {
+            if (stamped) {
+                return;
+            }
+            stamped = true;
+            if (!isCommitted()) {
+                setIntHeader(HEADER_SQL_COUNT, SqlCountHolder.get());
+            }
+        }
+
+        @Override
+        public ServletOutputStream getOutputStream() throws IOException {
+            stamp();
+            return super.getOutputStream();
+        }
+
+        @Override
+        public PrintWriter getWriter() throws IOException {
+            stamp();
+            return super.getWriter();
+        }
+
+        @Override
+        public void flushBuffer() throws IOException {
+            stamp();
+            super.flushBuffer();
         }
     }
 

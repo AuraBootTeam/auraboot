@@ -61,5 +61,11 @@ public class PermissionAuditLog {
             jdbcType = JdbcType.OTHER)
     private List<Object> evaluationTrace;
 
+    /** OTel trace id of the request that produced this decision. */
+    private String traceId;
+
+    /** OTel span id, when the active span survived to the writer. */
+    private String spanId;
+
     private Instant createdAt;
 }

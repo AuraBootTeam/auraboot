@@ -17,8 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>{@code POST} is open to any authenticated user (they report their own browser
  * errors; tenant/user are taken from the session, not the payload). {@code GET} is
- * gated by {@link MetaPermission#COMMAND_READ} — the same read permission the error
- * board uses — so only troubleshooters list them.
+ * gated by {@link MetaPermission#SYSTEM_MANAGEMENT}, matching the
+ * {@code /ops/errors} menu contract, so only system operators list them.
  */
 @RestController
 @RequestMapping("/api/client-errors")
@@ -34,7 +34,7 @@ public class WebClientErrorController {
     }
 
     @GetMapping
-    @RequirePermission(MetaPermission.COMMAND_READ)
+    @RequirePermission(MetaPermission.SYSTEM_MANAGEMENT)
     public ApiResponse<PaginationResult<WebClientError>> list(
             @RequestParam(defaultValue = "1") int pageNum,
             @RequestParam(defaultValue = "20") int pageSize) {
