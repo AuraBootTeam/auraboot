@@ -127,6 +127,7 @@ test.describe('PCBA quote BOM price manual adoption', () => {
       // own column rather than folded into the drawer like the other multi-source columns).
       // Detail-per-source is asserted via the drawer candidates below.
       expect(headers).toEqual([
+        'Excel行',
         '物料',
         'BOM用量',
         PURCHASE_ANALYSIS_RECENT_PRICE_LABEL,
@@ -142,6 +143,7 @@ test.describe('PCBA quote BOM price manual adoption', () => {
           text,
         ]),
       );
+      expect(cellTextByHeader.get('Excel行')).toBe('2');
       expect(cellTextByHeader.get('BOM用量')).toBe('10');
       expect(cellTextByHeader.get(PURCHASE_ANALYSIS_RECENT_PRICE_LABEL) ?? '').toMatch(/^[-—–]?$/);
       // No yunhan price-evidence row was seeded for this line (seedBomPriceManualReviewQuote
