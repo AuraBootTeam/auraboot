@@ -316,9 +316,9 @@ test.describe('QuoteOps non-standard quick-quote (upload-bom) golden', () => {
     );
     const processCells = await tableTexts(resistorHitRow.locator('td, [role="cell"]'));
     for (const [label, expected] of [
-      [/^(数量|Qty)$/i, '3'],
+      [/^(数量|单套用量|Qty)$/i, '3'],
       [/^(单件点数|Unit Points)$/i, '2'],
-      [/^(合计点数|Total Points)$/i, '6'],
+      [/^(合计点数|单套点数|Total Points)$/i, '6'],
     ] as const) {
       const column = processHeaders.findIndex((header) => label.test(header));
       expect(column, `process headers: ${processHeaders.join(' | ')}`).toBeGreaterThanOrEqual(0);
