@@ -7,12 +7,15 @@ import { evaluateCondition as evaluateExpressionCondition } from '~/framework/me
 
 import { MetricStripBlockRenderer } from '../MetricStripBlockRenderer';
 import { CandidateListBlockRenderer } from '../CandidateListBlockRenderer';
-import { parseLadderRungs, safeExternalUrl } from '../ReviewDrawerBlockRenderer';
+import {
+  parseLadderRungs,
+  ReviewDrawerBlockRenderer,
+  safeExternalUrl,
+} from '../ReviewDrawerBlockRenderer';
 import { RecordInspectorBlockRenderer } from '../RecordInspectorBlockRenderer';
 import { WorkbenchActionBarBlockRenderer } from '../WorkbenchActionBarBlockRenderer';
 import { EvidencePanelBlockRenderer } from '../EvidencePanelBlockRenderer';
 import { ArtifactTimelineBlockRenderer } from '../ArtifactTimelineBlockRenderer';
-import { ReviewDrawerBlockRenderer } from '../ReviewDrawerBlockRenderer';
 import { StatusBannerBlockRenderer } from '../StatusBannerBlockRenderer';
 import { useRuntimeStateSubscription } from '../workbenchBlockUtils';
 import { fetchResult } from '~/shared/services/http-client';
@@ -2004,6 +2007,100 @@ describe('ReviewDrawerBlockRenderer', () => {
     expect(screen.queryByTestId('review-drawer-tab-export')).not.toBeInTheDocument();
   });
 
+  it('shows original and factored prices consistently for tiered and non-tier candidates', () => {
+    const typedLadder = {
+      type: 'jsonb',
+      value: JSON.stringify([
+        { qty: '1', price: '0.0285', current: true },
+        { qty: '100', price: '0.0260', current: false },
+      ]),
+      null: false,
+    };
+    const runtime = makeRuntime({
+      data: {
+        priceEvidence: [
+          {
+            pid: 'EV-TIER',
+            qo_pe_part_no: '10K',
+            qo_pe_source: 'yunhan',
+            qo_pe_unit_price: '0.0285',
+            factored_unit_price: '0.0570',
+            applied_price_factor: '200.00%',
+            price_ladder_rows: typedLadder,
+          },
+          {
+            pid: 'EV-FLAT',
+            qo_pe_part_no: '10K',
+            qo_pe_source: 'purchase_analysis_recent_price',
+            qo_pe_unit_price: '0.0310',
+            factored_unit_price: '0.0620',
+            applied_price_factor: '200.00%',
+          },
+        ],
+      },
+      getContext: () => ({
+        locale: 'zh-CN',
+        t: (k: string) => k,
+        global: {},
+        state: { selectedPriceLine: { pid: 'QL-1', qo_ql_mpn: '10K' } },
+      }),
+    }) as any;
+
+    render(
+      <ReviewDrawerBlockRenderer
+        block={{
+          id: 'price_review_drawer',
+          blockType: 'review-drawer',
+          context: '${state.selectedPriceLine}',
+          candidates: {
+            dataSource: 'priceEvidence',
+            item: {
+              titleField: 'qo_pe_part_no',
+              detailFields: [
+                { key: 'source', label: '来源', field: 'qo_pe_source' },
+                {
+                  key: 'price',
+                  label: '价格',
+                  field: 'qo_pe_unit_price',
+                  format: 'price-comparison',
+                  factoredField: 'factored_unit_price',
+                  factorField: 'applied_price_factor',
+                  span: 2,
+                },
+                {
+                  key: 'ladder',
+                  label: '阶梯价',
+                  field: 'price_ladder_rows',
+                  format: 'ladder',
+                  factorField: 'applied_price_factor',
+                  span: 2,
+                  hideWhenEmpty: true,
+                },
+              ],
+            },
+          },
+        }}
+        runtime={runtime}
+      />,
+    );
+
+    const tier = screen.getByTestId('review-drawer-candidate-EV-TIER');
+    expect(tier).toHaveTextContent('原始单价');
+    expect(tier).toHaveTextContent('系数后单价');
+    expect(tier).toHaveTextContent('0.0285');
+    expect(tier).toHaveTextContent('0.0570');
+    expect(tier).toHaveTextContent('数量');
+    expect(tier).toHaveTextContent('系数后 (200%)');
+    expect(screen.getByTestId('review-drawer-ladder-current-EV-TIER')).toHaveTextContent('当前');
+    expect(screen.getByTestId('review-drawer-ladder-current-EV-TIER')).toHaveTextContent('0.0570');
+    expect(tier).not.toHaveTextContent('"type":"jsonb"');
+
+    const flat = screen.getByTestId('review-drawer-candidate-EV-FLAT');
+    expect(flat).toHaveTextContent('0.0310');
+    expect(flat).toHaveTextContent('0.0620');
+    expect(flat).not.toHaveTextContent('阶梯价');
+  });
+
   it('keeps long BOM refdes titles constrained so drawer actions remain visible', () => {
     const longRefdes = Array.from({ length: 48 }, (_, index) => `C${1000 + index}`).join(',');
     const runtime = makeReviewDrawerRuntime({
@@ -2874,9 +2971,9 @@ describe('ArtifactTimelineBlockRenderer', () => {
 
 describe('safeExternalUrl', () => {
   it('accepts http and https and rejects every other scheme', () => {
-    expect(safeExternalUrl('https://www.ickey.cn/detail/1003001033412565/FRC0603P000%20TS.html')).toBe(
-      'https://www.ickey.cn/detail/1003001033412565/FRC0603P000%20TS.html',
-    );
+    expect(
+      safeExternalUrl('https://www.ickey.cn/detail/1003001033412565/FRC0603P000%20TS.html'),
+    ).toBe('https://www.ickey.cn/detail/1003001033412565/FRC0603P000%20TS.html');
     expect(safeExternalUrl('http://example.com/a')).toBe('http://example.com/a');
 
     // Evidence snapshots carry supplier links copied verbatim from an upstream API, so an href is
@@ -2900,6 +2997,22 @@ describe('parseLadderRungs', () => {
     expect(parseLadderRungs(rungs)).toEqual(rungs);
     // jsonb reaches the client as an array or as its string form depending on the driver.
     expect(parseLadderRungs(JSON.stringify(rungs))).toEqual(rungs);
+    expect(
+      parseLadderRungs({
+        type: 'jsonb',
+        value: JSON.stringify(rungs),
+        null: false,
+      }),
+    ).toEqual(rungs);
+    expect(
+      parseLadderRungs(
+        JSON.stringify({
+          type: 'jsonb',
+          value: JSON.stringify(rungs),
+          null: false,
+        }),
+      ),
+    ).toEqual(rungs);
 
     expect(parseLadderRungs(null)).toBeNull();
     expect(parseLadderRungs([])).toBeNull();
