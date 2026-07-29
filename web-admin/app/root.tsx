@@ -28,6 +28,7 @@ import {
   type RuntimeProfile,
 } from '@auraboot/runtime-kernel';
 import { useFederationStore } from '~/plugins/FederationManager';
+import { resolveIcpComplianceConfig, type IcpComplianceConfig } from '~/config/icpCompliance';
 
 export interface RootLoaderData {
   runtimeProfile: RuntimeProfile;
@@ -41,6 +42,7 @@ export interface RootLoaderData {
   edition: string;
   spaces: any[];
   bootstrapStatus: BootstrapStatus | null;
+  icpCompliance: IcpComplianceConfig;
 }
 
 import '~/app.css';
@@ -99,6 +101,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
   const initialTimezone = getTimezoneFromRequest(request);
   const { pathname } = new URL(request.url);
   const runtimeProfile = getRuntimeProfileFromPathname(pathname);
+  const icpCompliance = resolveIcpComplianceConfig(process.env);
 
   // Bootstrap status: never redirect; inject into loader data so the banner can render
   const bootstrapStatus = await fetchBootstrapStatus();
@@ -135,6 +138,7 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
       edition,
       spaces: [],
       bootstrapStatus,
+      icpCompliance,
     };
     ssrLoaderCache.set(cacheKey, result);
     return result;
@@ -206,8 +210,12 @@ export async function loader({ request }: LoaderFunctionArgs): Promise<RootLoade
     edition,
     spaces,
     bootstrapStatus,
+    icpCompliance,
   };
 }
+
+export const meta = ({ data }: { data?: RootLoaderData }) =>
+  data?.icpCompliance.enabled ? [{ title: data.icpCompliance.siteDisplayName }] : [];
 
 export function useRootLoaderData(): RootLoaderData | undefined {
   return useRouteLoaderData<typeof loader>('root') as RootLoaderData | undefined;

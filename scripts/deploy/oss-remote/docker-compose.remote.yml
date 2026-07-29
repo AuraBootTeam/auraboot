@@ -72,6 +72,9 @@ services:
       BFF_INTERNAL_URL: http://backend:6443
       CORS_ALLOWED_ORIGINS: ${PUBLIC_URL:?set PUBLIC_URL}
       SESSION_SECRET: ${SESSION_SECRET:?set in .env}
+      ICP_COMPLIANCE_ENABLED: ${ICP_COMPLIANCE_ENABLED:-0}
+      ICP_SITE_TITLE: ${ICP_SITE_TITLE:-个人技术}
+      ICP_RECORD_NUMBER: ${ICP_RECORD_NUMBER:-浙ICP备2023054087号}
     depends_on:
       backend: { condition: service_healthy }
     networks: [oss]

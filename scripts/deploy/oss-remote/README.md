@@ -13,7 +13,8 @@ build (off-host) ─► save|ssh docker load ─► compose up ─► quickstart
 - Backend image: builds the (arch-independent) Spring `bootJar` natively, then bakes it
   into an `eclipse-temurin:21-jre-alpine` runtime for the target arch — no slow QEMU Java compile.
 - Frontend image: cross-builds for the target arch (`--platform`), injecting CN mirrors
-  (`APK_MIRROR` / `NPM_REGISTRY`) without editing the canonical Dockerfile.
+  (`APK_MIRROR` / `NPM_REGISTRY`) without editing the canonical Dockerfile. ICP review
+  settings are deliberately excluded from the build and are read by the BFF at runtime.
 - Ships `docker-compose.remote.yml` + a mode override + `gateway.conf` + `schema.sql`
   (fresh-DB init) + `plugins/` + `quickstart.sh`.
 - `quickstart.sh` creates the admin and imports the 11 core plugins.
@@ -59,6 +60,33 @@ APK_MIRROR=mirrors.aliyun.com NPM_REGISTRY=https://registry.npmmirror.com \
 ## Single phases
 `STEP=build|ship|up|bootstrap|seed|verify ./deploy.sh` runs one phase; `SKIP_BUILD=1` /
 `SKIP_SEED=1` skip the expensive ones. See the header of `deploy.sh` for all env vars.
+
+## Toggle ICP review mode without rebuilding images
+
+The frontend BFF reads these values at process startup:
+
+```dotenv
+ICP_COMPLIANCE_ENABLED=1
+ICP_SITE_TITLE=个人技术
+ICP_RECORD_NUMBER=浙ICP备2023054087号
+```
+
+After a host has received a frontend image containing runtime-config support, switch the
+profile without building or uploading another image:
+
+```bash
+HOST=root@1.2.3.4 PUBLIC_URL=https://example.com \
+ICP_COMPLIANCE_ENABLED=1 \
+ICP_SITE_TITLE=个人技术 \
+ICP_RECORD_NUMBER=浙ICP备2023054087号 \
+STEP=config scripts/deploy/oss-remote/deploy.sh
+```
+
+`STEP=config` only updates the remote `.env` and force-recreates the frontend container
+with its existing image. It does not restart the backend or change the database. Set
+`ICP_COMPLIANCE_ENABLED=0` to turn the profile off. A plain `docker restart` is not
+sufficient because Docker does not reload changed Compose environment values into an
+existing container.
 
 ## Reverse a coexist deploy
 ```bash
