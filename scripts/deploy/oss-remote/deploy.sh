@@ -29,6 +29,9 @@
 #   SHOWCASE_DEFAULT_DASHBOARD_CODE=crm_overview
 #   APK_MIRROR=mirrors.aliyun.com  NPM_REGISTRY=https://registry.npmmirror.com
 #   PLATFORM=linux/amd64              # target arch of the host
+#   ICP_COMPLIANCE_ENABLED=1          # show the temporary ICP review profile
+#   ICP_SITE_TITLE=个人技术
+#   ICP_RECORD_NUMBER=浙ICP备2023054087号
 #
 # Host prereqs: docker + docker compose, python3 + curl (for bootstrap).
 # Build-host prereqs: docker buildx, JDK 21 + gradle (bundled wrapper), and
@@ -54,6 +57,9 @@ LOCAL_ADMIN_PORT="${LOCAL_ADMIN_PORT:-18081}"
 PUBLIC_HTTP_PORT="${PUBLIC_HTTP_PORT:-80}"
 APK_MIRROR="${APK_MIRROR:-}"
 NPM_REGISTRY="${NPM_REGISTRY:-https://registry.npmjs.org}"
+ICP_COMPLIANCE_ENABLED="${ICP_COMPLIANCE_ENABLED:-0}"
+ICP_SITE_TITLE="${ICP_SITE_TITLE:-个人技术}"
+ICP_RECORD_NUMBER="${ICP_RECORD_NUMBER:-浙ICP备2023054087号}"
 SEED_PHASES="${SEED_PHASES:-data extended workflow ai supplement}"
 SHOWCASE_DEFAULT_DASHBOARD_CODE="${SHOWCASE_DEFAULT_DASHBOARD_CODE:-crm_overview}"
 STEP="${STEP:-all}"
@@ -82,6 +88,9 @@ build(){
   else cp "$WEB_ADMIN/Dockerfile" "$fedf"; fi
   docker buildx build --platform "$PLATFORM" --load \
     --build-arg NPM_REGISTRY="$NPM_REGISTRY" \
+    --build-arg VITE_ICP_COMPLIANCE_ENABLED="$ICP_COMPLIANCE_ENABLED" \
+    --build-arg VITE_ICP_SITE_TITLE="$ICP_SITE_TITLE" \
+    --build-arg VITE_ICP_RECORD_NUMBER="$ICP_RECORD_NUMBER" \
     -f "$fedf" -t "$FE_IMG" "$ROOT"
   rm -f "$fedf"
   for i in "$BE_IMG" "$FE_IMG"; do

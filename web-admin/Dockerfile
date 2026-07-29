@@ -32,11 +32,17 @@ FROM node:26-alpine AS builder
 # https://registry.npmjs.org is firewalled or rate-limited. Pass at build
 # time, e.g. `docker build --build-arg NPM_REGISTRY=https://registry.npmmirror.com`.
 ARG NPM_REGISTRY=https://registry.npmjs.org
+ARG VITE_ICP_COMPLIANCE_ENABLED=false
+ARG VITE_ICP_SITE_TITLE=个人技术
+ARG VITE_ICP_RECORD_NUMBER=浙ICP备2023054087号
 
 # `npm_config_registry` is honored by both npm AND pnpm. Setting it as an
 # env var (rather than via `pnpm config set`) means the value survives any
 # subsequent USER switch and is inherited by all child npm/pnpm invocations.
 ENV npm_config_registry=$NPM_REGISTRY
+ENV VITE_ICP_COMPLIANCE_ENABLED=$VITE_ICP_COMPLIANCE_ENABLED
+ENV VITE_ICP_SITE_TITLE=$VITE_ICP_SITE_TITLE
+ENV VITE_ICP_RECORD_NUMBER=$VITE_ICP_RECORD_NUMBER
 
 WORKDIR /app
 

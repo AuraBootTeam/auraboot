@@ -16,6 +16,8 @@ import { post, fetchResult } from '~/shared/services/http-client';
 import { ResultHelper, type User } from '~/utils/type';
 import { getUserInfo } from '~/shared/services/userService';
 import { useI18n } from '~/contexts/I18nContext';
+import { getIcpComplianceConfig } from '~/config/icpCompliance';
+import IcpComplianceFooter from './IcpComplianceFooter';
 import { getLoginFailureActionData } from './login-errors';
 
 const REMEMBER_KEY = 'auth.remember';
@@ -38,6 +40,11 @@ const SOCIAL_I18N_KEYS: Record<string, string> = {
   google: 'auth.social.google',
   apple: 'auth.social.apple',
   oidc: 'auth.social.oidc',
+};
+
+export const meta = () => {
+  const compliance = getIcpComplianceConfig();
+  return compliance.enabled ? [{ title: compliance.siteDisplayName }] : [];
 };
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
@@ -303,6 +310,7 @@ interface CapabilityRow {
 }
 
 export default function LoginPage() {
+  const compliance = getIcpComplianceConfig();
   const { t } = useI18n();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
@@ -448,7 +456,9 @@ export default function LoginPage() {
           {t('auth.welcome') || '欢迎回来'}
         </h1>
         <p className="mt-2 text-[15px] text-[#8A8694] dark:text-gray-400">
-          {t('auth.welcomeSub', undefined, '登录以继续使用 AuraBoot 工作台')}
+          {compliance.enabled
+            ? t('auth.compliance.welcomeSub', undefined, '登录以继续使用 AuraBoot')
+            : t('auth.welcomeSub', undefined, '登录以继续使用 AuraBoot 工作台')}
         </p>
       </div>
 
@@ -493,6 +503,7 @@ export default function LoginPage() {
           setPassword={setPassword}
           remember={remember}
           setRemember={setRemember}
+          complianceEnabled={compliance.enabled}
           t={t}
         />
       )}
@@ -569,11 +580,11 @@ export default function LoginPage() {
     <div
       data-testid="login-page-root"
       data-hydrated={hydrated ? 'true' : 'false'}
-      className="relative min-h-[calc(100vh-4rem)] bg-white dark:bg-gray-900"
+      className="relative flex min-h-[calc(100vh-4rem)] flex-col bg-white dark:bg-gray-900"
     >
       {isMobile ? (
         // Mobile: single column with brand on top, card centered
-        <div className="relative flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center bg-[#F7F8FB] px-4 py-8 sm:px-6 dark:bg-gray-900">
+        <div className="relative flex flex-1 flex-col items-center justify-center bg-[#F7F8FB] px-4 py-8 sm:px-6 dark:bg-gray-900">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(600px_400px_at_50%_0%,rgba(124,92,255,0.10),transparent_60%)]"
@@ -584,8 +595,11 @@ export default function LoginPage() {
               alt="AuraBoot"
               className="h-9 w-9 rounded-lg shadow-sm"
             />
-            <span className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">
-              AuraBoot
+            <span
+              data-testid="login-mobile-site-title"
+              className="text-xl font-semibold tracking-tight text-gray-900 dark:text-white"
+            >
+              {compliance.siteDisplayName}
             </span>
           </div>
           <div className="relative w-full max-w-md rounded-2xl border border-gray-200/80 bg-white p-6 shadow-[0_24px_60px_-20px_rgba(30,40,80,0.18),0_6px_16px_rgba(30,40,80,0.06)] dark:border-gray-700 dark:bg-gray-800">
@@ -594,7 +608,7 @@ export default function LoginPage() {
         </div>
       ) : (
         // Desktop: full-bleed 2-col, left brand region + right form region
-        <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-[1.15fr_1fr]">
+        <div className="grid flex-1 lg:grid-cols-[1.15fr_1fr]">
           {/* Left: brand / positioning region */}
           <section className="flex flex-col justify-center bg-white px-8 py-12 lg:px-14 xl:px-20 2xl:px-24 dark:bg-gray-900">
             <div className="flex w-full max-w-[600px] flex-col">
@@ -661,6 +675,7 @@ export default function LoginPage() {
           </section>
         </div>
       )}
+      <IcpComplianceFooter />
     </div>
   );
 }
@@ -731,6 +746,7 @@ function EmailPasswordForm({
   setPassword,
   remember,
   setRemember,
+  complianceEnabled,
   t,
 }: {
   emailRef: React.RefObject<HTMLInputElement | null>;
@@ -743,6 +759,7 @@ function EmailPasswordForm({
   setPassword: (v: string) => void;
   remember: boolean;
   setRemember: (v: boolean) => void;
+  complianceEnabled: boolean;
   t: (key: string, params?: Record<string, any>, fallback?: string) => string;
 }) {
   const [showPwd, setShowPwd] = useState(false);
@@ -777,7 +794,9 @@ function EmailPasswordForm({
 
       <div>
         <label htmlFor="identifier" className={LABEL_CLS}>
-          {t('auth.identifier', undefined, '用户名或邮箱')}
+          {complianceEnabled
+            ? t('auth.compliance.identifier', undefined, '账号或邮箱')
+            : t('auth.identifier', undefined, '用户名或邮箱')}
         </label>
         <input
           ref={emailRef}
@@ -789,7 +808,11 @@ function EmailPasswordForm({
           autoComplete="username"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          placeholder={t('auth.identifierPlaceholder', undefined, '输入用户名或邮箱')}
+          placeholder={
+            complianceEnabled
+              ? t('auth.compliance.identifierPlaceholder', undefined, '请输入账号或邮箱')
+              : t('auth.identifierPlaceholder', undefined, '输入用户名或邮箱')
+          }
           aria-invalid={actionData?.errors?.email ? true : undefined}
           className={INPUT_CLS}
         />
