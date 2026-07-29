@@ -24,6 +24,20 @@ import java.util.List;
 public interface PermissionMapper extends BaseMapper<Permission> {
 
     /**
+     * Load the tenant permission catalog used by authorization checks.
+     *
+     * <p>Archived definitions remain resolvable for backward compatibility with
+     * {@link #findByCode(String)}; soft-deleted definitions do not.
+     */
+    @Select("""
+        SELECT *
+        FROM ab_permission
+        WHERE (deleted_flag = false OR deleted_flag IS NULL)
+        ORDER BY created_at DESC
+        """)
+    List<Permission> findResolvableDefinitions();
+
+    /**
      * Find permission by code
      *
      * @param code Permission code (e.g., "model.user_model.create")

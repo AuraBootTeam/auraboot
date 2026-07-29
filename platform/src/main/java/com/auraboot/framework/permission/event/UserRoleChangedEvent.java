@@ -22,13 +22,20 @@ import org.springframework.context.ApplicationEvent;
  */
 @Getter
 public class UserRoleChangedEvent extends ApplicationEvent {
-    
+
+    private final Long tenantId;
     private final Long userId;
     private final Long roleId;
     private final String operation;  // CREATE, DELETE
     
     public UserRoleChangedEvent(Object source, Long userId, Long roleId, String operation) {
+        this(source, null, userId, roleId, operation);
+    }
+
+    public UserRoleChangedEvent(
+            Object source, Long tenantId, Long userId, Long roleId, String operation) {
         super(source);
+        this.tenantId = tenantId;
         this.userId = userId;
         this.roleId = roleId;
         this.operation = operation;

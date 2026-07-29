@@ -1,5 +1,6 @@
 package com.auraboot.framework.permission.listener;
 
+import com.auraboot.framework.permission.event.PermissionDefinitionChangedEvent;
 import com.auraboot.framework.permission.event.RolePermissionChangedEvent;
 import com.auraboot.framework.permission.event.UserRoleChangedEvent;
 import com.auraboot.framework.permission.service.UserPermissionService;
@@ -18,14 +19,17 @@ import org.springframework.stereotype.Component;
  * <pre>
  * Event                          | Eviction Target
  * -------------------------------|----------------------------------
- * RolePermissionChangedEvent     | user-permissions (all users of role)
- * UserRoleChangedEvent           | user-permissions (specific user)
+ * PermissionDefinitionChanged    | permission-catalog (tenant)
+ * RolePermissionChangedEvent     | role-permission + derived user snapshots
+ * UserRoleChangedEvent           | user-role + effective user snapshot
  * </pre>
  *
  * <p>Cache Hierarchy:
  * <pre>
- * L1: user-permissions:{userId}
- * L3: subject-declarations:{subjectType}:{subjectId}
+ * permission-catalog (tenant)
+ * user-role-snapshots (tenant + user)
+ * role-permission-snapshots (tenant + role + date)
+ * user-permissions (tenant + user + date)
  * </pre>
  *
  * @author AuraBoot Platform
@@ -65,7 +69,11 @@ public class PermissionCacheEvictionListener {
             roleId, operation);
 
         // Evict all users' permission cache for this role
-        userPermissionService.evictRoleUsers(roleId);
+        if (event.getTenantId() != null) {
+            userPermissionService.evictRoleUsers(event.getTenantId(), roleId);
+        } else {
+            userPermissionService.evictRoleUsers(roleId);
+        }
     }
 
     /**
@@ -93,7 +101,18 @@ public class PermissionCacheEvictionListener {
             userId, operation);
 
         // Evict the user's permission cache
-        userPermissionService.evictUserPermissions(userId);
+        if (event.getTenantId() != null) {
+            userPermissionService.evictUserPermissions(event.getTenantId(), userId);
+        } else {
+            userPermissionService.evictUserPermissions(userId);
+        }
+    }
+
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+    public void onPermissionDefinitionChanged(PermissionDefinitionChangedEvent event) {
+        log.info("Permission definition changed, evicting tenant catalog: tenantId={}, code={}, operation={}",
+                event.getTenantId(), event.getPermissionCode(), event.getOperation());
+        userPermissionService.evictPermissionDefinitions(event.getTenantId());
     }
 
 }
