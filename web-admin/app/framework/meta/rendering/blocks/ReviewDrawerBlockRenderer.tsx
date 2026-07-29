@@ -327,8 +327,8 @@ function ComparisonList({
             data-testid={`review-drawer-comparison-${index}`}
             className="rounded-control border-border bg-panel overflow-hidden border"
           >
-            <div className="flex flex-wrap items-center justify-between gap-2 border-border border-b px-2.5 py-1.5">
-              <span className="text-text min-w-0 break-words text-xs font-semibold">{key}</span>
+            <div className="border-border flex flex-wrap items-center justify-between gap-2 border-b px-2.5 py-1.5">
+              <span className="text-text min-w-0 text-xs font-semibold break-words">{key}</span>
               <span
                 className={`rounded-pill shrink-0 border px-2 py-0.5 text-[11px] font-semibold ${comparisonStatusClass(
                   comparison.status,
@@ -589,7 +589,8 @@ function DrawerEditForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  if (fields.length === 0 || !config?.command) return <div data-testid="review-drawer-edit-form-empty" />;
+  if (fields.length === 0 || !config?.command)
+    return <div data-testid="review-drawer-edit-form-empty" />;
   const recordPid = record ? String(record.pid ?? '') : '';
   const disabled = !recordPid;
 
@@ -607,9 +608,7 @@ function DrawerEditForm({
   async function submit() {
     // A field marked required must not be cleared: a non-standard BOM's description is Yunhan's
     // search key, so submitting it blank would re-price against nothing.
-    const missing = fields.find(
-      (f: any) => f.required && (values[f.field] ?? '').trim() === '',
-    );
+    const missing = fields.find((f: any) => f.required && (values[f.field] ?? '').trim() === '');
     if (missing) {
       setError(
         getLocalizedText(
@@ -660,7 +659,11 @@ function DrawerEditForm({
           onClick={begin}
           className="rounded-control border-border bg-panel text-text hover:bg-hover border px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {getLocalizedText(config.openLabel || { 'zh-CN': '编辑此行并重新查价', en: 'Edit this row' }, locale, t)}
+          {getLocalizedText(
+            config.openLabel || { 'zh-CN': '编辑此行并重新查价', en: 'Edit this row' },
+            locale,
+            t,
+          )}
         </button>
       ) : (
         <div className="space-y-2">
@@ -684,9 +687,12 @@ function DrawerEditForm({
                     placeholder={
                       f.placeholder ? getLocalizedText(f.placeholder, locale, t) : undefined
                     }
-                    onChange={(e) =>
-                      setValues((prev) => ({ ...prev, [key]: e.target.value }))
-                    }
+                    onChange={(e) => {
+                      setValues((prev) => ({ ...prev, [key]: e.target.value }));
+                      // A validation or command error describes the previous values. Keeping it
+                      // visible after the user corrects a field makes a valid form look broken.
+                      if (error) setError(null);
+                    }}
                   />
                 </label>
               );
@@ -714,7 +720,11 @@ function DrawerEditForm({
             >
               {saving
                 ? t('common.loading')
-                : getLocalizedText(config.submitLabel || { 'zh-CN': '保存并重新查价', en: 'Save and re-price' }, locale, t)}
+                : getLocalizedText(
+                    config.submitLabel || { 'zh-CN': '保存并重新查价', en: 'Save and re-price' },
+                    locale,
+                    t,
+                  )}
             </button>
           </div>
         </div>
@@ -802,9 +812,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
           (row: any) => String(readPath(row, contextKeyField)) === String(contextRecordKey),
         ) || contextRecord
       : contextRecord;
-  const selectedRecordKey = record
-                      ? String(record.pid ?? record.bom_std_row_no ?? '')
-    : '';
+  const selectedRecordKey = record ? String(record.pid ?? record.bom_std_row_no ?? '') : '';
   const candidates = readDataSourceRows(runtime, candidateDataSource);
   const exportRows = readDataSourceRows(runtime, exportDataSource);
   const selectedCandidate = candidates.find((row: any, index: number) => {
@@ -930,7 +938,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     return (
       <button
         type="button"
-        className="rounded-control bg-panel text-text shadow-pop fixed right-4 bottom-4 z-50 border border-border px-4 py-2 text-sm font-medium hover:bg-hover"
+        className="rounded-control bg-panel text-text shadow-pop border-border hover:bg-hover fixed right-4 bottom-4 z-50 border px-4 py-2 text-sm font-medium"
         data-testid="review-drawer-minimized"
         onClick={() => setDismissedRecordKey('')}
       >
@@ -941,7 +949,14 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
 
   const titleTemplate = (block as any).titleTemplate;
   const title = titleTemplate
-    ? fillTemplate(String(titleTemplate), runtime, record, buildTemplateFieldConfigs(block), locale, t)
+    ? fillTemplate(
+        String(titleTemplate),
+        runtime,
+        record,
+        buildTemplateFieldConfigs(block),
+        locale,
+        t,
+      )
     : getLocalizedText(block.title || 'Review', locale, t);
   const rawRecord = findRelatedRecord(runtime, rawRecordConfig, record);
   const canonicalRecord = findRelatedRecord(runtime, canonicalRecordConfig, record);
@@ -993,7 +1008,6 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
       ? evaluator.evaluateCondition(actionConfig.disabledWhen, actionContext)
       : false;
 
-
   const jumpRow = (offset: number) => {
     if (!contextStateBinding || contextRows.length <= 1) return;
     const currentIndex = contextRows.findIndex((row: any) => {
@@ -1027,7 +1041,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
     <section
       data-testid="review-drawer"
       style={drawerStyle}
-      className="rounded-card bg-panel shadow-pop fixed z-50 grid min-h-[500px] max-w-[calc(100vw-24px)] grid-rows-[auto_auto_auto_minmax(0,1fr)] overflow-hidden border border-border"
+      className="rounded-card bg-panel shadow-pop border-border fixed z-50 grid min-h-[500px] max-w-[calc(100vw-24px)] grid-rows-[auto_auto_auto_minmax(0,1fr)] overflow-hidden border"
     >
       <div
         className="bg-accent flex min-h-12 cursor-move items-center justify-between gap-3 overflow-hidden px-4 text-white"
@@ -1123,7 +1137,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           t,
                           'Raw',
                         )}
-                        <span className="rounded-pill border border-status-blue bg-status-blue-bg px-2 py-0.5 text-xs font-medium text-status-blue">
+                        <span className="rounded-pill border-status-blue bg-status-blue-bg text-status-blue border px-2 py-0.5 text-xs font-medium">
                           {localized(locale, t, '只读证据', 'Read-only evidence')}
                         </span>
                       </header>
@@ -1141,7 +1155,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                           t,
                           'Canonical',
                         )}
-                        <span className="rounded-pill border border-status-blue bg-status-blue-bg px-2 py-0.5 text-xs font-medium text-status-blue">
+                        <span className="rounded-pill border-status-blue bg-status-blue-bg text-status-blue border px-2 py-0.5 text-xs font-medium">
                           {localized(locale, t, '转换结果', 'Canonical result')}
                         </span>
                       </header>
@@ -1187,7 +1201,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       return (
                         <span
                           key={key}
-                          className="rounded-control text-text-2 inline-flex min-h-8 max-w-full items-center gap-1.5 border border-border bg-subtle px-2.5 py-1 text-xs"
+                          className="rounded-control text-text-2 border-border bg-subtle inline-flex min-h-8 max-w-full items-center gap-1.5 border px-2.5 py-1 text-xs"
                         >
                           <span className="text-text-2 shrink-0 font-medium">{label}</span>
                           <span
@@ -1361,7 +1375,7 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
                       <ol className="rounded-card border-border divide-border bg-panel divide-y border">
                         {exportRows.map((row: any, index: number) => (
                           <li
-                      key={String(row.pid ?? index)}
+                            key={String(row.pid ?? index)}
                             className="text-text-2 px-3 py-2 text-sm"
                           >
                             <span className="font-mono font-semibold">
@@ -1388,326 +1402,336 @@ export const ReviewDrawerBlockRenderer: React.FC<ReviewDrawerBlockRendererProps>
               domain's vocabulary in front of another domain's users — a FAQ reviewer has no idea
               what a 标准编码 is, and nothing on the panel does anything. Show it when it is asked for. */}
           {hasCandidatesConfig && (
-          <aside
-            data-testid="review-drawer-tab-candidates"
-            className="rounded-card border-border bg-panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden border"
-          >
-            <header className="border-border flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
-              <h3 className="text-text min-w-0 flex-1 truncate text-sm font-semibold">
-                {getLocalizedText(
-                  candidatesConfig.title || {
-                    'zh-CN': '候选物料与用户决策',
-                    en: 'Candidates and decision',
-                  },
-                  locale,
-                  t,
-                )}
-              </h3>
-              {(exportConfig.actions || []).length > 0 && (
-                <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                  {exportConfig.actions.filter(isActionVisible).map((actionConfig: any) => {
-                    const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
-                    const disabled = Boolean(
-                      isActionDisabledByCondition(actionConfig) || runningAction,
-                    );
-                    return (
-                      <button
-                        key={code}
-                        type="button"
-                        data-testid={`review-drawer-export-action-${code}`}
-                        disabled={disabled}
-                        onClick={() => {
-                          void runAction(actionConfig, 'export');
-                        }}
-                        className={`rounded-control px-3 py-2 text-sm font-medium ${
-                          buttonClass[actionConfig.variant || 'secondary'] || buttonClass.secondary
-                        } disabled:cursor-not-allowed disabled:opacity-50`}
-                      >
-                        {runningAction === `export:${code}`
-                          ? t('common.loading')
-                          : getLocalizedText(actionConfig.label || code, locale, t)}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </header>
-            <div
-              data-testid="review-drawer-candidate-list"
-              className="min-h-0 flex-1 space-y-1.5 overflow-auto p-2"
+            <aside
+              data-testid="review-drawer-tab-candidates"
+              className="rounded-card border-border bg-panel flex h-full min-h-0 min-w-0 flex-col overflow-hidden border"
             >
-              {candidates.length === 0 ? (
-                <div
-                  data-testid="review-drawer-candidates-empty"
-                  className="rounded-control border-border-strong text-text-2 border border-dashed p-3 text-sm"
-                >
+              <header className="border-border flex flex-wrap items-center justify-between gap-2 border-b px-3 py-2">
+                <h3 className="text-text min-w-0 flex-1 truncate text-sm font-semibold">
                   {getLocalizedText(
-                    candidatesConfig.empty?.title || { 'zh-CN': '暂无候选', en: 'No candidates' },
+                    candidatesConfig.title || {
+                      'zh-CN': '候选物料与用户决策',
+                      en: 'Candidates and decision',
+                    },
                     locale,
                     t,
                   )}
-                </div>
-              ) : (
-                candidates.map((candidate: any, index: number) => {
-                  const rowKey = candidateKey(candidate, index);
-                  const active = rowKey === selectedCandidateKey;
-                  const item = candidatesConfig.item || {};
-                  const titleText = formatValue(readPath(candidate, item.titleField), rowKey);
-                  const score = item.scoreField ? readPath(candidate, item.scoreField) : undefined;
-                  const scoreColor = item.statusColorField
-                    ? readPath(candidate, item.statusColorField)
-                    : undefined;
-                  return (
-                    <button
-                      key={rowKey}
-                      type="button"
-                      data-testid={`review-drawer-candidate-${rowKey}`}
-                      onClick={() => {
-                        setSelectedCandidateKey(rowKey);
-                        if (candidatesConfig.selection?.bind) {
-                          writeRuntimeState(runtime, candidatesConfig.selection.bind, candidate);
-                        }
-                      }}
-                      className={`rounded-card block w-full border p-3 text-left ${
-                        active
-                          ? 'bg-accent-weak border-accent'
-                          : 'border-border bg-panel hover:bg-hover'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div
-                            className="text-text whitespace-normal break-words font-mono text-xs font-semibold"
-                            title={titleText}
-                          >
-                            {titleText}
-                          </div>
-                          <dl className="mt-2 grid gap-x-3 gap-y-1.5 text-xs sm:grid-cols-2">
-                            {(item.detailFields || []).map((field: any) => {
-                              const key = String(field.key || field.field || field.label);
-                              const label = getLocalizedText(field.label || key, locale, t);
-                              const rawValue = readFieldValue(candidate, field);
-                              if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
-                              const value = formatConfiguredValue(rawValue, field, locale, t);
-                              return (
-                                <div
-                                  key={key}
-                                  data-testid={`review-drawer-candidate-${rowKey}-field-${key}`}
-                                  className={`min-w-0 ${
-                                    field.span === 2 ? 'sm:col-span-2' : ''
-                                  } grid grid-cols-[72px_minmax(0,1fr)] gap-2 ${
-                                    // A ladder is a multi-row card, so align its label to the top of
-                                    // the card and give the card room below it instead of letting the
-                                    // next field sit tight against it.
-                                    field.format === 'ladder' ? 'items-start pb-1' : 'items-baseline'
-                                  }`}
-                                >
-                                  <dt className="text-text-2 min-w-0 break-words" title={label}>
-                                    {label}
-                                  </dt>
-                                  <dd
-                                    className="text-text min-w-0 whitespace-normal break-words"
-                                    title={value}
-                                  >
-                                    {field.format === 'ladder' && parseLadderRungs(rawValue) ? (
-                                      // A self-contained tier card: quantity and price sit next to
-                                      // each other (an inline-grid so the columns hug their content
-                                      // instead of spanning the whole field), and the tier the line
-                                      // quotes at is a filled row rather than only coloured text.
-                                      <div
-                                        className="border-border bg-subtle inline-grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 rounded-control border p-1.5 text-xs tabular-nums"
-                                        data-testid={`review-drawer-candidate-${rowKey}-ladder`}
-                                      >
-                                        {parseLadderRungs(rawValue)!.map((rung) => (
-                                          <div
-                                            key={String(rung.qty)}
-                                            data-testid={
-                                              rung.current
-                                                ? `review-drawer-ladder-current-${rowKey}`
-                                                : undefined
-                                            }
-                                            className={`col-span-2 grid grid-cols-subgrid rounded px-1.5 py-0.5 ${
-                                              rung.current
-                                                ? 'bg-accent text-white font-semibold'
-                                                : 'text-text-2'
-                                            }`}
-                                          >
-                                            <span className="whitespace-nowrap">{String(rung.qty)}+</span>
-                                            <span className="whitespace-nowrap text-right">{String(rung.price)}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    ) : field.format === 'link' && safeExternalUrl(rawValue) ? (
-                                      <a
-                                        href={safeExternalUrl(rawValue) as string}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-accent underline underline-offset-2"
-                                        data-testid={`review-drawer-candidate-${rowKey}-link-${key}`}
-                                      >
-                                        {getLocalizedText(
-                                          field.linkLabel || { 'zh-CN': '查看', en: 'Open' },
-                                          locale,
-                                          t,
-                                        )}
-                                      </a>
-                                    ) : (
-                                      value
-                                    )}
-                                  </dd>
-                                </div>
-                              );
-                            })}
-                          </dl>
-                        </div>
-                        {score !== undefined && (
-                          <span
-                            className={`rounded-pill px-1.5 py-0.5 text-xs font-semibold ${scoreToneClass(
-                              scoreColor,
-                            )}`}
-                          >
-                            {String(score)}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })
-              )}
-            </div>
-            <section
-              data-testid="review-drawer-decision-panel"
-              className="bg-subtle border-border max-h-[48%] shrink-0 overflow-auto border-t p-2.5"
-            >
-              <h3 className="text-text text-sm font-semibold">
-                {getLocalizedText(
-                  candidatesConfig.decisionTitle || { 'zh-CN': '当前决策状态', en: 'Decision' },
-                  locale,
-                  t,
+                </h3>
+                {(exportConfig.actions || []).length > 0 && (
+                  <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                    {exportConfig.actions.filter(isActionVisible).map((actionConfig: any) => {
+                      const code = String(
+                        actionConfig.code || actionConfig.id || actionConfig.label,
+                      );
+                      const disabled = Boolean(
+                        isActionDisabledByCondition(actionConfig) || runningAction,
+                      );
+                      return (
+                        <button
+                          key={code}
+                          type="button"
+                          data-testid={`review-drawer-export-action-${code}`}
+                          disabled={disabled}
+                          onClick={() => {
+                            void runAction(actionConfig, 'export');
+                          }}
+                          className={`rounded-control px-3 py-2 text-sm font-medium ${
+                            buttonClass[actionConfig.variant || 'secondary'] ||
+                            buttonClass.secondary
+                          } disabled:cursor-not-allowed disabled:opacity-50`}
+                        >
+                          {runningAction === `export:${code}`
+                            ? t('common.loading')
+                            : getLocalizedText(actionConfig.label || code, locale, t)}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
-              </h3>
-              <dl className="mt-2 space-y-1.5 text-sm">
-                {decisionFields.length > 0 ? (
-                  decisionFields.map((field: any) => {
-                    const key = String(field.key || field.field || field.label);
-                    const label = getLocalizedText(field.label || key, locale, t);
-                    const rawValue = readFieldValue(record, field);
-                    if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
-                    const value = formatConfiguredValue(rawValue, field, locale, t);
-                    return (
-                      <div key={key} className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
-                        <dt className="text-text-2 text-xs">{label}</dt>
-                        <dd className="text-text break-words">{value}</dd>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <>
-                    <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
-                      <dt className="text-text-2 text-xs">
-                        {localized(locale, t, '标准编码', 'Standard Code')}
-                      </dt>
-                      <dd className="text-text font-mono">
-                        {formatValue(
-                          readPath(record, 'bom_std_material_code'),
-                          localized(locale, t, '确认候选后写入', 'Pending confirmation'),
-                        )}
-                      </dd>
-                    </div>
-                    <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
-                      <dt className="text-text-2 text-xs">
-                        {localized(locale, t, '当前状态', 'Reason')}
-                      </dt>
-                      <dd className="text-text break-words">
-                        {formatConfiguredValue(
-                          readPath(record, 'bom_std_reason_code'),
-                          candidatesConfig.reasonField || {},
-                          locale,
-                          t,
-                        )}
-                      </dd>
-                    </div>
-                  </>
-                )}
-              </dl>
-              {selectedCandidate &&
-                (selectedCandidateFields.length > 0 || selectedCandidateGroups.length > 0) && (
-                <section className="rounded-control border-border bg-panel mt-3 border">
-                  <header className="border-border text-text-2 border-b px-3 py-1.5 text-xs font-semibold">
+              </header>
+              <div
+                data-testid="review-drawer-candidate-list"
+                className="min-h-0 flex-1 space-y-1.5 overflow-auto p-2"
+              >
+                {candidates.length === 0 ? (
+                  <div
+                    data-testid="review-drawer-candidates-empty"
+                    className="rounded-control border-border-strong text-text-2 border border-dashed p-3 text-sm"
+                  >
                     {getLocalizedText(
-                      candidatesConfig.selectedTitle || {
-                        'zh-CN': '匹配证据',
-                        en: 'Match Evidence',
-                      },
+                      candidatesConfig.empty?.title || { 'zh-CN': '暂无候选', en: 'No candidates' },
                       locale,
                       t,
                     )}
-                  </header>
-                  {selectedCandidateGroups.length > 0 ? (
-                    <FieldGroups
-                      groups={selectedCandidateGroups}
-                      record={selectedCandidate}
-                      locale={locale}
-                      t={t}
-                    />
-                  ) : (
-                    <FieldRows
-                      fields={selectedCandidateFields}
-                      record={selectedCandidate}
-                      locale={locale}
-                      t={t}
-                    />
-                  )}
-                </section>
+                  </div>
+                ) : (
+                  candidates.map((candidate: any, index: number) => {
+                    const rowKey = candidateKey(candidate, index);
+                    const active = rowKey === selectedCandidateKey;
+                    const item = candidatesConfig.item || {};
+                    const titleText = formatValue(readPath(candidate, item.titleField), rowKey);
+                    const score = item.scoreField
+                      ? readPath(candidate, item.scoreField)
+                      : undefined;
+                    const scoreColor = item.statusColorField
+                      ? readPath(candidate, item.statusColorField)
+                      : undefined;
+                    return (
+                      <button
+                        key={rowKey}
+                        type="button"
+                        data-testid={`review-drawer-candidate-${rowKey}`}
+                        onClick={() => {
+                          setSelectedCandidateKey(rowKey);
+                          if (candidatesConfig.selection?.bind) {
+                            writeRuntimeState(runtime, candidatesConfig.selection.bind, candidate);
+                          }
+                        }}
+                        className={`rounded-card block w-full border p-3 text-left ${
+                          active
+                            ? 'bg-accent-weak border-accent'
+                            : 'border-border bg-panel hover:bg-hover'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div
+                              className="text-text font-mono text-xs font-semibold break-words whitespace-normal"
+                              title={titleText}
+                            >
+                              {titleText}
+                            </div>
+                            <dl className="mt-2 grid gap-x-3 gap-y-1.5 text-xs sm:grid-cols-2">
+                              {(item.detailFields || []).map((field: any) => {
+                                const key = String(field.key || field.field || field.label);
+                                const label = getLocalizedText(field.label || key, locale, t);
+                                const rawValue = readFieldValue(candidate, field);
+                                if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
+                                const value = formatConfiguredValue(rawValue, field, locale, t);
+                                return (
+                                  <div
+                                    key={key}
+                                    data-testid={`review-drawer-candidate-${rowKey}-field-${key}`}
+                                    className={`min-w-0 ${
+                                      field.span === 2 ? 'sm:col-span-2' : ''
+                                    } grid grid-cols-[72px_minmax(0,1fr)] gap-2 ${
+                                      // A ladder is a multi-row card, so align its label to the top of
+                                      // the card and give the card room below it instead of letting the
+                                      // next field sit tight against it.
+                                      field.format === 'ladder'
+                                        ? 'items-start pb-1'
+                                        : 'items-baseline'
+                                    }`}
+                                  >
+                                    <dt className="text-text-2 min-w-0 break-words" title={label}>
+                                      {label}
+                                    </dt>
+                                    <dd
+                                      className="text-text min-w-0 break-words whitespace-normal"
+                                      title={value}
+                                    >
+                                      {field.format === 'ladder' && parseLadderRungs(rawValue) ? (
+                                        // A self-contained tier card: quantity and price sit next to
+                                        // each other (an inline-grid so the columns hug their content
+                                        // instead of spanning the whole field), and the tier the line
+                                        // quotes at is a filled row rather than only coloured text.
+                                        <div
+                                          className="border-border bg-subtle rounded-control inline-grid grid-cols-[auto_auto] gap-x-3 gap-y-0.5 border p-1.5 text-xs tabular-nums"
+                                          data-testid={`review-drawer-candidate-${rowKey}-ladder`}
+                                        >
+                                          {parseLadderRungs(rawValue)!.map((rung) => (
+                                            <div
+                                              key={String(rung.qty)}
+                                              data-testid={
+                                                rung.current
+                                                  ? `review-drawer-ladder-current-${rowKey}`
+                                                  : undefined
+                                              }
+                                              className={`col-span-2 grid grid-cols-subgrid rounded px-1.5 py-0.5 ${
+                                                rung.current
+                                                  ? 'bg-accent font-semibold text-white'
+                                                  : 'text-text-2'
+                                              }`}
+                                            >
+                                              <span className="whitespace-nowrap">
+                                                {String(rung.qty)}+
+                                              </span>
+                                              <span className="text-right whitespace-nowrap">
+                                                {String(rung.price)}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : field.format === 'link' && safeExternalUrl(rawValue) ? (
+                                        <a
+                                          href={safeExternalUrl(rawValue) as string}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="text-accent underline underline-offset-2"
+                                          data-testid={`review-drawer-candidate-${rowKey}-link-${key}`}
+                                        >
+                                          {getLocalizedText(
+                                            field.linkLabel || { 'zh-CN': '查看', en: 'Open' },
+                                            locale,
+                                            t,
+                                          )}
+                                        </a>
+                                      ) : (
+                                        value
+                                      )}
+                                    </dd>
+                                  </div>
+                                );
+                              })}
+                            </dl>
+                          </div>
+                          {score !== undefined && (
+                            <span
+                              className={`rounded-pill px-1.5 py-0.5 text-xs font-semibold ${scoreToneClass(
+                                scoreColor,
+                              )}`}
+                            >
+                              {String(score)}
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
                 )}
-            </section>
-            {/*
+              </div>
+              <section
+                data-testid="review-drawer-decision-panel"
+                className="bg-subtle border-border max-h-[48%] shrink-0 overflow-auto border-t p-2.5"
+              >
+                <h3 className="text-text text-sm font-semibold">
+                  {getLocalizedText(
+                    candidatesConfig.decisionTitle || { 'zh-CN': '当前决策状态', en: 'Decision' },
+                    locale,
+                    t,
+                  )}
+                </h3>
+                <dl className="mt-2 space-y-1.5 text-sm">
+                  {decisionFields.length > 0 ? (
+                    decisionFields.map((field: any) => {
+                      const key = String(field.key || field.field || field.label);
+                      const label = getLocalizedText(field.label || key, locale, t);
+                      const rawValue = readFieldValue(record, field);
+                      if (field.hideWhenEmpty && isEmptyValue(rawValue)) return null;
+                      const value = formatConfiguredValue(rawValue, field, locale, t);
+                      return (
+                        <div key={key} className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
+                          <dt className="text-text-2 text-xs">{label}</dt>
+                          <dd className="text-text break-words">{value}</dd>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
+                        <dt className="text-text-2 text-xs">
+                          {localized(locale, t, '标准编码', 'Standard Code')}
+                        </dt>
+                        <dd className="text-text font-mono">
+                          {formatValue(
+                            readPath(record, 'bom_std_material_code'),
+                            localized(locale, t, '确认候选后写入', 'Pending confirmation'),
+                          )}
+                        </dd>
+                      </div>
+                      <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-2">
+                        <dt className="text-text-2 text-xs">
+                          {localized(locale, t, '当前状态', 'Reason')}
+                        </dt>
+                        <dd className="text-text break-words">
+                          {formatConfiguredValue(
+                            readPath(record, 'bom_std_reason_code'),
+                            candidatesConfig.reasonField || {},
+                            locale,
+                            t,
+                          )}
+                        </dd>
+                      </div>
+                    </>
+                  )}
+                </dl>
+                {selectedCandidate &&
+                  (selectedCandidateFields.length > 0 || selectedCandidateGroups.length > 0) && (
+                    <section className="rounded-control border-border bg-panel mt-3 border">
+                      <header className="border-border text-text-2 border-b px-3 py-1.5 text-xs font-semibold">
+                        {getLocalizedText(
+                          candidatesConfig.selectedTitle || {
+                            'zh-CN': '匹配证据',
+                            en: 'Match Evidence',
+                          },
+                          locale,
+                          t,
+                        )}
+                      </header>
+                      {selectedCandidateGroups.length > 0 ? (
+                        <FieldGroups
+                          groups={selectedCandidateGroups}
+                          record={selectedCandidate}
+                          locale={locale}
+                          t={t}
+                        />
+                      ) : (
+                        <FieldRows
+                          fields={selectedCandidateFields}
+                          record={selectedCandidate}
+                          locale={locale}
+                          t={t}
+                        />
+                      )}
+                    </section>
+                  )}
+              </section>
+              {/*
               The actions live outside the decision panel on purpose. Inside it they were the last
               child of a max-h-[48%] overflow-auto section, so "确认此报价" scrolled out of sight
               behind the evidence it was meant to confirm. As a shrink-0 sibling in the aside's flex
               column they stay on screen however long the candidate detail runs.
             */}
-            {(candidatesConfig.actions || []).length > 0 && (
-              <footer
-                data-testid="review-drawer-actions"
-                className="border-border bg-panel flex shrink-0 flex-wrap justify-end gap-2 border-t px-2.5 py-2"
-              >
-                {candidatesConfig.actions.filter(isActionVisible).map((actionConfig: any) => {
-                  const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
-                  const requiresSelection =
-                    actionConfig.requiresSelection !== false &&
-                    actionConfig.code !== 'undo_decision';
-                  const disabled = Boolean(
-                    (requiresSelection && !selectedCandidate) ||
-                    isActionDisabledByCondition(actionConfig) ||
-                    runningAction,
-                  );
-                  return (
-                    <button
-                      key={code}
-                      type="button"
-                      data-testid={`review-drawer-candidate-action-${code}`}
-                      disabled={disabled}
-                      onClick={() => {
-                        void runAction(actionConfig, 'candidate');
-                      }}
-                      className={`rounded-control px-3 py-2 text-sm font-medium ${
-                        buttonClass[actionConfig.variant || 'primary'] || buttonClass.primary
-                      } disabled:cursor-not-allowed disabled:opacity-50`}
-                    >
-                      {runningAction === `candidate:${code}`
-                        ? t('common.loading')
-                        : getLocalizedText(actionConfig.label || code, locale, t)}
-                    </button>
-                  );
-                })}
-              </footer>
-            )}
-          </aside>
+              {(candidatesConfig.actions || []).length > 0 && (
+                <footer
+                  data-testid="review-drawer-actions"
+                  className="border-border bg-panel flex shrink-0 flex-wrap justify-end gap-2 border-t px-2.5 py-2"
+                >
+                  {candidatesConfig.actions.filter(isActionVisible).map((actionConfig: any) => {
+                    const code = String(actionConfig.code || actionConfig.id || actionConfig.label);
+                    const requiresSelection =
+                      actionConfig.requiresSelection !== false &&
+                      actionConfig.code !== 'undo_decision';
+                    const disabled = Boolean(
+                      (requiresSelection && !selectedCandidate) ||
+                      isActionDisabledByCondition(actionConfig) ||
+                      runningAction,
+                    );
+                    return (
+                      <button
+                        key={code}
+                        type="button"
+                        data-testid={`review-drawer-candidate-action-${code}`}
+                        disabled={disabled}
+                        onClick={() => {
+                          void runAction(actionConfig, 'candidate');
+                        }}
+                        className={`rounded-control px-3 py-2 text-sm font-medium ${
+                          buttonClass[actionConfig.variant || 'primary'] || buttonClass.primary
+                        } disabled:cursor-not-allowed disabled:opacity-50`}
+                      >
+                        {runningAction === `candidate:${code}`
+                          ? t('common.loading')
+                          : getLocalizedText(actionConfig.label || code, locale, t)}
+                      </button>
+                    );
+                  })}
+                </footer>
+              )}
+            </aside>
           )}
         </div>
       </div>
-
 
       {!isMaximized && (
         <button

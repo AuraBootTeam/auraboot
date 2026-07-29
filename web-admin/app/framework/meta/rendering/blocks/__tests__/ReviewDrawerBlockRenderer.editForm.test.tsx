@@ -64,7 +64,12 @@ function block(): BlockConfig {
       openLabel: { 'zh-CN': '编辑此行并重新查价', en: 'Edit this row' },
       submitLabel: { 'zh-CN': '保存并重新查价', en: 'Save and re-price' },
       fields: [
-        { field: 'qo_ql_qty_per_set', label: { 'zh-CN': '单套用量' }, type: 'number', valueField: 'qty_per_set' },
+        {
+          field: 'qo_ql_qty_per_set',
+          label: { 'zh-CN': '单套用量' },
+          type: 'number',
+          valueField: 'qty_per_set',
+        },
         { field: 'qo_ql_mpn', label: { 'zh-CN': 'MPN' }, valueField: 'mpn' },
       ],
     },
@@ -81,7 +86,9 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
 
     fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
     // seeded from the record
-    const perSet = screen.getByTestId('review-drawer-edit-field-qo_ql_qty_per_set').querySelector('input')!;
+    const perSet = screen
+      .getByTestId('review-drawer-edit-field-qo_ql_qty_per_set')
+      .querySelector('input')!;
     expect((perSet as HTMLInputElement).value).toBe('2');
 
     fireEvent.change(perSet, { target: { value: '5' } });
@@ -102,7 +109,9 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
     const mpn = screen.getByTestId('review-drawer-edit-field-qo_ql_mpn').querySelector('input')!;
     fireEvent.change(mpn, { target: { value: '' } });
-    const perSet = screen.getByTestId('review-drawer-edit-field-qo_ql_qty_per_set').querySelector('input')!;
+    const perSet = screen
+      .getByTestId('review-drawer-edit-field-qo_ql_qty_per_set')
+      .querySelector('input')!;
     fireEvent.change(perSet, { target: { value: '5' } });
     fireEvent.click(screen.getByTestId('review-drawer-edit-submit'));
 
@@ -118,19 +127,29 @@ describe('ReviewDrawerBlockRenderer — inline edit form', () => {
     // still means "keep the current value".
     const b = block();
     (b as any).editForm.fields = [
-      { field: 'qo_ql_description', label: { 'zh-CN': '规格描述' }, valueField: 'material_label', required: true },
+      {
+        field: 'qo_ql_description',
+        label: { 'zh-CN': '规格描述' },
+        valueField: 'material_label',
+        required: true,
+      },
       { field: 'qo_ql_mpn', label: { 'zh-CN': 'MPN' }, valueField: 'mpn' },
     ];
     render(<ReviewDrawerBlockRenderer block={b} runtime={makeRuntime(LINE)} />);
 
     fireEvent.click(screen.getByTestId('review-drawer-edit-open'));
-    const desc = screen.getByTestId('review-drawer-edit-field-qo_ql_description').querySelector('input')!;
+    const desc = screen
+      .getByTestId('review-drawer-edit-field-qo_ql_description')
+      .querySelector('input')!;
     fireEvent.change(desc, { target: { value: '' } });
     fireEvent.click(screen.getByTestId('review-drawer-edit-submit'));
 
     // no command fires, and the error is shown
     await waitFor(() => expect(screen.getByTestId('review-drawer-edit-error')).toBeInTheDocument());
     expect(executeSimpleWorkbenchAction).not.toHaveBeenCalled();
+
+    fireEvent.change(desc, { target: { value: 'Switching diode 1N4148W' } });
+    expect(screen.queryByTestId('review-drawer-edit-error')).toBeNull();
   });
 
   it('renders nothing when the block declares no editForm', () => {

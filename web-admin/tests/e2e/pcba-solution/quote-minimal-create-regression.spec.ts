@@ -4,6 +4,7 @@ import { navigateToDynamicPage, queryFilteredList, waitForFormReady } from '../h
 import {
   cleanupRows,
   createCorrectedBomWorkbook,
+  dynamicCreate,
   executeCommand,
   openQuoteCreateFormFromList,
   openQuoteDetailFromList,
@@ -204,6 +205,31 @@ test.describe('PCBA quote minimal create regression', () => {
       expect(projectId, 'bom:create_project should return recordId').toBeTruthy();
       created.rows.push({ model: 'req_requirement_set_pcba_bom', pid: projectId });
 
+      // This golden owns the create/RFQ linkage contract, not the external-source contract. Seed
+      // fresh Yunhan evidence for the workbook's two MPNs so the create task deterministically
+      // exercises cache reuse and does not consume Yunhan's shared 1-call/minute batch allowance.
+      // Dedicated Yunhan goldens below this suite still exercise the real upload/search lanes.
+      const validUntil = new Date(Date.now() + 7 * 24 * 3600 * 1000)
+        .toISOString()
+        .slice(0, 10);
+      for (const mpn of ['RC0603FR-0710KL', 'STM32F103C8T6']) {
+        await dynamicCreate(
+          page,
+          'qo_price_evidence_common',
+          {
+            qo_pe_quote_line_id: `GOLDEN-MINIMAL-CREATE-CACHE-${suffix}-${mpn}`,
+            qo_pe_part_no: mpn,
+            qo_pe_source: 'yunhan',
+            qo_pe_source_ref: 'golden:minimal-create-cache',
+            qo_pe_status: 'captured',
+            qo_pe_unit_price: 0.1234,
+            qo_pe_currency: 'CNY',
+            qo_pe_valid_until: validUntil,
+          },
+          created.rows,
+        );
+      }
+
       const accountOptionsLoaded = page
         .waitForResponse(
           (response) =>
@@ -224,7 +250,9 @@ test.describe('PCBA quote minimal create regression', () => {
         'form-field-gerber_source_file',
         'form-field-qo_quote_crm_account_id',
         'form-field-qo_quote_notes',
+        'form-field-qo_quote_price_factor',
         'form-field-qo_quote_project_id',
+        'form-field-qo_quote_set_count',
       ]);
       await expect(page.getByTestId('form-field-gerber_source_file')).toBeVisible();
       await expect(page.getByTestId('form-field-cpl_source_file')).toBeVisible();
@@ -292,6 +320,7 @@ test.describe('PCBA quote minimal create regression', () => {
         { model: 'req_requirement_set_pcba_bom', pid: projectId },
         { model: 'crm_customer_request_common', pid: customerRequestId },
         { model: 'qo_quote_common', pid: quoteId },
+        ...created.rows.filter((row) => row.model === 'qo_price_evidence_common'),
       ];
 
       const customerRequest = await readDynamicRecord(
