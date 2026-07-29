@@ -375,7 +375,8 @@ public class HandlerPhase implements CommandPhase {
 
     private void appendScopedWriteGuards(StringBuilder sql, Long tenantId, String modelCode) {
         Long userId = MetaContext.getCurrentUserId();
-        String permitFilter = com.auraboot.framework.meta.service.impl.CommandPermitDataAccess.rowFilter(userId);
+        String permitFilter = com.auraboot.framework.meta.service.impl.CommandPermitDataAccess.rowFilter(
+                modelCode, userId);
         if (permitFilter != null) {
             appendScopedFilter(sql, permitFilter);
             return;

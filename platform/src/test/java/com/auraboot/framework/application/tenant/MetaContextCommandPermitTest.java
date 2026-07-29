@@ -21,12 +21,26 @@ class MetaContextCommandPermitTest {
     void publishesScopeAndVersionThenCloses() {
         MetaContext.runWithCommandPermitPlan("SELF", 7L, "quote", "q-42", () -> {
             assertThat(MetaContext.getCommandPermitScope()).isEqualTo("SELF");
+            assertThat(MetaContext.getCommandPermitScopeFor("quote")).isEqualTo("SELF");
+            assertThat(MetaContext.hasCommandPermitScopeFor("quote")).isTrue();
+            assertThat(MetaContext.getCommandPermitScopeFor("shared_config")).isNull();
+            assertThat(MetaContext.hasCommandPermitScopeFor("shared_config")).isFalse();
             assertThat(MetaContext.getCommandExpectedVersion("quote", "q-42")).isEqualTo(7L);
             assertThat(MetaContext.getCommandExpectedVersion("quote_line", "q-42")).isNull();
         });
 
         assertThat(MetaContext.getCommandPermitScope()).isNull();
+        assertThat(MetaContext.getCommandPermitScopeFor("quote")).isNull();
         assertThat(MetaContext.getCommandExpectedVersion("quote", "q-42")).isNull();
+    }
+
+    @Test
+    @DisplayName("legacy explicit scope remains global because it has no target model")
+    void explicitScopeRemainsGlobal() {
+        MetaContext.runWithCommandPermitScope("SELF", () -> {
+            assertThat(MetaContext.getCommandPermitScopeFor("quote")).isEqualTo("SELF");
+            assertThat(MetaContext.getCommandPermitScopeFor("shared_config")).isEqualTo("SELF");
+        });
     }
 
     @Test

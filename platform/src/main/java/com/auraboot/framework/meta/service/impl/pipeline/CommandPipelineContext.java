@@ -84,8 +84,9 @@ public class CommandPipelineContext {
      * authorization phases have run (assembled by {@code PermitPlanAssemblyPhase}, order 550 — after
      * the last authorization gate, before the data layer).
      *
-     * <p>A permitting plan with a resolved scope is enforced by the remaining guarded phases and
-     * data layer. Null until the assembly phase runs (or if it was skipped).</p>
+     * <p>A permitting plan with a resolved scope is enforced for the command's root model by the
+     * remaining guarded phases and data layer. Other models evaluate their own data permission.
+     * Null until the assembly phase runs (or if it was skipped).</p>
      */
     private CommandPermitPlan permitPlan;
 

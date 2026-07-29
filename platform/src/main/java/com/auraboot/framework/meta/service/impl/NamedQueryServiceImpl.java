@@ -1179,14 +1179,14 @@ public class NamedQueryServiceImpl extends BaseMetaService implements NamedQuery
             Long tenantId,
             Long userId,
             List<String> whereClauses) {
-        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        String resourceCode = trimToNull(query.getResourceCode());
+        String permitFilter = CommandPermitDataAccess.rowFilter(resourceCode, userId);
         if (permitFilter != null) {
             if (!permitFilter.isBlank()) {
                 whereClauses.add(stripSqlConditionPrefix(permitFilter));
             }
             return;
         }
-        String resourceCode = trimToNull(query.getResourceCode());
         String actionCode = trimToNull(query.getActionCode());
         if (resourceCode == null || actionCode == null) {
             return;

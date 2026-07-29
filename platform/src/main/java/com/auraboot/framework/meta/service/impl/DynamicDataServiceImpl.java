@@ -202,7 +202,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         queryBuilder.addCondition("tenant_id", QueryCondition.Operator.EQ.name(), tenantId);
 
         Long userId = getCurrentUserId();
-        String permitRowFilter = CommandPermitDataAccess.rowFilter(userId);
+        String permitRowFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
         boolean commandPermitInForce = permitRowFilter != null;
         String scopedRowFilter = null;
         String scopedDomainFilter = null;
@@ -1004,9 +1004,9 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         // Read-shape contract: json/jsonb fields leave as JSON strings, never PGobject.
         JsonbFieldHelper.normalizeJsonReadValues(model, record);
 
-        boolean commandPermitInForce = MetaContext.hasCommandPermitScope();
+        boolean commandPermitInForce = MetaContext.hasCommandPermitScopeFor(modelCode);
         if (commandPermitInForce
-                && !CommandPermitDataAccess.permitsRecord(record, getCurrentUserId())) {
+                && !CommandPermitDataAccess.permitsRecord(modelCode, record, getCurrentUserId())) {
             throw new MetaServiceException("Access denied: command permit scope does not include this record");
         }
 
@@ -1311,7 +1311,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         if (data == null || data.isEmpty()) {
             return Collections.emptySet();
         }
-        if (MetaContext.hasCommandPermitScope()) {
+        if (MetaContext.hasCommandPermitScopeFor(modelCode)) {
             return Collections.emptySet();
         }
         Long tenantId = getCurrentTenantId();
@@ -1862,7 +1862,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
             String modelCode,
             Long userId,
             String operation) {
-        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
         if (permitFilter != null) {
             appendScopedBulkFilter(sql, permitFilter);
             return;
@@ -1894,7 +1894,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
      * direct callers retain the existing engine path.
      */
     private String resolveWriteRowFilter(Long tenantId, String modelCode, Long userId) {
-        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
         if (permitFilter != null) {
             return permitFilter;
         }
@@ -2132,7 +2132,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
         }
         sql.append(")");
 
-        String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+        String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
         if (permitFilter != null) {
             appendScopedBulkFilter(sql, permitFilter);
         } else {
@@ -3086,7 +3086,7 @@ public class DynamicDataServiceImpl extends BaseMetaService implements DynamicDa
                     Map<String, Object> params = new HashMap<>();
                     params.put("tenantId", tenantId);
 
-                    String permitFilter = CommandPermitDataAccess.rowFilter(userId);
+                    String permitFilter = CommandPermitDataAccess.rowFilter(modelCode, userId);
                     if (permitFilter != null) {
                         appendScopedBulkFilter(sql, permitFilter);
                     } else {

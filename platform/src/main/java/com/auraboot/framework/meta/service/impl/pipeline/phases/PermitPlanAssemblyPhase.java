@@ -46,10 +46,11 @@ import org.springframework.util.StringUtils;
 public class PermitPlanAssemblyPhase implements CommandPhase {
 
     /**
-     * The existing row-scope engine. We call it once here, at the boundary, so the plan carries the
-     * scope grade instead of each execution site re-deciding it (the whole point of §11.15).
-     * Optional so a minimal context without the engine still assembles a plan; an unresolved scope
-     * is never published as authoritative.
+     * The existing row-scope engine. We call it once here for the command's root model, at the
+     * boundary, so execution sites for that model do not re-decide it (the whole point of §11.15).
+     * Other models touched by the handler evaluate their own data permission. Optional so a minimal
+     * context without the engine still assembles a plan; an unresolved scope is never published as
+     * authoritative.
      */
     @Autowired(required = false)
     private DataPermissionEngine dataPermissionEngine;
@@ -107,13 +108,13 @@ public class PermitPlanAssemblyPhase implements CommandPhase {
     }
 
     /**
-     * Resolve the row-scope grade (D3) the whole command runs under, from the existing row-scope
+     * Resolve the row-scope grade (D3) for the command's root model, from the existing row-scope
      * engine's own verdict — so the plan's grade can never drift from what the engine actually
-     * filters. {@code buildRowFilter} returns a blank fragment exactly when the caller has ALL access
-     * (or no row policy at all — the unrestricted default), and a non-blank fragment when it is
-     * restricted (SELF, and — folded to SELF for phase-1, per §11.13 — DEPARTMENT / CUSTOM). Multiple
-     * roles are already combined most-permissive-wins inside the engine, so a caller with any ALL
-     * grant comes back blank → {@link ScopeGrade#ALL}.
+     * filters for that resource. {@code buildRowFilter} returns a blank fragment exactly when the
+     * caller has ALL access (or no row policy at all — the unrestricted default), and a non-blank
+     * fragment when it is restricted (SELF, and — folded to SELF for phase-1, per §11.13 —
+     * DEPARTMENT / CUSTOM). Multiple roles are already combined most-permissive-wins inside the
+     * engine, so a caller with any ALL grant comes back blank → {@link ScopeGrade#ALL}.
      *
      * <p>Returns {@code null} (unresolved) when the inputs to decide a grade are absent, or when the
      * engine is unavailable or errors. The pipeline never publishes an unresolved plan, so the

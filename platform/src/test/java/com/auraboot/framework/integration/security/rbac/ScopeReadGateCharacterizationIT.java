@@ -79,6 +79,8 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     private final String suffix = UUID.randomUUID().toString().replace("-", "").substring(0, 8).toLowerCase(Locale.ROOT);
     private final String model = "spc_" + suffix;
     private final String table = "mt_" + model;
+    private final String sharedModel = "shr_" + suffix;
+    private final String sharedTable = "mt_" + sharedModel;
     private final List<Long> fieldIds = new ArrayList<>();
 
     private Long tenantId;
@@ -90,6 +92,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     private String rolePid;
     private String ownRecordPid;
     private String otherRecordPid;
+    private String sharedRecordPid;
 
     @BeforeAll
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -104,13 +107,19 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
         selfMemberId = insertMember(selfUserId);
         openMemberId = insertMember(openUserId);
         createDynamicModel();
+        createSharedModel();
         ownRecordPid = "own_" + suffix;
         otherRecordPid = "other_" + suffix;
+        sharedRecordPid = "shared_" + suffix;
         jdbc.update("INSERT INTO " + table
                         + " (pid, tenant_id, name, row_version, created_by, updated_by) "
                         + "VALUES (?, ?, ?, 1, ?, ?), (?, ?, ?, 1, ?, ?)",
                 ownRecordPid, tenantId, "own row", selfUserId, selfUserId,
                 otherRecordPid, tenantId, "other row", openUserId, openUserId);
+        jdbc.update("INSERT INTO " + sharedTable
+                        + " (pid, tenant_id, name, row_version, created_by, updated_by) "
+                        + "VALUES (?, ?, ?, 1, ?, ?)",
+                sharedRecordPid, tenantId, "admin-created shared config", openUserId, openUserId);
 
         // A role the SELF member holds; the open member holds nothing.
         long roleId = System.nanoTime() & 0x7fffffffffffffffL;
@@ -146,15 +155,18 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     void tearDown() {
         try {
             jdbc.execute("DROP TABLE IF EXISTS " + table);
+            jdbc.execute("DROP TABLE IF EXISTS " + sharedTable);
             jdbc.update("DELETE FROM ab_data_permission_role_binding WHERE policy_pid = ?", policyPid);
             jdbc.update("DELETE FROM ab_data_permission_policy WHERE pid = ?", policyPid);
             jdbc.update("DELETE FROM ab_meta_model_field_binding WHERE model_id IN "
-                    + "(SELECT id FROM ab_meta_model WHERE code = ? AND tenant_id = ?)", model, tenantId);
+                            + "(SELECT id FROM ab_meta_model WHERE code IN (?, ?) AND tenant_id = ?)",
+                    model, sharedModel, tenantId);
             if (fieldIds.size() == 3) {
                 jdbc.update("DELETE FROM ab_meta_field WHERE tenant_id = ? AND id IN (?, ?, ?)",
                         tenantId, fieldIds.get(0), fieldIds.get(1), fieldIds.get(2));
             }
-            jdbc.update("DELETE FROM ab_meta_model WHERE code = ? AND tenant_id = ?", model, tenantId);
+            jdbc.update("DELETE FROM ab_meta_model WHERE code IN (?, ?) AND tenant_id = ?",
+                    model, sharedModel, tenantId);
             jdbc.update("DELETE FROM ab_user_role WHERE tenant_id = ?", tenantId);
             jdbc.update("DELETE FROM ab_role WHERE pid = ?", rolePid);
             jdbc.update("DELETE FROM ab_tenant_member WHERE tenant_id = ?", tenantId);
@@ -247,6 +259,40 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
                             .as("ALL must not re-consult the seeded SELF engine policy")
                             .extracting(row -> String.valueOf(row.get("pid")))
                             .contains(ownRecordPid, otherRecordPid));
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    @Test
+    @DisplayName("a root-model plan never leaks its SELF or ALL grade into another model")
+    void commandPlanScopeIsBoundToItsRootModel() {
+        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "self-member");
+        MetaContext.setMemberId(selfMemberId);
+        DynamicQueryRequest request = DynamicQueryRequest.builder()
+                .pageNum(1)
+                .pageSize(10)
+                .conditions(List.of())
+                .build();
+        try {
+            MetaContext.runWithCommandPermitPlan("SELF", null, model, ownRecordPid, () -> {
+                assertThat(dynamicDataService.list(model, request).getRecords())
+                        .as("the root model still executes the command's SELF grade")
+                        .extracting(row -> String.valueOf(row.get("pid")))
+                        .contains(ownRecordPid)
+                        .doesNotContain(otherRecordPid);
+                assertThat(dynamicDataService.list(sharedModel, request).getRecords())
+                        .as("the independent model uses its own no-policy=ALL scope")
+                        .extracting(row -> String.valueOf(row.get("pid")))
+                        .contains(sharedRecordPid);
+            });
+
+            MetaContext.runWithCommandPermitPlan("ALL", null, sharedModel, sharedRecordPid, () ->
+                    assertThat(dynamicDataService.list(model, request).getRecords())
+                            .as("the independent model's SELF policy must not inherit the root ALL grade")
+                            .extracting(row -> String.valueOf(row.get("pid")))
+                            .contains(ownRecordPid)
+                            .doesNotContain(otherRecordPid));
         } finally {
             MetaContext.clear();
         }
@@ -369,22 +415,7 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
     private void createDynamicModel() {
         MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "scope-char-model");
         try {
-            Model entity = new Model();
-            entity.setPid(UniqueIdGenerator.generate());
-            entity.setTenantId(tenantId);
-            entity.setCode(model);
-            entity.setVersion(1);
-            entity.setIsCurrent(true);
-            entity.setStatus(Status.PUBLISHED.getCode());
-            entity.setCreatedAt(Instant.now());
-            entity.setUpdatedAt(Instant.now());
-            entity.setDeletedFlag(false);
-            ExtensionBean extension = new ExtensionBean();
-            extension.setExtension(Map.of(
-                    "displayName", "Scope read gate characterization",
-                    "modelType", "entity"));
-            entity.setExtension(extension);
-            metaModelMapper.insert(entity);
+            Model entity = insertModel(model, "Scope read gate characterization");
 
             bindField(entity.getId(), "pid", "string", true, 0);
             bindField(entity.getId(), "name", "string", false, 1);
@@ -397,6 +428,48 @@ class ScopeReadGateCharacterizationIT extends BaseIntegrationTest {
         } finally {
             MetaContext.clear();
         }
+    }
+
+    private void createSharedModel() {
+        MetaContext.setContext(tenantId, selfUserId, "u-" + selfUserId, "scope-char-shared-model");
+        try {
+            Model entity = insertModel(sharedModel, "Shared configuration characterization");
+            for (int index = 0; index < fieldIds.size(); index++) {
+                ModelFieldBinding binding = new ModelFieldBinding();
+                binding.setTenantId(tenantId);
+                binding.setModelId(entity.getId());
+                binding.setFieldId(fieldIds.get(index));
+                binding.setFieldOrder(index);
+                fieldBindingMapper.insert(binding);
+            }
+
+            SchemaOperationResult result = schemaManagementService.createTableByModel(sharedModel);
+            assertThat(result.isSuccess())
+                    .as("real shared dynamic table must be created: %s", result.getMessage())
+                    .isTrue();
+        } finally {
+            MetaContext.clear();
+        }
+    }
+
+    private Model insertModel(String modelCode, String displayName) {
+        Model entity = new Model();
+        entity.setPid(UniqueIdGenerator.generate());
+        entity.setTenantId(tenantId);
+        entity.setCode(modelCode);
+        entity.setVersion(1);
+        entity.setIsCurrent(true);
+        entity.setStatus(Status.PUBLISHED.getCode());
+        entity.setCreatedAt(Instant.now());
+        entity.setUpdatedAt(Instant.now());
+        entity.setDeletedFlag(false);
+        ExtensionBean extension = new ExtensionBean();
+        extension.setExtension(Map.of(
+                "displayName", displayName,
+                "modelType", "entity"));
+        entity.setExtension(extension);
+        metaModelMapper.insert(entity);
+        return entity;
     }
 
     private void bindField(Long modelId, String code, String dataType, boolean primaryKey, int order) {

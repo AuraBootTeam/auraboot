@@ -13,14 +13,16 @@ import java.util.List;
  * asking again: the aggregate root derived writes inherit (D4), the row-scope grade (D3), and the
  * record version the decision was made against — the optimistic TOCTOU guard (D5).</p>
  *
- * <p>This is the "decide once at the boundary, execute everywhere else" contract in one object.
- * Once a plan exists, the data layer never re-runs an authorization decision; it filters by the
- * plan's scope and asserts the plan's version, and that is all. See the authorization architecture
- * §11.15 (owner-settled decisions D1–D6) and §11.10 (shadow → enforce migration).</p>
+ * <p>This is the "decide once at the boundary, execute within that decision's applicability"
+ * contract in one object. The scalar scope in this phase-1 plan belongs to the command's root model;
+ * the data layer executes it without re-deciding only for that model. Any other model touched by the
+ * handler must evaluate its own data permission until the plan becomes a resource-keyed decision
+ * map. See the authorization architecture §11.15 (owner-settled decisions D1–D6) and §11.10
+ * (shadow → enforce migration).</p>
  *
  * <p>A permitting plan with a resolved scope is published after assembly and remains authoritative
- * for every downstream guarded phase. DENY, ABSTAIN, and unresolved scopes publish nothing, so
- * legacy direct-call enforcement remains the fail-secure fallback.</p>
+ * for the root model in every downstream guarded phase. DENY, ABSTAIN, and unresolved scopes publish
+ * nothing, so legacy direct-call enforcement remains the fail-secure fallback.</p>
  */
 public record CommandPermitPlan(
         Decision decision,
@@ -41,9 +43,9 @@ public record CommandPermitPlan(
     public enum Decision { PERMIT, DENY, ABSTAIN }
 
     /**
-     * Row-level scope grade (D3). {@code SELF} filters execution to the caller's own rows; {@code ALL}
-     * applies no row filter. The predicate itself (owner column, current user) is resolved by the
-     * data layer at execution — the plan carries only the grade.
+     * Row-level scope grade (D3) for the command's root model. {@code SELF} filters execution to the
+     * caller's own rows; {@code ALL} applies no row filter. The predicate itself (owner column,
+     * current user) is resolved by the data layer at execution — the plan carries only the grade.
      */
     public enum ScopeGrade { SELF, ALL }
 

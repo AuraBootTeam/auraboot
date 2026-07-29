@@ -395,15 +395,43 @@ public class MetaContext {
         });
     }
 
-    /** The row-scope grade the current command was authorized under ("SELF"/"ALL"), or null. */
+    /**
+     * The row-scope grade the current command was authorized under ("SELF"/"ALL"), or null.
+     *
+     * <p>This unqualified accessor is for context propagation and diagnostics. Data-access callers
+     * must use {@link #getCommandPermitScopeFor(String)} so a target model's grade is not inherited
+     * by unrelated models touched inside the same command.</p>
+     */
     public static String getCommandPermitScope() {
         CommandPermitExecution permit = COMMAND_PERMIT.get();
         return permit == null ? null : permit.scopeGrade;
     }
 
-    /** Whether a resolved command permit plan is currently authoritative for data access. */
+    /**
+     * The current command grade when it is authoritative for {@code modelCode}, otherwise null.
+     *
+     * <p>A normal command plan carries its target model, so its row grade is authoritative only for
+     * that model. Other models must evaluate their own data-scope policy. A null target is retained
+     * as a global scope for the legacy explicit {@link #runWithCommandPermitScope} bridge.</p>
+     */
+    public static String getCommandPermitScopeFor(String modelCode) {
+        CommandPermitExecution permit = COMMAND_PERMIT.get();
+        if (permit == null
+                || (permit.targetModel != null
+                && !java.util.Objects.equals(permit.targetModel, modelCode))) {
+            return null;
+        }
+        return permit.scopeGrade;
+    }
+
+    /** Whether a resolved command permit plan exists, for propagation and diagnostics. */
     public static boolean hasCommandPermitScope() {
         return COMMAND_PERMIT.get() != null;
+    }
+
+    /** Whether the current command permit grade is authoritative for {@code modelCode}. */
+    public static boolean hasCommandPermitScopeFor(String modelCode) {
+        return getCommandPermitScopeFor(modelCode) != null;
     }
 
     /**

@@ -26,6 +26,7 @@ class DataAccessAuthorizationHelperImplTest {
     private static final Long TENANT_ID = 10L;
     private static final Long USER_ID = 20L;
     private static final String RESOURCE_CODE = "quote_order";
+    private static final String SHARED_RESOURCE_CODE = "shared_config";
 
     @Mock
     private DataPermissionEngine dataPermissionEngine;
@@ -139,5 +140,37 @@ class DataAccessAuthorizationHelperImplTest {
         });
 
         verifyNoInteractions(dataPermissionEngine);
+    }
+
+    @Test
+    @DisplayName("a root SELF plan does not restrict an independent shared resource")
+    void rootSelfPlanUsesIndependentResourcePolicy() {
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, SHARED_RESOURCE_CODE, "read", USER_ID))
+                .thenReturn("");
+
+        MetaContext.runWithCommandPermitPlan("SELF", null, RESOURCE_CODE, "q-1", () -> {
+            assertThat(helper.authorizeList(RESOURCE_CODE, "read").filterClause())
+                    .isEqualTo("created_by = 20");
+            assertThat(helper.authorizeList(SHARED_RESOURCE_CODE, "read").filterClause())
+                    .as("the independent resource's no-row-filter policy must win")
+                    .isEmpty();
+        });
+
+        verify(dataPermissionEngine)
+                .buildRowFilter(TENANT_ID, SHARED_RESOURCE_CODE, "read", USER_ID);
+    }
+
+    @Test
+    @DisplayName("a root ALL plan does not widen an independent restricted resource")
+    void rootAllPlanUsesIndependentRestrictedPolicy() {
+        when(dataPermissionEngine.buildRowFilter(TENANT_ID, SHARED_RESOURCE_CODE, "read", USER_ID))
+                .thenReturn("AND created_by = 20");
+
+        MetaContext.runWithCommandPermitPlan("ALL", null, RESOURCE_CODE, "q-1", () ->
+                assertThat(helper.authorizeList(SHARED_RESOURCE_CODE, "read").filterClause())
+                        .isEqualTo("created_by = 20"));
+
+        verify(dataPermissionEngine)
+                .buildRowFilter(TENANT_ID, SHARED_RESOURCE_CODE, "read", USER_ID);
     }
 }

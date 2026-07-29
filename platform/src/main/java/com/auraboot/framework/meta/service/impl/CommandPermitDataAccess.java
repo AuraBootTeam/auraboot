@@ -7,10 +7,10 @@ import java.util.Map;
 /**
  * Executes the row-scope grade already decided by the command permit plan.
  *
- * <p>This class deliberately contains no policy lookup. When a command permit scope is present,
- * consulting Rule Center, the row-policy engine, or data-scope again would turn execution back into
- * a second authorization decision. Direct non-command calls receive {@code null} from
- * {@link #rowFilter(Long)} and keep the legacy policy path.</p>
+ * <p>This class deliberately contains no policy lookup. A command plan's grade is authoritative for
+ * its target model only; another model touched by the handler receives {@code null} and evaluates
+ * its own policy through the normal data-access path. The legacy explicit global bridge has no
+ * target model and intentionally retains its process-wide scope semantics.</p>
  */
 public final class CommandPermitDataAccess {
 
@@ -19,7 +19,18 @@ public final class CommandPermitDataAccess {
 
     /** Whether the authoritative plan grade permits this already-loaded record. */
     public static boolean permitsRecord(Map<String, Object> record, Long userId) {
-        String scope = MetaContext.getCommandPermitScope();
+        return permitsRecordForScope(MetaContext.getCommandPermitScope(), record, userId);
+    }
+
+    /** Whether the command plan grade for {@code modelCode} permits this already-loaded record. */
+    public static boolean permitsRecord(String modelCode, Map<String, Object> record, Long userId) {
+        return permitsRecordForScope(MetaContext.getCommandPermitScopeFor(modelCode), record, userId);
+    }
+
+    private static boolean permitsRecordForScope(
+            String scope,
+            Map<String, Object> record,
+            Long userId) {
         if ("ALL".equals(scope)) {
             return true;
         }
@@ -35,7 +46,18 @@ public final class CommandPermitDataAccess {
      * and the caller must use the legacy engine.
      */
     public static String rowFilter(Long userId) {
-        String scope = MetaContext.getCommandPermitScope();
+        return rowFilterForScope(MetaContext.getCommandPermitScope(), userId);
+    }
+
+    /**
+     * SQL fragment for the command plan grade when it applies to {@code modelCode}, or {@code null}
+     * when that model must use its own policy.
+     */
+    public static String rowFilter(String modelCode, Long userId) {
+        return rowFilterForScope(MetaContext.getCommandPermitScopeFor(modelCode), userId);
+    }
+
+    private static String rowFilterForScope(String scope, Long userId) {
         if (scope == null) {
             return null;
         }
