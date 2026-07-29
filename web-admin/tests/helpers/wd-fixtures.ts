@@ -587,7 +587,7 @@ export async function loginViaUI(page: Page, email: string, password: string): P
   try {
     const loginResp = await page.request.post(`${BASE_URL}/login`, {
       form: {
-        email,
+        identifier: email,
         password,
         remember: 'on',
         redirectTo: '/',
@@ -648,9 +648,11 @@ export async function loginViaUI(page: Page, email: string, password: string): P
   }
 
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
+  await page
+    .locator('[data-testid="login-page-root"][data-hydrated="true"]')
+    .waitFor({ state: 'attached', timeout: 10_000 });
   const emailInput = page.locator('input#identifier, input#email').first();
   await emailInput.waitFor({ state: 'visible', timeout: 10_000 });
-  // Click to focus before fill — prevents React hydration from discarding the value.
   await emailInput.click();
   await emailInput.fill(email);
 
