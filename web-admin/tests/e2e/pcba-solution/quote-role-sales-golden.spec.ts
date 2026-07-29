@@ -687,9 +687,9 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await expect(factoredRow).toBeVisible({ timeout: 15_000 });
         const waterfallTable = page.locator('table').filter({ has: factoredRow }).first();
         await expect(waterfallTable).toBeVisible();
-        const headers = (await waterfallTable.locator('thead th').allInnerTexts()).map((text) =>
-          text.replace(/\s+/g, ' ').trim(),
-        );
+        const headers = (
+          await waterfallTable.locator('thead th, thead [role="columnheader"]').allInnerTexts()
+        ).map((text) => text.replace(/\s+/g, ' ').trim());
         const yunhanColumn = headers.findIndex((text) =>
           /云汉\(系数后\)|Yunhan \(After Factor\)/.test(text),
         );
@@ -718,9 +718,7 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await expect(yunhanCandidate).toContainText('0.0171');
         await expect(yunhanCandidate).toContainText('当前');
         await expect(yunhanCandidate).toContainText('0.0126');
-        const yunhanLadder = page.getByTestId(
-          `review-drawer-candidate-${yunhanEvidenceId}-ladder`,
-        );
+        const yunhanLadder = page.getByTestId(`review-drawer-candidate-${yunhanEvidenceId}-ladder`);
         await expect(yunhanLadder).toBeVisible();
         await yunhanLadder.scrollIntoViewIfNeeded();
         await yunhanLadder.screenshot({
@@ -747,9 +745,15 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
       await expect(page.getByTestId('form-dialog')).toBeVisible({ timeout: 15_000 });
       await fillDialogField(page, 'unitPrice', String(MANUAL_UNIT_PRICE));
       await fillDialogField(page, 'supplierName', MANUAL_SUPPLIER);
+      await fillDialogField(page, 'sourceNote', 'smoke sales golden');
       await fillDialogField(page, 'reason', MANUAL_REASON);
       await fillDialogField(page, 'validUntil', MANUAL_VALID_UNTIL);
-      await fillDialogField(page, 'sourceNote', 'smoke sales golden');
+      await expect(page.getByTestId('form-dialog-field-unitPrice')).toHaveValue(
+        String(MANUAL_UNIT_PRICE),
+      );
+      await expect(page.getByTestId('form-dialog-field-validUntil')).toHaveValue(
+        MANUAL_VALID_UNTIL,
+      );
       const manualResponsePromise = page.waitForResponse(
         (response) =>
           response
@@ -906,8 +910,10 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         unitCost: refreshedUnitCost,
       });
       await page.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
-      await page.getByTestId(`table-row-${lineId}`).screenshot({
+      await expect(page.getByTestId(`table-row-${lineId}`)).toBeVisible({ timeout: 20_000 });
+      await page.screenshot({
         path: testInfo.outputPath('ordinary-sales-reprice-result.png'),
+        fullPage: true,
       });
 
       // 8. A second sales employee has the same capability atoms but cannot read any record
