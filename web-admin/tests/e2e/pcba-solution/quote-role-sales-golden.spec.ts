@@ -685,18 +685,31 @@ test.describe('Quote full chain deep golden as qo_sales @smoke', () => {
         await page.getByRole('tab', { name: /BOM价格|BOM Price/ }).click();
         const factoredRow = page.getByTestId(`table-row-${lineId}`);
         await expect(factoredRow).toBeVisible({ timeout: 15_000 });
-        const waterfallTable = page.locator('table').filter({ has: factoredRow }).first();
-        await expect(waterfallTable).toBeVisible();
-        const headers = (
-          await waterfallTable.locator('thead th, thead [role="columnheader"]').allInnerTexts()
-        ).map((text) => text.replace(/\s+/g, ' ').trim());
-        const yunhanColumn = headers.findIndex((text) =>
-          /云汉\(系数后\)|Yunhan \(After Factor\)/.test(text),
-        );
-        expect(
-          yunhanColumn,
-          `waterfall headers: ${JSON.stringify(headers)}`,
-        ).toBeGreaterThanOrEqual(0);
+        // A remote tab can restore its cached row before the table header finishes
+        // hydrating. Bind to this row's exact table and wait for its first header so
+        // we neither read an empty header list nor pick headers from a mounted hidden tab.
+        const waterfallTable = factoredRow.locator('xpath=ancestor::table[1]');
+        const waterfallHeaders = waterfallTable.locator('thead th, thead [role="columnheader"]');
+        let headers: string[] = [];
+        let yunhanColumn = -1;
+        await expect
+          .poll(
+            async () => {
+              headers = (await waterfallHeaders.allInnerTexts()).map((text) =>
+                text.replace(/\s+/g, ' ').trim(),
+              );
+              yunhanColumn = headers.findIndex((text) =>
+                /云汉\(系数后\)|Yunhan \(After Factor\)/.test(text),
+              );
+              return yunhanColumn;
+            },
+            {
+              timeout: 20_000,
+              intervals: [250, 500, 1000],
+              message: `waterfall headers hydrate: ${JSON.stringify(headers)}`,
+            },
+          )
+          .toBeGreaterThanOrEqual(0);
         await expect(factoredRow.locator('td, [role="cell"]').nth(yunhanColumn)).toContainText(
           '0.0171',
         );
